@@ -53,7 +53,16 @@ export interface TextColumn {
   placeholder?: string;
 }
 
-export type ColumnSpec = StaticColumn | SingleSelectColumn | MultiSelectColumn | TextColumn;
+export interface AvatarColumn {
+  id: string;
+  kind: 'avatar';
+  label: string;
+  field: string;
+  size?: number;
+  fallbackField?: string;
+}
+
+export type ColumnSpec = StaticColumn | SingleSelectColumn | MultiSelectColumn | TextColumn | AvatarColumn;
 
 export interface ItemRow {
   id: string;
@@ -132,15 +141,17 @@ function isEmptyValue(value: CellValue | undefined): boolean {
   return value.length === 0;
 }
 
-function editableColumns(columns: ColumnSpec[]): Exclude<ColumnSpec, StaticColumn>[] {
-  return columns.filter((c) => c.kind !== 'static') as Exclude<ColumnSpec, StaticColumn>[];
+type DisplayOnlyColumn = StaticColumn | AvatarColumn;
+
+function editableColumns(columns: ColumnSpec[]): Exclude<ColumnSpec, DisplayOnlyColumn>[] {
+  return columns.filter((c) => c.kind !== 'static' && c.kind !== 'avatar') as Exclude<ColumnSpec, DisplayOnlyColumn>[];
 }
 
 function hasOption(options: SelectOption[], id: unknown): boolean {
   return typeof id === 'string' && options.some((o) => o.id === id);
 }
 
-function initialCellValue(column: Exclude<ColumnSpec, StaticColumn>, item: ItemRow): CellValue {
+function initialCellValue(column: Exclude<ColumnSpec, DisplayOnlyColumn>, item: ItemRow): CellValue {
   const suggested = item.suggestion?.[column.id];
   if (column.kind === 'single-select') {
     return hasOption(column.options, suggested) ? (suggested as string) : (column.default ?? '');
@@ -322,6 +333,18 @@ function Cell({ column, item, itemLabel, value, invalidSuggestion, disabled, onC
     return <StaticCell field={item[column.field]} href={item.href} link={column.link === true} />;
   }
 
+  if (column.kind === 'avatar') {
+    const url = item[column.field];
+    const fallback = column.fallbackField !== undefined ? item[column.fallbackField] : undefined;
+    return (
+      <AvatarCell
+        url={typeof url === 'string' ? url : undefined}
+        fallback={typeof fallback === 'string' ? fallback : undefined}
+        size={column.size}
+      />
+    );
+  }
+
   if (column.kind === 'text') {
     return (
       <>
@@ -430,6 +453,37 @@ function StaticCell({ field, href, link }: { field: unknown; href: string | unde
     );
   }
   return <span className="font-medium">{text}</span>;
+}
+
+function deriveInitials(name: string): string {
+  const words = name.trim().split(/\s+/);
+  const first = words[0]?.[0] ?? '';
+  const last = words.length > 1 ? words[words.length - 1]![0] ?? '' : '';
+  return (first + last).toUpperCase();
+}
+
+function AvatarCell({ url, fallback, size = 32 }: { url?: string; fallback?: string; size?: number }) {
+  if (url !== undefined && url.length > 0) {
+    return (
+      <img
+        src={url}
+        alt={fallback ?? ''}
+        width={size}
+        height={size}
+        className="rounded-full object-cover"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  const initials = fallback !== undefined ? deriveInitials(fallback) : '?';
+  return (
+    <div
+      className="inline-flex items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground"
+      style={{ width: size, height: size }}
+    >
+      {initials}
+    </div>
+  );
 }
 
 function OptionKindHint({ option }: { option: SelectOption }) {

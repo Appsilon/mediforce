@@ -58,7 +58,7 @@
       "agent": {
         "image": "mediforce-golden-image:latest",
         "runtime": "javascript",
-        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const apiKey = process.env.PLATFORM_API_KEY;\n  const baseUrl = process.env.APP_BASE_URL;\n  if (!apiKey || !baseUrl) { console.error('PLATFORM_API_KEY or APP_BASE_URL missing'); process.exit(1); }\n  const ns = input.namespace || 'mediforce';\n  const res = await fetch(`${baseUrl}/api/users/members?handle=${encodeURIComponent(ns)}`, {\n    headers: { 'X-Api-Key': apiKey, Accept: 'application/json' },\n  });\n  if (!res.ok) { console.error(`Failed to fetch members: ${res.status}`); process.exit(1); }\n  const data = await res.json();\n  const options = (data.members || []).map(m => ({\n    id: m.uid,\n    label: m.displayName || m.email || m.uid,\n    email: m.email || '',\n    role: m.role || 'member',\n  }));\n  writeFileSync('/output/result.json', JSON.stringify({ options }));\n  console.log(`Fetched ${options.length} member(s)`);\n} catch (err) {\n  console.error('fetch_members crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const apiKey = process.env.PLATFORM_API_KEY;\n  const baseUrl = process.env.APP_BASE_URL;\n  if (!apiKey || !baseUrl) { console.error('PLATFORM_API_KEY or APP_BASE_URL missing'); process.exit(1); }\n  const ns = input.namespace || 'mediforce';\n  const res = await fetch(`${baseUrl}/api/users/members?handle=${encodeURIComponent(ns)}`, {\n    headers: { 'X-Api-Key': apiKey, Accept: 'application/json' },\n  });\n  if (!res.ok) { console.error(`Failed to fetch members: ${res.status}`); process.exit(1); }\n  const data = await res.json();\n  const options = (data.members || []).map(m => ({\n    id: m.uid,\n    label: m.displayName || m.email || m.uid,\n    email: m.email || '',\n    role: m.role || 'member',\n    avatarUrl: m.avatarUrl || '',\n  }));\n  writeFileSync('/output/result.json', JSON.stringify({ options }));\n  console.log(`Fetched ${options.length} member(s)`);\n} catch (err) {\n  console.error('fetch_members crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
       }
     },
     {
@@ -74,6 +74,7 @@
           "submitLabel": "Confirm selection",
           "emptyMessage": "No members found in the organization.",
           "columns": [
+            { "id": "avatar", "kind": "avatar", "label": "", "field": "avatarUrl", "fallbackField": "label", "size": 32 },
             { "id": "name", "kind": "static", "label": "Name", "field": "label" },
             { "id": "email", "kind": "static", "label": "Email", "field": "email" },
             { "id": "role", "kind": "static", "label": "Role", "field": "role" },
