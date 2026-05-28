@@ -43,3 +43,19 @@ services:
   postgres:
     volumes:
       - /var/lib/mediforce/postgres-data:/var/lib/postgresql/data
+    # ADR-0001 — staging-only planner tuning. The staging host has only
+    # ~3.7GB total RAM shared across postgres + platform-ui +
+    # container-worker + agent-worker + caddy + redis + stunnel. Postgres
+    # ships with `effective_cache_size = 4GB`, which over-estimates the OS
+    # page cache available on this box and biases the planner toward plans
+    # that assume cached data (e.g. index scans that miss and re-fetch
+    # from disk). 1.5GB is realistic for OS cache headroom on staging
+    # after the other containers' working sets. `shared_buffers` stays at
+    # the default 128MB — fine for dormant + early-cutover load; revisit
+    # once we have real query patterns post-Phase D. Override here
+    # (staging overlay) rather than in docker-compose.prod.yml so
+    # better-provisioned prod hosts keep the more generous defaults.
+    command:
+      - postgres
+      - -c
+      - effective_cache_size=1536MB
