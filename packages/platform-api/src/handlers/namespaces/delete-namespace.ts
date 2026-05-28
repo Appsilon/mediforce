@@ -7,14 +7,7 @@ import type {
 } from '../../contract/namespaces.js';
 
 /**
- * DELETE /api/namespaces/:handle — cascade delete. Owner only.
- *
- * Deletes every member doc + arrayRemoves the handle from each member's
- * `users/{uid}.organizations`, then deletes the namespace doc itself.
- * Atomicity: Firestore batch (cap ~249 members per workspace; see
- * `NamespaceRepository.deleteNamespaceCascade` docstring).
- *
- * Emits `namespace.deleted` per ADR-0005 §7.
+ * Owner-only cascade delete via `NamespaceRepository.deleteNamespaceCascade`.
  */
 export async function deleteNamespace(
   input: DeleteNamespaceInput,

@@ -219,6 +219,7 @@ export type {
   CronTriggerStateRepository,
   ToolCatalogRepository,
   NamespaceRepository,
+  NamespaceUpdates,
   NamespaceSecretsRepository,
   UserProfile,
   UserProfileRepository,

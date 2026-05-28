@@ -7,14 +7,8 @@ import type {
 } from '../../contract/namespaces.js';
 
 /**
- * PATCH /api/namespaces/:handle/members/:uid — flip member ↔ admin role.
- * Owner only (`assertCallerIsNamespaceOwner`). Returns the post-mutation
- * member entity-echo per ADR-0005 §5. Emits `namespace.member_role_changed`
- * per ADR-0005 §7.
- *
- * Promoting / demoting the workspace owner through this endpoint is
- * rejected — there is no transfer-ownership flow yet, and silently flipping
- * the owner to admin would orphan the workspace.
+ * Owner flips a member between `admin` and `member`. Changing the owner's
+ * own role is rejected — no transfer-ownership flow yet.
  */
 export async function updateNamespaceMemberRole(
   input: UpdateNamespaceMemberRoleInput,

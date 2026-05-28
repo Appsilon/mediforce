@@ -3,15 +3,14 @@ import type {
   NamespaceMember,
   NamespaceMembership,
   NamespaceRepository,
+  NamespaceUpdates,
 } from '@mediforce/platform-core';
 
 /**
- * Shared test double for `NamespaceRepository` used by the new PR4.5 handler
- * tests. Each method mirrors the semantics documented in the interface:
- * `createNamespaceWithOwner`, `removeMemberWithOrganizations`,
- * `deleteNamespaceCascade` keep the `users/{uid}.organizations` denormalised
- * array consistent with the member-subcollection so handler tests can
- * observe both sides of an "atomic" mutation.
+ * In-memory `NamespaceRepository` shared across handler tests. Mirrors the
+ * Firestore impl's atomic mutations so tests can observe both sides of a
+ * member remove or cascade delete (member subcollection + the denormalised
+ * `users/{uid}.organizations` array).
  */
 export class InMemoryNamespaceRepo implements NamespaceRepository {
   readonly namespaces = new Map<string, Namespace>();
@@ -39,18 +38,19 @@ export class InMemoryNamespaceRepo implements NamespaceRepository {
     this.namespaces.set(input.namespace.handle, input.namespace);
     this.seedMember(input.namespace.handle, input.ownerMember);
   }
-  async updateNamespace(handle: string, updates: Partial<Namespace>): Promise<void> {
+  async updateNamespace(handle: string, updates: NamespaceUpdates): Promise<void> {
     const existing = this.namespaces.get(handle);
     if (existing === undefined) return;
-    const merged: Namespace = { ...existing };
-    for (const [key, value] of Object.entries(updates) as Array<[keyof Namespace, unknown]>) {
-      if (value === undefined) {
-        delete (merged as Record<string, unknown>)[key];
+    const merged: Record<string, unknown> = { ...existing };
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === undefined) continue;
+      if (value === null) {
+        delete merged[key];
       } else {
-        (merged as Record<string, unknown>)[key] = value;
+        merged[key] = value;
       }
     }
-    this.namespaces.set(handle, merged);
+    this.namespaces.set(handle, merged as Namespace);
   }
   async getNamespacesByUser(): Promise<Namespace[]> {
     return [];

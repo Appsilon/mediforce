@@ -5,6 +5,7 @@ import {
   type NamespaceMember,
   type NamespaceMembership,
   type NamespaceRepository,
+  type NamespaceUpdates,
 } from '@mediforce/platform-core';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 
@@ -54,11 +55,16 @@ export class FirestoreNamespaceRepository implements NamespaceRepository {
     await batch.commit();
   }
 
-  async updateNamespace(handle: string, updates: Partial<Namespace>): Promise<void> {
+  async updateNamespace(handle: string, updates: NamespaceUpdates): Promise<void> {
+    const payload: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === undefined) continue;
+      payload[key] = value === null ? FieldValue.delete() : value;
+    }
     await this.db
       .collection(this.namespacesCollection)
       .doc(handle)
-      .update(updates);
+      .update(payload);
   }
 
   async getNamespacesByUser(uid: string): Promise<Namespace[]> {

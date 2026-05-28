@@ -15,7 +15,7 @@ export type {
 export type { CoworkSessionRepository } from './cowork-session-repository.js';
 export type { CronTriggerStateRepository } from './cron-trigger-state-repository.js';
 export type { ToolCatalogRepository } from './tool-catalog-repository.js';
-export type { NamespaceRepository } from './namespace-repository.js';
+export type { NamespaceRepository, NamespaceUpdates } from './namespace-repository.js';
 export type { NamespaceSecretsRepository } from './namespace-secrets-repository.js';
 export type { UserProfile, UserProfileRepository } from './user-profile-repository.js';
 export type { WorkflowSecretsRepository } from './workflow-secrets-repository.js';

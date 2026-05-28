@@ -361,28 +361,35 @@ export default function WorkspaceConfigPage() {
   const leaveNamespace = useLeaveNamespace();
   const deleteNamespace = useDeleteNamespace();
 
+  // Surface fail-cases for every workspace-altering action via one banner —
+  // member removal, role flips, leave, delete. Optimistic snapshot rollback
+  // hides the underlying error; without this banner an admin would see the
+  // role un-flip and not know why.
+  const [dangerError, setDangerError] = useState<string | null>(null);
+
   async function handleRemoveMember(memberUid: string) {
+    setDangerError(null);
     try {
       await removeMember.mutateAsync({ handle, uid: memberUid });
       void refreshMembers();
-    } catch {
-      // Hook restored the optimistic snapshot.
+    } catch (err: unknown) {
+      setDangerError(err instanceof Error ? err.message : 'Failed to remove member.');
     }
   }
 
   async function handleToggleRole(memberUid: string, currentRole: string) {
+    setDangerError(null);
     const nextRole: 'admin' | 'member' = currentRole === 'admin' ? 'member' : 'admin';
     try {
       await updateMemberRole.mutateAsync({ handle, uid: memberUid, role: nextRole });
       void refreshMembers();
-    } catch {
-      // Hook restored the optimistic snapshot.
+    } catch (err: unknown) {
+      setDangerError(err instanceof Error ? err.message : 'Failed to update member role.');
     }
   }
 
   // ── Danger zone ────────────────────────────────────────────────────────────
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [dangerError, setDangerError] = useState<string | null>(null);
 
   async function handleDeleteWorkspace() {
     if (!confirmDelete) {

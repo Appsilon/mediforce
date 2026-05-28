@@ -6,15 +6,8 @@ import type {
 } from '../../contract/users.js';
 
 /**
- * Acknowledge a forced password change for the caller's own account. Flips
- * `users/{uid}.mustChangePassword` to `false` via `UserProfileRepository`
- * (which merge-writes the doc, creating it if absent). Emits
- * `user.password_change_acknowledged` per ADR-0005 §7.
- *
- * apiKey callers (CLI server-to-server) MUST name the target `uid`. User
- * callers always operate on their own uid; passing a non-matching `uid`
- * returns 403 — operators cannot clear someone else's flag through the
- * authenticated UI path.
+ * Acknowledge a forced password change. User callers always operate on
+ * their own uid; apiKey callers must pass `uid` explicitly.
  */
 export async function clearMustChangePassword(
   input: ClearMustChangePasswordInput,

@@ -1,5 +1,16 @@
 import type { Namespace, NamespaceMember, NamespaceMembership } from '../schemas/index.js';
 
+/**
+ * Patch shape for `updateNamespace`. `null` on an optional field means
+ * "clear this field"; `undefined` means "leave unchanged".
+ */
+export interface NamespaceUpdates {
+  readonly displayName?: string;
+  readonly icon?: string | null;
+  readonly bio?: string | null;
+  readonly avatarUrl?: string | null;
+}
+
 export interface NamespaceRepository {
   getNamespace(handle: string): Promise<Namespace | null>;
   createNamespace(namespace: Namespace): Promise<void>;
@@ -15,7 +26,14 @@ export interface NamespaceRepository {
     namespace: Namespace;
     ownerMember: NamespaceMember;
   }): Promise<void>;
-  updateNamespace(handle: string, updates: Partial<Namespace>): Promise<void>;
+  /**
+   * Patch namespace fields. Any value passed as `null` clears the field
+   * (`FieldValue.delete()` under Firestore; key deletion under in-memory).
+   * Undefined values are ignored — only explicitly-provided keys are
+   * touched. Pre-headless, the UI used `deleteField()` directly; this null
+   * sentinel preserves that semantics through the headless boundary.
+   */
+  updateNamespace(handle: string, updates: NamespaceUpdates): Promise<void>;
   getNamespacesByUser(uid: string): Promise<Namespace[]>;
   addMember(handle: string, member: NamespaceMember): Promise<void>;
   removeMember(handle: string, uid: string): Promise<void>;

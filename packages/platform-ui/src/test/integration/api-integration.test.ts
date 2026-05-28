@@ -46,6 +46,7 @@ import type {
   NamespaceMember,
   NamespaceMembership,
   NamespaceRepository,
+  NamespaceUpdates,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { Mediforce, ApiError } from '@mediforce/platform-api/client';
@@ -387,9 +388,8 @@ describe('Mediforce client ↔ route-adapter ↔ createNamespace (in-process)', 
   });
 });
 
-// Phase 4 PR4.5: PATCH /api/namespaces/:handle round-trip — owner edits
-// metadata; client sees the entity-echo back; firestore-shaped repo mirror
-// reflects the write.
+// PATCH /api/namespaces/:handle round-trip — owner edits metadata; client
+// sees the entity-echo back; in-memory namespace repo reflects the write.
 describe('Mediforce client ↔ route-adapter ↔ updateNamespace (in-process)', () => {
   let namespaceRepo: InMemoryNamespaceRepo;
   let auditRepo: InMemoryAuditRepository;
@@ -459,8 +459,8 @@ describe('Mediforce client ↔ route-adapter ↔ updateNamespace (in-process)', 
   });
 });
 
-// Phase 4 PR4.5: POST /api/namespaces/:handle/leave round-trip — owner
-// blocked → 409 precondition_failed; member succeeds.
+// POST /api/namespaces/:handle/leave round-trip — owner blocked → 409
+// precondition_failed; member succeeds.
 describe('Mediforce client ↔ route-adapter ↔ leaveNamespace (in-process)', () => {
   let namespaceRepo: InMemoryNamespaceRepo;
   let auditRepo: InMemoryAuditRepository;
@@ -563,11 +563,19 @@ class InMemoryNamespaceRepo implements NamespaceRepository {
       this.userOrganizations.set(input.ownerMember.uid, [...orgs, input.namespace.handle]);
     }
   }
-  async updateNamespace(handle: string, updates: Partial<Namespace>): Promise<void> {
+  async updateNamespace(handle: string, updates: NamespaceUpdates): Promise<void> {
     const existing = this.namespaces.get(handle);
-    if (existing !== undefined) {
-      this.namespaces.set(handle, { ...existing, ...updates });
+    if (existing === undefined) return;
+    const merged: Record<string, unknown> = { ...existing };
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === undefined) continue;
+      if (value === null) {
+        delete merged[key];
+      } else {
+        merged[key] = value;
+      }
     }
+    this.namespaces.set(handle, merged as Namespace);
   }
   async getNamespacesByUser(): Promise<Namespace[]> {
     return [];

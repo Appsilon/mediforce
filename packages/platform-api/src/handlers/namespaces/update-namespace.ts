@@ -1,4 +1,4 @@
-import type { Namespace } from '@mediforce/platform-core';
+import type { NamespaceUpdates } from '@mediforce/platform-core';
 import { assertCallerIsNamespaceAdmin } from '../../auth.js';
 import { NotFoundError } from '../../errors.js';
 import type { CallerScope } from '../../repositories/index.js';
@@ -8,19 +8,8 @@ import type {
 } from '../../contract/namespaces.js';
 
 /**
- * PATCH /api/namespaces/:handle — edit workspace `displayName`, `bio`,
- * `icon`. Owner/admin only (`assertCallerIsNamespaceAdmin`). Returns the
- * post-update entity-echo per ADR-0005 §5. Emits `namespace.updated` per
- * ADR-0005 §7.
- *
- * `bio: null` clears the field; omitting it leaves it unchanged. We
- * normalise to `undefined` for the storage write so the repo sees a Partial
- * with only the set fields. The Firestore impl uses doc().update() which
- * supports `FieldValue.delete()` for true field removal; for Phase 4 the
- * UI's existing flow (delete-field on empty bio) is preserved by passing
- * `bio: undefined` here and relying on the storage layer's merge semantics
- * — clearing the field is a no-op vs leaving it set today, which matches
- * the pre-migration behaviour.
+ * Edit workspace `displayName`, `bio`, `icon`. Owner/admin only.
+ * `bio: null` clears the field via the repo's null-sentinel semantics.
  */
 export async function updateNamespace(
   input: UpdateNamespaceInput,
@@ -33,12 +22,11 @@ export async function updateNamespace(
     throw new NotFoundError(`Namespace "${input.handle}" not found`);
   }
 
-  const updates: Partial<Namespace> = {};
-  if (input.displayName !== undefined) updates.displayName = input.displayName;
-  if (input.icon !== undefined) updates.icon = input.icon;
-  if (input.bio !== undefined) {
-    updates.bio = input.bio === null ? undefined : input.bio;
-  }
+  const updates: NamespaceUpdates = {
+    ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
+    ...(input.icon !== undefined ? { icon: input.icon } : {}),
+    ...(input.bio !== undefined ? { bio: input.bio } : {}),
+  };
 
   await scope.workspaces.updateNamespace(input.handle, updates);
 

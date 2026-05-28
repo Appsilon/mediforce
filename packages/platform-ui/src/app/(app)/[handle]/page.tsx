@@ -326,15 +326,9 @@ function InlineEditableBio({
 // ---------------------------------------------------------------------------
 
 /**
- * Show the workspaces the signed-in user belongs to — only when they are
- * viewing their own personal namespace. Reads from `useUserMe()`'s cache
- * (selector), so the panel mirrors the sidebar switcher and stays free of
- * any per-namespace round trips.
- *
- * Previously the panel walked `users/{linkedUserId}.organizations` via
- * Firestore for any personal namespace, including someone else's. The
- * fan-out belongs in a dedicated endpoint, not the workspace home — until
- * one exists, the panel is owner-only.
+ * Show org workspaces the signed-in user belongs to — only when viewing
+ * their own personal namespace. Owner-only until a public "workspaces of
+ * uid X" endpoint exists.
  */
 function UserWorkspaces({ namespace }: { namespace: Namespace }) {
   const { data } = useUserMe();

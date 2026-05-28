@@ -57,7 +57,7 @@ describe('leaveNamespace handler', () => {
     await expect(leaveNamespace({ handle: 'acme' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  it('cannot leave a personal namespace', async () => {
+  it('cannot leave a personal namespace (caught by owner guard)', async () => {
     namespaceRepo.seedNamespace({
       handle: 'marek',
       type: 'personal',
@@ -72,6 +72,8 @@ describe('leaveNamespace handler', () => {
       caller: userCaller('uid-marek', ['marek'], new Map([['marek', 'owner']])),
     });
 
+    // Personal namespace owner is the linked user — so the owner-can't-leave
+    // guard rejects it. One code path for both cases.
     await expect(leaveNamespace({ handle: 'marek' }, scope)).rejects.toBeInstanceOf(
       PreconditionFailedError,
     );

@@ -7,15 +7,8 @@ import type {
 } from '../../contract/namespaces.js';
 
 /**
- * DELETE /api/namespaces/:handle/members/:uid — owner/admin removes member.
- *
- * Atomic: deletes the member subcollection doc AND arrayRemoves the handle
- * from `users/{uid}.organizations`. Owner removal is blocked at this
- * endpoint — delete the workspace or have ownership transferred first.
- * Self-removal goes through POST /api/namespaces/:handle/leave instead so
- * UX gets a distinct precondition message for the owner case.
- *
- * Emits `namespace.member_removed` per ADR-0005 §7.
+ * Owner/admin removes a member. Removing the workspace owner is blocked —
+ * delete the workspace or transfer ownership first.
  */
 export async function removeNamespaceMember(
   input: RemoveNamespaceMemberInput,

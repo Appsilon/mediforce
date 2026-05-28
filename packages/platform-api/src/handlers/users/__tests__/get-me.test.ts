@@ -4,6 +4,7 @@ import type {
   NamespaceMember,
   NamespaceMembership,
   NamespaceRepository,
+  NamespaceUpdates,
   UserDirectoryService,
 } from '@mediforce/platform-core';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
@@ -45,10 +46,19 @@ class InMemoryNamespaceRepository implements NamespaceRepository {
     this.namespaces.set(input.namespace.handle, input.namespace);
     this.setMembership(input.namespace.handle, input.ownerMember);
   }
-  async updateNamespace(handle: string, updates: Partial<Namespace>): Promise<void> {
+  async updateNamespace(handle: string, updates: NamespaceUpdates): Promise<void> {
     const existing = this.namespaces.get(handle);
     if (existing === undefined) return;
-    this.namespaces.set(handle, { ...existing, ...updates });
+    const merged: Record<string, unknown> = { ...existing };
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === undefined) continue;
+      if (value === null) {
+        delete merged[key];
+      } else {
+        merged[key] = value;
+      }
+    }
+    this.namespaces.set(handle, merged as Namespace);
   }
   async getNamespacesByUser(uid: string): Promise<Namespace[]> {
     const out: Namespace[] = [];
