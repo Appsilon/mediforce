@@ -51,6 +51,16 @@ export class FirestoreProcessInstanceRepository
       : null;
   }
 
+  async getNamespaceById(instanceId: string): Promise<string | null> {
+    const snapshot = await this.db
+      .collection(this.collectionName)
+      .doc(instanceId)
+      .get();
+    if (!snapshot.exists) return null;
+    const ns = (snapshot.data() as { namespace?: unknown }).namespace;
+    return typeof ns === 'string' && ns.length > 0 ? ns : null;
+  }
+
   async update(
     instanceId: string,
     updates: Partial<ProcessInstance>,

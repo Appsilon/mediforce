@@ -31,9 +31,9 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
   ): Promise<HumanTask | null> {
     const task = await this.getById(taskId);
     if (task === null) return null;
-    const parent = await this.parents.getById(task.processInstanceId);
-    if (!parent || typeof parent.namespace !== 'string') return null;
-    return allowed.includes(parent.namespace) ? task : null;
+    const parentNs = await this.parents.getNamespaceById(task.processInstanceId);
+    if (parentNs === null) return null;
+    return allowed.includes(parentNs) ? task : null;
   }
 
   async getByRoleAll(role: string): Promise<HumanTask[]> {
@@ -67,9 +67,8 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
     instanceId: string,
     allowed: readonly string[],
   ): Promise<HumanTask[]> {
-    const parent = await this.parents.getById(instanceId);
-    if (!parent || typeof parent.namespace !== 'string') return [];
-    if (!allowed.includes(parent.namespace)) return [];
+    const parentNs = await this.parents.getNamespaceById(instanceId);
+    if (parentNs === null || !allowed.includes(parentNs)) return [];
     return this.getByInstanceId(instanceId);
   }
 
@@ -111,10 +110,12 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
     instanceIds: readonly string[],
     allowed: readonly string[],
   ): Promise<HumanTask[]> {
-    const parents = await Promise.all(instanceIds.map((id) => this.parents.getById(id)));
+    const namespaces = await Promise.all(
+      instanceIds.map((id) => this.parents.getNamespaceById(id)),
+    );
     const allowedIds = instanceIds.filter((_, i) => {
-      const parent = parents[i];
-      return parent !== null && typeof parent.namespace === 'string' && allowed.includes(parent.namespace);
+      const ns = namespaces[i];
+      return ns !== null && allowed.includes(ns);
     });
     return this.getByInstanceIdsAll(allowedIds);
   }

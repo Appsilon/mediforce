@@ -38,6 +38,15 @@ export interface ProcessInstanceRepository {
   getById(instanceId: string): Promise<ProcessInstance | null>;
   getByIdInNamespaces(instanceId: string, allowed: readonly string[]): Promise<ProcessInstance | null>;
 
+  /**
+   * Cheap namespace lookup for gate-only callers (e.g. the human-task
+   * wrapper resolving "which workspace does this task belong to?"). Reads
+   * only the `namespace` field — no per-row schema parse — so one legacy
+   * corrupt doc cannot 400 a fan-out call. Returns `null` if the doc is
+   * missing or has no namespace.
+   */
+  getNamespaceById(instanceId: string): Promise<string | null>;
+
   listAll(options: ListInstancesOptions): Promise<ProcessInstance[]>;
   listInNamespaces(allowed: readonly string[], options: ListInstancesOptions): Promise<ProcessInstance[]>;
 
