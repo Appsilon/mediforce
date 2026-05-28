@@ -2,5 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "outputDirectory": ".next",
-  "ignoreCommand": "[ \"$VERCEL_GIT_COMMIT_REF\" != \"main\" ] && exit 0; cd \"$(git rev-parse --show-toplevel)\" && git diff --quiet HEAD^ HEAD -- . ':!docs' ':!skills' ':!.claude' ':!agents' ':!.planning' ':!LICENSE' ':(exclude,glob)*.md'"
+  "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" != \"main\" ] && ! git log -1 --pretty=%B | grep -q '\\[preview\\]'; then exit 0; fi; cd \"$(git rev-parse --show-toplevel)\" && git diff --quiet HEAD^ HEAD -- . ':!docs' ':!skills' ':!.claude' ':!agents' ':!.planning' ':!LICENSE' ':(exclude,glob)*.md'"
 }

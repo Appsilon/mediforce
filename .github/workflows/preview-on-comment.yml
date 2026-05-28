@@ -5,7 +5,7 @@ on:
     types: [created]
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: read
   issues: write
 
@@ -39,10 +39,19 @@ jobs:
             --json headRefName -q .headRefName)
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
 
-      - name: Trigger Vercel deploy hook
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.ref }}
+          fetch-depth: 2
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push empty commit with [preview] marker
         run: |
-          curl -fsSL -X POST \
-            "${{ secrets.VERCEL_DEPLOY_HOOK }}?ref=${{ steps.pr.outputs.ref }}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit --allow-empty -m "ci: trigger preview deploy [preview]"
+          git push origin HEAD:${{ steps.pr.outputs.ref }}
 
       - name: Post status comment
         env:
@@ -50,4 +59,4 @@ jobs:
         run: |
           gh pr comment ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
-            --body "Preview deployment triggered for \`${{ steps.pr.outputs.ref }}\`. Check the Vercel check on this PR."
+            --body "Preview deploy triggered via empty commit on \`${{ steps.pr.outputs.ref }}\`. Vercel build will start shortly."
