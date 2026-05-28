@@ -77,7 +77,6 @@
             { "id": "avatar", "kind": "avatar", "label": "", "field": "avatarUrl", "fallbackField": "label", "size": 32 },
             { "id": "name", "kind": "static", "label": "Name", "field": "label" },
             { "id": "email", "kind": "static", "label": "Email", "field": "email" },
-            { "id": "role", "kind": "static", "label": "Role", "field": "role" },
             {
               "id": "include",
               "kind": "single-select",

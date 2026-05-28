@@ -462,19 +462,7 @@ export function deriveInitials(name: string): string {
   return (first + last).toUpperCase();
 }
 
-function AvatarCell({ url, fallback, size = 32 }: { url?: string; fallback?: string; size?: number }) {
-  if (url !== undefined && url.length > 0) {
-    return (
-      <img
-        src={url}
-        alt={fallback ?? ''}
-        width={size}
-        height={size}
-        className="rounded-full object-cover"
-        style={{ width: size, height: size }}
-      />
-    );
-  }
+function InitialsCircle({ fallback, size }: { fallback?: string; size: number }) {
   const initials = fallback !== undefined ? deriveInitials(fallback) : '?';
   return (
     <div
@@ -483,6 +471,25 @@ function AvatarCell({ url, fallback, size = 32 }: { url?: string; fallback?: str
     >
       {initials}
     </div>
+  );
+}
+
+function AvatarCell({ url, fallback, size = 32 }: { url?: string; fallback?: string; size?: number }) {
+  const [broken, setBroken] = React.useState(false);
+
+  if (broken || url === undefined || url.length === 0) {
+    return <InitialsCircle fallback={fallback} size={size} />;
+  }
+  return (
+    <img
+      src={url}
+      alt={fallback ?? ''}
+      width={size}
+      height={size}
+      className="rounded-full object-cover"
+      style={{ width: size, height: size }}
+      onError={() => setBroken(true)}
+    />
   );
 }
 
