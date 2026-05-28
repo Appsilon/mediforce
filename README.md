@@ -292,10 +292,13 @@ manually via ssh. See
 [`docs/staging-postgres-prep.md`](docs/staging-postgres-prep.md) for
 the one-off checklist.
 
-`platform-ui` runs Drizzle migrations on every container start via
-[`packages/platform-infra/scripts/migrate.mjs`](packages/platform-infra/scripts/migrate.mjs)
-(idempotent via the `drizzle.__drizzle_migrations` ledger). No separate
-migration step in the deploy pipeline.
+Drizzle migrations run in a short-lived `migrate` compose service (init
+container, see [`docker-compose.prod.yml`](docker-compose.prod.yml))
+before `platform-ui` starts. `platform-ui` waits via
+`depends_on: { migrate: { condition: service_completed_successfully } }`.
+Idempotent (drizzle's `__drizzle_migrations` ledger), exits 0 immediately
+when `STORAGE_BACKEND != postgres`. No separate migration step in the
+deploy pipeline.
 
 `STORAGE_BACKEND` defaults to `firestore` until the ADR-0001 §8 data
 cutover. Until then, Postgres runs on staging but the app routes only
