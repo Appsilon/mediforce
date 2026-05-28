@@ -94,10 +94,12 @@ export class FirestoreAgentRunRepository implements AgentRunRepository {
   }
 
   private async fetchPage(opts: ListAgentRunsOptions): Promise<AgentRun[]> {
-    let q: Query = this.db
-      .collection(this.collectionName)
-      .orderBy('startedAt', 'desc')
-      .orderBy('id', 'desc');
+    // Single explicit orderBy — Firestore tiebreaks ties on `__name__`
+    // implicitly. Adding a second orderBy('id') would force a composite
+    // index for the `agentRuns` collection and the `(processInstanceId,
+    // startedAt, id)` slice; keyset stability via a DocumentSnapshot
+    // cursor gives the same guarantees without the index requirement.
+    let q: Query = this.db.collection(this.collectionName).orderBy('startedAt', 'desc');
     if (opts.runId !== undefined) {
       q = q.where('processInstanceId', '==', opts.runId);
     }
@@ -106,7 +108,13 @@ export class FirestoreAgentRunRepository implements AgentRunRepository {
     }
     if (opts.cursor !== undefined) {
       const cur = decodeAgentRunCursor(opts.cursor);
-      if (cur !== null) q = q.startAfter(cur.startedAt, cur.id);
+      if (cur !== null) {
+        // Resolve the cursor doc so Firestore can apply its native
+        // tie-break on `__name__` after `startedAt`. One extra read per
+        // page in exchange for zero composite-index ops.
+        const cursorSnap = await this.db.collection(this.collectionName).doc(cur.id).get();
+        if (cursorSnap.exists) q = q.startAfter(cursorSnap);
+      }
     }
     // +1 so we can detect "more pages" without a second query.
     const snap = await q.limit(opts.limit + 1).get();
