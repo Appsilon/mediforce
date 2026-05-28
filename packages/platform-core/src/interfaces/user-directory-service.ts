@@ -5,6 +5,7 @@ export interface DirectoryUser {
 
 export interface UserAuthMetadata {
   email: string | null;
+  displayName: string | null;
   lastSignInTime: string | null;
 }
 

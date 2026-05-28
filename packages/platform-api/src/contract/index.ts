@@ -368,6 +368,9 @@ export {
   InviteUserOutputSchema,
   ResendInviteInputSchema,
   ResendInviteOutputSchema,
+  GetMeInputSchema,
+  GetMeOutputSchema,
+  MeNamespaceSchema,
   type ListNamespaceMembersInput,
   type ListNamespaceMembersOutput,
   type NamespaceMemberWithAuth,
@@ -375,4 +378,18 @@ export {
   type InviteUserOutput,
   type ResendInviteInput,
   type ResendInviteOutput,
+  type GetMeInput,
+  type GetMeOutput,
+  type MeNamespace,
 } from './users.js';
+
+export {
+  GetNamespaceInputSchema,
+  GetNamespaceOutputSchema,
+  CreateNamespaceInputSchema,
+  CreateNamespaceOutputSchema,
+  type GetNamespaceInput,
+  type GetNamespaceOutput,
+  type CreateNamespaceInput,
+  type CreateNamespaceOutput,
+} from './namespaces.js';

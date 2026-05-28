@@ -16,12 +16,20 @@ import {
   buildHumanTask,
   buildProcessInstance,
 } from '@mediforce/platform-core/testing';
-import { listTasks, claimTask, cancelRun } from '@mediforce/platform-api/handlers';
+import { listTasks, claimTask, cancelRun, createNamespace } from '@mediforce/platform-api/handlers';
 import {
   ListTasksInputSchema,
   ClaimTaskInputSchema,
   CancelRunInputSchema,
+  CreateNamespaceInputSchema,
 } from '@mediforce/platform-api/contract';
+import type {
+  Namespace,
+  NamespaceMember,
+  NamespaceMembership,
+  NamespaceRepository,
+} from '@mediforce/platform-core';
+import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { Mediforce, ApiError } from '@mediforce/platform-api/client';
 import { createRouteAdapter } from '../../lib/route-adapter';
@@ -290,3 +298,123 @@ describe('Mediforce client ↔ route-adapter ↔ cancelRun (in-process)', () => 
     expect((err as ApiError).code).toBe('precondition_failed');
   });
 });
+
+// Phase 4 PR4: namespaces.create round-trip — covers the list-affecting
+// mutation template (workspaces/new optimistic flow uses this contract).
+describe('Mediforce client ↔ route-adapter ↔ createNamespace (in-process)', () => {
+  let namespaceRepo: InMemoryNamespaceRepo;
+  let auditRepo: InMemoryAuditRepository;
+  let mediforce: Mediforce;
+  let route: (req: NextRequest) => Promise<Response>;
+
+  const userCaller: CallerIdentity = {
+    kind: 'user',
+    uid: 'u-create',
+    namespaces: new Set(),
+    namespaceRoles: new Map(),
+    isSystemActor: false,
+  };
+
+  beforeEach(() => {
+    namespaceRepo = new InMemoryNamespaceRepo();
+    auditRepo = new InMemoryAuditRepository();
+
+    route = createRouteAdapter(
+      CreateNamespaceInputSchema,
+      async (req) => (await req.json().catch(() => ({}))) as Record<string, unknown>,
+      createNamespace,
+      {
+        successStatus: 201,
+        resolveCaller: async () => userCaller,
+        buildScope: (caller) => createTestScope({ caller, namespaceRepo, auditRepo }),
+      },
+    );
+
+    mediforce = new Mediforce({
+      fetch: async (input, init) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
+        return route(new NextRequest(absolute, init));
+      },
+    });
+  });
+
+  it('creates a namespace and round-trips the entity-echo + 201', async () => {
+    const result = await mediforce.namespaces.create({
+      handle: 'acme',
+      displayName: 'Acme Co.',
+    });
+
+    expect(result.namespace.handle).toBe('acme');
+    expect(result.namespace.type).toBe('organization');
+    expect(namespaceRepo.namespaces.get('acme')?.displayName).toBe('Acme Co.');
+    expect(namespaceRepo.members.get('acme')?.[0]?.uid).toBe('u-create');
+    expect(auditRepo.getAll().some((e) => e.action === 'namespace.created')).toBe(true);
+  });
+
+  it('returns a typed `conflict` envelope when the handle is taken', async () => {
+    namespaceRepo.namespaces.set('acme', {
+      handle: 'acme',
+      type: 'organization',
+      displayName: 'someone else',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const err = await mediforce.namespaces
+      .create({ handle: 'acme', displayName: 'Acme Co.' })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(409);
+    expect((err as ApiError).code).toBe('conflict');
+  });
+});
+
+class InMemoryNamespaceRepo implements NamespaceRepository {
+  readonly namespaces = new Map<string, Namespace>();
+  readonly members = new Map<string, NamespaceMember[]>();
+  readonly userOrganizations = new Map<string, string[]>();
+
+  async getNamespace(handle: string): Promise<Namespace | null> {
+    return this.namespaces.get(handle) ?? null;
+  }
+  async createNamespace(namespace: Namespace): Promise<void> {
+    this.namespaces.set(namespace.handle, namespace);
+  }
+  async createNamespaceWithOwner(input: {
+    namespace: Namespace;
+    ownerMember: NamespaceMember;
+  }): Promise<void> {
+    this.namespaces.set(input.namespace.handle, input.namespace);
+    const members = this.members.get(input.namespace.handle) ?? [];
+    this.members.set(input.namespace.handle, [...members, input.ownerMember]);
+    const orgs = this.userOrganizations.get(input.ownerMember.uid) ?? [];
+    if (!orgs.includes(input.namespace.handle)) {
+      this.userOrganizations.set(input.ownerMember.uid, [...orgs, input.namespace.handle]);
+    }
+  }
+  async updateNamespace(): Promise<void> {
+    /* not exercised */
+  }
+  async getNamespacesByUser(): Promise<Namespace[]> {
+    return [];
+  }
+  async addMember(): Promise<void> {
+    /* not exercised */
+  }
+  async removeMember(): Promise<void> {
+    /* not exercised */
+  }
+  async getMember(): Promise<NamespaceMember | null> {
+    return null;
+  }
+  async getMembers(handle: string): Promise<NamespaceMember[]> {
+    return this.members.get(handle) ?? [];
+  }
+  async getUserNamespaces(): Promise<Namespace[]> {
+    return [];
+  }
+  async getMembershipsForUser(): Promise<readonly NamespaceMembership[]> {
+    return [];
+  }
+}

@@ -34,6 +34,10 @@ export class FirebaseUserDirectoryService implements UserDirectoryService {
       const record = await this.adminAuth.getUser(uid);
       return {
         email: typeof record.email === 'string' && record.email !== '' ? record.email : null,
+        displayName:
+          typeof record.displayName === 'string' && record.displayName !== ''
+            ? record.displayName
+            : null,
         lastSignInTime: record.metadata.lastSignInTime ?? null,
       };
     } catch {

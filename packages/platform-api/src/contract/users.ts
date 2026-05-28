@@ -1,5 +1,43 @@
 import { z } from 'zod';
-import { NamespaceMemberSchema } from '@mediforce/platform-core';
+import {
+  HandleSchema,
+  NamespaceMemberSchema,
+  NamespaceTypeSchema,
+} from '@mediforce/platform-core';
+
+export const GetMeInputSchema = z
+  .object({
+    /**
+     * Server-to-server escape hatch: an apiKey caller has no user identity of
+     * its own, so it must name the user whose `me` view it wants. Bearer-token
+     * callers always derive the uid from the verified token; if `uid` is set
+     * for a user caller it MUST match `caller.uid` or the handler 403s.
+     */
+    uid: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const MeNamespaceSchema = z.object({
+  handle: HandleSchema,
+  type: NamespaceTypeSchema,
+  displayName: z.string(),
+  role: z.enum(['owner', 'admin', 'member']),
+  avatarUrl: z.string().url().optional(),
+  icon: z.string().optional(),
+});
+
+export const GetMeOutputSchema = z.object({
+  user: z.object({
+    uid: z.string(),
+    email: z.string().email().nullable(),
+    displayName: z.string().nullable(),
+  }),
+  namespaces: z.array(MeNamespaceSchema),
+});
+
+export type GetMeInput = z.infer<typeof GetMeInputSchema>;
+export type GetMeOutput = z.infer<typeof GetMeOutputSchema>;
+export type MeNamespace = z.infer<typeof MeNamespaceSchema>;
 
 const NamespaceQuery = z.object({ namespace: z.string().min(1) });
 

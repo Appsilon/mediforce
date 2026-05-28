@@ -226,6 +226,13 @@ export {
 } from './namespace.js';
 
 export {
+  HandleSchema,
+  HANDLE_REGEX,
+  HANDLE_MAX_LENGTH,
+  type Handle,
+} from './handle.js';
+
+export {
   AgentDefinitionSchema,
   type AgentDefinition,
 } from './agent-definition.js';

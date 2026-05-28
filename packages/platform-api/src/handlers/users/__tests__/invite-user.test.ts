@@ -34,6 +34,9 @@ class InMemoryNamespaceRepository implements NamespaceRepository {
   async createNamespace(): Promise<void> {
     /* not exercised */
   }
+  async createNamespaceWithOwner(): Promise<void> {
+    /* not exercised */
+  }
   async updateNamespace(): Promise<void> {
     /* not exercised */
   }

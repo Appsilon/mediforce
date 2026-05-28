@@ -96,7 +96,12 @@ export {
   AssignmentItemSchema,
   TableEditorRowSchema,
   CompleteHumanTaskPayloadSchema,
+  HandleSchema,
+  HANDLE_REGEX,
+  HANDLE_MAX_LENGTH,
 } from './schemas/index.js';
+
+export type { Handle } from './schemas/handle.js';
 
 // Types (re-exported from schemas for convenience)
 export type {
