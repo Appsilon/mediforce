@@ -71,7 +71,7 @@ describe('useTask', () => {
     await waitFor(() => expect(getMock).toHaveBeenCalledTimes(3));
   });
 
-  it('stops polling once the task reaches a terminal status', async () => {
+  it('stops polling once the task reaches a terminal status (completed)', async () => {
     getMock.mockResolvedValueOnce(buildHumanTask({ id: 't-1', status: 'pending' }));
     getMock.mockResolvedValue(buildHumanTask({ id: 't-1', status: 'completed' }));
     const { wrapper } = createQueryWrapper();
@@ -82,7 +82,21 @@ describe('useTask', () => {
     await vi.advanceTimersByTimeAsync(1600);
     await waitFor(() => expect(getMock).toHaveBeenCalledTimes(2));
 
-    // Second fetch returned 'completed' — polling should now stop.
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(getMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops polling once the task reaches a terminal status (cancelled)', async () => {
+    getMock.mockResolvedValueOnce(buildHumanTask({ id: 't-1', status: 'pending' }));
+    getMock.mockResolvedValue(buildHumanTask({ id: 't-1', status: 'cancelled' }));
+    const { wrapper } = createQueryWrapper();
+
+    renderHook(() => useTask('t-1'), { wrapper });
+
+    await waitFor(() => expect(getMock).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(1600);
+    await waitFor(() => expect(getMock).toHaveBeenCalledTimes(2));
+
     await vi.advanceTimersByTimeAsync(5_000);
     expect(getMock).toHaveBeenCalledTimes(2);
   });
