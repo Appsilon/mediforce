@@ -49,7 +49,10 @@ export function useProcessInstances(
         namespace,
         workflow: definitionName,
         status: apiStatus,
-        limit: 100,
+        // Parity workaround — tracked in #588. Pre-PR3 the UI did an
+        // unbounded Firestore read; pagination on the contract isn't here
+        // yet, so we ride the schema max instead of regressing visibility.
+        limit: 10000,
       });
       return result.runs;
     },

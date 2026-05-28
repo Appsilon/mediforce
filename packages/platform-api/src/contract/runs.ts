@@ -64,7 +64,12 @@ export const ListRunsInputSchema = z.object({
    * reads are intersection semantics, not access checks.
    */
   namespace: z.string().min(1).optional(),
-  limit: z.coerce.number().int().positive().max(100).default(20),
+  // 10_000 is the parity workaround for the pre-paginated UI: Phase 4 PR3
+  // moved `/handle/runs` off an unbounded Firestore read onto this contract;
+  // a 100-row cap would have been a silent regression for workspaces with
+  // more runs. Tracked in #588 alongside PR2's identical workaround — the
+  // cap drops back to a sane page size once cursor pagination lands.
+  limit: z.coerce.number().int().positive().max(10000).default(20),
 });
 
 /**
