@@ -20,16 +20,17 @@
       "description": "Question to ask the team"
     },
     {
-      "name": "teamMembers",
-      "type": "string",
-      "required": true,
-      "description": "JSON array of {userId, email} objects"
-    },
-    {
       "name": "durationHours",
       "type": "number",
       "required": true,
       "description": "Hours to collect perspectives (e.g. 0.5 = 30min, 24 = 1 day)"
+    },
+    {
+      "name": "namespace",
+      "type": "string",
+      "required": true,
+      "default": "mediforce",
+      "description": "Namespace handle to fetch team members from"
     },
     {
       "name": "repo",
@@ -47,17 +48,61 @@
   ],
   "steps": [
     {
+      "id": "fetch_members",
+      "name": "Fetch members",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Fetch organization members from the platform API and output as table-editor options.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const apiKey = process.env.PLATFORM_API_KEY;\n  const baseUrl = process.env.APP_BASE_URL;\n  if (!apiKey || !baseUrl) { console.error('PLATFORM_API_KEY or APP_BASE_URL missing'); process.exit(1); }\n  const ns = input.namespace || 'mediforce';\n  const res = await fetch(`${baseUrl}/api/users/members?handle=${encodeURIComponent(ns)}`, {\n    headers: { 'X-Api-Key': apiKey, Accept: 'application/json' },\n  });\n  if (!res.ok) { console.error(`Failed to fetch members: ${res.status}`); process.exit(1); }\n  const data = await res.json();\n  const options = (data.members || []).map(m => ({\n    id: m.uid,\n    label: m.displayName || m.email || m.uid,\n    email: m.email || '',\n    role: m.role || 'member',\n  }));\n  writeFileSync('/output/result.json', JSON.stringify({ options }));\n  console.log(`Fetched ${options.length} member(s)`);\n} catch (err) {\n  console.error('fetch_members crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+      }
+    },
+    {
+      "id": "select_members",
+      "name": "Select team members",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["product-owner"],
+      "description": "Product owner selects which team members to include in this pulse.",
+      "ui": {
+        "component": "table-editor",
+        "config": {
+          "submitLabel": "Confirm selection",
+          "emptyMessage": "No members found in the organization.",
+          "columns": [
+            { "id": "name", "kind": "static", "label": "Name", "field": "label" },
+            { "id": "email", "kind": "static", "label": "Email", "field": "email" },
+            { "id": "role", "kind": "static", "label": "Role", "field": "role" },
+            {
+              "id": "include",
+              "kind": "single-select",
+              "label": "Include",
+              "default": "yes",
+              "options": [
+                { "id": "yes", "label": "Yes" },
+                { "id": "no", "label": "No" }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
       "id": "prepare",
       "name": "Prepare",
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
       "autonomyLevel": "L4",
-      "description": "Parse teamMembers JSON string into an array (triggerInput only supports primitives).",
+      "description": "Filter selected members and compute collection deadline.",
       "agent": {
         "image": "mediforce-golden-image:latest",
         "runtime": "javascript",
-        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const raw = input.teamMembers;\n  const teamMembers = typeof raw === 'string' ? JSON.parse(raw) : raw;\n  if (!Array.isArray(teamMembers)) { console.error('teamMembers must be a JSON array'); process.exit(1); }\n  const hours = Number(input.durationHours);\n  if (!Number.isFinite(hours) || hours <= 0) { console.error('durationHours must be a positive number'); process.exit(1); }\n  const deadline = new Date(Date.now() + hours * 3600000).toISOString();\n  writeFileSync('/output/result.json', JSON.stringify({ teamMembers, question: input.question, deadline }));\n  console.log(`Parsed ${teamMembers.length} team member(s), deadline: ${deadline}`);\n} catch (err) {\n  console.error('prepare crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const rows = input.steps?.select_members?.rows || [];\n  const fetchedMembers = input.steps?.fetch_members?.options || [];\n  const includedIds = new Set(rows.filter(r => r.values?.include === 'yes').map(r => r.itemId));\n  const teamMembers = fetchedMembers.filter(m => includedIds.has(m.id)).map(m => ({ userId: m.id, email: m.email }));\n  if (teamMembers.length === 0) { console.error('No members selected'); process.exit(1); }\n  const hours = Number(input.durationHours);\n  if (!Number.isFinite(hours) || hours <= 0) { console.error('durationHours must be a positive number'); process.exit(1); }\n  const deadline = new Date(Date.now() + hours * 3600000).toISOString();\n  writeFileSync('/output/result.json', JSON.stringify({ teamMembers, question: input.question, deadline }));\n  console.log(`Selected ${teamMembers.length} member(s), deadline: ${deadline}`);\n} catch (err) {\n  console.error('prepare crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
       }
     },
     {
@@ -65,7 +110,7 @@
       "name": "Spawn perspectives",
       "type": "creation",
       "executor": "action",
-      "description": "Spawn a gather-perspective child workflow for each team member.",
+      "description": "Spawn a gather-perspective child workflow for each selected team member.",
       "action": {
         "kind": "spawn",
         "config": {
@@ -177,6 +222,8 @@
     }
   ],
   "transitions": [
+    { "from": "fetch_members", "to": "select_members" },
+    { "from": "select_members", "to": "prepare" },
     { "from": "prepare", "to": "spawn_perspectives" },
     { "from": "spawn_perspectives", "to": "wait_for_responses" },
     { "from": "wait_for_responses", "to": "collect_responses" },

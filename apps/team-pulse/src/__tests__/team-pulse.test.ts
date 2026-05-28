@@ -21,21 +21,43 @@ describe('team-pulse', () => {
     expect(result.success).toBe(true);
   });
 
-  it('has 8 steps with exactly 1 terminal', () => {
+  it('has 10 steps with exactly 1 terminal', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data.steps).toHaveLength(8);
+    expect(result.data.steps).toHaveLength(10);
     expect(result.data.steps.filter((s) => s.type === 'terminal')).toHaveLength(1);
   });
 
-  it('prepare step parses teamMembers and computes deadline from durationHours', () => {
+  it('fetch_members is script step that calls members API', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const step = result.data.steps.find((s) => s.id === 'fetch_members');
+    expect(step?.executor).toBe('script');
+    expect(step?.agent?.inlineScript).toMatch(/\/api\/users\/members/);
+    expect(step?.agent?.inlineScript).toMatch(/options/);
+  });
+
+  it('select_members is human step with table-editor', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const step = result.data.steps.find((s) => s.id === 'select_members');
+    expect(step?.executor).toBe('human');
+    expect(step?.allowedRoles).toEqual(['product-owner']);
+    const ui = step?.ui as { component: string; config: { columns: { id: string; kind: string }[] } };
+    expect(ui.component).toBe('table-editor');
+    expect(ui.config.columns.find((c) => c.id === 'include')?.kind).toBe('single-select');
+  });
+
+  it('prepare step filters selected members and computes deadline', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
     const step = result.data.steps.find((s) => s.id === 'prepare');
     expect(step?.executor).toBe('script');
-    expect(step?.agent?.inlineScript).toMatch(/JSON\.parse/);
+    expect(step?.agent?.inlineScript).toMatch(/includedIds/);
     expect(step?.agent?.inlineScript).toMatch(/durationHours/);
     expect(step?.agent?.inlineScript).toMatch(/deadline/);
   });
@@ -128,14 +150,15 @@ describe('team-pulse', () => {
     expect(fromDecide.find((t) => t.to === 'report')?.when).toBe('verdict == "skip"');
   });
 
-  it('declares triggerInput for question, teamMembers, durationHours, repo, labelFilter', () => {
+  it('declares triggerInput for question, durationHours, namespace, repo, labelFilter', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
     const params = result.data.triggerInput ?? [];
     const names = params.map((p) => p.name);
-    expect(names).toEqual(['question', 'teamMembers', 'durationHours', 'repo', 'labelFilter']);
+    expect(names).toEqual(['question', 'durationHours', 'namespace', 'repo', 'labelFilter']);
     expect(params.find((p) => p.name === 'durationHours')?.type).toBe('number');
+    expect(params.find((p) => p.name === 'namespace')?.default).toBe('mediforce');
     expect(params.find((p) => p.name === 'repo')?.default).toBe('appsilon/mediforce');
     expect(params.find((p) => p.name === 'labelFilter')?.required).toBe(false);
   });
@@ -146,5 +169,15 @@ describe('team-pulse', () => {
     if (!result.success) return;
     expect(result.data.env?.PLATFORM_API_KEY).toBe('{{PLATFORM_API_KEY}}');
     expect(result.data.env?.APP_BASE_URL).toBe('{{APP_BASE_URL}}');
+  });
+
+  it('transitions form complete chain from fetch_members to report', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const t = result.data.transitions;
+    expect(t[0]).toEqual({ from: 'fetch_members', to: 'select_members' });
+    expect(t[1]).toEqual({ from: 'select_members', to: 'prepare' });
+    expect(t[2]).toEqual({ from: 'prepare', to: 'spawn_perspectives' });
   });
 });
