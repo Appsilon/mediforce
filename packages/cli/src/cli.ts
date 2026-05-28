@@ -43,6 +43,12 @@ import { modelSyncCommand } from './commands/model-sync.js';
 import { secretSetCommand } from './commands/secret-set.js';
 import { secretListCommand } from './commands/secret-list.js';
 import { secretDeleteCommand } from './commands/secret-delete.js';
+import { taskListCommand } from './commands/task-list.js';
+import { taskClaimCommand } from './commands/task-claim.js';
+import { taskCompleteCommand } from './commands/task-complete.js';
+import { userListCommand } from './commands/user-list.js';
+import { userInviteCommand } from './commands/user-invite.js';
+import { userResendInviteCommand } from './commands/user-resend-invite.js';
 import { type CommandFn } from './define-command.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
@@ -111,6 +117,22 @@ export const TREE: Record<string, BranchEntry> = {
       set: { description: 'Set a secret', fn: secretSetCommand },
       list: { description: 'List secret keys', fn: secretListCommand },
       delete: { description: 'Delete a secret', fn: secretDeleteCommand },
+    },
+  },
+  task: {
+    description: 'Human tasks (list, claim, complete)',
+    leaves: {
+      list: { description: 'List tasks for a run or role', fn: taskListCommand },
+      claim: { description: 'Claim a task for the caller', fn: taskClaimCommand },
+      complete: { description: 'Complete a task with a JSON payload', fn: taskCompleteCommand },
+    },
+  },
+  user: {
+    description: 'Workspace members (list, invite, resend-invite)',
+    leaves: {
+      list: { description: 'List workspace members', fn: userListCommand },
+      invite: { description: 'Invite a user to a workspace', fn: userInviteCommand },
+      'resend-invite': { description: 'Resend invitation credentials', fn: userResendInviteCommand },
     },
   },
   system: {
