@@ -25,8 +25,6 @@ import { PreviousRunBanner } from './previous-run-banner';
 import { formatDuration, formatCostUsd } from '@/lib/format';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 
-type AuditEventWithId = AuditEvent & { id: string };
-
 function resolveStepLabel(stepId: string, steps: Step[]): string {
   const found = steps.find((s) => s.id === stepId);
   return found?.name ?? stepId.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -54,7 +52,7 @@ export function ProcessDetail({
 }: {
   instance: ProcessInstance;
   stepExecutions: StepExecution[];
-  auditEvents: AuditEventWithId[];
+  auditEvents: AuditEvent[];
   auditEventsLoading: boolean;
   auditEventsError?: Error | null;
   definitionSteps?: Step[];
