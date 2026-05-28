@@ -66,13 +66,39 @@ function makeQuery(recorder: QueryRecorder, rows: AgentRun[]): unknown {
   return query;
 }
 
+interface ProcessInstanceRow {
+  readonly id: string;
+  readonly namespace: string;
+}
+
+function makeProcessInstancesQuery(rows: readonly ProcessInstanceRow[]): unknown {
+  const query: Record<string, unknown> = {};
+  let nsFilter: string | undefined;
+  query.where = vi.fn((field: string, op: string, value: unknown) => {
+    if (field === 'namespace' && op === '==' && typeof value === 'string') {
+      nsFilter = value;
+    }
+    return query;
+  });
+  query.get = vi.fn(async () => ({
+    docs: rows
+      .filter((row) => nsFilter === undefined || row.namespace === nsFilter)
+      .map((row) => ({ id: row.id, data: () => row })),
+  }));
+  return query;
+}
+
 function makeDb(
   recorder: QueryRecorder,
   rows: AgentRun[],
   docStore: Map<string, AgentRun>,
+  processInstanceRows: readonly ProcessInstanceRow[] = [],
 ): Firestore {
   return {
     collection: vi.fn((name: string) => {
+      if (name === 'processInstances') {
+        return makeProcessInstancesQuery(processInstanceRows) as Record<string, unknown>;
+      }
       if (name !== 'agentRuns') {
         throw new Error(`unexpected collection: ${name}`);
       }
@@ -217,13 +243,38 @@ describe('FirestoreAgentRunRepository — composite-index regression guard', () 
       buildAgentRun({ id: 'run-a2', processInstanceId: parentAlphaTwo.id, startedAt: '2026-05-23T10:00:00.000Z' }),
       buildAgentRun({ id: 'run-orphan', processInstanceId: 'inst-missing', startedAt: '2026-05-22T10:00:00.000Z' }),
     ];
-    const db = makeDb(recorder, runs, docStore);
+    const processInstanceRows: ProcessInstanceRow[] = [
+      { id: parentAlphaOne.id, namespace: 'team-alpha' },
+      { id: parentAlphaTwo.id, namespace: 'team-alpha' },
+      { id: parentBeta.id, namespace: 'team-beta' },
+    ];
+    const db = makeDb(recorder, runs, docStore, processInstanceRows);
     const repo = new FirestoreAgentRunRepository(db, parents);
 
     const page = await repo.listInNamespaces(['team-alpha'], { limit: 10 });
 
     const ids = page.items.map((r) => r.id);
     expect(ids).toEqual(['run-a1', 'run-a2']);
+  });
+
+  it('listInNamespaces avoids the parent N+1 — one processInstances query per workspace + one agentRuns read', async () => {
+    const parent = buildProcessInstance({ id: 'inst-1', namespace: 'team-alpha' });
+    await parents.create(parent);
+
+    const runs: AgentRun[] = [
+      buildAgentRun({ id: 'r-1', processInstanceId: parent.id, startedAt: '2026-05-25T10:00:00.000Z' }),
+      buildAgentRun({ id: 'r-2', processInstanceId: parent.id, startedAt: '2026-05-24T10:00:00.000Z' }),
+      buildAgentRun({ id: 'r-3', processInstanceId: parent.id, startedAt: '2026-05-23T10:00:00.000Z' }),
+    ];
+    const processInstanceRows: ProcessInstanceRow[] = [{ id: parent.id, namespace: 'team-alpha' }];
+    const db = makeDb(recorder, runs, docStore, processInstanceRows);
+    const repo = new FirestoreAgentRunRepository(db, parents);
+
+    await repo.listInNamespaces(['team-alpha'], { limit: 10 });
+
+    // No `parents.getById()` per agent run — the path materialises the
+    // ProcessInstance id set once and joins in memory.
+    expect(recorder.docGets).not.toContain('inst-1');
   });
 
   it('listInNamespaces short-circuits to an empty page when allowed is empty', async () => {

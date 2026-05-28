@@ -78,15 +78,30 @@ export class FirestoreAgentRunRepository implements AgentRunRepository {
     opts: ListAgentRunsOptions,
   ): Promise<ListAgentRunsPage> {
     // Agent runs carry no namespace field; the parent ProcessInstance owns
-    // workspace membership. Over-fetch by 2x to absorb namespace-filter
-    // attrition without paging twice for the common "all my workspace" view.
-    const allowedSet = new Set(allowed);
+    // workspace membership. Pre-materialise the allowed `ProcessInstance`
+    // id set via one indexed read per workspace, then a single agent-runs
+    // page read + in-memory join — eliminates the N+1 `parents.getById()`
+    // that made the UI's user-actor path ~40 s on a 2.3k-run workspace.
+    // Same shape as the CLI's system-actor `raw.list` for the read budget.
+    //
+    // Over-fetch by 2x absorbs namespace-filter attrition for the common
+    // "all my workspaces" view without paging twice. Postgres makes this
+    // a single keyset query with a join condition — drop both passes
+    // when the agent-runs domain migrates (ADR-0001).
+    const allowedInstanceIds = new Set<string>();
+    await Promise.all(
+      allowed.map(async (ns) => {
+        const snap = await this.db
+          .collection('processInstances')
+          .where('namespace', '==', ns)
+          .get();
+        for (const doc of snap.docs) allowedInstanceIds.add(doc.id);
+      }),
+    );
     const raw = await this.fetchPage({ ...opts, limit: opts.limit * 2 });
     const kept: AgentRun[] = [];
     for (const run of raw) {
-      const parent = await this.parents.getById(run.processInstanceId);
-      if (!parent || typeof parent.namespace !== 'string') continue;
-      if (!allowedSet.has(parent.namespace)) continue;
+      if (!allowedInstanceIds.has(run.processInstanceId)) continue;
       kept.push(run);
       if (kept.length >= opts.limit + 1) break;
     }
