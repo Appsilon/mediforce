@@ -35,6 +35,43 @@ describe('ListTasksInputSchema — filter exclusivity refine (instanceId XOR rol
   });
 });
 
+describe('ListTasksInputSchema — stepId narrowing', () => {
+  // The Phase 4 PRD proposed a refine "stepId requires instanceId" but the
+  // schema already allowed `role + stepId`. Decision recorded: leave the
+  // schema permissive — no consumer needs the constraint and `role + stepId`
+  // is a semantically valid cross-instance bottleneck view.
+
+  it('accepts instanceId + stepId (next-step-card pattern)', () => {
+    expect(
+      ListTasksInputSchema.safeParse({ instanceId: 'inst-1', stepId: 'step-a' }).success,
+    ).toBe(true);
+  });
+
+  it('accepts role + stepId (cross-instance step inspection, allowed by design)', () => {
+    expect(
+      ListTasksInputSchema.safeParse({ role: 'reviewer', stepId: 'step-a' }).success,
+    ).toBe(true);
+  });
+
+  it('accepts instanceId + stepId + status (full narrowing)', () => {
+    expect(
+      ListTasksInputSchema.safeParse({
+        instanceId: 'inst-1',
+        stepId: 'step-a',
+        status: ['pending'],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects stepId alone (no axis — fails XOR refine)', () => {
+    expect(ListTasksInputSchema.safeParse({ stepId: 'step-a' }).success).toBe(false);
+  });
+
+  it('rejects status alone (no axis — fails XOR refine)', () => {
+    expect(ListTasksInputSchema.safeParse({ status: ['pending'] }).success).toBe(false);
+  });
+});
+
 describe('ACTIONABLE_STATUSES', () => {
   it('is [pending, claimed]', () => {
     expect([...ACTIONABLE_STATUSES]).toEqual(['pending', 'claimed']);

@@ -518,6 +518,67 @@ serialization — at most 2–3 PRs in parallel review.
 Once PR-final merges, PG PR2 ([#534](https://github.com/Appsilon/mediforce/pull/534))
 is unblocked.
 
+### 9. Read-path schema drift — discovered during PR1 smoke
+
+PR1 smoke surfaced a class of bug worth calling out before PRs 2–6:
+
+**The pattern.** A Firestore document satisfies the *write-time* Zod
+schema in force the day it was registered. The *read-time* schema
+later narrows (enum tightened, field made required, discriminator
+added). Now every read of that document throws `ZodError` at the repo
+boundary. The route adapter maps it to a 400 envelope; React Query
+re-polls because 400 is not a terminal status by default.
+Reference incident: `humanTasks/*` docs with `params[i].type = 'textarea'`
+( a widget hint the UI already renders) blew up `GET /api/tasks/:taskId`
+in a tight 400 loop once `StepParamSchema.type` was tightened to a
+strict enum. Fixed in [#562](https://github.com/Appsilon/mediforce/pull/562)
+by widening to `z.string().min(1).default('string')` (still rejects
+non-string corruption, accepts unknown widget hints).
+
+**Five rules for PRs 2–6.**
+
+1. **One vocabulary, one schema.** If two schemas claim to validate
+   the same field (today: `StepParamSchema.type` is strict 4-enum,
+   `TriggerInputFieldSchema.type` extends to 7 values incl.
+   `textarea`/`multiselect`) the registration path and the read path
+   *will* drift. Pick a single source of truth and re-export. The
+   widget-type vocabulary should land in one constant referenced
+   from both schemas (follow-up — out of scope for #562). Same rule
+   applies to any new shared vocabulary introduced in PRs 2–6.
+2. **Prefer open strings to enums at the storage boundary** for
+   anything that's a UI hint, plugin name, or extensibility point.
+   Enums are right when the *engine* branches on the value
+   (`executor: human|agent|script|cowork|action`); they are wrong
+   when the *UI* renders by the value (`type: textarea`) — the UI
+   already has a default branch, the schema doesn't need a wall.
+3. **Repo-boundary parsing must log.** `XSchema.parse(snap.data())`
+   throwing a `ZodError` is the single most common silent failure
+   mode in this codebase. Either log the path + doc id before
+   re-throwing, or `safeParse` and convert to a structured handler
+   error (`NotFoundError` if the doc is unrecoverable). PR1 added a
+   `console.error` in `route-adapter` for handler-thrown ZodErrors;
+   that is the *catch* — the *cause* still belongs at the repo.
+4. **Hooks must terminate on 4xx.** `useTask`'s `refetchInterval`
+   returns `false` on `query.state.error`. Copy this pattern into
+   every polling hook PRs 2–6 introduce — `useAgentRuns`,
+   `useProcessInstance`, `useMonitoring`. A 400 / 403 / 404 from the
+   server means the user's intent does not match server state; no
+   amount of retrying will reconcile that.
+5. **Add a repo-level "legacy shape" test** for any schema where you
+   intentionally accept old data. `step-param.test.ts` covers
+   canonical, widget-hint, default, and non-string-corruption cases.
+   When PR3 touches `humanTasks` repo or PR4 touches `users`, mirror
+   that pattern with a `__tests__/legacy-shape.test.ts` per schema
+   that has any data already in production.
+
+**Schema convergence — out of scope for PR1, queued for PR3.** Unify
+`StepParamSchema.type` and `TriggerInputFieldSchema.type` behind one
+shared widget-type constant. Bundling this with PR3 (processes/runs,
+which already touches step/trigger surface) keeps the merge sequence
+intact. Tracked as [#563](https://github.com/Appsilon/mediforce/issues/563)
+with the proposed `PARAM_WIDGET_TYPES` const shape and an exhaustive-
+switch contract for the 6 current consumers.
+
 ## Testing decisions
 
 Mediforce's test taxonomy from [`docs/headless-migration.md`](./headless-migration.md) §"Testing

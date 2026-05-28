@@ -43,6 +43,9 @@ import { modelSyncCommand } from './commands/model-sync.js';
 import { secretSetCommand } from './commands/secret-set.js';
 import { secretListCommand } from './commands/secret-list.js';
 import { secretDeleteCommand } from './commands/secret-delete.js';
+import { taskListCommand } from './commands/task-list.js';
+import { taskGetCommand } from './commands/task-get.js';
+import { taskClaimCommand } from './commands/task-claim.js';
 import { type CommandFn } from './define-command.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
@@ -85,6 +88,14 @@ export const TREE: Record<string, BranchEntry> = {
       archive: { description: 'Soft-archive (or restore) a run', fn: runArchiveCommand },
       'bulk-cancel': { description: 'Cancel multiple runs in one call', fn: runBulkCancelCommand },
       'bulk-archive': { description: 'Archive multiple runs in one call', fn: runBulkArchiveCommand },
+    },
+  },
+  task: {
+    description: 'Human tasks (list, get, claim)',
+    leaves: {
+      list: { description: 'List tasks by role or instance', fn: taskListCommand },
+      get: { description: 'Fetch a single task', fn: taskGetCommand },
+      claim: { description: 'Claim a pending task', fn: taskClaimCommand },
     },
   },
   agent: {

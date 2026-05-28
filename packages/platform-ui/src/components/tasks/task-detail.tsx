@@ -2,17 +2,15 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useMemo } from 'react';
 import { format } from 'date-fns';
 import { ArrowLeft } from 'lucide-react';
-import { where, orderBy } from 'firebase/firestore';
 import type { HumanTask, ProcessInstance } from '@mediforce/platform-core';
 import { TaskContextPanel } from './task-context-panel';
 import { AgentOutputReviewPanel } from './agent-output-review-panel';
 import { NextStepCard } from './next-step-card';
 import { resolveTaskBody } from './task-body-registry';
 import { getTaskDisplayTitle, isAgentReviewTask, getAgentOutput, getAgentOutputFromSiblings } from './task-utils';
-import { useCollection } from '@/hooks/use-collection';
+import { useMyActionableTasksByRole } from '@/hooks/use-tasks';
 import { useInstanceTasks } from '@/hooks/use-instance-tasks';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { cn } from '@/lib/utils';
@@ -36,21 +34,7 @@ export function TaskDetail({
   const { goBack } = useBackNavigation(`/${handle}/tasks`);
   const { data: processInstance } = useProcessInstance(task.processInstanceId);
 
-  const remainingConstraints = useMemo(
-    () =>
-      task.assignedRole
-        ? [
-            where('assignedRole', '==', task.assignedRole),
-            where('status', 'in', ['pending', 'claimed']),
-            orderBy('createdAt', 'asc'),
-          ]
-        : [],
-    [task.assignedRole],
-  );
-  const { data: remainingTasks } = useCollection<HumanTask>(
-    'humanTasks',
-    remainingConstraints,
-  );
+  const { data: remainingTasks } = useMyActionableTasksByRole(task.assignedRole ?? undefined);
   const remainingTaskCount = remainingTasks.filter((t) => t.id !== task.id).length;
 
   const { tasks: siblingTasks } = useInstanceTasks(task.processInstanceId);

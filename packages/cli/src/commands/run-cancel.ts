@@ -1,5 +1,5 @@
 import { defineCommand } from '../define-command.js';
-import { printJson } from '../output.js';
+import { printJson, printKv } from '../output.js';
 
 export const runCancelCommand = defineCommand({
   name: 'mediforce run cancel',
@@ -22,8 +22,10 @@ export const runCancelCommand = defineCommand({
       return 0;
     }
     output.stdout(`Run ${result.run.id} cancelled`);
-    output.stdout(`  status:  ${result.run.status}`);
-    output.stdout(`  reason:  ${result.run.error ?? '(none)'}`);
+    printKv(output, [
+      ['status', result.run.status],
+      ['reason', result.run.error],
+    ]);
     return 0;
   },
 });

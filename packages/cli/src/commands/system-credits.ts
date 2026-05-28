@@ -1,5 +1,5 @@
 import { defineCommand } from '../define-command.js';
-import { printJson } from '../output.js';
+import { printJson, printKv } from '../output.js';
 
 export const systemCreditsCommand = defineCommand({
   name: 'mediforce system credits',
@@ -22,9 +22,11 @@ export const systemCreditsCommand = defineCommand({
     }
 
     output.stdout(`OpenRouter credits for namespace "${args.namespace}":\n`);
-    output.stdout(`  Remaining:  $${data.remaining.toFixed(2)}`);
-    output.stdout(`  Used:       $${data.usage.toFixed(2)}`);
-    output.stdout(`  Limit:      $${data.limit.toFixed(2)}`);
+    printKv(output, [
+      ['Remaining', `$${data.remaining.toFixed(2)}`],
+      ['Used', `$${data.usage.toFixed(2)}`],
+      ['Limit', `$${data.limit.toFixed(2)}`],
+    ]);
     return 0;
   },
 });
