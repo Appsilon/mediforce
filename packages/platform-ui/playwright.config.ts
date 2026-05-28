@@ -11,7 +11,9 @@ const recording = process.env.E2E_RECORD === 'true';
 // that connects to production Firebase. This is the #1 cause of "data not found"
 // failures: seed data goes into the emulator but the reused dev server reads
 // from production.
-const testPort = useEmulators ? 9007 : 9003;
+const testPort = useEmulators
+  ? Number(process.env.E2E_PORT ?? 9007)
+  : Number(process.env.PORT ?? 9003);
 
 const projects: PlaywrightTestConfig['projects'] = [];
 
