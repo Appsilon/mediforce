@@ -12,10 +12,13 @@
 // (non-zero exit) on any migration failure — fail-stop is the right
 // posture: an app boot against a half-migrated schema is worse than
 // "container failed to start".
+//
+// Static imports are limited to node: builtins so this script can be
+// loaded by the Next.js standalone runner even when `postgres` /
+// `drizzle-orm` are not in the standalone bundle. The flag check then
+// either exits 0 (Firestore mode) or dynamically imports the
+// driver-only-needed packages.
 
-import postgres from 'postgres';
-import { drizzle } from 'drizzle-orm/postgres-js';
-import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -29,6 +32,10 @@ if (typeof url !== 'string' || url.length === 0) {
   console.error('[migrate-postgres] STORAGE_BACKEND=postgres requires DATABASE_URL.');
   process.exit(1);
 }
+
+const { default: postgres } = await import('postgres');
+const { drizzle } = await import('drizzle-orm/postgres-js');
+const { migrate } = await import('drizzle-orm/postgres-js/migrator');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Script lives at packages/platform-infra/scripts/migrate.mjs; the
