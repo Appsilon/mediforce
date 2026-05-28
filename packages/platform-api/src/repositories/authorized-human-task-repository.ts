@@ -35,6 +35,11 @@ export class AuthorizedHumanTaskRepository extends AuthorizedScope {
       ? this.raw.getByInstanceId(instanceId)
       : this.raw.getByInstanceIdInNamespaces(instanceId, [...this.caller.namespaces]);
 
+  getByInstanceIds = async (instanceIds: readonly string[]): Promise<HumanTask[]> =>
+    this.caller.isSystemActor
+      ? this.raw.getByInstanceIdsAll(instanceIds)
+      : this.raw.getByInstanceIdsInNamespaces(instanceIds, [...this.caller.namespaces]);
+
   /**
    * Caller-scope read: every task the caller is allowed to see across all
    * roles + instances. System actors see the whole store; user callers see

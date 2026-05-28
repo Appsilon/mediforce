@@ -9,12 +9,13 @@ import type { HumanTaskStatus, InstanceStatus } from '@mediforce/platform-core';
  * literal at the tail when the filter set has multiple fields.
  *
  * Convention for the singular detail key: lives under a distinct domain
- * (`'task'`, `'run'`) so list-prefix invalidation of `['tasks']` / `['runs']`
- * does not clobber the detail cache. Detail and list are different surfaces.
+ * (`'task'`, `'run'`, `'agent-run'`) so list-prefix invalidation of
+ * `['tasks']` / `['runs']` / `['agent-runs']` does not clobber the detail
+ * cache. Detail and list are different surfaces.
  *
  * Currently covers tasks, runs / processes / audit, cowork, users (`me`),
- * namespace (detail). Future work extends with `workflows`, `agent-runs`,
- * `monitoring`.
+ * namespace (detail), agent-runs, monitoring. Future work extends with
+ * `workflows`.
  */
 export const queryKeys = {
   tasks: {
@@ -60,7 +61,6 @@ export const queryKeys = {
      * scope without invalidating session metadata. */
     turns: (sessionId: string) => ['cowork', sessionId, 'turns'] as const,
   },
-
   /**
    * Identity + memberships bundle. ONE-SHOT, `refetchOnWindowFocus: false`
    * per ADR-0006 §4: role / membership changes are a deliberate backend-403
@@ -70,7 +70,21 @@ export const queryKeys = {
   users: {
     me: () => ['users', 'me'] as const,
   },
-
   /** Single-namespace detail (members + metadata). */
   namespace: (handle: string) => ['namespace', handle] as const,
+  agentRuns: {
+    /** Prefix matcher — `['agent-runs']` invalidates every list slice. */
+    all: () => ['agent-runs'] as const,
+    /** List slice — namespace + optional `runId`/`stepId` filters. */
+    list: (
+      handle: string | undefined,
+      filters?: { runId?: string; stepId?: string },
+    ) => ['agent-runs', handle ?? null, { ...filters }] as const,
+  },
+  /** Single agent-run detail key (singular `agent-run`). */
+  agentRun: (agentRunId: string) => ['agent-run', agentRunId] as const,
+  monitoring: {
+    /** Per-workspace dashboard summary. */
+    summary: (handle: string) => ['monitoring', handle] as const,
+  },
 } as const;

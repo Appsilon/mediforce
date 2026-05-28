@@ -40,7 +40,22 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    the codebase's language and surfaces fuzzy terms before you write code.
    Optional, not every task needs it.
 
-2. **Test first via `/new-test` — for product code.** Write a failing test at
+2. **No tech debt — fix the rzeźba inline.** If you notice handmade code
+   where a standard pattern would fit (custom string format where a
+   library / JSON / Zod schema does it, per-domain helper where a
+   generic in `platform-core` belongs, inline auth check where the
+   wrapper exists, raw `fetch` where the CLI / client covers it), and
+   the refactor is small + mechanical (≤ ~100 LOC, ≤ ~3 call sites,
+   no behaviour change), **do it in the same PR**. Don't file a
+   follow-up issue, don't leave a `TODO`, don't ship "we'll generalise
+   when the second consumer lands". A follow-up that requires the
+   next reader to remember context is debt; an inline refactor with
+   the same diff that touches the code is free. Only defer when the
+   change is architectural (new ADR, cross-package surface) or
+   genuinely large — and then file the issue with a concrete fix
+   shape, not a vague "improve X".
+
+3. **Test first via `/new-test` — for product code.** Write a failing test at
    the lowest level that gives real signal before implementation. `/new-test`
    picks the level (L1 unit / L2 integration / L3 API E2E / L4 UI / L5
    external), scaffolds the file, and walks RED → GREEN. Product features
@@ -56,7 +71,7 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    trivial product edits (typo, comment, single-line config) — and say so
    out loud.
 
-3. **Dogfood the CLI via `/use-mediforce`.** Any operation `pnpm exec mediforce`
+4. **Dogfood the CLI via `/use-mediforce`.** Any operation `pnpm exec mediforce`
    covers MUST go through it — never curl REST when the CLI does it. If the
    command is missing, add it in the same task. `/use-mediforce` also covers the
    dev environment (`pnpm dev*`), the REST fallback ladder (browser:
@@ -64,13 +79,13 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    client), and the recipe for adding a CLI command. **Never hit
    production.**
 
-4. **Self-review before reporting done via `/self-review`.** Always invoke as
+5. **Self-review before reporting done via `/self-review`.** Always invoke as
    a **subagent** — clean context yields honest review. The skill runs
    typecheck, affected tests, diff inspection, style audit, and
    `/code-review`, returning SHIP or ITERATE. Iterate until the diff is
    something you'd approve in someone else's PR.
 
-5. **Ask, don't sneak.** If the codebase lacks something the task needs
+6. **Ask, don't sneak.** If the codebase lacks something the task needs
    (missing CLI command, endpoint, unmocked dep, blocking refactor), STOP
    and offer:
    a. Open a GitHub issue and continue without it.
@@ -79,7 +94,7 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    d. Spawn a subagent here to add it inline.
    Default: small + mechanical → (d); larger or architectural → (b).
 
-6. **Main thread is manager and lead architect.** Owns the outcome,
+7. **Main thread is manager and lead architect.** Owns the outcome,
    decomposes, delegates, narrates. Subagents are ICs doing the heavy
    lifting (sometimes architects themselves — Plan, code-review).
    Owning the outcome means verifying actual results, not avoiding
@@ -106,7 +121,7 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
      - Heuristic: prompt-prep <30s AND task >2min → spawn. Otherwise
        main thread does it.
 
-7. **No new Server Actions.** Phase 2/3 of the headless-platform-API
+8. **No new Server Actions.** Phase 2/3 of the headless-platform-API
    migration is deleting `'use server'` files; do not introduce new ones.
    Every new mutation lands as `(input, scope) => output` in
    `packages/platform-api/src/handlers/` + a Zod contract + a route adapter
@@ -117,14 +132,14 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    `revalidatePath` / form-action / `redirect` semantics, ask before
    adding. See ADR-0005.
 
-8. **Style.** English everywhere. No `any` — Zod + `z.infer`. No one-letter
+9. **Style.** English everywhere. No `any` — Zod + `z.infer`. No one-letter
    names. Self-documenting code over comments; NEVER add docstrings/types/
    comments to code you didn't change. Explicit boolean comparisons. Scripts
    in Python, not bash. Native platform > third-party. First-principles >
    clever workarounds. Voice input: interpret intent. NEVER use the
    `AskUserQuestion` tool — write a/b/c/... in plain text.
 
-9. **Log it via `/add-changelog-entry`.** Every non-trivial PR appends a
+10. **Log it via `/add-changelog-entry`.** Every non-trivial PR appends a
    one-line bullet under `## [Unreleased]` in `CHANGELOG.md` using
    Keep-a-Changelog categories. Group several PRs covering one thing as a
    nested list. Skip only for trivial edits. Weekly cut is automated —
@@ -152,18 +167,20 @@ trigger phrases match the action you're about to take. List with
 ## Reminder — re-read at the top of every task
 
 1. Simplify before coding.
-2. Test first via `/new-test` (RED → GREEN) at the lowest level with real
+2. No tech debt — small/mechanical refactor of adjacent rzeźba happens
+   in this PR, not in a follow-up issue.
+3. Test first via `/new-test` (RED → GREEN) at the lowest level with real
    signal. L3 is the foundation for every feature.
-3. CLI > REST. `/use-mediforce` first; add the command if missing.
-4. `/self-review` as a subagent before reporting done.
-5. Ask, don't sneak, when a capability is missing.
-6. No new Server Actions. Headless handler + route adapter + `mediforce.X.Y()`.
-7. Main thread = manager + lead architect. NEVER fg subagent or
+4. CLI > REST. `/use-mediforce` first; add the command if missing.
+5. `/self-review` as a subagent before reporting done.
+6. Ask, don't sneak, when a capability is missing.
+7. No new Server Actions. Headless handler + route adapter + `mediforce.X.Y()`.
+8. Main thread = manager + lead architect. NEVER fg subagent or
    non-trivial bash. Decompose, narrate, verify actual output.
-8. Log non-trivial changes via `/add-changelog-entry`.
-9. No regressions. Diff OLD vs NEW user-observable behaviour on every
-   replaced read / write / endpoint / hook. Silent `.limit()` caps, silent
-   default flips, missing parity branches all count. Word them
-   "regression", never "risk".
+9. Log non-trivial changes via `/add-changelog-entry`.
+10. No regressions. Diff OLD vs NEW user-observable behaviour on every
+    replaced read / write / endpoint / hook. Silent `.limit()` caps, silent
+    default flips, missing parity branches all count. Word them
+    "regression", never "risk".
 
 See `README.md` for one-time env setup (Node, pnpm, Firebase CLI, `.env.local`).

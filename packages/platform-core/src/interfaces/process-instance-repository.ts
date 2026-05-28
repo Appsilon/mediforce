@@ -6,10 +6,15 @@ export interface ListInstancesOptions {
   definitionName?: string;
   status?: InstanceStatus;
   /**
-   * Narrow to a single workspace. Composed with the caller's allowed-
-   * namespaces filter: a user caller asking for a namespace they don't
-   * belong to gets an empty list back (not an error — list reads are
-   * intersection semantics, not access checks).
+   * Workspace filter pushed into the storage layer. Set by handlers that
+   * already know which workspace they're aggregating for (e.g. the
+   * monitoring summary). Replaces a JS-side `r.namespace === handle`
+   * pass over an over-fetched cross-workspace page — the Firestore
+   * impl rewrites to a `where('namespace','==',ns)` so the wire payload
+   * shrinks to the keep-set. Composed with `listInNamespaces`'s
+   * `allowed` set under intersection semantics: a user caller asking
+   * for a namespace they don't belong to gets an empty list back, not
+   * an error.
    */
   namespace?: string;
   limit?: number;
@@ -34,6 +39,15 @@ export interface ProcessInstanceRepository {
   // Read methods, paired (All = system actor; InNamespaces = namespace-scoped caller)
   getById(instanceId: string): Promise<ProcessInstance | null>;
   getByIdInNamespaces(instanceId: string, allowed: readonly string[]): Promise<ProcessInstance | null>;
+
+  /**
+   * Cheap namespace lookup for gate-only callers (e.g. the human-task
+   * wrapper resolving "which workspace does this task belong to?"). Reads
+   * only the `namespace` field — no per-row schema parse — so one legacy
+   * corrupt doc cannot 400 a fan-out call. Returns `null` if the doc is
+   * missing or has no namespace.
+   */
+  getNamespaceById(instanceId: string): Promise<string | null>;
 
   listAll(options: ListInstancesOptions): Promise<ProcessInstance[]>;
   listInNamespaces(allowed: readonly string[], options: ListInstancesOptions): Promise<ProcessInstance[]>;

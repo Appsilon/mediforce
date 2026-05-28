@@ -293,6 +293,18 @@ import {
   type SynthesizeVoiceArtifactInput,
   type SynthesizeVoiceArtifactOutput,
   type ListPluginsOutput,
+  ListAgentRunsInputSchema,
+  ListAgentRunsOutputSchema,
+  GetAgentRunInputSchema,
+  GetAgentRunOutputSchema,
+  type ListAgentRunsInput,
+  type ListAgentRunsOutput,
+  type GetAgentRunInput,
+  type GetAgentRunOutput,
+  MonitoringSummaryInputSchema,
+  GetMonitoringSummaryOutputSchema,
+  type MonitoringSummaryInput,
+  type GetMonitoringSummaryOutput,
 } from '../contract/index.js';
 // SDK consumers reach for one path:
 //   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
@@ -514,6 +526,15 @@ export class Mediforce {
   readonly namespaces: {
     get: (input: GetNamespaceInput) => Promise<GetNamespaceOutput>;
     create: (input: CreateNamespaceInput) => Promise<CreateNamespaceOutput>;
+  };
+
+  readonly agentRuns: {
+    list: (input?: ListAgentRunsInput) => Promise<ListAgentRunsOutput>;
+    get: (input: GetAgentRunInput) => Promise<GetAgentRunOutput>;
+  };
+
+  readonly monitoring: {
+    summary: (input: MonitoringSummaryInput) => Promise<GetMonitoringSummaryOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -1276,6 +1297,41 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.delete');
         return DeleteToolCatalogEntryOutputSchema.parse(body);
+      },
+    };
+
+    this.agentRuns = {
+      list: async (input) => {
+        const validated = ListAgentRunsInputSchema.parse(input ?? {});
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          runId: validated.runId,
+          stepId: validated.stepId,
+          limit: validated.limit !== undefined ? String(validated.limit) : undefined,
+          cursor: validated.cursor,
+        });
+        const res = await this.request(`/api/agent-runs${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.list');
+        return ListAgentRunsOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetAgentRunInputSchema.parse(input);
+        const res = await this.request(
+          `/api/agent-runs/${encodeURIComponent(validated.agentRunId)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.get');
+        return GetAgentRunOutputSchema.parse(body);
+      },
+    };
+
+    this.monitoring = {
+      summary: async (input) => {
+        const validated = MonitoringSummaryInputSchema.parse(input);
+        const res = await this.request(
+          `/api/namespaces/${encodeURIComponent(validated.handle)}/monitoring/summary`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.monitoring.summary');
+        return GetMonitoringSummaryOutputSchema.parse(body);
       },
     };
 

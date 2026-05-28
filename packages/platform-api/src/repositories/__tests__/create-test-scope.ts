@@ -5,6 +5,7 @@
  */
 import {
   InMemoryAgentDefinitionRepository,
+  InMemoryAgentRunRepository,
   InMemoryAuditRepository,
   InMemoryCoworkSessionRepository,
   InMemoryCronTriggerStateRepository,
@@ -17,7 +18,6 @@ import {
   InMemoryAgentOAuthTokenRepository,
 } from '@mediforce/platform-core/testing';
 import type {
-  AgentRun,
   AgentRunRepository,
   ModelRegistryRepository,
   NamespaceRepository,
@@ -32,55 +32,6 @@ import { createCallerScope, type CallerScopeServices } from '../create-caller-sc
 import { noopRunKicker, type RunKicker } from '../../runtime/run-kicker.js';
 import type { DockerImagesService } from '../../services/docker-images-service.js';
 import type { InviteNotificationService, InviteService } from '../../services/invite-notification.js';
-
-class InMemoryAgentRunRepository implements AgentRunRepository {
-  private readonly byId = new Map<string, AgentRun>();
-
-  constructor(private readonly parents?: ProcessInstanceRepository) {}
-
-  async create(run: AgentRun): Promise<AgentRun> {
-    this.byId.set(run.id, run);
-    return run;
-  }
-  async getById(runId: string): Promise<AgentRun | null> {
-    return this.byId.get(runId) ?? null;
-  }
-  async getByIdInNamespaces(
-    runId: string,
-    allowed: readonly string[],
-  ): Promise<AgentRun | null> {
-    const run = this.byId.get(runId);
-    if (!run) return null;
-    const parent = await this.requireParents().getById(run.processInstanceId);
-    if (!parent || typeof parent.namespace !== 'string') return null;
-    return allowed.includes(parent.namespace) ? run : null;
-  }
-  async getByInstanceId(instanceId: string): Promise<AgentRun[]> {
-    return [...this.byId.values()].filter((r) => r.processInstanceId === instanceId);
-  }
-  async getByInstanceIdInNamespaces(
-    instanceId: string,
-    allowed: readonly string[],
-  ): Promise<AgentRun[]> {
-    const parent = await this.requireParents().getById(instanceId);
-    if (!parent || typeof parent.namespace !== 'string') return [];
-    if (!allowed.includes(parent.namespace)) return [];
-    return this.getByInstanceId(instanceId);
-  }
-  async getAll(limit?: number): Promise<AgentRun[]> {
-    const all = [...this.byId.values()];
-    return limit === undefined ? all : all.slice(0, limit);
-  }
-
-  private requireParents(): ProcessInstanceRepository {
-    if (this.parents === undefined) {
-      throw new Error(
-        'InMemoryAgentRunRepository: ProcessInstanceRepository required for namespace-scoped methods',
-      );
-    }
-    return this.parents;
-  }
-}
 
 const stubNamespaceRepo: NamespaceRepository = {
   async getNamespace() {

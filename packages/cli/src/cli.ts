@@ -52,6 +52,8 @@ import { coworkChatCommand } from './commands/cowork-chat.js';
 import { usersMeCommand } from './commands/users-me.js';
 import { namespaceGetCommand } from './commands/namespace-get.js';
 import { namespaceCreateCommand } from './commands/namespace-create.js';
+import { agentRunListCommand } from './commands/agent-run-list.js';
+import { agentRunGetCommand } from './commands/agent-run-get.js';
 import { type CommandFn } from './define-command.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
@@ -123,6 +125,13 @@ export const TREE: Record<string, BranchEntry> = {
       create: { description: 'Create an agent from a JSON file', fn: agentCreateCommand },
       delete: { description: 'Delete an agent definition', fn: agentDeleteCommand },
       'set-visibility': { description: 'Set agent visibility (public|private)', fn: agentSetVisibilityCommand },
+    },
+  },
+  'agent-run': {
+    description: 'Agent runs (list, get) — single agent invocations inside workflow runs',
+    leaves: {
+      list: { description: 'List recent agent runs', fn: agentRunListCommand },
+      get: { description: 'Fetch a single agent run', fn: agentRunGetCommand },
     },
   },
   model: {

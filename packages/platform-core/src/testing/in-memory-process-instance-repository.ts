@@ -36,6 +36,14 @@ export class InMemoryProcessInstanceRepository
     return allowed.includes(instance.namespace ?? '') ? { ...instance } : null;
   }
 
+  async getNamespaceById(instanceId: string): Promise<string | null> {
+    const instance = this.instances.get(instanceId);
+    if (!instance) return null;
+    return typeof instance.namespace === 'string' && instance.namespace.length > 0
+      ? instance.namespace
+      : null;
+  }
+
   async update(
     instanceId: string,
     updates: Partial<ProcessInstance>,
@@ -66,6 +74,9 @@ export class InMemoryProcessInstanceRepository
     options: ListInstancesOptions,
   ): ProcessInstance[] {
     let results = rows.filter((i) => i.deleted !== true);
+    if (options.namespace !== undefined) {
+      results = results.filter((i) => i.namespace === options.namespace);
+    }
     if (options.definitionName !== undefined) {
       results = results.filter((i) => i.definitionName === options.definitionName);
     }

@@ -51,6 +51,16 @@ export class FirestoreProcessInstanceRepository
       : null;
   }
 
+  async getNamespaceById(instanceId: string): Promise<string | null> {
+    const snapshot = await this.db
+      .collection(this.collectionName)
+      .doc(instanceId)
+      .get();
+    if (!snapshot.exists) return null;
+    const ns = (snapshot.data() as { namespace?: unknown }).namespace;
+    return typeof ns === 'string' && ns.length > 0 ? ns : null;
+  }
+
   async update(
     instanceId: string,
     updates: Partial<ProcessInstance>,
@@ -66,6 +76,9 @@ export class FirestoreProcessInstanceRepository
       .collection(this.collectionName)
       .where('deleted', '==', false);
 
+    if (options.namespace !== undefined) {
+      query = query.where('namespace', '==', options.namespace);
+    }
     if (options.definitionName !== undefined) {
       query = query.where('definitionName', '==', options.definitionName);
     }
@@ -78,7 +91,22 @@ export class FirestoreProcessInstanceRepository
     query = query.orderBy('createdAt', 'desc').limit(options.limit ?? 20);
 
     const snapshot = await query.get();
-    return snapshot.docs.map((d) => ProcessInstanceSchema.parse(d.data()));
+    // Skip the per-row `ProcessInstanceSchema.parse` on this hot path.
+    // The monitoring summary fan-out fetches up to 10k cross-workspace
+    // ProcessInstances; a single legacy doc with an out-of-enum `status`
+    // (e.g. pre-rename `cancelled`) or a non-string `updatedAt`
+    // (a Firestore Timestamp written before the ISO-string normalisation)
+    // turned the whole endpoint into a 400 ZodError. The handler then
+    // surfaced `0/0/0` to the UI.
+    //
+    // Same precedent as `FirestoreAgentRunRepository.list` — the write
+    // side accepts a typed `ProcessInstance`, and the monitoring handler
+    // tolerates unknown statuses (its bucket comparisons just fail to
+    // match) and non-finite `updatedAt` (it `Number.isFinite`-guards).
+    // `listRuns` callers downstream see the raw shape; legacy corruption
+    // there was the same risk before this change because the Firestore
+    // subscription the pre-PR2 UI used also bypassed the schema.
+    return snapshot.docs.map((d) => d.data() as ProcessInstance);
   }
 
   async listInNamespaces(
