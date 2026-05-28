@@ -1256,6 +1256,13 @@ def _render_compose_env(ctx: Context) -> str:
         f"DOCKER_OPENROUTER_API_KEY={openrouter}",
         "DOCKER_DEEPSEEK_API_KEY=",
         "",
+        "# Postgres (ADR-0001). POSTGRES_USER + POSTGRES_DB default to",
+        "# 'mediforce' inside docker-compose.prod.yml — only set them here",
+        "# to override. STORAGE_BACKEND stays 'firestore' until the data",
+        "# cutover (PLAN-0001 §8.2 step 6) — flip to 'postgres' then.",
+        f"POSTGRES_PASSWORD={ctx.collected.get('POSTGRES_PASSWORD', '')}",
+        "# STORAGE_BACKEND=postgres",
+        "",
         "# Caddy — site block matcher (real domain → Let's Encrypt cert, IP → self-signed)",
         f"DOMAIN={_caddy_site(ctx)}",
         "",
@@ -1346,6 +1353,12 @@ def _ensure_api_keys(ctx: Context) -> None:
         ctx.collected["SECRETS_ENCRYPTION_KEY"] = secrets.token_hex(32)
         ok("SECRETS_ENCRYPTION_KEY auto-generated (32 bytes hex) — back this up; losing it makes stored workflow secrets unrecoverable")
 
+    if not ctx.collected.get("POSTGRES_PASSWORD"):
+        # ADR-0001 — required when STORAGE_BACKEND=postgres. URL-safe so it
+        # drops into DATABASE_URL without further escaping.
+        ctx.collected["POSTGRES_PASSWORD"] = secrets.token_urlsafe(32)
+        ok("POSTGRES_PASSWORD auto-generated (32 bytes url-safe) — back this up; losing it locks you out of the Postgres data volume")
+
 
 def step_env_local(ctx: Context) -> None:
     # --- Hydrate firebase config from state on resumed runs ---
@@ -1400,6 +1413,48 @@ def step_env_local(ctx: Context) -> None:
     ok(f"uploaded packages/platform-ui/.env.local (0600, owned by deploy)")
     _upload_env_file(ctx, compose_env, f"{REMOTE_DEPLOY_DIR}/.env")
     ok(f"uploaded /opt/mediforce/.env (0600, owned by deploy)")
+
+
+def step_postgres_dir(ctx: Context) -> None:
+    """Create the Postgres bind-mount data dir at /var/lib/mediforce/postgres-data.
+
+    docker-compose.staging.yml bind-mounts the host path into the postgres
+    container so `docker compose down -v` cannot wipe staging data. The dir
+    must exist and be owned by UID 999 (postgres-alpine's postgres user)
+    before the container starts, or initdb fails.
+
+    Idempotent — verifies existing ownership and exits early if already
+    correct. Uses the same rootful-alpine trick as deploy-staging.sh
+    because the deploy user lacks sudo.
+    """
+    host_dir = "/var/lib/mediforce/postgres-data"
+    probe = ssh(
+        ctx,
+        f"if [ -d {shlex.quote(host_dir)} ]; then stat -c '%u:%g' {shlex.quote(host_dir)}; else echo MISSING; fi",
+    )
+    current = probe.stdout.strip()
+    if current == "999:999":
+        ok(f"{host_dir} exists with correct ownership (999:999)")
+        return
+
+    info(f"{host_dir} state: {current!r} — needs mkdir or chown to 999:999")
+
+    if ctx.dry_run:
+        if current == "MISSING":
+            info(f"[dry-run] would mkdir -p {host_dir} && chown -R 999:999 {host_dir}")
+        else:
+            info(f"[dry-run] would chown -R 999:999 {host_dir}")
+        return
+
+    # Rootful alpine elevates without sudo — deploy is in the docker group.
+    fix_cmd = (
+        "docker run --rm -v /var/lib:/host/var/lib alpine:latest "
+        "sh -c 'mkdir -p /host/var/lib/mediforce/postgres-data && "
+        "chown -R 999:999 /host/var/lib/mediforce/postgres-data'"
+    )
+    result = ssh(ctx, fix_cmd, check=True)
+    if result.rc == 0:
+        ok(f"created {host_dir} owned by 999:999")
 
 
 def step_firewall(ctx: Context) -> None:
@@ -1584,6 +1639,7 @@ STEPS: list[tuple[str, str, Callable[[Context], None]]] = [
     ("api_keys",         "API keys",                             step_api_keys),
     ("domain",           "Domain",                               step_domain),
     ("env_local",        "Assemble and upload env files",        step_env_local),
+    ("postgres_dir",     "Postgres data dir (bind mount)",       step_postgres_dir),
     ("firewall",         "Firewall (UFW)",                       step_firewall),
     ("first_deploy",     "First deploy (running scripts/deploy.sh)", step_first_deploy),
     ("smoke_test",       "Smoke test",                           step_smoke_test),
