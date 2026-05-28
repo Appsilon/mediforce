@@ -1,10 +1,93 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { where, orderBy } from 'firebase/firestore';
 import type { HumanTask, CoworkSession } from '@mediforce/platform-core';
+import { ACTIONABLE_STATUSES } from '@mediforce/platform-api/contract';
+import { mediforce } from '@/lib/mediforce';
+import { queryKeys } from '@/lib/query-keys';
 import { useCollection } from './use-collection';
 
+const STANDARD_LIVE_INTERVAL_MS = 5_000;
+
+/**
+ * Role-scoped actionable task queue, react-query backed (STANDARD LIVE per
+ * ADR-0006 §4). Returns the same `{ data, loading, error }` shape as the
+ * Firestore-backed `useMyTasks(null, …)` fallback below so callers swap
+ * in mechanically once an "all my visible tasks" endpoint axis exists.
+ */
+export function useMyActionableTasksByRole(
+  assignedRole: string,
+  currentUserId?: string | null,
+): { data: HumanTask[]; loading: boolean; error: Error | null } {
+  const query = useQuery({
+    queryKey: queryKeys.tasks.byRole(assignedRole, { status: [...ACTIONABLE_STATUSES] }),
+    queryFn: async () => {
+      const result = await mediforce.tasks.list({
+        role: assignedRole,
+        status: [...ACTIONABLE_STATUSES],
+      });
+      return result.tasks;
+    },
+    refetchInterval: STANDARD_LIVE_INTERVAL_MS,
+  });
+
+  const filtered = useMemo(() => {
+    const tasks = query.data ?? [];
+    const notDeleted = tasks.filter((t) => !t.deleted);
+    if (currentUserId === undefined || currentUserId === null) return notDeleted;
+    return notDeleted.filter(
+      (t) => t.assignedUserId === null || t.assignedUserId === currentUserId,
+    );
+  }, [query.data, currentUserId]);
+
+  return {
+    data: filtered,
+    loading: query.isLoading,
+    error: (query.error as Error | null) ?? null,
+  };
+}
+
+/**
+ * Role-scoped completed task list, react-query backed (STANDARD LIVE).
+ * Sorts `completedAt` desc client-side — the API does not promise an order.
+ */
+export function useCompletedTasksByRole(
+  assignedRole: string,
+): { data: HumanTask[]; loading: boolean; error: Error | null } {
+  const query = useQuery({
+    queryKey: queryKeys.tasks.byRole(assignedRole, { status: ['completed'] }),
+    queryFn: async () => {
+      const result = await mediforce.tasks.list({
+        role: assignedRole,
+        status: ['completed'],
+      });
+      return result.tasks;
+    },
+    refetchInterval: STANDARD_LIVE_INTERVAL_MS,
+  });
+
+  const filtered = useMemo(() => {
+    const tasks = (query.data ?? []).filter((t) => !t.deleted);
+    return [...tasks].sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''));
+  }, [query.data]);
+
+  return {
+    data: filtered,
+    loading: query.isLoading,
+    error: (query.error as Error | null) ?? null,
+  };
+}
+
+/**
+ * @deprecated PR3 — Firestore `onSnapshot` fallback. The `role === null`
+ * caller pattern (workspace home / workflow detail / runs list) needs an
+ * "all tasks visible to me" axis on `mediforce.tasks.list` before it can
+ * migrate to react-query; that endpoint extension lands with PR3. PR1
+ * keeps this hook intact so PR3 pages keep working without regression.
+ * For the role-provided path, use `useMyActionableTasksByRole` instead.
+ */
 export function useMyTasks(assignedRole: string | null, currentUserId?: string | null) {
   const constraints = useMemo(
     () =>
@@ -42,6 +125,10 @@ export function useMyTasks(assignedRole: string | null, currentUserId?: string |
   return { data: filtered, loading, error };
 }
 
+/**
+ * @deprecated PR3 — Firestore fallback for the `role === null` branch.
+ * For the role-provided path, use `useCompletedTasksByRole` instead.
+ */
 export function useCompletedTasks(assignedRole: string | null) {
   const constraints = useMemo(
     () =>
@@ -68,13 +155,6 @@ export function useCompletedTasks(assignedRole: string | null) {
   );
 
   return { data: filtered, loading, error };
-}
-
-export function useAllTasks() {
-  const constraints = useMemo(() => [orderBy('createdAt', 'desc')], []);
-  const result = useCollection<HumanTask>('humanTasks', constraints);
-  const data = useMemo(() => result.data.filter((task) => !task.deleted), [result.data]);
-  return { ...result, data };
 }
 
 export function useActiveTaskForInstance(processInstanceId: string | null) {
