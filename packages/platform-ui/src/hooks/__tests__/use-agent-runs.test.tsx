@@ -50,6 +50,12 @@ describe('useAgentRuns', () => {
     expect(result.current.error).toBe(err);
     expect(listMock).toHaveBeenCalledTimes(1);
   });
+
+  it('does not fire while handle is empty (page still resolving URL params)', () => {
+    const { wrapper } = createQueryWrapper();
+    renderHook(() => useAgentRuns(''), { wrapper });
+    expect(listMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('useAgentRunsForStep', () => {

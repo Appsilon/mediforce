@@ -26,10 +26,14 @@ function stopRetryOn4xx(failureCount: number, err: unknown): boolean {
 }
 
 /**
- * List agent runs visible to the caller via `mediforce.agentRuns.list`.
+ * List agent runs scoped to a workspace via `mediforce.agentRuns.list`.
  * STANDARD LIVE per ADR-0006 §4 — polls every 5 s for fresh runs.
+ *
+ * `handle` is required: a missing namespace filter would give system-actor
+ * callers (CLI / agent runtime) a cross-workspace firehose, and there is no
+ * legitimate UI surface that wants every run across every workspace.
  */
-export function useAgentRuns(handle?: string): {
+export function useAgentRuns(handle: string): {
   data: AgentRun[];
   loading: boolean;
   error: Error | null;
@@ -37,18 +41,17 @@ export function useAgentRuns(handle?: string): {
   const query = useQuery({
     queryKey: queryKeys.agentRuns.list(handle),
     queryFn: async () => {
-      const result = await mediforce.agentRuns.list(
-        handle !== undefined ? { namespace: handle } : {},
-      );
+      const result = await mediforce.agentRuns.list({ namespace: handle });
       return result.runs;
     },
+    enabled: handle.length > 0,
     retry: stopRetryOn4xx,
     refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
   });
 
   return {
     data: query.data ?? [],
-    loading: query.isLoading,
+    loading: handle.length > 0 && query.isLoading,
     error: (query.error as Error | null) ?? null,
   };
 }
