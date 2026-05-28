@@ -84,10 +84,34 @@ export class FirestoreAgentRunRepository implements AgentRunRepository {
     // that made the UI's user-actor path ~40 s on a 2.3k-run workspace.
     // Same shape as the CLI's system-actor `raw.list` for the read budget.
     //
+    // Note: this path intentionally does NOT parse the parent documents
+    // through `ProcessInstanceSchema` — only `doc.id` is read — so a
+    // corrupt field on a legacy ProcessInstance (e.g. missing `updatedAt`
+    // on pre-migration rows) cannot poison the agent-runs response.
+    //
     // Over-fetch by 2x absorbs namespace-filter attrition for the common
-    // "all my workspaces" view without paging twice. Postgres makes this
-    // a single keyset query with a join condition — drop both passes
-    // when the agent-runs domain migrates (ADR-0001).
+    // "all my workspaces" view without paging twice.
+    //
+    // The `AuthorizedAgentRunRepository` workspace gate is unchanged —
+    // every row still matches `allowedInstanceIds.has(...)` derived from
+    // the caller's membership set. Only the fetch shape changed.
+    //
+    // TODO(post-postgres-migration, ADR-0001 / #588):
+    //   - Denormalise `namespace` onto the AgentRun row so the entire
+    //     listInNamespaces becomes one keyset query:
+    //       SELECT ... FROM agent_runs
+    //         WHERE namespace IN ($1, $2, ...)
+    //           [AND (started_at, id) < ($cursor_ts, $cursor_id)]
+    //         ORDER BY started_at DESC, id DESC
+    //         LIMIT $limit + 1
+    //   - Drop the separate `listInNamespaces` method on the interface and
+    //     collapse it into `list({ namespace?: string[], ... })` — the
+    //     authorized wrapper passes the caller's membership set directly.
+    //   - Drop the `limit * 2` over-fetch — Postgres returns exactly
+    //     `limit + 1` from a filter-pushdown query, so attrition is zero.
+    //   - Reconsider whether the AuthorizedRepo wrapper is still needed
+    //     once Postgres RLS (or an equivalent storage-layer policy) can
+    //     enforce the namespace constraint at the row level.
     const allowedInstanceIds = new Set<string>();
     await Promise.all(
       allowed.map(async (ns) => {
