@@ -15,7 +15,7 @@ import { useUserProfiles } from '@/hooks/use-users';
 import { useProcessDefinitions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
 import { useWorkflowDefinitionsApi } from '@/hooks/use-workflows-api';
-import { useMyTasks } from '@/hooks/use-tasks';
+import { useMyActionableTasks } from '@/hooks/use-tasks';
 import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons, isActiveStatus } from '@/components/processes/process-card';
 import { WorkflowProblems } from '@/components/processes/workflow-problems';
 import { OpenRouterCreditsIndicator } from '@/components/namespace/openrouter-credits-indicator';
@@ -494,7 +494,7 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
 
   const { definitions, stepsByDefinition, latestDocs, loading: defsLoading } = useProcessDefinitions();
   const { data: allInstances, loading: instancesLoading } = useProcessInstances('all', undefined, false, handle);
-  const { data: activeTasks } = useMyTasks(null);
+  const { data: activeTasks } = useMyActionableTasks();
 
   const loading = defsLoading || instancesLoading;
 
