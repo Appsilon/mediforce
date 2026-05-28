@@ -5,7 +5,7 @@
  * runtime on workspaces with more than 30 active runs.
  */
 import { describe, it, expect, vi } from 'vitest';
-import type { Firestore } from 'firebase-admin/firestore';
+import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import { InMemoryProcessInstanceRepository } from '@mediforce/platform-core/testing';
 import { FirestoreHumanTaskRepository } from '../firestore/human-task-repository';
 
@@ -15,14 +15,25 @@ interface InCall {
   readonly values: readonly string[];
 }
 
-function makeDb(
-  docsByChunk: ReadonlyArray<ReadonlyArray<Record<string, unknown>>> = [],
-): { db: Firestore; calls: InCall[] } {
+interface MockCollection {
+  readonly calls: InCall[];
+  readonly query: Record<string, unknown>;
+}
+
+function buildCollection(
+  docsByChunk: ReadonlyArray<ReadonlyArray<Record<string, unknown>>>,
+): MockCollection {
   const calls: InCall[] = [];
   const query: Record<string, unknown> = {};
-  query.where = vi.fn((field: string, op: string, value: unknown) => {
+  query.where = vi.fn((field: unknown, op: string, value: unknown) => {
     if (op === 'in' && Array.isArray(value)) {
-      calls.push({ field, op, values: [...(value as string[])] });
+      const label =
+        typeof field === 'string'
+          ? field
+          : field instanceof FieldPath
+            ? '__name__'
+            : 'unknown';
+      calls.push({ field: label, op, values: [...(value as string[])] });
     }
     return query;
   });
@@ -32,13 +43,27 @@ function makeDb(
     const docs = docsByChunk[idx] ?? [];
     return { docs: docs.map((d) => ({ id: String(d.id ?? 'x'), data: () => d })) };
   });
+  return { calls, query };
+}
+
+function makeDb(
+  docsByChunk: ReadonlyArray<ReadonlyArray<Record<string, unknown>>> = [],
+  parentDocsByChunk: ReadonlyArray<ReadonlyArray<Record<string, unknown>>> = [],
+): {
+  db: Firestore;
+  calls: InCall[];
+  parentCalls: InCall[];
+} {
+  const tasks = buildCollection(docsByChunk);
+  const parents = buildCollection(parentDocsByChunk);
   const db = {
     collection: vi.fn((name: string) => {
-      if (name !== 'humanTasks') throw new Error(`unexpected: ${name}`);
-      return query;
+      if (name === 'humanTasks') return tasks.query;
+      if (name === 'processInstances') return parents.query;
+      throw new Error(`unexpected: ${name}`);
     }),
   } as unknown as Firestore;
-  return { db, calls };
+  return { db, calls: tasks.calls, parentCalls: parents.calls };
 }
 
 function ids(count: number): string[] {
@@ -130,4 +155,94 @@ describe('FirestoreHumanTaskRepository.getByInstanceIdsAll', () => {
     expect(result[0].id).toBe('task-legacy');
     expect(result[0].status).toBe('cancelled');
   });
+});
+
+describe('FirestoreHumanTaskRepository.getByInstanceIdsInNamespaces', () => {
+  it('returns [] without touching Firestore when given an empty input', async () => {
+    const { db, calls, parentCalls } = makeDb();
+    const parents = new InMemoryProcessInstanceRepository();
+    const repo = new FirestoreHumanTaskRepository(db, parents);
+
+    const result = await repo.getByInstanceIdsInNamespaces([], ['ns-a']);
+
+    expect(result).toEqual([]);
+    expect(calls).toHaveLength(0);
+    expect(parentCalls).toHaveLength(0);
+  });
+
+  it('chunks 31 ids into 30 + 1 parent-ns lookups via __name__', async () => {
+    const allIds = ids(31);
+    const parentDocs = allIds.map((id) => ({ id, namespace: 'ns-a' }));
+    const { db, calls, parentCalls } = makeDb(
+      [allIds.map((id) => ({ id: `task-${id}`, processInstanceId: id }))],
+      [parentDocs.slice(0, 30), parentDocs.slice(30)],
+    );
+    const parents = new InMemoryProcessInstanceRepository();
+    const repo = new FirestoreHumanTaskRepository(db, parents);
+
+    await repo.getByInstanceIdsInNamespaces(allIds, ['ns-a']);
+
+    expect(parentCalls).toHaveLength(2);
+    expect(parentCalls[0].field).toBe('__name__');
+    expect(parentCalls[0].values).toHaveLength(30);
+    expect(parentCalls[1].values).toHaveLength(1);
+    expect(calls.map((c) => c.values.length)).toEqual([30, 1]);
+  });
+
+  it('chunks 322 ids into 11 parent-ns lookups [30×10, 22]', async () => {
+    const allIds = ids(322);
+    const parentDocs = allIds.map((id) => ({ id, namespace: 'ns-a' }));
+    const parentChunks: Record<string, unknown>[][] = [];
+    for (let i = 0; i < parentDocs.length; i += 30) {
+      parentChunks.push(parentDocs.slice(i, i + 30));
+    }
+    const taskChunks: Record<string, unknown>[][] = [];
+    for (let i = 0; i < allIds.length; i += 30) {
+      taskChunks.push(
+        allIds.slice(i, i + 30).map((id) => ({ id: `task-${id}`, processInstanceId: id })),
+      );
+    }
+    const { db, calls, parentCalls } = makeDb(taskChunks, parentChunks);
+    const parents = new InMemoryProcessInstanceRepository();
+    const repo = new FirestoreHumanTaskRepository(db, parents);
+
+    await repo.getByInstanceIdsInNamespaces(allIds, ['ns-a']);
+
+    expect(parentCalls.map((c) => c.values.length)).toEqual([
+      30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 22,
+    ]);
+    expect(calls.map((c) => c.values.length)).toEqual([
+      30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 22,
+    ]);
+  });
+
+  it('drops ids whose parent namespace is not in allowed before fetching tasks', async () => {
+    const allIds = ids(4);
+    const parentDocs = [
+      { id: allIds[0], namespace: 'ns-a' },
+      { id: allIds[1], namespace: 'ns-b' },
+      { id: allIds[2], namespace: 'ns-a' },
+      // allIds[3] missing — orphan parent doc
+    ];
+    const { db, calls, parentCalls } = makeDb(
+      [
+        [
+          { id: 'task-0', processInstanceId: allIds[0] },
+          { id: 'task-2', processInstanceId: allIds[2] },
+        ],
+      ],
+      [parentDocs],
+    );
+    const parents = new InMemoryProcessInstanceRepository();
+    const repo = new FirestoreHumanTaskRepository(db, parents);
+
+    const result = await repo.getByInstanceIdsInNamespaces(allIds, ['ns-a']);
+
+    expect(parentCalls).toHaveLength(1);
+    expect(parentCalls[0].values).toEqual(allIds);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].values).toEqual([allIds[0], allIds[2]]);
+    expect(result.map((t) => t.id)).toEqual(['task-0', 'task-2']);
+  });
+
 });

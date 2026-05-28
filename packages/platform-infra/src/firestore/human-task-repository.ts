@@ -1,4 +1,4 @@
-import type { Firestore } from 'firebase-admin/firestore';
+import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import {
   HumanTaskSchema,
   type HumanTask,
@@ -109,12 +109,37 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
     instanceIds: readonly string[],
     allowed: readonly string[],
   ): Promise<HumanTask[]> {
-    const namespaces = await Promise.all(
-      instanceIds.map((id) => this.parents.getNamespaceById(id)),
+    if (instanceIds.length === 0) return [];
+    // Bulk-resolve parent namespaces in chunks of 30 — Firestore's `in`
+    // operator limit. 322 parents collapse from 322 single-doc gets
+    // (~37 s saturated user-actor monitoring on appsilon) to ~11
+    // parallel indexed queries (~2 s).
+    const chunkSize = 30;
+    const chunks: string[][] = [];
+    for (let i = 0; i < instanceIds.length; i += chunkSize) {
+      chunks.push([...instanceIds.slice(i, i + chunkSize)]);
+    }
+    const allowedSet = new Set(allowed);
+    const snapshots = await Promise.all(
+      chunks.map((chunk) =>
+        this.db
+          .collection('processInstances')
+          .where(FieldPath.documentId(), 'in', chunk)
+          .get(),
+      ),
     );
-    const allowedIds = instanceIds.filter((_, i) => {
-      const ns = namespaces[i];
-      return ns !== null && allowed.includes(ns);
+    const namespaceById = new Map<string, string>();
+    for (const snap of snapshots) {
+      for (const doc of snap.docs) {
+        const ns = (doc.data() as { namespace?: unknown }).namespace;
+        if (typeof ns === 'string' && ns.length > 0) {
+          namespaceById.set(doc.id, ns);
+        }
+      }
+    }
+    const allowedIds = instanceIds.filter((id) => {
+      const ns = namespaceById.get(id);
+      return ns !== undefined && allowedSet.has(ns);
     });
     return this.getByInstanceIdsAll(allowedIds);
   }
