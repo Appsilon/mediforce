@@ -49,12 +49,11 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
   const definitionVersion = instance ? Number.parseInt(instance.definitionVersion, 10) : NaN;
   const definitionName = instance?.definitionName ?? '';
   const defQuery = useQuery({
-    queryKey: [
-      'workflow',
+    queryKey: queryKeys.workflow(
       handle,
       definitionName,
-      Number.isFinite(definitionVersion) ? definitionVersion : 'latest',
-    ] as const,
+      Number.isFinite(definitionVersion) ? definitionVersion : undefined,
+    ),
     queryFn: () =>
       mediforce.workflows.get({
         name: definitionName,

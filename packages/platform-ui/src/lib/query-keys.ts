@@ -47,6 +47,11 @@ export const queryKeys = {
    *  invalidate `['audit']` across every detail page if needed. */
   audit: (runId: string) => ['audit', runId] as const,
 
+  /** Workflow definition lookup — scoped by workspace handle + definition
+   *  name + version. Version `undefined` is the "latest" lookup. */
+  workflow: (handle: string, name: string, version: number | undefined) =>
+    ['workflow', handle, name, version ?? 'latest'] as const,
+
   cowork: {
     /** Session metadata key (status, artifact, model, voice config). */
     session: (sessionId: string) => ['cowork', sessionId] as const,

@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ProcessInstance } from '@mediforce/platform-core';
-import { ApiError, mediforce } from '@/lib/mediforce';
+import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { snapshotCache } from '@/lib/optimistic';
 
@@ -118,10 +118,6 @@ export function useStartRun() {
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.runs.all() });
-    },
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-      return failureCount < 2;
     },
   });
 }
