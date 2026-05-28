@@ -964,29 +964,62 @@ Multi-tab live sync intentionally excluded — no demand. ChatGPT and Claude.ai 
 
 ### Phase 4 — UI off Firestore (gating for ADR-0001 cutover)
 
+**Status:** plan finalized 2026-05-28 — see
+[`headless-migration-phase-4-plan.md`](./headless-migration-phase-4-plan.md)
+for the authoritative implementation plan + per-consumer migration
+table + PR sizing. Cache architecture in
+[`ADR-0006`](./adr/0006-client-side-server-state.md). ADR-0001 §5
+amendment bundled with the plan (SSE deferred; polling at cutover).
+
 **Folded from previous Phase 4 + Phase 6 (2026-05-27).** Original split —
 "typed apiClient + first hook" vs "remaining UI data fetching" — was
 artificial. The typed `Mediforce` client already exists (started in #232,
-expanded alongside every Phase 1-3 endpoint), used punctually by
-`StepHistoryTabs` and `TaskDetail.siblingTasks`. Practical effort = one
+expanded alongside every Phase 1-3 endpoint). Practical effort = one
 stream: rewrite every UI consumer that imports `firebase/firestore` to go
-through `mediforce.X.Y()` + SSE. Treating it as one phase reflects reality.
+through `mediforce.X.Y()` + react-query. Treating it as one phase reflects
+reality.
 
 **Gating for ADR-0001.** Postgres has no `onSnapshot` equivalent. PG PR2
 ([#534](https://github.com/Appsilon/mediforce/pull/534)) — server-side
 Firestore deletion + cutover script — is explicitly blocked on this phase.
-Sequencing per ADR-0001 §8 + PR2 description:
+The PRD ([`headless-migration-phase-4-plan.md`](./headless-migration-phase-4-plan.md))
+holds the per-PR sequencing; high-level cutover order per ADR-0001 §8 + PR2 description:
 
 1. Merge PG PR1 ([#515](https://github.com/Appsilon/mediforce/pull/515)) —
    tracer-bullet `STORAGE_BACKEND=postgres` flag + `PostgresToolCatalogRepository`.
 2. **This phase** — UI off Firestore. Behavioural no-op alone (Firestore
    stays the server data layer); UI just routes reads through
-   `mediforce.X.Y()` + SSE instead of `onSnapshot`.
+   `mediforce.X.Y()` + react-query instead of `onSnapshot`.
 3. Staging cutover via `scripts/migrate-firestore-to-postgres/`.
 4. Merge PG PR2 ([#534](https://github.com/Appsilon/mediforce/pull/534)) —
    server flips to Postgres, `STORAGE_BACKEND` flag removed,
    `platform-infra/src/firestore/` deleted.
 5. Production cutover.
+
+**Locked decisions** (full reasoning in PRD + [`ADR-0006`](./adr/0006-client-side-server-state.md)):
+
+- Cache library: **`@tanstack/react-query`**.
+- Polling at cutover for every surface (CRITICAL LIVE 1–2 s, STANDARD LIVE 5 s,
+  NICE LIVE 30 s, ONE-SHOT). SSE deferred to a focused follow-up; ADR-0001 §5
+  amended to match.
+- **Six new endpoints** (`GET /api/users/me` with lazy bootstrap,
+  `GET /api/namespaces/:handle`, `POST /api/namespaces`,
+  `GET /api/agent-runs` + single, `GET /api/namespaces/:handle/monitoring/summary`).
+  Two contract extensions (`ListTasks +instanceId+stepId`, chat handler
+  `+session+turns`). No `/api/audit-events` (existing per-run audit covers).
+- **Six PRs** (per-resource tracer): tasks + react-query foundation →
+  agent-runs + monitoring → processes → namespaces + auth → cowork → final
+  flip (delete `lib/firebase.ts`).
+- `use-collection.ts` deleted (consumers fold into specific endpoints);
+  `use-user-namespace.ts` becomes a selector over `useUserMe()`.
+- Cowork live-turn observation: optimistic prepend + polling 1 s gated on
+  `useMutation.isPending`, 5 s idle.
+
+Everything below this point about scope / live-update / cache library /
+endpoint inventory / decision tree was the pre-grilling working hypothesis.
+The PRD supersedes it. Kept here only as historical context until PR-final
+merges, at which point this section reduces to a one-line "done" pointer at
+the PRD.
 
 **Scope — 22 files importing `firebase/firestore`, 11 with live `onSnapshot`:**
 
