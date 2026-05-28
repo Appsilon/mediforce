@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import type { HumanTask, HumanTaskStatus } from '@mediforce/platform-core';
-import { mediforce } from '@/lib/mediforce';
+import { ApiError, mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 
 const TERMINAL: ReadonlySet<HumanTaskStatus> = new Set(['completed', 'cancelled']);
@@ -19,21 +19,35 @@ export function useTask(taskId: string | undefined): {
   task: HumanTask | null;
   loading: boolean;
   error: Error | null;
+  notFound: boolean;
 } {
   const query = useQuery({
     queryKey: queryKeys.task(taskId ?? ''),
     queryFn: () => mediforce.tasks.get({ taskId: taskId as string }),
     enabled: taskId !== undefined,
+    // Validation / authorisation failures are not transient — a 4xx will keep
+    // failing. Don't waste two retry attempts before showing the error.
+    retry: (failureCount, err) => {
+      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
+      return failureCount < 2;
+    },
     refetchInterval: (q) => {
+      // Stop polling once the query has errored — a persistent 4xx (validation,
+      // not-found, forbidden) does not recover on its own, and a 1.5s retry
+      // loop spams the backend + flickers the UI.
+      if (q.state.error !== null) return false;
       const status = q.state.data?.status;
       if (status === undefined) return CRITICAL_LIVE_INTERVAL_MS;
       return TERMINAL.has(status) ? false : CRITICAL_LIVE_INTERVAL_MS;
     },
   });
 
+  const err = taskId === undefined ? null : (query.error as Error | null) ?? null;
+  const notFound = err instanceof ApiError && err.status === 404;
   return {
     task: taskId === undefined ? null : query.data ?? null,
     loading: query.isLoading && taskId !== undefined,
-    error: taskId === undefined ? null : (query.error as Error | null) ?? null,
+    error: notFound ? null : err,
+    notFound,
   };
 }

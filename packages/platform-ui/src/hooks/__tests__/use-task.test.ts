@@ -5,9 +5,12 @@ import { buildHumanTask } from '@mediforce/platform-core/testing';
 import { createQueryWrapper } from '@/test/react-query';
 
 const getMock = vi.fn<(...args: unknown[]) => Promise<HumanTask>>();
+class ApiError extends Error {
+  constructor(public status: number, message: string) { super(message); }
+}
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { tasks: { get: getMock } },
-  ApiError: class ApiError extends Error {},
+  ApiError,
 }));
 
 const { useTask } = await import('../use-task');
@@ -46,8 +49,9 @@ describe('useTask', () => {
     expect(result.current.error).toBeNull();
   });
 
-  it('surfaces errors without leaving loading stuck', async () => {
-    const err = new Error('not found');
+  it('surfaces non-404 errors without leaving loading stuck', async () => {
+    // 4xx (non-404) — fast-fail per the retry policy, no transient-retry wait.
+    const err = new ApiError(403, 'forbidden');
     getMock.mockRejectedValue(err);
     const { wrapper } = createQueryWrapper();
 
@@ -55,7 +59,43 @@ describe('useTask', () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBe(err);
+    expect(result.current.notFound).toBe(false);
     expect(result.current.task).toBeNull();
+  });
+
+  it('signals notFound=true for 404 without surfacing the error', async () => {
+    getMock.mockRejectedValue(new ApiError(404, 'Task not found'));
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = renderHook(() => useTask('t-1'), { wrapper });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.notFound).toBe(true);
+    expect(result.current.error).toBeNull();
+    expect(result.current.task).toBeNull();
+  });
+
+  it('stops polling once the query has errored', async () => {
+    getMock.mockRejectedValue(new ApiError(400, 'Invalid input'));
+    const { wrapper } = createQueryWrapper();
+
+    renderHook(() => useTask('t-1'), { wrapper });
+
+    await waitFor(() => expect(getMock).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(getMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry on 4xx (fast-fail)', async () => {
+    getMock.mockRejectedValue(new ApiError(400, 'Invalid input'));
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = renderHook(() => useTask('t-1'), { wrapper });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    // Default retry would call 3x (1 + 2 retries). Custom retry returns false
+    // for 4xx, so call count is 1.
+    expect(getMock).toHaveBeenCalledTimes(1);
   });
 
   it('keeps polling while the task is non-terminal (CRITICAL LIVE 1.5s)', async () => {
