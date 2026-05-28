@@ -52,7 +52,16 @@ export async function chatCoworkSession(
       input.sessionId,
       agentTurn(result.agentText, result.artifact ?? null),
     );
-    return { turnId: agentTurnId, ...result };
+    const finalSession = await loadOr404(
+      scope.coworkSessions.getById(input.sessionId),
+      'Session disappeared after saving agent turn',
+    );
+    return {
+      turnId: agentTurnId,
+      ...result,
+      session: finalSession,
+      turns: finalSession.turns,
+    };
   } finally {
     if (mcp !== null) await mcp.manager.disconnect().catch(() => {});
   }

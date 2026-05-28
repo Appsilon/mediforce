@@ -46,6 +46,9 @@ import { secretDeleteCommand } from './commands/secret-delete.js';
 import { taskListCommand } from './commands/task-list.js';
 import { taskGetCommand } from './commands/task-get.js';
 import { taskClaimCommand } from './commands/task-claim.js';
+import { coworkGetCommand } from './commands/cowork-get.js';
+import { coworkGetByInstanceCommand } from './commands/cowork-get-by-instance.js';
+import { coworkChatCommand } from './commands/cowork-chat.js';
 import { type CommandFn } from './define-command.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
@@ -96,6 +99,17 @@ export const TREE: Record<string, BranchEntry> = {
       list: { description: 'List tasks by role or instance', fn: taskListCommand },
       get: { description: 'Fetch a single task', fn: taskGetCommand },
       claim: { description: 'Claim a pending task', fn: taskClaimCommand },
+    },
+  },
+  cowork: {
+    description: 'Cowork sessions (get, get-by-instance, chat)',
+    leaves: {
+      get: { description: 'Fetch a single cowork session', fn: coworkGetCommand },
+      'get-by-instance': {
+        description: 'Fetch the active cowork session for a process instance',
+        fn: coworkGetByInstanceCommand,
+      },
+      chat: { description: 'Send a chat message to a cowork session', fn: coworkChatCommand },
     },
   },
   agent: {
