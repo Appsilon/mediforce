@@ -102,13 +102,11 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
     instanceIds: readonly string[],
     allowed: readonly string[],
   ): Promise<HumanTask[]> {
-    const allowedIds: string[] = [];
-    for (const id of instanceIds) {
-      const parent = await this.parents.getById(id);
-      if (parent && typeof parent.namespace === 'string' && allowed.includes(parent.namespace)) {
-        allowedIds.push(id);
-      }
-    }
+    const parents = await Promise.all(instanceIds.map((id) => this.parents.getById(id)));
+    const allowedIds = instanceIds.filter((_, i) => {
+      const parent = parents[i];
+      return parent !== null && typeof parent.namespace === 'string' && allowed.includes(parent.namespace);
+    });
     return this.getByInstanceIdsAll(allowedIds);
   }
 

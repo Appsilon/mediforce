@@ -78,13 +78,11 @@ export class InMemoryHumanTaskRepository implements HumanTaskRepository {
     allowed: readonly string[],
   ): Promise<HumanTask[]> {
     const parents = this.requireParents();
-    const allowedIds: string[] = [];
-    for (const id of instanceIds) {
-      const parent = await parents.getById(id);
-      if (parent && typeof parent.namespace === 'string' && allowed.includes(parent.namespace)) {
-        allowedIds.push(id);
-      }
-    }
+    const resolved = await Promise.all(instanceIds.map((id) => parents.getById(id)));
+    const allowedIds = instanceIds.filter((_, i) => {
+      const parent = resolved[i];
+      return parent !== null && typeof parent.namespace === 'string' && allowed.includes(parent.namespace);
+    });
     return this.getByInstanceIdsAll(allowedIds);
   }
 
