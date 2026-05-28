@@ -7,20 +7,23 @@ import type {
 } from '@mediforce/platform-core';
 
 /**
- * In-memory `NamespaceRepository` shared across handler tests. Mirrors the
- * Firestore impl's atomic mutations so tests can observe both sides of a
- * member remove or cascade delete (member subcollection + the denormalised
- * `users/{uid}.organizations` array).
+ * In-memory `NamespaceRepository` shared by every test that exercises the
+ * namespace handlers, the integration loopback, or the getMe bootstrap path.
+ * Mirrors the Firestore impl's atomic mutations so tests can observe both
+ * sides of an "atomic" operation: the member subcollection AND the
+ * denormalised `users/{uid}.organizations` array.
  */
 export class InMemoryNamespaceRepo implements NamespaceRepository {
   readonly namespaces = new Map<string, Namespace>();
   readonly members = new Map<string, NamespaceMember[]>();
   readonly userOrganizations = new Map<string, string[]>();
 
+  /** Seed a namespace doc without touching the member subcollection. */
   seedNamespace(namespace: Namespace): void {
     this.namespaces.set(namespace.handle, namespace);
   }
 
+  /** Seed a member doc and keep the denormalised organizations array in sync. */
   seedMember(handle: string, member: NamespaceMember): void {
     const existing = this.members.get(handle) ?? [];
     this.members.set(handle, [...existing.filter((m) => m.uid !== member.uid), member]);
@@ -52,8 +55,21 @@ export class InMemoryNamespaceRepo implements NamespaceRepository {
     }
     this.namespaces.set(handle, merged as Namespace);
   }
-  async getNamespacesByUser(): Promise<Namespace[]> {
-    return [];
+  async getNamespacesByUser(uid: string): Promise<Namespace[]> {
+    const out: Namespace[] = [];
+    const seen = new Set<string>();
+    for (const ns of this.namespaces.values()) {
+      if (ns.type === 'personal' && ns.linkedUserId === uid) {
+        out.push(ns);
+        seen.add(ns.handle);
+      }
+    }
+    for (const handle of this.userOrganizations.get(uid) ?? []) {
+      if (seen.has(handle)) continue;
+      const ns = this.namespaces.get(handle);
+      if (ns !== undefined) out.push(ns);
+    }
+    return out;
   }
   async addMember(handle: string, member: NamespaceMember): Promise<void> {
     this.seedMember(handle, member);
@@ -86,10 +102,22 @@ export class InMemoryNamespaceRepo implements NamespaceRepository {
   async getMembers(handle: string): Promise<NamespaceMember[]> {
     return this.members.get(handle) ?? [];
   }
-  async getUserNamespaces(): Promise<Namespace[]> {
-    return [];
+  async getUserNamespaces(uid: string): Promise<Namespace[]> {
+    return this.getNamespacesByUser(uid);
   }
-  async getMembershipsForUser(): Promise<readonly NamespaceMembership[]> {
-    return [];
+  async getMembershipsForUser(uid: string): Promise<readonly NamespaceMembership[]> {
+    const out: NamespaceMembership[] = [];
+    for (const ns of this.namespaces.values()) {
+      if (ns.type === 'personal' && ns.linkedUserId === uid) {
+        out.push({ handle: ns.handle, role: 'owner' });
+      }
+    }
+    for (const handle of this.userOrganizations.get(uid) ?? []) {
+      const member = await this.getMember(handle, uid);
+      if (member !== null && !out.some((m) => m.handle === handle)) {
+        out.push({ handle, role: member.role });
+      }
+    }
+    return out;
   }
 }

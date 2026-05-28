@@ -85,11 +85,13 @@ export { clearMustChangePassword } from './users/clear-must-change-password.js';
 
 export { getNamespace } from './namespaces/get-namespace.js';
 export { createNamespace } from './namespaces/create-namespace.js';
-export { updateNamespace } from './namespaces/update-namespace.js';
-export { deleteNamespace } from './namespaces/delete-namespace.js';
-export { leaveNamespace } from './namespaces/leave-namespace.js';
-export { removeNamespaceMember } from './namespaces/remove-member.js';
-export { updateNamespaceMemberRole } from './namespaces/update-member-role.js';
+export {
+  updateNamespace,
+  deleteNamespace,
+  leaveNamespace,
+  removeNamespaceMember,
+  updateNamespaceMemberRole,
+} from './namespaces/namespace-mutations.js';
 
 export { listToolCatalogEntries } from './tool-catalog/list-entries.js';
 export { getToolCatalogEntry } from './tool-catalog/get-entry.js';

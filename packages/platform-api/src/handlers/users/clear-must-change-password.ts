@@ -1,3 +1,4 @@
+import { emitAudit } from '../../audit-helpers.js';
 import { ForbiddenError, ValidationError } from '../../errors.js';
 import type { CallerScope } from '../../repositories/index.js';
 import type {
@@ -17,14 +18,9 @@ export async function clearMustChangePassword(
 
   await scope.userProfiles.setMustChangePassword(uid, false);
 
-  const now = new Date().toISOString();
-  await scope.system.audit.append({
-    actorId: scope.caller.kind === 'user' ? scope.caller.uid : 'system',
-    actorType: scope.caller.kind === 'user' ? 'user' : 'system',
-    actorRole: scope.caller.kind === 'user' ? 'operator' : 'system',
+  await emitAudit(scope.system.audit, scope.caller, {
     action: 'user.password_change_acknowledged',
     description: `User '${uid}' acknowledged forced password change`,
-    timestamp: now,
     inputSnapshot: { uid },
     outputSnapshot: { uid, mustChangePassword: false },
     basis: 'User completed forced password change',

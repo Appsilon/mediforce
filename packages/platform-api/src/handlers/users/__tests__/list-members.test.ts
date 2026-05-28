@@ -1,76 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type {
-  NamespaceMember,
-  NamespaceRepository,
-  UserDirectoryService,
-} from '@mediforce/platform-core';
+import type { NamespaceMember, UserDirectoryService } from '@mediforce/platform-core';
+import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index.js';
 import { listNamespaceMembers } from '../list-members.js';
 import { NotFoundError } from '../../../errors.js';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
 
 const ALPHA_MEMBERS: NamespaceMember[] = [
-  {
-    uid: 'uid-owner',
-    role: 'owner',
-    displayName: 'Alpha Owner',
-    joinedAt: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    uid: 'uid-member',
-    role: 'member',
-    joinedAt: '2026-02-01T00:00:00.000Z',
-  },
+  { uid: 'uid-owner', role: 'owner', displayName: 'Alpha Owner', joinedAt: '2026-01-01T00:00:00.000Z' },
+  { uid: 'uid-member', role: 'member', joinedAt: '2026-02-01T00:00:00.000Z' },
 ];
-
-function namespaceRepoWith(members: ReadonlyMap<string, NamespaceMember[]>): NamespaceRepository {
-  return {
-    async getNamespace() {
-      return null;
-    },
-    async createNamespace() {
-      /* no-op */
-    },
-    async createNamespaceWithOwner() {
-      /* no-op */
-    },
-    async updateNamespace() {
-      /* no-op */
-    },
-    async getNamespacesByUser() {
-      return [];
-    },
-    async addMember() {
-      /* no-op */
-    },
-    async removeMember() {
-      /* no-op */
-    },
-    async removeMemberWithOrganizations() {
-      /* no-op */
-    },
-    async setMemberRole() {
-      /* no-op */
-    },
-    async deleteNamespaceCascade() {
-      /* no-op */
-    },
-    async getMember() {
-      return null;
-    },
-    async getMembers(handle: string) {
-      return members.get(handle) ?? [];
-    },
-    async getUserNamespaces() {
-      return [];
-    },
-    async getMembershipsForUser() {
-      return [];
-    },
-  };
-}
 
 function directoryWith(
   map: ReadonlyMap<string, { email: string | null; lastSignInTime: string | null } | null>,
@@ -88,11 +25,12 @@ function directoryWith(
 }
 
 describe('listNamespaceMembers handler', () => {
-  let namespaceRepo: NamespaceRepository;
+  let namespaceRepo: InMemoryNamespaceRepo;
   let directory: UserDirectoryService;
 
   beforeEach(() => {
-    namespaceRepo = namespaceRepoWith(new Map([['alpha', ALPHA_MEMBERS]]));
+    namespaceRepo = new InMemoryNamespaceRepo();
+    for (const m of ALPHA_MEMBERS) namespaceRepo.seedMember('alpha', m);
     directory = directoryWith(
       new Map([
         ['uid-owner', { email: 'owner@alpha.test', lastSignInTime: '2026-05-01T10:00:00.000Z' }],

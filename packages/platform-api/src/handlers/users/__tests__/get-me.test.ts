@@ -1,133 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type {
-  Namespace,
-  NamespaceMember,
-  NamespaceMembership,
-  NamespaceRepository,
-  NamespaceUpdates,
-  UserDirectoryService,
-} from '@mediforce/platform-core';
+import type { UserDirectoryService } from '@mediforce/platform-core';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
+import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index.js';
 import { getMe } from '../get-me.js';
 import { ForbiddenError, ValidationError } from '../../../errors.js';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-
-class InMemoryNamespaceRepository implements NamespaceRepository {
-  readonly namespaces = new Map<string, Namespace>();
-  readonly members = new Map<string, NamespaceMember[]>();
-  readonly userOrganizations = new Map<string, string[]>();
-
-  setNamespace(namespace: Namespace): void {
-    this.namespaces.set(namespace.handle, namespace);
-  }
-
-  setMembership(handle: string, member: NamespaceMember): void {
-    const existing = this.members.get(handle) ?? [];
-    this.members.set(handle, [...existing.filter((m) => m.uid !== member.uid), member]);
-    const orgs = this.userOrganizations.get(member.uid) ?? [];
-    if (!orgs.includes(handle)) {
-      this.userOrganizations.set(member.uid, [...orgs, handle]);
-    }
-  }
-
-  async getNamespace(handle: string): Promise<Namespace | null> {
-    return this.namespaces.get(handle) ?? null;
-  }
-  async createNamespace(namespace: Namespace): Promise<void> {
-    this.namespaces.set(namespace.handle, namespace);
-  }
-  async createNamespaceWithOwner(input: {
-    namespace: Namespace;
-    ownerMember: NamespaceMember;
-  }): Promise<void> {
-    this.namespaces.set(input.namespace.handle, input.namespace);
-    this.setMembership(input.namespace.handle, input.ownerMember);
-  }
-  async updateNamespace(handle: string, updates: NamespaceUpdates): Promise<void> {
-    const existing = this.namespaces.get(handle);
-    if (existing === undefined) return;
-    const merged: Record<string, unknown> = { ...existing };
-    for (const [key, value] of Object.entries(updates)) {
-      if (value === undefined) continue;
-      if (value === null) {
-        delete merged[key];
-      } else {
-        merged[key] = value;
-      }
-    }
-    this.namespaces.set(handle, merged as Namespace);
-  }
-  async getNamespacesByUser(uid: string): Promise<Namespace[]> {
-    const out: Namespace[] = [];
-    const seen = new Set<string>();
-    for (const ns of this.namespaces.values()) {
-      if (ns.type === 'personal' && ns.linkedUserId === uid) {
-        out.push(ns);
-        seen.add(ns.handle);
-      }
-    }
-    for (const handle of this.userOrganizations.get(uid) ?? []) {
-      if (seen.has(handle)) continue;
-      const ns = this.namespaces.get(handle);
-      if (ns !== undefined) out.push(ns);
-    }
-    return out;
-  }
-  async addMember(handle: string, member: NamespaceMember): Promise<void> {
-    this.setMembership(handle, member);
-  }
-  async removeMember(handle: string, uid: string): Promise<void> {
-    const list = this.members.get(handle) ?? [];
-    this.members.set(handle, list.filter((m) => m.uid !== uid));
-  }
-  async removeMemberWithOrganizations(handle: string, uid: string): Promise<void> {
-    await this.removeMember(handle, uid);
-    const orgs = this.userOrganizations.get(uid) ?? [];
-    this.userOrganizations.set(uid, orgs.filter((h) => h !== handle));
-  }
-  async setMemberRole(handle: string, uid: string, role: NamespaceMember['role']): Promise<void> {
-    const list = this.members.get(handle) ?? [];
-    this.members.set(handle, list.map((m) => (m.uid === uid ? { ...m, role } : m)));
-  }
-  async deleteNamespaceCascade(handle: string): Promise<void> {
-    const list = this.members.get(handle) ?? [];
-    for (const member of list) {
-      const orgs = this.userOrganizations.get(member.uid) ?? [];
-      this.userOrganizations.set(member.uid, orgs.filter((h) => h !== handle));
-    }
-    this.members.delete(handle);
-    this.namespaces.delete(handle);
-  }
-  async getMember(handle: string, uid: string): Promise<NamespaceMember | null> {
-    return this.members.get(handle)?.find((m) => m.uid === uid) ?? null;
-  }
-  async getMembers(handle: string): Promise<NamespaceMember[]> {
-    return this.members.get(handle) ?? [];
-  }
-  async getUserNamespaces(uid: string): Promise<Namespace[]> {
-    return this.getNamespacesByUser(uid);
-  }
-  async getMembershipsForUser(uid: string): Promise<readonly NamespaceMembership[]> {
-    const out: NamespaceMembership[] = [];
-    for (const ns of this.namespaces.values()) {
-      if (ns.type === 'personal' && ns.linkedUserId === uid) {
-        out.push({ handle: ns.handle, role: 'owner' });
-      }
-    }
-    for (const handle of this.userOrganizations.get(uid) ?? []) {
-      const member = await this.getMember(handle, uid);
-      if (member !== null) {
-        if (!out.some((m) => m.handle === handle)) {
-          out.push({ handle, role: member.role });
-        }
-      }
-    }
-    return out;
-  }
-}
 
 function directoryWith(uid: string, metadata: { email: string | null; displayName: string | null }): UserDirectoryService {
   return {
@@ -142,11 +18,11 @@ function directoryWith(uid: string, metadata: { email: string | null; displayNam
 }
 
 describe('getMe handler', () => {
-  let namespaceRepo: InMemoryNamespaceRepository;
+  let namespaceRepo: InMemoryNamespaceRepo;
   let auditRepo: InMemoryAuditRepository;
 
   beforeEach(() => {
-    namespaceRepo = new InMemoryNamespaceRepository();
+    namespaceRepo = new InMemoryNamespaceRepo();
     auditRepo = new InMemoryAuditRepository();
   });
 
@@ -215,14 +91,14 @@ describe('getMe handler', () => {
   });
 
   it('does not create or emit when personal namespace already exists', async () => {
-    namespaceRepo.setNamespace({
+    namespaceRepo.seedNamespace({
       handle: 'alice',
       type: 'personal',
       displayName: 'Alice',
       linkedUserId: 'uid-1',
       createdAt: '2026-01-01T00:00:00.000Z',
     });
-    namespaceRepo.setMembership('alice', {
+    namespaceRepo.seedMember('alice', {
       uid: 'uid-1',
       role: 'owner',
       joinedAt: '2026-01-01T00:00:00.000Z',
@@ -268,13 +144,13 @@ describe('getMe handler', () => {
   });
 
   it('includes organization memberships with their role alongside the personal namespace', async () => {
-    namespaceRepo.setNamespace({
+    namespaceRepo.seedNamespace({
       handle: 'acme',
       type: 'organization',
       displayName: 'Acme Co.',
       createdAt: '2026-01-01T00:00:00.000Z',
     });
-    namespaceRepo.setMembership('acme', {
+    namespaceRepo.seedMember('acme', {
       uid: 'uid-1',
       role: 'admin',
       joinedAt: '2026-02-01T00:00:00.000Z',
@@ -316,7 +192,7 @@ describe('getMe handler', () => {
   });
 
   it('appends a numeric suffix when the base handle is already taken', async () => {
-    namespaceRepo.setNamespace({
+    namespaceRepo.seedNamespace({
       handle: 'alice',
       type: 'personal',
       displayName: 'someone else',

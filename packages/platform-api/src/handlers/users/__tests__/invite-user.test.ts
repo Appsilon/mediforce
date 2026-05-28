@@ -1,16 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
-import type {
-  Namespace,
-  NamespaceMember,
-  NamespaceRepository,
-} from '@mediforce/platform-core';
+import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index.js';
 import { inviteUser } from '../invite-user.js';
 import { ForbiddenError, PreconditionFailedError } from '../../../errors.js';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
 import type {
   InviteNotificationService,
   InviteService,
@@ -18,64 +10,6 @@ import type {
   SendInviteEmailInput,
   SendWorkspaceNotificationEmailInput,
 } from '../../../services/invite-notification.js';
-
-class InMemoryNamespaceRepository implements NamespaceRepository {
-  readonly members = new Map<string, NamespaceMember[]>();
-  readonly userOrganizations = new Map<string, string[]>();
-  private readonly namespaces = new Map<string, Namespace>();
-
-  setNamespace(namespace: Namespace): void {
-    this.namespaces.set(namespace.handle, namespace);
-  }
-
-  async getNamespace(handle: string): Promise<Namespace | null> {
-    return this.namespaces.get(handle) ?? null;
-  }
-  async createNamespace(): Promise<void> {
-    /* not exercised */
-  }
-  async createNamespaceWithOwner(): Promise<void> {
-    /* not exercised */
-  }
-  async updateNamespace(): Promise<void> {
-    /* not exercised */
-  }
-  async getNamespacesByUser(): Promise<Namespace[]> {
-    return [];
-  }
-  async addMember(handle: string, member: NamespaceMember): Promise<void> {
-    const list = this.members.get(handle) ?? [];
-    this.members.set(handle, [...list.filter((m) => m.uid !== member.uid), member]);
-    const orgs = this.userOrganizations.get(member.uid) ?? [];
-    if (!orgs.includes(handle)) {
-      this.userOrganizations.set(member.uid, [...orgs, handle]);
-    }
-  }
-  async removeMember(): Promise<void> {
-    /* not exercised */
-  }
-  async removeMemberWithOrganizations(): Promise<void> {
-    /* not exercised */
-  }
-  async setMemberRole(): Promise<void> {
-    /* not exercised */
-  }
-  async deleteNamespaceCascade(): Promise<void> {
-    /* not exercised */
-  }
-  async getMember(): Promise<NamespaceMember | null> {
-    return null;
-  }
-  async getMembers(handle: string): Promise<NamespaceMember[]> {
-    return this.members.get(handle) ?? [];
-  }
-  async getUserNamespaces(): Promise<Namespace[]> {
-    return [];
-  }
-  async getMembershipsForUser(): Promise<readonly never[]> {
-    return [];
-  }
-}
 
 function inviteServiceReturning(result: InvitedUser): InviteService {
   return {
@@ -115,11 +49,11 @@ const baseInput = {
 };
 
 describe('inviteUser handler', () => {
-  let namespaceRepo: InMemoryNamespaceRepository;
+  let namespaceRepo: InMemoryNamespaceRepo;
   let auditRepo: InMemoryAuditRepository;
 
   beforeEach(() => {
-    namespaceRepo = new InMemoryNamespaceRepository();
+    namespaceRepo = new InMemoryNamespaceRepo();
     auditRepo = new InMemoryAuditRepository();
   });
 
@@ -265,7 +199,7 @@ describe('inviteUser handler', () => {
   });
 
   it('sends the workspace-notification email for an existing user', async () => {
-    namespaceRepo.setNamespace({
+    namespaceRepo.seedNamespace({
       handle: 'alpha',
       type: 'organization',
       displayName: 'Alpha Workspace',

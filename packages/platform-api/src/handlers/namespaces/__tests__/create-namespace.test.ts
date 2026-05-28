@@ -1,85 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type {
-  Namespace,
-  NamespaceMember,
-  NamespaceMembership,
-  NamespaceRepository,
-} from '@mediforce/platform-core';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
+import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index.js';
 import { createNamespace } from '../create-namespace.js';
 import { ConflictError, ForbiddenError } from '../../../errors.js';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-
-class InMemoryNamespaceRepository implements NamespaceRepository {
-  readonly namespaces = new Map<string, Namespace>();
-  readonly members = new Map<string, NamespaceMember[]>();
-  readonly userOrganizations = new Map<string, string[]>();
-
-  async getNamespace(handle: string): Promise<Namespace | null> {
-    return this.namespaces.get(handle) ?? null;
-  }
-  async createNamespace(namespace: Namespace): Promise<void> {
-    this.namespaces.set(namespace.handle, namespace);
-  }
-  async createNamespaceWithOwner(input: {
-    namespace: Namespace;
-    ownerMember: NamespaceMember;
-  }): Promise<void> {
-    this.namespaces.set(input.namespace.handle, input.namespace);
-    const members = this.members.get(input.namespace.handle) ?? [];
-    this.members.set(input.namespace.handle, [
-      ...members.filter((m) => m.uid !== input.ownerMember.uid),
-      input.ownerMember,
-    ]);
-    const orgs = this.userOrganizations.get(input.ownerMember.uid) ?? [];
-    if (!orgs.includes(input.namespace.handle)) {
-      this.userOrganizations.set(input.ownerMember.uid, [...orgs, input.namespace.handle]);
-    }
-  }
-  async updateNamespace(): Promise<void> {
-    /* not exercised */
-  }
-  async getNamespacesByUser(): Promise<Namespace[]> {
-    return [];
-  }
-  async addMember(): Promise<void> {
-    /* not exercised */
-  }
-  async removeMember(): Promise<void> {
-    /* not exercised */
-  }
-  async removeMemberWithOrganizations(): Promise<void> {
-    /* not exercised */
-  }
-  async setMemberRole(): Promise<void> {
-    /* not exercised */
-  }
-  async deleteNamespaceCascade(): Promise<void> {
-    /* not exercised */
-  }
-  async getMember(handle: string, uid: string): Promise<NamespaceMember | null> {
-    return this.members.get(handle)?.find((m) => m.uid === uid) ?? null;
-  }
-  async getMembers(handle: string): Promise<NamespaceMember[]> {
-    return this.members.get(handle) ?? [];
-  }
-  async getUserNamespaces(): Promise<Namespace[]> {
-    return [];
-  }
-  async getMembershipsForUser(): Promise<readonly NamespaceMembership[]> {
-    return [];
-  }
-}
 
 describe('createNamespace handler', () => {
-  let namespaceRepo: InMemoryNamespaceRepository;
+  let namespaceRepo: InMemoryNamespaceRepo;
   let auditRepo: InMemoryAuditRepository;
 
   beforeEach(() => {
-    namespaceRepo = new InMemoryNamespaceRepository();
+    namespaceRepo = new InMemoryNamespaceRepo();
     auditRepo = new InMemoryAuditRepository();
   });
 

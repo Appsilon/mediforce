@@ -41,17 +41,10 @@ import type {
   UpdateNamespaceInput,
   LeaveNamespaceInput,
 } from '@mediforce/platform-api/contract';
-import type {
-  Namespace,
-  NamespaceMember,
-  NamespaceMembership,
-  NamespaceRepository,
-  NamespaceUpdates,
-} from '@mediforce/platform-core';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { Mediforce, ApiError } from '@mediforce/platform-api/client';
 import { createRouteAdapter } from '../../lib/route-adapter';
-import { createTestScope } from '@mediforce/platform-api/testing';
+import { InMemoryNamespaceRepo, createTestScope } from '@mediforce/platform-api/testing';
 
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 
@@ -539,92 +532,6 @@ describe('Mediforce client ↔ route-adapter ↔ leaveNamespace (in-process)', (
     expect(namespaceRepo.members.get('acme')?.map((m) => m.uid)).toContain('uid-owner');
   });
 });
-
-class InMemoryNamespaceRepo implements NamespaceRepository {
-  readonly namespaces = new Map<string, Namespace>();
-  readonly members = new Map<string, NamespaceMember[]>();
-  readonly userOrganizations = new Map<string, string[]>();
-
-  async getNamespace(handle: string): Promise<Namespace | null> {
-    return this.namespaces.get(handle) ?? null;
-  }
-  async createNamespace(namespace: Namespace): Promise<void> {
-    this.namespaces.set(namespace.handle, namespace);
-  }
-  async createNamespaceWithOwner(input: {
-    namespace: Namespace;
-    ownerMember: NamespaceMember;
-  }): Promise<void> {
-    this.namespaces.set(input.namespace.handle, input.namespace);
-    const members = this.members.get(input.namespace.handle) ?? [];
-    this.members.set(input.namespace.handle, [...members, input.ownerMember]);
-    const orgs = this.userOrganizations.get(input.ownerMember.uid) ?? [];
-    if (!orgs.includes(input.namespace.handle)) {
-      this.userOrganizations.set(input.ownerMember.uid, [...orgs, input.namespace.handle]);
-    }
-  }
-  async updateNamespace(handle: string, updates: NamespaceUpdates): Promise<void> {
-    const existing = this.namespaces.get(handle);
-    if (existing === undefined) return;
-    const merged: Record<string, unknown> = { ...existing };
-    for (const [key, value] of Object.entries(updates)) {
-      if (value === undefined) continue;
-      if (value === null) {
-        delete merged[key];
-      } else {
-        merged[key] = value;
-      }
-    }
-    this.namespaces.set(handle, merged as Namespace);
-  }
-  async getNamespacesByUser(): Promise<Namespace[]> {
-    return [];
-  }
-  async addMember(handle: string, member: NamespaceMember): Promise<void> {
-    const existing = this.members.get(handle) ?? [];
-    this.members.set(handle, [...existing.filter((m) => m.uid !== member.uid), member]);
-    const orgs = this.userOrganizations.get(member.uid) ?? [];
-    if (!orgs.includes(handle)) this.userOrganizations.set(member.uid, [...orgs, handle]);
-  }
-  async removeMember(handle: string, uid: string): Promise<void> {
-    const existing = this.members.get(handle) ?? [];
-    this.members.set(handle, existing.filter((m) => m.uid !== uid));
-  }
-  async removeMemberWithOrganizations(handle: string, uid: string): Promise<void> {
-    await this.removeMember(handle, uid);
-    const orgs = this.userOrganizations.get(uid) ?? [];
-    this.userOrganizations.set(uid, orgs.filter((h) => h !== handle));
-  }
-  async setMemberRole(handle: string, uid: string, role: NamespaceMember['role']): Promise<void> {
-    const existing = this.members.get(handle) ?? [];
-    this.members.set(
-      handle,
-      existing.map((m) => (m.uid === uid ? { ...m, role } : m)),
-    );
-  }
-  async deleteNamespaceCascade(handle: string): Promise<void> {
-    const existing = this.members.get(handle) ?? [];
-    for (const member of existing) {
-      const orgs = this.userOrganizations.get(member.uid) ?? [];
-      this.userOrganizations.set(member.uid, orgs.filter((h) => h !== handle));
-    }
-    this.members.delete(handle);
-    this.namespaces.delete(handle);
-  }
-  async getMember(handle: string, uid: string): Promise<NamespaceMember | null> {
-    const existing = this.members.get(handle) ?? [];
-    return existing.find((m) => m.uid === uid) ?? null;
-  }
-  async getMembers(handle: string): Promise<NamespaceMember[]> {
-    return this.members.get(handle) ?? [];
-  }
-  async getUserNamespaces(): Promise<Namespace[]> {
-    return [];
-  }
-  async getMembershipsForUser(): Promise<readonly NamespaceMembership[]> {
-    return [];
-  }
-}
 
 // Fourth integration scenario: `runs.list` with the new `namespace` filter.
 // Confirms wire field flows adapter → handler → scope.runs.list → in-memory
