@@ -378,7 +378,7 @@ export default function AgentsPage() {
               onChange={(e) => setProcessFilter(e.target.value || null)}
               className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
             >
-              <option key="" value="">All Workflows</option>
+              <option key="__all" value="">All Workflows</option>
               {processNames.map((name) => (
                 <option key={name} value={name}>
                   {name}
@@ -391,7 +391,7 @@ export default function AgentsPage() {
               onChange={(e) => setStatusFilter(e.target.value || null)}
               className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
             >
-              <option key="" value="">All Statuses</option>
+              <option key="__all" value="">All Statuses</option>
               {ALL_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {status.replace(/_/g, ' ')}
