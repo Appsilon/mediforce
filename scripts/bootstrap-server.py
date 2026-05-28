@@ -15,17 +15,25 @@ so sync flows keep working).
 State is persisted at ~/.mediforce/bootstrap-<host>.json so the run is
 resumable after Ctrl+C or a network hiccup.
 
-The script is **idempotent on existing servers**: re-running it reads
-the existing /opt/mediforce/.env, hydrates managed secrets back into
-memory, and only generates values that are actually missing. Existing
-PLATFORM_API_KEY / SECRETS_ENCRYPTION_KEY / OPENROUTER_API_KEY /
-POSTGRES_PASSWORD survive the round-trip unchanged. Unmanaged keys (any
-operator-added entries) are preserved verbatim under a comment-labeled
-section in the re-rendered file. Every upload also leaves a timestamped
-.bak-YYYYMMDDTHHMMSSZ copy of the previous file next to it. This is how
-you add a new env var to an already-bootstrapped deployment: extend
-_render_compose_env, then `--from-step 10 --dry-run` against each
-target host to preview, then drop --dry-run.
+The script **attempts to be safe to re-run against existing servers**
+— not byte-idempotent (the rendered .env carries a fresh
+`# Generated: …` timestamp, every scp upload creates a new
+`.bak-<UTC>` copy, and step_first_deploy rebuilds docker images), and
+the re-run path is **not yet battle-tested in production**, so the
+operator stays in the loop via preview + dry-run. The intent:
+re-running reads the existing /opt/mediforce/.env, hydrates managed
+secrets back into memory, and only generates values that are actually
+missing. Existing PLATFORM_API_KEY / SECRETS_ENCRYPTION_KEY /
+OPENROUTER_API_KEY / POSTGRES_PASSWORD should survive the round-trip
+unchanged. Unmanaged keys (operator-added entries) are preserved
+verbatim under a comment-labeled section in the re-rendered file.
+Every upload also leaves a timestamped .bak-YYYYMMDDTHHMMSSZ copy of
+the previous file next to it — defense in depth for the hydration
+code, not the other way around. To add a new env var to an
+already-bootstrapped deployment: extend _render_compose_env, then
+`--from-step N --to-step M --dry-run` to scope a contiguous block of
+steps against each target host, review the preview, then drop
+--dry-run.
 
 Usage:
     python3 scripts/bootstrap-server.py                                # interactive, fresh server
@@ -1382,6 +1390,38 @@ def _fetch_remote_compose_env(ctx: Context) -> Optional[dict[str, str]]:
     return parsed
 
 
+def _fetch_remote_env_local(ctx: Context) -> dict[str, str]:
+    """Read /opt/mediforce/packages/platform-ui/.env.local from the server.
+
+    Returns {} when the file doesn't exist or can't be read. Unlike
+    _fetch_remote_compose_env, the absence of this file is benign — the
+    standalone Next.js container doesn't depend on it, so we don't need
+    to raise on probe failure. We only care about OPENAI_API_KEY since
+    it's the one key that lives here and not in /opt/mediforce/.env.
+    """
+    remote_path = f"{REMOTE_DEPLOY_DIR}/packages/platform-ui/.env.local"
+    script = (
+        f"if [ ! -f {shlex.quote(remote_path)} ]; then echo __MISSING__; exit 0; "
+        f"fi; cat {shlex.quote(remote_path)}"
+    )
+    probe = ssh(ctx, script)
+    if probe.rc != 0 or probe.stdout.strip().startswith("__MISSING__"):
+        return {}
+    parsed: dict[str, str] = {}
+    for line in probe.stdout.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key = key.strip()
+        val = val.strip()
+        if len(val) >= 2 and val[0] == val[-1] and val[0] in ("'", '"'):
+            val = val[1:-1]
+        if key:
+            parsed[key] = val
+    return parsed
+
+
 def _backup_remote_file_if_exists(ctx: Context, remote_path: str) -> Optional[str]:
     """If `remote_path` exists, copy it to `<remote_path>.bak-<UTC timestamp>`.
 
@@ -1446,8 +1486,18 @@ def _ensure_api_keys(ctx: Context) -> None:
     if remote_env is None:
         info("No existing /opt/mediforce/.env on server — fresh-server flow.")
     else:
+        # Also pick up OPENAI_API_KEY from the matching .env.local —
+        # it lives there, not in the compose env. Failure to hydrate it
+        # would silently empty the field in the re-rendered .env.local.
+        remote_env_local = _fetch_remote_env_local(ctx)
+        if remote_env_local:
+            openai_from_local = remote_env_local.get("OPENAI_API_KEY", "")
+            if openai_from_local and "OPENAI_API_KEY" not in ctx.collected:
+                ctx.collected["OPENAI_API_KEY"] = openai_from_local
+                ok("hydrated OPENAI_API_KEY from remote .env.local")
+
         hydrated_keys = []
-        for key in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "PLATFORM_API_KEY",
+        for key in ("OPENROUTER_API_KEY", "PLATFORM_API_KEY",
                     "SECRETS_ENCRYPTION_KEY", "POSTGRES_PASSWORD"):
             # _render_compose_env writes OPENROUTER as DOCKER_OPENROUTER_API_KEY;
             # the in-memory key keeps its un-prefixed name, so map back here.
@@ -1458,6 +1508,39 @@ def _ensure_api_keys(ctx: Context) -> None:
                 hydrated_keys.append(key)
         if hydrated_keys:
             ok(f"hydrated from remote /opt/mediforce/.env: {', '.join(hydrated_keys)}")
+        # DOMAIN is non-secret but persisted in remote .env; hydrate into
+        # ctx.state so step_domain skips its prompt on re-runs that used
+        # a different --host alias (state file is per-host-string).
+        remote_domain = remote_env.get("DOMAIN", "")
+        if remote_domain and not ctx.state.domain:
+            ctx.state.domain = remote_domain
+            ctx.state.save()
+            ok(f"hydrated DOMAIN from remote .env: {remote_domain} (saved to state)")
+        # Firebase web SDK config is also persisted in remote .env (as
+        # NEXT_PUBLIC_FIREBASE_* lines). Hydrate so step_env_local's
+        # "Loaded Firebase web SDK config from state" path fires instead
+        # of falling through to a re-fetch via the Firebase CLI (which
+        # fails if the operator isn't logged in to firebase on this laptop).
+        fb_field_map = {
+            "apiKey": "NEXT_PUBLIC_FIREBASE_API_KEY",
+            "authDomain": "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+            "projectId": "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+            "storageBucket": "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
+            "messagingSenderId": "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
+            "appId": "NEXT_PUBLIC_FIREBASE_APP_ID",
+        }
+        if not ctx.state.firebase_web_config:
+            hydrated_fb = {
+                local_key: remote_env[remote_key]
+                for local_key, remote_key in fb_field_map.items()
+                if remote_env.get(remote_key)
+            }
+            if hydrated_fb.get("projectId"):
+                ctx.state.firebase_web_config = hydrated_fb
+                if not ctx.state.firebase_project_id:
+                    ctx.state.firebase_project_id = hydrated_fb["projectId"]
+                ctx.state.save()
+                ok(f"hydrated Firebase web SDK config from remote .env ({hydrated_fb['projectId']})")
         # Stash any keys the bootstrap script does NOT manage (e.g. MAILGUN_*,
         # operator-added overrides) so step_env_local can carry them through
         # to the re-rendered file. Without this, the scp upload would silently
