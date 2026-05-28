@@ -254,6 +254,27 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       error: null,
       assignedRoles: ['reviewer'],
     },
+    // Dedicated completed instance for archive-from-list journey — isolated so
+    // archiving doesn't affect other tests that read proc-completed-1/2.
+    'proc-archive-target': {
+      id: 'proc-archive-target',
+      namespace: 'test',
+      definitionName: 'Data Quality Review',
+      definitionVersion: '2.1.0',
+      configName: 'all-human',
+      configVersion: '1',
+      status: 'completed',
+      currentStepId: null,
+      variables: { studyId: 'study-archive' },
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: twoDaysAgo,
+      createdBy: testUserId,
+      pauseReason: null,
+      error: null,
+      assignedRoles: ['reviewer'],
+    },
     'proc-human-waiting': {
       id: 'proc-human-waiting',
       namespace: 'test',
