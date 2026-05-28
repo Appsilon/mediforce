@@ -49,9 +49,11 @@ export function useAuditEvents(processInstanceId: string | null): {
     return [...events].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   }, [query.data]);
 
+  // `isPending` keeps the skeleton on while the first fetch is in flight;
+  // gated by `enabled` so a deliberate `null` id surfaces `loading: false`.
   return {
     data,
-    loading: query.isLoading && enabled,
+    loading: enabled && query.isPending,
     error: (query.error as Error | null) ?? null,
   };
 }

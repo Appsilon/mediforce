@@ -69,9 +69,14 @@ export function useProcessInstances(
     return runs.filter((inst) => showArchived || inst.archived !== true);
   }, [query.data, showArchived]);
 
+  // While `namespace` hasn't resolved yet (route params still loading) the
+  // query is disabled — `query.isPending` is true but `query.data` is also
+  // undefined. Reporting `loading: false` in that window let the page render
+  // its empty state ("No runs found.") before the first fetch even started.
+  // Treat namespace-pending as loading so the skeleton holds.
   return {
     data,
-    loading: query.isLoading && namespace.length > 0,
+    loading: namespace.length === 0 || query.isPending,
     error: (query.error as Error | null) ?? null,
   };
 }
@@ -106,9 +111,12 @@ export function useProcessInstance(instanceId: string | null) {
   const err = enabled ? (query.error as Error | null) ?? null : null;
   const notFound = err instanceof ApiError && err.status === 404;
 
+  // `isPending` (no data yet) keeps the skeleton on while the query is
+  // running its first fetch; gated by `enabled` so a deliberate `null` id
+  // surfaces `loading: false` (caller knows it isn't asking for anything).
   return {
     data: notFound ? null : query.data ?? null,
-    loading: query.isLoading && enabled,
+    loading: enabled && query.isPending,
     error: notFound ? null : err,
     notFound,
   };

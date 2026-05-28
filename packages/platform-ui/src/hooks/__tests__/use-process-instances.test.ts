@@ -84,7 +84,11 @@ describe('useProcessInstances — react-query backed', () => {
       { wrapper },
     );
     expect(listMock).not.toHaveBeenCalled();
-    expect(result.current.loading).toBe(false);
+    // Reports loading=true so callers keep the skeleton on while the route
+    // param is still resolving — prevents the "no runs" flash before the
+    // first fetch even starts.
+    expect(result.current.loading).toBe(true);
+    expect(result.current.data).toEqual([]);
   });
 
   it('forwards the status filter to the API (apiStatus !== "all")', async () => {
