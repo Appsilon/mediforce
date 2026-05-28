@@ -110,6 +110,7 @@ export function createRouteAdapter<
     } catch (err) {
       if (err instanceof HandlerError) return jsonErrorResponse(err);
       if (err instanceof z.ZodError) {
+        console.error('[route-adapter] handler ZodError:', err.issues);
         return jsonErrorResponse(new HandlerError('validation', 'Invalid input', err.issues));
       }
       console.error('[route-adapter] handler error:', err);

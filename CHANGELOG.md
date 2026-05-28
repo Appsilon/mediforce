@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Fixed
+- `StepParamSchema.type` widened from a strict enum to `z.string().min(1).default('string')` so human-task GETs no longer 400 when the param uses a widget hint the UI already renders (e.g. `textarea`, `multiselect`). Non-string `type` still fails parsing — only the enum was the bug. Route adapter also `console.error`s handler ZodErrors so similar mismatches are debuggable from the server log.
+
 ### Changed
 - Phase 4 PR1 — react-query foundation (ADR-0006) + tasks domain migrated off `firebase/firestore` (task detail page, claim button optimistic, role-scoped queues). New `mediforce task` CLI subcommand.
 - ADR-0005 Phase 2.5 — 18 endpoints (workflow-definition mutations, agents, secret read companions, processes archive/bulk) migrated to headless handlers; `actions/processes.ts` and `actions/definitions.ts` deleted. `transferWorkflow` now gates both source and target namespace, `deleteWorkflow` audit actor fixed, and archive / setDefault / register / copy / setVisibility now emit audit events.
