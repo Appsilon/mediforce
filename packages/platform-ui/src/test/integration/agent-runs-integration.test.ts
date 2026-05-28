@@ -14,7 +14,7 @@ import {
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { Mediforce } from '@mediforce/platform-api/client';
 import { createRouteAdapter } from '../../lib/route-adapter';
-import { createTestScope } from '@mediforce/platform-api/testing';
+import { createTestScope, userCaller } from '@mediforce/platform-api/testing';
 
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 
@@ -112,5 +112,58 @@ describe('Mediforce client ↔ route-adapter ↔ agentRuns handlers (in-process)
     await expect(mediforce.agentRuns.get({ agentRunId: 'nope' })).rejects.toMatchObject({
       status: 404,
     });
+  });
+});
+
+describe('Mediforce client ↔ route-adapter ↔ agentRuns handlers (user caller cross-workspace)', () => {
+  let agentRunRepo: InMemoryAgentRunRepository;
+  let instanceRepo: InMemoryProcessInstanceRepository;
+  let mediforce: Mediforce;
+
+  beforeEach(async () => {
+    instanceRepo = new InMemoryProcessInstanceRepository();
+    agentRunRepo = new InMemoryAgentRunRepository(instanceRepo);
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-1', namespace: 'team-alpha' }));
+    await agentRunRepo.create(buildAgentRun({ id: 'ar-1', processInstanceId: 'inst-1' }));
+
+    const caller = userCaller('u-1', ['team-alpha']);
+    const listRoute = createRouteAdapter(
+      ListAgentRunsInputSchema,
+      (req) => {
+        const p = req.nextUrl.searchParams;
+        return {
+          namespace: p.get('namespace') ?? undefined,
+          runId: p.get('runId') ?? undefined,
+          stepId: p.get('stepId') ?? undefined,
+          limit: p.get('limit') ?? undefined,
+          cursor: p.get('cursor') ?? undefined,
+        };
+      },
+      listAgentRuns,
+      {
+        resolveCaller: async () => caller,
+        buildScope: (c) => createTestScope({ caller: c, agentRunRepo, instanceRepo }),
+      },
+    );
+
+    mediforce = new Mediforce({
+      fetch: async (input, init) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
+        return listRoute(new NextRequest(absolute, init));
+      },
+    });
+  });
+
+  it('returns a 403 envelope when the user is not a member of the requested workspace', async () => {
+    await expect(mediforce.agentRuns.list({ namespace: 'team-beta' })).rejects.toMatchObject({
+      status: 403,
+      code: 'forbidden',
+    });
+  });
+
+  it('returns only the runs from the user’s own workspace when no namespace filter is set', async () => {
+    const { runs } = await mediforce.agentRuns.list({});
+    expect(runs.map((r) => r.id)).toEqual(['ar-1']);
   });
 });

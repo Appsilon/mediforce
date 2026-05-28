@@ -92,3 +92,53 @@ describe('useAgentRun', () => {
     expect(result.current.data?.id).toBe('ar-9');
   });
 });
+
+describe('useAgentRun polling (CRITICAL LIVE 1.5s)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('keeps polling while the run is non-terminal (running)', async () => {
+    getMock.mockResolvedValue({ run: buildAgentRun({ id: 'ar-1', status: 'running' }) });
+    const { wrapper } = createQueryWrapper();
+    renderHook(() => useAgentRun('ar-1'), { wrapper });
+
+    await waitFor(() => expect(getMock).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(1600);
+    await waitFor(() => expect(getMock).toHaveBeenCalledTimes(2));
+    await vi.advanceTimersByTimeAsync(1600);
+    await waitFor(() => expect(getMock).toHaveBeenCalledTimes(3));
+  });
+
+  it('stops polling once the run reaches a terminal status (completed)', async () => {
+    getMock.mockResolvedValueOnce({ run: buildAgentRun({ id: 'ar-1', status: 'running' }) });
+    getMock.mockResolvedValue({ run: buildAgentRun({ id: 'ar-1', status: 'completed' }) });
+    const { wrapper } = createQueryWrapper();
+    renderHook(() => useAgentRun('ar-1'), { wrapper });
+
+    await waitFor(() => expect(getMock).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(1600);
+    await waitFor(() => expect(getMock).toHaveBeenCalledTimes(2));
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(getMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops polling once the run reaches a terminal status (error)', async () => {
+    getMock.mockResolvedValueOnce({ run: buildAgentRun({ id: 'ar-1', status: 'running' }) });
+    getMock.mockResolvedValue({ run: buildAgentRun({ id: 'ar-1', status: 'error' }) });
+    const { wrapper } = createQueryWrapper();
+    renderHook(() => useAgentRun('ar-1'), { wrapper });
+
+    await waitFor(() => expect(getMock).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(1600);
+    await waitFor(() => expect(getMock).toHaveBeenCalledTimes(2));
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(getMock).toHaveBeenCalledTimes(2);
+  });
+});
