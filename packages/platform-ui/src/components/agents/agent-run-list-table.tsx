@@ -54,10 +54,16 @@ export function AgentRunListTable({
   runs,
   loading,
   processNameMap,
+  hasNextPage = false,
+  fetchNextPage,
+  isFetchingNextPage = false,
 }: {
   runs: AgentRun[];
   loading: boolean;
   processNameMap?: Map<string, string>;
+  hasNextPage?: boolean;
+  fetchNextPage?: () => void;
+  isFetchingNextPage?: boolean;
 }) {
   const handle = useHandleFromPath();
   return (
@@ -124,6 +130,26 @@ export function AgentRunListTable({
               </tr>
             ))}
         </tbody>
+        {!loading && runs.length > 0 && (hasNextPage || isFetchingNextPage) && fetchNextPage !== undefined && (
+          <tfoot>
+            <tr>
+              <td colSpan={8} className="px-4 py-3 text-center border-t bg-muted/20">
+                <button
+                  type="button"
+                  onClick={fetchNextPage}
+                  disabled={isFetchingNextPage}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium',
+                    'border bg-background hover:bg-muted transition-colors',
+                    'disabled:cursor-not-allowed disabled:opacity-60',
+                  )}
+                >
+                  {isFetchingNextPage ? 'Loading…' : 'Load more'}
+                </button>
+              </td>
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   );

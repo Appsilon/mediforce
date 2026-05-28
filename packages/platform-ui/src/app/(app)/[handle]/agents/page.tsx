@@ -306,7 +306,13 @@ function AgentCatalog({ handle }: { handle: string }) {
 
 export default function AgentsPage() {
   const { handle } = useParams<{ handle: string }>();
-  const { data: runs, loading } = useAgentRuns(handle);
+  const {
+    data: runs,
+    loading,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useAgentRuns(handle);
   const processNameMap = useProcessNameMap();
 
   const [processFilter, setProcessFilter] = useState<string | null>(null);
@@ -412,6 +418,9 @@ export default function AgentsPage() {
             runs={filteredRuns}
             loading={loading}
             processNameMap={processNameMap}
+            hasNextPage={hasNextPage}
+            fetchNextPage={fetchNextPage}
+            isFetchingNextPage={isFetchingNextPage}
           />
         </Tabs.Content>
       </Tabs.Root>
