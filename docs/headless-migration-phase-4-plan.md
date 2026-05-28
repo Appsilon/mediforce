@@ -575,7 +575,9 @@ non-string corruption, accepts unknown widget hints).
 `StepParamSchema.type` and `TriggerInputFieldSchema.type` behind one
 shared widget-type constant. Bundling this with PR3 (processes/runs,
 which already touches step/trigger surface) keeps the merge sequence
-intact.
+intact. Tracked as [#563](https://github.com/Appsilon/mediforce/issues/563)
+with the proposed `PARAM_WIDGET_TYPES` const shape and an exhaustive-
+switch contract for the 6 current consumers.
 
 ## Testing decisions
 
