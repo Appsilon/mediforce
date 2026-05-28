@@ -102,11 +102,13 @@ export function useBulkArchiveRuns() {
 }
 
 /**
- * List-affecting create template per ADR-0006 §6 — optimistically prepends a
- * placeholder to the currently-cached `['runs', handle, ...]` slices, then
- * replaces with the server entity-echo on success. The optimistic placeholder
- * carries the trigger details supplied to the call so the operator sees the
- * row immediately; the server-issued id replaces the placeholder.
+ * List-affecting create per ADR-0006 §6 (invalidate variant). On success the
+ * server-issued run is written into the detail cache so the run page loads
+ * without a round-trip; on settle every `['runs', ...]` slice is invalidated
+ * so list views pick the new row up. No optimistic placeholder — a synthetic
+ * `ProcessInstance` would have to fabricate every required schema field, and
+ * the start round-trip is short enough that the operator sees the row after
+ * the next list refetch.
  */
 export function useStartRun() {
   const qc = useQueryClient();
