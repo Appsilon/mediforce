@@ -17,13 +17,16 @@ import {
 /**
  * Contract for `GET /api/tasks`.
  *
- * Exactly one of `instanceId` or `role` must be provided; every other filter
- * combines multiplicatively with the chosen axis:
+ * Three axes, all optional. The handler picks the narrowest applicable path:
  *   - `instanceId` — return tasks belonging to that process instance
  *   - `role`       — return tasks assigned to that role
- *   - `stepId`     — further narrow to a specific step within the instance/role
- *   - `status`     — list of statuses to include. Pass `ACTIONABLE_STATUSES`
- *                    for the typical "my queue" view (pending + claimed).
+ *   - neither      — caller-scope: every task whose parent run belongs to
+ *                    a workspace the caller is a member of (system actors
+ *                    see everything). GitHub-like default — no axis means
+ *                    "my queue across the workspaces I belong to".
+ *
+ * `instanceId` and `role` are mutually exclusive; passing both is rejected.
+ * `stepId` and `status[]` further narrow whichever base set is chosen.
  */
 export const ListTasksInputSchema = z
   .object({
@@ -33,8 +36,8 @@ export const ListTasksInputSchema = z
     status: z.array(HumanTaskStatusSchema).min(1).optional(),
   })
   .refine(
-    (val) => (val.instanceId !== undefined) !== (val.role !== undefined),
-    { message: 'Exactly one of `instanceId` or `role` is required' },
+    (val) => !(val.instanceId !== undefined && val.role !== undefined),
+    { message: '`instanceId` and `role` are mutually exclusive' },
   );
 
 export const ListTasksOutputSchema = z.object({
@@ -53,14 +56,15 @@ interface ListTasksFilters {
 }
 
 /**
- * Modeled as a discriminated union so handlers narrow with a plain
- * conditional — no invariant throw. The Zod refine on `ListTasksInputSchema`
- * is what enforces exactly-one-of at parse time; this type describes what a
- * successful parse guarantees.
+ * Three-way discriminated union — exactly one of `instanceId` / `role` /
+ * "neither" is the post-parse guarantee. The `.refine()` on
+ * `ListTasksInputSchema` enforces the mutual-exclusion at parse time; this
+ * type describes what a successful parse delivers to the handler.
  */
 export type ListTasksInput =
   | (ListTasksFilters & { instanceId: string; role?: undefined })
-  | (ListTasksFilters & { role: string; instanceId?: undefined });
+  | (ListTasksFilters & { role: string; instanceId?: undefined })
+  | (ListTasksFilters & { instanceId?: undefined; role?: undefined });
 
 export type ListTasksOutput = z.infer<typeof ListTasksOutputSchema>;
 

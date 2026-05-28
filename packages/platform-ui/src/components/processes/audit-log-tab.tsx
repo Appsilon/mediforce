@@ -6,8 +6,6 @@ import { format } from 'date-fns';
 import { ChevronDown, User, Bot, Settings } from 'lucide-react';
 import type { AuditEvent } from '@mediforce/platform-core';
 
-type AuditEventWithId = AuditEvent & { id: string };
-
 const ACTOR_ICON: Record<string, React.ReactNode> = {
   user: <User className="h-3 w-3" />,
   agent: <Bot className="h-3 w-3" />,
@@ -30,7 +28,7 @@ function CollapsiblePayload({ label, data }: { label: string; data: Record<strin
   );
 }
 
-export function AuditLogTab({ events, loading, error }: { events: AuditEventWithId[]; loading: boolean; error?: Error | null }) {
+export function AuditLogTab({ events, loading, error }: { events: AuditEvent[]; loading: boolean; error?: Error | null }) {
   if (loading) {
     return <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 rounded bg-muted animate-pulse" />)}</div>;
   }
@@ -49,8 +47,8 @@ export function AuditLogTab({ events, loading, error }: { events: AuditEventWith
 
   return (
     <div className="space-y-2">
-      {events.map((event) => (
-        <div key={event.id} className="rounded-md border p-3 space-y-2 text-sm">
+      {events.map((event, i) => (
+        <div key={`${event.timestamp}-${event.actorId}-${i}`} className="rounded-md border p-3 space-y-2 text-sm">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-0.5 min-w-0">
               <div className="font-medium">{event.action}</div>

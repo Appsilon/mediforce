@@ -98,9 +98,8 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
     // typed `updatedAt` would otherwise 400 the whole monitoring summary
     // (which fans out across every workspace task). The monitoring
     // aggregator tolerates the raw shape — unknown statuses skip the
-    // bucket, and non-finite `updatedAt` falls out of the
-    // `Number.isFinite` stuck-task guard. Callers that need the strict
-    // shape (e.g. the per-instance `getByInstanceId`) still parse.
+    // bucket. Callers that need the strict shape (e.g. the per-instance
+    // `getByInstanceId`) still parse.
     return snapshots.flatMap((snap) =>
       snap.docs.map((d) => d.data() as HumanTask),
     );
@@ -118,6 +117,43 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
       return ns !== null && allowed.includes(ns);
     });
     return this.getByInstanceIdsAll(allowedIds);
+  }
+
+  async listAll(): Promise<HumanTask[]> {
+    // Caller-scope read path. Newest first matches the human-queue convention
+    // already established by `getByRoleAll`; the `createdAt` order is the
+    // single sort the UI relies on.
+    const snap = await this.db
+      .collection(this.collectionName)
+      .orderBy('createdAt', 'desc')
+      .get();
+    return snap.docs.map((d) => HumanTaskSchema.parse(d.data()));
+  }
+
+  async listInNamespaces(allowed: readonly string[]): Promise<HumanTask[]> {
+    // HumanTask has no namespace field; the parent ProcessInstance owns
+    // workspace membership. Pre-materialise the allowed `processInstanceId`
+    // set via one indexed `where('namespace','==', ns)` read per workspace
+    // (Promise.all in parallel for multi-workspace callers), then a single
+    // human-tasks collection scan + in-memory join. Two-pass shape kills
+    // the N+1 `parents.getById()` that made the agent-runs equivalent
+    // ~40 s on a 2.3k-run workspace before the same fix (PR2 #569 + the
+    // perf commit at `7cccb6f1`); applies the same here for caller-scope
+    // human tasks. Postgres collapses both passes into one JOIN —
+    // ADR-0001 + #588.
+    const allowedInstanceIds = new Set<string>();
+    await Promise.all(
+      allowed.map(async (ns) => {
+        const snap = await this.db
+          .collection('processInstances')
+          .where('namespace', '==', ns)
+          .get();
+        for (const doc of snap.docs) allowedInstanceIds.add(doc.id);
+      }),
+    );
+    if (allowedInstanceIds.size === 0) return [];
+    const rows = await this.listAll();
+    return rows.filter((t) => allowedInstanceIds.has(t.processInstanceId));
   }
 
   async claim(taskId: string, userId: string): Promise<HumanTask> {

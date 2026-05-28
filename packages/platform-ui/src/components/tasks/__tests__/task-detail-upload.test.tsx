@@ -65,6 +65,15 @@ vi.mock('@/lib/mediforce', () => ({
       list: vi.fn(async () => ({ tasks: [] })),
       get: vi.fn(async (input: { taskId: string }) => ({ id: input.taskId })),
     },
+    processes: {
+      get: vi.fn(async (input: { instanceId: string }) => ({ id: input.instanceId, status: 'running' })),
+      listAuditEvents: vi.fn(async () => ({ events: [] })),
+    },
+  },
+  ApiError: class ApiError extends Error {
+    constructor(public status: number, message: string) {
+      super(message);
+    }
   },
 }));
 

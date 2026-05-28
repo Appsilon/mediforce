@@ -11,8 +11,10 @@ export interface ListInstancesOptions {
    * monitoring summary). Replaces a JS-side `r.namespace === handle`
    * pass over an over-fetched cross-workspace page — the Firestore
    * impl rewrites to a `where('namespace','==',ns)` so the wire payload
-   * shrinks to the keep-set. Independent from `listInNamespaces`'s
-   * `allowed` set; the two compose when both are set.
+   * shrinks to the keep-set. Composed with `listInNamespaces`'s
+   * `allowed` set under intersection semantics: a user caller asking
+   * for a namespace they don't belong to gets an empty list back, not
+   * an error.
    */
   namespace?: string;
   limit?: number;

@@ -85,6 +85,9 @@ export class FirestoreProcessInstanceRepository
     if (options.status !== undefined) {
       query = query.where('status', '==', options.status);
     }
+    if (options.namespace !== undefined) {
+      query = query.where('namespace', '==', options.namespace);
+    }
     query = query.orderBy('createdAt', 'desc').limit(options.limit ?? 20);
 
     const snapshot = await query.get();

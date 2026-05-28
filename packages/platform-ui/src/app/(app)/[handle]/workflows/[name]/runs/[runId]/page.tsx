@@ -2,14 +2,13 @@
 
 import { useParams } from 'next/navigation';
 import { useMemo } from 'react';
-import type { StepExecution, AuditEvent, WorkflowStep } from '@mediforce/platform-core';
+import type { StepExecution, WorkflowStep } from '@mediforce/platform-core';
 import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
 import { useAuditEvents } from '@/hooks/use-audit-events';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { resolveDefinitionSteps } from '@/lib/resolve-definition-steps';
 import { ProcessDetail } from '@/components/processes/process-detail';
 
-type AuditEventWithId = AuditEvent & { id: string };
 type StepExecutionWithId = StepExecution;
 
 export default function RunDetailPage() {
@@ -88,7 +87,7 @@ export default function RunDetailPage() {
     <ProcessDetail
       instance={instance}
       stepExecutions={stepExecutions}
-      auditEvents={auditEvents as AuditEventWithId[]}
+      auditEvents={auditEvents}
       auditEventsLoading={auditLoading}
       auditEventsError={auditError}
       definitionSteps={definitionSteps}

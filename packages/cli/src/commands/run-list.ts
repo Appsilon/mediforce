@@ -53,7 +53,7 @@ export const runListCommand = defineCommand({
         ? `  $${run.totalCostUsd.toFixed(4)}${isTerminal ? '' : '+'}`
         : '';
       output.stdout(
-        `${icon} ${run.status.padEnd(10)} ${run.runId}  ${run.definitionName} v${run.definitionVersion}${costLabel}  ${age}`,
+        `${icon} ${run.status.padEnd(10)} ${run.id}  ${run.definitionName} v${run.definitionVersion}${costLabel}  ${age}`,
       );
       if (run.currentStepId !== null) output.stdout(`  step: ${run.currentStepId}`);
       if (run.error !== null) output.stdout(`  error: ${run.error}`);

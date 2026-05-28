@@ -2,14 +2,12 @@
 
 import { useParams } from 'next/navigation';
 import { useMemo } from 'react';
-import type { StepExecution, AuditEvent } from '@mediforce/platform-core';
+import type { StepExecution } from '@mediforce/platform-core';
 import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
 import { useAuditEvents } from '@/hooks/use-audit-events';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { resolveDefinitionSteps } from '@/lib/resolve-definition-steps';
 import { RunReport } from '@/components/reports/run-report';
-
-type AuditEventWithId = AuditEvent & { id: string };
 
 export default function RunReportPage() {
   const { name, runId, handle } = useParams<{ name: string; runId: string; handle: string }>();
@@ -60,7 +58,7 @@ export default function RunReportPage() {
     <RunReport
       instance={instance}
       stepExecutions={stepExecutions}
-      auditEvents={auditEvents as AuditEventWithId[]}
+      auditEvents={auditEvents}
       definitionSteps={definitionSteps}
       runDetailHref={`/${handle}/workflows/${encodeURIComponent(decodedName)}/runs/${runId}`}
     />

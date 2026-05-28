@@ -15,11 +15,17 @@ export async function listTasks(
   input: ListTasksInput,
   scope: CallerScope,
 ): Promise<ListTasksOutput> {
-  const base =
-    input.instanceId !== undefined
-      ? await scope.tasks.getByInstanceId(input.instanceId)
-      : await scope.tasks.getByRole(input.role);
+  const base = await selectBase(input, scope);
   return { tasks: applyFilters(base, input) };
+}
+
+async function selectBase(
+  input: ListTasksInput,
+  scope: CallerScope,
+): Promise<readonly HumanTask[]> {
+  if (input.instanceId !== undefined) return scope.tasks.getByInstanceId(input.instanceId);
+  if (input.role !== undefined) return scope.tasks.getByRole(input.role);
+  return scope.tasks.listForCaller();
 }
 
 function applyFilters(

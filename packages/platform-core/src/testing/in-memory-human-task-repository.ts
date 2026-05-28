@@ -86,6 +86,15 @@ export class InMemoryHumanTaskRepository implements HumanTaskRepository {
     return this.getByInstanceIdsAll(allowedIds);
   }
 
+  async listAll(): Promise<HumanTask[]> {
+    return [...this.tasks.values()].map((t) => ({ ...t }));
+  }
+
+  async listInNamespaces(allowed: readonly string[]): Promise<HumanTask[]> {
+    const tasks = await this.listAll();
+    return this.filterByParentNamespace(tasks, allowed);
+  }
+
   async claim(taskId: string, userId: string): Promise<HumanTask> {
     const task = this.tasks.get(taskId);
     if (!task) throw new Error(`HumanTask not found: ${taskId}`);

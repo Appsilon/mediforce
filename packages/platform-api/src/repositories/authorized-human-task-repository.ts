@@ -40,6 +40,16 @@ export class AuthorizedHumanTaskRepository extends AuthorizedScope {
       ? this.raw.getByInstanceIdsAll(instanceIds)
       : this.raw.getByInstanceIdsInNamespaces(instanceIds, [...this.caller.namespaces]);
 
+  /**
+   * Caller-scope read: every task the caller is allowed to see across all
+   * roles + instances. System actors see the whole store; user callers see
+   * tasks whose parent run belongs to one of their namespaces.
+   */
+  listForCaller = async (): Promise<HumanTask[]> =>
+    this.caller.isSystemActor
+      ? this.raw.listAll()
+      : this.raw.listInNamespaces([...this.caller.namespaces]);
+
   claim = async (taskId: string, userId: string): Promise<HumanTask> => {
     await this.assertCanMutate(taskId);
     return this.raw.claim(taskId, userId);
