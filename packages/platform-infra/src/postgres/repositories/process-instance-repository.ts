@@ -138,6 +138,9 @@ export class PostgresProcessInstanceRepository
     if (options.status !== undefined) {
       conditions.push(eq(processInstances.status, options.status));
     }
+    if (options.namespace !== undefined) {
+      conditions.push(eq(processInstances.workspace, options.namespace));
+    }
     const rows = await this.db
       .select()
       .from(processInstances)
@@ -161,6 +164,9 @@ export class PostgresProcessInstanceRepository
     }
     if (options.status !== undefined) {
       conditions.push(eq(processInstances.status, options.status));
+    }
+    if (options.namespace !== undefined) {
+      conditions.push(eq(processInstances.workspace, options.namespace));
     }
     const rows = await this.db
       .select()

@@ -161,6 +161,36 @@ function contract(
       expect(denied).toEqual([]);
     });
 
+    it('listAll applies options.namespace filter', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-alpha');
+      await registerWorkspace('ws-beta');
+      const alpha = await repo.create(instanceFor('ws-alpha'));
+      const beta = await repo.create(instanceFor('ws-beta'));
+
+      const onlyAlpha = await repo.listAll({ namespace: 'ws-alpha', limit: 50 });
+      const ids = onlyAlpha.map((r) => r.id);
+      expect(ids).toContain(alpha.id);
+      expect(ids).not.toContain(beta.id);
+    });
+
+    it('listInNamespaces applies options.namespace within the allowed set', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-alpha');
+      await registerWorkspace('ws-beta');
+      const alpha = await repo.create(instanceFor('ws-alpha'));
+      const beta = await repo.create(instanceFor('ws-beta'));
+
+      // Caller is a member of both, but page-scopes to alpha.
+      const scoped = await repo.listInNamespaces(
+        ['ws-alpha', 'ws-beta'],
+        { namespace: 'ws-alpha', limit: 50 },
+      );
+      const ids = scoped.map((r) => r.id);
+      expect(ids).toContain(alpha.id);
+      expect(ids).not.toContain(beta.id);
+    });
+
     it('getByIdInNamespaces honors the allowed list', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');
