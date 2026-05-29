@@ -228,6 +228,28 @@ function contract(
       expect(limited[1].timestamp).toBe('2026-01-01T10:00:00.000Z');
     });
 
+    it('append accepts workspace-scoped event via `namespace` (no processInstanceId)', async () => {
+      // Workspace-scoped events (tool_catalog.entry.created, namespace.created,
+      // cron.trigger.fired pre-instance-spawn) have no parent run. Both
+      // backends MUST resolve the workspace from `event.namespace` instead.
+      // Pre-create the workspace row so the FK holds on the Postgres side.
+      const handle = `ws-only-${randomBytes(4).toString('hex')}`;
+      await registerInstance(randomUUID(), handle); // bootstraps the workspace row
+      const { processInstanceId: _drop, ...withoutInstance } = eventBase();
+      const result = await repo.append({
+        ...withoutInstance,
+        namespace: handle,
+        entityType: 'toolCatalogEntry',
+        entityId: 'entry-1',
+        action: 'tool_catalog_entry.created',
+      });
+      expect(result.entityId).toBe('entry-1');
+      expect(result.processInstanceId).toBeUndefined();
+      // Stored shape doesn't carry `namespace` back (workspace lives in the
+      // derived column on Postgres; in-memory strips it on write).
+      expect(result.namespace).toBeUndefined();
+    });
+
     it('rejects append with invalid payload (bad actorType)', async () => {
       const instanceId = randomUUID();
       await registerInstance(instanceId, 'ws-1');
