@@ -10,6 +10,7 @@ interface MemberDoc {
 }
 
 interface MemberResponse extends MemberDoc {
+  avatarUrl: string | null;
   email: string | null;
   lastSignInTime: string | null;
 }
@@ -81,7 +82,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     const members: MemberResponse[] = memberDocs.map((memberDoc) => ({
       ...memberDoc,
-      avatarUrl: memberDoc.avatarUrl ?? authDataMap.get(memberDoc.uid)?.photoURL ?? undefined,
+      avatarUrl: memberDoc.avatarUrl ?? authDataMap.get(memberDoc.uid)?.photoURL ?? null,
       email: authDataMap.get(memberDoc.uid)?.email ?? null,
       lastSignInTime: authDataMap.get(memberDoc.uid)?.lastSignInTime ?? null,
     }));
