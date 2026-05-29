@@ -1,6 +1,6 @@
-import { defineCommand } from '../define-command.js';
-import { printJson, printError } from '../output.js';
-import type { CommandFn } from '../define-command.js';
+import { defineCommand } from '../define-command';
+import { printJson, printError } from '../output';
+import type { CommandFn } from '../define-command';
 
 function parseRunIds(raw: string): string[] {
   return raw

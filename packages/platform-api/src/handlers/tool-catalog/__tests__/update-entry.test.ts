@@ -3,13 +3,13 @@ import {
   InMemoryAuditRepository,
   InMemoryToolCatalogRepository,
 } from '@mediforce/platform-core/testing';
-import { updateToolCatalogEntry } from '../update-entry.js';
-import { ForbiddenError, NotFoundError } from '../../../errors.js';
+import { updateToolCatalogEntry } from '../update-entry';
+import { ForbiddenError, NotFoundError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { adminRoles, memberRoles, sampleEntry } from './fixtures.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { adminRoles, memberRoles, sampleEntry } from './fixtures';
 
 describe('updateToolCatalogEntry handler', () => {
   let repo: InMemoryToolCatalogRepository;

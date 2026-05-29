@@ -1,6 +1,6 @@
 import { ApiError } from '@mediforce/platform-api/client';
 import { describe, expect, it } from 'vitest';
-import { formatCliError } from '../errors.js';
+import { formatCliError } from '../errors';
 
 describe('formatCliError', () => {
   it('formats connection refused errors with the target URL and dev-server hint', () => {

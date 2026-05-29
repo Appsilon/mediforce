@@ -25,24 +25,24 @@ import type {
   WebhookRouter,
   WorkflowEngine,
 } from '@mediforce/workflow-engine';
-import type { CallerIdentity } from '../auth.js';
-import type { RunKicker } from '../runtime/run-kicker.js';
-import type { DockerImagesService } from '../services/docker-images-service.js';
-import type { InviteNotificationService, InviteService } from '../services/invite-notification.js';
-import type { CallerScope } from './caller-scope.js';
-import { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository.js';
-import { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository.js';
-import { AuthorizedAgentRunRepository } from './authorized-agent-run-repository.js';
-import { AuthorizedAuditEventRepository } from './authorized-audit-event-repository.js';
-import { AuthorizedCoworkSessionRepository } from './authorized-cowork-session-repository.js';
-import { AuthorizedHandoffRepository } from './authorized-handoff-repository.js';
-import { AuthorizedHumanTaskRepository } from './authorized-human-task-repository.js';
-import { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository.js';
-import { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository.js';
-import { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository.js';
-import { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository.js';
-import { AuthorizedWorkflowSecretRepository } from './authorized-workflow-secret-repository.js';
-import { AuthorizedWorkspaceSecretRepository } from './authorized-workspace-secret-repository.js';
+import type { CallerIdentity } from '../auth';
+import type { RunKicker } from '../runtime/run-kicker';
+import type { DockerImagesService } from '../services/docker-images-service';
+import type { InviteNotificationService, InviteService } from '../services/invite-notification';
+import type { CallerScope } from './caller-scope';
+import { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository';
+import { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository';
+import { AuthorizedAgentRunRepository } from './authorized-agent-run-repository';
+import { AuthorizedAuditEventRepository } from './authorized-audit-event-repository';
+import { AuthorizedCoworkSessionRepository } from './authorized-cowork-session-repository';
+import { AuthorizedHandoffRepository } from './authorized-handoff-repository';
+import { AuthorizedHumanTaskRepository } from './authorized-human-task-repository';
+import { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
+import { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
+import { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository';
+import { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository';
+import { AuthorizedWorkflowSecretRepository } from './authorized-workflow-secret-repository';
+import { AuthorizedWorkspaceSecretRepository } from './authorized-workspace-secret-repository';
 
 /**
  * Subset of `PlatformServices` (interface-typed) that `createCallerScope`

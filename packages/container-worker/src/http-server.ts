@@ -1,5 +1,5 @@
 import { createServer, type Server } from 'node:http';
-import { listImages, getDiskUsage, removeImage } from './docker-info.js';
+import { listImages, getDiskUsage, removeImage } from './docker-info';
 
 const WORKER_HTTP_PORT = process.env.WORKER_HTTP_PORT !== undefined
   ? Number(process.env.WORKER_HTTP_PORT)

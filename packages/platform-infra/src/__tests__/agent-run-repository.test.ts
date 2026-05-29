@@ -21,7 +21,7 @@ import {
   decodeAgentRunCursor,
 } from '@mediforce/platform-core/testing';
 import type { AgentRun } from '@mediforce/platform-core';
-import { FirestoreAgentRunRepository } from '../firestore/agent-run-repository.js';
+import { FirestoreAgentRunRepository } from '../firestore/agent-run-repository';
 
 interface OrderByCall {
   readonly field: string;

@@ -175,7 +175,7 @@ def seed_demo_data(env: dict[str, str]) -> None:
 def run_next(env: dict[str, str]) -> int:
     log(f"Starting Next.js on http://localhost:{NEXT_PORT}")
     proc = subprocess.Popen(
-        ["pnpm", "exec", "next", "dev", "--webpack", "-p", str(NEXT_PORT)],
+        ["pnpm", "exec", "next", "dev", "-p", str(NEXT_PORT)],
         cwd=str(PLATFORM_UI),
         env=env,
     )

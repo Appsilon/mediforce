@@ -58,13 +58,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
-import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
+import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin';
 import type { AgentConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import { writeFile } from 'node:fs/promises';
 import type { GitMetadata } from '@mediforce/platform-core';
-import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
-import type { ImageBuildMeta } from './docker-spawn-strategy.js';
-import { WorkspaceManager, type RunWorkspaceHandle } from '../workspace/workspace-manager.js';
+import { resolveStepEnv, type ResolvedEnv } from './resolve-env';
+import type { ImageBuildMeta } from './docker-spawn-strategy';
+import { WorkspaceManager, type RunWorkspaceHandle } from '../workspace/workspace-manager';
 
 let preparedDeployKeyPath: string | null = null;
 

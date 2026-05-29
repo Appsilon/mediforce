@@ -1,7 +1,7 @@
 import { validatePayload } from '@mediforce/platform-core';
-import type { StartRunInput, StartRunOutput } from '../../contract/runs.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { ForbiddenError, NotFoundError, HandlerError } from '../../errors.js';
+import type { StartRunInput, StartRunOutput } from '../../contract/runs';
+import type { CallerScope } from '../../repositories/index';
+import { ForbiddenError, NotFoundError, HandlerError } from '../../errors';
 
 // Engine's createInstance + startInstance emit instance.created /
 // instance.started; handler does NOT double-emit.

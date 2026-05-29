@@ -12,56 +12,56 @@
  *   2 — usage error (unknown command, missing required flag)
  */
 
-import { workflowRegisterCommand } from './commands/workflow-register.js';
-import { workflowListCommand } from './commands/workflow-list.js';
-import { workflowGetCommand } from './commands/workflow-get.js';
-import { runGetCommand } from './commands/run-get.js';
-import { runListCommand } from './commands/run-list.js';
-import { runStartCommand } from './commands/run-start.js';
-import { runCancelCommand } from './commands/run-cancel.js';
-import { runArchiveCommand } from './commands/run-archive.js';
-import { runBulkCancelCommand, runBulkArchiveCommand } from './commands/run-bulk.js';
-import { workflowArchiveCommand } from './commands/workflow-archive.js';
-import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility.js';
-import { workflowCopyCommand } from './commands/workflow-copy.js';
-import { workflowDeleteCommand } from './commands/workflow-delete.js';
+import { workflowRegisterCommand } from './commands/workflow-register';
+import { workflowListCommand } from './commands/workflow-list';
+import { workflowGetCommand } from './commands/workflow-get';
+import { runGetCommand } from './commands/run-get';
+import { runListCommand } from './commands/run-list';
+import { runStartCommand } from './commands/run-start';
+import { runCancelCommand } from './commands/run-cancel';
+import { runArchiveCommand } from './commands/run-archive';
+import { runBulkCancelCommand, runBulkArchiveCommand } from './commands/run-bulk';
+import { workflowArchiveCommand } from './commands/workflow-archive';
+import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility';
+import { workflowCopyCommand } from './commands/workflow-copy';
+import { workflowDeleteCommand } from './commands/workflow-delete';
 import {
   systemStatusCommand,
   systemImagesCommand,
   systemDiskCommand,
   systemRmiCommand,
-} from './commands/system-status.js';
-import { systemCreditsCommand } from './commands/system-credits.js';
-import { agentListCommand } from './commands/agent-list.js';
-import { agentGetCommand } from './commands/agent-get.js';
-import { agentDeleteCommand } from './commands/agent-delete.js';
-import { agentSetVisibilityCommand } from './commands/agent-set-visibility.js';
-import { agentCreateCommand } from './commands/agent-create.js';
-import { modelListCommand } from './commands/model-list.js';
-import { modelGetCommand } from './commands/model-get.js';
-import { modelSyncCommand } from './commands/model-sync.js';
-import { secretSetCommand } from './commands/secret-set.js';
-import { secretListCommand } from './commands/secret-list.js';
-import { secretDeleteCommand } from './commands/secret-delete.js';
-import { taskListCommand } from './commands/task-list.js';
-import { taskGetCommand } from './commands/task-get.js';
-import { taskClaimCommand } from './commands/task-claim.js';
-import { coworkGetCommand } from './commands/cowork-get.js';
-import { coworkGetByInstanceCommand } from './commands/cowork-get-by-instance.js';
-import { coworkChatCommand } from './commands/cowork-chat.js';
-import { usersMeCommand } from './commands/users-me.js';
-import { usersClearMustChangePasswordCommand } from './commands/users-clear-must-change-password.js';
-import { namespaceGetCommand } from './commands/namespace-get.js';
-import { namespaceCreateCommand } from './commands/namespace-create.js';
-import { agentRunListCommand } from './commands/agent-run-list.js';
-import { agentRunGetCommand } from './commands/agent-run-get.js';
-import { namespaceUpdateCommand } from './commands/namespace-update.js';
-import { namespaceDeleteCommand } from './commands/namespace-delete.js';
-import { namespaceLeaveCommand } from './commands/namespace-leave.js';
-import { namespaceRemoveMemberCommand } from './commands/namespace-remove-member.js';
-import { namespaceSetMemberRoleCommand } from './commands/namespace-set-member-role.js';
-import { type CommandFn } from './define-command.js';
-import { consoleOutput, type OutputSink } from './output.js';
+} from './commands/system-status';
+import { systemCreditsCommand } from './commands/system-credits';
+import { agentListCommand } from './commands/agent-list';
+import { agentGetCommand } from './commands/agent-get';
+import { agentDeleteCommand } from './commands/agent-delete';
+import { agentSetVisibilityCommand } from './commands/agent-set-visibility';
+import { agentCreateCommand } from './commands/agent-create';
+import { modelListCommand } from './commands/model-list';
+import { modelGetCommand } from './commands/model-get';
+import { modelSyncCommand } from './commands/model-sync';
+import { secretSetCommand } from './commands/secret-set';
+import { secretListCommand } from './commands/secret-list';
+import { secretDeleteCommand } from './commands/secret-delete';
+import { taskListCommand } from './commands/task-list';
+import { taskGetCommand } from './commands/task-get';
+import { taskClaimCommand } from './commands/task-claim';
+import { coworkGetCommand } from './commands/cowork-get';
+import { coworkGetByInstanceCommand } from './commands/cowork-get-by-instance';
+import { coworkChatCommand } from './commands/cowork-chat';
+import { usersMeCommand } from './commands/users-me';
+import { usersClearMustChangePasswordCommand } from './commands/users-clear-must-change-password';
+import { namespaceGetCommand } from './commands/namespace-get';
+import { namespaceCreateCommand } from './commands/namespace-create';
+import { agentRunListCommand } from './commands/agent-run-list';
+import { agentRunGetCommand } from './commands/agent-run-get';
+import { namespaceUpdateCommand } from './commands/namespace-update';
+import { namespaceDeleteCommand } from './commands/namespace-delete';
+import { namespaceLeaveCommand } from './commands/namespace-leave';
+import { namespaceRemoveMemberCommand } from './commands/namespace-remove-member';
+import { namespaceSetMemberRoleCommand } from './commands/namespace-set-member-role';
+import { type CommandFn } from './define-command';
+import { consoleOutput, type OutputSink } from './output';
 
 export interface RunCliInput {
   argv: string[];

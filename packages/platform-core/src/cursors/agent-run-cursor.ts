@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { encodeCursor, decodeCursor } from './cursor.js';
+import { encodeCursor, decodeCursor } from './cursor';
 
 /**
  * Cursor payload for `AgentRunRepository.list` / `.listInNamespaces`.

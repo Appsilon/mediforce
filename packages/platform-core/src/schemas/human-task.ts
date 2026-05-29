@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { StepParamSchema, StepUiSchema, SelectionSchema } from './process-definition.js';
+import { StepParamSchema, StepUiSchema, SelectionSchema } from './process-definition';
 
 export const HumanTaskStatusSchema = z.enum([
   'pending',    // unassigned, visible to all with matching role

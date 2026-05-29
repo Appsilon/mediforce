@@ -1,5 +1,5 @@
-import type { AgentOAuthTokenRepository } from '../repositories/agent-oauth-token-repository.js';
-import type { AgentOAuthToken } from '../schemas/agent-oauth-token.js';
+import type { AgentOAuthTokenRepository } from '../repositories/agent-oauth-token-repository';
+import type { AgentOAuthToken } from '../schemas/agent-oauth-token';
 
 function keyOf(agentId: string, serverName: string): string {
   return `${agentId}::${serverName}`;

@@ -1,8 +1,8 @@
-import { assertCallerIsNamespaceAdmin } from '../../auth.js';
-import { HandlerError, PreconditionFailedError } from '../../errors.js';
-import type { CallerScope } from '../../repositories/index.js';
-import type { ResendInviteInput, ResendInviteOutput } from '../../contract/users.js';
-import { actorFromCaller } from '../_helpers.js';
+import { assertCallerIsNamespaceAdmin } from '../../auth';
+import { HandlerError, PreconditionFailedError } from '../../errors';
+import type { CallerScope } from '../../repositories/index';
+import type { ResendInviteInput, ResendInviteOutput } from '../../contract/users';
+import { actorFromCaller } from '../_helpers';
 
 /**
  * Re-issue an invite for a pending workspace member.

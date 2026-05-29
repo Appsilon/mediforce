@@ -1,10 +1,10 @@
-import { PreconditionFailedError } from '../../errors.js';
-import { actorFromCaller, loadOr404 } from '../_helpers.js';
-import type { CallerScope } from '../../repositories/index.js';
+import { PreconditionFailedError } from '../../errors';
+import { actorFromCaller, loadOr404 } from '../_helpers';
+import type { CallerScope } from '../../repositories/index';
 import type {
   FinalizeCoworkSessionInput,
   FinalizeCoworkSessionOutput,
-} from '../../contract/cowork.js';
+} from '../../contract/cowork';
 
 /**
  * Finalize a cowork session and resume its parent process instance.

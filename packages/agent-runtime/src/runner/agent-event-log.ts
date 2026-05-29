@@ -1,5 +1,5 @@
 import type { AgentEvent } from '@mediforce/platform-core';
-import type { EmitPayload } from '../interfaces/agent-plugin.js';
+import type { EmitPayload } from '../interfaces/agent-plugin';
 import type { Firestore } from 'firebase-admin/firestore';
 
 export interface AgentEventLog {

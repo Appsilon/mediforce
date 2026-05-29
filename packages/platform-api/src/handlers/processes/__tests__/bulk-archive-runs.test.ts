@@ -5,8 +5,8 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { bulkArchiveRuns } from '../bulk-archive-runs.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { bulkArchiveRuns } from '../bulk-archive-runs';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('bulkArchiveRuns handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;

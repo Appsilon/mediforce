@@ -2,10 +2,10 @@ import type { NamespaceUpdates } from '@mediforce/platform-core';
 import {
   assertCallerIsNamespaceAdmin,
   assertCallerIsNamespaceOwner,
-} from '../../auth.js';
-import { emitAudit } from '../../audit-helpers.js';
-import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../errors.js';
-import type { CallerScope } from '../../repositories/index.js';
+} from '../../auth';
+import { emitAudit } from '../../audit-helpers';
+import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../errors';
+import type { CallerScope } from '../../repositories/index';
 import type {
   DeleteNamespaceInput,
   DeleteNamespaceOutput,
@@ -17,7 +17,7 @@ import type {
   UpdateNamespaceMemberRoleInput,
   UpdateNamespaceMemberRoleOutput,
   UpdateNamespaceOutput,
-} from '../../contract/namespaces.js';
+} from '../../contract/namespaces';
 
 /**
  * Edit workspace `displayName`, `bio`, `icon`. Owner/admin only.

@@ -11,12 +11,12 @@ import {
   listAgentOAuthTokens,
   getAgentOAuthToken,
   deleteAgentOAuthToken,
-} from '../oauth-tokens.js';
+} from '../oauth-tokens';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { NotFoundError } from '../../../errors.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { NotFoundError } from '../../../errors';
 
 const sampleToken: AgentOAuthToken = {
   provider: 'github',

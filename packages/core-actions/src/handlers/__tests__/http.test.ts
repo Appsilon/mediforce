@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { httpActionHandler } from '../http.js';
-import type { ActionContext } from '../../types.js';
+import { httpActionHandler } from '../http';
+import type { ActionContext } from '../../types';
 
 const baseCtx: ActionContext = {
   stepId: 'echo',

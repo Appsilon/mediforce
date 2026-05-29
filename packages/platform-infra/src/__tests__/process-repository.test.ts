@@ -5,7 +5,7 @@ import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import {
   FirestoreProcessRepository,
   WorkflowDefinitionVersionAlreadyExistsError,
-} from '../firestore/process-repository.js';
+} from '../firestore/process-repository';
 
 describe('InMemoryProcessRepository', () => {
   let repo: InMemoryProcessRepository;

@@ -1,7 +1,7 @@
-import type { LlmMessage, LlmResponse } from '../interfaces/agent-plugin.js';
+import type { LlmMessage, LlmResponse } from '../interfaces/agent-plugin';
 
 // Re-export the interface defined in interfaces/ for barrel convenience
-export type { LlmClient, LlmMessage, LlmResponse } from '../interfaces/agent-plugin.js';
+export type { LlmClient, LlmMessage, LlmResponse } from '../interfaces/agent-plugin';
 
 // OpenRouterLlmClient: wraps the OpenRouter API for LLM access.
 // Platform provides this to agents — agents never call OpenRouter directly.

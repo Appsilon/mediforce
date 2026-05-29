@@ -5,7 +5,7 @@ import {
   CreateOAuthProviderInputSchema,
   UpdateOAuthProviderInputSchema,
   OAUTH_PROVIDER_PRESETS,
-} from '../oauth-provider.js';
+} from '../oauth-provider';
 
 const validInput = {
   id: 'github',

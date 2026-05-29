@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
-import { FirestoreAgentOAuthTokenRepository } from '../firestore/agent-oauth-token-repository.js';
+import { FirestoreAgentOAuthTokenRepository } from '../firestore/agent-oauth-token-repository';
 import type { AgentOAuthToken } from '@mediforce/platform-core';
 
 const {

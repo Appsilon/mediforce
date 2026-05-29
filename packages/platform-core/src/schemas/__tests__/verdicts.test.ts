@@ -4,7 +4,7 @@ import {
   defaultRequiresComment,
   defaultVerdictIntent,
   defaultVerdictLabel,
-} from '../verdicts.js';
+} from '../verdicts';
 
 describe('defaultVerdictLabel', () => {
   it('returns "Approve" for approve', () => {

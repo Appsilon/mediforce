@@ -4,7 +4,7 @@ import {
   type WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import type { Firestore } from 'firebase-admin/firestore';
-import { encrypt, decrypt } from '../crypto/secrets-cipher.js';
+import { encrypt, decrypt } from '../crypto/secrets-cipher';
 
 /**
  * Stores workflow secrets per namespace.

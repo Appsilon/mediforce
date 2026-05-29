@@ -3,12 +3,12 @@ import { readFile, readdir, mkdtemp, writeFile, rm, mkdir, appendFile, realpath,
 import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
+import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation } from '@mediforce/platform-core';
-import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env.js';
-import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls, formatExitInfo, type ContainerPluginInit } from './container-plugin.js';
-import { renderOAuthHeader } from '../oauth/resolve-oauth-token.js';
+import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
+import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls, formatExitInfo, type ContainerPluginInit } from './container-plugin';
+import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
 import { createLineStreamReader } from '@mediforce/platform-core';
 
 /** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`

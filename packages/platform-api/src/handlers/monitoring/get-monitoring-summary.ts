@@ -1,10 +1,10 @@
-import type { CallerScope } from '../../repositories/index.js';
+import type { CallerScope } from '../../repositories/index';
 import type {
   GetMonitoringSummaryOutput,
   MonitoringSummary,
   MonitoringSummaryInput,
-} from '../../contract/monitoring.js';
-import { assertNamespaceAccess } from '../../auth.js';
+} from '../../contract/monitoring';
+import { assertNamespaceAccess } from '../../auth';
 
 /**
  * Compact dashboard aggregate for a single workspace. Computed server-side so

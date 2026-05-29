@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { FileMetadataSchema } from '../file-metadata.js';
+import { FileMetadataSchema } from '../file-metadata';
 
 const validFileMetadata = {
   id: 'file-001',

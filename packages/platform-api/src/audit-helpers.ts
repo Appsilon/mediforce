@@ -1,5 +1,5 @@
 import type { AuditEvent, AuditRepository } from '@mediforce/platform-core';
-import type { CallerIdentity } from './auth.js';
+import type { CallerIdentity } from './auth';
 
 /**
  * Derive the `actorId` / `actorType` / `actorRole` triple from a caller. User

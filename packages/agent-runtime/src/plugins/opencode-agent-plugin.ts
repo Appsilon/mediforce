@@ -5,8 +5,8 @@ import {
   BaseContainerAgentPlugin,
   type SpawnCliOptions,
   type AgentCommandSpec,
-} from './base-container-agent-plugin.js';
-import { isWorkflowAgentContext } from './container-plugin.js';
+} from './base-container-agent-plugin';
+import { isWorkflowAgentContext } from './container-plugin';
 
 /** Default model used when agentConfig.model is not set. */
 const DEFAULT_MODEL = 'deepseek/deepseek-chat';

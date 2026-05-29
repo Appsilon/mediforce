@@ -8,14 +8,14 @@ import type {
   HumanTask,
   ProcessInstance,
 } from '@mediforce/platform-core';
-import type { CompleteTaskInput, CompleteTaskOutput } from '../../contract/tasks.js';
-import type { CallerScope } from '../../repositories/index.js';
+import type { CompleteTaskInput, CompleteTaskOutput } from '../../contract/tasks';
+import type { CallerScope } from '../../repositories/index';
 import {
   HandlerError,
   NotFoundError,
   PreconditionFailedError,
-} from '../../errors.js';
-import { actorFromCaller, loadOr404 } from '../_helpers.js';
+} from '../../errors';
+import { actorFromCaller, loadOr404 } from '../_helpers';
 
 export async function completeTask(
   input: CompleteTaskInput,

@@ -1,7 +1,7 @@
 import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
-import { ForbiddenError, ValidationError } from '../../errors.js';
-import type { CallerScope } from '../../repositories/index.js';
-import type { GetMeInput, GetMeOutput, MeNamespace } from '../../contract/users.js';
+import { ForbiddenError, ValidationError } from '../../errors';
+import type { CallerScope } from '../../repositories/index';
+import type { GetMeInput, GetMeOutput, MeNamespace } from '../../contract/users';
 
 const PERSONAL_HANDLE_FALLBACK = 'user';
 

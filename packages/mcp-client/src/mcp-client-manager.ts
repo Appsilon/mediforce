@@ -2,8 +2,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { McpServerConfig } from '@mediforce/platform-core';
-import type { McpToolDefinition, McpToolCallResult, McpClientManagerOptions } from './types.js';
-import { resolveValue } from './resolve-env.js';
+import type { McpToolDefinition, McpToolCallResult, McpClientManagerOptions } from './types';
+import { resolveValue } from './resolve-env';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const NAMESPACE_SEPARATOR = '__';

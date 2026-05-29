@@ -3,7 +3,7 @@ import {
   WorkflowDefinitionSchema,
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,
-} from '../workflow-definition.js';
+} from '../workflow-definition';
 
 const baseTemplate = {
   name: 'execution-summaries-api',

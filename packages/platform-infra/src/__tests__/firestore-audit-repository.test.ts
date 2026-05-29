@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import type { ProcessInstanceRepository } from '@mediforce/platform-core';
-import { FirestoreAuditRepository } from '../firestore/audit-repository.js';
+import { FirestoreAuditRepository } from '../firestore/audit-repository';
 
 /**
  * Real Firestore rejects `undefined` values with

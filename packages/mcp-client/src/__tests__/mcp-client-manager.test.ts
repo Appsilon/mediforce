@@ -43,7 +43,7 @@ vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => {
 });
 
 // Import after mocks
-const { McpClientManager } = await import('../mcp-client-manager.js');
+const { McpClientManager } = await import('../mcp-client-manager');
 
 const TEALFLOW_TOOLS = [
   {

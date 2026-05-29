@@ -8,8 +8,8 @@ import {
   CoworkSessionSchema,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import { WorkflowEngine } from '../index.js';
-import type { StepActor } from '../index.js';
+import { WorkflowEngine } from '../index';
+import type { StepActor } from '../index';
 
 // ---------------------------------------------------------------------------
 // Test definitions

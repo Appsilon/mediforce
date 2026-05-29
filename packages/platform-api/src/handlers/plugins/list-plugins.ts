@@ -1,6 +1,6 @@
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
-import type { CallerScope } from '../../repositories/index.js';
-import type { ListPluginsInput, ListPluginsOutput } from '../../contract/plugins.js';
+import type { CallerScope } from '../../repositories/index';
+import type { ListPluginsInput, ListPluginsOutput } from '../../contract/plugins';
 
 /**
  * List every plugin registered with the running `PluginRegistry`.

@@ -1,5 +1,5 @@
-import { defineCommand } from '../define-command.js';
-import { printJson, printError } from '../output.js';
+import { defineCommand } from '../define-command';
+import { printJson, printError } from '../output';
 
 function readStdinDefault(): Promise<string> {
   return new Promise((resolve, reject) => {

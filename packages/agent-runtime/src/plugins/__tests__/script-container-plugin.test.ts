@@ -4,11 +4,11 @@ import { EventEmitter } from 'node:events';
 import { Readable, Writable } from 'node:stream';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ChildProcess } from 'node:child_process';
-import type { AgentContext, WorkflowAgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin.js';
+import type { AgentContext, WorkflowAgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
-import { ScriptContainerPlugin } from '../script-container-plugin.js';
-import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager.js';
+import { ScriptContainerPlugin } from '../script-container-plugin';
+import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 
 // Only mock `spawn` (used for docker run). Leave the rest of child_process
 // real so WorkspaceManager's `execFileSync` calls to git actually work.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { CallerScope } from '../../repositories/index.js';
-import { NotFoundError } from '../../errors.js';
-import { getByIdAdapter, listAdapter } from '../_generic.js';
+import type { CallerScope } from '../../repositories/index';
+import { NotFoundError } from '../../errors';
+import { getByIdAdapter, listAdapter } from '../_generic';
 
 const fakeScope = {} as unknown as CallerScope;
 

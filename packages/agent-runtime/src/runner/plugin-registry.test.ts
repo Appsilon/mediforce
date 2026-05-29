@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { PluginRegistry } from './plugin-registry.js';
-import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin.js';
+import { PluginRegistry } from './plugin-registry';
+import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin';
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
 
 // Minimal mock plugin without metadata

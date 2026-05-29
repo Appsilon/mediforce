@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   PluginCapabilityMetadataSchema,
   PluginRoleSchema,
-} from '../plugin-capability-metadata.js';
+} from '../plugin-capability-metadata';
 
 const validMetadata = {
   name: 'Vendor Compliance Analyzer',

@@ -1,4 +1,4 @@
-import type { ProcessConfig, ProcessDefinition, StepConfig } from '../index.js';
+import type { ProcessConfig, ProcessDefinition, StepConfig } from '../index';
 
 export interface ConfigValidationResult {
   valid: boolean;

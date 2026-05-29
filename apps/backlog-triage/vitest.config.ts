@@ -3,7 +3,6 @@ import { resolve } from 'node:path';
 
 export default defineConfig({
   resolve: {
-    conditions: ['@mediforce/source'],
     alias: {
       '@mediforce/platform-core': resolve(__dirname, '../../packages/platform-core/src/index.ts'),
       '@mediforce/platform-api': resolve(__dirname, '../../packages/platform-api/src/index.ts'),

@@ -4,7 +4,7 @@ import type {
   InstanceStatus,
   StepExecution,
   ListInstancesOptions,
-} from '../index.js';
+} from '../index';
 
 /**
  * In-memory implementation of ProcessInstanceRepository for testing.

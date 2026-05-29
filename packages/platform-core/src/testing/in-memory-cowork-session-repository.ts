@@ -1,6 +1,6 @@
-import type { CoworkSession, ConversationTurn } from '../schemas/cowork-session.js';
-import type { CoworkSessionRepository } from '../interfaces/cowork-session-repository.js';
-import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository.js';
+import type { CoworkSession, ConversationTurn } from '../schemas/cowork-session';
+import type { CoworkSessionRepository } from '../interfaces/cowork-session-repository';
+import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository';
 
 /**
  * In-memory implementation of CoworkSessionRepository for testing.

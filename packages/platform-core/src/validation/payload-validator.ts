@@ -1,4 +1,4 @@
-import type { TriggerInputField } from '../schemas/workflow-definition.js';
+import type { TriggerInputField } from '../schemas/workflow-definition';
 
 export interface PayloadValidationError {
   field: string;

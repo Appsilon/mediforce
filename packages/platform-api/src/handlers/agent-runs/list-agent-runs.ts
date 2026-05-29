@@ -1,8 +1,8 @@
-import type { CallerScope } from '../../repositories/index.js';
+import type { CallerScope } from '../../repositories/index';
 import type {
   ListAgentRunsInput,
   ListAgentRunsOutput,
-} from '../../contract/agent-runs.js';
+} from '../../contract/agent-runs';
 
 const DEFAULT_LIMIT = 50;
 

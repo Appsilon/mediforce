@@ -6,8 +6,8 @@ import {
   type RegisterWorkflowInput,
 } from '@mediforce/platform-api/contract';
 import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
-import { defineCommand } from '../define-command.js';
-import { printJson, printError, type OutputSink } from '../output.js';
+import { defineCommand } from '../define-command';
+import { printJson, printError, type OutputSink } from '../output';
 
 const execFileAsync = promisify(execFile);
 

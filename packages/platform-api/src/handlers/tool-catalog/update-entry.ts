@@ -1,11 +1,11 @@
-import { assertCallerIsNamespaceAdmin } from '../../auth.js';
-import { NotFoundError } from '../../errors.js';
-import type { CallerScope } from '../../repositories/index.js';
+import { assertCallerIsNamespaceAdmin } from '../../auth';
+import { NotFoundError } from '../../errors';
+import type { CallerScope } from '../../repositories/index';
 import type {
   UpdateToolCatalogEntryInputApi,
   UpdateToolCatalogEntryOutput,
-} from '../../contract/tool-catalog.js';
-import { actorFromCaller } from '../_helpers.js';
+} from '../../contract/tool-catalog';
+import { actorFromCaller } from '../_helpers';
 
 export async function updateToolCatalogEntry(
   input: UpdateToolCatalogEntryInputApi,

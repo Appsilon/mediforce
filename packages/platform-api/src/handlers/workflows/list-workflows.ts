@@ -1,9 +1,9 @@
-import type { CallerScope } from '../../repositories/index.js';
+import type { CallerScope } from '../../repositories/index';
 import type {
   ListWorkflowsInput,
   ListWorkflowsOutput,
   WorkflowDefinitionGroupSummary,
-} from '../../contract/workflows.js';
+} from '../../contract/workflows';
 
 /**
  * List workflow definitions visible to the caller, grouped by name with the

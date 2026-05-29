@@ -6,12 +6,12 @@ import {
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { transferWorkflowNamespace } from '../transfer-workflow.js';
+import { transferWorkflowNamespace } from '../transfer-workflow';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { ForbiddenError } from '../../../errors.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { ForbiddenError } from '../../../errors';
 
 describe('transferWorkflowNamespace handler', () => {
   let processRepo: InMemoryProcessRepository;

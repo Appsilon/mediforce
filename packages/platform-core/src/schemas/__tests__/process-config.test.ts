@@ -3,7 +3,7 @@ import {
   ProcessConfigSchema,
   StepConfigSchema,
   ReviewConstraintsSchema,
-} from '../process-config.js';
+} from '../process-config';
 
 const validStepConfig = {
   stepId: 'review-step',

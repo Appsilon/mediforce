@@ -9,11 +9,11 @@ export type {
   EmitPayload,
   EmitFn,
   AgentPlugin,
-} from './agent-plugin.js';
+} from './agent-plugin';
 
 export type {
   ReviewPlugin,
   ReviewPluginContext,
   ReviewPluginResult,
   ReviewVerdict,
-} from './review-plugin.js';
+} from './review-plugin';

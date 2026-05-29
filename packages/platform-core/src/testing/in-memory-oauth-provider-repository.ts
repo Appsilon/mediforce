@@ -1,12 +1,12 @@
 import {
   ProviderAlreadyExistsError,
   type OAuthProviderRepository,
-} from '../repositories/oauth-provider-repository.js';
+} from '../repositories/oauth-provider-repository';
 import type {
   OAuthProviderConfig,
   CreateOAuthProviderInput,
   UpdateOAuthProviderInput,
-} from '../schemas/oauth-provider.js';
+} from '../schemas/oauth-provider';
 
 export class InMemoryOAuthProviderRepository implements OAuthProviderRepository {
   // namespace → id → config

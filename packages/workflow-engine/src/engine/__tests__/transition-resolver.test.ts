@@ -4,7 +4,7 @@ import {
   TransitionValidationError,
   NoMatchingTransitionError,
   type TransitionContext,
-} from '../transition-resolver.js';
+} from '../transition-resolver';
 
 type TestTransition = { from: string; to: string; when?: string };
 

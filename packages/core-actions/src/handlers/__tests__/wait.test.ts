@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { waitActionHandler, isWaitSentinel, type WaitSentinel } from '../wait.js';
-import type { ActionContext } from '../../types.js';
+import { waitActionHandler, isWaitSentinel, type WaitSentinel } from '../wait';
+import type { ActionContext } from '../../types';
 
 const baseCtx: ActionContext = {
   stepId: 'wait-step',

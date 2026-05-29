@@ -7,17 +7,17 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { claimTask } from '../claim-task.js';
+import { claimTask } from '../claim-task';
 import {
   ForbiddenError,
   HandlerError,
   NotFoundError,
   PreconditionFailedError,
-} from '../../../errors.js';
+} from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
+} from '../../../repositories/__tests__/create-test-scope';
 
 /**
  * Handler tests for `claimTask`. Exercise the handler against real in-memory

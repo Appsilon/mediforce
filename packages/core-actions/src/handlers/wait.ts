@@ -1,6 +1,6 @@
 import type { WaitActionConfig } from '@mediforce/platform-core';
-import type { WaitActionHandler } from '../types.js';
-import { interpolate } from '../interpolation.js';
+import type { WaitActionHandler } from '../types';
+import { interpolate } from '../interpolation';
 
 export interface WaitActionOutput {
   resumeReason: 'deadline_reached' | 'duration_elapsed' | 'condition_met';

@@ -97,7 +97,7 @@ export default defineConfig({
     // step already started.
     command: useEmulators
       ? process.env.E2E_DEV_SERVER === 'true'
-        ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce MOCK_AGENT=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${testPort} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npx next dev --webpack -p ${testPort}`
+        ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce MOCK_AGENT=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${testPort} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npx next dev -p ${testPort}`
         : `pnpm start:e2e`
       : 'pnpm dev',
     port: testPort,

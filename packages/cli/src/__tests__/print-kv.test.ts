@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { printKv } from '../output.js';
-import { captureOutput } from './test-helpers.js';
+import { printKv } from '../output';
+import { captureOutput } from './test-helpers';
 
 describe('printKv', () => {
   it('pads labels to the max label width across rows', () => {

@@ -2,8 +2,8 @@ import type {
   ProcessRepository,
   WorkflowDefinitionListResult,
   WorkflowDefinitionGroup,
-} from '../index.js';
-import type { WorkflowDefinition } from '../schemas/workflow-definition.js';
+} from '../index';
+import type { WorkflowDefinition } from '../schemas/workflow-definition';
 
 /**
  * In-memory implementation of ProcessRepository for testing.

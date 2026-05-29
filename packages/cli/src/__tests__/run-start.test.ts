@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { runStartCommand } from '../commands/run-start.js';
-import { captureOutput, jsonResponse } from './test-helpers.js';
+import { runStartCommand } from '../commands/run-start';
+import { captureOutput, jsonResponse } from './test-helpers';
 
 beforeEach(() => {
   vi.restoreAllMocks();

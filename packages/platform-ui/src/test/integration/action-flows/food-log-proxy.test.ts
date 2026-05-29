@@ -36,7 +36,7 @@ import {
   parseWorkflowTemplate,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import { createEchoServer } from '../../../../../../scripts/test-echo-server/server.js';
+import { createEchoServer } from '../../../../../../scripts/test-echo-server/server';
 
 // Distinct port from execution-summaries-api so the two e2e files don't
 // fight when run in the same vitest process (vitest.config.action-flows.ts

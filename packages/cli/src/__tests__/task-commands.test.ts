@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { taskListCommand } from '../commands/task-list.js';
-import { taskGetCommand } from '../commands/task-get.js';
-import { taskClaimCommand } from '../commands/task-claim.js';
-import { captureOutput, jsonResponse } from './test-helpers.js';
+import { taskListCommand } from '../commands/task-list';
+import { taskGetCommand } from '../commands/task-get';
+import { taskClaimCommand } from '../commands/task-claim';
+import { captureOutput, jsonResponse } from './test-helpers';
 
 beforeEach(() => {
   vi.restoreAllMocks();

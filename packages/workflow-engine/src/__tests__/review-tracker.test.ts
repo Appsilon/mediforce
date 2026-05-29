@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { ReviewVerdict } from '@mediforce/platform-core';
-import { ReviewTracker } from '../index.js';
+import { ReviewTracker } from '../index';
 
 function makeVerdict(overrides: Partial<ReviewVerdict> = {}): ReviewVerdict {
   return {

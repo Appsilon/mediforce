@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
-import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index.js';
-import { getNamespace } from '../get-namespace.js';
-import { NotFoundError } from '../../../errors.js';
+import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index';
+import { getNamespace } from '../get-namespace';
+import { NotFoundError } from '../../../errors';
 
 const ACME: Namespace = {
   handle: 'acme',

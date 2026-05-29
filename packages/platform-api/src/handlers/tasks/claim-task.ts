@@ -1,7 +1,7 @@
-import type { ClaimTaskInput, ClaimTaskOutput } from '../../contract/tasks.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { ForbiddenError, PreconditionFailedError } from '../../errors.js';
-import { loadOr404 } from '../_helpers.js';
+import type { ClaimTaskInput, ClaimTaskOutput } from '../../contract/tasks';
+import type { CallerScope } from '../../repositories/index';
+import { ForbiddenError, PreconditionFailedError } from '../../errors';
+import { loadOr404 } from '../_helpers';
 
 // PR1 deviation from ADR-0005 §2a: state-machine precondition stays in the
 // handler. Wrapper migration deferred until claim/complete/resolve/cancel

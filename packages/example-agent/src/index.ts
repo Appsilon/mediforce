@@ -1,1 +1,1 @@
-export { ExampleAgent } from './example-agent.js';
+export { ExampleAgent } from './example-agent';

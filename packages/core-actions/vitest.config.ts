@@ -6,7 +6,6 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
   },
   resolve: {
-    conditions: ['@mediforce/source'],
     alias: {
       '@mediforce/platform-core': path.resolve(
         __dirname,

@@ -1,5 +1,5 @@
-import { defineCommand, enumArg } from '../define-command.js';
-import { printJson } from '../output.js';
+import { defineCommand, enumArg } from '../define-command';
+import { printJson } from '../output';
 
 export const workflowSetVisibilityCommand = defineCommand({
   name: 'mediforce workflow set-visibility',

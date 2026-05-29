@@ -1,7 +1,7 @@
 import type { ProcessRepository } from '@mediforce/platform-core';
-import type { WorkflowEngine } from '../engine/workflow-engine.js';
-import type { TriggerResult, WorkflowTriggerContext } from './trigger-types.js';
-import { ManualTriggerNotDeclaredError } from './trigger-errors.js';
+import type { WorkflowEngine } from '../engine/workflow-engine';
+import type { TriggerResult, WorkflowTriggerContext } from './trigger-types';
+import { ManualTriggerNotDeclaredError } from './trigger-errors';
 
 /**
  * ManualTrigger: creates and starts a process instance via WorkflowEngine.

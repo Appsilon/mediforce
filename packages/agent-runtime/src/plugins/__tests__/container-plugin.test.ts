@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatExitInfo } from '../container-plugin.js';
+import { formatExitInfo } from '../container-plugin';
 
 describe('formatExitInfo', () => {
   it('[DATA] reports the exit code when the process exited normally', () => {

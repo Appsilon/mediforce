@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { StepParamSchema } from '../process-definition.js';
+import { StepParamSchema } from '../process-definition';
 
 describe('StepParamSchema.type', () => {
   it.each(['string', 'number', 'boolean', 'date'])('accepts canonical data type %s', (type) => {

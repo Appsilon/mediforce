@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildProcessInstance } from '@mediforce/platform-core/testing';
-import { isRunActiveForArchive } from '../_run-active.js';
+import { isRunActiveForArchive } from '../_run-active';
 
 describe('isRunActiveForArchive', () => {
   it('treats running and created runs as active', () => {

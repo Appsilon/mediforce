@@ -1,7 +1,7 @@
-import type { ManualTrigger } from './manual-trigger.js';
-import type { WebhookTrigger } from './webhook-trigger.js';
-import type { CronTrigger } from './cron-trigger.js';
-import type { WorkflowTriggerContext, TriggerResult } from './trigger-types.js';
+import type { ManualTrigger } from './manual-trigger';
+import type { WebhookTrigger } from './webhook-trigger';
+import type { CronTrigger } from './cron-trigger';
+import type { WorkflowTriggerContext, TriggerResult } from './trigger-types';
 
 /**
  * TriggerHandler: dispatches to the correct trigger implementation

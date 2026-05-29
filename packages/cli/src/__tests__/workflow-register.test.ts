@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { workflowRegisterCommand } from '../commands/workflow-register.js';
+import { workflowRegisterCommand } from '../commands/workflow-register';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
-import { captureOutput, jsonResponse } from './test-helpers.js';
+import { captureOutput, jsonResponse } from './test-helpers';
 
 let tempDir: string;
 let wdFile: string;

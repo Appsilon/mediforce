@@ -1,11 +1,11 @@
 import type { StepExecution } from '@mediforce/platform-core';
-import type { CallerScope } from '../../repositories/index.js';
-import { NotFoundError } from '../../errors.js';
+import type { CallerScope } from '../../repositories/index';
+import { NotFoundError } from '../../errors';
 import type {
   GetProcessStepsInput,
   GetProcessStepsOutput,
   StepEntry,
-} from '../../contract/processes.js';
+} from '../../contract/processes';
 
 /**
  * Derived per-step view combining workflow-definition order, the latest step

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { runCli, TREE } from '../cli.js';
-import { captureOutput } from './test-helpers.js';
+import { runCli, TREE } from '../cli';
+import { captureOutput } from './test-helpers';
 
 // Sanity sweep: every branch×leaf in `TREE` must respond to `--help` with
 // exit 0 and stdout that mentions the leaf name. Catches "imported but not

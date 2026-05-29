@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getPath, interpolate } from '../interpolation.js';
-import type { InterpolationSources } from '../types.js';
+import { getPath, interpolate } from '../interpolation';
+import type { InterpolationSources } from '../types';
 
 const sources: InterpolationSources = {
   triggerPayload: {

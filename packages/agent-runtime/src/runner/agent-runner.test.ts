@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { AgentRunner } from './agent-runner.js';
+import { AgentRunner } from './agent-runner';
 import {
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
 } from '@mediforce/platform-core';
-import { InMemoryAgentEventLog } from '../testing/index.js';
-import { NoopLlmClient } from '../testing/index.js';
+import { InMemoryAgentEventLog } from '../testing/index';
+import { NoopLlmClient } from '../testing/index';
 import type {
   AgentPlugin,
   AgentContext,
   EmitFn,
-} from '../interfaces/agent-plugin.js';
+} from '../interfaces/agent-plugin';
 import type {
   StepConfig,
   ProcessConfig,

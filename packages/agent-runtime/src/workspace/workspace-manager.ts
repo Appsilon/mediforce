@@ -26,7 +26,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import type { WorkflowWorkspace } from '@mediforce/platform-core';
-import { normalizeRepoUrls, toHttpsWithToken } from '../plugins/container-plugin.js';
+import { normalizeRepoUrls, toHttpsWithToken } from '../plugins/container-plugin';
 
 /**
  * Baseline gitignore-style patterns applied to every workspace via `.git/info/exclude`.

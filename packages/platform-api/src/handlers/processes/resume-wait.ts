@@ -1,8 +1,8 @@
 import { evaluateExpression } from '@mediforce/workflow-engine';
-import type { ResumeWaitInput, ResumeWaitOutput } from '../../contract/processes.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { PreconditionFailedError } from '../../errors.js';
-import { actorFromCaller, loadOr404 } from '../_helpers.js';
+import type { ResumeWaitInput, ResumeWaitOutput } from '../../contract/processes';
+import type { CallerScope } from '../../repositories/index';
+import { PreconditionFailedError } from '../../errors';
+import { actorFromCaller, loadOr404 } from '../_helpers';
 
 interface WaitMetadata {
   stepId: string;

@@ -1,8 +1,8 @@
 import {
   ToolCatalogEntrySchema,
   type ToolCatalogEntry,
-} from '../schemas/agent-mcp-binding.js';
-import type { ToolCatalogRepository } from '../interfaces/tool-catalog-repository.js';
+} from '../schemas/agent-mcp-binding';
+import type { ToolCatalogRepository } from '../interfaces/tool-catalog-repository';
 
 /** In-memory double for ToolCatalogRepository. Stores entries keyed by
  *  `${namespace}/${entryId}` so tests can exercise namespace isolation

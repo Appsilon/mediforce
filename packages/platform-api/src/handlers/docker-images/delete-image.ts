@@ -1,11 +1,11 @@
-import { assertCallerCanAdminDockerImages } from '../../auth.js';
-import { PreconditionFailedError } from '../../errors.js';
-import type { CallerScope } from '../../repositories/index.js';
+import { assertCallerCanAdminDockerImages } from '../../auth';
+import { PreconditionFailedError } from '../../errors';
+import type { CallerScope } from '../../repositories/index';
 import type {
   DeleteDockerImageInput,
   DeleteDockerImageOutput,
-} from '../../contract/docker-images.js';
-import { actorFromCaller } from '../_helpers.js';
+} from '../../contract/docker-images';
+import { actorFromCaller } from '../_helpers';
 
 export async function deleteDockerImage(
   input: DeleteDockerImageInput,

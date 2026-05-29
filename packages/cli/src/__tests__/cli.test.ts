@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { runCli } from '../cli.js';
-import { captureOutput } from './test-helpers.js';
+import { runCli } from '../cli';
+import { captureOutput } from './test-helpers';
 
 describe('runCli — top-level dispatch', () => {
   it('prints help when called with no arguments', async () => {

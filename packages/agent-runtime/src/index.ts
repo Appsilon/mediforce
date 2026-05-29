@@ -14,34 +14,34 @@ export type {
   ReviewPluginContext,
   ReviewPluginResult,
   ReviewVerdict,
-} from './interfaces/index.js';
+} from './interfaces/index';
 
 // Plugins
-export { BaseContainerAgentPlugin, isLocalExecutionAllowed, OAuthTokenUnavailableError } from './plugins/base-container-agent-plugin.js';
-export type { AgentCommandSpec, SpawnCliOptions, SpawnDockerResult } from './plugins/base-container-agent-plugin.js';
-export { ClaudeCodeAgentPlugin } from './plugins/claude-code-agent-plugin.js';
-export { MockClaudeCodeAgentPlugin } from './plugins/mock-claude-code-agent-plugin.js';
-export { OpenCodeAgentPlugin } from './plugins/opencode-agent-plugin.js';
-export { ScriptContainerPlugin } from './plugins/script-container-plugin.js';
-export type { DockerSpawnStrategy, DockerSpawnRequest, DockerSpawnResult } from './plugins/docker-spawn-strategy.js';
+export { BaseContainerAgentPlugin, isLocalExecutionAllowed, OAuthTokenUnavailableError } from './plugins/base-container-agent-plugin';
+export type { AgentCommandSpec, SpawnCliOptions, SpawnDockerResult } from './plugins/base-container-agent-plugin';
+export { ClaudeCodeAgentPlugin } from './plugins/claude-code-agent-plugin';
+export { MockClaudeCodeAgentPlugin } from './plugins/mock-claude-code-agent-plugin';
+export { OpenCodeAgentPlugin } from './plugins/opencode-agent-plugin';
+export { ScriptContainerPlugin } from './plugins/script-container-plugin';
+export type { DockerSpawnStrategy, DockerSpawnRequest, DockerSpawnResult } from './plugins/docker-spawn-strategy';
 
 // Runner
-export type { AgentEventLog } from './runner/agent-event-log.js';
-export { FirestoreAgentEventLog } from './runner/agent-event-log.js';
-export { PluginRegistry, PluginNotFoundError } from './runner/plugin-registry.js';
-export { OpenRouterLlmClient } from './runner/llm-client.js';
-export { AgentRunner } from './runner/agent-runner.js';
-export type { AgentRunResult } from './runner/agent-runner.js';
-export { FallbackHandler } from './runner/fallback-handler.js';
+export type { AgentEventLog } from './runner/agent-event-log';
+export { FirestoreAgentEventLog } from './runner/agent-event-log';
+export { PluginRegistry, PluginNotFoundError } from './runner/plugin-registry';
+export { OpenRouterLlmClient } from './runner/llm-client';
+export { AgentRunner } from './runner/agent-runner';
+export type { AgentRunResult } from './runner/agent-runner';
+export { FallbackHandler } from './runner/fallback-handler';
 
 // Env validation
-export { validateWorkflowEnv } from './plugins/resolve-env.js';
-export type { MissingEnvVar } from './plugins/resolve-env.js';
+export { validateWorkflowEnv } from './plugins/resolve-env';
+export type { MissingEnvVar } from './plugins/resolve-env';
 
 // MCP resolution helpers
-export { resolveMcpForStep, AgentDefinitionNotFoundError } from './mcp/resolve-mcp-for-step.js';
-export type { ResolveMcpForStepDeps } from './mcp/resolve-mcp-for-step.js';
-export { flattenResolvedMcpToLegacy } from './mcp/flatten-resolved-mcp.js';
+export { resolveMcpForStep, AgentDefinitionNotFoundError } from './mcp/resolve-mcp-for-step';
+export type { ResolveMcpForStepDeps } from './mcp/resolve-mcp-for-step';
+export { flattenResolvedMcpToLegacy } from './mcp/flatten-resolved-mcp';
 
 // OAuth (Step 5)
 export {
@@ -51,7 +51,7 @@ export {
   generatePkcePair,
   type OAuthStatePayload,
   type PkcePair,
-} from './oauth/state-hmac.js';
+} from './oauth/state-hmac';
 export {
   REFRESH_MARGIN_MS,
   RefreshTokenRejectedError,
@@ -60,7 +60,7 @@ export {
   resolveOAuthToken,
   type ResolvedToken,
   type ResolveTokenOptions,
-} from './oauth/resolve-oauth-token.js';
+} from './oauth/resolve-oauth-token';
 export {
   discoverMcpAuthServer,
   deriveProviderSlug,
@@ -69,17 +69,17 @@ export {
   type DiscoveredAuthServer,
   type ProtectedResourceMetadata,
   type AuthServerMetadata,
-} from './oauth/mcp-oauth-discovery.js';
+} from './oauth/mcp-oauth-discovery';
 export {
   registerOAuthClient,
   pickAuthMethod,
   DcrError,
   type DcrRequest,
   type DcrResponse,
-} from './oauth/dcr-client.js';
+} from './oauth/dcr-client';
 
 // Workspace
-export { WorkspaceManager, SecretDetectedError } from './workspace/workspace-manager.js';
+export { WorkspaceManager, SecretDetectedError } from './workspace/workspace-manager';
 export type {
   WorkflowIdentity,
   WorkspaceManagerInit,
@@ -87,10 +87,10 @@ export type {
   RunWorkspaceHandle,
   CommitStepOptions,
   CommitStepResult,
-} from './workspace/workspace-manager.js';
+} from './workspace/workspace-manager';
 
 // Testing utilities
 export {
   InMemoryAgentEventLog,
   NoopLlmClient,
-} from './testing/index.js';
+} from './testing/index';

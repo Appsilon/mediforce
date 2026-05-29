@@ -5,4 +5,4 @@ export {
   type NoopRunKicker,
   type KickRecord,
   type HttpSelfFetchRunKickerConfig,
-} from './run-kicker.js';
+} from './run-kicker';

@@ -1,11 +1,11 @@
-export { ActionRegistry, UnknownActionKindError } from './registry.js';
-export { interpolate, getPath } from './interpolation.js';
-export { httpActionHandler, type HttpActionOutput } from './handlers/http.js';
-export { reshapeActionHandler } from './handlers/reshape.js';
-export { createEmailActionHandler, type EmailActionOutput, type EmailRateLimitConfig } from './handlers/email.js';
-export { createSpawnActionHandler, type SpawnActionOutput } from './handlers/spawn.js';
-export { waitActionHandler, isWaitSentinel, type WaitActionOutput, type WaitSentinel } from './handlers/wait.js';
-export { validateActionSecrets, type MissingActionSecret } from './validate-action-secrets.js';
+export { ActionRegistry, UnknownActionKindError } from './registry';
+export { interpolate, getPath } from './interpolation';
+export { httpActionHandler, type HttpActionOutput } from './handlers/http';
+export { reshapeActionHandler } from './handlers/reshape';
+export { createEmailActionHandler, type EmailActionOutput, type EmailRateLimitConfig } from './handlers/email';
+export { createSpawnActionHandler, type SpawnActionOutput } from './handlers/spawn';
+export { waitActionHandler, isWaitSentinel, type WaitActionOutput, type WaitSentinel } from './handlers/wait';
+export { validateActionSecrets, type MissingActionSecret } from './validate-action-secrets';
 export type {
   ActionConfig,
   ActionContext,
@@ -18,4 +18,4 @@ export type {
   SpawnActionHandler,
   WaitActionHandler,
   InterpolationSources,
-} from './types.js';
+} from './types';

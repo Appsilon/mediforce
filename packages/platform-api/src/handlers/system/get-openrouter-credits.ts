@@ -1,8 +1,8 @@
-import type { CallerScope } from '../../repositories/index.js';
+import type { CallerScope } from '../../repositories/index';
 import type {
   OpenRouterCreditsInput,
   OpenRouterCreditsOutput,
-} from '../../contract/system.js';
+} from '../../contract/system';
 
 const EMPTY: OpenRouterCreditsOutput = {
   available: false,

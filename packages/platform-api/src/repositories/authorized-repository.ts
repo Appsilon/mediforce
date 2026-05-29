@@ -1,5 +1,5 @@
-import type { CallerIdentity } from '../auth.js';
-import { ForbiddenError } from '../errors.js';
+import type { CallerIdentity } from '../auth';
+import { ForbiddenError } from '../errors';
 
 /**
  * Workspace-scope base for `Authorized<Entity>Repository` wrappers in

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { validateProcessConfig } from '../config-validator.js';
-import type { ProcessDefinition, ProcessConfig } from '../../index.js';
+import { validateProcessConfig } from '../config-validator';
+import type { ProcessDefinition, ProcessConfig } from '../../index';
 
 const baseDefinition: ProcessDefinition = {
   name: 'test-process',

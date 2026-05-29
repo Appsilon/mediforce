@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildProcessInstance } from '@mediforce/platform-core/testing';
-import { runListCommand } from '../commands/run-list.js';
-import { captureOutput, jsonResponse } from './test-helpers.js';
+import { runListCommand } from '../commands/run-list';
+import { captureOutput, jsonResponse } from './test-helpers';
 
 beforeEach(() => {
   vi.restoreAllMocks();

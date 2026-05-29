@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DcrError, pickAuthMethod, registerOAuthClient } from '../dcr-client.js';
+import { DcrError, pickAuthMethod, registerOAuthClient } from '../dcr-client';
 
 describe('pickAuthMethod', () => {
   it('prefers client_secret_basic, then post, then none', () => {

@@ -1,10 +1,10 @@
-import { assertCallerIsNamespaceAdmin } from '../../auth.js';
-import type { CallerScope } from '../../repositories/index.js';
+import { assertCallerIsNamespaceAdmin } from '../../auth';
+import type { CallerScope } from '../../repositories/index';
 import type {
   DeleteOAuthProviderInput,
   DeleteOAuthProviderOutput,
-} from '../../contract/oauth-providers.js';
-import { actorFromCaller } from '../_helpers.js';
+} from '../../contract/oauth-providers';
+import { actorFromCaller } from '../_helpers';
 
 export async function deleteOAuthProvider(
   input: DeleteOAuthProviderInput,

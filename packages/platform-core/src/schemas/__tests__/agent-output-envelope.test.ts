@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   AgentOutputEnvelopeSchema,
   AnnotationSchema,
-} from '../agent-output-envelope.js';
+} from '../agent-output-envelope';
 
 const validAnnotation = {
   id: 'ann-1',

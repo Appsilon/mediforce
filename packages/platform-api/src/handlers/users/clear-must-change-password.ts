@@ -1,10 +1,10 @@
-import { emitAudit } from '../../audit-helpers.js';
-import { ForbiddenError, ValidationError } from '../../errors.js';
-import type { CallerScope } from '../../repositories/index.js';
+import { emitAudit } from '../../audit-helpers';
+import { ForbiddenError, ValidationError } from '../../errors';
+import type { CallerScope } from '../../repositories/index';
 import type {
   ClearMustChangePasswordInput,
   ClearMustChangePasswordOutput,
-} from '../../contract/users.js';
+} from '../../contract/users';
 
 /**
  * Acknowledge a forced password change. User callers always operate on

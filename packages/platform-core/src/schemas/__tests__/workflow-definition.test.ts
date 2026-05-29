@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { WorkflowDefinitionSchema } from '../workflow-definition.js';
+import { WorkflowDefinitionSchema } from '../workflow-definition';
 
 const baseWd = {
   name: 'sftp-monitor',

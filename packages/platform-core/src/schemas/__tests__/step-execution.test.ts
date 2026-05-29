@@ -4,7 +4,7 @@ import {
   StepExecutionStatusSchema,
   GateResultSchema,
   ReviewVerdictSchema,
-} from '../step-execution.js';
+} from '../step-execution';
 
 const validStepExecution = {
   id: 'se-001',

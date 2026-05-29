@@ -4,7 +4,7 @@ import {
   ListAgentRunsOutputSchema,
   GetAgentRunInputSchema,
   GetAgentRunOutputSchema,
-} from '../agent-runs.js';
+} from '../agent-runs';
 
 describe('ListAgentRunsInputSchema', () => {
   it('accepts an empty input — limit is optional, handler picks the default', () => {

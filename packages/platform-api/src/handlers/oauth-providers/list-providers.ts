@@ -1,10 +1,10 @@
-import { assertCallerIsNamespaceAdmin } from '../../auth.js';
-import type { CallerScope } from '../../repositories/index.js';
+import { assertCallerIsNamespaceAdmin } from '../../auth';
+import type { CallerScope } from '../../repositories/index';
 import type {
   ListOAuthProvidersInput,
   ListOAuthProvidersOutput,
-} from '../../contract/oauth-providers.js';
-import { toPublicProvider } from './_helpers.js';
+} from '../../contract/oauth-providers';
+import { toPublicProvider } from './_helpers';
 
 export async function listOAuthProviders(
   input: ListOAuthProvidersInput,

@@ -1,4 +1,4 @@
-import type { UserProfile, UserProfileRepository } from '../interfaces/user-profile-repository.js';
+import type { UserProfile, UserProfileRepository } from '../interfaces/user-profile-repository';
 
 export class InMemoryUserProfileRepository implements UserProfileRepository {
   private readonly profiles = new Map<string, UserProfile>();

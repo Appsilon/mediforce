@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateOutputSchema } from '../base-container-agent-plugin.js';
+import { validateOutputSchema } from '../base-container-agent-plugin';
 
 describe('validateOutputSchema', () => {
   const schema = {

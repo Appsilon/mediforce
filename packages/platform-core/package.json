@@ -4,20 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": {
-      "import": {
-        "@mediforce/source": "./src/index.ts",
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      }
-    },
-    "./testing": {
-      "import": {
-        "@mediforce/source": "./src/testing/index.ts",
-        "types": "./dist/testing/index.d.ts",
-        "default": "./dist/testing/index.js"
-      }
-    }
+    ".": "./src/index.ts",
+    "./testing": "./src/testing/index.ts"
   },
   "dependencies": {
     "yaml": "^2.8.0",

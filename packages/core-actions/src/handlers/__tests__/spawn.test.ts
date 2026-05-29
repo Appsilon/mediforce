@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createSpawnActionHandler, type SpawnActionOutput } from '../spawn.js';
-import type { ActionContext, ActionOutput } from '../../types.js';
+import { createSpawnActionHandler, type SpawnActionOutput } from '../spawn';
+import type { ActionContext, ActionOutput } from '../../types';
 
 const asSpawn = (o: ActionOutput) => o as unknown as SpawnActionOutput;
 

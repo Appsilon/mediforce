@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { CronTrigger } from '../cron-trigger.js';
-import type { WorkflowEngine } from '../../engine/workflow-engine.js';
+import { CronTrigger } from '../cron-trigger';
+import type { WorkflowEngine } from '../../engine/workflow-engine';
 
 function createMockEngine(): WorkflowEngine {
   return {

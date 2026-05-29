@@ -1,6 +1,6 @@
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
-import type { AgentContext, AgentPlugin, EmitFn, WorkflowAgentContext } from '../interfaces/agent-plugin.js';
-import { ClaudeCodeAgentPlugin } from './claude-code-agent-plugin.js';
+import type { AgentContext, AgentPlugin, EmitFn, WorkflowAgentContext } from '../interfaces/agent-plugin';
+import { ClaudeCodeAgentPlugin } from './claude-code-agent-plugin';
 
 export class MockClaudeCodeAgentPlugin implements AgentPlugin {
   readonly metadata: PluginCapabilityMetadata = new ClaudeCodeAgentPlugin().metadata;

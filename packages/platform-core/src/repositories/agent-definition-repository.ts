@@ -5,7 +5,7 @@ import type {
   AgentDefinition,
   CreateAgentDefinitionInput,
   UpdateAgentDefinitionInput,
-} from '../schemas/agent-definition.js';
+} from '../schemas/agent-definition';
 
 export type { CreateAgentDefinitionInput, UpdateAgentDefinitionInput };
 

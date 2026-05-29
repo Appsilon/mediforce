@@ -5,8 +5,8 @@ import {
   buildAuditEvent,
   buildProcessInstance,
 } from '@mediforce/platform-core/testing';
-import { AuthorizedAuditEventRepository } from '../authorized-audit-event-repository.js';
-import type { CallerIdentity } from '../../auth.js';
+import { AuthorizedAuditEventRepository } from '../authorized-audit-event-repository';
+import type { CallerIdentity } from '../../auth';
 
 /**
  * Wrapper tests for the audit-event repository. Reads are namespace-gated;

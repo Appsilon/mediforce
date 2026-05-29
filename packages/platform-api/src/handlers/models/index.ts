@@ -1,4 +1,4 @@
-export { listModels, type ListModelsDeps } from './list-models.js';
-export { getModel, type GetModelDeps } from './get-model.js';
-export { syncModels, type SyncModelsDeps } from './sync-models.js';
-export { updateRankings, type UpdateRankingsDeps } from './update-rankings.js';
+export { listModels, type ListModelsDeps } from './list-models';
+export { getModel, type GetModelDeps } from './get-model';
+export { syncModels, type SyncModelsDeps } from './sync-models';
+export { updateRankings, type UpdateRankingsDeps } from './update-rankings';

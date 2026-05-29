@@ -1,6 +1,6 @@
 import type { EmailActionConfig, SendEmailFn } from '@mediforce/platform-core';
-import { interpolate } from '../interpolation.js';
-import type { EmailActionHandler, InterpolationSources } from '../types.js';
+import { interpolate } from '../interpolation';
+import type { EmailActionHandler, InterpolationSources } from '../types';
 
 export type { SendEmailFn };
 

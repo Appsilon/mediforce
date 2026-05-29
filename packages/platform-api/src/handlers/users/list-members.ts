@@ -1,10 +1,10 @@
-import { NotFoundError } from '../../errors.js';
-import type { CallerScope } from '../../repositories/index.js';
+import { NotFoundError } from '../../errors';
+import type { CallerScope } from '../../repositories/index';
 import type {
   ListNamespaceMembersInput,
   ListNamespaceMembersOutput,
   NamespaceMemberWithAuth,
-} from '../../contract/users.js';
+} from '../../contract/users';
 
 /**
  * Return the workspace's member list with each member's Firebase Auth

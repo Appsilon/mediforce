@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
-import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index.js';
-import { inviteUser } from '../invite-user.js';
-import { ForbiddenError, PreconditionFailedError } from '../../../errors.js';
+import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index';
+import { inviteUser } from '../invite-user';
+import { ForbiddenError, PreconditionFailedError } from '../../../errors';
 import type {
   InviteNotificationService,
   InviteService,
   InvitedUser,
   SendInviteEmailInput,
   SendWorkspaceNotificationEmailInput,
-} from '../../../services/invite-notification.js';
+} from '../../../services/invite-notification';
 
 function inviteServiceReturning(result: InvitedUser): InviteService {
   return {

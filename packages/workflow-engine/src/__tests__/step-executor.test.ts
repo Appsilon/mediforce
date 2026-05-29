@@ -11,8 +11,8 @@ import {
   StepExecutor,
   RoutingError,
   InvalidTransitionError,
-} from '../index.js';
-import type { StepActor } from '../index.js';
+} from '../index';
+import type { StepActor } from '../index';
 
 const linearDef: ProcessDefinition = {
   name: 'linear-process',

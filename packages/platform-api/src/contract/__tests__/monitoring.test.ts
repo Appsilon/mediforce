@@ -3,7 +3,7 @@ import {
   MonitoringSummaryInputSchema,
   MonitoringSummarySchema,
   GetMonitoringSummaryOutputSchema,
-} from '../monitoring.js';
+} from '../monitoring';
 
 describe('MonitoringSummaryInputSchema', () => {
   it('requires a non-empty handle', () => {

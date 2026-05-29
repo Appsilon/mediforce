@@ -1,9 +1,9 @@
-import type { CallerScope } from '../../repositories/index.js';
+import type { CallerScope } from '../../repositories/index';
 import type {
   GetWorkflowSecretsFullInput,
   GetWorkflowSecretsFullOutput,
-} from '../../contract/secrets.js';
-import { assertNamespaceAccess } from '../../auth.js';
+} from '../../contract/secrets';
+import { assertNamespaceAccess } from '../../auth';
 
 /**
  * Value-revealing read of workflow-scoped secrets. Used by the secrets-management

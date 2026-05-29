@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { InMemoryProcessInstanceRepository } from '@mediforce/platform-core/testing';
-import { FirestoreHumanTaskRepository } from '../firestore/human-task-repository.js';
+import { FirestoreHumanTaskRepository } from '../firestore/human-task-repository';
 
 interface InCall {
   readonly field: string;

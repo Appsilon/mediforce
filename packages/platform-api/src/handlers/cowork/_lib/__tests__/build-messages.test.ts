@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildMessages, ARTIFACT_TOOL } from '../build-messages.js';
+import { buildMessages, ARTIFACT_TOOL } from '../build-messages';
 import type { CoworkSession, ConversationTurn } from '@mediforce/platform-core';
 
 function makeSession(overrides?: Partial<CoworkSession>): CoworkSession {

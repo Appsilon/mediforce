@@ -6,11 +6,11 @@ import {
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { archiveWorkflow } from '../archive-workflow.js';
+import { archiveWorkflow } from '../archive-workflow';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
+} from '../../../repositories/__tests__/create-test-scope';
 
 describe('archiveWorkflow handler', () => {
   let processRepo: InMemoryProcessRepository;

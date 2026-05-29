@@ -1,4 +1,4 @@
-import type { HumanTask } from '../schemas/human-task.js';
+import type { HumanTask } from '../schemas/human-task';
 
 /**
  * Storage-layer authorization (ADR-0004): tasks have no namespace field of

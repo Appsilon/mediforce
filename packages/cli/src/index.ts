@@ -1,4 +1,4 @@
-export { runCli, type RunCliInput } from './cli.js';
+export { runCli, type RunCliInput } from './cli';
 export {
   resolveConfig,
   resolveApiKey,
@@ -6,4 +6,4 @@ export {
   DEFAULT_BASE_URL,
   type ResolvedConfig,
   type ResolveConfigInput,
-} from './config.js';
+} from './config';

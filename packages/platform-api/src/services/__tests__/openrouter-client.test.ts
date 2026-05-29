@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { callOpenRouter } from '../openrouter-client.js';
+import { callOpenRouter } from '../openrouter-client';
 
 describe('callOpenRouter', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;

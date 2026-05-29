@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PresentationSchema, TokenUsageSchema } from './agent-output-envelope.js';
+import { PresentationSchema, TokenUsageSchema } from './agent-output-envelope';
 
 export const StepExecutionStatusSchema = z.enum([
   'pending',

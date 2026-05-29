@@ -6,10 +6,10 @@ import type {
   GetAgentOAuthTokenOutput,
   DeleteAgentOAuthTokenInput,
   DeleteAgentOAuthTokenOutput,
-} from '../../contract/agents.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { NotFoundError } from '../../errors.js';
-import { actorFromCaller } from '../_helpers.js';
+} from '../../contract/agents';
+import type { CallerScope } from '../../repositories/index';
+import { NotFoundError } from '../../errors';
+import { actorFromCaller } from '../_helpers';
 
 function sanitize(
   entry: AgentOAuthToken & { serverName: string },

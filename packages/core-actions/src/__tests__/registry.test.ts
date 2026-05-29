@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ActionRegistry, UnknownActionKindError } from '../registry.js';
-import type { ActionContext } from '../types.js';
+import { ActionRegistry, UnknownActionKindError } from '../registry';
+import type { ActionContext } from '../types';
 
 const ctx: ActionContext = {
   stepId: 'step-1',

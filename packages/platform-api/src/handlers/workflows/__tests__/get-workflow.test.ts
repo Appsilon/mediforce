@@ -3,9 +3,9 @@ import {
   InMemoryProcessRepository,
   buildWorkflowDefinition,
 } from '@mediforce/platform-core/testing';
-import { getWorkflow } from '../get-workflow.js';
-import { NotFoundError } from '../../../errors.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { getWorkflow } from '../get-workflow';
+import { NotFoundError } from '../../../errors';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('getWorkflow handler', () => {
   let processRepo: InMemoryProcessRepository;

@@ -8,13 +8,13 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import type { ProcessInstance } from '@mediforce/platform-core';
-import { finalizeCoworkSession } from '../finalize.js';
-import { NotFoundError, PreconditionFailedError } from '../../../errors.js';
+import { finalizeCoworkSession } from '../finalize';
+import { NotFoundError, PreconditionFailedError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { noopRunKicker } from '../../../runtime/run-kicker.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { noopRunKicker } from '../../../runtime/run-kicker';
 
 interface AdvanceStepCall {
   readonly instanceId: string;

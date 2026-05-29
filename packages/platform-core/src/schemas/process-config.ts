@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { McpServerConfigSchema } from './mcp-server-config.js';
+import { McpServerConfigSchema } from './mcp-server-config';
 
 export const ReviewConstraintsSchema = z.object({
   maxIterations: z.number().int().positive().optional(),

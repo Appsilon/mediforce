@@ -7,13 +7,13 @@ import {
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { startRun } from '../start-run.js';
-import { HandlerError, NotFoundError } from '../../../errors.js';
+import { startRun } from '../start-run';
+import { HandlerError, NotFoundError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { noopRunKicker } from '../../../runtime/run-kicker.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { noopRunKicker } from '../../../runtime/run-kicker';
 
 /**
  * Handler-level tests for `startRun`. The manual trigger is stubbed; engine

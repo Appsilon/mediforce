@@ -1,8 +1,8 @@
-import type { CallerScope } from '../../repositories/index.js';
+import type { CallerScope } from '../../repositories/index';
 import type {
   SaveWorkflowSecretsInput,
   SaveWorkflowSecretsOutput,
-} from '../../contract/secrets.js';
+} from '../../contract/secrets';
 
 /**
  * Atomic bulk replace of workflow-scoped secrets. Used by the secrets-management

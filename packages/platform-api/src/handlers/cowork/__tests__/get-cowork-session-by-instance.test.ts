@@ -6,9 +6,9 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { getCoworkSessionByInstance } from '../get-cowork-session-by-instance.js';
-import { NotFoundError } from '../../../errors.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { getCoworkSessionByInstance } from '../get-cowork-session-by-instance';
+import { NotFoundError } from '../../../errors';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('getCoworkSessionByInstance handler', () => {
   let coworkSessionRepo: InMemoryCoworkSessionRepository;

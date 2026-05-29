@@ -6,13 +6,13 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import type { ProcessInstance } from '@mediforce/platform-core';
-import { retryStep } from '../retry-step.js';
-import { NotFoundError, PreconditionFailedError } from '../../../errors.js';
+import { retryStep } from '../retry-step';
+import { NotFoundError, PreconditionFailedError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { noopRunKicker } from '../../../runtime/run-kicker.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { noopRunKicker } from '../../../runtime/run-kicker';
 
 /**
  * Handler-level tests for `retryStep`. The engine is stubbed; engine-internal

@@ -1,6 +1,6 @@
-import type { ProcessInstance } from '../schemas/process-instance.js';
-import type { StepExecution } from '../schemas/step-execution.js';
-import type { InstanceStatus } from '../schemas/process-instance.js';
+import type { ProcessInstance } from '../schemas/process-instance';
+import type { StepExecution } from '../schemas/step-execution';
+import type { InstanceStatus } from '../schemas/process-instance';
 
 export interface ListInstancesOptions {
   definitionName?: string;

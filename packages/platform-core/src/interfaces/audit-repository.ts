@@ -1,4 +1,4 @@
-import type { AuditEvent } from '../schemas/audit-event.js';
+import type { AuditEvent } from '../schemas/audit-event';
 
 /**
  * Storage-layer authorization (ADR-0004): audit events have no namespace

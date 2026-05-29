@@ -1,8 +1,8 @@
 import { InvalidTransitionError } from '@mediforce/workflow-engine';
-import type { RetryStepInput, RetryStepOutput } from '../../contract/processes.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { PreconditionFailedError } from '../../errors.js';
-import { actorFromCaller, loadOr404 } from '../_helpers.js';
+import type { RetryStepInput, RetryStepOutput } from '../../contract/processes';
+import type { CallerScope } from '../../repositories/index';
+import { PreconditionFailedError } from '../../errors';
+import { actorFromCaller, loadOr404 } from '../_helpers';
 
 // Engine emits `step.retried` (stepExecution-scoped); handler additionally
 // emits `instance.retried` for the processInstance-scoped audit lane.

@@ -10,8 +10,8 @@ import {
   WorkflowEngine,
   WebhookTrigger,
   WebhookPayloadValidationError,
-} from '../index.js';
-import type { WorkflowTriggerContext } from '../index.js';
+} from '../index';
+import type { WorkflowTriggerContext } from '../index';
 
 const webhookDef: WorkflowDefinition = {
   name: 'webhook-process',

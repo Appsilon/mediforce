@@ -9,8 +9,8 @@
  *   - Firebase emulators running (Auth on 9099, Firestore on 8080)
  */
 
-import { clearEmulators, createTestUser, seedCollection, seedSubcollection } from '../e2e/helpers/emulator.js';
-import { buildSeedData } from '../e2e/helpers/seed-data.js';
+import { clearEmulators, createTestUser, seedCollection, seedSubcollection } from '../e2e/helpers/emulator';
+import { buildSeedData } from '../e2e/helpers/seed-data';
 
 const TEST_EMAIL = 'test@mediforce.dev';
 const TEST_PASSWORD = 'test123456';

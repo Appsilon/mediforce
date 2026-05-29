@@ -39,7 +39,7 @@ import {
   parseWorkflowTemplate,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import { createEchoServer } from '../../../../../../scripts/test-echo-server/server.js';
+import { createEchoServer } from '../../../../../../scripts/test-echo-server/server';
 
 // ---- Wiring: in-memory services + handler glue -----------------------------
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ModelRegistryEntry, ModelRegistryRepository, CreateModelRegistryEntryInput } from '@mediforce/platform-core';
-import { getModel } from '../get-model.js';
+import { getModel } from '../get-model';
 
 function makeEntry(id: string): ModelRegistryEntry {
   return {

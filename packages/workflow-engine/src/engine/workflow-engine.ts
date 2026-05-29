@@ -19,11 +19,11 @@ import type {
 } from '@mediforce/platform-core';
 import type { Selection, TaskVerdict } from '@mediforce/platform-core';
 import { RbacService, RbacError, normalizeSelection, buildTaskVerdicts, interpolate } from '@mediforce/platform-core';
-import { validateStepGraph } from '../graph/graph-validator.js';
-import { StepExecutor, type StepActor } from './step-executor.js';
-import { RoutingError, InvalidTransitionError, ParentInstanceNotFoundError } from './errors.js';
-import { ReviewTracker } from '../review/review-tracker.js';
-import { shapeCompletion } from './complete-human-task.js';
+import { validateStepGraph } from '../graph/graph-validator';
+import { StepExecutor, type StepActor } from './step-executor';
+import { RoutingError, InvalidTransitionError, ParentInstanceNotFoundError } from './errors';
+import { ReviewTracker } from '../review/review-tracker';
+import { shapeCompletion } from './complete-human-task';
 
 /**
  * Minimal shape of AgentRunResult needed by WorkflowEngine for handoff creation.

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   AgentRunSchema,
   AgentRunStatusSchema,
-} from '../agent-run.js';
+} from '../agent-run';
 
 const validEnvelope = {
   confidence: 0.87,

@@ -1,7 +1,7 @@
 import type { Queue, QueueEvents } from 'bullmq';
-import { getRedisConnection } from './connection.js';
-import { QUEUE_NAME, DockerJobResultSchema } from './schemas.js';
-import type { DockerJobData, DockerJobResult } from './schemas.js';
+import { getRedisConnection } from './connection';
+import { QUEUE_NAME, DockerJobResultSchema } from './schemas';
+import type { DockerJobData, DockerJobResult } from './schemas';
 
 let sharedQueue: Queue | null = null;
 let sharedQueueEvents: QueueEvents | null = null;

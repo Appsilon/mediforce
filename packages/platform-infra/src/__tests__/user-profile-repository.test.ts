@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
-import { FirestoreUserProfileRepository } from '../firestore/user-profile-repository.js';
+import { FirestoreUserProfileRepository } from '../firestore/user-profile-repository';
 
 interface DocSpy {
   exists: boolean;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toPublicProvider } from '../_helpers.js';
+import { toPublicProvider } from '../_helpers';
 
 describe('toPublicProvider', () => {
   const fullProvider = {

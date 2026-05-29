@@ -5,12 +5,12 @@ import {
   InMemoryProcessInstanceRepository,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { deleteAgent } from '../delete-agent.js';
+import { deleteAgent } from '../delete-agent';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { NotFoundError } from '../../../errors.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { NotFoundError } from '../../../errors';
 
 describe('deleteAgent handler', () => {
   let agentDefinitionRepo: InMemoryAgentDefinitionRepository;

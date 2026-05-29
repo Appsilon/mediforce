@@ -7,8 +7,8 @@ import { promisify } from 'node:util';
 import {
   DockerDiskInfoSchema,
   DockerImageInfoSchema,
-} from '../../contract/system.js';
-import type { DockerInfoResponse } from '../../contract/system.js';
+} from '../../contract/system';
+import type { DockerInfoResponse } from '../../contract/system';
 
 const execFileAsync = promisify(execFile);
 

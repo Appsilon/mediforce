@@ -6,11 +6,11 @@ import {
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { registerWorkflow } from '../register-workflow.js';
+import { registerWorkflow } from '../register-workflow';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
+} from '../../../repositories/__tests__/create-test-scope';
 
 describe('registerWorkflow handler', () => {
   let processRepo: InMemoryProcessRepository;

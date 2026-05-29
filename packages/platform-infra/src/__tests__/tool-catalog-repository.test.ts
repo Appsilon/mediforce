@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
-import { FirestoreToolCatalogRepository } from '../firestore/tool-catalog-repository.js';
+import { FirestoreToolCatalogRepository } from '../firestore/tool-catalog-repository';
 import type { ToolCatalogEntry } from '@mediforce/platform-core';
 
 // Mock Firestore using the chainable stub pattern used elsewhere in this

@@ -1,8 +1,8 @@
-import type { CallerScope } from '../../repositories/index.js';
+import type { CallerScope } from '../../repositories/index';
 import type {
   DeleteSecretInput,
   DeleteSecretOutput,
-} from '../../contract/secrets.js';
+} from '../../contract/secrets';
 
 /**
  * Delete a secret. Workflow-scoped when `workflow` is set, workspace-scoped

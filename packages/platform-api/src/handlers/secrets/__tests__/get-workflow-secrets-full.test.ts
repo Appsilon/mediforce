@@ -4,13 +4,13 @@ import type {
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
-import { getWorkflowSecretsFull } from '../get-workflow-secrets-full.js';
-import { ForbiddenError } from '../../../errors.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { getWorkflowSecretsFull } from '../get-workflow-secrets-full';
+import { ForbiddenError } from '../../../errors';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import {
   buildNamespaceSecretsRepo,
   buildWorkflowSecretsRepo,
-} from './fakes.js';
+} from './fakes';
 
 describe('getWorkflowSecretsFull handler', () => {
   let workspaceSecretsRepo: NamespaceSecretsRepository;

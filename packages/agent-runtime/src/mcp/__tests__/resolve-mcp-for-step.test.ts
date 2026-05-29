@@ -11,7 +11,7 @@ import {
 import {
   AgentDefinitionNotFoundError,
   resolveMcpForStep,
-} from '../resolve-mcp-for-step.js';
+} from '../resolve-mcp-for-step';
 
 function makeStep(overrides: Partial<WorkflowStep> = {}): WorkflowStep {
   return WorkflowStepSchema.parse({

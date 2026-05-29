@@ -1,8 +1,8 @@
-import type { CallerScope } from '../../repositories/index.js';
+import type { CallerScope } from '../../repositories/index';
 import type {
   ListSecretKeysInput,
   ListSecretKeysOutput,
-} from '../../contract/secrets.js';
+} from '../../contract/secrets';
 
 /**
  * List secret keys (not values) for a workspace, or for a specific workflow

@@ -7,9 +7,9 @@ import {
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { getProcessSteps } from '../get-process-steps.js';
-import { NotFoundError } from '../../../errors.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { getProcessSteps } from '../get-process-steps';
+import { NotFoundError } from '../../../errors';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 /**
  * Locks in the status-derivation rules across the common shapes (running,

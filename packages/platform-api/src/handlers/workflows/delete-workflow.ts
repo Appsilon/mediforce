@@ -1,10 +1,10 @@
 import type {
   DeleteWorkflowInput,
   DeleteWorkflowOutput,
-} from '../../contract/workflows.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { ConflictError } from '../../errors.js';
-import { actorFromCaller } from '../_helpers.js';
+} from '../../contract/workflows';
+import type { CallerScope } from '../../repositories/index';
+import { ConflictError } from '../../errors';
+import { actorFromCaller } from '../_helpers';
 
 /**
  * Soft-deletes a workflow definition and cascades the soft-delete to all

@@ -1,8 +1,8 @@
-import { assertCallerIsNamespaceAdmin } from '../../auth.js';
-import { PreconditionFailedError } from '../../errors.js';
-import type { CallerScope } from '../../repositories/index.js';
-import type { InviteUserInput, InviteUserOutput } from '../../contract/users.js';
-import { actorFromCaller } from '../_helpers.js';
+import { assertCallerIsNamespaceAdmin } from '../../auth';
+import { PreconditionFailedError } from '../../errors';
+import type { CallerScope } from '../../repositories/index';
+import type { InviteUserInput, InviteUserOutput } from '../../contract/users';
+import { actorFromCaller } from '../_helpers';
 
 /**
  * Invite a user to a workspace.

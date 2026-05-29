@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { NamespaceMember, UserDirectoryService } from '@mediforce/platform-core';
-import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index.js';
-import { listNamespaceMembers } from '../list-members.js';
-import { NotFoundError } from '../../../errors.js';
+import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index';
+import { listNamespaceMembers } from '../list-members';
+import { NotFoundError } from '../../../errors';
 
 const ALPHA_MEMBERS: NamespaceMember[] = [
   { uid: 'uid-owner', role: 'owner', displayName: 'Alpha Owner', joinedAt: '2026-01-01T00:00:00.000Z' },

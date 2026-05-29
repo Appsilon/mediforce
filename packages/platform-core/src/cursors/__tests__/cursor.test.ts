@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { encodeCursor, decodeCursor } from '../cursor.js';
+import { encodeCursor, decodeCursor } from '../cursor';
 
 const TestPayloadSchema = z.object({
   a: z.string().min(1),

@@ -12,7 +12,6 @@
     "incremental": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "customConditions": ["@mediforce/source"],
     "types": ["node"]
   },
   "include": [],

@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { readFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { workflowGetCommand } from '../commands/workflow-get.js';
+import { workflowGetCommand } from '../commands/workflow-get';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
-import { captureOutput, jsonResponse } from './test-helpers.js';
+import { captureOutput, jsonResponse } from './test-helpers';
 
 beforeEach(() => {
   vi.restoreAllMocks();

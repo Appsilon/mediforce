@@ -5,8 +5,8 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { bulkCancelRuns } from '../bulk-cancel-runs.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { bulkCancelRuns } from '../bulk-cancel-runs';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('bulkCancelRuns handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;

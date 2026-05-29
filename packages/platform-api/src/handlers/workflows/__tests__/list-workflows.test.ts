@@ -3,8 +3,8 @@ import {
   InMemoryProcessRepository,
   buildWorkflowDefinition,
 } from '@mediforce/platform-core/testing';
-import { listWorkflows } from '../list-workflows.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { listWorkflows } from '../list-workflows';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('listWorkflows handler', () => {
   let processRepo: InMemoryProcessRepository;

@@ -5,13 +5,13 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { resumeRun } from '../resume-run.js';
-import { NotFoundError, PreconditionFailedError } from '../../../errors.js';
+import { resumeRun } from '../resume-run';
+import { NotFoundError, PreconditionFailedError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { noopRunKicker } from '../../../runtime/run-kicker.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { noopRunKicker } from '../../../runtime/run-kicker';
 
 describe('resumeRun handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;

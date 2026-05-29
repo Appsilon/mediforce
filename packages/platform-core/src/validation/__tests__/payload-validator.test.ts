@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { validatePayload } from '../payload-validator.js';
-import type { TriggerInputField } from '../../schemas/workflow-definition.js';
+import { validatePayload } from '../payload-validator';
+import type { TriggerInputField } from '../../schemas/workflow-definition';
 
 const field = (overrides: Partial<TriggerInputField> & { name: string }): TriggerInputField => ({
   type: 'string',

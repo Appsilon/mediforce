@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ModelRegistryEntry, ModelRegistryRepository, CreateModelRegistryEntryInput } from '@mediforce/platform-core';
-import { listModels } from '../list-models.js';
+import { listModels } from '../list-models';
 
 function makeEntry(overrides: Partial<ModelRegistryEntry> & { id: string }): ModelRegistryEntry {
   return {

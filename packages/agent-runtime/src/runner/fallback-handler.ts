@@ -4,8 +4,8 @@ import type {
   AgentEvent,
   AgentOutputEnvelope,
 } from '@mediforce/platform-core';
-import type { AgentContext, WorkflowAgentContext } from '../interfaces/agent-plugin.js';
-import type { AgentRunResult } from './agent-runner.js';
+import type { AgentContext, WorkflowAgentContext } from '../interfaces/agent-plugin';
+import type { AgentRunResult } from './agent-runner';
 
 export class FallbackHandler {
   constructor(

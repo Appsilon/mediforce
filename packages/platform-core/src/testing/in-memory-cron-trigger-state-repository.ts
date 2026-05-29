@@ -1,5 +1,5 @@
-import type { CronTriggerState } from '../schemas/cron-trigger-state.js';
-import type { CronTriggerStateRepository } from '../interfaces/cron-trigger-state-repository.js';
+import type { CronTriggerState } from '../schemas/cron-trigger-state';
+import type { CronTriggerStateRepository } from '../interfaces/cron-trigger-state-repository';
 
 export class InMemoryCronTriggerStateRepository implements CronTriggerStateRepository {
   private readonly store = new Map<string, CronTriggerState>();

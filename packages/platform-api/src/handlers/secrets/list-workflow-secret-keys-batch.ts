@@ -1,8 +1,8 @@
-import type { CallerScope } from '../../repositories/index.js';
+import type { CallerScope } from '../../repositories/index';
 import type {
   ListWorkflowSecretKeysBatchInput,
   ListWorkflowSecretKeysBatchOutput,
-} from '../../contract/secrets.js';
+} from '../../contract/secrets';
 
 /**
  * Per-workflow key listing in a single round-trip. The wrapper soft-fails to

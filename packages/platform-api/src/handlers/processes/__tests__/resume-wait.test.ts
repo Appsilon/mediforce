@@ -5,13 +5,13 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { resumeWait } from '../resume-wait.js';
-import { PreconditionFailedError } from '../../../errors.js';
+import { resumeWait } from '../resume-wait';
+import { PreconditionFailedError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { noopRunKicker } from '../../../runtime/run-kicker.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { noopRunKicker } from '../../../runtime/run-kicker';
 
 describe('resumeWait handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;

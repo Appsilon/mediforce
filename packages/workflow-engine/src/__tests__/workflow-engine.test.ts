@@ -14,8 +14,8 @@ import type {
 import {
   WorkflowEngine,
   InvalidTransitionError,
-} from '../index.js';
-import type { StepActor } from '../index.js';
+} from '../index';
+import type { StepActor } from '../index';
 
 // All test definitions use WorkflowDefinition (unified schema)
 const linearDef: WorkflowDefinition = {

@@ -1,5 +1,5 @@
 import { ApiError } from '@mediforce/platform-api/client';
-import type { ErrorPayload } from './output.js';
+import type { ErrorPayload } from './output';
 
 export interface FormatCliErrorInput {
   baseUrl?: string;

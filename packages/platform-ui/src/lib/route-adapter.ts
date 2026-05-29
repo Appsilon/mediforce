@@ -4,9 +4,9 @@ import { HandlerError } from '@mediforce/platform-api/errors';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { createCallerScope, type CallerScope } from '@mediforce/platform-api/repositories';
 import { createHttpSelfFetchRunKicker, type RunKicker } from '@mediforce/platform-api/runtime';
-import { resolveCallerIdentity } from './api-auth.js';
-import { getPlatformServices } from './platform-services.js';
-import { getAppBaseUrl } from './app-base-url.js';
+import { resolveCallerIdentity } from './api-auth';
+import { getPlatformServices } from './platform-services';
+import { getAppBaseUrl } from './app-base-url';
 
 /**
  * Wraps a pure handler (from `@mediforce/platform-api`) into a Next.js route.

@@ -1,6 +1,6 @@
 import type { SpawnActionConfig, SpawnTargetConfig, ProcessRepository } from '@mediforce/platform-core';
-import { interpolate } from '../interpolation.js';
-import type { SpawnActionHandler, InterpolationSources } from '../types.js';
+import { interpolate } from '../interpolation';
+import type { SpawnActionHandler, InterpolationSources } from '../types';
 
 interface TriggerResult {
   instanceId: string;

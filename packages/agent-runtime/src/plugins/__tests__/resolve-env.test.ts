@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveStepEnv, validateWorkflowEnv, resolveValue } from '../resolve-env.js';
+import { resolveStepEnv, validateWorkflowEnv, resolveValue } from '../resolve-env';
 
 describe('resolve-env', () => {
   // ---------------------------------------------------------------------------

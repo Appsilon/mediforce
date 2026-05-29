@@ -1,5 +1,5 @@
 import type { ModelRegistryRepository } from '@mediforce/platform-core';
-import type { UpdateRankingsInput, UpdateRankingsOutput } from '../../contract/models.js';
+import type { UpdateRankingsInput, UpdateRankingsOutput } from '../../contract/models';
 
 export interface UpdateRankingsDeps {
   modelRegistryRepo: ModelRegistryRepository;

@@ -1,6 +1,6 @@
 import type { CoworkSession } from '@mediforce/platform-core';
 import type { McpToolDefinition } from '@mediforce/mcp-client';
-import type { OpenRouterChatMessage } from '../../../services/openrouter-client.js';
+import type { OpenRouterChatMessage } from '../../../services/openrouter-client';
 
 /**
  * Message format compatible with OpenRouter / OpenAI chat completions API.

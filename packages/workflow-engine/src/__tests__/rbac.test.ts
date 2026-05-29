@@ -9,8 +9,8 @@ import {
   type StepConfig,
   type WorkflowDefinition,
 } from '@mediforce/platform-core';
-import { WorkflowEngine } from '../engine/workflow-engine.js';
-import type { StepActor } from '../index.js';
+import { WorkflowEngine } from '../engine/workflow-engine';
+import type { StepActor } from '../index';
 
 // A simple 2-step workflow (start -> done) with no gate needed (single transition)
 const simpleDefinition: WorkflowDefinition = {

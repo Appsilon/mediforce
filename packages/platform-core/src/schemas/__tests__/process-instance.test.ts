@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ProcessInstanceSchema,
   InstanceStatusSchema,
-} from '../process-instance.js';
+} from '../process-instance';
 
 const validInstance = {
   id: 'pi-001',

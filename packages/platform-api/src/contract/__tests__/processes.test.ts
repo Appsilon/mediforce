@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CancelRunInputSchema } from '../processes.js';
+import { CancelRunInputSchema } from '../processes';
 
 describe('CancelRunInputSchema', () => {
   it('accepts a non-empty runId without reason', () => {

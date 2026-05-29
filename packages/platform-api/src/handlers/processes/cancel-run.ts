@@ -1,7 +1,7 @@
-import type { CancelRunInput, CancelRunOutput } from '../../contract/processes.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { PreconditionFailedError } from '../../errors.js';
-import { loadOr404 } from '../_helpers.js';
+import type { CancelRunInput, CancelRunOutput } from '../../contract/processes';
+import type { CallerScope } from '../../repositories/index';
+import { PreconditionFailedError } from '../../errors';
+import { loadOr404 } from '../_helpers';
 
 const DEFAULT_REASON = 'Cancelled by user';
 

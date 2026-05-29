@@ -1,6 +1,6 @@
 import type { HumanTask, HumanTaskStatus } from '@mediforce/platform-core';
-import type { CallerScope } from '../../repositories/index.js';
-import type { ListTasksInput, ListTasksOutput } from '../../contract/tasks.js';
+import type { CallerScope } from '../../repositories/index';
+import type { ListTasksInput, ListTasksOutput } from '../../contract/tasks';
 
 /**
  * List tasks visible to the caller. Workspace gating is enforced by the

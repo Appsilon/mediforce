@@ -1,9 +1,9 @@
-import type { CallerScope } from '../../repositories/index.js';
+import type { CallerScope } from '../../repositories/index';
 import type {
   GetWorkspaceSecretPreviewsInput,
   GetWorkspaceSecretPreviewsOutput,
   SecretPreview,
-} from '../../contract/secrets.js';
+} from '../../contract/secrets';
 
 // Mask format matches the legacy `getNamespaceSecretPreviews` action: first 4
 // + last 4 chars for values long enough to anchor visually, eight bullets

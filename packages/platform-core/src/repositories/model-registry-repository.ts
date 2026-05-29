@@ -3,7 +3,7 @@ import type {
   ModelRegistryMeta,
   CreateModelRegistryEntryInput,
   UpdateModelRegistryEntryInput,
-} from '../schemas/model-registry.js';
+} from '../schemas/model-registry';
 
 export interface ModelRegistryRepository {
   getById(id: string): Promise<ModelRegistryEntry | null>;

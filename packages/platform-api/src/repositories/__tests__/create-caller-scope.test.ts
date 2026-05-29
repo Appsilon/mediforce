@@ -22,7 +22,7 @@ import {
   buildHumanTask,
   buildProcessInstance,
 } from '@mediforce/platform-core/testing';
-import { createTestScope, userCaller } from '../../testing/index.js';
+import { createTestScope, userCaller } from '../../testing/index';
 
 describe('createCallerScope', () => {
   it('exposes every documented wrapper field + deployment-global pass-throughs', () => {

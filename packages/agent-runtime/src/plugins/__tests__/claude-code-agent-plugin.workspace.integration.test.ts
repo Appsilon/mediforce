@@ -12,9 +12,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
-import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin.js';
-import type { EmitPayload, EmitFn, WorkflowAgentContext } from '../../interfaces/agent-plugin.js';
-import type { AgentCommandSpec } from '../base-container-agent-plugin.js';
+import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
+import type { EmitPayload, EmitFn, WorkflowAgentContext } from '../../interfaces/agent-plugin';
+import type { AgentCommandSpec } from '../base-container-agent-plugin';
 
 type GetAgentCommandTarget = { getAgentCommand: (promptPath: string, options?: unknown) => AgentCommandSpec };
 type ReadSkillTarget = { readSkillFile: (skillsDir: string, skill: string) => Promise<string> };

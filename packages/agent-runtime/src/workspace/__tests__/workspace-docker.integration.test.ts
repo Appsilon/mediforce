@@ -23,12 +23,12 @@ import type {
   WorkflowDefinition,
   WorkflowStep,
 } from '@mediforce/platform-core';
-import { ScriptContainerPlugin } from '../../plugins/script-container-plugin.js';
+import { ScriptContainerPlugin } from '../../plugins/script-container-plugin';
 import type {
   EmitFn,
   EmitPayload,
   WorkflowAgentContext,
-} from '../../interfaces/agent-plugin.js';
+} from '../../interfaces/agent-plugin';
 
 function dockerAvailable(): boolean {
   try {

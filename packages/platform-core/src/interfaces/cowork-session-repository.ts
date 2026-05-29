@@ -1,4 +1,4 @@
-import type { CoworkSession, ConversationTurn } from '../schemas/cowork-session.js';
+import type { CoworkSession, ConversationTurn } from '../schemas/cowork-session';
 
 /**
  * Storage-layer authorization (ADR-0004): cowork sessions have no namespace

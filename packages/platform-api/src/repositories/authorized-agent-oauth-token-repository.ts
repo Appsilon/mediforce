@@ -2,8 +2,8 @@ import type {
   AgentOAuthToken,
   AgentOAuthTokenRepository,
 } from '@mediforce/platform-core';
-import type { CallerIdentity } from '../auth.js';
-import { AuthorizedScope } from './authorized-repository.js';
+import type { CallerIdentity } from '../auth';
+import { AuthorizedScope } from './authorized-repository';
 
 /**
  * Workspace-scoped storage of per-agent OAuth tokens. Namespace is path

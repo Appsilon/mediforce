@@ -1,10 +1,10 @@
-import { HandlerError, PreconditionFailedError } from '../../errors.js';
-import { loadOr404 } from '../_helpers.js';
-import type { CallerScope } from '../../repositories/index.js';
+import { HandlerError, PreconditionFailedError } from '../../errors';
+import { loadOr404 } from '../_helpers';
+import type { CallerScope } from '../../repositories/index';
 import type {
   CreateVoiceEphemeralKeyInput,
   CreateVoiceEphemeralKeyOutput,
-} from '../../contract/cowork.js';
+} from '../../contract/cowork';
 
 const DEFAULT_VOICE_INSTRUCTIONS =
   'You are a collaborative assistant. Help the user design and discuss their requirements through voice conversation. ' +

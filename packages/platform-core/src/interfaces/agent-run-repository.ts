@@ -1,4 +1,4 @@
-import type { AgentRun } from '../schemas/agent-run.js';
+import type { AgentRun } from '../schemas/agent-run';
 
 export interface ListAgentRunsOptions {
   readonly limit: number;

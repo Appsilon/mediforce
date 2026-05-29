@@ -1,5 +1,5 @@
-import { defineCommand } from '../define-command.js';
-import { printJson, printKv } from '../output.js';
+import { defineCommand } from '../define-command';
+import { printJson, printKv } from '../output';
 
 export const usersClearMustChangePasswordCommand = defineCommand({
   name: 'mediforce users clear-must-change-password',

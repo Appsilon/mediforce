@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { agentListCommand } from '../commands/agent-list.js';
-import { captureOutput, jsonResponse } from './test-helpers.js';
+import { agentListCommand } from '../commands/agent-list';
+import { captureOutput, jsonResponse } from './test-helpers';
 
 beforeEach(() => {
   vi.restoreAllMocks();

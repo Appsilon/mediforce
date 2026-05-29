@@ -1,10 +1,10 @@
 import type {
   CopyWorkflowInput,
   CopyWorkflowOutput,
-} from '../../contract/workflows.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { ConflictError, NotFoundError } from '../../errors.js';
-import { actorFromCaller } from '../_helpers.js';
+} from '../../contract/workflows';
+import type { CallerScope } from '../../repositories/index';
+import { ConflictError, NotFoundError } from '../../errors';
+import { actorFromCaller } from '../_helpers';
 
 interface ScopedInput extends CopyWorkflowInput {
   targetNamespace: string;

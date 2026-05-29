@@ -4,8 +4,8 @@ import type {
   OAuthProviderRepository,
   UpdateOAuthProviderInput,
 } from '@mediforce/platform-core';
-import type { CallerIdentity } from '../auth.js';
-import { AuthorizedScope } from './authorized-repository.js';
+import type { CallerIdentity } from '../auth';
+import { AuthorizedScope } from './authorized-repository';
 
 /**
  * Workspace-scoped OAuth provider configs. Namespace is path-prefix on every

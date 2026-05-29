@@ -8,11 +8,11 @@ import { spawn } from 'node:child_process';
 import { appendFile, mkdir, mkdtemp, writeFile, readdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { getRedisConnection } from './connection.js';
-import { QUEUE_NAME, DockerJobDataSchema } from './schemas.js';
-import type { DockerJobResult } from './schemas.js';
-import { ensureImage } from './docker-image-builder.js';
-import { startHttpServer } from './http-server.js';
+import { getRedisConnection } from './connection';
+import { QUEUE_NAME, DockerJobDataSchema } from './schemas';
+import type { DockerJobResult } from './schemas';
+import { ensureImage } from './docker-image-builder';
+import { startHttpServer } from './http-server';
 import { createLineStreamReader } from '@mediforce/platform-core';
 
 /**

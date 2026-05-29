@@ -1,5 +1,5 @@
 import type { ModelRegistryRepository } from '@mediforce/platform-core';
-import type { ListModelsInput, ListModelsOutput } from '../../contract/models.js';
+import type { ListModelsInput, ListModelsOutput } from '../../contract/models';
 
 export interface ListModelsDeps {
   modelRegistryRepo: ModelRegistryRepository;

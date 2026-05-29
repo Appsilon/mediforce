@@ -10,8 +10,8 @@ import type {
   ToolCatalogRepository,
 } from '@mediforce/platform-core';
 import { InMemoryToolCatalogRepository } from '@mediforce/platform-core/testing';
-import { PostgresToolCatalogRepository } from '../repositories/tool-catalog-repository.js';
-import * as schema from '../schema/index.js';
+import { PostgresToolCatalogRepository } from '../repositories/tool-catalog-repository';
+import * as schema from '../schema/index';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = resolve(__dirname, '..', 'migrations');

@@ -6,8 +6,8 @@ import {
   callerCanAccess,
   filterByCaller,
   type CallerIdentity,
-} from '../auth.js';
-import { ForbiddenError } from '../errors.js';
+} from '../auth';
+import { ForbiddenError } from '../errors';
 
 const apiKey: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 const userInNsA: CallerIdentity = {

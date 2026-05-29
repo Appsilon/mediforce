@@ -5,9 +5,9 @@ import type {
   CreateAgentDefinitionInput,
   UpdateAgentDefinitionInput,
 } from '@mediforce/platform-core';
-import type { CallerIdentity } from '../auth.js';
-import { NotFoundError } from '../errors.js';
-import { AuthorizedScope } from './authorized-repository.js';
+import type { CallerIdentity } from '../auth';
+import { NotFoundError } from '../errors';
+import { AuthorizedScope } from './authorized-repository';
 
 /**
  * Workspace + visibility-scoped view of `AgentDefinitionRepository`. Mirrors

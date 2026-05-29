@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runGetCommand } from '../commands/run-get.js';
-import { workflowRegisterCommand } from '../commands/workflow-register.js';
-import { printError } from '../output.js';
-import { captureOutput, jsonResponse } from './test-helpers.js';
+import { runGetCommand } from '../commands/run-get';
+import { workflowRegisterCommand } from '../commands/workflow-register';
+import { printError } from '../output';
+import { captureOutput, jsonResponse } from './test-helpers';
 
 /**
  * Regression tests for the `printError` stream contract documented in

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { loadOr404 } from '../_helpers.js';
-import { HandlerError, NotFoundError } from '../../errors.js';
+import { loadOr404 } from '../_helpers';
+import { HandlerError, NotFoundError } from '../../errors';
 
 /**
  * Tests for the shared handler helpers. Right now `loadOr404` is the only

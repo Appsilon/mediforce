@@ -1,6 +1,6 @@
-import type { CallerScope } from '../../repositories/index.js';
-import { NotFoundError } from '../../errors.js';
-import type { GetRunInput, GetRunOutput } from '../../contract/runs.js';
+import type { CallerScope } from '../../repositories/index';
+import { NotFoundError } from '../../errors';
+import type { GetRunInput, GetRunOutput } from '../../contract/runs';
 import type { InstanceStatus } from '@mediforce/platform-core';
 
 /**

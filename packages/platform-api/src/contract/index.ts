@@ -24,7 +24,7 @@ export {
   type Attachment,
   type AssignmentItem,
   type TableEditorRow,
-} from './tasks.js';
+} from './tasks';
 
 export {
   RegisterWorkflowInputSchema,
@@ -76,7 +76,7 @@ export {
   type GetWorkflowRunCountOutput,
   type TransferWorkflowInput,
   type TransferWorkflowOutput,
-} from './workflows.js';
+} from './workflows';
 
 export {
   DockerImageInfoSchema,
@@ -91,7 +91,7 @@ export {
   OpenRouterCreditsOutputSchema,
   type OpenRouterCreditsInput,
   type OpenRouterCreditsOutput,
-} from './system.js';
+} from './system';
 
 export {
   ListAgentsInputSchema,
@@ -142,7 +142,7 @@ export {
   type GetAgentOAuthTokenOutput,
   type DeleteAgentOAuthTokenInput,
   type DeleteAgentOAuthTokenOutput,
-} from './agents.js';
+} from './agents';
 
 export {
   GetRunInputSchema,
@@ -157,7 +157,7 @@ export {
   type StartRunOutput,
   type ListRunsInput,
   type ListRunsOutput,
-} from './runs.js';
+} from './runs';
 
 export {
   ListModelsInputSchema,
@@ -176,7 +176,7 @@ export {
   type UpdateRankingsInput,
   type UpdateRankingsOutput,
   type GetMetaOutput,
-} from './models.js';
+} from './models';
 
 export {
   SetSecretInputSchema,
@@ -209,7 +209,7 @@ export {
   type GetWorkflowSecretsFullOutput,
   type SaveWorkflowSecretsInput,
   type SaveWorkflowSecretsOutput,
-} from './secrets.js';
+} from './secrets';
 
 export {
   GetProcessInputSchema,
@@ -256,7 +256,7 @@ export {
   type BulkRunInput,
   type BulkRunOutput,
   type BulkRunResultItem,
-} from './processes.js';
+} from './processes';
 
 export {
   GetCoworkSessionInputSchema,
@@ -285,7 +285,7 @@ export {
   type CreateVoiceEphemeralKeyOutput,
   type SynthesizeVoiceArtifactInput,
   type SynthesizeVoiceArtifactOutput,
-} from './cowork.js';
+} from './cowork';
 
 export {
   ListPluginsInputSchema,
@@ -294,7 +294,7 @@ export {
   type ListPluginsInput,
   type ListPluginsOutput,
   type PluginSummary,
-} from './plugins.js';
+} from './plugins';
 
 export {
   HeartbeatInputSchema,
@@ -305,7 +305,7 @@ export {
   type HeartbeatOutput,
   type TriggeredEntry,
   type SkippedEntry,
-} from './cron.js';
+} from './cron';
 
 export {
   ListOAuthProvidersInputSchema,
@@ -328,14 +328,14 @@ export {
   type UpdateOAuthProviderOutput,
   type DeleteOAuthProviderInput,
   type DeleteOAuthProviderOutput,
-} from './oauth-providers.js';
+} from './oauth-providers';
 
 export {
   DeleteDockerImageInputSchema,
   DeleteDockerImageOutputSchema,
   type DeleteDockerImageInput,
   type DeleteDockerImageOutput,
-} from './docker-images.js';
+} from './docker-images';
 
 export {
   ListToolCatalogEntriesInputSchema,
@@ -358,7 +358,7 @@ export {
   type UpdateToolCatalogEntryOutput,
   type DeleteToolCatalogEntryInput,
   type DeleteToolCatalogEntryOutput,
-} from './tool-catalog.js';
+} from './tool-catalog';
 
 export {
   ListAgentRunsInputSchema,
@@ -369,7 +369,7 @@ export {
   type ListAgentRunsOutput,
   type GetAgentRunInput,
   type GetAgentRunOutput,
-} from './agent-runs.js';
+} from './agent-runs';
 
 export {
   MonitoringSummaryInputSchema,
@@ -378,7 +378,7 @@ export {
   type MonitoringSummaryInput,
   type MonitoringSummary,
   type GetMonitoringSummaryOutput,
-} from './monitoring.js';
+} from './monitoring';
 
 export {
   ListNamespaceMembersInputSchema,
@@ -405,7 +405,7 @@ export {
   type MeNamespace,
   type ClearMustChangePasswordInput,
   type ClearMustChangePasswordOutput,
-} from './users.js';
+} from './users';
 
 export {
   GetNamespaceInputSchema,
@@ -438,4 +438,4 @@ export {
   type RemoveNamespaceMemberOutput,
   type UpdateNamespaceMemberRoleInput,
   type UpdateNamespaceMemberRoleOutput,
-} from './namespaces.js';
+} from './namespaces';

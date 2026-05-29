@@ -1,10 +1,10 @@
 import type {
   SetVisibilityInput,
   SetVisibilityOutput,
-} from '../../contract/workflows.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { NotFoundError } from '../../errors.js';
-import { actorFromCaller } from '../_helpers.js';
+} from '../../contract/workflows';
+import type { CallerScope } from '../../repositories/index';
+import { NotFoundError } from '../../errors';
+import { actorFromCaller } from '../_helpers';
 
 interface ScopedInput extends SetVisibilityInput {
   namespace: string;

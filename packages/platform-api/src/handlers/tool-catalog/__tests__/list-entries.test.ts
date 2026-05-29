@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryToolCatalogRepository } from '@mediforce/platform-core/testing';
-import { listToolCatalogEntries } from '../list-entries.js';
-import { ForbiddenError } from '../../../errors.js';
+import { listToolCatalogEntries } from '../list-entries';
+import { ForbiddenError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { adminRoles, memberRoles, sampleEntry } from './fixtures.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { adminRoles, memberRoles, sampleEntry } from './fixtures';
 
 describe('listToolCatalogEntries handler', () => {
   let repo: InMemoryToolCatalogRepository;

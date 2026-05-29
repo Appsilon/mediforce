@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { workflowListCommand } from '../commands/workflow-list.js';
+import { workflowListCommand } from '../commands/workflow-list';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
-import { captureOutput, jsonResponse } from './test-helpers.js';
+import { captureOutput, jsonResponse } from './test-helpers';
 
 beforeEach(() => {
   vi.restoreAllMocks();

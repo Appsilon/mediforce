@@ -1,4 +1,4 @@
-import type { Namespace, NamespaceMember, NamespaceMembership } from '../schemas/index.js';
+import type { Namespace, NamespaceMember, NamespaceMembership } from '../schemas/index';
 
 /**
  * Patch shape for `updateNamespace`. `undefined` means "leave unchanged";

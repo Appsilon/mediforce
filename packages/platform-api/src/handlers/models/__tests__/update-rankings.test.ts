@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ModelRegistryRepository, CreateModelRegistryEntryInput, ModelRegistryEntry } from '@mediforce/platform-core';
-import { updateRankings } from '../update-rankings.js';
+import { updateRankings } from '../update-rankings';
 
 function stubEntry(): ModelRegistryEntry {
   return { id: 'test/m', name: 'm', provider: 'test', contextLength: 0, maxCompletionTokens: null, pricing: { input: 0, output: 0 }, modality: 'text->text', inputModalities: ['text'], outputModalities: ['text'], supportsTools: false, supportsVision: false, source: 'openrouter' as const, canonicalSlug: null, requestCount: null, lastSyncedAt: '', createdAt: '', updatedAt: '' };

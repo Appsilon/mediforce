@@ -6,24 +6,24 @@ import type { ConversationTurn, CoworkSession } from '@mediforce/platform-core';
 import {
   HandlerError,
   PreconditionFailedError,
-} from '../../errors.js';
-import { loadOr404 } from '../_helpers.js';
-import type { CallerScope } from '../../repositories/index.js';
+} from '../../errors';
+import { loadOr404 } from '../_helpers';
+import type { CallerScope } from '../../repositories/index';
 import type {
   ChatCoworkSessionInput,
   ChatCoworkSessionOutput,
   ChatCoworkToolCall,
-} from '../../contract/cowork.js';
+} from '../../contract/cowork';
 import {
   buildMessages,
   buildToolsArray,
   buildMcpSystemPromptSection,
   type ChatMessage,
-} from './_lib/build-messages.js';
+} from './_lib/build-messages';
 import {
   callOpenRouter,
   type OpenRouterToolCall,
-} from '../../services/openrouter-client.js';
+} from '../../services/openrouter-client';
 
 const MAX_TOOL_LOOP_ITERATIONS = 10;
 const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';

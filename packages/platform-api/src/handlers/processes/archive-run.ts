@@ -1,8 +1,8 @@
-import type { ArchiveRunInput, ArchiveRunOutput } from '../../contract/processes.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { PreconditionFailedError } from '../../errors.js';
-import { actorFromCaller, loadOr404 } from '../_helpers.js';
-import { isRunActiveForArchive } from './_run-active.js';
+import type { ArchiveRunInput, ArchiveRunOutput } from '../../contract/processes';
+import type { CallerScope } from '../../repositories/index';
+import { PreconditionFailedError } from '../../errors';
+import { actorFromCaller, loadOr404 } from '../_helpers';
+import { isRunActiveForArchive } from './_run-active';
 
 // Audit action `instance.archived` / `instance.unarchived` aligns with the
 // existing `instance.*` family. Active runs are blocked to mirror the legacy
