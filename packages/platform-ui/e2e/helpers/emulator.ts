@@ -129,6 +129,29 @@ export async function seedCollection(
   }
 }
 
+/** Delete a single Firebase Auth emulator account by email, if it exists.
+ *  Scoped delete — unlike `clearEmulators`, it leaves the shared auth-setup
+ *  user and seeded data intact. Used to make a journey's `beforeAll`
+ *  idempotent across Playwright retries: a retry after the test already
+ *  changed the user's password would otherwise re-sign-in with the now-stale
+ *  temp password and fail with INVALID_PASSWORD. */
+export async function deleteAuthUser(email: string): Promise<void> {
+  const localId = await getUserIdByEmail(email);
+  if (localId === null) return;
+  const res = await fetch(
+    `${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/accounts:delete?key=${API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ localId }),
+      signal: AbortSignal.timeout(5000),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to delete auth user ${email}: ${await res.text()}`);
+  }
+}
+
 export async function getUserIdByEmail(email: string): Promise<string | null> {
   const res = await fetch(
     `${AUTH_EMULATOR}/emulator/v1/projects/${PROJECT_ID}/accounts`,

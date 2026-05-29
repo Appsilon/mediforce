@@ -16,7 +16,7 @@ import {
 } from 'firebase/auth';
 import { useQueryClient } from '@tanstack/react-query';
 import { auth } from '@/lib/firebase';
-import { mediforce } from '@/lib/mediforce';
+import { mediforce, ApiError } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { useUserMe } from '@/hooks/use-user-me';
 
@@ -182,8 +182,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clearMustChangePassword = React.useCallback(async () => {
     if (auth.currentUser === null) return;
-    await mediforce.users.clearMustChangePassword();
-    await qc.invalidateQueries({ queryKey: queryKeys.users.me() });
+    // Changing the password revokes the user's existing ID tokens. The caller
+    // re-authenticates first, but the SDK can still briefly hand a stale
+    // (pre-change) token to this request, which the backend rejects as revoked
+    // (401). Force a token refresh and retry so the call lands on the new
+    // session's valid token. In production tokens aren't revoked on this path,
+    // so the first attempt succeeds and the loop is a no-op.
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        await mediforce.users.clearMustChangePassword();
+        break;
+      } catch (err) {
+        if (attempt >= 5 || !(err instanceof ApiError) || err.status !== 401) throw err;
+        await auth.currentUser?.getIdToken(true);
+      }
+    }
+    // refetchQueries (not invalidateQueries) so the `me` cache holds the fresh
+    // `mustChangePassword: false` before the caller navigates. invalidateQueries
+    // only refetches *active* observers and resolves immediately when none are
+    // attached — during the post-change route transition the `me` observer can
+    // detach, leaving the cache stale and bouncing the user back to
+    // /change-password. refetchQueries always performs and awaits the refetch.
+    await qc.refetchQueries({ queryKey: queryKeys.users.me() });
   }, [qc]);
 
   const signOut = React.useCallback(async () => {
