@@ -205,6 +205,7 @@ export type {
   WorkflowDefinitionGroup,
   ProcessInstanceRepository,
   ListInstancesOptions,
+  WorkflowRunSummaryResult,
   HumanTaskRepository,
   HandoffRepository,
   NotificationService,
