@@ -21,6 +21,24 @@ export interface ListInstancesOptions {
 }
 
 /**
+ * Per-workflow run aggregate for the workspace home cards. Computed without
+ * shipping the whole run collection: `total` / `active` come from Firestore
+ * count() aggregations (no document reads), `latest` from a bounded
+ * `orderBy(createdAt desc).limit(3)` query.
+ *
+ * Always excludes soft-deleted (`deleted`) and user-archived (`archived`)
+ * runs — the home cards never show either. `active` counts runs in
+ * {running, created, paused} and is unaffected by `includeCompleted`. When
+ * `includeCompleted` is false, `total` and `latest` exclude terminal
+ * (completed / failed) runs.
+ */
+export interface WorkflowRunSummaryResult {
+  total: number;
+  active: number;
+  latest: ProcessInstance[];
+}
+
+/**
  * Storage-layer authorization (ADR-0004): read methods come in pairs. The
  * unscoped variant (`listAll`, `getByStatusAll`, …) is for system actors —
  * Firestore implementations issue a single query with no namespace filter.
@@ -83,4 +101,16 @@ export interface ProcessInstanceRepository {
 
   getIdsByDefinitionName(name: string): Promise<string[]>;
   setDeletedByDefinitionName(name: string, deleted: boolean): Promise<void>;
+
+  /**
+   * Per-workflow run aggregate for the workspace home cards. Scoped by
+   * (`namespace`, `definitionName` == `name`). Uses count aggregations for
+   * `total` / `active` (no document reads) plus a bounded latest-3 query — so
+   * the home page never re-reads the whole run collection on every poll.
+   */
+  summarizeRunsByWorkflow(
+    namespace: string,
+    name: string,
+    includeCompleted: boolean,
+  ): Promise<WorkflowRunSummaryResult>;
 }

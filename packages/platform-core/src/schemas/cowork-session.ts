@@ -74,11 +74,16 @@ export const CoworkSessionSchema = z.object({
   assignedRole: z.string().min(1),
   assignedUserId: z.string().nullable(),
   status: CoworkSessionStatusSchema,
-  agent: CoworkAgentSchema,
+  // Legacy sessions created before the `agent` field existed predate
+  // voice-realtime — they were all chat. Default keeps full-scan reads
+  // tolerant of those docs instead of failing the whole list.
+  agent: CoworkAgentSchema.default('chat'),
   model: z.string().nullable(),
   systemPrompt: z.string().nullable(),
   outputSchema: z.record(z.string(), z.unknown()).nullable(),
-  voiceConfig: CoworkVoiceConfigSchema.nullable(),
+  // Legacy chat-only sessions predate voice — they have no voiceConfig.
+  // Default null keeps full-scan reads tolerant of those docs.
+  voiceConfig: CoworkVoiceConfigSchema.nullable().default(null),
   artifact: z.record(z.string(), z.unknown()).nullable(),
   /** MCP servers available during this cowork session */
   mcpServers: z.array(McpServerConfigSchema).nullable().default(null),

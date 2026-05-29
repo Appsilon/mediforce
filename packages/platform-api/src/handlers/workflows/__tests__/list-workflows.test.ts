@@ -1,6 +1,8 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import {
+  InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
+  buildProcessInstance,
   buildWorkflowDefinition,
 } from '@mediforce/platform-core/testing';
 import { listWorkflows } from '../list-workflows';
@@ -15,7 +17,7 @@ describe('listWorkflows handler', () => {
 
   it('returns { definitions: [] } when nothing is registered', async () => {
     const scope = createTestScope({ processRepo });
-    const result = await listWorkflows({}, scope);
+    const result = await listWorkflows({ includeCompletedRuns: true }, scope);
     expect(result.definitions).toEqual([]);
   });
 
@@ -31,7 +33,7 @@ describe('listWorkflows handler', () => {
     );
 
     const scope = createTestScope({ processRepo });
-    const result = await listWorkflows({}, scope);
+    const result = await listWorkflows({ includeCompletedRuns: true }, scope);
 
     expect(result.definitions).toHaveLength(2);
     const flowA = result.definitions.find((d) => d.name === 'flow-a');
@@ -51,7 +53,7 @@ describe('listWorkflows handler', () => {
     );
 
     const scope = createTestScope({ processRepo });
-    const result = await listWorkflows({}, scope);
+    const result = await listWorkflows({ includeCompletedRuns: true }, scope);
 
     expect(result.definitions).toHaveLength(1);
     expect(result.definitions[0]?.latestVersion).toBe(3);
@@ -88,7 +90,7 @@ describe('listWorkflows handler', () => {
 
     it('api-key callers see every group regardless of visibility', async () => {
       const scope = createTestScope({ processRepo });
-      const result = await listWorkflows({}, scope);
+      const result = await listWorkflows({ includeCompletedRuns: true }, scope);
       expect(result.definitions.map((d) => d.name).sort()).toEqual([
         'alpha-private',
         'beta-private',
@@ -102,7 +104,7 @@ describe('listWorkflows handler', () => {
         caller: userCaller('u-1', ['team-alpha']),
       });
 
-      const result = await listWorkflows({}, scope);
+      const result = await listWorkflows({ includeCompletedRuns: true }, scope);
 
       expect(result.definitions.map((d) => d.name).sort()).toEqual([
         'alpha-private',
@@ -116,7 +118,7 @@ describe('listWorkflows handler', () => {
         caller: userCaller('u-2', ['team-gamma']),
       });
 
-      const result = await listWorkflows({}, scope);
+      const result = await listWorkflows({ includeCompletedRuns: true }, scope);
 
       expect(result.definitions.map((d) => d.name)).toEqual(['beta-public']);
     });
@@ -128,7 +130,7 @@ describe('listWorkflows handler', () => {
       });
 
       const result = await listWorkflows(
-        { namespace: 'team-beta' },
+        { namespace: 'team-beta', includeCompletedRuns: true },
         scope,
       );
 
@@ -139,11 +141,87 @@ describe('listWorkflows handler', () => {
     it('namespace filter applies for api-key callers too', async () => {
       const scope = createTestScope({ processRepo });
       const result = await listWorkflows(
-        { namespace: 'team-alpha' },
+        { namespace: 'team-alpha', includeCompletedRuns: true },
         scope,
       );
 
       expect(result.definitions.map((d) => d.name)).toEqual(['alpha-private']);
+    });
+  });
+
+  describe('runSummary aggregate', () => {
+    let instanceRepo: InMemoryProcessInstanceRepository;
+
+    beforeEach(async () => {
+      instanceRepo = new InMemoryProcessInstanceRepository();
+      await processRepo.saveWorkflowDefinition(
+        buildWorkflowDefinition({ name: 'flow-a', version: 1, namespace: 'team-alpha' }),
+      );
+    });
+
+    const seedRun = (overrides: Parameters<typeof buildProcessInstance>[0]) =>
+      instanceRepo.create(
+        buildProcessInstance({ definitionName: 'flow-a', namespace: 'team-alpha', ...overrides }),
+      );
+
+    it('counts total + active and previews the 3 newest runs (includeCompletedRuns=true)', async () => {
+      await seedRun({ status: 'running', createdAt: '2026-01-01T00:00:00.000Z' });
+      await seedRun({ status: 'created', createdAt: '2026-01-02T00:00:00.000Z' });
+      await seedRun({ status: 'paused', createdAt: '2026-01-03T00:00:00.000Z' });
+      await seedRun({ status: 'completed', createdAt: '2026-01-04T00:00:00.000Z' });
+      await seedRun({ status: 'failed', createdAt: '2026-01-05T00:00:00.000Z' });
+
+      const scope = createTestScope({ processRepo, instanceRepo });
+      const result = await listWorkflows({ includeCompletedRuns: true }, scope);
+
+      const flowA = result.definitions.find((d) => d.name === 'flow-a');
+      expect(flowA?.runSummary.total).toBe(5);
+      expect(flowA?.runSummary.active).toBe(3);
+      expect(flowA?.runSummary.latest).toHaveLength(3);
+      // Newest-first by createdAt.
+      expect(flowA?.runSummary.latest.map((r) => r.status)).toEqual([
+        'failed',
+        'completed',
+        'paused',
+      ]);
+    });
+
+    it('excludes terminal runs from total + latest when includeCompletedRuns=false', async () => {
+      await seedRun({ status: 'running', createdAt: '2026-01-01T00:00:00.000Z' });
+      await seedRun({ status: 'completed', createdAt: '2026-01-04T00:00:00.000Z' });
+      await seedRun({ status: 'failed', createdAt: '2026-01-05T00:00:00.000Z' });
+
+      const scope = createTestScope({ processRepo, instanceRepo });
+      const result = await listWorkflows({ includeCompletedRuns: false }, scope);
+
+      const flowA = result.definitions.find((d) => d.name === 'flow-a');
+      // Only the non-terminal running run survives total + latest.
+      expect(flowA?.runSummary.total).toBe(1);
+      expect(flowA?.runSummary.latest.map((r) => r.status)).toEqual(['running']);
+      // `active` is independent of the toggle.
+      expect(flowA?.runSummary.active).toBe(1);
+    });
+
+    it('always excludes archived and soft-deleted runs', async () => {
+      await seedRun({ status: 'running', createdAt: '2026-01-01T00:00:00.000Z' });
+      await seedRun({ status: 'completed', archived: true, createdAt: '2026-01-02T00:00:00.000Z' });
+      await seedRun({ status: 'completed', deleted: true, createdAt: '2026-01-03T00:00:00.000Z' });
+
+      const scope = createTestScope({ processRepo, instanceRepo });
+      const result = await listWorkflows({ includeCompletedRuns: true }, scope);
+
+      const flowA = result.definitions.find((d) => d.name === 'flow-a');
+      expect(flowA?.runSummary.total).toBe(1);
+      expect(flowA?.runSummary.active).toBe(1);
+      expect(flowA?.runSummary.latest.map((r) => r.status)).toEqual(['running']);
+    });
+
+    it('returns a zeroed summary for a workflow with no runs', async () => {
+      const scope = createTestScope({ processRepo, instanceRepo });
+      const result = await listWorkflows({ includeCompletedRuns: true }, scope);
+
+      const flowA = result.definitions.find((d) => d.name === 'flow-a');
+      expect(flowA?.runSummary).toEqual({ total: 0, active: 0, latest: [] });
     });
   });
 });

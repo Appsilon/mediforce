@@ -4,6 +4,7 @@ import type {
   StepExecution,
   HumanTask,
   AgentRun,
+  AgentEvent,
   AuditEvent,
   ProcessConfig,
   AgentOutputEnvelope,
@@ -232,6 +233,26 @@ export function buildAuditEvent(
     entityId: 'exec-0001',
     processInstanceId: 'inst-0001',
     stepId: 'step-intake',
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// buildAgentEvent
+// ---------------------------------------------------------------------------
+
+export function buildAgentEvent(
+  overrides?: Partial<AgentEvent>,
+): AgentEvent {
+  const id = nextId('evt');
+  return {
+    id,
+    processInstanceId: 'inst-0001',
+    stepId: 'step-analyze',
+    type: 'status',
+    payload: null,
+    timestamp: DEFAULT_TIMESTAMP,
+    sequence: 0,
     ...overrides,
   };
 }

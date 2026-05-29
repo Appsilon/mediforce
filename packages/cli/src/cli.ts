@@ -14,6 +14,7 @@
 
 import { workflowRegisterCommand } from './commands/workflow-register';
 import { workflowListCommand } from './commands/workflow-list';
+import { workflowListVersionsCommand } from './commands/workflow-list-versions';
 import { workflowGetCommand } from './commands/workflow-get';
 import { runGetCommand } from './commands/run-get';
 import { runListCommand } from './commands/run-list';
@@ -48,6 +49,7 @@ import { taskGetCommand } from './commands/task-get';
 import { taskClaimCommand } from './commands/task-claim';
 import { coworkGetCommand } from './commands/cowork-get';
 import { coworkGetByInstanceCommand } from './commands/cowork-get-by-instance';
+import { coworkListCommand } from './commands/cowork-list';
 import { coworkChatCommand } from './commands/cowork-chat';
 import { usersMeCommand } from './commands/users-me';
 import { usersClearMustChangePasswordCommand } from './commands/users-clear-must-change-password';
@@ -60,6 +62,7 @@ import { namespaceDeleteCommand } from './commands/namespace-delete';
 import { namespaceLeaveCommand } from './commands/namespace-leave';
 import { namespaceRemoveMemberCommand } from './commands/namespace-remove-member';
 import { namespaceSetMemberRoleCommand } from './commands/namespace-set-member-role';
+import { processesAgentEventsCommand } from './commands/processes-agent-events';
 import { type CommandFn } from './define-command';
 import { consoleOutput, type OutputSink } from './output';
 
@@ -85,6 +88,10 @@ export const TREE: Record<string, BranchEntry> = {
     leaves: {
       register: { description: 'Register a workflow definition from a JSON file', fn: workflowRegisterCommand },
       list: { description: 'List registered workflow definitions', fn: workflowListCommand },
+      'list-versions': {
+        description: 'List metadata for every version of a workflow',
+        fn: workflowListVersionsCommand,
+      },
       get: { description: 'Fetch a workflow definition', fn: workflowGetCommand },
       'set-visibility': { description: 'Set workflow visibility (public|private)', fn: workflowSetVisibilityCommand },
       copy: { description: 'Copy workflow to another namespace', fn: workflowCopyCommand },
@@ -113,8 +120,9 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   cowork: {
-    description: 'Cowork sessions (get, get-by-instance, chat)',
+    description: 'Cowork sessions (list, get, get-by-instance, chat)',
     leaves: {
+      list: { description: 'List cowork sessions by role or caller scope', fn: coworkListCommand },
       get: { description: 'Fetch a single cowork session', fn: coworkGetCommand },
       'get-by-instance': {
         description: 'Fetch the active cowork session for a process instance',
@@ -176,6 +184,15 @@ export const TREE: Record<string, BranchEntry> = {
       leave: { description: 'Leave a workspace (self-remove)', fn: namespaceLeaveCommand },
       'remove-member': { description: 'Remove a member from a workspace', fn: namespaceRemoveMemberCommand },
       'set-member-role': { description: 'Flip a member to admin|member', fn: namespaceSetMemberRoleCommand },
+    },
+  },
+  processes: {
+    description: 'Process instances (read-only diagnostics)',
+    leaves: {
+      'agent-events': {
+        description: 'Dump the agent-event feed for a process instance',
+        fn: processesAgentEventsCommand,
+      },
     },
   },
   system: {

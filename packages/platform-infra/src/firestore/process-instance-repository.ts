@@ -6,8 +6,12 @@ import {
   type InstanceStatus,
   type StepExecution,
   type ListInstancesOptions,
+  type WorkflowRunSummaryResult,
 } from '@mediforce/platform-core';
-import type { Firestore } from 'firebase-admin/firestore';
+import type { Firestore, Query } from 'firebase-admin/firestore';
+
+const ACTIVE_STATUSES: readonly InstanceStatus[] = ['running', 'created', 'paused'];
+const NON_TERMINAL_STATUSES: readonly InstanceStatus[] = ['running', 'created', 'paused'];
 
 /**
  * Firestore implementation of the ProcessInstanceRepository interface.
@@ -249,5 +253,51 @@ export class FirestoreProcessInstanceRepository
     for (const d of snapshot.docs) {
       await this.db.collection(this.collectionName).doc(d.id).update({ deleted });
     }
+  }
+
+  async summarizeRunsByWorkflow(
+    namespace: string,
+    name: string,
+    includeCompleted: boolean,
+  ): Promise<WorkflowRunSummaryResult> {
+    // `deleted` / `archived` are written explicitly as `false` on every run
+    // (WorkflowEngine.createInstance), and `archived` only ever flips true via
+    // a user action on a terminal run. Both filters mirror the home page's
+    // exclusions — soft-deleted runs and the "Show archived" toggle (off by
+    // default) — so the card aggregates match what the pre-cutover onSnapshot
+    // surfaced for platform-written data. Pre-feature docs missing either
+    // field are the same population `getLastCompletedByDefinitionName`'s
+    // `deleted == false` filter already excludes; no backfill required.
+    const base = (): Query =>
+      this.db
+        .collection(this.collectionName)
+        .where('namespace', '==', namespace)
+        .where('definitionName', '==', name)
+        .where('deleted', '==', false)
+        .where('archived', '==', false);
+
+    // count() aggregations download only the final tally — no document reads —
+    // which is the entire point of this method vs the previous 10k-run fetch.
+    const activeQuery = base().where('status', 'in', [...ACTIVE_STATUSES]);
+    const totalQuery = includeCompleted
+      ? base()
+      : base().where('status', 'in', [...NON_TERMINAL_STATUSES]);
+
+    const latestQueryBase = includeCompleted
+      ? base()
+      : base().where('status', 'in', [...NON_TERMINAL_STATUSES]);
+    const latestQuery = latestQueryBase.orderBy('createdAt', 'desc').limit(3);
+
+    const [activeSnapshot, totalSnapshot, latestSnapshot] = await Promise.all([
+      activeQuery.count().get(),
+      totalQuery.count().get(),
+      latestQuery.get(),
+    ]);
+
+    return {
+      total: totalSnapshot.data().count,
+      active: activeSnapshot.data().count,
+      latest: latestSnapshot.docs.map((d) => ProcessInstanceSchema.parse(d.data())),
+    };
   }
 }

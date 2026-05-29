@@ -18,6 +18,7 @@ import type { RunKicker } from '../runtime/run-kicker';
 import type { DockerImagesService } from '../services/docker-images-service';
 import type { InviteNotificationService, InviteService } from '../services/invite-notification';
 import type { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository';
+import type { AuthorizedAgentEventRepository } from './authorized-agent-event-repository';
 import type { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository';
 import type { AuthorizedAgentRunRepository } from './authorized-agent-run-repository';
 import type { AuthorizedAuditEventRepository } from './authorized-audit-event-repository';
@@ -60,6 +61,7 @@ export interface CallerScope {
   readonly agentDefinitions: AuthorizedAgentDefinitionRepository;
   readonly coworkSessions: AuthorizedCoworkSessionRepository;
   readonly agentRuns: AuthorizedAgentRunRepository;
+  readonly agentEvents: AuthorizedAgentEventRepository;
   readonly auditEvents: AuthorizedAuditEventRepository;
   readonly handoffs: AuthorizedHandoffRepository;
   readonly toolCatalog: AuthorizedToolCatalogRepository;

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { ChevronRight, Pencil, Loader2, Archive, ArchiveRestore, Eye, EyeOff } from 'lucide-react';
-import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
+import { useWorkflowVersions } from '@/hooks/use-workflow-versions';
 import { VersionLabel } from '@/components/ui/version-label';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
@@ -15,7 +15,7 @@ interface DefinitionsListProps {
 
 export function DefinitionsList({ workflowName }: DefinitionsListProps) {
   const handle = useHandleFromPath();
-  const { definitions, latestVersion, defaultVersion, loading, refreshDefault } = useWorkflowDefinitions(workflowName, handle);
+  const { versions: definitions, latestVersion, defaultVersion, loading, refreshDefault } = useWorkflowVersions(workflowName, handle);
   const [showArchived, setShowArchived] = React.useState(false);
   const [archivingVersion, setArchivingVersion] = React.useState<number | null>(null);
 
@@ -114,7 +114,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
               {/* Right: metadata + actions */}
               <div className="flex items-center gap-4 shrink-0 ml-4">
                 <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
-                  {def.steps.length} steps
+                  {def.stepCount} steps
                 </span>
 
                 {def.createdAt && (
@@ -134,7 +134,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                       if (canSetDefault) {
                         await mediforce.workflows.setDefaultVersion({
                           name: workflowName,
-                          namespace: def.namespace,
+                          namespace: handle,
                           version: def.version,
                         });
                         refreshDefault();
@@ -159,7 +159,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                     try {
                       await mediforce.workflows.archiveVersion(
                         { name: workflowName, version: def.version, archived: !isArchived },
-                        { namespace: def.namespace },
+                        { namespace: handle },
                       );
                     } catch (err) {
                       const message = err instanceof ApiError ? err.message

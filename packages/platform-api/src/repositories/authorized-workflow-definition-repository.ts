@@ -47,6 +47,27 @@ export class AuthorizedWorkflowDefinitionRepository extends AuthorizedScope {
     return def?.visibility === 'public' ? version : 0;
   };
 
+  /**
+   * Return every version of `name` in `namespace` the caller is allowed to
+   * see. Mirrors the visibility gate in `get()`: members get every version;
+   * non-members get versions only when the workflow is public. System actors
+   * bypass. Returns an empty array when the workflow does not exist or the
+   * caller cannot see any version — the handler maps empty to 404 so a
+   * non-member cannot distinguish "exists privately elsewhere" from
+   * "doesn't exist".
+   */
+  listVersions = async (namespace: string, name: string): Promise<WorkflowDefinition[]> => {
+    const versions = await this.raw.listWorkflowVersions(namespace, name);
+    if (versions.length === 0) return [];
+    if (this.caller.isSystemActor) return versions;
+    if (this.caller.namespaces.has(namespace)) return versions;
+    // Foreign namespace: only public-latest workflows are listable. Probe
+    // the latest version's visibility — matches `getLatestVersion` so the
+    // surface is consistent.
+    const latest = versions.reduce((acc, v) => (v.version > acc.version ? v : acc));
+    return latest.visibility === 'public' ? versions : [];
+  };
+
   listGroups = async (includeArchived: boolean): Promise<WorkflowDefinitionGroup[]> => {
     const { definitions } = this.caller.isSystemActor
       ? await this.raw.listAllWorkflowDefinitions(includeArchived)

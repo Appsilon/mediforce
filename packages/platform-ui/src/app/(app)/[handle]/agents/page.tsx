@@ -307,7 +307,7 @@ function AgentCatalog({ handle }: { handle: string }) {
 export default function AgentsPage() {
   const { handle } = useParams<{ handle: string }>();
   const { data: runs, loading } = useAgentRuns(handle);
-  const processNameMap = useProcessNameMap();
+  const processNameMap = useProcessNameMap(handle);
 
   const [processFilter, setProcessFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);

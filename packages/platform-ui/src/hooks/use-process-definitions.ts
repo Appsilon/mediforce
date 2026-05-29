@@ -1,12 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
-import { where, orderBy } from 'firebase/firestore';
+import { useQuery } from '@tanstack/react-query';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import { useCollection } from './use-collection';
-
-// Firestore documents always have an auto-added id field
-type WorkflowDefinitionDoc = WorkflowDefinition & { id: string };
+import type { WorkflowRunSummary } from '@mediforce/platform-api';
+import { mediforce, ApiError } from '@/lib/mediforce';
 
 export interface DefinitionVersion {
   version: string;
@@ -29,94 +27,81 @@ export interface DefinitionGroup {
   archived?: boolean;
   namespace?: string;
   visibility?: string;
+  runSummary: WorkflowRunSummary;
 }
 
-function compareSemver(a: string, b: string): number {
-  const parse = (v: string) => v.replace(/^v/, '').split('.').map(Number);
-  const pa = parse(a);
-  const pb = parse(b);
-  for (let i = 0; i < 3; i++) {
-    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
+function retryOn5xx(failureCount: number, err: unknown): boolean {
+  if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
+  return failureCount < 2;
 }
 
-function groupKey(doc: WorkflowDefinitionDoc): string {
-  return `${doc.namespace ?? ''}:${doc.name}`;
-}
+/**
+ * Workspace-home workflow cards data. ONE-SHOT per ADR-0006 §4 —
+ * `refetchOnWindowFocus: true` (default) is enough; mutations to workflows
+ * (`workflows.register`, `workflows.delete`, etc.) invalidate the cache.
+ *
+ * Source is `mediforce.workflows.list({})` which returns the latest version
+ * per `(name, namespace)` group; consumers on workspace home don't iterate
+ * historical versions. For full version pickers use `useWorkflowVersions`
+ * (separate hook, separate endpoint).
+ */
+export function useProcessDefinitions(includeCompletedRuns: boolean = true) {
+  const query = useQuery({
+    queryKey: ['workflows', 'list', includeCompletedRuns] as const,
+    queryFn: async () => {
+      const result = await mediforce.workflows.list({ includeCompletedRuns });
+      return result.definitions;
+    },
+    retry: retryOn5xx,
+  });
 
-function getLatestByName(docs: WorkflowDefinitionDoc[]): Map<string, WorkflowDefinitionDoc> {
-  const byKey = new Map<string, WorkflowDefinitionDoc[]>();
-  for (const doc of docs) {
-    const key = groupKey(doc);
-    const existing = byKey.get(key) ?? [];
-    existing.push(doc);
-    byKey.set(key, existing);
-  }
-  const result = new Map<string, WorkflowDefinitionDoc>();
-  for (const [key, group] of byKey) {
-    const latest = [...group].sort((a, b) => compareSemver(String(b.version), String(a.version)))[0];
-    if (latest) result.set(key, latest);
-  }
-  return result;
-}
+  const groups = query.data ?? [];
 
-export function useProcessDefinitions() {
-  const workflowConstraints = useMemo(() => [orderBy('name', 'asc')], []);
-
-  const { data: workflowData, loading, error } = useCollection<WorkflowDefinitionDoc>(
-    'workflowDefinitions',
-    workflowConstraints,
-  );
-
-  const allDocs = useMemo((): WorkflowDefinitionDoc[] => {
-    return workflowData.filter((doc) => !doc.deleted);
-  }, [workflowData]);
-
-  const latestDocs = useMemo(() => getLatestByName(allDocs), [allDocs]);
+  const latestDocs = useMemo((): Map<string, WorkflowDefinition> => {
+    const result = new Map<string, WorkflowDefinition>();
+    for (const g of groups) {
+      if (g.definition === null) continue;
+      result.set(`${g.namespace}:${g.name}`, g.definition);
+    }
+    return result;
+  }, [groups]);
 
   const definitions = useMemo((): DefinitionGroup[] => {
-    const byKey = new Map<string, DefinitionVersion[]>();
-    for (const def of allDocs) {
-      const key = groupKey(def);
-      const entry = byKey.get(key) ?? [];
-      entry.push({
-        version: String(def.version),
-        stepCount: def.steps.length,
-        triggerCount: def.triggers.length,
-        title: def.title,
-        description: def.description,
+    return groups
+      .filter((g) => g.definition !== null)
+      .map((g) => {
+        // `definition !== null` guarded above; non-null narrowing for the type system.
+        const def = g.definition as WorkflowDefinition;
+        const latestVersion = String(g.latestVersion);
+        return {
+          name: g.name,
+          title: def.title,
+          description: def.description,
+          latestVersion,
+          versions: [
+            {
+              version: latestVersion,
+              stepCount: def.steps.length,
+              triggerCount: def.triggers.length,
+              title: def.title,
+              description: def.description,
+            },
+          ],
+          stepCount: def.steps.length,
+          hasManualTrigger: def.triggers.some((t) => t.type === 'manual'),
+          repo: def.repo,
+          url: def.url,
+          archived: def.archived,
+          namespace: g.namespace,
+          visibility: def.visibility,
+          runSummary: g.runSummary,
+        };
       });
-      byKey.set(key, entry);
-    }
-
-    return Array.from(byKey.entries()).map(([key, versions]) => {
-      const sorted = [...versions].sort((a, b) => compareSemver(b.version, a.version));
-      const latestDoc = latestDocs.get(key)!;
-      const name = latestDoc.name;
-      const latest = sorted[0];
-      const hasManualTrigger = latestDoc.triggers.some((trigger) => trigger.type === 'manual');
-      return {
-        name,
-        title: latest.title,
-        description: latest.description,
-        latestVersion: latest.version,
-        versions: sorted,
-        stepCount: latest.stepCount,
-        hasManualTrigger,
-        repo: latestDoc.repo,
-        url: latestDoc.url,
-        archived: latestDoc.archived,
-        namespace: latestDoc.namespace,
-        visibility: latestDoc.visibility,
-      };
-    });
-  }, [allDocs, latestDocs]);
+  }, [groups]);
 
   const stepsByDefinition = useMemo((): Map<string, string[]> => {
     const result = new Map<string, string[]>();
-    for (const [_key, doc] of latestDocs) {
+    for (const doc of latestDocs.values()) {
       result.set(
         doc.name,
         doc.steps.filter((step) => step.type !== 'terminal').map((step) => step.id),
@@ -125,23 +110,11 @@ export function useProcessDefinitions() {
     return result;
   }, [latestDocs]);
 
-  return { definitions, stepsByDefinition, latestDocs, loading, error };
-}
-
-export function useProcessDefinitionVersions(name: string, namespace: string) {
-  const workflowConstraints = useMemo(
-    () => [where('name', '==', name)],
-    [name],
-  );
-  const { data: workflowData, loading } = useCollection<WorkflowDefinitionDoc>(
-    'workflowDefinitions',
-    workflowConstraints,
-  );
-
-  const sorted = useMemo(() => {
-    const filtered = workflowData.filter((doc) => !doc.deleted && doc.namespace === namespace);
-    return [...filtered].sort((a, b) => compareSemver(String(b.version), String(a.version)));
-  }, [workflowData, namespace]);
-
-  return { versions: sorted, loading, error: null };
+  return {
+    definitions,
+    stepsByDefinition,
+    latestDocs,
+    loading: query.isPending,
+    error: (query.error as Error | null) ?? null,
+  };
 }

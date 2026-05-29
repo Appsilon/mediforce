@@ -1,7 +1,12 @@
+export type { AgentEventRepository } from './agent-event-repository';
 export type { AuditRepository } from './audit-repository';
 export type { AuthService, AuthUser } from './auth-service';
 export type { ProcessRepository, WorkflowDefinitionListResult, WorkflowDefinitionGroup } from './process-repository';
-export type { ProcessInstanceRepository, ListInstancesOptions } from './process-instance-repository';
+export type {
+  ProcessInstanceRepository,
+  ListInstancesOptions,
+  WorkflowRunSummaryResult,
+} from './process-instance-repository';
 export type { HumanTaskRepository } from './human-task-repository';
 export type { HandoffRepository } from './handoff-repository';
 export type { NotificationService, NotificationEvent, NotificationTarget } from './notification-service';

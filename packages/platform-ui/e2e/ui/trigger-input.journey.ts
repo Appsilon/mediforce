@@ -42,7 +42,17 @@ test.describe('Trigger Input Journey', () => {
 
     // Run created — verify on workflow page (run visible in list)
     await expect(page).toHaveURL(/Trigger%20Input%20Test/, { timeout: 30_000 });
-    await expect(page.getByText('In Progress').first()).toBeVisible({ timeout: 10_000 });
+    // Phase 4 (PR #591) replaced Firestore push with react-query polling
+    // (CRITICAL LIVE 1.5 s per ADR-0006 §4). The `Trigger Input Test`
+    // workflow's first step is `executor: human`, so the run transitions
+    // `created` → `running` → `paused (waiting_for_human)` and the
+    // `created` / `running` window collapses inside one poll on MOCK_AGENT
+    // runs. Assert against either the transient "In Progress" badge or
+    // the steady-state "Waiting for human" badge — both prove the run
+    // started successfully.
+    await expect(
+      page.getByText(/In Progress|Waiting for human/).first(),
+    ).toBeVisible({ timeout: 20_000 });
     await showResult(page);
     await endRecording(page);
   });

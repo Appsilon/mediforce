@@ -19,7 +19,7 @@ interface WorkflowWarning extends PreflightWarning {
 
 interface WorkflowProblemsProps {
   handle: string;
-  latestDocs: Map<string, WorkflowDefinition & { id: string }>;
+  latestDocs: Map<string, WorkflowDefinition>;
   loading: boolean;
 }
 
@@ -31,7 +31,7 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
   const [copied, setCopied] = React.useState(false);
 
   const namespaceDocs = React.useMemo(() => {
-    const result: Array<WorkflowDefinition & { id: string }> = [];
+    const result: WorkflowDefinition[] = [];
     for (const doc of latestDocs.values()) {
       if (doc.namespace === handle && doc.archived !== true) {
         result.push(doc);

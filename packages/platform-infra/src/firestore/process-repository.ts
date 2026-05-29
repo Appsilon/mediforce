@@ -168,6 +168,35 @@ export class FirestoreProcessRepository implements ProcessRepository {
       .set({ defaultVersion: version }, { merge: true });
   }
 
+  async listWorkflowVersions(namespace: string, name: string): Promise<WorkflowDefinition[]> {
+    const snapshot = await this.db
+      .collection(this.workflowDefinitionsCollection)
+      .where('namespace', '==', namespace)
+      .where('name', '==', name)
+      .get();
+
+    if (snapshot.empty) return [];
+
+    const versions: WorkflowDefinition[] = [];
+    for (const docSnap of snapshot.docs) {
+      const raw = docSnap.data();
+      const parsed = WorkflowDefinitionSchema.safeParse(raw);
+      if (!parsed.success) {
+        // PRD §9 rule 3: log + rethrow. Silent `continue` would render a
+        // partial version picker without any operator-visible signal that
+        // a row is corrupt.
+        console.error(
+          `[process-repository] listWorkflowVersions parse failed for ${docSnap.id}:`,
+          parsed.error.format(),
+        );
+        throw parsed.error;
+      }
+      versions.push(parsed.data);
+    }
+    versions.sort((a, b) => a.version - b.version);
+    return versions;
+  }
+
   async getLatestWorkflowVersion(namespace: string, name: string): Promise<number> {
     const snapshot = await this.db
       .collection(this.workflowDefinitionsCollection)

@@ -2,9 +2,9 @@
 
 import { useParams } from 'next/navigation';
 import { useMemo } from 'react';
-import type { StepExecution } from '@mediforce/platform-core';
 import { useAgentRun } from '@/hooks/use-agent-runs';
-import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
+import { useProcessInstance } from '@/hooks/use-process-instances';
+import { useStepExecutions } from '@/hooks/use-step-executions';
 import { AgentRunDetail } from '@/components/agents/agent-run-detail';
 
 export default function AgentRunDetailPage() {
@@ -17,10 +17,9 @@ export default function AgentRunDetailPage() {
   );
 
   // Fetch step executions to find input data (previous step output)
-  const parentPath = run ? `processInstances/${run.processInstanceId}` : '';
-  const { data: stepExecutions, loading: seLoading } = useSubcollection<StepExecution>(
-    parentPath,
-    'stepExecutions',
+  const { data: stepExecutions, loading: seLoading } = useStepExecutions(
+    run?.processInstanceId ?? null,
+    processInstance?.status,
   );
 
   // Find the step execution whose gateResult.next === run.stepId (the previous step)

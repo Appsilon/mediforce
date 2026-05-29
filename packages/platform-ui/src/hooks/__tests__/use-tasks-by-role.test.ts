@@ -5,9 +5,12 @@ import { buildHumanTask } from '@mediforce/platform-core/testing';
 import { createQueryWrapper } from '@/test/react-query';
 
 const listMock = vi.fn<(...args: unknown[]) => Promise<{ tasks: HumanTask[] }>>();
+class ApiError extends Error {
+  constructor(public status: number, message: string) { super(message); }
+}
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { tasks: { list: listMock } },
-  ApiError: class ApiError extends Error {},
+  ApiError,
 }));
 
 // Stub use-collection so loading the module doesn't pull Firestore SDK in.
@@ -79,8 +82,8 @@ describe('useMyActionableTasksByRole', () => {
     expect(result.current.data.map((t) => t.id)).toEqual(['t2']);
   });
 
-  it('surfaces errors without leaving loading stuck', async () => {
-    const err = new Error('boom');
+  it('surfaces 4xx errors immediately (retry policy gates on 5xx)', async () => {
+    const err = new ApiError(403, 'forbidden');
     listMock.mockRejectedValue(err);
     const { wrapper } = createQueryWrapper();
 
@@ -89,6 +92,7 @@ describe('useMyActionableTasksByRole', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBe(err);
     expect(result.current.data).toEqual([]);
+    expect(listMock).toHaveBeenCalledTimes(1);
   });
 });
 
