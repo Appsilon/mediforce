@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import * as Switch from '@radix-ui/react-switch';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -156,6 +158,7 @@ export default function WorkspaceConfigPage() {
   const rawHandle = params.handle;
   const handle = Array.isArray(rawHandle) ? rawHandle[0] : (rawHandle ?? '');
   const router = useRouter();
+  const qc = useQueryClient();
 
   const { firebaseUser } = useAuth();
   const { namespace, loading: namespaceLoading } = useNamespace(handle);
@@ -327,6 +330,10 @@ export default function WorkspaceConfigPage() {
       setInviteEmail('');
       setInviteName('');
       setInviteRole('member');
+      // Refresh the members list — PR4 swapped the previous onSnapshot
+      // subscription for `useNamespace` react-query, so the cache needs an
+      // explicit invalidation now that the invite mutation isn't a hook.
+      await qc.invalidateQueries({ queryKey: queryKeys.namespace(handle) });
       void fetchLastSignIn();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to send invite.');
