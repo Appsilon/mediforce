@@ -49,7 +49,7 @@ test.describe('Workspace bio clear journey', () => {
     });
   });
 
-  test('owner clears bio → Firestore doc no longer contains the bio field', async ({
+  test('owner clears bio → bio stored as empty string in Firestore', async ({
     page,
   }, testInfo) => {
     await setupRecording(page, 'workspace-bio-clear', testInfo);
@@ -86,16 +86,16 @@ test.describe('Workspace bio clear journey', () => {
     await expect(page.getByText('Saved', { exact: true })).toBeVisible({ timeout: 10_000 });
     await showCaption(page, 'Bio cleared — verifying Firestore doc');
 
-    // The actual bug-fix assertion: an empty bio must result in the `bio`
-    // field being deleted from the document (FieldValue.delete()), not stored
-    // as null or empty string. In-memory test doubles cannot catch this — only
-    // the real Firestore emulator distinguishes "field absent" from
-    // "field present with null/empty value".
+    // Two-state bio semantics: undefined leaves the field untouched; any
+    // string overwrites it. Clearing the description in the UI sends
+    // `bio: ""` and the Firestore doc round-trips as an empty stringValue.
+    // The original PR4.5 bug — UI dropped `undefined`, so "clear" never
+    // reached Firestore — is moot now that the UI always sends a string.
     const fields = await getDocumentFields('namespaces', HANDLE);
     expect(fields).not.toBeNull();
     expect(fields).toHaveProperty('displayName');
     expect(fields).toHaveProperty('handle');
-    expect(fields).not.toHaveProperty('bio');
+    expect((fields?.bio as { stringValue?: string } | undefined)?.stringValue).toBe('');
 
     await showResult(page);
     await endRecording(page);

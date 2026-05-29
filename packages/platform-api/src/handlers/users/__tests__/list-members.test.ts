@@ -10,7 +10,10 @@ const ALPHA_MEMBERS: NamespaceMember[] = [
 ];
 
 function directoryWith(
-  map: ReadonlyMap<string, { email: string | null; lastSignInTime: string | null } | null>,
+  map: ReadonlyMap<
+    string,
+    { email: string | null; displayName?: string | null; lastSignInTime: string | null } | null
+  >,
 ): UserDirectoryService {
   return {
     async getUsersByRole() {
@@ -19,7 +22,7 @@ function directoryWith(
     async getUserMetadata(uid: string) {
       const entry = map.has(uid) ? map.get(uid) ?? null : null;
       if (entry === null) return null;
-      return { ...entry, displayName: null };
+      return { displayName: entry.displayName ?? null, email: entry.email, lastSignInTime: entry.lastSignInTime };
     },
   };
 }
@@ -119,6 +122,49 @@ describe('listNamespaceMembers handler', () => {
       email: null,
       lastSignInTime: null,
     });
+  });
+
+  it('keeps the workspace-scoped displayName when the member doc has one', async () => {
+    directory = directoryWith(
+      new Map([
+        ['uid-owner', { email: 'owner@alpha.test', displayName: 'Auth Owner Name', lastSignInTime: null }],
+      ]),
+    );
+    const scope = createTestScope({ namespaceRepo, userDirectory: directory });
+
+    const result = await listNamespaceMembers({ namespace: 'alpha' }, scope);
+
+    // Member doc displayName ('Alpha Owner') wins over auth profile name.
+    expect(result.members[0]?.displayName).toBe('Alpha Owner');
+  });
+
+  it('falls back to the Firebase Auth displayName when the member doc has none', async () => {
+    directory = directoryWith(
+      new Map([
+        ['uid-owner', { email: null, lastSignInTime: null }],
+        ['uid-member', { email: null, displayName: 'Auth Member Name', lastSignInTime: null }],
+      ]),
+    );
+    const scope = createTestScope({ namespaceRepo, userDirectory: directory });
+
+    const result = await listNamespaceMembers({ namespace: 'alpha' }, scope);
+
+    expect(result.members[1]?.displayName).toBe('Auth Member Name');
+  });
+
+  it('returns null displayName when neither the member doc nor auth metadata has one', async () => {
+    directory = directoryWith(
+      new Map([
+        ['uid-owner', { email: null, lastSignInTime: null }],
+        ['uid-member', { email: null, lastSignInTime: null }],
+      ]),
+    );
+    const scope = createTestScope({ namespaceRepo, userDirectory: directory });
+
+    const result = await listNamespaceMembers({ namespace: 'alpha' }, scope);
+
+    expect(result.members[1]?.uid).toBe('uid-member');
+    expect(result.members[1]?.displayName).toBeNull();
   });
 
   it('returns null email/lastSignInTime per member when directory is unconfigured', async () => {

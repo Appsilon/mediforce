@@ -51,6 +51,13 @@ const NamespaceQuery = z.object({ namespace: z.string().min(1) });
 export const ListNamespaceMembersInputSchema = NamespaceQuery;
 
 export const NamespaceMemberWithAuthSchema = NamespaceMemberSchema.extend({
+  /**
+   * Resolved display name for the member: the workspace-scoped `displayName`
+   * on the member doc when set, otherwise the Firebase Auth profile name
+   * looked up via `userDirectory.getUserMetadata`, otherwise `null`. UI
+   * chains `?? member.uid` to render a stable fallback.
+   */
+  displayName: z.string().nullable(),
   email: z.string().nullable(),
   lastSignInTime: z.string().nullable(),
 });

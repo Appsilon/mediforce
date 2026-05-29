@@ -47,11 +47,7 @@ export class InMemoryNamespaceRepo implements NamespaceRepository {
     const merged: Record<string, unknown> = { ...existing };
     for (const [key, value] of Object.entries(updates)) {
       if (value === undefined) continue;
-      if (value === null) {
-        delete merged[key];
-      } else {
-        merged[key] = value;
-      }
+      merged[key] = value;
     }
     this.namespaces.set(handle, merged as Namespace);
   }

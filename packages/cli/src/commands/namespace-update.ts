@@ -14,7 +14,7 @@ export const namespaceUpdateCommand = defineCommand({
     const input: Parameters<typeof mediforce.namespaces.update>[0] = { handle: args.handle };
     if (args['display-name'] !== undefined) input.displayName = args['display-name'];
     if (args.icon !== undefined) input.icon = args.icon;
-    if (args.bio !== undefined) input.bio = args.bio === '' ? null : args.bio;
+    if (args.bio !== undefined) input.bio = args.bio;
 
     const result = await mediforce.namespaces.update(input);
 

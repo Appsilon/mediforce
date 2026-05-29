@@ -48,11 +48,7 @@ export function useUpdateNamespace(handle: string) {
             ...prev.namespace,
             ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
             ...(input.icon !== undefined ? { icon: input.icon } : {}),
-            ...(input.bio !== undefined
-              ? input.bio === null
-                ? { bio: undefined }
-                : { bio: input.bio }
-              : {}),
+            ...(input.bio !== undefined ? { bio: input.bio } : {}),
           },
         };
       });

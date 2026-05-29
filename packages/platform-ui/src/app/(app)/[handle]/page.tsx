@@ -225,7 +225,7 @@ function InlineEditableBio({
       const trimmed = value.trim();
       await updateNamespace.mutateAsync({
         handle: namespace.handle,
-        bio: trimmed !== '' ? trimmed : null,
+        bio: trimmed,
       });
       setEditing(false);
     } catch {

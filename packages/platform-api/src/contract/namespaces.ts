@@ -29,11 +29,12 @@ export type CreateNamespaceOutput = z.infer<typeof CreateNamespaceOutputSchema>;
 
 /**
  * PATCH /api/namespaces/:handle — workspace metadata edit (owner/admin only).
- * `bio: null` clears the field; omitting it leaves it unchanged.
+ * Omitting a field leaves it unchanged; passing an empty string for `bio`
+ * clears it.
  */
 const UpdateNamespaceFieldsSchema = z.object({
   displayName: z.string().min(1).max(128).optional(),
-  bio: z.string().max(2048).nullable().optional(),
+  bio: z.string().max(2048).optional(),
   icon: z.string().min(1).max(64).optional(),
 });
 const atLeastOneUpdateField = (v: z.infer<typeof UpdateNamespaceFieldsSchema>): boolean =>

@@ -184,9 +184,14 @@ export default function WorkspaceConfigPage() {
     void refreshMembers();
   }, [refreshMembers]);
 
-  // API fetch for lastSignInTime + email
+  // API fetch for lastSignInTime + email + auth-enriched displayName.
+  // Owner member docs created before the createNamespace handler started
+  // persisting displayName lack it locally; the listMembers handler falls
+  // back to the Firebase Auth profile name, and we merge that override
+  // here so legacy workspaces show a human name instead of the uid.
   const [lastSignInMap, setLastSignInMap] = useState<Map<string, string | null>>(new Map());
   const [emailMap, setEmailMap] = useState<Map<string, string | null>>(new Map());
+  const [displayNameMap, setDisplayNameMap] = useState<Map<string, string | null>>(new Map());
 
   const fetchLastSignIn = useCallback(async () => {
     if (handle === '' || firebaseUser === null) return;
@@ -194,12 +199,15 @@ export default function WorkspaceConfigPage() {
       const { members } = await mediforce.users.listMembers({ namespace: handle });
       const map = new Map<string, string | null>();
       const emailMapLocal = new Map<string, string | null>();
+      const displayNameMapLocal = new Map<string, string | null>();
       for (const member of members) {
         map.set(member.uid, member.lastSignInTime);
         emailMapLocal.set(member.uid, member.email);
+        displayNameMapLocal.set(member.uid, member.displayName);
       }
       setLastSignInMap(map);
       setEmailMap(emailMapLocal);
+      setDisplayNameMap(displayNameMapLocal);
     } catch {
       // non-fatal — lastSignIn just won't show
     }
@@ -209,19 +217,25 @@ export default function WorkspaceConfigPage() {
     void fetchLastSignIn();
   }, [fetchLastSignIn]);
 
-  // Merge realtime members with email + lastSignInTime from API
+  // Merge realtime members with enriched displayName + email + lastSignInTime
   const members = useMemo((): MemberWithLastSignIn[] => {
     return realtimeMembers
-      .map((member) => ({
-        ...member,
-        email: emailMap.get(member.uid),
-        lastSignInTime: lastSignInMap.get(member.uid),
-      }))
+      .map((member) => {
+        const enrichedDisplayName = displayNameMap.get(member.uid);
+        return {
+          ...member,
+          displayName: enrichedDisplayName !== undefined && enrichedDisplayName !== null
+            ? enrichedDisplayName
+            : member.displayName,
+          email: emailMap.get(member.uid),
+          lastSignInTime: lastSignInMap.get(member.uid),
+        };
+      })
       .sort((memberA, memberB) => {
         const roleOrder: Record<string, number> = { owner: 0, admin: 1, member: 2 };
         return (roleOrder[memberA.role] ?? 3) - (roleOrder[memberB.role] ?? 3);
       });
-  }, [realtimeMembers, lastSignInMap, emailMap]);
+  }, [realtimeMembers, lastSignInMap, emailMap, displayNameMap]);
 
   const currentUserMember = useMemo(
     () =>
@@ -270,7 +284,7 @@ export default function WorkspaceConfigPage() {
       await updateNamespace.mutateAsync({
         handle,
         displayName: trimmedName,
-        bio: trimmedBio !== '' ? trimmedBio : null,
+        bio: trimmedBio,
       });
       setProfileSaved(true);
       setTimeout(() => setProfileSaved(false), 2500);

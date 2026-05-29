@@ -48,10 +48,14 @@ export async function listNamespaceMembers(
 
 function withAuth(
   doc: Awaited<ReturnType<CallerScope['workspaces']['getMembers']>>[number],
-  metadata: { email: string | null; lastSignInTime: string | null } | null,
+  metadata: { email: string | null; displayName?: string | null; lastSignInTime: string | null } | null,
 ): NamespaceMemberWithAuth {
+  const docDisplayName = typeof doc.displayName === 'string' && doc.displayName.length > 0
+    ? doc.displayName
+    : null;
   return {
     ...doc,
+    displayName: docDisplayName ?? metadata?.displayName ?? null,
     email: metadata?.email ?? null,
     lastSignInTime: metadata?.lastSignInTime ?? null,
   };

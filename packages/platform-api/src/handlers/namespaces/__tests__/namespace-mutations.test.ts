@@ -49,10 +49,10 @@ describe('updateNamespace handler', () => {
     expect(namespaceRepo.namespaces.get(HANDLE)?.displayName).toBe('Acme Inc.');
   });
 
-  it('clears bio when passed null', async () => {
+  it('clears bio when passed an empty string', async () => {
     const scope = createTestScope({ namespaceRepo, auditRepo, caller: ownerCaller });
-    await updateNamespace({ handle: HANDLE, bio: null }, scope);
-    expect(namespaceRepo.namespaces.get(HANDLE)?.bio).toBeUndefined();
+    await updateNamespace({ handle: HANDLE, bio: '' }, scope);
+    expect(namespaceRepo.namespaces.get(HANDLE)?.bio).toBe('');
   });
 
   it('admins may edit (not just owners)', async () => {

@@ -16,7 +16,7 @@ describe('UpdateNamespace schemas', () => {
   it('UpdateNamespaceBodySchema requires at least one field', () => {
     expect(UpdateNamespaceBodySchema.safeParse({}).success).toBe(false);
     expect(UpdateNamespaceBodySchema.safeParse({ displayName: 'Acme' }).success).toBe(true);
-    expect(UpdateNamespaceBodySchema.safeParse({ bio: null }).success).toBe(true);
+    expect(UpdateNamespaceBodySchema.safeParse({ bio: '' }).success).toBe(true);
     expect(UpdateNamespaceBodySchema.safeParse({ icon: 'Briefcase' }).success).toBe(true);
   });
 
@@ -35,8 +35,8 @@ describe('UpdateNamespace schemas', () => {
     expect(parsed.success).toBe(false);
   });
 
-  it('UpdateNamespaceInputSchema accepts bio: null to clear', () => {
-    expect(UpdateNamespaceInputSchema.safeParse({ handle: 'acme', bio: null }).success).toBe(true);
+  it('UpdateNamespaceInputSchema accepts bio: "" to clear', () => {
+    expect(UpdateNamespaceInputSchema.safeParse({ handle: 'acme', bio: '' }).success).toBe(true);
   });
 });
 

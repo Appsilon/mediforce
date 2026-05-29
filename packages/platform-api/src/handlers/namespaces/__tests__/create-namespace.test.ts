@@ -1,8 +1,22 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
+import type { UserDirectoryService } from '@mediforce/platform-core';
 import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index.js';
 import { createNamespace } from '../create-namespace.js';
 import { ConflictError, ForbiddenError } from '../../../errors.js';
+
+function directoryWithMetadata(
+  map: ReadonlyMap<string, { email: string | null; displayName: string | null; lastSignInTime: string | null }>,
+): UserDirectoryService {
+  return {
+    async getUsersByRole() {
+      return [];
+    },
+    async getUserMetadata(uid: string) {
+      return map.get(uid) ?? null;
+    },
+  };
+}
 
 describe('createNamespace handler', () => {
   let namespaceRepo: InMemoryNamespaceRepo;
@@ -74,6 +88,42 @@ describe('createNamespace handler', () => {
       createNamespace({ handle: 'acme', displayName: 'Acme Co.' }, scope),
     ).rejects.toBeInstanceOf(ConflictError);
     expect(auditRepo.getAll().some((e) => e.action === 'namespace.created')).toBe(false);
+  });
+
+  it('stores the caller Firebase Auth displayName on the owner member doc', async () => {
+    const directory = directoryWithMetadata(
+      new Map([
+        ['uid-marek', { email: 'marek@example.test', displayName: 'Marek R', lastSignInTime: null }],
+      ]),
+    );
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      caller: userCaller('uid-marek', []),
+      userDirectory: directory,
+    });
+
+    await createNamespace({ handle: 'acme', displayName: 'Acme Co.' }, scope);
+
+    expect(namespaceRepo.members.get('acme')).toEqual([
+      expect.objectContaining({ uid: 'uid-marek', role: 'owner', displayName: 'Marek R' }),
+    ]);
+  });
+
+  it('omits owner displayName when directory has no metadata for the caller', async () => {
+    const directory = directoryWithMetadata(new Map());
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      caller: userCaller('uid-marek', []),
+      userDirectory: directory,
+    });
+
+    await createNamespace({ handle: 'acme', displayName: 'Acme Co.' }, scope);
+
+    const owner = namespaceRepo.members.get('acme')?.[0];
+    expect(owner?.uid).toBe('uid-marek');
+    expect(owner?.displayName).toBeUndefined();
   });
 
   it('rejects apiKey caller (no human owner to attribute the workspace to)', async () => {

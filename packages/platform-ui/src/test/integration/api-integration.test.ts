@@ -479,7 +479,7 @@ describe('Mediforce client ↔ route-adapter ↔ updateNamespace (in-process)', 
     expect(auditRepo.getAll().some((e) => e.action === 'namespace.updated')).toBe(true);
   });
 
-  it('bio: null clears the field through the full stack', async () => {
+  it('bio: "" clears the field through the full stack', async () => {
     namespaceRepo.namespaces.set('acme', {
       handle: 'acme',
       type: 'organization',
@@ -488,10 +488,10 @@ describe('Mediforce client ↔ route-adapter ↔ updateNamespace (in-process)', 
       createdAt: '2026-01-01T00:00:00.000Z',
     });
 
-    const result = await mediforce.namespaces.update({ handle: 'acme', bio: null });
+    const result = await mediforce.namespaces.update({ handle: 'acme', bio: '' });
 
-    expect(result.namespace.bio).toBeUndefined();
-    expect(namespaceRepo.namespaces.get('acme')?.bio).toBeUndefined();
+    expect(result.namespace.bio).toBe('');
+    expect(namespaceRepo.namespaces.get('acme')?.bio).toBe('');
   });
 });
 

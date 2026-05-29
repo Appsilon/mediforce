@@ -21,7 +21,8 @@ import type {
 
 /**
  * Edit workspace `displayName`, `bio`, `icon`. Owner/admin only.
- * `bio: null` clears the field via the repo's null-sentinel semantics.
+ * Two-state semantics: undefined leaves the field untouched, any string
+ * overwrites it (empty string is the cleared state for `bio`).
  */
 export async function updateNamespace(
   input: UpdateNamespaceInput,

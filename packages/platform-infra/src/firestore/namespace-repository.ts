@@ -59,7 +59,7 @@ export class FirestoreNamespaceRepository implements NamespaceRepository {
     const payload: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(updates)) {
       if (value === undefined) continue;
-      payload[key] = value === null ? FieldValue.delete() : value;
+      payload[key] = value;
     }
     await this.db
       .collection(this.namespacesCollection)
