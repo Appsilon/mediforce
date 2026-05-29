@@ -544,7 +544,7 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
 
   return (
     <WorkflowSecretKeysProvider handle={handle} workflowNames={workflowNames}>
-    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4">
       <OpenRouterCreditsIndicator handle={handle} />
       <WorkflowProblems handle={handle} latestDocs={latestDocs} loading={defsLoading} />
 
@@ -634,13 +634,13 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
           ))}
         </div>
       )}
-    </div>
-    <ImportWorkflowDialog
-      namespace={handle}
-      open={importDialogOpen}
-      onOpenChange={setImportDialogOpen}
-      onImported={() => {}}
-    />
+      </div>
+      <ImportWorkflowDialog
+        namespace={handle}
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImported={() => {}}
+      />
     </WorkflowSecretKeysProvider>
   );
 }

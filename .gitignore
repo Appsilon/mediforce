@@ -32,6 +32,7 @@ CLAUDE.local.md
 # env
 .env.local
 .env*.local
+.envrc
 
 # firebase
 firebase-debug.log
@@ -47,3 +48,6 @@ coverage/
 packages/platform-ui/.emulator-data
 .claude/scheduled_tasks.lock
 .planning/wave-*-status.log
+
+__pycache__
+.pnpm-store

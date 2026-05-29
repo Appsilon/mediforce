@@ -107,7 +107,9 @@ export const workflowImportCommand = defineCommand({
         );
         return 1;
       }
-      templateRaw = await res.json();
+      const rawJson = await res.json() as Record<string, unknown>;
+      const { namespace: _ns, ...stripped } = rawJson;
+      templateRaw = stripped;
     } catch (err) {
       printError(output, { error: `Failed to fetch workflow file: ${String(err)}` }, jsonMode);
       return 1;
