@@ -6,13 +6,9 @@ import type { HumanTask, CoworkSession } from '@mediforce/platform-core';
 import { ACTIONABLE_STATUSES } from '@mediforce/platform-api/contract';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
+import { stopRetryOn4xx } from '@/lib/retry';
 
 import { CRITICAL_LIVE_INTERVAL_MS, STANDARD_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
-
-function retryOn5xx(failureCount: number, err: unknown): boolean {
-  if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-  return failureCount < 2;
-}
 
 /**
  * Role-scoped actionable task queue, react-query backed (STANDARD LIVE per
@@ -33,8 +29,8 @@ export function useMyActionableTasksByRole(
       return result.tasks;
     },
     enabled: assignedRole !== undefined && assignedRole.length > 0,
-    refetchInterval: STANDARD_LIVE_INTERVAL_MS,
-    retry: retryOn5xx,
+    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
+    retry: stopRetryOn4xx,
   });
 
   const filtered = useMemo(() => {
@@ -68,8 +64,8 @@ export function useMyActionableTasks(
       const result = await mediforce.tasks.list({ status: [...ACTIONABLE_STATUSES] });
       return result.tasks;
     },
-    refetchInterval: STANDARD_LIVE_INTERVAL_MS,
-    retry: retryOn5xx,
+    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
+    retry: stopRetryOn4xx,
   });
 
   const filtered = useMemo(() => {
@@ -105,8 +101,8 @@ export function useCompletedTasksByRole(
       return result.tasks;
     },
     enabled: assignedRole !== undefined && assignedRole.length > 0,
-    refetchInterval: STANDARD_LIVE_INTERVAL_MS,
-    retry: retryOn5xx,
+    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
+    retry: stopRetryOn4xx,
   });
 
   const filtered = useMemo(() => {
@@ -131,8 +127,8 @@ export function useMyCompletedTasks(): { data: HumanTask[]; loading: boolean; er
       const result = await mediforce.tasks.list({ status: ['completed'] });
       return result.tasks;
     },
-    refetchInterval: STANDARD_LIVE_INTERVAL_MS,
-    retry: retryOn5xx,
+    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
+    retry: stopRetryOn4xx,
   });
 
   const filtered = useMemo(() => {
@@ -169,8 +165,8 @@ export function useActiveTaskForInstance(
       return result.tasks;
     },
     enabled,
-    refetchInterval: CRITICAL_LIVE_INTERVAL_MS,
-    retry: retryOn5xx,
+    refetchInterval: (q) => (q.state.error !== null ? false : CRITICAL_LIVE_INTERVAL_MS),
+    retry: stopRetryOn4xx,
   });
 
   const activeTask = useMemo(
@@ -210,7 +206,7 @@ export function useActiveCoworkSession(
         : CRITICAL_LIVE_INTERVAL_MS,
     retry: (failureCount, err) => {
       if (err instanceof ApiError && err.status === 404) return false;
-      return retryOn5xx(failureCount, err);
+      return stopRetryOn4xx(failureCount, err);
     },
   });
 
@@ -241,8 +237,8 @@ export function useMyCoworkSessions(
       });
       return result.sessions;
     },
-    refetchInterval: STANDARD_LIVE_INTERVAL_MS,
-    retry: retryOn5xx,
+    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
+    retry: stopRetryOn4xx,
   });
 
   const sorted = useMemo(() => {
@@ -272,8 +268,8 @@ export function useFinalizedCoworkSessions(
       });
       return result.sessions;
     },
-    refetchInterval: STANDARD_LIVE_INTERVAL_MS,
-    retry: retryOn5xx,
+    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
+    retry: stopRetryOn4xx,
   });
 
   const sorted = useMemo(() => {

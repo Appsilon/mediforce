@@ -3,8 +3,9 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { AgentRun, AgentRunStatus } from '@mediforce/platform-core';
-import { ApiError, mediforce } from '@/lib/mediforce';
+import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
+import { stopRetryOn4xx } from '@/lib/retry';
 import {
   CRITICAL_LIVE_INTERVAL_MS,
   LEGACY_FIRESTORE_PARITY_LIMIT,
@@ -19,13 +20,6 @@ const TERMINAL: ReadonlySet<AgentRunStatus> = new Set([
   'escalated',
   'flagged',
 ]);
-
-// ADR-0006 §8a — 4xx is not transient; stop retrying so a 403/404 surfaces
-// immediately instead of burning the default two retries first.
-function stopRetryOn4xx(failureCount: number, err: unknown): boolean {
-  if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-  return failureCount < 2;
-}
 
 /**
  * Practical cap for the unbounded UI fetch. Pre-PR2 the page used a Firestore
@@ -163,10 +157,7 @@ export function useProcessNameMap(handle: string): Map<string, string> {
       if (q.state.error !== null) return false;
       return STANDARD_LIVE_INTERVAL_MS;
     },
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-      return failureCount < 2;
-    },
+    retry: stopRetryOn4xx,
   });
   const instances = query.data ?? [];
   return useMemo(() => {

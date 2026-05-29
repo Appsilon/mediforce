@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { buildProcessInstance } from '@mediforce/platform-core/testing';
@@ -95,6 +95,22 @@ describe('useProcessInstances — react-query backed', () => {
 
     await waitFor(() => expect(listMock).toHaveBeenCalled());
     expect(listMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'running' }));
+  });
+
+  it('stops polling after a 4xx error (PRD §9 rule 4)', async () => {
+    const { ApiError } = await import('@/lib/mediforce');
+    listMock.mockRejectedValue(new (ApiError as new (status: number, msg: string) => Error)(403, 'forbidden'));
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { wrapper } = createQueryWrapper();
+
+    renderHook(() => useProcessInstances('all', undefined, false, 'alpha'), { wrapper });
+
+    await vi.waitFor(() => expect(listMock).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(listMock).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
   });
 });
 
