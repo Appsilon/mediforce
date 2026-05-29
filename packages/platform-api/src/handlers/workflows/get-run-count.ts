@@ -1,8 +1,8 @@
 import type {
   GetWorkflowRunCountInput,
   GetWorkflowRunCountOutput,
-} from '../../contract/workflows.js';
-import type { CallerScope } from '../../repositories/index.js';
+} from '../../contract/workflows';
+import type { CallerScope } from '../../repositories/index';
 
 export async function getWorkflowRunCount(
   input: GetWorkflowRunCountInput,

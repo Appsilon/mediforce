@@ -6,11 +6,11 @@ import {
   LeaveNamespaceInputSchema,
   DeleteNamespaceInputSchema,
   RemoveNamespaceMemberInputSchema,
-} from '../namespaces.js';
+} from '../namespaces';
 import {
   ClearMustChangePasswordInputSchema,
   ClearMustChangePasswordOutputSchema,
-} from '../users.js';
+} from '../users';
 
 describe('UpdateNamespace schemas', () => {
   it('UpdateNamespaceBodySchema requires at least one field', () => {

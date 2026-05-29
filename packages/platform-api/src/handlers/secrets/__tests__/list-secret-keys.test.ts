@@ -3,12 +3,12 @@ import type {
   NamespaceSecretsRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
-import { listSecretKeys } from '../list-secret-keys.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { listSecretKeys } from '../list-secret-keys';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import {
   buildNamespaceSecretsRepo,
   buildWorkflowSecretsRepo,
-} from './fakes.js';
+} from './fakes';
 
 describe('listSecretKeys handler', () => {
   let workspaceSecretsRepo: NamespaceSecretsRepository;

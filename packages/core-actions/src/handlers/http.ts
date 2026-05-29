@@ -1,6 +1,6 @@
 import type { HttpActionConfig } from '@mediforce/platform-core';
-import { interpolate } from '../interpolation.js';
-import type { HttpActionHandler } from '../types.js';
+import { interpolate } from '../interpolation';
+import type { HttpActionHandler } from '../types';
 
 /** Output shape of the http action.
  *  Mirrors n8n's webhook response item: status, headers, JSON body parsed when
@@ -104,7 +104,7 @@ interface ResolvedHttpConfig {
 
 function interpolateConfig(
   config: HttpActionConfig,
-  sources: import('../types.js').InterpolationSources,
+  sources: import('../types').InterpolationSources,
 ): ResolvedHttpConfig {
   const method = String(interpolate(config.method, sources));
   const url = String(interpolate(config.url, sources));

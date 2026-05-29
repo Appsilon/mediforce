@@ -2,7 +2,7 @@ import {
   evaluateExpression,
   ExpressionError,
   type ExpressionContext,
-} from '../expressions/expression-evaluator.js';
+} from '../expressions/expression-evaluator';
 
 // Re-export the context type so callers don't need to import from expressions
 export type { ExpressionContext as TransitionContext };

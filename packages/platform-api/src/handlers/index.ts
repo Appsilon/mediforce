@@ -1,105 +1,105 @@
-export { listTasks } from './tasks/list-tasks.js';
-export { claimTask } from './tasks/claim-task.js';
-export { completeTask } from './tasks/complete-task.js';
-export { listModels, type ListModelsDeps } from './models/list-models.js';
-export { getModel, type GetModelDeps } from './models/get-model.js';
-export { syncModels, type SyncModelsDeps } from './models/sync-models.js';
-export { updateRankings, type UpdateRankingsDeps } from './models/update-rankings.js';
+export { listTasks } from './tasks/list-tasks';
+export { claimTask } from './tasks/claim-task';
+export { completeTask } from './tasks/complete-task';
+export { listModels, type ListModelsDeps } from './models/list-models';
+export { getModel, type GetModelDeps } from './models/get-model';
+export { syncModels, type SyncModelsDeps } from './models/sync-models';
+export { updateRankings, type UpdateRankingsDeps } from './models/update-rankings';
 
-export { listAuditEvents } from './processes/list-audit-events.js';
-export { getProcessSteps } from './processes/get-process-steps.js';
-export { cancelRun } from './processes/cancel-run.js';
-export { resumeRun } from './processes/resume-run.js';
-export { resumeWait } from './processes/resume-wait.js';
-export { retryStep } from './processes/retry-step.js';
-export { archiveRun } from './processes/archive-run.js';
-export { bulkCancelRuns } from './processes/bulk-cancel-runs.js';
-export { bulkArchiveRuns } from './processes/bulk-archive-runs.js';
+export { listAuditEvents } from './processes/list-audit-events';
+export { getProcessSteps } from './processes/get-process-steps';
+export { cancelRun } from './processes/cancel-run';
+export { resumeRun } from './processes/resume-run';
+export { resumeWait } from './processes/resume-wait';
+export { retryStep } from './processes/retry-step';
+export { archiveRun } from './processes/archive-run';
+export { bulkCancelRuns } from './processes/bulk-cancel-runs';
+export { bulkArchiveRuns } from './processes/bulk-archive-runs';
 
-export { createAgent } from './agents/create-agent.js';
-export { updateAgent } from './agents/update-agent.js';
-export { deleteAgent } from './agents/delete-agent.js';
+export { createAgent } from './agents/create-agent';
+export { updateAgent } from './agents/update-agent';
+export { deleteAgent } from './agents/delete-agent';
 export {
   listAgentMcpBindings,
   upsertAgentMcpBinding,
   deleteAgentMcpBinding,
-} from './agents/mcp-bindings.js';
+} from './agents/mcp-bindings';
 export {
   listAgentOAuthTokens,
   getAgentOAuthToken,
   deleteAgentOAuthToken,
-} from './agents/oauth-tokens.js';
+} from './agents/oauth-tokens';
 
-export { listWorkflows } from './workflows/list-workflows.js';
-export { getWorkflow } from './workflows/get-workflow.js';
-export { registerWorkflow } from './workflows/register-workflow.js';
-export { setWorkflowVisibility } from './workflows/set-visibility.js';
+export { listWorkflows } from './workflows/list-workflows';
+export { getWorkflow } from './workflows/get-workflow';
+export { registerWorkflow } from './workflows/register-workflow';
+export { setWorkflowVisibility } from './workflows/set-visibility';
 export {
   archiveWorkflow,
   archiveWorkflowVersion,
-} from './workflows/archive-workflow.js';
-export { copyWorkflow } from './workflows/copy-workflow.js';
-export { setDefaultWorkflowVersion } from './workflows/set-default-version.js';
-export { deleteWorkflow } from './workflows/delete-workflow.js';
-export { transferWorkflowNamespace } from './workflows/transfer-workflow.js';
-export { getWorkflowRunCount } from './workflows/get-run-count.js';
+} from './workflows/archive-workflow';
+export { copyWorkflow } from './workflows/copy-workflow';
+export { setDefaultWorkflowVersion } from './workflows/set-default-version';
+export { deleteWorkflow } from './workflows/delete-workflow';
+export { transferWorkflowNamespace } from './workflows/transfer-workflow';
+export { getWorkflowRunCount } from './workflows/get-run-count';
 
-export { getCoworkSessionByInstance } from './cowork/get-cowork-session-by-instance.js';
-export { chatCoworkSession } from './cowork/chat.js';
-export { finalizeCoworkSession } from './cowork/finalize.js';
-export { createVoiceEphemeralKey } from './cowork/voice-ephemeral-key.js';
-export { synthesizeVoiceArtifact } from './cowork/voice-synthesize.js';
+export { getCoworkSessionByInstance } from './cowork/get-cowork-session-by-instance';
+export { chatCoworkSession } from './cowork/chat';
+export { finalizeCoworkSession } from './cowork/finalize';
+export { createVoiceEphemeralKey } from './cowork/voice-ephemeral-key';
+export { synthesizeVoiceArtifact } from './cowork/voice-synthesize';
 
-export { listPlugins } from './plugins/list-plugins.js';
+export { listPlugins } from './plugins/list-plugins';
 
-export { heartbeat as cronHeartbeat } from './cron/heartbeat.js';
+export { heartbeat as cronHeartbeat } from './cron/heartbeat';
 
-export { listRuns } from './runs/list-runs.js';
-export { getRun } from './runs/get-run.js';
-export { startRun } from './runs/start-run.js';
+export { listRuns } from './runs/list-runs';
+export { getRun } from './runs/get-run';
+export { startRun } from './runs/start-run';
 
-export { listSecretKeys } from './secrets/list-secret-keys.js';
-export { setSecret } from './secrets/set-secret.js';
-export { deleteSecret } from './secrets/delete-secret.js';
-export { getWorkspaceSecretPreviews } from './secrets/get-workspace-secret-previews.js';
-export { listWorkflowSecretKeysBatch } from './secrets/list-workflow-secret-keys-batch.js';
-export { getWorkflowSecretsFull } from './secrets/get-workflow-secrets-full.js';
-export { saveWorkflowSecrets } from './secrets/save-workflow-secrets.js';
+export { listSecretKeys } from './secrets/list-secret-keys';
+export { setSecret } from './secrets/set-secret';
+export { deleteSecret } from './secrets/delete-secret';
+export { getWorkspaceSecretPreviews } from './secrets/get-workspace-secret-previews';
+export { listWorkflowSecretKeysBatch } from './secrets/list-workflow-secret-keys-batch';
+export { getWorkflowSecretsFull } from './secrets/get-workflow-secrets-full';
+export { saveWorkflowSecrets } from './secrets/save-workflow-secrets';
 
-export { getDockerInfo } from './system/get-docker-info.js';
-export { getOpenRouterCredits } from './system/get-openrouter-credits.js';
+export { getDockerInfo } from './system/get-docker-info';
+export { getOpenRouterCredits } from './system/get-openrouter-credits';
 
-export { deleteDockerImage } from './docker-images/delete-image.js';
+export { deleteDockerImage } from './docker-images/delete-image';
 
-export { listOAuthProviders } from './oauth-providers/list-providers.js';
-export { getOAuthProvider } from './oauth-providers/get-provider.js';
-export { createOAuthProvider } from './oauth-providers/create-provider.js';
-export { updateOAuthProvider } from './oauth-providers/update-provider.js';
-export { deleteOAuthProvider } from './oauth-providers/delete-provider.js';
+export { listOAuthProviders } from './oauth-providers/list-providers';
+export { getOAuthProvider } from './oauth-providers/get-provider';
+export { createOAuthProvider } from './oauth-providers/create-provider';
+export { updateOAuthProvider } from './oauth-providers/update-provider';
+export { deleteOAuthProvider } from './oauth-providers/delete-provider';
 
-export { listNamespaceMembers } from './users/list-members.js';
-export { inviteUser } from './users/invite-user.js';
-export { resendInvite } from './users/resend-invite.js';
-export { getMe } from './users/get-me.js';
-export { clearMustChangePassword } from './users/clear-must-change-password.js';
+export { listNamespaceMembers } from './users/list-members';
+export { inviteUser } from './users/invite-user';
+export { resendInvite } from './users/resend-invite';
+export { getMe } from './users/get-me';
+export { clearMustChangePassword } from './users/clear-must-change-password';
 
-export { getNamespace } from './namespaces/get-namespace.js';
-export { createNamespace } from './namespaces/create-namespace.js';
+export { getNamespace } from './namespaces/get-namespace';
+export { createNamespace } from './namespaces/create-namespace';
 export {
   updateNamespace,
   deleteNamespace,
   leaveNamespace,
   removeNamespaceMember,
   updateNamespaceMemberRole,
-} from './namespaces/namespace-mutations.js';
+} from './namespaces/namespace-mutations';
 
-export { listToolCatalogEntries } from './tool-catalog/list-entries.js';
-export { getToolCatalogEntry } from './tool-catalog/get-entry.js';
-export { createToolCatalogEntry } from './tool-catalog/create-entry.js';
-export { updateToolCatalogEntry } from './tool-catalog/update-entry.js';
-export { deleteToolCatalogEntry } from './tool-catalog/delete-entry.js';
+export { listToolCatalogEntries } from './tool-catalog/list-entries';
+export { getToolCatalogEntry } from './tool-catalog/get-entry';
+export { createToolCatalogEntry } from './tool-catalog/create-entry';
+export { updateToolCatalogEntry } from './tool-catalog/update-entry';
+export { deleteToolCatalogEntry } from './tool-catalog/delete-entry';
 
-export { listAgentRuns } from './agent-runs/list-agent-runs.js';
-export { getMonitoringSummary } from './monitoring/get-monitoring-summary.js';
+export { listAgentRuns } from './agent-runs/list-agent-runs';
+export { getMonitoringSummary } from './monitoring/get-monitoring-summary';
 
-export { listAdapter, getByIdAdapter } from './_generic.js';
+export { listAdapter, getByIdAdapter } from './_generic';

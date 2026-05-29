@@ -1,9 +1,9 @@
-import { assertCallerIsNamespaceAdmin } from '../../auth.js';
-import type { CallerScope } from '../../repositories/index.js';
+import { assertCallerIsNamespaceAdmin } from '../../auth';
+import type { CallerScope } from '../../repositories/index';
 import type {
   ListToolCatalogEntriesInput,
   ListToolCatalogEntriesOutput,
-} from '../../contract/tool-catalog.js';
+} from '../../contract/tool-catalog';
 
 export async function listToolCatalogEntries(
   input: ListToolCatalogEntriesInput,

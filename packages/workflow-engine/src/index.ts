@@ -1,23 +1,23 @@
 // Expressions
-export { evaluateExpression, ExpressionError } from './expressions/expression-evaluator.js';
-export type { ExpressionContext } from './expressions/expression-evaluator.js';
+export { evaluateExpression, ExpressionError } from './expressions/expression-evaluator';
+export type { ExpressionContext } from './expressions/expression-evaluator';
 
 // Transition resolver
 export {
   resolveTransitions,
   TransitionValidationError,
   NoMatchingTransitionError,
-} from './engine/transition-resolver.js';
-export type { ResolvedTransition, TransitionContext } from './engine/transition-resolver.js';
+} from './engine/transition-resolver';
+export type { ResolvedTransition, TransitionContext } from './engine/transition-resolver';
 
 // Graph
-export { validateStepGraph, type ValidationResult } from './graph/graph-validator.js';
+export { validateStepGraph, type ValidationResult } from './graph/graph-validator';
 
 // Engine
-export { WorkflowEngine } from './engine/workflow-engine.js';
-export type { AgentRunResult } from './engine/workflow-engine.js';
-export { StepExecutor } from './engine/step-executor.js';
-export type { StepActor } from './engine/step-executor.js';
+export { WorkflowEngine } from './engine/workflow-engine';
+export type { AgentRunResult } from './engine/workflow-engine';
+export { StepExecutor } from './engine/step-executor';
+export type { StepActor } from './engine/step-executor';
 export {
   StepFailureError,
   RoutingError,
@@ -25,33 +25,33 @@ export {
   MaxIterationsExceededError,
   CompleteHumanTaskValidationError,
   ParentInstanceNotFoundError,
-} from './engine/errors.js';
+} from './engine/errors';
 
 export {
   resolveTaskKind,
   shapeCompletion,
   type TaskKind,
   type CompletionShape,
-} from './engine/complete-human-task.js';
+} from './engine/complete-human-task';
 
 // Review
-export { ReviewTracker } from './review/review-tracker.js';
-export type { ReviewState } from './review/review-types.js';
+export { ReviewTracker } from './review/review-tracker';
+export type { ReviewState } from './review/review-types';
 
 // Triggers
-export { ManualTrigger } from './triggers/manual-trigger.js';
-export { WebhookTrigger } from './triggers/webhook-trigger.js';
-export { CronTrigger } from './triggers/cron-trigger.js';
-export { TriggerHandler } from './triggers/trigger-handler.js';
-export { WebhookRouter } from './triggers/webhook-router.js';
+export { ManualTrigger } from './triggers/manual-trigger';
+export { WebhookTrigger } from './triggers/webhook-trigger';
+export { CronTrigger } from './triggers/cron-trigger';
+export { TriggerHandler } from './triggers/trigger-handler';
+export { WebhookRouter } from './triggers/webhook-router';
 export type {
   WebhookRouteInput,
   WebhookRouteResult,
-} from './triggers/webhook-router.js';
-export type { TriggerResult, WorkflowTriggerContext } from './triggers/trigger-types.js';
+} from './triggers/webhook-router';
+export type { TriggerResult, WorkflowTriggerContext } from './triggers/trigger-types';
 export {
   WebhookPayloadValidationError,
   TriggerNotFoundError,
   ManualTriggerNotDeclaredError,
-} from './triggers/trigger-errors.js';
-export { validateCronSchedule, isDue } from './triggers/cron-utils.js';
+} from './triggers/trigger-errors';
+export { validateCronSchedule, isDue } from './triggers/cron-utils';

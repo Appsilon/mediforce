@@ -1,5 +1,5 @@
-import type { CallerScope } from '../../repositories/index.js';
-import type { SetSecretInput, SetSecretOutput } from '../../contract/secrets.js';
+import type { CallerScope } from '../../repositories/index';
+import type { SetSecretInput, SetSecretOutput } from '../../contract/secrets';
 
 /**
  * Upsert a secret value. When `workflow` is set, writes to the workflow-

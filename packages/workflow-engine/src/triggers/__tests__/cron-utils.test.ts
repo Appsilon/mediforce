@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateCronSchedule, isDue } from '../cron-utils.js';
+import { validateCronSchedule, isDue } from '../cron-utils';
 
 describe('validateCronSchedule', () => {
   it('accepts */15 * * * *', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createLineStreamReader } from '../line-stream.js';
+import { createLineStreamReader } from '../line-stream';
 
 describe('createLineStreamReader', () => {
   it('[DATA] emits each complete line as it arrives', () => {

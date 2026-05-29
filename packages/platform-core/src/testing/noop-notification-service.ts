@@ -1,4 +1,4 @@
-import type { NotificationService, NotificationEvent, NotificationTarget } from '../interfaces/notification-service.js';
+import type { NotificationService, NotificationEvent, NotificationTarget } from '../interfaces/notification-service';
 
 export class NoopNotificationService implements NotificationService {
   readonly sent: Array<{ event: NotificationEvent; targets: NotificationTarget[] }> = [];

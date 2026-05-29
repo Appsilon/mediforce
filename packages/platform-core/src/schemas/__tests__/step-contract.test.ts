@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { StepInputSchema, StepOutputSchema } from '../step-contract.js';
+import { StepInputSchema, StepOutputSchema } from '../step-contract';
 
 const validStepInput = {
   stepId: 'collect-data',

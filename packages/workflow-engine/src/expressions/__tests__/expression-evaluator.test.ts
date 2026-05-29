@@ -3,7 +3,7 @@ import {
   evaluateExpression,
   ExpressionError,
   type ExpressionContext,
-} from '../expression-evaluator.js';
+} from '../expression-evaluator';
 
 function makeContext(
   overrides: Partial<ExpressionContext> = {},

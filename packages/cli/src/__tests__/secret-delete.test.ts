@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { secretDeleteCommand } from '../commands/secret-delete.js';
-import { captureOutput, jsonResponse } from './test-helpers.js';
+import { secretDeleteCommand } from '../commands/secret-delete';
+import { captureOutput, jsonResponse } from './test-helpers';
 
 beforeEach(() => {
   vi.restoreAllMocks();

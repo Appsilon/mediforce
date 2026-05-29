@@ -3,7 +3,7 @@
 // "Definition" suffix is a historical artifact. See CONTEXT.md
 // "Agent vs Agent Definition" flagged ambiguity.
 import { z } from 'zod';
-import { AgentMcpBindingMapSchema } from './agent-mcp-binding.js';
+import { AgentMcpBindingMapSchema } from './agent-mcp-binding';
 
 export const AgentVisibilitySchema = z.enum(['public', 'private']);
 export type AgentVisibility = z.infer<typeof AgentVisibilitySchema>;

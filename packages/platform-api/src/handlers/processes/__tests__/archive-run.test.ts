@@ -5,9 +5,9 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { archiveRun } from '../archive-run.js';
-import { NotFoundError, PreconditionFailedError } from '../../../errors.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { archiveRun } from '../archive-run';
+import { NotFoundError, PreconditionFailedError } from '../../../errors';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('archiveRun handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;

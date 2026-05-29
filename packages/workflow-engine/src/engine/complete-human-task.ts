@@ -3,7 +3,7 @@ import type {
   CompleteHumanTaskPayload,
   Attachment,
 } from '@mediforce/platform-core';
-import { CompleteHumanTaskValidationError } from './errors.js';
+import { CompleteHumanTaskValidationError } from './errors';
 
 // Pure helpers backing engine.completeHumanTask. Split out so per-variant
 // validation + stepOutput shaping is unit-testable without engine wiring.

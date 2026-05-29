@@ -1,13 +1,13 @@
 import { ProviderAlreadyExistsError } from '@mediforce/platform-core';
-import { assertCallerIsNamespaceAdmin } from '../../auth.js';
-import { HandlerError } from '../../errors.js';
-import type { CallerScope } from '../../repositories/index.js';
+import { assertCallerIsNamespaceAdmin } from '../../auth';
+import { HandlerError } from '../../errors';
+import type { CallerScope } from '../../repositories/index';
 import type {
   CreateOAuthProviderInputApi,
   CreateOAuthProviderOutput,
-} from '../../contract/oauth-providers.js';
-import { actorFromCaller } from '../_helpers.js';
-import { toPublicProvider } from './_helpers.js';
+} from '../../contract/oauth-providers';
+import { actorFromCaller } from '../_helpers';
+import { toPublicProvider } from './_helpers';
 
 export async function createOAuthProvider(
   input: CreateOAuthProviderInputApi,

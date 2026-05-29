@@ -1,6 +1,6 @@
-import type { UpdateAgentInput, UpdateAgentBody, UpdateAgentOutput } from '../../contract/agents.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { actorFromCaller } from '../_helpers.js';
+import type { UpdateAgentInput, UpdateAgentBody, UpdateAgentOutput } from '../../contract/agents';
+import type { CallerScope } from '../../repositories/index';
+import { actorFromCaller } from '../_helpers';
 
 // Body is merged into input by the route adapter — see route.ts for the
 // inputFromRequest shape. Wrapper enforces namespace-write on the existing

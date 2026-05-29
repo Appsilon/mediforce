@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import type { AgentEvent } from '@mediforce/platform-core';
-import { FirestoreAgentEventLog } from '../agent-event-log.js';
+import { FirestoreAgentEventLog } from '../agent-event-log';
 
 /**
  * Tiny in-memory Firestore stub that simulates an asynchronous `.set()` write.

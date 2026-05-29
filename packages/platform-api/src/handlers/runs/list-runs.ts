@@ -1,6 +1,6 @@
 import type { ProcessInstance } from '@mediforce/platform-core';
-import type { ListRunsInput } from '../../contract/runs.js';
-import { listAdapter } from '../_generic.js';
+import type { ListRunsInput } from '../../contract/runs';
+import { listAdapter } from '../_generic';
 
 /**
  * List workflow runs (process instances) visible to the caller. Workspace

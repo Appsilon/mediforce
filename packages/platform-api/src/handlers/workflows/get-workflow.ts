@@ -1,9 +1,9 @@
-import type { CallerScope } from '../../repositories/index.js';
-import { NotFoundError } from '../../errors.js';
+import type { CallerScope } from '../../repositories/index';
+import { NotFoundError } from '../../errors';
 import type {
   GetWorkflowInput,
   GetWorkflowOutput,
-} from '../../contract/workflows.js';
+} from '../../contract/workflows';
 
 /**
  * Fetch one workflow definition by name (+ optional version, + optional

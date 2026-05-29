@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GetRunInputSchema, GetRunOutputSchema } from '../runs.js';
+import { GetRunInputSchema, GetRunOutputSchema } from '../runs';
 
 describe('GetRunInputSchema', () => {
   it('accepts a non-empty runId', () => {

@@ -1,4 +1,4 @@
-import type { AgentOAuthToken } from '../schemas/agent-oauth-token.js';
+import type { AgentOAuthToken } from '../schemas/agent-oauth-token';
 
 /** Namespace + agent + server-scoped token storage. Backing store:
  *  `namespaces/{namespace}/agentOAuthTokens/{agentId}__{serverName}` (single

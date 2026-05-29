@@ -5,10 +5,10 @@ import type {
   HeartbeatOutput,
   SkippedEntry,
   TriggeredEntry,
-} from '../../contract/cron.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { ForbiddenError, PreconditionFailedError } from '../../errors.js';
-import { resumeWait } from '../processes/resume-wait.js';
+} from '../../contract/cron';
+import type { CallerScope } from '../../repositories/index';
+import { ForbiddenError, PreconditionFailedError } from '../../errors';
+import { resumeWait } from '../processes/resume-wait';
 
 type Evaluation = { fire: true } | { fire: false; reason: string };
 

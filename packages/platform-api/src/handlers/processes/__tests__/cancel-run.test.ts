@@ -5,16 +5,16 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { cancelRun } from '../cancel-run.js';
+import { cancelRun } from '../cancel-run';
 import {
   HandlerError,
   NotFoundError,
   PreconditionFailedError,
-} from '../../../errors.js';
+} from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
+} from '../../../repositories/__tests__/create-test-scope';
 
 describe('cancelRun handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;

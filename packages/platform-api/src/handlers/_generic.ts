@@ -1,5 +1,5 @@
-import type { CallerScope } from '../repositories/index.js';
-import { NotFoundError } from '../errors.js';
+import type { CallerScope } from '../repositories/index';
+import { NotFoundError } from '../errors';
 
 type ScopeHandler<Input, Output> = (input: Input, scope: CallerScope) => Promise<Output>;
 

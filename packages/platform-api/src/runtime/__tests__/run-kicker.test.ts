@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { noopRunKicker, createHttpSelfFetchRunKicker } from '../run-kicker.js';
+import { noopRunKicker, createHttpSelfFetchRunKicker } from '../run-kicker';
 
 describe('noopRunKicker', () => {
   it('records each call on `kicks`', async () => {

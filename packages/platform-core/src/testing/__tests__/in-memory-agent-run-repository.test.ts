@@ -6,7 +6,7 @@ import {
   buildProcessInstance,
   encodeAgentRunCursor,
   decodeAgentRunCursor,
-} from '../index.js';
+} from '../index';
 
 describe('encodeAgentRunCursor / decodeAgentRunCursor', () => {
   it('round-trips a startedAt + id pair', () => {

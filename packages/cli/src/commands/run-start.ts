@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { defineCommand } from '../define-command.js';
-import { printJson, printError, printKv } from '../output.js';
+import { defineCommand } from '../define-command';
+import { printJson, printError, printKv } from '../output';
 
 export const runStartCommand = defineCommand({
   name: 'mediforce run start',

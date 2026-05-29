@@ -10,7 +10,7 @@ import {
   InMemoryProcessInstanceRepository,
   type ProcessConfig,
 } from '@mediforce/platform-core';
-import { ExampleAgent } from './example-agent.js';
+import { ExampleAgent } from './example-agent';
 
 describe('ExampleAgent integration', () => {
   let registry: PluginRegistry;

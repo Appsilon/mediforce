@@ -1,2 +1,2 @@
-export { parseProcessDefinition, type ParseResult } from './process-parser.js';
-export { formatZodErrors } from './error-formatter.js';
+export { parseProcessDefinition, type ParseResult } from './process-parser';
+export { formatZodErrors } from './error-formatter';

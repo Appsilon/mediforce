@@ -17,7 +17,7 @@ import {
   WorkflowEngine,
   InvalidTransitionError,
   CompleteHumanTaskValidationError,
-} from '../../index.js';
+} from '../../index';
 
 /**
  * Integration coverage for `WorkflowEngine.completeHumanTask` — the

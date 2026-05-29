@@ -1,9 +1,9 @@
-import type { CallerScope } from '../../repositories/index.js';
-import { NotFoundError } from '../../errors.js';
+import type { CallerScope } from '../../repositories/index';
+import { NotFoundError } from '../../errors';
 import type {
   GetCoworkSessionByInstanceInput,
   GetCoworkSessionByInstanceOutput,
-} from '../../contract/cowork.js';
+} from '../../contract/cowork';
 
 /**
  * Get the most recent *active* cowork session for a given process instance.

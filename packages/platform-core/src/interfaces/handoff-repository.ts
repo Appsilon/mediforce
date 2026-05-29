@@ -1,4 +1,4 @@
-import type { HandoffEntity } from '../schemas/handoff-entity.js';
+import type { HandoffEntity } from '../schemas/handoff-entity';
 
 /**
  * Storage-layer authorization (ADR-0004): handoffs have no namespace field —

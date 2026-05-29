@@ -6,9 +6,9 @@ import {
   removeNamespaceMember,
   updateNamespace,
   updateNamespaceMemberRole,
-} from '../namespace-mutations.js';
-import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../../errors.js';
-import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index.js';
+} from '../namespace-mutations';
+import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../../errors';
+import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index';
 
 const HANDLE = 'acme';
 const ownerCaller = userCaller('uid-owner', [HANDLE], new Map([[HANDLE, 'owner']]));

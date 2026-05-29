@@ -7,7 +7,7 @@ import {
   TransitionSchema,
   TriggerSchema,
   VerdictSchema,
-} from '../process-definition.js';
+} from '../process-definition';
 
 const minimalStep = {
   id: 'step-1',

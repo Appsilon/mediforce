@@ -6,7 +6,7 @@
  * `bin/mediforce.cjs` spawns via tsx.
  */
 
-import { runCli } from './cli.js';
+import { runCli } from './cli';
 
 runCli({ argv: process.argv.slice(2), env: process.env })
   .then((code) => {

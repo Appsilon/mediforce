@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   fetchFromContainerWorker,
   fetchFromLocalDocker,
-} from '../_docker.js';
+} from '../_docker';
 
 describe('fetchFromLocalDocker', () => {
   it('parses one-image-per-line JSON and the disk-df rows', async () => {

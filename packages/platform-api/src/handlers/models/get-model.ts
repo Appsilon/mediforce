@@ -1,6 +1,6 @@
 import type { ModelRegistryRepository } from '@mediforce/platform-core';
-import { NotFoundError } from '../../errors.js';
-import type { GetModelInput, GetModelOutput } from '../../contract/models.js';
+import { NotFoundError } from '../../errors';
+import type { GetModelInput, GetModelOutput } from '../../contract/models';
 
 export interface GetModelDeps {
   modelRegistryRepo: ModelRegistryRepository;

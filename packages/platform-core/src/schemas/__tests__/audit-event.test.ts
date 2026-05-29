@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AuditEventSchema } from '../audit-event.js';
+import { AuditEventSchema } from '../audit-event';
 
 const validAuditEvent = {
   actorId: 'user-123',

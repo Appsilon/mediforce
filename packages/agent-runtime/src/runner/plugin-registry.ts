@@ -1,5 +1,5 @@
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
-import type { AgentPlugin } from '../interfaces/agent-plugin.js';
+import type { AgentPlugin } from '../interfaces/agent-plugin';
 
 export class PluginNotFoundError extends Error {
   override name = 'PluginNotFoundError';

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { ConversationTurnSchema, CoworkSessionSchema } from '../cowork-session.js';
-import { buildCoworkSession } from '../../testing/factories.js';
+import { ConversationTurnSchema, CoworkSessionSchema } from '../cowork-session';
+import { buildCoworkSession } from '../../testing/factories';
 
 describe('ConversationTurnSchema', () => {
   it('should parse a human turn', () => {

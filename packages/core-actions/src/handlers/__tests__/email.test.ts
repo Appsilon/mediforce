@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createEmailActionHandler } from '../email.js';
-import type { ActionContext } from '../../types.js';
+import { createEmailActionHandler } from '../email';
+import type { ActionContext } from '../../types';
 
 const baseCtx: ActionContext = {
   stepId: 'send-email',

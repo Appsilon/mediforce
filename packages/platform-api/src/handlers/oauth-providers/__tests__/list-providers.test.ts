@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryOAuthProviderRepository } from '@mediforce/platform-core/testing';
-import { listOAuthProviders } from '../list-providers.js';
-import { ForbiddenError } from '../../../errors.js';
+import { listOAuthProviders } from '../list-providers';
+import { ForbiddenError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { adminRoles, memberRoles, sampleProviderInput } from './fixtures.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { adminRoles, memberRoles, sampleProviderInput } from './fixtures';
 
 describe('listOAuthProviders handler', () => {
   let repo: InMemoryOAuthProviderRepository;

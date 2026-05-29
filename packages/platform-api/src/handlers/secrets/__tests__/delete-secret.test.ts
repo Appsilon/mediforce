@@ -3,13 +3,13 @@ import type {
   NamespaceSecretsRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
-import { deleteSecret } from '../delete-secret.js';
-import { ForbiddenError } from '../../../errors.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { deleteSecret } from '../delete-secret';
+import { ForbiddenError } from '../../../errors';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import {
   buildNamespaceSecretsRepo,
   buildWorkflowSecretsRepo,
-} from './fakes.js';
+} from './fakes';
 
 describe('deleteSecret handler', () => {
   let workspaceSecretsRepo: NamespaceSecretsRepository;

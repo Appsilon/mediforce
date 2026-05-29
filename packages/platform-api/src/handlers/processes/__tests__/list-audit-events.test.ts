@@ -6,9 +6,9 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { listAuditEvents } from '../list-audit-events.js';
-import { NotFoundError } from '../../../errors.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { listAuditEvents } from '../list-audit-events';
+import { NotFoundError } from '../../../errors';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('listAuditEvents handler', () => {
   let auditRepo: InMemoryAuditRepository;

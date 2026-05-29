@@ -25,9 +25,9 @@ import {
   type ParsedArgs,
 } from 'citty';
 import { Mediforce } from '@mediforce/platform-api/client';
-import { resolveConfig, type ResolvedConfig } from './config.js';
-import { printError, type OutputSink } from './output.js';
-import { formatCliError } from './errors.js';
+import { resolveConfig, type ResolvedConfig } from './config';
+import { printError, type OutputSink } from './output';
+import { formatCliError } from './errors';
 
 export interface CommandInput {
   argv: string[];

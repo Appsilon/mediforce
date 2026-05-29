@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { signState, verifyState, generateNonce, type OAuthStatePayload } from '../state-hmac.js';
+import { signState, verifyState, generateNonce, type OAuthStatePayload } from '../state-hmac';
 
 const SECRET = 'test-hmac-secret-0123456789';
 

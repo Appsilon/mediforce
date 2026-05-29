@@ -6,11 +6,11 @@ import {
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { deleteWorkflow } from '../delete-workflow.js';
+import { deleteWorkflow } from '../delete-workflow';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
+} from '../../../repositories/__tests__/create-test-scope';
 
 describe('deleteWorkflow handler', () => {
   let processRepo: InMemoryProcessRepository;

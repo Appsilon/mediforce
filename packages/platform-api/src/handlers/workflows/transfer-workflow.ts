@@ -1,9 +1,9 @@
 import type {
   TransferWorkflowInput,
   TransferWorkflowOutput,
-} from '../../contract/workflows.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { actorFromCaller } from '../_helpers.js';
+} from '../../contract/workflows';
+import type { CallerScope } from '../../repositories/index';
+import { actorFromCaller } from '../_helpers';
 
 /**
  * Move all versions of a workflow definition between workspaces. Transfer

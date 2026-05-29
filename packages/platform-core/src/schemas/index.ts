@@ -16,7 +16,7 @@ export {
   type Transition,
   type Trigger,
   type ProcessDefinition,
-} from './process-definition.js';
+} from './process-definition';
 
 export {
   buildTaskVerdicts,
@@ -24,7 +24,7 @@ export {
   defaultVerdictLabel,
   defaultRequiresComment,
   type TaskVerdict,
-} from './verdicts.js';
+} from './verdicts';
 
 export {
   ReviewConstraintsSchema,
@@ -37,31 +37,31 @@ export {
   type StepConfig,
   type ProcessNotificationConfig,
   type ProcessConfig,
-} from './process-config.js';
+} from './process-config';
 
 export {
   FileMetadataSchema,
   type FileMetadata,
-} from './file-metadata.js';
+} from './file-metadata';
 
 export {
   AuditEventSchema,
   type AuditEvent,
-} from './audit-event.js';
+} from './audit-event';
 
 export {
   StepInputSchema,
   StepOutputSchema,
   type StepInput,
   type StepOutput,
-} from './step-contract.js';
+} from './step-contract';
 
 export {
   InstanceStatusSchema,
   ProcessInstanceSchema,
   type InstanceStatus,
   type ProcessInstance,
-} from './process-instance.js';
+} from './process-instance';
 
 export {
   StepExecutionStatusSchema,
@@ -74,7 +74,7 @@ export {
   type ReviewVerdict,
   type AgentOutputSnapshot,
   type StepExecution,
-} from './step-execution.js';
+} from './step-execution';
 
 export {
   AnnotationSchema,
@@ -85,19 +85,19 @@ export {
   type GitMetadata,
   type TokenUsage,
   type AgentOutputEnvelope,
-} from './agent-output-envelope.js';
+} from './agent-output-envelope';
 
 export {
   AgentEventSchema,
   type AgentEvent,
-} from './agent-event.js';
+} from './agent-event';
 
 export {
   AgentRunStatusSchema,
   AgentRunSchema,
   type AgentRunStatus,
   type AgentRun,
-} from './agent-run.js';
+} from './agent-run';
 
 export {
   CreationReasonSchema,
@@ -105,21 +105,21 @@ export {
   HumanTaskSchema,
   type HumanTaskStatus,
   type HumanTask,
-} from './human-task.js';
+} from './human-task';
 
 export {
   HandoffStatusSchema,
   HandoffEntitySchema,
   type HandoffStatus,
   type HandoffEntity,
-} from './handoff-entity.js';
+} from './handoff-entity';
 
-export { NotificationTargetSchema, type NotificationTarget } from './process-config.js';
+export { NotificationTargetSchema, type NotificationTarget } from './process-config';
 
 export {
   McpServerConfigSchema,
   type McpServerConfig,
-} from './mcp-server-config.js';
+} from './mcp-server-config';
 
 export {
   AgentMcpBindingSchema,
@@ -142,7 +142,7 @@ export {
   type StepMcpRestriction,
   type StepMcpRestrictionEntry,
   type ToolCatalogEntry,
-} from './agent-mcp-binding.js';
+} from './agent-mcp-binding';
 
 export {
   WorkflowAgentConfigSchema,
@@ -189,7 +189,7 @@ export {
   type SpawnActionConfig,
   type WaitActionConfig,
   type ActionConfig,
-} from './workflow-definition.js';
+} from './workflow-definition';
 
 export {
   ConversationTurnSchema,
@@ -206,13 +206,13 @@ export {
   type ToolTurn,
   type CoworkSessionStatus,
   type CoworkSession,
-} from './cowork-session.js';
+} from './cowork-session';
 
 export {
   PluginRoleSchema,
   PluginCapabilityMetadataSchema,
   type PluginCapabilityMetadata,
-} from './plugin-capability-metadata.js';
+} from './plugin-capability-metadata';
 
 export {
   NamespaceTypeSchema,
@@ -223,34 +223,34 @@ export {
   type Namespace,
   type NamespaceMember,
   type NamespaceMembership,
-} from './namespace.js';
+} from './namespace';
 
 export {
   HandleSchema,
   HANDLE_REGEX,
   HANDLE_MAX_LENGTH,
   type Handle,
-} from './handle.js';
+} from './handle';
 
 export {
   AgentDefinitionSchema,
   type AgentDefinition,
-} from './agent-definition.js';
+} from './agent-definition';
 
 export {
   WorkflowSecretsSchema,
   type WorkflowSecrets,
-} from './workflow-secret.js';
+} from './workflow-secret';
 
 export {
   NamespaceSecretsSchema,
   type NamespaceSecrets,
-} from './namespace-secret.js';
+} from './namespace-secret';
 
 export {
   CronTriggerStateSchema,
   type CronTriggerState,
-} from './cron-trigger-state.js';
+} from './cron-trigger-state';
 
 export {
   ModelRegistryEntrySchema,
@@ -263,7 +263,7 @@ export {
   type CreateModelRegistryEntryInput,
   type UpdateModelRegistryEntryInput,
   type UpdateRankingsInput,
-} from './model-registry.js';
+} from './model-registry';
 
 export {
   AttachmentSchema,
@@ -274,4 +274,4 @@ export {
   type AssignmentItem,
   type TableEditorRow,
   type CompleteHumanTaskPayload,
-} from './task-completion.js';
+} from './task-completion';

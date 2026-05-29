@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
 
-vi.mock('../../lib/platform-services.js', () => {
+vi.mock('../../lib/platform-services', () => {
   const mockPlugins = new Map<string, { metadata?: PluginCapabilityMetadata }>();
   return {
     getPlatformServices: () => ({
@@ -19,9 +19,9 @@ vi.mock('../../lib/platform-services.js', () => {
   };
 });
 
-vi.mock('../../lib/api-auth.js', async () => {
-  const actual = await vi.importActual<typeof import('../../lib/api-auth.js')>(
-    '../../lib/api-auth.js',
+vi.mock('../../lib/api-auth', async () => {
+  const actual = await vi.importActual<typeof import('../../lib/api-auth')>(
+    '../../lib/api-auth',
   );
   return {
     ...actual,
@@ -37,13 +37,13 @@ describe('GET /api/plugins', () => {
   let mockPlugins: Map<string, { metadata?: PluginCapabilityMetadata }>;
 
   beforeEach(async () => {
-    const mod = await import('../../lib/platform-services.js');
+    const mod = await import('../../lib/platform-services');
     mockPlugins = (mod as unknown as { _mockPlugins: Map<string, { metadata?: PluginCapabilityMetadata }> })._mockPlugins;
     mockPlugins.clear();
   });
 
   it('[DATA] returns 200 with plugins array', async () => {
-    const { GET } = await import('../../app/api/plugins/route.js');
+    const { GET } = await import('../../app/api/plugins/route');
     const response = await GET(makeRequest(), undefined);
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -61,7 +61,7 @@ describe('GET /api/plugins', () => {
     };
     mockPlugins.set('sc/compliance-analyzer', { metadata: testMetadata });
 
-    const { GET } = await import('../../app/api/plugins/route.js');
+    const { GET } = await import('../../app/api/plugins/route');
     const response = await GET(makeRequest(), undefined);
     const body = await response.json();
 
@@ -74,7 +74,7 @@ describe('GET /api/plugins', () => {
   it('[DATA] returns plugin without metadata as undefined', async () => {
     mockPlugins.set('basic-plugin', {});
 
-    const { GET } = await import('../../app/api/plugins/route.js');
+    const { GET } = await import('../../app/api/plugins/route');
     const response = await GET(makeRequest(), undefined);
     const body = await response.json();
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { workflowArchiveCommand } from '../commands/workflow-archive.js';
-import { captureOutput, jsonResponse } from './test-helpers.js';
+import { workflowArchiveCommand } from '../commands/workflow-archive';
+import { captureOutput, jsonResponse } from './test-helpers';
 
 beforeEach(() => {
   vi.restoreAllMocks();

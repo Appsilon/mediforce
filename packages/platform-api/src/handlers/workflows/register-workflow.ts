@@ -2,15 +2,15 @@ import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
 import type {
   RegisterWorkflowInput,
   RegisterWorkflowOutput,
-} from '../../contract/workflows.js';
-import type { CallerScope } from '../../repositories/index.js';
+} from '../../contract/workflows';
+import type { CallerScope } from '../../repositories/index';
 import {
   ConflictError,
   ForbiddenError,
   HandlerError,
   ValidationError,
-} from '../../errors.js';
-import { actorFromCaller } from '../_helpers.js';
+} from '../../errors';
+import { actorFromCaller } from '../_helpers';
 
 interface RegisterScopedInput extends RegisterWorkflowInput {
   namespace: string;

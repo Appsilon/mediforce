@@ -1,6 +1,6 @@
-import type { CallerIdentity } from '../auth.js';
+import type { CallerIdentity } from '../auth';
 import type { WorkflowSecretsRepository } from '@mediforce/platform-core';
-import { AuthorizedScope } from './authorized-repository.js';
+import { AuthorizedScope } from './authorized-repository';
 
 /** Workspace-scoped workflow secret access. Membership is on the workspace. */
 export class AuthorizedWorkflowSecretRepository extends AuthorizedScope {

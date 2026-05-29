@@ -1,7 +1,7 @@
-import type { ResumeRunInput, ResumeRunOutput } from '../../contract/processes.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { PreconditionFailedError } from '../../errors.js';
-import { actorFromCaller, loadOr404 } from '../_helpers.js';
+import type { ResumeRunInput, ResumeRunOutput } from '../../contract/processes';
+import type { CallerScope } from '../../repositories/index';
+import { PreconditionFailedError } from '../../errors';
+import { actorFromCaller, loadOr404 } from '../_helpers';
 
 // `failed` source state covers agent-escalated / agent-paused recovery.
 export async function resumeRun(

@@ -6,9 +6,9 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { listTasks } from '../list-tasks.js';
-import { ACTIONABLE_STATUSES } from '../../../contract/tasks.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { listTasks } from '../list-tasks';
+import { ACTIONABLE_STATUSES } from '../../../contract/tasks';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 /**
  * Handler behaviour tests: exercise `listTasks` against real in-memory repos —

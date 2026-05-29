@@ -1,9 +1,9 @@
 import type {
   SetDefaultVersionInput,
   SetDefaultVersionOutput,
-} from '../../contract/workflows.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { actorFromCaller, loadOr404 } from '../_helpers.js';
+} from '../../contract/workflows';
+import type { CallerScope } from '../../repositories/index';
+import { actorFromCaller, loadOr404 } from '../_helpers';
 
 export async function setDefaultWorkflowVersion(
   input: SetDefaultVersionInput,

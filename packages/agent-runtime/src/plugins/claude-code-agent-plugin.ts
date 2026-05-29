@@ -3,8 +3,8 @@ import {
   BaseContainerAgentPlugin,
   type SpawnCliOptions,
   type AgentCommandSpec,
-} from './base-container-agent-plugin.js';
-import { isWorkflowAgentContext } from './container-plugin.js';
+} from './base-container-agent-plugin';
+import { isWorkflowAgentContext } from './container-plugin';
 
 interface StreamEvent {
   type: string;

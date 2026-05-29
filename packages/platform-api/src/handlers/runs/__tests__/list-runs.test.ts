@@ -4,8 +4,8 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { listRuns } from '../list-runs.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { listRuns } from '../list-runs';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('listRuns handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;

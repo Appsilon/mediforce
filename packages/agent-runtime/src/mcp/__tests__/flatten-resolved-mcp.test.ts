@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { McpServerConfigSchema } from '@mediforce/platform-core';
-import { flattenResolvedMcpToLegacy } from '../flatten-resolved-mcp.js';
+import { flattenResolvedMcpToLegacy } from '../flatten-resolved-mcp';
 
 describe('flattenResolvedMcpToLegacy', () => {
   it('returns empty array for empty resolved config', () => {

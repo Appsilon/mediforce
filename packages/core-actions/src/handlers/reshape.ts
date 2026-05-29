@@ -1,5 +1,5 @@
-import { interpolate } from '../interpolation.js';
-import type { ReshapeActionHandler } from '../types.js';
+import { interpolate } from '../interpolation';
+import type { ReshapeActionHandler } from '../types';
 
 /**
  * reshape action: pure data transformation. Walks `config.values` with the

@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { HandlerError } from '../errors.js';
+import { HandlerError } from '../errors';
 
 const execFileAsync = promisify(execFile);
 

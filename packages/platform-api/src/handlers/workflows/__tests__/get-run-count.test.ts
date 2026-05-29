@@ -3,11 +3,11 @@ import {
   InMemoryProcessRepository,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { getWorkflowRunCount } from '../get-run-count.js';
+import { getWorkflowRunCount } from '../get-run-count';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
+} from '../../../repositories/__tests__/create-test-scope';
 
 describe('getWorkflowRunCount handler', () => {
   let processRepo: InMemoryProcessRepository;

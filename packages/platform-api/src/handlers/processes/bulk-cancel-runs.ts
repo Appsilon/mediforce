@@ -1,7 +1,7 @@
-import type { BulkRunInput, BulkRunOutput, BulkRunResultItem } from '../../contract/processes.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { HandlerError } from '../../errors.js';
-import { cancelRun } from './cancel-run.js';
+import type { BulkRunInput, BulkRunOutput, BulkRunResultItem } from '../../contract/processes';
+import type { CallerScope } from '../../repositories/index';
+import { HandlerError } from '../../errors';
+import { cancelRun } from './cancel-run';
 
 // Reuses the single-run `cancelRun` handler per id — same audit emission, same
 // state-machine guard, same wrapper gating. Per-item failures surface in the

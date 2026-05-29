@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { systemStatusCommand, systemImagesCommand, systemDiskCommand } from '../commands/system-status.js';
-import { captureOutput, jsonResponse } from './test-helpers.js';
+import { systemStatusCommand, systemImagesCommand, systemDiskCommand } from '../commands/system-status';
+import { captureOutput, jsonResponse } from './test-helpers';
 
 const DOCKER_INFO_RESPONSE = {
   available: true,

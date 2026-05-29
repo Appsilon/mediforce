@@ -12,8 +12,8 @@ import type {
   UserDirectoryService,
   DirectoryUser,
 } from '@mediforce/platform-core';
-import { WorkflowEngine } from '../workflow-engine.js';
-import type { StepActor, AgentRunResult } from '../../index.js';
+import { WorkflowEngine } from '../workflow-engine';
+import type { StepActor, AgentRunResult } from '../../index';
 
 // In-memory test double for UserDirectoryService (not exported, test-only)
 class InMemoryUserDirectoryService implements UserDirectoryService {

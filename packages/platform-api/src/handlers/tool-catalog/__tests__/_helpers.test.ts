@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { slugifyCommand } from '../_helpers.js';
+import { slugifyCommand } from '../_helpers';
 
 describe('slugifyCommand', () => {
   it('strips path prefix and lowercases', () => {

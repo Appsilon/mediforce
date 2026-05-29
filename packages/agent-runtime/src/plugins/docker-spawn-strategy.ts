@@ -10,7 +10,7 @@
 import { spawn } from 'node:child_process';
 import { appendFile, readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { ensureImage } from './docker-image-builder.js';
+import { ensureImage } from './docker-image-builder';
 import { createLineStreamReader } from '@mediforce/platform-core';
 
 export interface ImageBuildMeta {

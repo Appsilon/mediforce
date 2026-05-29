@@ -8,13 +8,13 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import type { HumanTask, ProcessInstance, CompleteHumanTaskPayload } from '@mediforce/platform-core';
-import { completeTask } from '../complete-task.js';
-import { NotFoundError, PreconditionFailedError } from '../../../errors.js';
+import { completeTask } from '../complete-task';
+import { NotFoundError, PreconditionFailedError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { noopRunKicker } from '../../../runtime/run-kicker.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { noopRunKicker } from '../../../runtime/run-kicker';
 
 /**
  * Handler-level tests for `completeTask`. The engine is stubbed so this

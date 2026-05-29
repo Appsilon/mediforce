@@ -4,7 +4,7 @@ import type {
   WebhookTriggerConfig,
 } from '@mediforce/platform-core';
 import { WebhookTriggerConfigSchema } from '@mediforce/platform-core';
-import type { WorkflowEngine } from '../engine/workflow-engine.js';
+import type { WorkflowEngine } from '../engine/workflow-engine';
 
 /** Caller-supplied request shape — normalized to the runtime's vocabulary
  *  so the router can be driven from any HTTP framework. */

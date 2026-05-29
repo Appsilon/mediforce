@@ -1,6 +1,6 @@
-import type { CreateAgentInput, CreateAgentOutput } from '../../contract/agents.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { actorFromCaller } from '../_helpers.js';
+import type { CreateAgentInput, CreateAgentOutput } from '../../contract/agents';
+import type { CallerScope } from '../../repositories/index';
+import { actorFromCaller } from '../_helpers';
 
 export async function createAgent(
   input: CreateAgentInput,

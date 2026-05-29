@@ -9,8 +9,8 @@ import {
   resolveTransitions,
   TransitionValidationError,
   NoMatchingTransitionError,
-} from './transition-resolver.js';
-import { RoutingError, InvalidTransitionError } from './errors.js';
+} from './transition-resolver';
+import { RoutingError, InvalidTransitionError } from './errors';
 
 export interface StepActor {
   id: string;

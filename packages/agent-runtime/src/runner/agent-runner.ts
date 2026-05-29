@@ -9,9 +9,9 @@ import {
   type WorkflowStep,
 } from '@mediforce/platform-core';
 import { randomUUID } from 'crypto';
-import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitPayload } from '../interfaces/agent-plugin.js';
-import type { AgentEventLog } from './agent-event-log.js';
-import { FallbackHandler } from './fallback-handler.js';
+import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitPayload } from '../interfaces/agent-plugin';
+import type { AgentEventLog } from './agent-event-log';
+import { FallbackHandler } from './fallback-handler';
 
 export interface AgentRunResult {
   status: AgentRunStatus;

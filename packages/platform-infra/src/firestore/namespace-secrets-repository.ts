@@ -4,7 +4,7 @@ import {
   type NamespaceSecretsRepository,
 } from '@mediforce/platform-core';
 import type { Firestore } from 'firebase-admin/firestore';
-import { encrypt, decrypt } from '../crypto/secrets-cipher.js';
+import { encrypt, decrypt } from '../crypto/secrets-cipher';
 
 /**
  * Namespace-level secrets shared across all workflows in a namespace.

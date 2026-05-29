@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
-import { FirestoreNamespaceRepository } from '../firestore/namespace-repository.js';
+import { FirestoreNamespaceRepository } from '../firestore/namespace-repository';
 
 /**
  * Tests for the `users/{uid}.organizations` primary path on

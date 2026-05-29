@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { UserDirectoryService } from '@mediforce/platform-core';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
-import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index.js';
-import { getMe } from '../get-me.js';
-import { ForbiddenError, ValidationError } from '../../../errors.js';
+import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index';
+import { getMe } from '../get-me';
+import { ForbiddenError, ValidationError } from '../../../errors';
 
 function directoryWith(uid: string, metadata: { email: string | null; displayName: string | null }): UserDirectoryService {
   return {

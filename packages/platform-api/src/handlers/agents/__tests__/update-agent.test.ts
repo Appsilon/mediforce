@@ -5,12 +5,12 @@ import {
   InMemoryProcessInstanceRepository,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { updateAgent } from '../update-agent.js';
+import { updateAgent } from '../update-agent';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { NotFoundError } from '../../../errors.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { NotFoundError } from '../../../errors';
 
 describe('updateAgent handler', () => {
   let agentDefinitionRepo: InMemoryAgentDefinitionRepository;

@@ -8,9 +8,9 @@ import type {
   ProcessConfig,
   AgentOutputEnvelope,
   FileMetadata,
-} from '../index.js';
-import type { WorkflowDefinition } from '../schemas/workflow-definition.js';
-import type { CoworkSession } from '../schemas/cowork-session.js';
+} from '../index';
+import type { WorkflowDefinition } from '../schemas/workflow-definition';
+import type { CoworkSession } from '../schemas/cowork-session';
 
 // ---------------------------------------------------------------------------
 // Internal counter for deterministic sequential IDs

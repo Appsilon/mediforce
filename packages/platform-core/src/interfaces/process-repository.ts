@@ -1,4 +1,4 @@
-import type { WorkflowDefinition } from '../schemas/workflow-definition.js';
+import type { WorkflowDefinition } from '../schemas/workflow-definition';
 
 export interface WorkflowDefinitionGroup {
   namespace: string;

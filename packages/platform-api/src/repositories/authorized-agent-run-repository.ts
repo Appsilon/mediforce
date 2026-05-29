@@ -4,8 +4,8 @@ import type {
   ListAgentRunsOptions,
   ListAgentRunsPage,
 } from '@mediforce/platform-core';
-import type { CallerIdentity } from '../auth.js';
-import { AuthorizedScope } from './authorized-repository.js';
+import type { CallerIdentity } from '../auth';
+import { AuthorizedScope } from './authorized-repository';
 
 /**
  * Agent-run reads. AgentRun has no namespace field — workspace membership

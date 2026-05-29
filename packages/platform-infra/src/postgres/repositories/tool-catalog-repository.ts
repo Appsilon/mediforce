@@ -4,8 +4,8 @@ import {
   type ToolCatalogEntry,
   type ToolCatalogRepository,
 } from '@mediforce/platform-core';
-import type { Database } from '../client.js';
-import { toolCatalogEntries } from '../schema/tool-catalog.js';
+import type { Database } from '../client';
+import { toolCatalogEntries } from '../schema/tool-catalog';
 
 /**
  * Postgres-backed ToolCatalogRepository (ADR-0001 tracer-bullet repo).

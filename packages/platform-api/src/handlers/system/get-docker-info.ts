@@ -3,13 +3,13 @@
 // button, processes problems panel, admin infra page); there is no
 // per-workspace view to enforce.
 
-import type { CallerScope } from '../../repositories/index.js';
-import type { DockerInfoResponse, GetDockerInfoInput } from '../../contract/system.js';
+import type { CallerScope } from '../../repositories/index';
+import type { DockerInfoResponse, GetDockerInfoInput } from '../../contract/system';
 import {
   fetchFromContainerWorker,
   fetchFromLocalDocker,
   isLocalAgentMode,
-} from './_docker.js';
+} from './_docker';
 
 export async function getDockerInfo(
   _input: GetDockerInfoInput,

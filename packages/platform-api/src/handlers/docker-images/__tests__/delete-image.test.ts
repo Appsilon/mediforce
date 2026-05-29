@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
-import { deleteDockerImage } from '../delete-image.js';
-import { ForbiddenError, PreconditionFailedError } from '../../../errors.js';
+import { deleteDockerImage } from '../delete-image';
+import { ForbiddenError, PreconditionFailedError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import type { DockerImagesService } from '../../../services/docker-images-service.js';
-import type { CallerIdentity } from '../../../auth.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import type { DockerImagesService } from '../../../services/docker-images-service';
+import type { CallerIdentity } from '../../../auth';
 
 class FakeDeleter implements DockerImagesService {
   public calls: string[] = [];

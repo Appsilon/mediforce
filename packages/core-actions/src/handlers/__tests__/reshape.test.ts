@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { reshapeActionHandler } from '../reshape.js';
-import type { ActionContext } from '../../types.js';
+import { reshapeActionHandler } from '../reshape';
+import type { ActionContext } from '../../types';
 
 const baseCtx: ActionContext = {
   stepId: 'shape',

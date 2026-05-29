@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Mediforce, ApiError } from '../index.js';
+import { Mediforce, ApiError } from '../index';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
-import { omitServerFields } from '../../contract/__tests__/_helpers.js';
+import { omitServerFields } from '../../contract/__tests__/_helpers';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

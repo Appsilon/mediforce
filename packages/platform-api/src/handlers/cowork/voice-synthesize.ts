@@ -2,14 +2,14 @@ import type {
   ConversationTurn,
   CoworkSession,
 } from '@mediforce/platform-core';
-import { HandlerError, PreconditionFailedError } from '../../errors.js';
-import { loadOr404 } from '../_helpers.js';
-import type { CallerScope } from '../../repositories/index.js';
+import { HandlerError, PreconditionFailedError } from '../../errors';
+import { loadOr404 } from '../_helpers';
+import type { CallerScope } from '../../repositories/index';
 import type {
   SynthesizeVoiceArtifactInput,
   SynthesizeVoiceArtifactOutput,
-} from '../../contract/cowork.js';
-import { callOpenRouter } from '../../services/openrouter-client.js';
+} from '../../contract/cowork';
+import { callOpenRouter } from '../../services/openrouter-client';
 
 const DEFAULT_SYNTHESIS_MODEL = 'anthropic/claude-sonnet-4';
 const SYNTHESIS_TEMPERATURE = 0.3;

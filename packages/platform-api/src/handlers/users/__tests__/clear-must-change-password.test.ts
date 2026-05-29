@@ -3,12 +3,12 @@ import {
   InMemoryAuditRepository,
   InMemoryUserProfileRepository,
 } from '@mediforce/platform-core/testing';
-import { clearMustChangePassword } from '../clear-must-change-password.js';
-import { ForbiddenError, ValidationError } from '../../../errors.js';
+import { clearMustChangePassword } from '../clear-must-change-password';
+import { ForbiddenError, ValidationError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
+} from '../../../repositories/__tests__/create-test-scope';
 
 describe('clearMustChangePassword handler', () => {
   let userProfileRepo: InMemoryUserProfileRepository;

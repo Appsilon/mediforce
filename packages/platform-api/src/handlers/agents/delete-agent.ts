@@ -1,6 +1,6 @@
-import type { DeleteAgentInput, DeleteAgentOutput } from '../../contract/agents.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { actorFromCaller, loadOr404 } from '../_helpers.js';
+import type { DeleteAgentInput, DeleteAgentOutput } from '../../contract/agents';
+import type { CallerScope } from '../../repositories/index';
+import { actorFromCaller, loadOr404 } from '../_helpers';
 
 export async function deleteAgent(
   input: DeleteAgentInput,

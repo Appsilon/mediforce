@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { McpServerConfigSchema } from '../mcp-server-config.js';
-import { WorkflowAgentConfigSchema, WorkflowCoworkConfigSchema } from '../workflow-definition.js';
+import { McpServerConfigSchema } from '../mcp-server-config';
+import { WorkflowAgentConfigSchema, WorkflowCoworkConfigSchema } from '../workflow-definition';
 
 describe('McpServerConfigSchema', () => {
   it('should parse a valid stdio MCP server config', () => {

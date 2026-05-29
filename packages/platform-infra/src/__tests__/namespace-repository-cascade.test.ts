@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
-import { FirestoreNamespaceRepository } from '../firestore/namespace-repository.js';
+import { FirestoreNamespaceRepository } from '../firestore/namespace-repository';
 
 interface BatchSpy {
   ops: Array<{ op: 'set' | 'delete'; refId: string; data?: unknown; options?: unknown }>;

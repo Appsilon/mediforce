@@ -331,13 +331,13 @@ import {
   GetMonitoringSummaryOutputSchema,
   type MonitoringSummaryInput,
   type GetMonitoringSummaryOutput,
-} from '../contract/index.js';
+} from '../contract/index';
 // SDK consumers reach for one path:
 //   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
 // Server-side handlers throw `HandlerError` (or subclasses) imported from
 // `@mediforce/platform-api/errors`; the wire envelope is the only shared
 // surface, so the client just exposes `code`/`details` on `ApiError` directly.
-import { ApiErrorEnvelopeSchema, type ApiErrorCode } from '../errors.js';
+import { ApiErrorEnvelopeSchema, type ApiErrorCode } from '../errors';
 export type { ApiErrorCode };
 
 /**

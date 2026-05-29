@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   AgentOAuthTokenSchema,
   PublicAgentOAuthTokenSchema,
-} from '../agent-oauth-token.js';
+} from '../agent-oauth-token';
 
 const valid = {
   provider: 'github',

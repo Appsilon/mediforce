@@ -1,21 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
-import { resendInvite } from '../resend-invite.js';
+import { resendInvite } from '../resend-invite';
 import {
   ForbiddenError,
   HandlerError,
   PreconditionFailedError,
-} from '../../../errors.js';
+} from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
+} from '../../../repositories/__tests__/create-test-scope';
 import type {
   InviteNotificationService,
   InviteService,
   SendInviteEmailInput,
   SendWorkspaceNotificationEmailInput,
-} from '../../../services/invite-notification.js';
+} from '../../../services/invite-notification';
 
 interface InviteServiceStub {
   email: string | null;

@@ -1,5 +1,5 @@
-import { defineCommand } from '../define-command.js';
-import { printJson, printKv } from '../output.js';
+import { defineCommand } from '../define-command';
+import { printJson, printKv } from '../output';
 
 export const namespaceSetMemberRoleCommand = defineCommand({
   name: 'mediforce namespace set-member-role',

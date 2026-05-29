@@ -2,11 +2,11 @@ import { readFile, mkdtemp, writeFile, rm, realpath, mkdir, appendFile, stat } f
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
+import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, Presentation } from '@mediforce/platform-core';
-import { getDockerSpawnStrategy } from './docker-spawn-strategy.js';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, type ContainerPluginInit } from './container-plugin.js';
-import { isLocalExecutionAllowed } from './base-container-agent-plugin.js';
+import { getDockerSpawnStrategy } from './docker-spawn-strategy';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, type ContainerPluginInit } from './container-plugin';
+import { isLocalExecutionAllowed } from './base-container-agent-plugin';
 
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 

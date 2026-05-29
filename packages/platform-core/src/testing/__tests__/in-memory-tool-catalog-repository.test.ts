@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InMemoryToolCatalogRepository } from '../in-memory-tool-catalog-repository.js';
-import type { ToolCatalogEntry } from '../../schemas/agent-mcp-binding.js';
+import { InMemoryToolCatalogRepository } from '../in-memory-tool-catalog-repository';
+import type { ToolCatalogEntry } from '../../schemas/agent-mcp-binding';
 
 function makeEntry(overrides: Partial<ToolCatalogEntry> = {}): ToolCatalogEntry {
   return {

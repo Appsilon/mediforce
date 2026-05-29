@@ -7,9 +7,9 @@ import {
   HttpOAuthAuthSchema,
   StepMcpRestrictionSchema,
   ToolCatalogEntrySchema,
-} from '../agent-mcp-binding.js';
-import { AgentDefinitionSchema } from '../agent-definition.js';
-import { WorkflowDefinitionSchema } from '../workflow-definition.js';
+} from '../agent-mcp-binding';
+import { AgentDefinitionSchema } from '../agent-definition';
+import { WorkflowDefinitionSchema } from '../workflow-definition';
 
 describe('AgentMcpBindingSchema', () => {
   describe('stdio variant', () => {

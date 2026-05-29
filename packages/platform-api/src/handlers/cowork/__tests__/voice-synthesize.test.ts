@@ -10,12 +10,12 @@ import type {
   NamespaceSecretsRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
-import { synthesizeVoiceArtifact } from '../voice-synthesize.js';
-import { HandlerError, NotFoundError } from '../../../errors.js';
+import { synthesizeVoiceArtifact } from '../voice-synthesize';
+import { HandlerError, NotFoundError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
+} from '../../../repositories/__tests__/create-test-scope';
 
 function fixedNamespaceSecrets(values: Record<string, string>): NamespaceSecretsRepository {
   return {

@@ -7,9 +7,9 @@ import {
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { getRun } from '../get-run.js';
-import { NotFoundError } from '../../../errors.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { getRun } from '../get-run';
+import { NotFoundError } from '../../../errors';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('getRun handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;

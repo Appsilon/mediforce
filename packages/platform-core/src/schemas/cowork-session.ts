@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { McpServerConfigSchema } from './mcp-server-config.js';
+import { McpServerConfigSchema } from './mcp-server-config';
 
 // ---------------------------------------------------------------------------
 // ConversationTurn — a single message in a cowork conversation

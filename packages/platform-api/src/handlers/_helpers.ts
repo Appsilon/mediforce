@@ -1,5 +1,5 @@
-import { NotFoundError } from '../errors.js';
-import type { CallerScope } from '../repositories/index.js';
+import { NotFoundError } from '../errors';
+import type { CallerScope } from '../repositories/index';
 
 export async function loadOr404<T>(
   lookup: Promise<T | null>,

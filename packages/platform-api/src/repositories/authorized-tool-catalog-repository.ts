@@ -2,8 +2,8 @@ import type {
   ToolCatalogEntry,
   ToolCatalogRepository,
 } from '@mediforce/platform-core';
-import type { CallerIdentity } from '../auth.js';
-import { AuthorizedScope } from './authorized-repository.js';
+import type { CallerIdentity } from '../auth';
+import { AuthorizedScope } from './authorized-repository';
 
 /**
  * Workspace-scoped view of `ToolCatalogRepository`. The underlying store is

@@ -18,4 +18,4 @@
 // been migrated yet.
 
 export { getPlatformServices, type PlatformServices } from '@mediforce/platform-api/services';
-export { getAppBaseUrl } from './app-base-url.js';
+export { getAppBaseUrl } from './app-base-url';

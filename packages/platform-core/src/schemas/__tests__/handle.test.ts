@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { HandleSchema, HANDLE_MAX_LENGTH } from '../handle.js';
+import { HandleSchema, HANDLE_MAX_LENGTH } from '../handle';
 
 describe('HandleSchema', () => {
   it.each([

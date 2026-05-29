@@ -6,16 +6,16 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { createVoiceEphemeralKey } from '../voice-ephemeral-key.js';
+import { createVoiceEphemeralKey } from '../voice-ephemeral-key';
 import {
   HandlerError,
   NotFoundError,
   PreconditionFailedError,
-} from '../../../errors.js';
+} from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
+} from '../../../repositories/__tests__/create-test-scope';
 
 describe('createVoiceEphemeralKey handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;

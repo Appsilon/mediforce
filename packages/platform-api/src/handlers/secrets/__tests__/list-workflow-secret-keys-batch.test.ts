@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { listWorkflowSecretKeysBatch } from '../list-workflow-secret-keys-batch.js';
+import { listWorkflowSecretKeysBatch } from '../list-workflow-secret-keys-batch';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { buildWorkflowSecretsRepo } from './fakes.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { buildWorkflowSecretsRepo } from './fakes';
 
 describe('listWorkflowSecretKeysBatch handler', () => {
   it('returns per-workflow key arrays in one call', async () => {

@@ -20,9 +20,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { WorkspaceManager } from '../workspace-manager.js';
-import { createTestRepo, addCommitToTestRepo } from '../../plugins/__tests__/helpers/create-test-repo.js';
-import { normalizeRepoUrls } from '../../plugins/container-plugin.js';
+import { WorkspaceManager } from '../workspace-manager';
+import { createTestRepo, addCommitToTestRepo } from '../../plugins/__tests__/helpers/create-test-repo';
+import { normalizeRepoUrls } from '../../plugins/container-plugin';
 import type { WorkflowWorkspace } from '@mediforce/platform-core';
 
 function git(args: string[], cwd: string): string {

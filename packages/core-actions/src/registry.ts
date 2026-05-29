@@ -4,7 +4,7 @@ import type {
   ActionHandler,
   ActionOutput,
   AnyActionHandler,
-} from './types.js';
+} from './types';
 
 /**
  * Hints shown when a workflow references an action `kind` whose handler

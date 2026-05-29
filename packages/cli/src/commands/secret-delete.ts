@@ -1,5 +1,5 @@
-import { defineCommand } from '../define-command.js';
-import { printJson } from '../output.js';
+import { defineCommand } from '../define-command';
+import { printJson } from '../output';
 
 export const secretDeleteCommand = defineCommand({
   name: 'mediforce secret delete',

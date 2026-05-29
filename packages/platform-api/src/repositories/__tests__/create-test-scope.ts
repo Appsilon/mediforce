@@ -28,12 +28,12 @@ import type {
   UserProfileRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
-import type { CallerIdentity } from '../../auth.js';
-import type { CallerScope } from '../caller-scope.js';
-import { createCallerScope, type CallerScopeServices } from '../create-caller-scope.js';
-import { noopRunKicker, type RunKicker } from '../../runtime/run-kicker.js';
-import type { DockerImagesService } from '../../services/docker-images-service.js';
-import type { InviteNotificationService, InviteService } from '../../services/invite-notification.js';
+import type { CallerIdentity } from '../../auth';
+import type { CallerScope } from '../caller-scope';
+import { createCallerScope, type CallerScopeServices } from '../create-caller-scope';
+import { noopRunKicker, type RunKicker } from '../../runtime/run-kicker';
+import type { DockerImagesService } from '../../services/docker-images-service';
+import type { InviteNotificationService, InviteService } from '../../services/invite-notification';
 
 const stubNamespaceRepo: NamespaceRepository = {
   async getNamespace() {

@@ -9,7 +9,7 @@ import { execSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { prepareDeployKeyPath, toHttpsWithToken } from './container-plugin.js';
+import { prepareDeployKeyPath, toHttpsWithToken } from './container-plugin';
 
 export interface BuildImageOptions {
   image: string;

@@ -7,10 +7,10 @@ import {
   TransitionSchema,
   TriggerSchema,
   RepoSchema,
-} from './process-definition.js';
-import { ProcessNotificationConfigSchema } from './process-config.js';
-import { McpServerConfigSchema } from './mcp-server-config.js';
-import { StepMcpRestrictionSchema } from './agent-mcp-binding.js';
+} from './process-definition';
+import { ProcessNotificationConfigSchema } from './process-config';
+import { McpServerConfigSchema } from './mcp-server-config';
+import { StepMcpRestrictionSchema } from './agent-mcp-binding';
 
 /** HTTP method enum used by webhook triggers and the http action handler. */
 export const HttpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']);

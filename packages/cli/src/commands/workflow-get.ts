@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises';
-import { defineCommand } from '../define-command.js';
-import { printError } from '../output.js';
+import { defineCommand } from '../define-command';
+import { printError } from '../output';
 
 export const workflowGetCommand = defineCommand({
   name: 'mediforce workflow get',

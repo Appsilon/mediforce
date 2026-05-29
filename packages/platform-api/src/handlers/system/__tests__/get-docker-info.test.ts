@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach } from 'vitest';
-import { getDockerInfo } from '../get-docker-info.js';
-import { createTestScope } from '../../../repositories/__tests__/create-test-scope.js';
+import { getDockerInfo } from '../get-docker-info';
+import { createTestScope } from '../../../repositories/__tests__/create-test-scope';
 
 /**
  * `getDockerInfo` is a five-line dispatcher around `_docker.ts`. The

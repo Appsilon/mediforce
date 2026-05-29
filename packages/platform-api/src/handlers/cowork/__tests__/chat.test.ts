@@ -7,12 +7,12 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import type { NamespaceSecretsRepository } from '@mediforce/platform-core';
-import { chatCoworkSession } from '../chat.js';
-import { HandlerError, NotFoundError, PreconditionFailedError } from '../../../errors.js';
+import { chatCoworkSession } from '../chat';
+import { HandlerError, NotFoundError, PreconditionFailedError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
+} from '../../../repositories/__tests__/create-test-scope';
 
 function fixedNamespaceSecrets(values: Record<string, string>): NamespaceSecretsRepository {
   return {

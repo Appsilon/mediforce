@@ -1,13 +1,13 @@
 import { ToolCatalogEntrySchema } from '@mediforce/platform-core';
-import { assertCallerIsNamespaceAdmin } from '../../auth.js';
-import { HandlerError } from '../../errors.js';
-import type { CallerScope } from '../../repositories/index.js';
+import { assertCallerIsNamespaceAdmin } from '../../auth';
+import { HandlerError } from '../../errors';
+import type { CallerScope } from '../../repositories/index';
 import type {
   CreateToolCatalogEntryInputApi,
   CreateToolCatalogEntryOutput,
-} from '../../contract/tool-catalog.js';
-import { actorFromCaller } from '../_helpers.js';
-import { slugifyCommand } from './_helpers.js';
+} from '../../contract/tool-catalog';
+import { actorFromCaller } from '../_helpers';
+import { slugifyCommand } from './_helpers';
 
 export async function createToolCatalogEntry(
   input: CreateToolCatalogEntryInputApi,

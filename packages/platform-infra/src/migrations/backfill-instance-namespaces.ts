@@ -1,5 +1,5 @@
 import type { Firestore } from 'firebase-admin/firestore';
-import { FirestoreProcessRepository } from '../firestore/process-repository.js';
+import { FirestoreProcessRepository } from '../firestore/process-repository';
 import { WorkflowDefinitionSchema } from '@mediforce/platform-core';
 
 /**

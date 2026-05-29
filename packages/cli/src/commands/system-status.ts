@@ -1,6 +1,6 @@
 import type { DockerInfoResponse } from '@mediforce/platform-api/contract';
-import { defineCommand } from '../define-command.js';
-import { printJson, type OutputSink } from '../output.js';
+import { defineCommand } from '../define-command';
+import { printJson, type OutputSink } from '../output';
 
 function padRight(str: string, len: number): string {
   return str.length >= len ? str : str + ' '.repeat(len - str.length);

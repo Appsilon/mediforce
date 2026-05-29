@@ -4,7 +4,4 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
   },
-  resolve: {
-    conditions: ['@mediforce/source'],
-  },
 });

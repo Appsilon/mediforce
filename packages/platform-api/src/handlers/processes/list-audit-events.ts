@@ -1,9 +1,9 @@
-import type { CallerScope } from '../../repositories/index.js';
-import { NotFoundError } from '../../errors.js';
+import type { CallerScope } from '../../repositories/index';
+import { NotFoundError } from '../../errors';
 import type {
   ListAuditEventsInput,
   ListAuditEventsOutput,
-} from '../../contract/processes.js';
+} from '../../contract/processes';
 
 /**
  * Every audit event for a process instance, wrapped as `{ events }`. The

@@ -7,7 +7,7 @@ import {
   InMemoryCoworkSessionRepository,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import { WorkflowEngine } from '../index.js';
+import { WorkflowEngine } from '../index';
 
 /**
  * Integration test: full cowork lifecycle

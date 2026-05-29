@@ -1,4 +1,4 @@
-import type { AuthService, AuthUser } from '../interfaces/auth-service.js';
+import type { AuthService, AuthUser } from '../interfaces/auth-service';
 
 export class RbacError extends Error {
   override name = 'RbacError';

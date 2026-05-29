@@ -99,9 +99,9 @@ export {
   AssignmentItemSchema,
   TableEditorRowSchema,
   CompleteHumanTaskPayloadSchema,
-} from './schemas/index.js';
+} from './schemas/index';
 
-export type { Handle } from './schemas/handle.js';
+export type { Handle } from './schemas/handle';
 
 // Types (re-exported from schemas for convenience)
 export type {
@@ -136,7 +136,7 @@ export type {
   AgentEvent,
   AgentRunStatus,
   AgentRun,
-} from './types/index.js';
+} from './types/index';
 
 export type {
   HumanTaskStatus,
@@ -193,7 +193,7 @@ export type {
   AssignmentItem,
   TableEditorRow,
   CompleteHumanTaskPayload,
-} from './schemas/index.js';
+} from './schemas/index';
 
 // Interfaces (repository and service contracts)
 export type {
@@ -227,14 +227,14 @@ export type {
   SendEmailParams,
   SendEmailResult,
   SendEmailFn,
-} from './interfaces/index.js';
+} from './interfaces/index';
 
-export { encodeCursor, decodeCursor } from './cursors/cursor.js';
+export { encodeCursor, decodeCursor } from './cursors/cursor';
 export {
   encodeAgentRunCursor,
   decodeAgentRunCursor,
-} from './cursors/agent-run-cursor.js';
-export type { AgentRunCursorPayload } from './cursors/agent-run-cursor.js';
+} from './cursors/agent-run-cursor';
+export type { AgentRunCursorPayload } from './cursors/agent-run-cursor';
 
 // Agent definition schema + repository interface
 export {
@@ -242,14 +242,14 @@ export {
   AgentVisibilitySchema,
   CreateAgentDefinitionInputSchema,
   UpdateAgentDefinitionInputSchema,
-} from './schemas/agent-definition.js';
+} from './schemas/agent-definition';
 export type {
   AgentDefinition,
   AgentVisibility,
   CreateAgentDefinitionInput,
   UpdateAgentDefinitionInput,
-} from './schemas/agent-definition.js';
-export type { AgentDefinitionRepository } from './repositories/agent-definition-repository.js';
+} from './schemas/agent-definition';
+export type { AgentDefinitionRepository } from './repositories/agent-definition-repository';
 
 // Model registry schema + repository interface
 export {
@@ -258,15 +258,15 @@ export {
   CreateModelRegistryEntryInputSchema,
   UpdateModelRegistryEntryInputSchema,
   UpdateRankingsInputSchema,
-} from './schemas/model-registry.js';
+} from './schemas/model-registry';
 export type {
   ModelRegistryEntry,
   ModelRegistryMeta,
   CreateModelRegistryEntryInput,
   UpdateModelRegistryEntryInput,
   UpdateRankingsInput,
-} from './schemas/model-registry.js';
-export type { ModelRegistryRepository } from './repositories/model-registry-repository.js';
+} from './schemas/model-registry';
+export type { ModelRegistryRepository } from './repositories/model-registry-repository';
 
 // OAuth — Step 5
 export {
@@ -275,30 +275,30 @@ export {
   CreateOAuthProviderInputSchema,
   UpdateOAuthProviderInputSchema,
   OAUTH_PROVIDER_PRESETS,
-} from './schemas/oauth-provider.js';
+} from './schemas/oauth-provider';
 export type {
   OAuthProviderConfig,
   PublicOAuthProviderConfig,
   CreateOAuthProviderInput,
   UpdateOAuthProviderInput,
-} from './schemas/oauth-provider.js';
+} from './schemas/oauth-provider';
 export {
   AgentOAuthTokenSchema,
   PublicAgentOAuthTokenSchema,
-} from './schemas/agent-oauth-token.js';
+} from './schemas/agent-oauth-token';
 export type {
   AgentOAuthToken,
   PublicAgentOAuthToken,
-} from './schemas/agent-oauth-token.js';
+} from './schemas/agent-oauth-token';
 export {
   ProviderAlreadyExistsError,
   type OAuthProviderRepository,
-} from './repositories/oauth-provider-repository.js';
-export type { AgentOAuthTokenRepository } from './repositories/agent-oauth-token-repository.js';
+} from './repositories/oauth-provider-repository';
+export type { AgentOAuthTokenRepository } from './repositories/agent-oauth-token-repository';
 
 // Parser (YAML process definition parsing)
-export { parseProcessDefinition, type ParseResult } from './parser/index.js';
-export { formatZodErrors } from './parser/index.js';
+export { parseProcessDefinition, type ParseResult } from './parser/index';
+export { formatZodErrors } from './parser/index';
 
 // Testing utilities (in-memory implementations for test doubles)
 export {
@@ -326,13 +326,13 @@ export {
   buildFileMetadata,
   buildCoworkSession,
   resetFactorySequence,
-} from './testing/index.js';
+} from './testing/index';
 
 // Validation
-export { validateProcessConfig } from './validation/config-validator.js';
-export type { ConfigValidationResult } from './validation/config-validator.js';
-export { validatePayload } from './validation/payload-validator.js';
-export type { PayloadValidationError, PayloadValidationResult } from './validation/payload-validator.js';
+export { validateProcessConfig } from './validation/config-validator';
+export type { ConfigValidationResult } from './validation/config-validator';
+export { validatePayload } from './validation/payload-validator';
+export type { PayloadValidationError, PayloadValidationResult } from './validation/payload-validator';
 
 // MCP resolver (pure; wires AgentDefinition + step restrictions + catalog)
 export {
@@ -344,20 +344,20 @@ export {
   type ResolvedMcpServer,
   type ResolvedStdioMcpServer,
   type ResolvedHttpMcpServer,
-} from './mcp/resolve-effective-mcp.js';
+} from './mcp/resolve-effective-mcp';
 
 // Collaboration (handoff registry, RBAC)
-export { handoffTypeRegistry, RbacService, RbacError } from './collaboration/index.js';
-export type { HandoffTypeRegistration } from './collaboration/index.js';
+export { handoffTypeRegistry, RbacService, RbacError } from './collaboration/index';
+export type { HandoffTypeRegistration } from './collaboration/index';
 
 // Interpolation (shared across workflow-engine + core-actions)
 export {
   getPath,
   interpolate,
   type InterpolationSources,
-} from './interpolation.js';
+} from './interpolation';
 
 // Utils (zero-dep helpers shared across runtime + worker)
-export { createLineStreamReader } from './utils/line-stream.js';
-export type { LineStreamReader } from './utils/line-stream.js';
-export { calculateEstimatedCost } from './utils/cost.js';
+export { createLineStreamReader } from './utils/line-stream';
+export type { LineStreamReader } from './utils/line-stream';
+export { calculateEstimatedCost } from './utils/cost';

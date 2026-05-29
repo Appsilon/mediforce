@@ -2,9 +2,9 @@ import type {
   HandoffEntity,
   HandoffRepository,
 } from '@mediforce/platform-core';
-import type { CallerIdentity } from '../auth.js';
-import { ForbiddenError } from '../errors.js';
-import { AuthorizedScope } from './authorized-repository.js';
+import type { CallerIdentity } from '../auth';
+import { ForbiddenError } from '../errors';
+import { AuthorizedScope } from './authorized-repository';
 
 /**
  * Workspace-scoped handoff entity reads + mutations. Handoffs have no

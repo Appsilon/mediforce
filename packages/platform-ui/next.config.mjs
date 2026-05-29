@@ -2,7 +2,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const packagesDir = path.resolve(__dirname, '..');
 
 const isVercel = process.env.VERCEL === '1';
 
@@ -53,38 +52,26 @@ const nextConfig = {
     '@hookform/resolvers',
   ],
   serverExternalPackages: ['bullmq', 'ioredis'],
-  webpack: (config) => {
-    config.resolve.extensionAlias = {
-      '.js': ['.ts', '.tsx', '.js'],
-      '.jsx': ['.tsx', '.jsx'],
-    };
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@mediforce/platform-core': path.join(packagesDir, 'platform-core/src/index.ts'),
-      '@mediforce/platform-infra': path.join(packagesDir, 'platform-infra/src/index.ts'),
-      '@mediforce/platform-api/contract': path.join(packagesDir, 'platform-api/src/contract/index.ts'),
-      '@mediforce/platform-api/handlers': path.join(packagesDir, 'platform-api/src/handlers/index.ts'),
-      '@mediforce/platform-api/services': path.join(packagesDir, 'platform-api/src/services/index.ts'),
-      '@mediforce/platform-api/client': path.join(packagesDir, 'platform-api/src/client/index.ts'),
-      '@mediforce/platform-api/errors': path.join(packagesDir, 'platform-api/src/errors.ts'),
-      '@mediforce/platform-api/auth': path.join(packagesDir, 'platform-api/src/auth.ts'),
-      '@mediforce/platform-api/repositories': path.join(packagesDir, 'platform-api/src/repositories/index.ts'),
-      '@mediforce/platform-api/runtime': path.join(packagesDir, 'platform-api/src/runtime/index.ts'),
-      '@mediforce/platform-api': path.join(packagesDir, 'platform-api/src/index.ts'),
-      '@mediforce/workflow-engine': path.join(packagesDir, 'workflow-engine/src/index.ts'),
-      '@mediforce/agent-runtime': path.join(packagesDir, 'agent-runtime/src/index.ts'),
-      '@mediforce/container-worker': path.join(packagesDir, 'container-worker/src/index.ts'),
-      '@mediforce/mcp-client': path.join(packagesDir, 'mcp-client/src/index.ts'),
-      '@mediforce/core-actions': path.join(packagesDir, 'core-actions/src/index.ts'),
-      // Pin zod to platform-ui's own copy so `@hookform/resolvers/zod` (which
-      // imports `zod/v4/core` without declaring zod as a peer dep) resolves
-      // on Vercel. Without this, webpack walks up from the resolver's .pnpm
-      // dir and fails — pnpm's `.pnpm/node_modules` hoist isn't reliably on
-      // Vercel's resolve path. Subpaths like `zod/v4/core` map through this
-      // alias automatically.
-      zod: path.join(__dirname, 'node_modules/zod'),
-    };
-    return config;
+  turbopack: {
+    resolveAlias: {
+      // Pin zod to platform-ui's own copy so `@hookform/resolvers/zod`
+      // (which imports `zod/v4/core` without declaring zod as a peer dep)
+      // resolves on Vercel. Without this, the bundler walks up from the
+      // resolver's .pnpm dir and fails — pnpm's `.pnpm/node_modules` hoist
+      // isn't reliably on Vercel's resolve path. Subpaths like `zod/v4/core`
+      // map through this alias automatically.
+      //
+      // Note: relative path (not absolute). Turbopack's resolveAlias does
+      // not accept absolute filesystem paths — only relative paths from the
+      // project root or module names.
+      zod: './node_modules/zod',
+    },
+  },
+  experimental: {
+    // Eagerly compile every route at dev-server boot so per-route cold compile
+    // cost is paid once at startup, not on each first-hit. Default `true` in
+    // Next 16.2; set explicitly to guard against future default flips.
+    preloadEntriesOnStart: true,
   },
   typescript: {
     ignoreBuildErrors: false,

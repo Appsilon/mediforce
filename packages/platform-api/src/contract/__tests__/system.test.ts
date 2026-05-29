@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   OpenRouterCreditsInputSchema,
   OpenRouterCreditsOutputSchema,
-} from '../system.js';
+} from '../system';
 
 describe('OpenRouterCreditsInputSchema', () => {
   it('accepts valid namespace', () => {

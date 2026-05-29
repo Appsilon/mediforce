@@ -1,6 +1,6 @@
-import { NotFoundError } from '../../errors.js';
-import type { CallerScope } from '../../repositories/index.js';
-import type { GetNamespaceInput, GetNamespaceOutput } from '../../contract/namespaces.js';
+import { NotFoundError } from '../../errors';
+import type { CallerScope } from '../../repositories/index';
+import type { GetNamespaceInput, GetNamespaceOutput } from '../../contract/namespaces';
 
 /**
  * Return a workspace's metadata + member list. Anti-enum on access:

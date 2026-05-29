@@ -6,8 +6,8 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { getMonitoringSummary } from '../get-monitoring-summary.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { getMonitoringSummary } from '../get-monitoring-summary';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('getMonitoringSummary handler', () => {
   let humanTaskRepo: InMemoryHumanTaskRepository;

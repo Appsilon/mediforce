@@ -27,4 +27,4 @@ COPY packages/container-worker/ packages/container-worker/
 COPY packages/platform-core/ packages/platform-core/
 COPY tsconfig.json ./
 
-CMD ["pnpm", "tsx", "--conditions", "@mediforce/source", "packages/container-worker/src/worker-entry.ts"]
+CMD ["pnpm", "tsx", "packages/container-worker/src/worker-entry.ts"]

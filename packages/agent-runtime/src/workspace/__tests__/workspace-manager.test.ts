@@ -7,8 +7,8 @@ import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { WorkspaceManager, formatFileDelta, formatStepCommitMessage } from '../workspace-manager.js';
-import { createTestRepo, type TestRepo } from '../../plugins/__tests__/helpers/create-test-repo.js';
+import { WorkspaceManager, formatFileDelta, formatStepCommitMessage } from '../workspace-manager';
+import { createTestRepo, type TestRepo } from '../../plugins/__tests__/helpers/create-test-repo';
 import type { WorkflowWorkspace } from '@mediforce/platform-core';
 
 function listBareBranches(bareRepoPath: string): string[] {

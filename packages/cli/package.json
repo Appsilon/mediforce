@@ -7,13 +7,7 @@
     "mediforce": "./bin/mediforce.cjs"
   },
   "exports": {
-    ".": {
-      "import": {
-        "@mediforce/source": "./src/index.ts",
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      }
-    }
+    ".": "./src/index.ts"
   },
   "scripts": {
     "test": "vitest run",

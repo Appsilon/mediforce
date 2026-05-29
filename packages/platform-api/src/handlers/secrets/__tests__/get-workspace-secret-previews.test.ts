@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { getWorkspaceSecretPreviews } from '../get-workspace-secret-previews.js';
+import { getWorkspaceSecretPreviews } from '../get-workspace-secret-previews';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { buildNamespaceSecretsRepo } from './fakes.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { buildNamespaceSecretsRepo } from './fakes';
 
 describe('getWorkspaceSecretPreviews handler', () => {
   it('returns masked previews (4+4 for long values, bullets for short)', async () => {

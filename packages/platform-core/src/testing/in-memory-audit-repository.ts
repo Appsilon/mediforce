@@ -1,5 +1,5 @@
-import type { AuditRepository, AuditEvent } from '../index.js';
-import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository.js';
+import type { AuditRepository, AuditEvent } from '../index';
+import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository';
 
 /**
  * In-memory implementation of AuditRepository for testing.

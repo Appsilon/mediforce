@@ -1,9 +1,9 @@
-import type { CallerIdentity } from '../auth.js';
+import type { CallerIdentity } from '../auth';
 import type {
   NamespaceSecretsRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
-import { AuthorizedScope } from './authorized-repository.js';
+import { AuthorizedScope } from './authorized-repository';
 
 /**
  * Workspace-scoped workspace secret access. Plaintext values flow through the

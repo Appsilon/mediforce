@@ -4,7 +4,7 @@ import {
   resolveBaseUrl,
   resolveConfig,
   DEFAULT_BASE_URL,
-} from '../config.js';
+} from '../config';
 
 describe('resolveApiKey', () => {
   it('prefers MEDIFORCE_API_KEY over PLATFORM_API_KEY', () => {

@@ -5,8 +5,8 @@ import {
   InMemoryAuditRepository,
 } from '@mediforce/platform-core';
 import type { StepExecution, WorkflowDefinition } from '@mediforce/platform-core';
-import { WorkflowEngine, InvalidTransitionError } from '../index.js';
-import type { StepActor } from '../index.js';
+import { WorkflowEngine, InvalidTransitionError } from '../index';
+import type { StepActor } from '../index';
 
 const def: WorkflowDefinition = {
   name: 'retry-process',

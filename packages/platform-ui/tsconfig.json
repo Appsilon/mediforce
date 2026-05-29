@@ -22,9 +22,6 @@
         "name": "next"
       }
     ],
-    "customConditions": [
-      "@mediforce/source"
-    ],
     "paths": {
       "@/*": [
         "./src/*"

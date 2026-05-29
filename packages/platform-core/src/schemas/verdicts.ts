@@ -1,4 +1,4 @@
-import type { Verdict } from './process-definition.js';
+import type { Verdict } from './process-definition';
 
 /** Default UI label for a verdict key. Server-side fallback so UI stays dumb. */
 export function defaultVerdictLabel(key: string): string {

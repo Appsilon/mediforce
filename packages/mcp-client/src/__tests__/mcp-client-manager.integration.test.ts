@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { execSync } from 'node:child_process';
-import { McpClientManager } from '../mcp-client-manager.js';
+import { McpClientManager } from '../mcp-client-manager';
 
 /**
  * Integration test: real tealflow-mcp via stdio.

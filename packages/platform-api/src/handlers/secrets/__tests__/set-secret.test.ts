@@ -3,13 +3,13 @@ import type {
   NamespaceSecretsRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
-import { setSecret } from '../set-secret.js';
-import { ForbiddenError } from '../../../errors.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
+import { setSecret } from '../set-secret';
+import { ForbiddenError } from '../../../errors';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import {
   buildNamespaceSecretsRepo,
   buildWorkflowSecretsRepo,
-} from './fakes.js';
+} from './fakes';
 
 describe('setSecret handler', () => {
   let workspaceSecretsRepo: NamespaceSecretsRepository;

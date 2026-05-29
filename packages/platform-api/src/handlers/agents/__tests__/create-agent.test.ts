@@ -5,11 +5,11 @@ import {
   InMemoryProcessInstanceRepository,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { createAgent } from '../create-agent.js';
+import { createAgent } from '../create-agent';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
+} from '../../../repositories/__tests__/create-test-scope';
 
 describe('createAgent handler', () => {
   let agentDefinitionRepo: InMemoryAgentDefinitionRepository;

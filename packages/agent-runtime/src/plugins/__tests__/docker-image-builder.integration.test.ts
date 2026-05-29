@@ -10,8 +10,8 @@ import {
   getImageBuildCommit,
   buildImageFromRepo,
   ensureImage,
-} from '../docker-image-builder.js';
-import { createTestRepo, addCommitToTestRepo, type TestRepo } from './helpers/create-test-repo.js';
+} from '../docker-image-builder';
+import { createTestRepo, addCommitToTestRepo, type TestRepo } from './helpers/create-test-repo';
 
 function dockerAvailable(): boolean {
   try {

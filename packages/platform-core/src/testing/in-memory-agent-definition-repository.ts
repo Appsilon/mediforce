@@ -3,8 +3,8 @@ import type {
   AgentDefinitionRepository,
   CreateAgentDefinitionInput,
   UpdateAgentDefinitionInput,
-} from '../index.js';
-import { AgentDefinitionSchema } from '../schemas/agent-definition.js';
+} from '../index';
+import { AgentDefinitionSchema } from '../schemas/agent-definition';
 
 /**
  * In-memory `AgentDefinitionRepository` for tests. Implements the full

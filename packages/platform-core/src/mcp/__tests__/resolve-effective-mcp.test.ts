@@ -7,17 +7,17 @@ import {
   type ResolvedMcpServer,
   type ResolvedStdioMcpServer,
   type ResolvedHttpMcpServer,
-} from '../resolve-effective-mcp.js';
+} from '../resolve-effective-mcp';
 import type {
   AgentMcpBindingMap,
   StepMcpRestriction,
   ToolCatalogEntry,
-} from '../../schemas/agent-mcp-binding.js';
-import type { AgentDefinition } from '../../schemas/agent-definition.js';
+} from '../../schemas/agent-mcp-binding';
+import type { AgentDefinition } from '../../schemas/agent-definition';
 import {
   WorkflowStepSchema,
   type WorkflowStep,
-} from '../../schemas/workflow-definition.js';
+} from '../../schemas/workflow-definition';
 
 function makeAgent(mcpServers?: AgentMcpBindingMap): AgentDefinition {
   return {

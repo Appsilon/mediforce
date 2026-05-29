@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { systemCreditsCommand } from '../commands/system-credits.js';
-import { captureOutput, jsonResponse } from './test-helpers.js';
+import { systemCreditsCommand } from '../commands/system-credits';
+import { captureOutput, jsonResponse } from './test-helpers';
 
 const CREDITS_RESPONSE = {
   available: true,

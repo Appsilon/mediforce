@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateEstimatedCost } from '../cost.js';
+import { calculateEstimatedCost } from '../cost';
 
 describe('calculateEstimatedCost', () => {
   it('multiplies tokens by per-token pricing', () => {

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AgentOutputEnvelopeSchema } from './agent-output-envelope.js';
+import { AgentOutputEnvelopeSchema } from './agent-output-envelope';
 
 export const AgentRunStatusSchema = z.enum([
   'running',

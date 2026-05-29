@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { agentRunListCommand } from '../commands/agent-run-list.js';
-import { agentRunGetCommand } from '../commands/agent-run-get.js';
-import { captureOutput, jsonResponse } from './test-helpers.js';
+import { agentRunListCommand } from '../commands/agent-run-list';
+import { agentRunGetCommand } from '../commands/agent-run-get';
+import { captureOutput, jsonResponse } from './test-helpers';
 
 const SAMPLE_RUN = {
   id: 'ar-1',

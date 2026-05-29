@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateActionSecrets } from '../validate-action-secrets.js';
+import { validateActionSecrets } from '../validate-action-secrets';
 
 const step = (id: string, config: unknown) => ({
   id,

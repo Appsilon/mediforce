@@ -1,7 +1,7 @@
 import { pathToFileURL } from 'node:url';
 import type { Firestore } from 'firebase-admin/firestore';
 import { WorkflowDefinitionSchema } from '@mediforce/platform-core';
-import { getAdminFirestore } from '../src/auth/firebase-admin-init.js';
+import { getAdminFirestore } from '../src/auth/firebase-admin-init';
 
 interface MigrationOptions {
   dryRun: boolean;

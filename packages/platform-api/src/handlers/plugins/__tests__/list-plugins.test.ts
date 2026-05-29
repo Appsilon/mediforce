@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
-import { listPlugins } from '../list-plugins.js';
-import { createTestScope } from '../../../repositories/__tests__/create-test-scope.js';
+import { listPlugins } from '../list-plugins';
+import { createTestScope } from '../../../repositories/__tests__/create-test-scope';
 
 /**
  * Handler is pure: it forwards whatever the registry's `list()` returns,

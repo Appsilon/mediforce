@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ACTIONABLE_STATUSES,
   ListTasksInputSchema,
-} from '../../../contract/tasks.js';
+} from '../../../contract/tasks';
 
 /**
  * Contract-only tests: exercise the non-trivial bits of the Zod schema —

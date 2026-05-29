@@ -7,8 +7,8 @@ import {
   InMemoryCoworkSessionRepository,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import { WorkflowEngine } from '../../engine/workflow-engine.js';
-import { WebhookRouter } from '../webhook-router.js';
+import { WorkflowEngine } from '../../engine/workflow-engine';
+import { WebhookRouter } from '../webhook-router';
 
 const definition: WorkflowDefinition = {
   name: 'execution-summaries-api',

@@ -6,8 +6,8 @@ import {
   validatePayloadKindMatchesTask,
   validateVerdictPayload,
   validateUploadPayload,
-} from '../complete-human-task.js';
-import { CompleteHumanTaskValidationError } from '../errors.js';
+} from '../complete-human-task';
+import { CompleteHumanTaskValidationError } from '../errors';
 
 function baseTask(overrides: Partial<HumanTask> = {}): HumanTask {
   return {

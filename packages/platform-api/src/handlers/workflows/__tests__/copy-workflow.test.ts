@@ -6,12 +6,12 @@ import {
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { copyWorkflow } from '../copy-workflow.js';
+import { copyWorkflow } from '../copy-workflow';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { ConflictError, NotFoundError } from '../../../errors.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { ConflictError, NotFoundError } from '../../../errors';
 
 describe('copyWorkflow handler', () => {
   let processRepo: InMemoryProcessRepository;

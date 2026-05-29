@@ -1,11 +1,11 @@
-import { assertCallerIsNamespaceAdmin } from '../../auth.js';
-import { NotFoundError } from '../../errors.js';
-import type { CallerScope } from '../../repositories/index.js';
+import { assertCallerIsNamespaceAdmin } from '../../auth';
+import { NotFoundError } from '../../errors';
+import type { CallerScope } from '../../repositories/index';
 import type {
   GetOAuthProviderInput,
   GetOAuthProviderOutput,
-} from '../../contract/oauth-providers.js';
-import { toPublicProvider } from './_helpers.js';
+} from '../../contract/oauth-providers';
+import { toPublicProvider } from './_helpers';
 
 export async function getOAuthProvider(
   input: GetOAuthProviderInput,

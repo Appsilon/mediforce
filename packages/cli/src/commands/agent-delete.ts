@@ -1,5 +1,5 @@
-import { defineCommand } from '../define-command.js';
-import { printJson, printError } from '../output.js';
+import { defineCommand } from '../define-command';
+import { printJson, printError } from '../output';
 
 export const agentDeleteCommand = defineCommand({
   name: 'mediforce agent delete',

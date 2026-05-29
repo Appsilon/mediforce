@@ -1,14 +1,14 @@
-import type { AgentRun } from '../schemas/agent-run.js';
+import type { AgentRun } from '../schemas/agent-run';
 import type {
   AgentRunRepository,
   ListAgentRunsOptions,
   ListAgentRunsPage,
-} from '../interfaces/agent-run-repository.js';
-import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository.js';
+} from '../interfaces/agent-run-repository';
+import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository';
 import {
   encodeAgentRunCursor,
   decodeAgentRunCursor,
-} from '../cursors/agent-run-cursor.js';
+} from '../cursors/agent-run-cursor';
 
 /**
  * Comparator: startedAt DESC then id DESC. Same ordering in-memory and

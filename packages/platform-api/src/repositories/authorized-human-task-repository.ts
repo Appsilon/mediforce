@@ -2,9 +2,9 @@ import type {
   HumanTask,
   HumanTaskRepository,
 } from '@mediforce/platform-core';
-import type { CallerIdentity } from '../auth.js';
-import { ForbiddenError } from '../errors.js';
-import { AuthorizedScope } from './authorized-repository.js';
+import type { CallerIdentity } from '../auth';
+import { ForbiddenError } from '../errors';
+import { AuthorizedScope } from './authorized-repository';
 
 /**
  * Workspace-scoped view of `HumanTaskRepository`. Tasks have no namespace

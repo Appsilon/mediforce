@@ -1,10 +1,10 @@
 import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
-import { ConflictError, ForbiddenError } from '../../errors.js';
-import type { CallerScope } from '../../repositories/index.js';
+import { ConflictError, ForbiddenError } from '../../errors';
+import type { CallerScope } from '../../repositories/index';
 import type {
   CreateNamespaceInput,
   CreateNamespaceOutput,
-} from '../../contract/namespaces.js';
+} from '../../contract/namespaces';
 
 /**
  * Create an organization workspace. Atomic write of namespace doc + owner

@@ -4,8 +4,8 @@ import {
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
   ListWorkflowsOutputSchema,
-} from '../workflows.js';
-import { omitServerFields } from './_helpers.js';
+} from '../workflows';
+import { omitServerFields } from './_helpers';
 
 describe('RegisterWorkflowInputSchema', () => {
   it('accepts a workflow definition body without version, createdAt, or namespace', () => {

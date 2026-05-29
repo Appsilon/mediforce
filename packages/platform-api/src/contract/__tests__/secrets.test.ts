@@ -7,7 +7,7 @@ import {
   SetSecretOutputSchema,
   DeleteSecretOutputSchema,
   SECRET_VALUE_MAX_BYTES,
-} from '../secrets.js';
+} from '../secrets';
 
 describe('SetSecretInputSchema', () => {
   it('accepts valid input', () => {

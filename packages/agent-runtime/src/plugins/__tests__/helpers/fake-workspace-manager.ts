@@ -1,5 +1,5 @@
-import type { WorkspaceManagerLike } from '../../container-plugin.js';
-import type { RunWorkspaceHandle } from '../../../workspace/workspace-manager.js';
+import type { WorkspaceManagerLike } from '../../container-plugin';
+import type { RunWorkspaceHandle } from '../../../workspace/workspace-manager';
 import { vi } from 'vitest';
 
 export interface FakeWorkspaceManagerOptions {

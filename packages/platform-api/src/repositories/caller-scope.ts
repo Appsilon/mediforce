@@ -13,23 +13,23 @@ import type {
   WebhookRouter,
   WorkflowEngine,
 } from '@mediforce/workflow-engine';
-import type { CallerIdentity } from '../auth.js';
-import type { RunKicker } from '../runtime/run-kicker.js';
-import type { DockerImagesService } from '../services/docker-images-service.js';
-import type { InviteNotificationService, InviteService } from '../services/invite-notification.js';
-import type { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository.js';
-import type { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository.js';
-import type { AuthorizedAgentRunRepository } from './authorized-agent-run-repository.js';
-import type { AuthorizedAuditEventRepository } from './authorized-audit-event-repository.js';
-import type { AuthorizedCoworkSessionRepository } from './authorized-cowork-session-repository.js';
-import type { AuthorizedHandoffRepository } from './authorized-handoff-repository.js';
-import type { AuthorizedHumanTaskRepository } from './authorized-human-task-repository.js';
-import type { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository.js';
-import type { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository.js';
-import type { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository.js';
-import type { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository.js';
-import type { AuthorizedWorkflowSecretRepository } from './authorized-workflow-secret-repository.js';
-import type { AuthorizedWorkspaceSecretRepository } from './authorized-workspace-secret-repository.js';
+import type { CallerIdentity } from '../auth';
+import type { RunKicker } from '../runtime/run-kicker';
+import type { DockerImagesService } from '../services/docker-images-service';
+import type { InviteNotificationService, InviteService } from '../services/invite-notification';
+import type { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository';
+import type { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository';
+import type { AuthorizedAgentRunRepository } from './authorized-agent-run-repository';
+import type { AuthorizedAuditEventRepository } from './authorized-audit-event-repository';
+import type { AuthorizedCoworkSessionRepository } from './authorized-cowork-session-repository';
+import type { AuthorizedHandoffRepository } from './authorized-handoff-repository';
+import type { AuthorizedHumanTaskRepository } from './authorized-human-task-repository';
+import type { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
+import type { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
+import type { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository';
+import type { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository';
+import type { AuthorizedWorkflowSecretRepository } from './authorized-workflow-secret-repository';
+import type { AuthorizedWorkspaceSecretRepository } from './authorized-workspace-secret-repository';
 
 /**
  * Per-request data-access surface for an API handler.

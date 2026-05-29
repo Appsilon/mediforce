@@ -1,5 +1,5 @@
-import { defineCommand, enumArg } from '../define-command.js';
-import { printJson } from '../output.js';
+import { defineCommand, enumArg } from '../define-command';
+import { printJson } from '../output';
 
 const SORT_FIELDS = ['name', 'provider', 'context', 'price-in', 'price-out', 'popularity'] as const;
 type SortField = (typeof SORT_FIELDS)[number];

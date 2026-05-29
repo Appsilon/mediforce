@@ -9,8 +9,8 @@ import {
   WorkflowEngine,
   ManualTrigger,
   ManualTriggerNotDeclaredError,
-} from '../index.js';
-import type { WorkflowTriggerContext } from '../index.js';
+} from '../index';
+import type { WorkflowTriggerContext } from '../index';
 
 const linearDef: WorkflowDefinition = {
   name: 'linear-process',

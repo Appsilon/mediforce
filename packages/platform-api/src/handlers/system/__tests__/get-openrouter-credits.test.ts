@@ -1,8 +1,8 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import type { NamespaceSecretsRepository } from '@mediforce/platform-core';
-import { getOpenRouterCredits } from '../get-openrouter-credits.js';
-import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
-import { buildNamespaceSecretsRepo } from '../../secrets/__tests__/fakes.js';
+import { getOpenRouterCredits } from '../get-openrouter-credits';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
+import { buildNamespaceSecretsRepo } from '../../secrets/__tests__/fakes';
 
 function makeJsonResponse(body: unknown, ok = true): Response {
   return new Response(JSON.stringify(body), {

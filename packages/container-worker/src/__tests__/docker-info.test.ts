@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { listImages, getDiskUsage } from '../docker-info.js';
+import { listImages, getDiskUsage } from '../docker-info';
 
 vi.mock('node:child_process', () => ({
   execFile: vi.fn(),

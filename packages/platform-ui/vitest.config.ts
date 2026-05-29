@@ -5,7 +5,6 @@ import { resolve } from 'path';
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    conditions: ['@mediforce/source'],
     alias: {
       '@': resolve(__dirname, './src'),
       '@mediforce/platform-core/testing': resolve(__dirname, '../platform-core/src/testing/index.ts'),

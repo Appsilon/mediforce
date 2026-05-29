@@ -7,13 +7,13 @@ import {
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { heartbeat } from '../heartbeat.js';
-import { ForbiddenError } from '../../../errors.js';
+import { heartbeat } from '../heartbeat';
+import { ForbiddenError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { noopRunKicker } from '../../../runtime/run-kicker.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { noopRunKicker } from '../../../runtime/run-kicker';
 
 /**
  * Handler-level tests for `heartbeat`. The cron trigger is stubbed; engine

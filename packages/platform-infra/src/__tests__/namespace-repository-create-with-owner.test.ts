@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
-import { FirestoreNamespaceRepository } from '../firestore/namespace-repository.js';
+import { FirestoreNamespaceRepository } from '../firestore/namespace-repository';
 
 interface BatchSpy {
   sets: Array<{ refId: string; data: unknown; options?: unknown }>;

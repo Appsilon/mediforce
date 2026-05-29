@@ -1,7 +1,7 @@
-import type { BulkRunInput, BulkRunOutput, BulkRunResultItem } from '../../contract/processes.js';
-import type { CallerScope } from '../../repositories/index.js';
-import { HandlerError } from '../../errors.js';
-import { archiveRun } from './archive-run.js';
+import type { BulkRunInput, BulkRunOutput, BulkRunResultItem } from '../../contract/processes';
+import type { CallerScope } from '../../repositories/index';
+import { HandlerError } from '../../errors';
+import { archiveRun } from './archive-run';
 
 // Always archives (no unarchive bulk path today — matches legacy behaviour).
 export async function bulkArchiveRuns(

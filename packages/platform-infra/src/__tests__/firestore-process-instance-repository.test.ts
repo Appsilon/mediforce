@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
-import { FirestoreProcessInstanceRepository } from '../firestore/process-instance-repository.js';
+import { FirestoreProcessInstanceRepository } from '../firestore/process-instance-repository';
 
 interface RecordedWhere {
   readonly field: string;

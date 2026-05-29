@@ -1,6 +1,6 @@
-import type { HumanTask } from '../schemas/human-task.js';
-import type { HumanTaskRepository } from '../interfaces/human-task-repository.js';
-import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository.js';
+import type { HumanTask } from '../schemas/human-task';
+import type { HumanTaskRepository } from '../interfaces/human-task-repository';
+import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository';
 
 /**
  * In-memory implementation of HumanTaskRepository for testing.

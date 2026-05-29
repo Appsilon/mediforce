@@ -1,6 +1,6 @@
-import type { HandoffEntity } from '../schemas/handoff-entity.js';
-import type { HandoffRepository } from '../interfaces/handoff-repository.js';
-import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository.js';
+import type { HandoffEntity } from '../schemas/handoff-entity';
+import type { HandoffRepository } from '../interfaces/handoff-repository';
+import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository';
 
 /**
  * In-memory implementation of HandoffRepository for testing.

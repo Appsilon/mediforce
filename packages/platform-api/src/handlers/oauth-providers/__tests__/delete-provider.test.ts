@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryAuditRepository, InMemoryOAuthProviderRepository } from '@mediforce/platform-core/testing';
-import { deleteOAuthProvider } from '../delete-provider.js';
-import { ForbiddenError } from '../../../errors.js';
+import { deleteOAuthProvider } from '../delete-provider';
+import { ForbiddenError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-import { adminRoles, memberRoles, sampleProviderInput } from './fixtures.js';
+} from '../../../repositories/__tests__/create-test-scope';
+import { adminRoles, memberRoles, sampleProviderInput } from './fixtures';
 
 describe('deleteOAuthProvider handler', () => {
   let repo: InMemoryOAuthProviderRepository;

@@ -1,4 +1,4 @@
-import { ForbiddenError } from './errors.js';
+import { ForbiddenError } from './errors';
 
 /**
  * Identity of the caller hitting an API handler.

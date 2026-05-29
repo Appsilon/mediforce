@@ -32,15 +32,15 @@ import {
   LocalDockerImagesService,
   isLocalAgentMode,
   type DockerImagesService,
-} from './docker-images-service.js';
-import { sendInviteEmail, sendWorkspaceNotificationEmail } from './invite-emails.js';
+} from './docker-images-service';
+import { sendInviteEmail, sendWorkspaceNotificationEmail } from './invite-emails';
 import type {
   InviteNotificationService,
   InviteService,
   InvitedUser,
   SendInviteEmailInput,
   SendWorkspaceNotificationEmailInput,
-} from './invite-notification.js';
+} from './invite-notification';
 import type {
   CronTriggerStateRepository,
   ToolCatalogRepository,
@@ -68,10 +68,10 @@ import {
   createEmailActionHandler,
   waitActionHandler,
 } from '@mediforce/core-actions';
-import { createHttpSelfFetchRunKicker } from '../runtime/run-kicker.js';
+import { createHttpSelfFetchRunKicker } from '../runtime/run-kicker';
 import { WebhookRouter } from '@mediforce/workflow-engine';
-import { seedBuiltinAgentDefinitions } from './seed-agent-definitions.js';
-import { seedBuiltinToolCatalog } from './seed-tool-catalog.js';
+import { seedBuiltinAgentDefinitions } from './seed-agent-definitions';
+import { seedBuiltinToolCatalog } from './seed-tool-catalog';
 import { backfillInstanceNamespaces } from '@mediforce/platform-infra';
 
 let services: PlatformServices | null = null;

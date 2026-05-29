@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
-import { FirestoreOAuthProviderRepository } from '../firestore/oauth-provider-repository.js';
+import { FirestoreOAuthProviderRepository } from '../firestore/oauth-provider-repository';
 import {
   ProviderAlreadyExistsError,
   type CreateOAuthProviderInput,

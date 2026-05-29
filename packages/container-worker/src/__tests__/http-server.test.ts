@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { Server } from 'node:http';
 
-vi.mock('../docker-info.js', () => ({
+vi.mock('../docker-info', () => ({
   listImages: vi.fn(),
   getDiskUsage: vi.fn(),
 }));
 
-import { listImages, getDiskUsage } from '../docker-info.js';
+import { listImages, getDiskUsage } from '../docker-info';
 const mockListImages = vi.mocked(listImages);
 const mockGetDiskUsage = vi.mocked(getDiskUsage);
 
@@ -14,7 +14,7 @@ let server: Server | null = null;
 
 async function getServer(): Promise<{ server: Server; port: number }> {
   process.env.WORKER_HTTP_PORT = '0';
-  const { startHttpServer } = await import('../http-server.js');
+  const { startHttpServer } = await import('../http-server');
   const srv = startHttpServer();
   await new Promise<void>((resolve) => srv.once('listening', resolve));
   const addr = srv.address();

@@ -5,11 +5,11 @@ import {
   InMemoryProcessInstanceRepository,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { upsertAgentMcpBinding, deleteAgentMcpBinding } from '../mcp-bindings.js';
+import { upsertAgentMcpBinding, deleteAgentMcpBinding } from '../mcp-bindings';
 import {
   createTestScope,
   userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
+} from '../../../repositories/__tests__/create-test-scope';
 
 describe('agent MCP binding handlers', () => {
   let agentDefinitionRepo: InMemoryAgentDefinitionRepository;

@@ -2,10 +2,10 @@ import { mkdtemp, writeFile, rm, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
-import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin.js';
+import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin';
 import type { ProcessConfig } from '@mediforce/platform-core';
-import { OpenCodeAgentPlugin } from '../opencode-agent-plugin.js';
-import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager.js';
+import { OpenCodeAgentPlugin } from '../opencode-agent-plugin';
+import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 
 const originalAllowLocal = process.env.ALLOW_LOCAL_AGENTS;
 beforeEach(() => {
