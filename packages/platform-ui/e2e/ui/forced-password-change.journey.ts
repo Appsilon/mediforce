@@ -41,15 +41,6 @@ test.describe('Forced Password Change Journey', () => {
   test('invited user is forced to set a permanent password on first sign-in', async ({ page }, testInfo) => {
     await setupRecording(page, 'forced-password-change', testInfo);
 
-    // Changing the password revokes the user's existing ID token (Firebase
-    // moves `validSince` to now). The client re-authenticates immediately, but
-    // for a sub-second window background providers on the landing page (docker
-    // images, namespace) can fire with a token whose whole-second `auth_time`
-    // has not yet overtaken `validSince`. The Auth emulator's admin SDK rejects
-    // those as revoked — production `verifyIdToken` does not check revocation,
-    // so this transient 401 cannot happen there. Tolerate it here.
-    allowPageErrors(page, ['the server responded with a status of 401']);
-
     await page.goto('/login');
     await expect(page.getByRole('heading', { name: 'Mediforce' })).toBeVisible({ timeout: 10_000 });
     await showCaption(page, 'Invited user signs in with temporary password');
@@ -73,6 +64,16 @@ test.describe('Forced Password Change Journey', () => {
     await showStep(page);
 
     await showCaption(page, 'Setting permanent password…');
+    // Submitting changes the password, which revokes the user's existing ID
+    // token (Firebase moves `validSince` to now). The client re-authenticates
+    // immediately, but for a sub-second window background providers on the
+    // landing page (docker images, namespace) can fire with a token whose
+    // whole-second `auth_time` has not yet overtaken `validSince`. The Auth
+    // emulator's admin SDK rejects those as revoked — production
+    // `verifyIdToken` does not check revocation, so this transient 401 cannot
+    // happen there. Scope the tolerance to the post-submit window so a 401
+    // anywhere earlier in the journey still fails the test.
+    allowPageErrors(page, ['the server responded with a status of 401']);
     await click(page, page.getByRole('button', { name: /set password and continue/i }));
 
     // After clearing mustChangePassword the page redirects to workspace-selection,
