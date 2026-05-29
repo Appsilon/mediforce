@@ -64,7 +64,7 @@ describe('importWorkflow handler', () => {
     expect(result.success).toBe(true);
     expect(result.name).toBe('workflow-designer');
     expect(result.version).toBe(1);
-    expect(result.source).toEqual({ repo: REPO, path: PATH });
+    expect(result.source).toEqual({ repo: REPO, path: PATH, ref: 'main' });
 
     const [fetchUrl] = vi.mocked(globalThis.fetch).mock.calls[0]!;
     expect(fetchUrl).toBe(
@@ -79,7 +79,7 @@ describe('importWorkflow handler', () => {
       buildScope(),
     );
     const saved = await processRepo.getWorkflowDefinition('team-alpha', 'workflow-designer', 1);
-    expect(saved?.source).toEqual({ repo: REPO, path: PATH });
+    expect(saved?.source).toEqual({ repo: REPO, path: PATH, ref: 'main' });
   });
 
   it('throws ValidationError for non-GitHub URLs', async () => {
@@ -112,13 +112,14 @@ describe('importWorkflow handler', () => {
     ).rejects.toThrow();
   });
 
-  it('respects the ref parameter when building the fetch URL', async () => {
+  it('respects the ref parameter when building the fetch URL and source metadata', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(makeTemplate()));
-    await importWorkflow(
+    const result = await importWorkflow(
       { repo: REPO, path: PATH, ref: 'v2.0.0', namespace: 'team-alpha' },
       buildScope(),
     );
     const [fetchUrl] = vi.mocked(globalThis.fetch).mock.calls[0]!;
     expect(fetchUrl).toContain('/v2.0.0/');
+    expect(result.source.ref).toBe('v2.0.0');
   });
 });

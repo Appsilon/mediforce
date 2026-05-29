@@ -123,7 +123,7 @@ export const workflowImportCommand = defineCommand({
 
     const body = {
       ...parsed.data,
-      source: { repo: args.repo, path: entry.path },
+      source: { repo: args.repo, path: entry.path, ref },
     };
 
     const result = await mediforce!.workflows.register(body, { namespace: args.namespace });

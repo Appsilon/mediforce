@@ -44,7 +44,7 @@ export async function importWorkflow(
     {
       ...parsed.data,
       namespace: input.namespace,
-      source: { repo: input.repo, path: input.path },
+      source: { repo: input.repo, path: input.path, ref: input.ref },
     },
     scope,
   );
@@ -53,6 +53,6 @@ export async function importWorkflow(
     success: true as const,
     name: registered.name,
     version: registered.version,
-    source: { repo: input.repo, path: input.path },
+    source: { repo: input.repo, path: input.path, ref: input.ref },
   };
 }

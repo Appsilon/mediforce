@@ -140,10 +140,11 @@ describe('workflow import command', () => {
 
     const registerCall = calls[2]!;
     expect(registerCall[0]).toBe('http://localhost:9999/api/workflow-definitions?namespace=my-ns');
-    const body = JSON.parse(registerCall[1]!.body as string) as { source: { repo: string; path: string } };
+    const body = JSON.parse(registerCall[1]!.body as string) as { source: { repo: string; path: string; ref: string } };
     expect(body.source).toEqual({
       repo: REPO_URL,
       path: 'workflow-designer/workflow-designer.wd.json',
+      ref: 'main',
     });
 
     expect(output.stdoutLines.join('\n')).toMatch(/Imported workflow-designer v1 into my-ns/);

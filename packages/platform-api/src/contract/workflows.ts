@@ -225,7 +225,7 @@ export const ImportWorkflowOutputSchema = z.object({
   success: z.literal(true),
   name: z.string(),
   version: z.number().int().positive(),
-  source: z.object({ repo: z.string(), path: z.string() }),
+  source: z.object({ repo: z.string(), path: z.string(), ref: z.string() }),
 });
 
 export type ImportWorkflowInput = z.infer<typeof ImportWorkflowInputSchema>;

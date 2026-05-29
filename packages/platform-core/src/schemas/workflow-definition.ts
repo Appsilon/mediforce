@@ -444,6 +444,7 @@ export type WorkflowVisibility = z.infer<typeof WorkflowVisibilitySchema>;
 export const WorkflowSourceSchema = z.object({
   repo: z.string().url(),
   path: z.string().min(1),
+  ref: z.string().min(1),
 });
 export type WorkflowSource = z.infer<typeof WorkflowSourceSchema>;
 
