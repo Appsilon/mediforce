@@ -31,9 +31,9 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
   ): Promise<HumanTask | null> {
     const task = await this.getById(taskId);
     if (task === null) return null;
-    const parent = await this.parents.getById(task.processInstanceId);
-    if (!parent || typeof parent.namespace !== 'string') return null;
-    return allowed.includes(parent.namespace) ? task : null;
+    const parentNs = await this.parents.getNamespaceById(task.processInstanceId);
+    if (parentNs === null) return null;
+    return allowed.includes(parentNs) ? task : null;
   }
 
   async getByRoleAll(role: string): Promise<HumanTask[]> {
@@ -67,10 +67,93 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
     instanceId: string,
     allowed: readonly string[],
   ): Promise<HumanTask[]> {
-    const parent = await this.parents.getById(instanceId);
-    if (!parent || typeof parent.namespace !== 'string') return [];
-    if (!allowed.includes(parent.namespace)) return [];
+    const parentNs = await this.parents.getNamespaceById(instanceId);
+    if (parentNs === null || !allowed.includes(parentNs)) return [];
     return this.getByInstanceId(instanceId);
+  }
+
+  async getByInstanceIdsAll(
+    instanceIds: readonly string[],
+  ): Promise<HumanTask[]> {
+    if (instanceIds.length === 0) return [];
+    // Firestore `in` accepts at most 30 values per query; chunk and fan
+    // out in parallel so a 113-instance monitoring summary collapses to
+    // ~4 indexed reads instead of 113 single-doc lookups.
+    const chunkSize = 30;
+    const chunks: string[][] = [];
+    for (let i = 0; i < instanceIds.length; i += chunkSize) {
+      chunks.push([...instanceIds.slice(i, i + chunkSize)]);
+    }
+    const snapshots = await Promise.all(
+      chunks.map((chunk) =>
+        this.db
+          .collection(this.collectionName)
+          .where('processInstanceId', 'in', chunk)
+          .get(),
+      ),
+    );
+    // Skip per-row `HumanTaskSchema.parse` for the same reason
+    // `FirestoreProcessInstanceRepository.listAll` skips its parse: a
+    // single legacy doc with an out-of-enum `status` or a `Timestamp`-
+    // typed `updatedAt` would otherwise 400 the whole monitoring summary
+    // (which fans out across every workspace task). The monitoring
+    // aggregator tolerates the raw shape — unknown statuses skip the
+    // bucket. Callers that need the strict shape (e.g. the per-instance
+    // `getByInstanceId`) still parse.
+    return snapshots.flatMap((snap) =>
+      snap.docs.map((d) => d.data() as HumanTask),
+    );
+  }
+
+  async getByInstanceIdsInNamespaces(
+    instanceIds: readonly string[],
+    allowed: readonly string[],
+  ): Promise<HumanTask[]> {
+    const namespaces = await Promise.all(
+      instanceIds.map((id) => this.parents.getNamespaceById(id)),
+    );
+    const allowedIds = instanceIds.filter((_, i) => {
+      const ns = namespaces[i];
+      return ns !== null && allowed.includes(ns);
+    });
+    return this.getByInstanceIdsAll(allowedIds);
+  }
+
+  async listAll(): Promise<HumanTask[]> {
+    // Caller-scope read path. Newest first matches the human-queue convention
+    // already established by `getByRoleAll`; the `createdAt` order is the
+    // single sort the UI relies on.
+    const snap = await this.db
+      .collection(this.collectionName)
+      .orderBy('createdAt', 'desc')
+      .get();
+    return snap.docs.map((d) => HumanTaskSchema.parse(d.data()));
+  }
+
+  async listInNamespaces(allowed: readonly string[]): Promise<HumanTask[]> {
+    // HumanTask has no namespace field; the parent ProcessInstance owns
+    // workspace membership. Pre-materialise the allowed `processInstanceId`
+    // set via one indexed `where('namespace','==', ns)` read per workspace
+    // (Promise.all in parallel for multi-workspace callers), then a single
+    // human-tasks collection scan + in-memory join. Two-pass shape kills
+    // the N+1 `parents.getById()` that made the agent-runs equivalent
+    // ~40 s on a 2.3k-run workspace before the same fix (PR2 #569 + the
+    // perf commit at `7cccb6f1`); applies the same here for caller-scope
+    // human tasks. Postgres collapses both passes into one JOIN —
+    // ADR-0001 + #588.
+    const allowedInstanceIds = new Set<string>();
+    await Promise.all(
+      allowed.map(async (ns) => {
+        const snap = await this.db
+          .collection('processInstances')
+          .where('namespace', '==', ns)
+          .get();
+        for (const doc of snap.docs) allowedInstanceIds.add(doc.id);
+      }),
+    );
+    if (allowedInstanceIds.size === 0) return [];
+    const rows = await this.listAll();
+    return rows.filter((t) => allowedInstanceIds.has(t.processInstanceId));
   }
 
   async claim(taskId: string, userId: string): Promise<HumanTask> {

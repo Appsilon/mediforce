@@ -1,0 +1,56 @@
+import { test, expect } from '../helpers/test-fixtures';
+import { createTestUser } from '../helpers/emulator';
+import { setupRecording, click, showStep, showResult, showCaption, endRecording } from '../helpers/recording';
+
+const BOOTSTRAP_EMAIL = 'bootstrap-journey@mediforce.dev';
+const BOOTSTRAP_PASSWORD = 'Journey123!';
+
+/**
+ * Phase 4 PR4 — `GET /api/users/me` lazy bootstrap.
+ *
+ * A user that exists in Firebase Auth but has no Firestore doc, no namespace,
+ * and no member entry signs in for the first time. The headless `/api/users/me`
+ * handler must create their personal namespace on the first call (idempotent)
+ * and the picker must show it. Pre-PR4 the same bootstrap ran inline in
+ * `auth-context.tsx`; this journey asserts the new server-side path keeps the
+ * UX identical.
+ */
+test.describe('Personal namespace lazy bootstrap journey', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test.beforeAll(async () => {
+    // No Firestore seeding — the only state for this user is the Firebase Auth
+    // account. The first GET /api/users/me must bootstrap the personal
+    // namespace.
+    await createTestUser(BOOTSTRAP_EMAIL, BOOTSTRAP_PASSWORD, 'Bootstrap User');
+  });
+
+  test('first sign-in bootstraps the personal namespace via /api/users/me', async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
+    await setupRecording(page, 'personal-namespace-bootstrap', testInfo);
+
+    await page.goto('/login');
+    await expect(page.getByRole('heading', { name: 'Mediforce' })).toBeVisible({ timeout: 15_000 });
+    await showCaption(page, 'New user signs in — no Firestore docs yet');
+
+    await click(page, page.getByLabel('Email'));
+    await page.getByLabel('Email').fill(BOOTSTRAP_EMAIL);
+    await page.getByLabel('Password').fill(BOOTSTRAP_PASSWORD);
+    await showStep(page);
+
+    await showCaption(page, 'Submitting credentials…');
+    await click(page, page.getByRole('button', { name: /^sign in$/i }));
+
+    // Single workspace (the lazy-bootstrapped personal one) → picker auto-
+    // redirects to it. The handle is derived from the email local part.
+    await page.waitForURL(/\/(bootstrap-journey|workspace-selection)/, { timeout: 25_000 });
+    await showCaption(page, 'Personal namespace appears in switcher');
+
+    // Sidebar workspace switcher shows the personal entry (label "My workspace"
+    // per the OrgCard rendering), proving the GET /api/users/me cache
+    // populated.
+    await expect(page.getByText(/my workspace/i)).toBeVisible({ timeout: 10_000 });
+    await showResult(page);
+    await endRecording(page);
+  });
+});

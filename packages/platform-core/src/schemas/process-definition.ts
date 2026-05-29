@@ -14,7 +14,14 @@ export const StepUiSchema = z.object({
 
 export const StepParamSchema = z.object({
   name: z.string().min(1),
-  type: z.enum(['string', 'number', 'boolean', 'date', 'textarea', 'multiselect']).default('string'),
+  // Data-or-widget hint consumed by `ParamField` to pick a form widget.
+  // `string|number|boolean|date` are canonical data types; `textarea`,
+  // `multiselect` are widget hints the UI already renders. Kept as an
+  // open string (not an enum) so legacy/future workflow definitions don't
+  // 400 when a task lands with a new hint — `ParamField` falls back to a
+  // text input for unknown values. Non-string `type` (genuine corruption)
+  // still fails parsing loudly.
+  type: z.string().min(1).default('string'),
   required: z.boolean().default(false),
   description: z.string().optional(),
   default: z.unknown().optional(),

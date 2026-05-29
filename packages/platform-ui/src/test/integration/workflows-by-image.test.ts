@@ -11,6 +11,10 @@ const fake = vi.hoisted(() => {
         { handle: 'acme' },
         { handle: 'beta' },
       ],
+      getMembershipsForUser: async (_uid: string) => [
+        { handle: 'acme', role: 'member' as const },
+        { handle: 'beta', role: 'member' as const },
+      ],
     },
     processRepo: {
       listAllWorkflowDefinitions: async () => {

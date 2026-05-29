@@ -1,64 +1,44 @@
-import { NextResponse } from 'next/server';
-import { AgentMcpBindingSchema } from '@mediforce/platform-core';
-import { getPlatformServices } from '@/lib/platform-services';
-import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import {
+  upsertAgentMcpBinding,
+  deleteAgentMcpBinding,
+} from '@mediforce/platform-api/handlers';
+import {
+  UpsertAgentMcpBindingInputSchema,
+  DeleteAgentMcpBindingInputSchema,
+  type UpsertAgentMcpBindingInput,
+  type DeleteAgentMcpBindingInput,
+} from '@mediforce/platform-api/contract';
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string; name: string }> },
-): Promise<NextResponse> {
-  const { id, name } = await params;
-  const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();
-
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
-  if (caller instanceof NextResponse) return caller;
-
-  const body = await request.json().catch(() => null);
-  if (!body || typeof body !== 'object') {
-    return NextResponse.json({ error: 'JSON body is required' }, { status: 400 });
-  }
-
-  const parsed = AgentMcpBindingSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Validation failed', issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
-
-  const agent = await agentDefinitionRepo.getById(id);
-  if (agent === null) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  const denied = agent.namespace ? requireNamespaceAccess(caller, agent.namespace) : null;
-  if (denied) return denied;
-
-  const nextMcpServers = { ...(agent.mcpServers ?? {}), [name]: parsed.data };
-  const updated = await agentDefinitionRepo.update(id, { mcpServers: nextMcpServers });
-  return NextResponse.json({ mcpServers: updated.mcpServers ?? {} });
+interface RouteContext {
+  params: Promise<{ id: string; name: string }>;
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string; name: string }> },
-): Promise<NextResponse> {
-  const { id, name } = await params;
-  const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();
+export const PUT = createRouteAdapter<
+  typeof UpsertAgentMcpBindingInputSchema,
+  UpsertAgentMcpBindingInput,
+  unknown,
+  RouteContext
+>(
+  UpsertAgentMcpBindingInputSchema,
+  async (req, ctx) => {
+    const { id, name } = await ctx.params;
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    return { id, name, binding: body };
+  },
+  upsertAgentMcpBinding,
+);
 
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
-  if (caller instanceof NextResponse) return caller;
-
-  const agent = await agentDefinitionRepo.getById(id);
-  if (agent === null) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  const denied = agent.namespace ? requireNamespaceAccess(caller, agent.namespace) : null;
-  if (denied) return denied;
-
-  const rest = { ...(agent.mcpServers ?? {}) };
-  delete rest[name];
-  const updated = await agentDefinitionRepo.update(id, { mcpServers: rest });
-  return NextResponse.json({ mcpServers: updated.mcpServers ?? {} });
-}
+export const DELETE = createRouteAdapter<
+  typeof DeleteAgentMcpBindingInputSchema,
+  DeleteAgentMcpBindingInput,
+  unknown,
+  RouteContext
+>(
+  DeleteAgentMcpBindingInputSchema,
+  async (_req, ctx) => {
+    const { id, name } = await ctx.params;
+    return { id, name };
+  },
+  deleteAgentMcpBinding,
+);

@@ -103,7 +103,7 @@ Single message, three `Agent` tool calls, `general-purpose` subagent. Each promp
 > - **Dead code** — functions/exports/files not referenced anywhere. Grep to verify.
 > - **DRY/KISS violations** — duplicated logic, unnecessary abstraction, layers that solve nothing.
 > - **Reuse misses** — places where the diff reinvents a helper/util/pattern that already exists in the repo. Search for it before flagging.
-> - **Comment quality** — flag flowery / restating-the-code comments. Keep only comments that explain *why* (non-obvious constraints, invariants, gotchas). Self-documenting code wins.
+> - **Comment quality** — flag flowery / restating-the-code comments, section-title banners (`// ---- POST /api/foo ----`), and ephemeral plan numbering / migration history (`// Phase 2.5`, `// pre-Phase-2.5 Server Action`). Keep only comments that explain *why* (non-obvious constraints, invariants, gotchas) and that still make sense to a reader who never saw the migration plan. Self-documenting code wins.
 > Distinguish hard violations from judgement calls. Skip anything tooling already checks. Under 600 words. Format each finding as `file:line — issue — suggestion`.
 
 **Spec sub-agent prompt**:
@@ -221,7 +221,8 @@ Reporting separately stops one axis from masking another.
 - MUST include `file:line` references for every Standards / Spec finding.
 - Big Picture findings phrased as **questions to the user**, not assertions.
 - MUST verify every "pre-existing" claim with `git blame` before accepting it.
-- In self mode: SHIP only when actually fixed; ITERATE if anything was waved away as pre-existing without git evidence.
+- MUST run the regression check (checklist §3a) on every replaced read / write / endpoint / hook. Call regressions **regressions**, never "regression risk". Regressions are SHIP blockers — fix in the PR, or get explicit user acceptance + tracked follow-up. Migrations / refactors get extra scrutiny: silent caps, silent default flips, missing parity branches all count.
+- In self mode: SHIP only when actually fixed; ITERATE if anything was waved away as pre-existing without git evidence OR if a regression was downgraded to "risk" without reproducing the failing input.
 - If no findings in a category, omit that subsection.
 
 ## What this skill does NOT do

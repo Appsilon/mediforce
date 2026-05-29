@@ -6,10 +6,11 @@
   "scripts": {
     "build": "pnpm -r run build",
     "typecheck": "tsc -b --noEmit",
-    "dev": "pnpm --filter @mediforce/platform-ui dev",
-    "dev:mock": "pnpm --filter @mediforce/platform-ui dev:mock",
-    "dev:no-docker": "ALLOW_LOCAL_AGENTS=true pnpm --filter @mediforce/platform-ui dev",
-    "dev:queue": "REDIS_URL=redis://localhost:6379 pnpm --filter @mediforce/platform-ui dev",
+    "dev": "pnpm install --prefer-offline --silent && pnpm --filter @mediforce/platform-ui dev",
+    "dev:mock": "pnpm install --prefer-offline --silent && pnpm --filter @mediforce/platform-ui dev:mock",
+    "dev:no-docker": "ALLOW_LOCAL_AGENTS=true pnpm dev",
+    "dev:queue": "REDIS_URL=redis://localhost:6379 pnpm dev",
+    "dev:postgres": "docker compose up postgres redis -d && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce STORAGE_BACKEND=postgres pnpm db:migrate && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce STORAGE_BACKEND=postgres REDIS_URL=redis://localhost:6379 pnpm dev",
     "emulators": "pnpm --filter @mediforce/platform-ui emulators",
     "test": "pnpm test:unit && pnpm test:e2e",
     "test:unit": "vitest run",
@@ -22,6 +23,8 @@
     "test:external": "pnpm --filter @mediforce/platform-ui test:external",
     "seed": "pnpm --filter @mediforce/platform-ui seed:dev",
     "start": "pnpm --filter @mediforce/platform-ui start",
+    "db:migrate": "pnpm --filter @mediforce/platform-infra exec drizzle-kit migrate",
+    "db:generate": "pnpm --filter @mediforce/platform-infra exec drizzle-kit generate",
     "migrate:handles": "tsx scripts/migrate-user-handles.ts",
     "link:cli": "python3 scripts/link-cli.py"
   },
@@ -35,7 +38,7 @@
     ],
     "overrides": {
       "axios": ">=1.15.0",
-      "protobufjs": "8.4.0",
+      "protobufjs": "8.4.2",
       "hono": "4.12.21",
       "@hono/node-server": "2.0.3",
       "fast-xml-parser": "5.8.0",
@@ -44,7 +47,7 @@
       "brace-expansion": "5.0.6",
       "@tootallnate/once": "3.0.1",
       "next": "16.2.6",
-      "vite": "8.0.13"
+      "vite": "8.0.14"
     },
     "minimumReleaseAgeExclude": [
       "axios",
@@ -59,7 +62,7 @@
     "@vitest/coverage-v8": "^4.1.4",
     "tsx": "latest",
     "typescript": "~6.0.0",
-    "vite": "8.0.13",
+    "vite": "8.0.14",
     "vitest": "^4.1.4"
   }
 }

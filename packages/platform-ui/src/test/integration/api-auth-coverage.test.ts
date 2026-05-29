@@ -1,8 +1,7 @@
 // packages/platform-ui/src/test/integration/api-auth-coverage.test.ts
-// RED phase: these tests describe the static structural contract for Step 0 of the MCP permissions refactor.
-// They will FAIL before middleware implementation and the follow-up cleanup commits.
-// After middleware.ts centralizes auth, redis-test is removed, and inline validateApiKey() calls
-// are deleted from route handlers, run again to confirm GREEN.
+// Static structural contract from Step 0 of the MCP permissions refactor.
+// Green since proxy.ts (formerly middleware.ts in Next 15) centralized auth
+// and inline validateApiKey() calls were removed from route handlers.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';

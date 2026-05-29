@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { defineCommand } from '../define-command.js';
-import { printJson, printError } from '../output.js';
+import { printJson, printError, printKv } from '../output.js';
 
 export const runStartCommand = defineCommand({
   name: 'mediforce run start',
@@ -105,8 +105,10 @@ export const runStartCommand = defineCommand({
       return 0;
     }
     output.stdout(`Run started`);
-    output.stdout(`  instanceId: ${result.run.id}`);
-    output.stdout(`  status:     ${result.run.status}`);
+    printKv(output, [
+      ['instanceId', result.run.id],
+      ['status', result.run.status],
+    ]);
     output.stdout('');
     output.stdout(`Follow with: mediforce run get ${result.run.id}`);
     return 0;

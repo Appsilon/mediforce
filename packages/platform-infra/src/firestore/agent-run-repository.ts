@@ -1,8 +1,12 @@
-import type { Firestore } from 'firebase-admin/firestore';
+import type { Firestore, Query } from 'firebase-admin/firestore';
 import {
   AgentRunSchema,
+  encodeAgentRunCursor,
+  decodeAgentRunCursor,
   type AgentRun,
   type AgentRunRepository,
+  type ListAgentRunsOptions,
+  type ListAgentRunsPage,
   type ProcessInstanceRepository,
 } from '@mediforce/platform-core';
 
@@ -62,5 +66,135 @@ export class FirestoreAgentRunRepository implements AgentRunRepository {
       .limit(limitN)
       .get();
     return snap.docs.map((d) => AgentRunSchema.parse(d.data()));
+  }
+
+  async list(opts: ListAgentRunsOptions): Promise<ListAgentRunsPage> {
+    // Skip the per-row `AgentRunSchema.parse` on this hot path — for a
+    // 2.3k-doc page in dev mode the envelope sub-schema dominates
+    // wall-clock by ~10 s, and the SDK client revalidates the entire
+    // response through `ListAgentRunsOutputSchema.parse` at the boundary
+    // anyway. Write-side guarantees the shape (`create()` accepts a typed
+    // `AgentRun`), so trusting the raw doc data here halves the parse
+    // budget end-to-end. A corrupt legacy row would have failed the SDK
+    // parse downstream regardless.
+    const docs = await this.fetchPageDocs(opts);
+    return this.toPage(
+      docs.map((d) => d.data() as AgentRun),
+      opts.limit,
+    );
+  }
+
+  async listInNamespaces(
+    allowed: readonly string[],
+    opts: ListAgentRunsOptions,
+  ): Promise<ListAgentRunsPage> {
+    // Agent runs carry no namespace field; the parent ProcessInstance owns
+    // workspace membership. Pre-materialise the allowed `ProcessInstance`
+    // id set via one indexed read per workspace, then a single agent-runs
+    // page read + in-memory join — eliminates the N+1 `parents.getById()`
+    // that made the UI's user-actor path ~40 s on a 2.3k-run workspace.
+    // Same shape as the CLI's system-actor `raw.list` for the read budget.
+    //
+    // Note: this path intentionally does NOT parse the parent documents
+    // through `ProcessInstanceSchema` — only `doc.id` is read — so a
+    // corrupt field on a legacy ProcessInstance (e.g. missing `updatedAt`
+    // on pre-migration rows) cannot poison the agent-runs response.
+    //
+    // Over-fetch by 2x absorbs namespace-filter attrition for the common
+    // "all my workspaces" view without paging twice.
+    //
+    // The `AuthorizedAgentRunRepository` workspace gate is unchanged —
+    // every row still matches `allowedInstanceIds.has(...)` derived from
+    // the caller's membership set. Only the fetch shape changed.
+    //
+    // TODO(post-postgres-migration, ADR-0001 / #588):
+    //   - Denormalise `namespace` onto the AgentRun row so the entire
+    //     listInNamespaces becomes one keyset query:
+    //       SELECT ... FROM agent_runs
+    //         WHERE namespace IN ($1, $2, ...)
+    //           [AND (started_at, id) < ($cursor_ts, $cursor_id)]
+    //         ORDER BY started_at DESC, id DESC
+    //         LIMIT $limit + 1
+    //   - Drop the separate `listInNamespaces` method on the interface and
+    //     collapse it into `list({ namespace?: string[], ... })` — the
+    //     authorized wrapper passes the caller's membership set directly.
+    //   - Drop the `limit * 2` over-fetch — Postgres returns exactly
+    //     `limit + 1` from a filter-pushdown query, so attrition is zero.
+    //   - Reconsider whether the AuthorizedRepo wrapper is still needed
+    //     once Postgres RLS (or an equivalent storage-layer policy) can
+    //     enforce the namespace constraint at the row level.
+    const allowedInstanceIds = new Set<string>();
+    await Promise.all(
+      allowed.map(async (ns) => {
+        const snap = await this.db
+          .collection('processInstances')
+          .where('namespace', '==', ns)
+          .get();
+        for (const doc of snap.docs) allowedInstanceIds.add(doc.id);
+      }),
+    );
+    // Pull the over-fetched page as raw Firestore docs and apply the
+    // namespace filter BEFORE parsing through `AgentRunSchema` — on a
+    // 2.3k-run workspace where only ~180 belong to the caller's
+    // namespace, this drops the parse count by an order of magnitude
+    // (envelope schema with `reasoning_chain` + `annotations` dominates
+    // the handler's wall-clock).
+    const docs = await this.fetchPageDocs({ ...opts, limit: opts.limit * 2 });
+    const kept: AgentRun[] = [];
+    for (const doc of docs) {
+      const data = doc.data() as { processInstanceId?: unknown };
+      if (typeof data.processInstanceId !== 'string') continue;
+      if (!allowedInstanceIds.has(data.processInstanceId)) continue;
+      kept.push(AgentRunSchema.parse(data));
+      if (kept.length >= opts.limit + 1) break;
+    }
+    return this.toPage(kept, opts.limit);
+  }
+
+  private async fetchPage(opts: ListAgentRunsOptions): Promise<AgentRun[]> {
+    const docs = await this.fetchPageDocs(opts);
+    return docs.map((d) => AgentRunSchema.parse(d.data()));
+  }
+
+  private async fetchPageDocs(
+    opts: ListAgentRunsOptions,
+  ): Promise<readonly FirebaseFirestore.QueryDocumentSnapshot[]> {
+    // Single explicit orderBy — Firestore tiebreaks ties on `__name__`
+    // implicitly. Adding a second orderBy('id') would force a composite
+    // index for the `agentRuns` collection and the `(processInstanceId,
+    // startedAt, id)` slice; keyset stability via a DocumentSnapshot
+    // cursor gives the same guarantees without the index requirement.
+    let q: Query = this.db.collection(this.collectionName).orderBy('startedAt', 'desc');
+    if (opts.runId !== undefined) {
+      q = q.where('processInstanceId', '==', opts.runId);
+    }
+    if (opts.stepId !== undefined) {
+      q = q.where('stepId', '==', opts.stepId);
+    }
+    if (opts.cursor !== undefined) {
+      const cur = decodeAgentRunCursor(opts.cursor);
+      if (cur !== null) {
+        // Resolve the cursor doc so Firestore can apply its native
+        // tie-break on `__name__` after `startedAt`. One extra read per
+        // page in exchange for zero composite-index ops.
+        const cursorSnap = await this.db.collection(this.collectionName).doc(cur.id).get();
+        if (cursorSnap.exists) q = q.startAfter(cursorSnap);
+      }
+    }
+    // +1 so we can detect "more pages" without a second query.
+    const snap = await q.limit(opts.limit + 1).get();
+    return snap.docs;
+  }
+
+  private toPage(runs: readonly AgentRun[], limit: number): ListAgentRunsPage {
+    const hasMore = runs.length > limit;
+    const items = hasMore ? runs.slice(0, limit) : [...runs];
+    const last = items[items.length - 1];
+    return {
+      items,
+      ...(hasMore && last !== undefined
+        ? { nextCursor: encodeAgentRunCursor(last.startedAt, last.id) }
+        : {}),
+    };
   }
 }

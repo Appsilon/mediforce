@@ -114,8 +114,6 @@ export interface WorkflowEditorCanvasProps {
   workflowName?: string;
   /** Namespace handle — required for the in-editor secrets panel. */
   namespace?: string;
-  /** Authenticated user ID — required for the in-editor secrets panel. */
-  userId?: string;
   /**
    * Render prop for save controls shown at the bottom of the YAML panel.
    * Receives the current steps + transitions + a discard callback.
@@ -144,7 +142,6 @@ export function WorkflowEditorCanvas({
   yamlFields,
   workflowName,
   namespace,
-  userId,
   renderSavePanel,
   onChange,
   stepErrors,
@@ -622,11 +619,10 @@ export function WorkflowEditorCanvas({
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                {namespace && userId && workflowName ? (
+                {namespace && workflowName ? (
                   <WorkflowSecretsEditor
                     namespace={namespace}
                     workflowName={workflowName}
-                    userId={userId}
                   />
                 ) : (
                   <p className="text-sm text-muted-foreground">Save the workflow first to manage secrets.</p>

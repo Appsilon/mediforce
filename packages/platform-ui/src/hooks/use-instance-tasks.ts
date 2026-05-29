@@ -1,60 +1,35 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { HumanTask } from '@mediforce/platform-core';
-import { mediforce, ApiError } from '@/lib/mediforce';
+import { mediforce } from '@/lib/mediforce';
+import { queryKeys } from '@/lib/query-keys';
 
 /**
- * Fetches the full set of human tasks belonging to a single process instance
- * through `mediforce.tasks.list`. One-shot read (no real-time subscription) —
- * intended for historical / contextual views where a stale read is acceptable.
+ * Fetches every human task belonging to a single process instance.
  *
- * For live task lists (badge counts, active-task inboxes) keep using the
- * Firestore-backed `useCollection` hooks until Phase 6 lands a streaming
- * replacement — see `docs/headless-migration.md`.
+ * One-shot read: `refetchInterval: 0` (the project default per ADR-0006 §3).
+ * Intended for historical / contextual views where stale data is acceptable —
+ * task detail's sibling list, post-completion next-step lookup. For live task
+ * inboxes use the role-scoped hooks (`useMyTasks`).
  */
 export function useInstanceTasks(instanceId: string | undefined): {
   tasks: HumanTask[];
   loading: boolean;
   error: Error | null;
 } {
-  const [tasks, setTasks] = useState<HumanTask[]>([]);
-  const [loading, setLoading] = useState<boolean>(instanceId !== undefined);
-  const [error, setError] = useState<Error | null>(null);
+  const query = useQuery({
+    queryKey: queryKeys.tasks.byInstance(instanceId ?? ''),
+    queryFn: async () => {
+      const result = await mediforce.tasks.list({ instanceId: instanceId as string });
+      return result.tasks;
+    },
+    enabled: instanceId !== undefined,
+  });
 
-  useEffect(() => {
-    if (instanceId === undefined) {
-      setTasks([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    mediforce.tasks
-      .list({ instanceId })
-      .then((result) => {
-        if (!cancelled) setTasks(result.tasks);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        const normalised = err instanceof ApiError || err instanceof Error
-          ? err
-          : new Error(String(err));
-        setError(normalised);
-        setTasks([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [instanceId]);
-
-  return { tasks, loading, error };
+  return {
+    tasks: instanceId === undefined ? [] : query.data ?? [],
+    loading: query.isLoading && instanceId !== undefined,
+    error: instanceId === undefined ? null : (query.error as Error | null) ?? null,
+  };
 }

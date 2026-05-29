@@ -1,94 +1,43 @@
-import { NextResponse } from 'next/server';
-import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
-import { WorkflowDefinitionVersionAlreadyExistsError } from '@mediforce/platform-infra';
-import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
-import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
-import { listWorkflows } from '@mediforce/platform-api/handlers';
-import { ListWorkflowsInputSchema } from '@mediforce/platform-api/contract';
+import { listWorkflows, registerWorkflow } from '@mediforce/platform-api/handlers';
+import {
+  ListWorkflowsInputSchema,
+  RegisterWorkflowInputSchema,
+  type RegisterWorkflowInput,
+} from '@mediforce/platform-api/contract';
+import { z } from 'zod';
 
 /**
- * GET /api/workflow-definitions
- *
- * List workflow definitions visible to the caller. Workspace + visibility
- * filtering lives in `scope.workflowDefinitions`; the optional `?namespace=`
- * query param narrows further but does not grant access.
+ * GET /api/workflow-definitions — list (visibility + namespace gated).
  */
 export const GET = createRouteAdapter(
   ListWorkflowsInputSchema,
   (req) => {
-    const url = new URL(req.url);
-    const namespace = url.searchParams.get('namespace');
+    const namespace = req.nextUrl.searchParams.get('namespace');
     return namespace !== null ? { namespace } : {};
   },
   listWorkflows,
 );
 
+const RegisterScopedSchema = RegisterWorkflowInputSchema.extend({
+  namespace: z.string().min(1),
+});
+
 /**
- * POST /api/workflow-definitions?namespace=handle
- *
- * Register a new WorkflowDefinition. Version is auto-incremented from the
- * latest existing version for the given name. Send the definition JSON
- * without `version` or `createdAt` — they are set server-side.
- *
- * The `namespace` query parameter is required and sets the owning namespace.
- * It overrides any `namespace` field in the request body.
+ * POST /api/workflow-definitions?namespace=… — register a new workflow.
+ * Auto-increments version. Mint-version race preserved (status quo);
+ * conflict surfaces as 409 via ConflictError.
  */
-export async function POST(request: Request): Promise<NextResponse> {
-  const { namespaceRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
-  if (caller instanceof NextResponse) return caller;
-
-  const url = new URL(request.url);
-  const namespace = url.searchParams.get('namespace');
-  if (!namespace) {
-    return NextResponse.json(
-      { error: 'Missing required query parameter: namespace' },
-      { status: 400 },
-    );
-  }
-
-  const denied = requireNamespaceAccess(caller, namespace);
-  if (denied) return denied;
-
-  const body = await request.json().catch(() => null);
-  if (!body || typeof body !== 'object') {
-    return NextResponse.json({ error: 'JSON body is required' }, { status: 400 });
-  }
-
-  const parsed = parseWorkflowDefinitionForCreation({
-    ...body,
-    namespace,
-  });
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Validation failed', issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
-
-  const { processRepo } = getPlatformServices();
-
-  try {
-    const latestVersion = await processRepo.getLatestWorkflowVersion(namespace, parsed.data.name);
-    const nextVersion = latestVersion + 1;
-
-    const definition = {
-      ...parsed.data,
-      version: nextVersion,
-      createdAt: new Date().toISOString(),
-    };
-
-    await processRepo.saveWorkflowDefinition(definition);
-
-    return NextResponse.json(
-      { success: true, name: definition.name, version: definition.version },
-      { status: 201 },
-    );
-  } catch (err) {
-    if (err instanceof WorkflowDefinitionVersionAlreadyExistsError) {
-      return NextResponse.json({ error: 'Version conflict — please retry.' }, { status: 409 });
-    }
-    throw err;
-  }
-}
+export const POST = createRouteAdapter<
+  typeof RegisterScopedSchema,
+  RegisterWorkflowInput & { namespace: string }
+>(
+  RegisterScopedSchema,
+  async (req) => {
+    const namespace = req.nextUrl.searchParams.get('namespace');
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    return { ...body, namespace: namespace ?? undefined };
+  },
+  registerWorkflow,
+  { successStatus: 201 },
+);

@@ -1,7 +1,7 @@
-// packages/platform-ui/src/test/integration/middleware.test.ts
-// RED phase: these tests describe the middleware auth contract for Step 0 of the MCP permissions refactor.
-// They will FAIL before middleware implementation.
-// After middleware.ts is updated to centralize auth, run again to confirm GREEN.
+// packages/platform-ui/src/test/integration/proxy.test.ts
+// Describes the proxy (formerly middleware.ts in Next 15) auth contract for
+// the MCP permissions refactor. Green since Step 0 landed; per-endpoint
+// admin gating now lives in handlers (`assertCallerIsNamespaceAdmin`).
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -111,7 +111,9 @@ describe('middleware admin prefix', () => {
   });
 
   it('passes through /api/admin/tool-catalog with valid PLATFORM_API_KEY', async () => {
-    // TODO(#218): tighten to PLATFORM_ADMIN_API_KEY when tier split lands
+    // Both PLATFORM_API_KEY and PLATFORM_ADMIN_API_KEY mint the same apiKey
+    // identity at this layer; per-endpoint admin role enforcement is in
+    // `assertCallerIsNamespaceAdmin` (closes #218).
     const res = await proxy(
       makeRequest('/api/admin/tool-catalog', { headers: { 'X-Api-Key': 'test-secret-key' } }),
     );

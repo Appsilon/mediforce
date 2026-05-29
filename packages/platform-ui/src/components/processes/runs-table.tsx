@@ -9,11 +9,16 @@ import { ProcessStatusBadge } from './process-status-badge';
 import { useUserDisplayNames } from '@/hooks/use-users';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
-import { archiveProcessRun, bulkCancelProcessRuns, bulkArchiveProcessRuns } from '@/app/actions/processes';
-import type { BulkOperationResult } from '@/app/actions/processes';
+import { ApiError } from '@/lib/mediforce';
+import type { BulkRunOutput } from '@mediforce/platform-api/contract';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 import { formatCostUsd } from '@/lib/format';
 import { useToast } from '@/components/command-palette/toast-provider';
+import {
+  useArchiveRun,
+  useBulkArchiveRuns,
+  useBulkCancelRuns,
+} from '@/hooks/use-run-mutations';
 
 interface RunsTableProps {
   runs: ProcessInstance[];
@@ -48,10 +53,13 @@ export function RunsTable({
   const handle = useHandleFromPath();
   const { toast } = useToast();
   const userNames = useUserDisplayNames();
+  const archiveMutation = useArchiveRun();
+  const bulkCancelMutation = useBulkCancelRuns();
+  const bulkArchiveMutation = useBulkArchiveRuns();
   const [archivingIds, setArchivingIds] = React.useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
-  const [bulkCancelling, setBulkCancelling] = React.useState(false);
-  const [bulkArchiving, setBulkArchiving] = React.useState(false);
+  const bulkCancelling = bulkCancelMutation.isPending;
+  const bulkArchiving = bulkArchiveMutation.isPending;
   const selectAllRef = React.useRef<HTMLInputElement>(null);
   const toolbarRef = React.useRef<HTMLDivElement>(null);
   const [toolbarHeight, setToolbarHeight] = React.useState(0);
@@ -99,39 +107,59 @@ export function RunsTable({
   async function handleArchive(run: ProcessInstance) {
     const newArchived = run.archived !== true;
     setArchivingIds((prev) => new Set(prev).add(run.id));
-    await archiveProcessRun(run.id, newArchived);
-    setArchivingIds((prev) => {
-      const next = new Set(prev);
-      next.delete(run.id);
-      return next;
-    });
+    try {
+      await archiveMutation.mutateAsync({ runId: run.id, archived: newArchived });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message
+        : err instanceof Error ? err.message : 'Archive failed';
+      toast({ title: 'Archive failed', description: message, variant: 'error' });
+    } finally {
+      setArchivingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(run.id);
+        return next;
+      });
+    }
   }
 
   const cancellableSelected = runs.filter((r) => selectedIds.has(r.id) && isCancellable(r));
   const archivableSelected = runs.filter((r) => selectedIds.has(r.id) && isArchivable(r));
 
-  function reportBulkResult(result: BulkOperationResult, action: string) {
-    if (result.failed.length > 0) {
+  function reportBulkResult(result: BulkRunOutput, action: string) {
+    const failed = result.results.filter((r) => r.status === 'error');
+    if (failed.length > 0) {
       toast({
-        title: `${result.failed.length} run(s) failed to ${action}`,
-        description: result.failed.map((f) => f.error).join('; '),
+        title: `${failed.length} run(s) failed to ${action}`,
+        description: failed.map((f) => f.error ?? 'Unknown error').join('; '),
         variant: 'error',
       });
     }
   }
 
   async function handleBulkCancel() {
-    setBulkCancelling(true);
-    const result = await bulkCancelProcessRuns(cancellableSelected.map((r) => r.id));
-    reportBulkResult(result, 'cancel');
-    setBulkCancelling(false);
+    try {
+      const result = await bulkCancelMutation.mutateAsync({
+        runIds: cancellableSelected.map((r) => r.id),
+      });
+      reportBulkResult(result, 'cancel');
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message
+        : err instanceof Error ? err.message : 'Bulk cancel failed';
+      toast({ title: 'Bulk cancel failed', description: message, variant: 'error' });
+    }
   }
 
   async function handleBulkArchive() {
-    setBulkArchiving(true);
-    const result = await bulkArchiveProcessRuns(archivableSelected.map((r) => r.id));
-    reportBulkResult(result, 'archive');
-    setBulkArchiving(false);
+    try {
+      const result = await bulkArchiveMutation.mutateAsync({
+        runIds: archivableSelected.map((r) => r.id),
+      });
+      reportBulkResult(result, 'archive');
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message
+        : err instanceof Error ? err.message : 'Bulk archive failed';
+      toast({ title: 'Bulk archive failed', description: message, variant: 'error' });
+    }
   }
 
   const effectiveRunHref = runHref ?? ((run: ProcessInstance) =>
@@ -236,6 +264,7 @@ export function RunsTable({
             return (
               <tr
                 key={run.id}
+                data-run-id={run.id}
                 className={`border-b last:border-0 transition-colors ${
                   isSelected ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-muted/30'
                 }`}

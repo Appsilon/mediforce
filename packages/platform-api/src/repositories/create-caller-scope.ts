@@ -15,6 +15,8 @@ import type {
   ProcessInstanceRepository,
   ProcessRepository,
   ToolCatalogRepository,
+  UserDirectoryService,
+  UserProfileRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import type {
@@ -25,6 +27,8 @@ import type {
 } from '@mediforce/workflow-engine';
 import type { CallerIdentity } from '../auth.js';
 import type { RunKicker } from '../runtime/run-kicker.js';
+import type { DockerImagesService } from '../services/docker-images-service.js';
+import type { InviteNotificationService, InviteService } from '../services/invite-notification.js';
 import type { CallerScope } from './caller-scope.js';
 import { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository.js';
 import { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository.js';
@@ -57,6 +61,7 @@ export interface CallerScopeServices {
   readonly cronTriggerStateRepo: CronTriggerStateRepository;
   readonly toolCatalogRepo: ToolCatalogRepository;
   readonly namespaceRepo: NamespaceRepository;
+  readonly userProfileRepo: UserProfileRepository;
   readonly oauthProviderRepo: OAuthProviderRepository;
   readonly agentOAuthTokenRepo: AgentOAuthTokenRepository;
   readonly modelRegistryRepo: ModelRegistryRepository;
@@ -69,6 +74,10 @@ export interface CallerScopeServices {
   readonly webhookRouter: WebhookRouter;
   readonly agentRunner: AgentRunner;
   readonly runKicker: RunKicker;
+  readonly inviteService: InviteService | null;
+  readonly inviteNotificationService: InviteNotificationService | null;
+  readonly dockerImages: DockerImagesService | null;
+  readonly userDirectory: UserDirectoryService | null;
 }
 
 /**
@@ -119,6 +128,7 @@ export function createCallerScope(
     models: services.modelRegistryRepo,
     plugins: services.pluginRegistry,
     workspaces: services.namespaceRepo,
+    userProfiles: services.userProfileRepo,
     cron: services.cronTriggerStateRepo,
 
     system: {
@@ -129,6 +139,10 @@ export function createCallerScope(
       agentRunner: services.agentRunner,
       audit: services.auditRepo,
       runKicker: services.runKicker,
+      inviteService: services.inviteService,
+      inviteNotificationService: services.inviteNotificationService,
+      dockerImages: services.dockerImages,
+      userDirectory: services.userDirectory,
     },
   };
 }

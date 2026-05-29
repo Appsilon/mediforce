@@ -19,9 +19,12 @@ import { runGetCommand } from './commands/run-get.js';
 import { runListCommand } from './commands/run-list.js';
 import { runStartCommand } from './commands/run-start.js';
 import { runCancelCommand } from './commands/run-cancel.js';
+import { runArchiveCommand } from './commands/run-archive.js';
+import { runBulkCancelCommand, runBulkArchiveCommand } from './commands/run-bulk.js';
 import { workflowArchiveCommand } from './commands/workflow-archive.js';
 import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility.js';
 import { workflowCopyCommand } from './commands/workflow-copy.js';
+import { workflowDeleteCommand } from './commands/workflow-delete.js';
 import {
   systemStatusCommand,
   systemImagesCommand,
@@ -33,12 +36,30 @@ import { agentListCommand } from './commands/agent-list.js';
 import { agentGetCommand } from './commands/agent-get.js';
 import { agentDeleteCommand } from './commands/agent-delete.js';
 import { agentSetVisibilityCommand } from './commands/agent-set-visibility.js';
+import { agentCreateCommand } from './commands/agent-create.js';
 import { modelListCommand } from './commands/model-list.js';
 import { modelGetCommand } from './commands/model-get.js';
 import { modelSyncCommand } from './commands/model-sync.js';
 import { secretSetCommand } from './commands/secret-set.js';
 import { secretListCommand } from './commands/secret-list.js';
 import { secretDeleteCommand } from './commands/secret-delete.js';
+import { taskListCommand } from './commands/task-list.js';
+import { taskGetCommand } from './commands/task-get.js';
+import { taskClaimCommand } from './commands/task-claim.js';
+import { coworkGetCommand } from './commands/cowork-get.js';
+import { coworkGetByInstanceCommand } from './commands/cowork-get-by-instance.js';
+import { coworkChatCommand } from './commands/cowork-chat.js';
+import { usersMeCommand } from './commands/users-me.js';
+import { usersClearMustChangePasswordCommand } from './commands/users-clear-must-change-password.js';
+import { namespaceGetCommand } from './commands/namespace-get.js';
+import { namespaceCreateCommand } from './commands/namespace-create.js';
+import { agentRunListCommand } from './commands/agent-run-list.js';
+import { agentRunGetCommand } from './commands/agent-run-get.js';
+import { namespaceUpdateCommand } from './commands/namespace-update.js';
+import { namespaceDeleteCommand } from './commands/namespace-delete.js';
+import { namespaceLeaveCommand } from './commands/namespace-leave.js';
+import { namespaceRemoveMemberCommand } from './commands/namespace-remove-member.js';
+import { namespaceSetMemberRoleCommand } from './commands/namespace-set-member-role.js';
 import { type CommandFn } from './define-command.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
@@ -60,7 +81,7 @@ interface BranchEntry {
 
 export const TREE: Record<string, BranchEntry> = {
   workflow: {
-    description: 'Workflow definitions (register, list, get, copy, archive, visibility)',
+    description: 'Workflow definitions (register, list, get, copy, archive, delete, visibility)',
     leaves: {
       register: { description: 'Register a workflow definition from a JSON file', fn: workflowRegisterCommand },
       list: { description: 'List registered workflow definitions', fn: workflowListCommand },
@@ -68,24 +89,55 @@ export const TREE: Record<string, BranchEntry> = {
       'set-visibility': { description: 'Set workflow visibility (public|private)', fn: workflowSetVisibilityCommand },
       copy: { description: 'Copy workflow to another namespace', fn: workflowCopyCommand },
       archive: { description: 'Archive/unarchive workflow versions', fn: workflowArchiveCommand },
+      delete: { description: 'Soft-delete a workflow + cascade', fn: workflowDeleteCommand },
     },
   },
   run: {
-    description: 'Workflow runs (list, start, get, cancel)',
+    description: 'Workflow runs (list, start, get, cancel, archive, bulk)',
     leaves: {
       list: { description: 'List recent runs', fn: runListCommand },
       start: { description: 'Start a new run (manual trigger)', fn: runStartCommand },
       get: { description: "Fetch a single run's status", fn: runGetCommand },
       cancel: { description: 'Cancel a running or paused run', fn: runCancelCommand },
+      archive: { description: 'Soft-archive (or restore) a run', fn: runArchiveCommand },
+      'bulk-cancel': { description: 'Cancel multiple runs in one call', fn: runBulkCancelCommand },
+      'bulk-archive': { description: 'Archive multiple runs in one call', fn: runBulkArchiveCommand },
+    },
+  },
+  task: {
+    description: 'Human tasks (list, get, claim)',
+    leaves: {
+      list: { description: 'List tasks by role or instance', fn: taskListCommand },
+      get: { description: 'Fetch a single task', fn: taskGetCommand },
+      claim: { description: 'Claim a pending task', fn: taskClaimCommand },
+    },
+  },
+  cowork: {
+    description: 'Cowork sessions (get, get-by-instance, chat)',
+    leaves: {
+      get: { description: 'Fetch a single cowork session', fn: coworkGetCommand },
+      'get-by-instance': {
+        description: 'Fetch the active cowork session for a process instance',
+        fn: coworkGetByInstanceCommand,
+      },
+      chat: { description: 'Send a chat message to a cowork session', fn: coworkChatCommand },
     },
   },
   agent: {
-    description: 'Agent definitions (list, get, delete, visibility)',
+    description: 'Agent definitions (list, get, create, delete, visibility)',
     leaves: {
       list: { description: 'List agent definitions', fn: agentListCommand },
       get: { description: 'Fetch an agent definition', fn: agentGetCommand },
+      create: { description: 'Create an agent from a JSON file', fn: agentCreateCommand },
       delete: { description: 'Delete an agent definition', fn: agentDeleteCommand },
       'set-visibility': { description: 'Set agent visibility (public|private)', fn: agentSetVisibilityCommand },
+    },
+  },
+  'agent-run': {
+    description: 'Agent runs (list, get) — single agent invocations inside workflow runs',
+    leaves: {
+      list: { description: 'List recent agent runs', fn: agentRunListCommand },
+      get: { description: 'Fetch a single agent run', fn: agentRunGetCommand },
     },
   },
   model: {
@@ -102,6 +154,28 @@ export const TREE: Record<string, BranchEntry> = {
       set: { description: 'Set a secret', fn: secretSetCommand },
       list: { description: 'List secret keys', fn: secretListCommand },
       delete: { description: 'Delete a secret', fn: secretDeleteCommand },
+    },
+  },
+  users: {
+    description: 'User identity + workspace memberships',
+    leaves: {
+      me: { description: 'Show the signed-in user + their workspaces', fn: usersMeCommand },
+      'clear-must-change-password': {
+        description: 'Acknowledge a forced password change',
+        fn: usersClearMustChangePasswordCommand,
+      },
+    },
+  },
+  namespace: {
+    description: 'Workspaces (get, create, update, delete, leave, members)',
+    leaves: {
+      get: { description: 'Fetch a namespace + member list', fn: namespaceGetCommand },
+      create: { description: 'Create an organization namespace', fn: namespaceCreateCommand },
+      update: { description: 'Edit display name / bio / icon', fn: namespaceUpdateCommand },
+      delete: { description: 'Delete a workspace (owner only, cascades members)', fn: namespaceDeleteCommand },
+      leave: { description: 'Leave a workspace (self-remove)', fn: namespaceLeaveCommand },
+      'remove-member': { description: 'Remove a member from a workspace', fn: namespaceRemoveMemberCommand },
+      'set-member-role': { description: 'Flip a member to admin|member', fn: namespaceSetMemberRoleCommand },
     },
   },
   system: {

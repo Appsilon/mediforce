@@ -73,6 +73,10 @@ export {
   NamespaceTypeSchema,
   NamespaceSchema,
   NamespaceMemberSchema,
+  NamespaceMembershipSchema,
+  HandleSchema,
+  HANDLE_REGEX,
+  HANDLE_MAX_LENGTH,
   WorkflowSecretsSchema,
   NamespaceSecretsSchema,
   CronTriggerStateSchema,
@@ -96,6 +100,8 @@ export {
   TableEditorRowSchema,
   CompleteHumanTaskPayloadSchema,
 } from './schemas/index.js';
+
+export type { Handle } from './schemas/handle.js';
 
 // Types (re-exported from schemas for convenience)
 export type {
@@ -167,6 +173,7 @@ export type {
   NamespaceType,
   Namespace,
   NamespaceMember,
+  NamespaceMembership,
   WorkflowSecrets,
   NamespaceSecrets,
   CronTriggerState,
@@ -204,17 +211,30 @@ export type {
   NotificationEvent,
   UserDirectoryService,
   DirectoryUser,
+  UserAuthMetadata,
   AgentRunRepository,
+  ListAgentRunsOptions,
+  ListAgentRunsPage,
   CoworkSessionRepository,
   CronTriggerStateRepository,
   ToolCatalogRepository,
   NamespaceRepository,
+  NamespaceUpdates,
   NamespaceSecretsRepository,
+  UserProfile,
+  UserProfileRepository,
   WorkflowSecretsRepository,
   SendEmailParams,
   SendEmailResult,
   SendEmailFn,
 } from './interfaces/index.js';
+
+export { encodeCursor, decodeCursor } from './cursors/cursor.js';
+export {
+  encodeAgentRunCursor,
+  decodeAgentRunCursor,
+} from './cursors/agent-run-cursor.js';
+export type { AgentRunCursorPayload } from './cursors/agent-run-cursor.js';
 
 // Agent definition schema + repository interface
 export {

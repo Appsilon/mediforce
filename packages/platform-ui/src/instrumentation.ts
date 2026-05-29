@@ -47,6 +47,17 @@ function validateEnv(existsSync: (path: string) => boolean): void {
     }
   }
 
+  // --- STORAGE_BACKEND (ADR-0001) ---
+  if (process.env.STORAGE_BACKEND === 'postgres') {
+    const dbUrl = process.env.DATABASE_URL;
+    if (typeof dbUrl !== 'string' || dbUrl.length === 0) {
+      errors.push(
+        'STORAGE_BACKEND=postgres requires DATABASE_URL. '
+        + 'Set DATABASE_URL or unset STORAGE_BACKEND to fall back to Firestore.',
+      );
+    }
+  }
+
   // --- MAILGUN EMAIL CONFIG ---
   if (process.env.MEDIFORCE_DISABLE_EMAIL !== 'true') {
     const mailgunVars = ['MAILGUN_API_KEY', 'MAILGUN_DOMAIN', 'MAILGUN_FROM_EMAIL'] as const;
@@ -81,3 +92,13 @@ export async function register(): Promise<void> {
     validateEnv(existsSync);
   }
 }
+
+// ADR-0001 — Postgres migrations are NOT applied here. They run via
+// `packages/platform-infra/scripts/migrate.mjs`, invoked by the
+// production Dockerfile's CMD before `server.js`. Local dev runs them
+// via `pnpm dev:postgres` (which calls `pnpm db:migrate` before the dev
+// server) or `pnpm db:migrate` directly. See docs/postgres-local-dev.md.
+// Instrumentation-time migration was tried (commit cd540e85) but
+// Turbopack's instrumentation pipeline doesn't honour `transpilePackages`
+// for workspace imports, which forced @ts-expect-error workarounds and
+// duplicated `postgres`/`drizzle-orm` as platform-ui direct deps.

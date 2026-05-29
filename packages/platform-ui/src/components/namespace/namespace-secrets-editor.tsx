@@ -2,12 +2,8 @@
 
 import * as React from 'react';
 import { Plus, Trash2, Save, Info, ClipboardPaste } from 'lucide-react';
-import {
-  getNamespaceSecretPreviews,
-  upsertNamespaceSecret,
-  deleteNamespaceSecret,
-  type SecretPreview,
-} from '@/app/actions/namespace-secrets';
+import { mediforce, ApiError } from '@/lib/mediforce';
+import type { SecretPreview } from '@mediforce/platform-api/contract';
 
 function parseEnvText(text: string): Array<{ key: string; value: string }> | null {
   const lines = text.split('\n').filter((line) => {
@@ -40,10 +36,12 @@ interface Row {
 
 interface NamespaceSecretsEditorProps {
   namespace: string;
+  // Kept for prop compatibility with the call site; auth flows via the
+  // bearer-token bridge now, not an explicit uid argument.
   userId: string;
 }
 
-export function NamespaceSecretsEditor({ namespace, userId }: NamespaceSecretsEditorProps) {
+export function NamespaceSecretsEditor({ namespace, userId: _userId }: NamespaceSecretsEditorProps) {
   const [rows, setRows] = React.useState<Row[]>([]);
   const [deletedKeys, setDeletedKeys] = React.useState<string[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -58,8 +56,9 @@ export function NamespaceSecretsEditor({ namespace, userId }: NamespaceSecretsEd
   React.useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getNamespaceSecretPreviews(namespace, userId)
-      .then((previews) => {
+    mediforce.secrets
+      .workspacePreviews({ namespace })
+      .then(({ previews }: { previews: SecretPreview[] }) => {
         if (cancelled) return;
         setRows(previews.map((p) => ({
           key: p.key,
@@ -76,20 +75,22 @@ export function NamespaceSecretsEditor({ namespace, userId }: NamespaceSecretsEd
         setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [namespace, userId]);
+  }, [namespace]);
 
   const handleSave = async () => {
     setSaving(true);
     setSaveMessage(null);
     try {
-      const ops: Promise<void>[] = [];
+      const ops: Promise<unknown>[] = [];
       for (const row of rows) {
         if ((row.changed || row.isNew) && row.key.trim() !== '' && row.value !== '') {
-          ops.push(upsertNamespaceSecret(namespace, row.key.trim(), row.value, userId));
+          ops.push(
+            mediforce.secrets.set({ namespace, key: row.key.trim(), value: row.value }),
+          );
         }
       }
       for (const key of deletedKeys) {
-        ops.push(deleteNamespaceSecret(namespace, key, userId));
+        ops.push(mediforce.secrets.delete({ namespace, key }));
       }
       await Promise.all(ops);
 
@@ -107,7 +108,11 @@ export function NamespaceSecretsEditor({ namespace, userId }: NamespaceSecretsEd
       setSaveMessage('Secrets saved');
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = error instanceof ApiError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : 'Unknown error';
       setSaveMessage(`Error: ${message}`);
       console.error('Failed to save namespace secrets:', error);
     } finally {

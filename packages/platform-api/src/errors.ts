@@ -92,6 +92,20 @@ export class PreconditionFailedError extends HandlerError {
   }
 }
 
+export class ConflictError extends HandlerError {
+  constructor(message = 'Conflict', details?: unknown) {
+    super('conflict', message, details);
+    this.name = 'ConflictError';
+  }
+}
+
+export class ValidationError extends HandlerError {
+  constructor(message = 'Invalid input', details?: unknown) {
+    super('validation', message, details);
+    this.name = 'ValidationError';
+  }
+}
+
 export function httpStatusForApiErrorCode(code: ApiErrorCode): number {
   switch (code) {
     case 'unauthorized':

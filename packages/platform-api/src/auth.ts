@@ -13,12 +13,15 @@ import { ForbiddenError } from './errors.js';
  * adapter (`platform-ui/src/lib/api-auth.ts`) is responsible for producing it
  * from a `Request`.
  */
+export type NamespaceRole = 'owner' | 'admin' | 'member';
+
 export type CallerIdentity =
   | { readonly kind: 'apiKey'; readonly isSystemActor: true }
   | {
       readonly kind: 'user';
       readonly uid: string;
       readonly namespaces: ReadonlySet<string>;
+      readonly namespaceRoles: ReadonlyMap<string, NamespaceRole>;
       readonly isSystemActor: false;
     };
 
@@ -72,4 +75,59 @@ export function filterByCaller<T>(
 ): T[] {
   if (caller.isSystemActor) return [...items];
   return items.filter((item) => callerCanAccess(caller, namespaceOf(item)));
+}
+
+/**
+ * Throw `ForbiddenError` unless the caller has owner/admin role in `namespace`.
+ *
+ * apiKey callers (trusted infra: CLI / engine / worker / agents) bypass —
+ * platform-admin in the operator's mental model. Per-user PATs (#376) reroute
+ * through the user variant later.
+ *
+ * Per ADR-0004 §4 the wrapper layer (`AuthorizedScope`) does NOT consult roles;
+ * this handler-resident helper is the only consumer.
+ */
+export function assertCallerIsNamespaceAdmin(
+  caller: CallerIdentity,
+  namespace: string,
+): void {
+  if (caller.isSystemActor) return;
+  const role = caller.namespaceRoles.get(namespace);
+  if (role !== 'owner' && role !== 'admin') {
+    throw new ForbiddenError();
+  }
+}
+
+/**
+ * Loose cross-namespace gate for the platform-wide DELETE /api/admin/docker-images
+ * proxy — the user must be owner/admin in at least one namespace.
+ *
+ * Replaced by a first-class platform-admin field once #376 (per-user PATs)
+ * lands; until then the "any namespace admin can prune image registry" proxy
+ * is the closest existing approximation.
+ */
+export function assertCallerCanAdminDockerImages(caller: CallerIdentity): void {
+  if (caller.isSystemActor) return;
+  for (const role of caller.namespaceRoles.values()) {
+    if (role === 'owner' || role === 'admin') return;
+  }
+  throw new ForbiddenError();
+}
+
+/**
+ * Throw `ForbiddenError` unless the caller is the owner of `namespace`.
+ *
+ * apiKey callers bypass (platform-admin trust). Used by handlers that perform
+ * owner-exclusive mutations: workspace deletion, role flips that promote /
+ * demote admins, and the owner-cannot-leave precondition check.
+ */
+export function assertCallerIsNamespaceOwner(
+  caller: CallerIdentity,
+  namespace: string,
+): void {
+  if (caller.isSystemActor) return;
+  const role = caller.namespaceRoles.get(namespace);
+  if (role !== 'owner') {
+    throw new ForbiddenError();
+  }
 }

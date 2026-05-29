@@ -53,9 +53,19 @@ Move the primary datastore to **self-hosted Postgres 16**, accessed via
    `archived: boolean` flags with `deleted_at timestamptz` and
    `archived_at timestamptz` columns. NULL = active. Soft-delete is **forever**
    for now; a later ADR may introduce a retention purge.
-5. **Realtime swap.** All `onSnapshot` listeners are removed. Lists move to
-   **SWR polling** (2–10 s interval). Live agent run logs and cowork text chat
-   move to **Server-Sent Events**. No WebSockets are introduced.
+5. **Realtime swap.** All `onSnapshot` listeners are removed. Everything moves
+   to **react-query polling** (1–10 s interval, terminal-state gating per
+   resource — see [`ADR-0006`](./0006-client-side-server-state.md)). No SSE
+   and no WebSockets at cutover. SSE remains a forward option for surfaces
+   where polling lag proves visible in practice (live token-stream during
+   agent runs, multi-second cowork tool loops); tracked by
+   [#516](https://github.com/Appsilon/mediforce/issues/516) and a future ADR.
+   `createRouteAdapter` stays forward-compatible — the handler shape
+   `(input, scope) => Promise<output>` does not preclude a sibling
+   `createStreamingRouteAdapter` later. _Amended 2026-05-28 to drop the
+   original SSE-at-cutover commitment per Phase 4 plan grilling; see
+   [`docs/headless-migration-phase-4-plan.md`](../headless-migration-phase-4-plan.md)
+   § 2 "ADR amendments bundled" for full reasoning._
 6. **Cross-workspace public discovery.** `WorkflowDefinition.visibility =
    'public'` remains a live, cross-Workspace feature — teams may publish,
    platform examples ship as public. Access goes through an explicit repo
@@ -76,6 +86,85 @@ Move the primary datastore to **self-hosted Postgres 16**, accessed via
    datastore env, and restart. Rollback path: restore Firestore from backup,
    retry next window. Mediforce is in platform-creation phase, not 24/7
    maintenance — downtime is acceptable.
+
+### Implementation patterns
+
+The first repository migration (`tool_catalog_entries`,
+[PR #515](https://github.com/Appsilon/mediforce/pull/515)) settled five
+patterns that every subsequent Postgres repository inherits. They are
+load-bearing for safety and operability, not stylistic — calling them out
+here so future repos don't relitigate them.
+
+**1. Shared per-process Postgres client.**
+[`getSharedPostgresClient()`](../../packages/platform-infra/src/postgres/client.ts)
+returns a process-wide singleton (`postgres-js` pool + `drizzle` wrapper).
+Every PG-backed repository constructor takes the same `Database` handle.
+Rationale: per-repo pools would multiply — 14 planned repos × default
+`max=10` connections = 140, blowing past Postgres' default
+`max_connections=100`. Pool size hardcoded in `client.ts` (no env knob —
+bump there if the deployment fans out).
+
+**2. Validate on both read and write in every repository.**
+[`PostgresToolCatalogRepository`](../../packages/platform-infra/src/postgres/repositories/tool-catalog-repository.ts)
+calls `ToolCatalogEntrySchema.parse(…)` on the row coming back from `select`
+and on the entry going into `upsert`. Rationale: `jsonb` cannot enforce
+TypeScript shape — `args: string[]` and `env: Record<string,string>` are
+opaque to Postgres, so a sibling repo, a raw-SQL fix, or a schema-drifting
+migration could silently land a malformed row. This matches the Firestore
+backend's behaviour. Cost is trivial for low-volume tables; high-volume
+read paths (audit, agent runs) will revisit at parse-on-write +
+parse-on-bulk-read granularity, but the default is "always parse".
+
+**3. `set_updated_at()` UPDATE trigger instead of application-side bumps.**
+The first migration ships a generic [trigger function](../../packages/platform-infra/src/postgres/migrations/0000_tool_catalog_entries.sql)
+that every soft-mutable table installs once. Rationale: raw-SQL writers
+(ops scripts, future data migrations, manual hot-fixes) get a correct
+`updated_at` for free. Application code never sets `updated_at` on
+`UPDATE` — the trigger owns it.
+
+**4. Boot-time env validation in
+[`instrumentation.ts`](../../packages/platform-ui/src/instrumentation.ts),
+not module-top of `platform-services.ts`.**
+Next.js loads route modules lazily on first request; a module-top throw
+fires per-request, not at boot, which means missing env wouldn't surface
+until a user hits the affected route. `instrumentation.register()` is
+Next.js' real boot hook and runs once per server start. Migrations apply
+*outside* the Next.js process — see Implementation pattern 6.
+
+**6. Migrations run as a separate process before app start, not from
+inside Next.js.**
+Production: [`packages/platform-ui/Dockerfile`](../../packages/platform-ui/Dockerfile)
+wraps the container `CMD` with
+[`packages/platform-infra/scripts/migrate.mjs`](../../packages/platform-infra/scripts/migrate.mjs):
+the script applies pending Drizzle migrations, then exec's `server.js`.
+A first attempt routed migrations through Next.js `instrumentation.ts`,
+but Turbopack's instrumentation pipeline does not honour
+`transpilePackages` for workspace imports, which forced `@ts-expect-error`
+escapes and duplicating `postgres` / `drizzle-orm` as `platform-ui`
+direct deps. The standalone-script approach drops the workarounds, keeps
+the Next.js boot path clean, and lets the same script run as an
+init-container if a future deployment goes multi-replica. Local dev
+runs migrations via `pnpm dev:postgres` (wrapper around `pnpm db:migrate`
++ `pnpm dev`) or `pnpm db:migrate` directly — same drizzle-kit CLI under
+the hood, just different boot-wrappers.
+
+**5. Per-repo ternary routing inside `getPlatformServices()`, no separate
+backend factory.**
+[`platform-services.ts`](../../packages/platform-api/src/services/platform-services.ts)
+selects the backend with a one-line ternary at the repo's declaration
+site:
+
+```ts
+const toolCatalogRepo: ToolCatalogRepository =
+  process.env.STORAGE_BACKEND === 'postgres'
+    ? new PostgresToolCatalogRepository(getSharedPostgresClient().db)
+    : new FirestoreToolCatalogRepository(db);
+```
+
+Rationale: `getPlatformServices()` *is* the factory. A separate
+`createBackend(flag)` abstraction would just rename it and add a layer of
+indirection. The inline ternary is local, explicit, greppable, and
+removable in one sweep after the cutover (§8.4).
 
 ## Considered alternatives
 
@@ -147,8 +236,10 @@ Move the primary datastore to **self-hosted Postgres 16**, accessed via
   removing a class of race-condition workarounds (notably the personal-
   namespace bootstrap dance in `auth-context.tsx`).
 - One-time migration effort, estimated 2 focused engineering weeks.
-- ~14 UI hook sites + 3 page-component sites are rewired from `onSnapshot` to
-  SWR / SSE. Mostly mechanical.
+- ~20 UI consumer sites are rewired from `onSnapshot` to react-query polling
+  (1–10 s, terminal-state gating). Mostly mechanical; see
+  [`docs/headless-migration-phase-4-plan.md`](../headless-migration-phase-4-plan.md)
+  per-consumer migration table.
 - New operational responsibility for self-hosted customers: Postgres backup.
   Standard tooling; documented as part of this migration.
 - Cross-workspace public-workflow discovery is the **single permitted scope

@@ -306,16 +306,20 @@ function AgentCatalog({ handle }: { handle: string }) {
 
 export default function AgentsPage() {
   const { handle } = useParams<{ handle: string }>();
-  const { data: runs, loading } = useAgentRuns();
+  const { data: runs, loading } = useAgentRuns(handle);
   const processNameMap = useProcessNameMap();
 
   const [processFilter, setProcessFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   const processNames = useMemo(() => {
+    // Drop empty / undefined definitionNames so the <select> doesn't end up
+    // with multiple <option key=""> children — that collision is what
+    // surfaces the "Each child in a list should have a unique key" warning
+    // from React when a legacy ProcessInstance lacks its name.
     const names = new Set<string>();
     for (const [, name] of processNameMap) {
-      names.add(name);
+      if (typeof name === 'string' && name.length > 0) names.add(name);
     }
     return Array.from(names).sort();
   }, [processNameMap]);
@@ -378,7 +382,7 @@ export default function AgentsPage() {
               onChange={(e) => setProcessFilter(e.target.value || null)}
               className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
             >
-              <option key="" value="">All Workflows</option>
+              <option key="__all" value="">All Workflows</option>
               {processNames.map((name) => (
                 <option key={name} value={name}>
                   {name}
@@ -391,7 +395,7 @@ export default function AgentsPage() {
               onChange={(e) => setStatusFilter(e.target.value || null)}
               className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
             >
-              <option key="" value="">All Statuses</option>
+              <option key="__all" value="">All Statuses</option>
               {ALL_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {status.replace(/_/g, ' ')}

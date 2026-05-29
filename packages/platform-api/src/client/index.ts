@@ -23,8 +23,15 @@ import {
   SetVisibilityOutputSchema,
   CopyWorkflowInputSchema,
   CopyWorkflowOutputSchema,
+  SetDefaultVersionInputSchema,
+  SetDefaultVersionOutputSchema,
+  DeleteWorkflowInputSchema,
+  DeleteWorkflowOutputSchema,
+  GetWorkflowRunCountInputSchema,
+  GetWorkflowRunCountOutputSchema,
+  TransferWorkflowInputSchema,
+  TransferWorkflowOutputSchema,
   DockerInfoResponseSchema,
-  RemoveImageOutputSchema,
   OpenRouterCreditsInputSchema,
   OpenRouterCreditsOutputSchema,
   ListAgentsInputSchema,
@@ -36,12 +43,34 @@ import {
   UpdateAgentInputSchema,
   UpdateAgentBodySchema,
   UpdateAgentOutputSchema,
+  CreateAgentInputSchema,
+  CreateAgentOutputSchema,
+  UpsertAgentMcpBindingInputSchema,
+  UpsertAgentMcpBindingOutputSchema,
+  DeleteAgentMcpBindingInputSchema,
+  DeleteAgentMcpBindingOutputSchema,
+  ListAgentMcpBindingsInputSchema,
+  ListAgentMcpBindingsOutputSchema,
+  ListAgentOAuthTokensInputSchema,
+  ListAgentOAuthTokensOutputSchema,
+  GetAgentOAuthTokenInputSchema,
+  GetAgentOAuthTokenOutputSchema,
+  DeleteAgentOAuthTokenInputSchema,
+  DeleteAgentOAuthTokenOutputSchema,
   SetSecretInputSchema,
   SetSecretOutputSchema,
   ListSecretKeysInputSchema,
   ListSecretKeysOutputSchema,
   DeleteSecretInputSchema,
   DeleteSecretOutputSchema,
+  GetWorkspaceSecretPreviewsInputSchema,
+  GetWorkspaceSecretPreviewsOutputSchema,
+  ListWorkflowSecretKeysBatchInputSchema,
+  ListWorkflowSecretKeysBatchOutputSchema,
+  GetWorkflowSecretsFullInputSchema,
+  GetWorkflowSecretsFullOutputSchema,
+  SaveWorkflowSecretsInputSchema,
+  SaveWorkflowSecretsOutputSchema,
   GetProcessInputSchema,
   GetProcessOutputSchema,
   ListAuditEventsInputSchema,
@@ -71,8 +100,106 @@ import {
   ResumeRunOutputSchema,
   RetryStepInputSchema,
   RetryStepOutputSchema,
+  ArchiveRunInputSchema,
+  ArchiveRunOutputSchema,
+  BulkRunInputSchema,
+  BulkRunOutputSchema,
   HeartbeatInputSchema,
   HeartbeatOutputSchema,
+  ListOAuthProvidersInputSchema,
+  ListOAuthProvidersOutputSchema,
+  GetOAuthProviderInputSchema,
+  GetOAuthProviderOutputSchema,
+  CreateOAuthProviderInputApiSchema,
+  CreateOAuthProviderOutputSchema,
+  UpdateOAuthProviderInputApiSchema,
+  UpdateOAuthProviderOutputSchema,
+  DeleteOAuthProviderInputSchema,
+  DeleteOAuthProviderOutputSchema,
+  ListToolCatalogEntriesInputSchema,
+  ListToolCatalogEntriesOutputSchema,
+  GetToolCatalogEntryInputSchema,
+  GetToolCatalogEntryOutputSchema,
+  CreateToolCatalogEntryInputApiSchema,
+  CreateToolCatalogEntryOutputSchema,
+  UpdateToolCatalogEntryInputApiSchema,
+  UpdateToolCatalogEntryOutputSchema,
+  DeleteToolCatalogEntryInputSchema,
+  DeleteToolCatalogEntryOutputSchema,
+  ListNamespaceMembersInputSchema,
+  ListNamespaceMembersOutputSchema,
+  InviteUserInputSchema,
+  InviteUserOutputSchema,
+  ResendInviteInputSchema,
+  ResendInviteOutputSchema,
+  GetMeInputSchema,
+  GetMeOutputSchema,
+  ClearMustChangePasswordInputSchema,
+  ClearMustChangePasswordOutputSchema,
+  GetNamespaceInputSchema,
+  GetNamespaceOutputSchema,
+  CreateNamespaceInputSchema,
+  CreateNamespaceOutputSchema,
+  UpdateNamespaceInputSchema,
+  UpdateNamespaceBodySchema,
+  UpdateNamespaceOutputSchema,
+  DeleteNamespaceInputSchema,
+  DeleteNamespaceOutputSchema,
+  LeaveNamespaceInputSchema,
+  LeaveNamespaceOutputSchema,
+  RemoveNamespaceMemberInputSchema,
+  RemoveNamespaceMemberOutputSchema,
+  UpdateNamespaceMemberRoleInputSchema,
+  UpdateNamespaceMemberRoleBodySchema,
+  UpdateNamespaceMemberRoleOutputSchema,
+  type ListNamespaceMembersInput,
+  type ListNamespaceMembersOutput,
+  type InviteUserInput,
+  type InviteUserOutput,
+  type ResendInviteInput,
+  type ResendInviteOutput,
+  type GetMeInput,
+  type GetMeOutput,
+  type ClearMustChangePasswordInput,
+  type ClearMustChangePasswordOutput,
+  type GetNamespaceInput,
+  type GetNamespaceOutput,
+  type CreateNamespaceInput,
+  type CreateNamespaceOutput,
+  type UpdateNamespaceInput,
+  type UpdateNamespaceOutput,
+  type DeleteNamespaceInput,
+  type DeleteNamespaceOutput,
+  type LeaveNamespaceInput,
+  type LeaveNamespaceOutput,
+  type RemoveNamespaceMemberInput,
+  type RemoveNamespaceMemberOutput,
+  type UpdateNamespaceMemberRoleInput,
+  type UpdateNamespaceMemberRoleOutput,
+  DeleteDockerImageInputSchema,
+  DeleteDockerImageOutputSchema,
+  type DeleteDockerImageInput,
+  type DeleteDockerImageOutput,
+  type ListOAuthProvidersInput,
+  type ListOAuthProvidersOutput,
+  type GetOAuthProviderInput,
+  type GetOAuthProviderOutput,
+  type CreateOAuthProviderInputApi,
+  type CreateOAuthProviderOutput,
+  type UpdateOAuthProviderInputApi,
+  type UpdateOAuthProviderOutput,
+  type DeleteOAuthProviderInput,
+  type DeleteOAuthProviderOutput,
+  type ListToolCatalogEntriesInput,
+  type ListToolCatalogEntriesOutput,
+  type GetToolCatalogEntryInput,
+  type GetToolCatalogEntryOutput,
+  type CreateToolCatalogEntryInputApi,
+  type CreateToolCatalogEntryOutput,
+  type UpdateToolCatalogEntryInputApi,
+  type UpdateToolCatalogEntryOutput,
+  type DeleteToolCatalogEntryInput,
+  type DeleteToolCatalogEntryOutput,
   type ListTasksInput,
   type ListTasksOutput,
   type GetTaskInput,
@@ -81,7 +208,7 @@ import {
   type ClaimTaskOutput,
   type CompleteTaskInput,
   type CompleteTaskOutput,
-  type RegisterWorkflowInput,
+  type RegisterWorkflowBody,
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
   type ListWorkflowsInput,
@@ -97,6 +224,14 @@ import {
   type CopyWorkflowInput,
   type CopyWorkflowOutput,
   type CopyWorkflowOptions,
+  type SetDefaultVersionInput,
+  type SetDefaultVersionOutput,
+  type DeleteWorkflowInput,
+  type DeleteWorkflowOutput,
+  type GetWorkflowRunCountInput,
+  type GetWorkflowRunCountOutput,
+  type TransferWorkflowInput,
+  type TransferWorkflowOutput,
   type GetRunInput,
   type GetRunOutput,
   type StartRunInput,
@@ -104,7 +239,6 @@ import {
   type ListRunsInput,
   type ListRunsOutput,
   type DockerInfoResponse,
-  type RemoveImageOutput,
   type OpenRouterCreditsInput,
   type OpenRouterCreditsOutput,
   type ListAgentsInput,
@@ -116,12 +250,34 @@ import {
   type UpdateAgentInput,
   type UpdateAgentBody,
   type UpdateAgentOutput,
+  type CreateAgentBody,
+  type CreateAgentOutput,
+  type UpsertAgentMcpBindingInput,
+  type UpsertAgentMcpBindingOutput,
+  type DeleteAgentMcpBindingInput,
+  type DeleteAgentMcpBindingOutput,
+  type ListAgentMcpBindingsInput,
+  type ListAgentMcpBindingsOutput,
+  type ListAgentOAuthTokensInput,
+  type ListAgentOAuthTokensOutput,
+  type GetAgentOAuthTokenInput,
+  type GetAgentOAuthTokenOutput,
+  type DeleteAgentOAuthTokenInput,
+  type DeleteAgentOAuthTokenOutput,
   type SetSecretInput,
   type SetSecretOutput,
   type ListSecretKeysInput,
   type ListSecretKeysOutput,
   type DeleteSecretInput,
   type DeleteSecretOutput,
+  type GetWorkspaceSecretPreviewsInput,
+  type GetWorkspaceSecretPreviewsOutput,
+  type ListWorkflowSecretKeysBatchInput,
+  type ListWorkflowSecretKeysBatchOutput,
+  type GetWorkflowSecretsFullInput,
+  type GetWorkflowSecretsFullOutput,
+  type SaveWorkflowSecretsInput,
+  type SaveWorkflowSecretsOutput,
   ListModelsInputSchema,
   ListModelsOutputSchema,
   GetModelInputSchema,
@@ -144,6 +300,10 @@ import {
   type ResumeRunOutput,
   type RetryStepInput,
   type RetryStepOutput,
+  type ArchiveRunInput,
+  type ArchiveRunOutput,
+  type BulkRunInput,
+  type BulkRunOutput,
   type HeartbeatInput,
   type HeartbeatOutput,
   type GetCoworkSessionInput,
@@ -159,6 +319,18 @@ import {
   type SynthesizeVoiceArtifactInput,
   type SynthesizeVoiceArtifactOutput,
   type ListPluginsOutput,
+  ListAgentRunsInputSchema,
+  ListAgentRunsOutputSchema,
+  GetAgentRunInputSchema,
+  GetAgentRunOutputSchema,
+  type ListAgentRunsInput,
+  type ListAgentRunsOutput,
+  type GetAgentRunInput,
+  type GetAgentRunOutput,
+  MonitoringSummaryInputSchema,
+  GetMonitoringSummaryOutputSchema,
+  type MonitoringSummaryInput,
+  type GetMonitoringSummaryOutput,
 } from '../contract/index.js';
 // SDK consumers reach for one path:
 //   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
@@ -265,15 +437,19 @@ export class Mediforce {
 
   readonly workflows: {
     register: (
-      input: RegisterWorkflowInput,
+      input: RegisterWorkflowBody,
       options: RegisterWorkflowOptions,
     ) => Promise<RegisterWorkflowOutput>;
     list: (input?: ListWorkflowsInput) => Promise<ListWorkflowsOutput>;
     get: (input: GetWorkflowInput) => Promise<GetWorkflowOutput>;
-    archiveVersion: (input: ArchiveVersionInput) => Promise<ArchiveVersionOutput>;
-    archiveAll: (input: ArchiveAllInput) => Promise<ArchiveAllOutput>;
-    setVisibility: (input: SetVisibilityInput) => Promise<SetVisibilityOutput>;
-    copy: (input: CopyWorkflowInput, options: CopyWorkflowOptions) => Promise<CopyWorkflowOutput>;
+    archiveVersion: (input: ArchiveVersionInput, options: { namespace: string }) => Promise<ArchiveVersionOutput>;
+    archiveAll: (input: ArchiveAllInput, options: { namespace: string }) => Promise<ArchiveAllOutput>;
+    setVisibility: (input: SetVisibilityInput, options: { namespace: string }) => Promise<SetVisibilityOutput>;
+    copy: (input: CopyWorkflowInput, options: CopyWorkflowOptions & { sourceNamespace?: string }) => Promise<CopyWorkflowOutput>;
+    setDefaultVersion: (input: SetDefaultVersionInput) => Promise<SetDefaultVersionOutput>;
+    delete: (input: DeleteWorkflowInput) => Promise<DeleteWorkflowOutput>;
+    getRunCount: (input: GetWorkflowRunCountInput) => Promise<GetWorkflowRunCountOutput>;
+    transferNamespace: (input: TransferWorkflowInput) => Promise<TransferWorkflowOutput>;
   };
 
   readonly runs: {
@@ -283,13 +459,35 @@ export class Mediforce {
     cancel: (input: CancelRunInput) => Promise<CancelRunOutput>;
     resume: (input: ResumeRunInput) => Promise<ResumeRunOutput>;
     retryStep: (input: RetryStepInput) => Promise<RetryStepOutput>;
+    archive: (input: ArchiveRunInput) => Promise<ArchiveRunOutput>;
+    bulkCancel: (input: BulkRunInput) => Promise<BulkRunOutput>;
+    bulkArchive: (input: BulkRunInput) => Promise<BulkRunOutput>;
   };
 
   readonly agents: {
     list: (input?: ListAgentsInput) => Promise<ListAgentsOutput>;
     get: (input: GetAgentInput) => Promise<GetAgentOutput>;
+    create: (input: CreateAgentBody) => Promise<CreateAgentOutput>;
     delete: (input: DeleteAgentInput) => Promise<DeleteAgentOutput>;
     update: (input: UpdateAgentInput, body: UpdateAgentBody) => Promise<UpdateAgentOutput>;
+    listMcpBindings: (
+      input: ListAgentMcpBindingsInput,
+    ) => Promise<ListAgentMcpBindingsOutput>;
+    upsertMcpBinding: (
+      input: UpsertAgentMcpBindingInput,
+    ) => Promise<UpsertAgentMcpBindingOutput>;
+    deleteMcpBinding: (
+      input: DeleteAgentMcpBindingInput,
+    ) => Promise<DeleteAgentMcpBindingOutput>;
+    listOAuthTokens: (
+      input: ListAgentOAuthTokensInput,
+    ) => Promise<ListAgentOAuthTokensOutput>;
+    getOAuthToken: (
+      input: GetAgentOAuthTokenInput,
+    ) => Promise<GetAgentOAuthTokenOutput>;
+    deleteOAuthToken: (
+      input: DeleteAgentOAuthTokenInput,
+    ) => Promise<DeleteAgentOAuthTokenOutput>;
   };
 
   readonly models: {
@@ -302,16 +500,73 @@ export class Mediforce {
     set: (input: SetSecretInput) => Promise<SetSecretOutput>;
     list: (input: ListSecretKeysInput) => Promise<ListSecretKeysOutput>;
     delete: (input: DeleteSecretInput) => Promise<DeleteSecretOutput>;
+    workspacePreviews: (
+      input: GetWorkspaceSecretPreviewsInput,
+    ) => Promise<GetWorkspaceSecretPreviewsOutput>;
+    workflowKeysBatch: (
+      input: ListWorkflowSecretKeysBatchInput,
+    ) => Promise<ListWorkflowSecretKeysBatchOutput>;
+  };
+
+  readonly workflowSecrets: {
+    values: (input: GetWorkflowSecretsFullInput) => Promise<GetWorkflowSecretsFullOutput>;
+    save: (input: SaveWorkflowSecretsInput) => Promise<SaveWorkflowSecretsOutput>;
   };
 
   readonly system: {
     dockerInfo: () => Promise<DockerInfoResponse>;
-    removeImage: (imageId: string) => Promise<RemoveImageOutput>;
     credits: (input: OpenRouterCreditsInput) => Promise<OpenRouterCreditsOutput>;
   };
 
   readonly cron: {
     heartbeat: (input?: HeartbeatInput) => Promise<HeartbeatOutput>;
+  };
+
+  readonly oauthProviders: {
+    list: (input: ListOAuthProvidersInput) => Promise<ListOAuthProvidersOutput>;
+    get: (input: GetOAuthProviderInput) => Promise<GetOAuthProviderOutput>;
+    create: (input: CreateOAuthProviderInputApi) => Promise<CreateOAuthProviderOutput>;
+    update: (input: UpdateOAuthProviderInputApi) => Promise<UpdateOAuthProviderOutput>;
+    delete: (input: DeleteOAuthProviderInput) => Promise<DeleteOAuthProviderOutput>;
+  };
+
+  readonly dockerImages: {
+    delete: (input: DeleteDockerImageInput) => Promise<DeleteDockerImageOutput>;
+  };
+
+  readonly toolCatalog: {
+    list: (input: ListToolCatalogEntriesInput) => Promise<ListToolCatalogEntriesOutput>;
+    get: (input: GetToolCatalogEntryInput) => Promise<GetToolCatalogEntryOutput>;
+    create: (input: CreateToolCatalogEntryInputApi) => Promise<CreateToolCatalogEntryOutput>;
+    update: (input: UpdateToolCatalogEntryInputApi) => Promise<UpdateToolCatalogEntryOutput>;
+    delete: (input: DeleteToolCatalogEntryInput) => Promise<DeleteToolCatalogEntryOutput>;
+  };
+
+  readonly users: {
+    listMembers: (input: ListNamespaceMembersInput) => Promise<ListNamespaceMembersOutput>;
+    invite: (input: InviteUserInput) => Promise<InviteUserOutput>;
+    resendInvite: (input: ResendInviteInput) => Promise<ResendInviteOutput>;
+    me: (input?: GetMeInput) => Promise<GetMeOutput>;
+    clearMustChangePassword: (input?: ClearMustChangePasswordInput) => Promise<ClearMustChangePasswordOutput>;
+  };
+
+  readonly namespaces: {
+    get: (input: GetNamespaceInput) => Promise<GetNamespaceOutput>;
+    create: (input: CreateNamespaceInput) => Promise<CreateNamespaceOutput>;
+    update: (input: UpdateNamespaceInput) => Promise<UpdateNamespaceOutput>;
+    delete: (input: DeleteNamespaceInput) => Promise<DeleteNamespaceOutput>;
+    leave: (input: LeaveNamespaceInput) => Promise<LeaveNamespaceOutput>;
+    removeMember: (input: RemoveNamespaceMemberInput) => Promise<RemoveNamespaceMemberOutput>;
+    updateMemberRole: (input: UpdateNamespaceMemberRoleInput) => Promise<UpdateNamespaceMemberRoleOutput>;
+  };
+
+  readonly agentRuns: {
+    list: (input?: ListAgentRunsInput) => Promise<ListAgentRunsOutput>;
+    get: (input: GetAgentRunInput) => Promise<GetAgentRunOutput>;
+  };
+
+  readonly monitoring: {
+    summary: (input: MonitoringSummaryInput) => Promise<GetMonitoringSummaryOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -498,13 +753,13 @@ export class Mediforce {
           );
         }
         const qs = toSearchParams({ namespace });
-        const res = await this.request(`/api/workflow-definitions${qs}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(validatedInput),
-        });
-        const body = await parseJsonOrThrow(res, 'mediforce.workflows.register');
-        return RegisterWorkflowOutputSchema.parse(body);
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions${qs}`,
+          { ...validatedInput } as Record<string, unknown>,
+          RegisterWorkflowOutputSchema,
+          'mediforce.workflows.register',
+        );
       },
       list: async (input) => {
         const validated = input ? ListWorkflowsInputSchema.parse(input) : undefined;
@@ -527,61 +782,95 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.get');
         return GetWorkflowOutputSchema.parse(body);
       },
-      archiveVersion: async (input) => {
+      archiveVersion: (input, options) => {
         const validated = ArchiveVersionInputSchema.parse(input);
-        const res = await this.request(
-          `/api/workflow-definitions/${encodeURIComponent(validated.name)}/versions/${validated.version}/archive`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ archived: validated.archived }),
-          },
+        const qs = toSearchParams({ namespace: options.namespace });
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions/${encodeURIComponent(validated.name)}/versions/${validated.version}/archive${qs}`,
+          { archived: validated.archived },
+          ArchiveVersionOutputSchema,
+          'mediforce.workflows.archiveVersion',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.workflows.archiveVersion');
-        return ArchiveVersionOutputSchema.parse(body);
       },
-      archiveAll: async (input) => {
+      archiveAll: (input, options) => {
         const validated = ArchiveAllInputSchema.parse(input);
-        const res = await this.request(
-          `/api/workflow-definitions/${encodeURIComponent(validated.name)}/archive`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ archived: validated.archived }),
-          },
+        const qs = toSearchParams({ namespace: options.namespace });
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions/${encodeURIComponent(validated.name)}/archive${qs}`,
+          { archived: validated.archived },
+          ArchiveAllOutputSchema,
+          'mediforce.workflows.archiveAll',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.workflows.archiveAll');
-        return ArchiveAllOutputSchema.parse(body);
       },
-      setVisibility: async (input) => {
+      setVisibility: (input, options) => {
         const validated = SetVisibilityInputSchema.parse(input);
-        const res = await this.request(
-          `/api/workflow-definitions/${encodeURIComponent(validated.name)}`,
-          {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ visibility: validated.visibility }),
-          },
+        const qs = toSearchParams({ namespace: options.namespace });
+        return this.sendJson(
+          'PATCH',
+          `/api/workflow-definitions/${encodeURIComponent(validated.name)}${qs}`,
+          { visibility: validated.visibility },
+          SetVisibilityOutputSchema,
+          'mediforce.workflows.setVisibility',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.workflows.setVisibility');
-        return SetVisibilityOutputSchema.parse(body);
       },
-      copy: async (input, options) => {
+      setDefaultVersion: (input) => {
+        const v = SetDefaultVersionInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions/${encodeURIComponent(v.name)}/default-version`,
+          { namespace: v.namespace, version: v.version },
+          SetDefaultVersionOutputSchema,
+          'mediforce.workflows.setDefaultVersion',
+        );
+      },
+      delete: (input) => {
+        const v = DeleteWorkflowInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: v.namespace });
+        return this.sendJson(
+          'DELETE',
+          `/api/workflow-definitions/${encodeURIComponent(v.name)}${qs}`,
+          { expectedRunCount: v.expectedRunCount, namespace: v.namespace },
+          DeleteWorkflowOutputSchema,
+          'mediforce.workflows.delete',
+        );
+      },
+      getRunCount: async (input) => {
+        const v = GetWorkflowRunCountInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: v.namespace });
+        const res = await this.request(
+          `/api/workflow-definitions/${encodeURIComponent(v.name)}/run-count${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.getRunCount');
+        return GetWorkflowRunCountOutputSchema.parse(body);
+      },
+      transferNamespace: (input) => {
+        const v = TransferWorkflowInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions/${encodeURIComponent(v.name)}/transfer`,
+          { sourceNamespace: v.sourceNamespace, targetNamespace: v.targetNamespace },
+          TransferWorkflowOutputSchema,
+          'mediforce.workflows.transferNamespace',
+        );
+      },
+      copy: (input, options) => {
         const validated = CopyWorkflowInputSchema.parse(input);
-        const qs = toSearchParams({ targetNamespace: options.targetNamespace });
+        const qs = toSearchParams({
+          targetNamespace: options.targetNamespace,
+          ...(options.sourceNamespace !== undefined ? { namespace: options.sourceNamespace } : {}),
+        });
         const reqBody: Record<string, unknown> = {};
         if (validated.version !== undefined) reqBody.version = validated.version;
         if (validated.targetName !== undefined) reqBody.targetName = validated.targetName;
-        const res = await this.request(
+        return this.sendJson(
+          'POST',
           `/api/workflow-definitions/${encodeURIComponent(validated.name)}/copy${qs}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(reqBody),
-          },
+          reqBody,
+          CopyWorkflowOutputSchema,
+          'mediforce.workflows.copy',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.workflows.copy');
-        return CopyWorkflowOutputSchema.parse(body);
       },
     };
 
@@ -608,19 +897,86 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.agents.delete');
         return DeleteAgentOutputSchema.parse(body);
       },
-      update: async (input, updateBody) => {
+      update: (input, updateBody) => {
         const validatedInput = UpdateAgentInputSchema.parse(input);
         const validatedBody = UpdateAgentBodySchema.parse(updateBody);
-        const res = await this.request(
+        return this.sendJson(
+          'PUT',
           `/api/agents/${encodeURIComponent(validatedInput.id)}`,
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(validatedBody),
-          },
+          validatedBody as Record<string, unknown>,
+          UpdateAgentOutputSchema,
+          'mediforce.agents.update',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.agents.update');
-        return UpdateAgentOutputSchema.parse(body);
+      },
+      create: (input) => {
+        const v = CreateAgentInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          '/api/agents',
+          { ...v } as Record<string, unknown>,
+          CreateAgentOutputSchema,
+          'mediforce.agents.create',
+        );
+      },
+      listMcpBindings: async (input) => {
+        const v = ListAgentMcpBindingsInputSchema.parse(input);
+        const res = await this.request(`/api/agents/${encodeURIComponent(v.id)}/mcp-servers`);
+        const body = await parseJsonOrThrow(res, 'mediforce.agents.listMcpBindings');
+        return ListAgentMcpBindingsOutputSchema.parse(body);
+      },
+      upsertMcpBinding: (input) => {
+        const v = UpsertAgentMcpBindingInputSchema.parse(input);
+        return this.sendJson(
+          'PUT',
+          `/api/agents/${encodeURIComponent(v.id)}/mcp-servers/${encodeURIComponent(v.name)}`,
+          v.binding as Record<string, unknown>,
+          UpsertAgentMcpBindingOutputSchema,
+          'mediforce.agents.upsertMcpBinding',
+        );
+      },
+      deleteMcpBinding: (input) => {
+        const v = DeleteAgentMcpBindingInputSchema.parse(input);
+        return this.sendJson(
+          'DELETE',
+          `/api/agents/${encodeURIComponent(v.id)}/mcp-servers/${encodeURIComponent(v.name)}`,
+          undefined,
+          DeleteAgentMcpBindingOutputSchema,
+          'mediforce.agents.deleteMcpBinding',
+        );
+      },
+      listOAuthTokens: async (input) => {
+        const v = ListAgentOAuthTokensInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: v.namespace });
+        const res = await this.request(
+          `/api/agents/${encodeURIComponent(v.id)}/oauth${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agents.listOAuthTokens');
+        return ListAgentOAuthTokensOutputSchema.parse(body);
+      },
+      getOAuthToken: async (input) => {
+        const v = GetAgentOAuthTokenInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: v.namespace, serverName: v.serverName });
+        const res = await this.request(
+          `/api/agents/${encodeURIComponent(v.id)}/oauth/${encodeURIComponent(v.provider)}${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agents.getOAuthToken');
+        return GetAgentOAuthTokenOutputSchema.parse(body);
+      },
+      deleteOAuthToken: async (input) => {
+        const v = DeleteAgentOAuthTokenInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: v.namespace,
+          serverName: v.serverName,
+          ...(v.revokeAtProvider !== undefined
+            ? { revokeAtProvider: v.revokeAtProvider ? 'true' : 'false' }
+            : {}),
+        });
+        const res = await this.request(
+          `/api/agents/${encodeURIComponent(v.id)}/oauth/${encodeURIComponent(v.provider)}${qs}`,
+          { method: 'DELETE' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agents.deleteOAuthToken');
+        return DeleteAgentOAuthTokenOutputSchema.parse(body);
       },
     };
 
@@ -660,6 +1016,7 @@ export class Mediforce {
         const qs = toSearchParams({
           workflow: validated.workflow,
           status: validated.status,
+          namespace: validated.namespace,
           limit: validated.limit !== undefined ? String(validated.limit) : undefined,
         });
         const res = await this.request(`/api/runs${qs}`);
@@ -716,6 +1073,36 @@ export class Mediforce {
         const parsed = await parseJsonOrThrow(res, 'mediforce.runs.retryStep');
         return RetryStepOutputSchema.parse(parsed);
       },
+      archive: (input) => {
+        const v = ArchiveRunInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/processes/${encodeURIComponent(v.runId)}/archive`,
+          { archived: v.archived },
+          ArchiveRunOutputSchema,
+          'mediforce.runs.archive',
+        );
+      },
+      bulkCancel: (input) => {
+        const v = BulkRunInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          '/api/processes/bulk/cancel',
+          { runIds: v.runIds },
+          BulkRunOutputSchema,
+          'mediforce.runs.bulkCancel',
+        );
+      },
+      bulkArchive: (input) => {
+        const v = BulkRunInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          '/api/processes/bulk/archive',
+          { runIds: v.runIds },
+          BulkRunOutputSchema,
+          'mediforce.runs.bulkArchive',
+        );
+      },
     };
 
     this.secrets = {
@@ -750,6 +1137,50 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.secrets.delete');
         return DeleteSecretOutputSchema.parse(body);
       },
+      workspacePreviews: async (input) => {
+        const validated = GetWorkspaceSecretPreviewsInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/workspace-secrets/previews${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.secrets.workspacePreviews');
+        return GetWorkspaceSecretPreviewsOutputSchema.parse(body);
+      },
+      workflowKeysBatch: async (input) => {
+        const validated = ListWorkflowSecretKeysBatchInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflow: validated.workflows,
+        });
+        const res = await this.request(`/api/workflow-secrets/keys-batch${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.secrets.workflowKeysBatch');
+        return ListWorkflowSecretKeysBatchOutputSchema.parse(body);
+      },
+    };
+
+    this.workflowSecrets = {
+      values: async (input) => {
+        const validated = GetWorkflowSecretsFullInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflow: validated.workflow,
+        });
+        const res = await this.request(`/api/workflow-secrets/values${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.workflowSecrets.values');
+        return GetWorkflowSecretsFullOutputSchema.parse(body);
+      },
+      save: (input) => {
+        const validated = SaveWorkflowSecretsInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflow: validated.workflow,
+        });
+        return this.sendJson(
+          'PUT',
+          `/api/workflow-secrets/values${qs}`,
+          { secrets: validated.secrets },
+          SaveWorkflowSecretsOutputSchema,
+          'mediforce.workflowSecrets.save',
+        );
+      },
     };
 
     this.system = {
@@ -757,15 +1188,6 @@ export class Mediforce {
         const res = await this.request('/api/system/docker-info');
         const body = await parseJsonOrThrow(res, 'mediforce.system.dockerInfo');
         return DockerInfoResponseSchema.parse(body);
-      },
-      removeImage: async (imageId: string) => {
-        const res = await this.request('/api/admin/docker-images', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageId }),
-        });
-        const body = await parseJsonOrThrow(res, 'mediforce.system.removeImage');
-        return RemoveImageOutputSchema.parse(body);
       },
       credits: async (input: OpenRouterCreditsInput) => {
         const validated = OpenRouterCreditsInputSchema.parse(input);
@@ -782,6 +1204,287 @@ export class Mediforce {
         const res = await this.request('/api/cron/heartbeat', { method: 'POST' });
         const body = await parseJsonOrThrow(res, 'mediforce.cron.heartbeat');
         return HeartbeatOutputSchema.parse(body);
+      },
+    };
+
+    this.oauthProviders = {
+      list: async (input) => {
+        const validated = ListOAuthProvidersInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/admin/oauth-providers${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.list');
+        return ListOAuthProvidersOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetOAuthProviderInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/admin/oauth-providers/${encodeURIComponent(validated.id)}${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.get');
+        return GetOAuthProviderOutputSchema.parse(body);
+      },
+      create: async (input) => {
+        const validated = CreateOAuthProviderInputApiSchema.parse(input);
+        const { namespace, ...createBody } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(`/api/admin/oauth-providers${qs}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(createBody),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.create');
+        return CreateOAuthProviderOutputSchema.parse(body);
+      },
+      update: async (input) => {
+        const validated = UpdateOAuthProviderInputApiSchema.parse(input);
+        const { namespace, id, ...patch } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(
+          `/api/admin/oauth-providers/${encodeURIComponent(id)}${qs}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.update');
+        return UpdateOAuthProviderOutputSchema.parse(body);
+      },
+      delete: async (input) => {
+        const validated = DeleteOAuthProviderInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/admin/oauth-providers/${encodeURIComponent(validated.id)}${qs}`,
+          { method: 'DELETE' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.delete');
+        return DeleteOAuthProviderOutputSchema.parse(body);
+      },
+    };
+
+    this.dockerImages = {
+      delete: async (input) => {
+        const validated = DeleteDockerImageInputSchema.parse(input);
+        const res = await this.request('/api/admin/docker-images', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageId: validated.imageId }),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.dockerImages.delete');
+        return DeleteDockerImageOutputSchema.parse(body);
+      },
+    };
+
+    this.toolCatalog = {
+      list: async (input) => {
+        const validated = ListToolCatalogEntriesInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/admin/tool-catalog${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.list');
+        return ListToolCatalogEntriesOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetToolCatalogEntryInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/admin/tool-catalog/${encodeURIComponent(validated.id)}${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.get');
+        return GetToolCatalogEntryOutputSchema.parse(body);
+      },
+      create: async (input) => {
+        const validated = CreateToolCatalogEntryInputApiSchema.parse(input);
+        const { namespace, ...createBody } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(`/api/admin/tool-catalog${qs}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(createBody),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.create');
+        return CreateToolCatalogEntryOutputSchema.parse(body);
+      },
+      update: async (input) => {
+        const validated = UpdateToolCatalogEntryInputApiSchema.parse(input);
+        const { namespace, id, ...patch } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(
+          `/api/admin/tool-catalog/${encodeURIComponent(id)}${qs}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.update');
+        return UpdateToolCatalogEntryOutputSchema.parse(body);
+      },
+      delete: async (input) => {
+        const validated = DeleteToolCatalogEntryInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/admin/tool-catalog/${encodeURIComponent(validated.id)}${qs}`,
+          { method: 'DELETE' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.delete');
+        return DeleteToolCatalogEntryOutputSchema.parse(body);
+      },
+    };
+
+    this.agentRuns = {
+      list: async (input) => {
+        const validated = ListAgentRunsInputSchema.parse(input ?? {});
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          runId: validated.runId,
+          stepId: validated.stepId,
+          limit: validated.limit !== undefined ? String(validated.limit) : undefined,
+          cursor: validated.cursor,
+        });
+        const res = await this.request(`/api/agent-runs${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.list');
+        return ListAgentRunsOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetAgentRunInputSchema.parse(input);
+        const res = await this.request(
+          `/api/agent-runs/${encodeURIComponent(validated.agentRunId)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.get');
+        return GetAgentRunOutputSchema.parse(body);
+      },
+    };
+
+    this.monitoring = {
+      summary: async (input) => {
+        const validated = MonitoringSummaryInputSchema.parse(input);
+        const res = await this.request(
+          `/api/namespaces/${encodeURIComponent(validated.handle)}/monitoring/summary`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.monitoring.summary');
+        return GetMonitoringSummaryOutputSchema.parse(body);
+      },
+    };
+
+    this.users = {
+      listMembers: async (input) => {
+        const validated = ListNamespaceMembersInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/users/members${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.users.listMembers');
+        return ListNamespaceMembersOutputSchema.parse(body);
+      },
+      invite: async (input) => {
+        const validated = InviteUserInputSchema.parse(input);
+        const res = await this.request('/api/users/invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.users.invite');
+        return InviteUserOutputSchema.parse(body);
+      },
+      resendInvite: async (input) => {
+        const validated = ResendInviteInputSchema.parse(input);
+        const res = await this.request('/api/users/resend-invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.users.resendInvite');
+        return ResendInviteOutputSchema.parse(body);
+      },
+      me: async (input) => {
+        const qs = input?.uid !== undefined && input.uid !== ''
+          ? toSearchParams({ uid: input.uid })
+          : '';
+        const res = await this.request(`/api/users/me${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.users.me');
+        return GetMeOutputSchema.parse(body);
+      },
+      clearMustChangePassword: async (input) => {
+        const validated = ClearMustChangePasswordInputSchema.parse(input ?? {});
+        return this.sendJson(
+          'POST',
+          '/api/users/me/clear-must-change-password',
+          validated,
+          ClearMustChangePasswordOutputSchema,
+          'mediforce.users.clearMustChangePassword',
+        );
+      },
+    };
+
+    this.namespaces = {
+      get: async (input) => {
+        const validated = GetNamespaceInputSchema.parse(input);
+        const res = await this.request(
+          `/api/namespaces/${encodeURIComponent(validated.handle)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.namespaces.get');
+        return GetNamespaceOutputSchema.parse(body);
+      },
+      create: async (input) => {
+        const validated = CreateNamespaceInputSchema.parse(input);
+        const res = await this.request('/api/namespaces', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.namespaces.create');
+        return CreateNamespaceOutputSchema.parse(body);
+      },
+      update: async (input) => {
+        const validated = UpdateNamespaceInputSchema.parse(input);
+        const body = UpdateNamespaceBodySchema.parse(input);
+        return this.sendJson(
+          'PATCH',
+          `/api/namespaces/${encodeURIComponent(validated.handle)}`,
+          body,
+          UpdateNamespaceOutputSchema,
+          'mediforce.namespaces.update',
+        );
+      },
+      delete: async (input) => {
+        const validated = DeleteNamespaceInputSchema.parse(input);
+        return this.sendJson(
+          'DELETE',
+          `/api/namespaces/${encodeURIComponent(validated.handle)}`,
+          undefined,
+          DeleteNamespaceOutputSchema,
+          'mediforce.namespaces.delete',
+        );
+      },
+      leave: async (input) => {
+        const validated = LeaveNamespaceInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/namespaces/${encodeURIComponent(validated.handle)}/leave`,
+          undefined,
+          LeaveNamespaceOutputSchema,
+          'mediforce.namespaces.leave',
+        );
+      },
+      removeMember: async (input) => {
+        const validated = RemoveNamespaceMemberInputSchema.parse(input);
+        return this.sendJson(
+          'DELETE',
+          `/api/namespaces/${encodeURIComponent(validated.handle)}/members/${encodeURIComponent(validated.uid)}`,
+          undefined,
+          RemoveNamespaceMemberOutputSchema,
+          'mediforce.namespaces.removeMember',
+        );
+      },
+      updateMemberRole: async (input) => {
+        const validated = UpdateNamespaceMemberRoleInputSchema.parse(input);
+        const body = UpdateNamespaceMemberRoleBodySchema.parse(input);
+        return this.sendJson(
+          'PATCH',
+          `/api/namespaces/${encodeURIComponent(validated.handle)}/members/${encodeURIComponent(validated.uid)}`,
+          body,
+          UpdateNamespaceMemberRoleOutputSchema,
+          'mediforce.namespaces.updateMemberRole',
+        );
       },
     };
   }
@@ -801,9 +1504,7 @@ export class Mediforce {
    * Mutation helper — `request(method, body)` → `parseJsonOrThrow` →
    * `outputSchema.parse(body)`. Callsites pre-validate input via
    * `<InputSchema>.parse` so `path` / `body` are typed; this helper covers
-   * everything past that. Single seam for the 16 mutation methods on this
-   * client. Currently applied to the four cowork mutations; the rest are
-   * tracked in #527.
+   * everything past that, giving the mutation methods a single shared seam.
    *
    * `body` is `undefined` for verb-only mutations (POST with no payload —
    * e.g. `cowork.voiceEphemeralKey`, `tasks.claim`). When set, the helper

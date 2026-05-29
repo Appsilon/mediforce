@@ -18,6 +18,22 @@ services:
       timeout: 3s
       retries: 5
 
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: mediforce
+      POSTGRES_PASSWORD: mediforce
+      POSTGRES_DB: mediforce
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mediforce -d mediforce"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   bull-board:
     image: deadly0/bull-board
     ports:
@@ -46,3 +62,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+
+volumes:
+  postgres-data:

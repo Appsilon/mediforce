@@ -7,6 +7,7 @@ import type { AgentOAuthToken } from '@mediforce/platform-core';
 const mockVerifyIdToken = vi.fn();
 const mockTokenListByAgent = vi.fn();
 const mockGetMember = vi.fn();
+const mockGetMembershipsForUser = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
   getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
@@ -15,7 +16,10 @@ vi.mock('@mediforce/platform-infra', () => ({
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
     agentOAuthTokenRepo: { listByAgent: mockTokenListByAgent },
-    namespaceRepo: { getMember: mockGetMember },
+    namespaceRepo: {
+      getMember: mockGetMember,
+      getMembershipsForUser: mockGetMembershipsForUser,
+    },
   }),
 }));
 
@@ -68,6 +72,7 @@ describe('GET /api/agents/:id/oauth', () => {
     vi.clearAllMocks();
     mockVerifyIdToken.mockResolvedValue({ uid: 'uid-1' });
     mockGetMember.mockResolvedValue(memberAppsilon);
+    mockGetMembershipsForUser.mockResolvedValue([{ handle: 'appsilon', role: 'member' as const }]);
   });
 
   it('[DATA] returns tokens with public fields only (no access/refresh tokens)', async () => {
@@ -153,6 +158,7 @@ describe('GET /api/agents/:id/oauth', () => {
   });
 
   it('[ISOLATION] queries scoped to the requested namespace + agent', async () => {
+    mockGetMembershipsForUser.mockResolvedValue([{ handle: 'other-ns', role: 'member' as const }]);
     mockTokenListByAgent.mockResolvedValue([]);
 
     await GET(
@@ -163,26 +169,27 @@ describe('GET /api/agents/:id/oauth', () => {
     expect(mockTokenListByAgent).toHaveBeenCalledWith('other-ns', 'other-agent');
   });
 
-  it('[AUTHZ] caller who is not a member of the namespace gets 404', async () => {
-    mockGetMember.mockResolvedValue(null);
+  it('[AUTHZ] caller who is not a member of the namespace gets an empty list', async () => {
     mockTokenListByAgent.mockResolvedValue([]);
 
     const res = await GET(
       makeGetRequest('agent-1', 'other-ns'),
       { params: makeParams('agent-1') },
     );
-    expect(res.status).toBe(404);
+    const json = (await res.json()) as { tokens: unknown[] };
+
+    expect(res.status).toBe(200);
+    expect(json.tokens).toEqual([]);
     expect(mockTokenListByAgent).not.toHaveBeenCalled();
   });
 
-  it('[AUTHZ] membership lookup uses the query-param namespace, not a hardcoded one', async () => {
-    mockGetMember.mockResolvedValue(memberAppsilon);
+  it('[AUTHZ] membership is read once from getMembershipsForUser per request', async () => {
     mockTokenListByAgent.mockResolvedValue([]);
 
     await GET(
-      makeGetRequest('agent-1', 'other-ns'),
+      makeGetRequest('agent-1', 'appsilon'),
       { params: makeParams('agent-1') },
     );
-    expect(mockGetMember).toHaveBeenCalledWith('other-ns', 'uid-1');
+    expect(mockGetMembershipsForUser).toHaveBeenCalledWith('uid-1');
   });
 });

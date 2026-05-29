@@ -3,13 +3,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/auth-context';
 import { Save } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { StartRunButton } from '@/components/processes/start-run-button';
-import { saveWorkflowDefinition, setDefaultWorkflowVersion } from '@/app/actions/definitions';
+import { mediforce, ApiError } from '@/lib/mediforce';
 import { parseStepErrors, validateSteps, mergeVerdictTransitions } from '@/lib/workflow-save-utils';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
@@ -24,7 +23,6 @@ type SaveState =
 export default function WorkflowDefinitionVersionPage() {
   const { name, version, handle } = useParams<{ name: string; version: string; handle: string }>();
   const router = useRouter();
-  const { firebaseUser } = useAuth();
   const decodedName = decodeURIComponent(name);
   const versionNumber = parseInt(version, 10);
 
@@ -82,38 +80,48 @@ export default function WorkflowDefinitionVersionPage() {
 
     const mergedTransitions = mergeVerdictTransitions(steps, transitions);
 
-    const result = await saveWorkflowDefinition({
-      name: definition.name,
-      namespace: definition.namespace,
-      title: title || undefined,
-      description: editedDescription.trim() || undefined,
-      steps,
-      transitions: mergedTransitions,
-      triggers: definition.triggers,
-      roles: definition.roles,
-      env: definition.env,
-      notifications: definition.notifications,
-      metadata: definition.metadata,
-      repo: definition.repo,
-      url: definition.url,
-    });
-
-    if (result.success) {
+    try {
+      const result = await mediforce.workflows.register(
+        {
+          name: definition.name,
+          title: title || undefined,
+          description: editedDescription.trim() || undefined,
+          steps,
+          transitions: mergedTransitions,
+          triggers: definition.triggers,
+          roles: definition.roles,
+          env: definition.env,
+          notifications: definition.notifications,
+          metadata: definition.metadata,
+          repo: definition.repo,
+          url: definition.url,
+        },
+        { namespace: definition.namespace },
+      );
       if (setAsDefault) {
-        await setDefaultWorkflowVersion(definition.namespace, definition.name, result.version);
+        await mediforce.workflows.setDefaultVersion({
+          name: definition.name,
+          namespace: definition.namespace,
+          version: result.version,
+        });
       }
       setSaveState({ status: 'saved', version: result.version });
       redirectTimerRef.current = setTimeout(() => {
         router.push(`/${handle}/workflows/${name}/definitions/${result.version}`);
       }, 500);
-    } else {
-      const parsed = parseStepErrors(result.issues ?? [], steps);
+    } catch (err) {
+      const issues = err instanceof ApiError && Array.isArray(err.details)
+        ? (err.details as Array<{ path: (string | number)[]; message: string }>)
+        : [];
+      const parsed = parseStepErrors(issues, steps);
       setStepErrors(parsed);
+      const message = err instanceof ApiError ? err.message
+        : err instanceof Error ? err.message : 'Unknown error';
       setSaveState({
         status: 'error',
         message: Object.keys(parsed).length > 0
           ? 'Some steps have errors — check the highlighted steps in the diagram.'
-          : result.error,
+          : message,
       });
     }
   }, [definition, editedDescription, name, handle, router]);
@@ -215,7 +223,6 @@ export default function WorkflowDefinitionVersionPage() {
         initialTransitions={definition.transitions}
         workflowName={decodedName}
         namespace={handle}
-        userId={firebaseUser?.uid}
         yamlFields={{ ...definition, version: undefined, createdAt: undefined } as Record<string, unknown>}
         onChange={handleCanvasChange}
         stepErrors={stepErrors}

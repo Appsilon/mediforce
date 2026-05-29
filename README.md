@@ -105,6 +105,13 @@ We're building the standard for human-agent collaboration in pharma — and we'r
 
 **[Getting Started Guide](GETTING-STARTED.md)** — Quick start with emulators and demo data, no setup required.
 
+> **Datastore transition (ADR-0001).** Mediforce is moving from Firestore to
+> self-hosted Postgres. The Postgres path is opt-in via
+> `STORAGE_BACKEND=postgres`; default is still `firestore` until the cutover.
+> Local-dev instructions below cover **both** modes. See
+> [`docs/postgres-local-dev.md`](docs/postgres-local-dev.md) and
+> [`docs/adr/0001-firestore-to-postgres.md`](docs/adr/0001-firestore-to-postgres.md).
+
 ### Fastest start (no setup)
 
 ```bash
@@ -122,10 +129,48 @@ Open `http://localhost:9007`. Use this to click through the UI without configuri
 | `pnpm dev:mock` | Mocked agents + seeded local emulator data, port 9007. No cloud keys, no Docker, no Firebase project. |
 | `pnpm dev:no-docker` | Like `dev`, but agents run via host `claude` CLI instead of Docker. |
 | `pnpm dev:queue` | Like `dev`, but agent execution goes through BullMQ queue (production architecture). Requires Redis + worker running — see below. |
+| `pnpm dev:postgres` | One-command Postgres mode. Boots `postgres` + `redis` via docker compose, runs `pnpm db:migrate`, then starts the dev server with `STORAGE_BACKEND=postgres`. Idempotent — safe to re-run after pulling new migrations. |
+
+### Postgres mode (ADR-0001)
+
+The new path. Bring up Postgres + Redis, point the app at them, set
+`STORAGE_BACKEND=postgres` to route migrated repositories through Postgres
+(today: `tool_catalog_entries`; more land per the [PLAN-0001 build order](docs/adr/PLAN-0001.md#52-build-order-postgres-implementations)).
+
+One command does all of the above:
+
+```bash
+pnpm dev:postgres                                  # docker compose up + migrate + dev
+```
+
+Manual equivalent if you need to wire your own env (e.g. point at an
+external Postgres):
+
+```bash
+docker compose up postgres redis -d                # boot Postgres 16 + Redis
+# in packages/platform-ui/.env.local:
+#   STORAGE_BACKEND=postgres
+#   DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce
+pnpm db:migrate                                    # apply Drizzle migrations once
+pnpm dev                                           # start the app
+```
+
+`pnpm db:migrate` is idempotent — re-run after pulling new migrations
+from main. Same script runs inside `pnpm dev:postgres` and inside the
+production Dockerfile's CMD, so dev and prod share the migration path.
+See [Staging / production ops](#staging--production-ops-postgres) below.
+
+Firebase Auth is still required (until [ADR-0002](docs/adr/) lands a NextAuth
+replacement); set the `NEXT_PUBLIC_FIREBASE_*` vars in `.env.local` as usual.
+Firebase Emulators are **not** required for the Postgres data path — only for
+the auth flow if you don't want to use a real Firebase project.
+
+Migration mechanics, schema authoring, and troubleshooting live in
+[`docs/postgres-local-dev.md`](docs/postgres-local-dev.md).
 
 ### Queue mode (production architecture)
 
-`docker-compose.yml` runs Redis + container-worker + bull-board (BullMQ UI on :3100):
+`docker-compose.yml` runs Postgres + Redis + container-worker + bull-board (BullMQ UI on :3100):
 
 ```bash
 docker compose up -d       # bring up queue infra
@@ -133,7 +178,7 @@ pnpm dev:queue             # native UI pointed at compose Redis
 docker compose down        # stop infra when you're done
 ```
 
-### Emulator + own seed data
+### Emulator + own seed data (Firestore path, default until cutover)
 
 ```bash
 cp packages/platform-ui/.env.example packages/platform-ui/.env.local
@@ -220,6 +265,47 @@ pnpm dev:no-docker
 > Requires `claude` to be available on your `PATH`. Use this script (not `ALLOW_LOCAL_AGENTS=true pnpm dev`) — the env var doesn't propagate reliably through pnpm script aliases.
 
 > Full guide: **[docs/development.md](docs/development.md)**
+
+## Staging / production ops (Postgres)
+
+`docker-compose.prod.yml` ships a `postgres:16-alpine` service alongside
+Redis. The host needs two things before `platform-ui` will start:
+
+1. `POSTGRES_PASSWORD` set in `/opt/mediforce/.env` (no default — required).
+   `POSTGRES_USER` + `POSTGRES_DB` default to `mediforce`.
+2. `/var/lib/mediforce/postgres-data` exists on the host, owned by UID
+   999 (the postgres-alpine user). `docker-compose.staging.yml` bind-mounts
+   that path so `docker compose down -v` cannot wipe data — only an
+   explicit `rm -rf` removes it. Local dev keeps a named volume, so
+   `docker compose down -v` is still a normal reset workflow on a
+   developer machine.
+
+**Fresh server provisioning** is handled by
+[`scripts/bootstrap-server.py`](scripts/bootstrap-server.py): it
+auto-generates `POSTGRES_PASSWORD` (per ADR-0001, PR #559) and creates
+the bind-mount data dir with the right ownership as part of its
+`step_env_local` + `step_postgres_dir` flow on a new host.
+
+**Already-bootstrapped deployments** (the current staging) — bootstrap
+is not re-run against them. Add `POSTGRES_PASSWORD` + create the dir
+manually via ssh. See
+[`docs/staging-postgres-prep.md`](docs/staging-postgres-prep.md) for
+the one-off checklist.
+
+`platform-ui` runs Drizzle migrations on every container start via
+[`packages/platform-infra/scripts/migrate.mjs`](packages/platform-infra/scripts/migrate.mjs)
+(idempotent via the `drizzle.__drizzle_migrations` ledger). No separate
+migration step in the deploy pipeline.
+
+`STORAGE_BACKEND` defaults to `firestore` until the ADR-0001 §8 data
+cutover. Until then, Postgres runs on staging but the app routes only
+`tool-catalog` reads/writes through it (when the flag is flipped).
+
+> **Current cutover (one-off):** existing staging needs the prep run
+> once before PR #515 lands. See
+> [`docs/staging-postgres-prep.md`](docs/staging-postgres-prep.md). That
+> file gets deleted after the cutover succeeds — long-term ops content
+> stays here.
 
 ## Deep Dives
 

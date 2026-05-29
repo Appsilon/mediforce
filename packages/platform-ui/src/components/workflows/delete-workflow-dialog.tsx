@@ -4,7 +4,7 @@ import * as React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, AlertTriangle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { deleteWorkflow, getWorkflowRunCount } from '@/app/actions/definitions';
+import { mediforce, ApiError } from '@/lib/mediforce';
 
 interface DeleteWorkflowDialogProps {
   workflowName: string;
@@ -36,10 +36,11 @@ export function DeleteWorkflowDialog({ workflowName, namespace, open, onOpenChan
     setState({ step: 'loading' });
     setNameInput('');
     setRunCountInput('');
-    getWorkflowRunCount(workflowName, namespace)
-      .then((count) => setState({ step: 'confirm', runCount: count }))
+    mediforce.workflows
+      .getRunCount({ name: workflowName, namespace })
+      .then(({ count }) => setState({ step: 'confirm', runCount: count }))
       .catch(() => setState({ step: 'error', message: 'Failed to load run count.', runCount: 0 }));
-  }, [open, workflowName]);
+  }, [open, workflowName, namespace]);
 
   function handleClose() {
     if (state.step === 'deleting') return;
@@ -49,12 +50,18 @@ export function DeleteWorkflowDialog({ workflowName, namespace, open, onOpenChan
   async function handleDelete() {
     if (!canConfirm) return;
     setState({ step: 'deleting' });
-    const result = await deleteWorkflow(workflowName, namespace, runCount);
-    if (result.success) {
+    try {
+      await mediforce.workflows.delete({
+        name: workflowName,
+        namespace,
+        expectedRunCount: runCount,
+      });
       onOpenChange(false);
       onDeleted();
-    } else {
-      setState({ step: 'error', message: result.error, runCount });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message
+        : err instanceof Error ? err.message : 'Unknown error';
+      setState({ step: 'error', message, runCount });
     }
   }
 

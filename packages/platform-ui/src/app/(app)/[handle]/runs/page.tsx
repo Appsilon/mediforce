@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Archive, Lock } from 'lucide-react';
 import { useProcessInstances } from '@/hooks/use-process-instances';
-import { useMyTasks } from '@/hooks/use-tasks';
+import { useMyActionableTasks } from '@/hooks/use-tasks';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { RunsTable } from '@/components/processes/runs-table';
 import { formatStepName } from '@/components/tasks/task-utils';
@@ -59,7 +59,7 @@ function RunsPageContent({ handle }: { handle: string }) {
     showArchivedRuns,
     handle,
   );
-  const { data: activeTasks } = useMyTasks(null);
+  const { data: activeTasks } = useMyActionableTasks();
 
   const activeTaskByInstance = React.useMemo(() => {
     const map = new Map<string, string>();

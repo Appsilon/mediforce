@@ -2,9 +2,27 @@
 
 import * as React from 'react';
 import { Loader2 } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { HumanTask } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
+import { queryKeys } from '@/lib/query-keys';
+import { snapshotCache } from '@/lib/optimistic';
 import { cn } from '@/lib/utils';
 
+/**
+ * State-transition optimistic update template per ADR-0006 §6:
+ *
+ * - `onMutate` cancels in-flight queries for the affected keys, snapshots
+ *   the detail entity, and patches it locally to `status: 'claimed'` so
+ *   the UI reflects the click instantly.
+ * - `onSuccess` overwrites the detail key with the server entity-echo
+ *   (`data.task`) — no refetch round trip — and invalidates the
+ *   `['tasks']` list prefix so every role / instance slice picks the new
+ *   state up on its next tick (tag-prefix invalidation per ADR-0006 §2).
+ * - `onError` restores the snapshot and surfaces a message inline. The
+ *   `['tasks']` prefix is also invalidated so any stale optimistic flicker
+ *   on adjacent list views recovers.
+ */
 export function ClaimButton({
   taskId,
   fullWidth = false,
@@ -16,21 +34,41 @@ export function ClaimButton({
   variant?: 'default' | 'inline';
   onClaimed?: () => void;
 }) {
-  const [pending, setPending] = React.useState(false);
+  const qc = useQueryClient();
   const [error, setError] = React.useState<string | null>(null);
 
-  async function handleClaim() {
-    setPending(true);
-    setError(null);
-    try {
-      await mediforce.tasks.claim({ taskId });
+  const claim = useMutation({
+    mutationFn: () => mediforce.tasks.claim({ taskId }),
+    onMutate: async () => {
+      const detailKey = queryKeys.task(taskId);
+      await qc.cancelQueries({ queryKey: detailKey });
+      await qc.cancelQueries({ queryKey: queryKeys.tasks.all() });
+
+      const { restore } = snapshotCache(qc, [detailKey]);
+      qc.setQueryData<HumanTask | undefined>(detailKey, (old) =>
+        old ? { ...old, status: 'claimed' } : old,
+      );
+      return { restore };
+    },
+    onSuccess: (data) => {
+      qc.setQueryData(queryKeys.task(data.task.id), data.task);
       onClaimed?.();
-    } catch (err) {
+    },
+    onError: (err, _input, ctx) => {
+      ctx?.restore();
       setError(err instanceof Error ? err.message : 'Failed to claim task');
-    } finally {
-      setPending(false);
-    }
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.tasks.all() });
+    },
+  });
+
+  function handleClaim() {
+    setError(null);
+    claim.mutate();
   }
+
+  const pending = claim.isPending;
 
   if (variant === 'inline') {
     return (

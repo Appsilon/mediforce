@@ -2,18 +2,9 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import * as Switch from '@radix-ui/react-switch';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
 import { useParams, useRouter } from 'next/navigation';
-import {
-  arrayRemove,
-  collection,
-  deleteDoc,
-  deleteField,
-  doc,
-  getDocs,
-  onSnapshot,
-  updateDoc,
-  writeBatch,
-} from 'firebase/firestore';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -24,12 +15,17 @@ import {
   Trash2,
   Users,
 } from 'lucide-react';
-import { db } from '@/lib/firebase';
-import { apiFetch } from '@/lib/api-fetch';
+import { ApiError, mediforce } from '@/lib/mediforce';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
+import {
+  useDeleteNamespace,
+  useLeaveNamespace,
+  useRemoveMember,
+  useUpdateMemberRole,
+  useUpdateNamespace,
+} from '@/hooks/use-namespace-mutations';
 import { WORKSPACE_ICONS, WORKSPACE_ICON_KEYS, getWorkspaceIcon, WORKSPACE_DEFAULT_KEY } from '@/lib/workspace-icons';
-import { NamespaceMemberSchema } from '@mediforce/platform-core';
 import type { NamespaceMember } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { NamespaceSecretsEditor } from '@/components/namespace/namespace-secrets-editor';
@@ -162,47 +158,58 @@ export default function WorkspaceConfigPage() {
   const rawHandle = params.handle;
   const handle = Array.isArray(rawHandle) ? rawHandle[0] : (rawHandle ?? '');
   const router = useRouter();
+  const qc = useQueryClient();
 
   const { firebaseUser } = useAuth();
   const { namespace, loading: namespaceLoading } = useNamespace(handle);
 
-  // Realtime Firestore subscription for role changes
+  // Polled members list via the headless contract — replaces the previous
+  // `onSnapshot(namespaces/{handle}/members)` subscription. Realtime updates
+  // become a small staleness window (next listMembers tick after a mutation);
+  // §"Phase 4 is a swap, not a redesign" accepts this regression.
   const [realtimeMembers, setRealtimeMembers] = useState<NamespaceMemberWithId[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
 
-  useEffect(() => {
+  const refreshMembers = useCallback(async () => {
     if (handle === '') return;
-    const colRef = collection(db, `namespaces/${handle}/members`);
-    const unsubscribe = onSnapshot(colRef, (snapshot) => {
-      const docs = snapshot.docs
-        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as NamespaceMemberWithId)
-        .filter((raw) => NamespaceMemberSchema.safeParse(raw).success);
-      setRealtimeMembers(docs);
+    try {
+      const { members: fetched } = await mediforce.users.listMembers({ namespace: handle });
+      setRealtimeMembers(
+        fetched.map((m) => ({ ...m, displayName: m.displayName ?? undefined, id: m.uid })),
+      );
+    } finally {
       setMembersLoading(false);
-    }, () => {
-      setMembersLoading(false);
-    });
-    return unsubscribe;
+    }
   }, [handle]);
 
-  // API fetch for lastSignInTime + email
+  useEffect(() => {
+    void refreshMembers();
+  }, [refreshMembers]);
+
+  // API fetch for lastSignInTime + email + auth-enriched displayName.
+  // Owner member docs created before the createNamespace handler started
+  // persisting displayName lack it locally; the listMembers handler falls
+  // back to the Firebase Auth profile name, and we merge that override
+  // here so legacy workspaces show a human name instead of the uid.
   const [lastSignInMap, setLastSignInMap] = useState<Map<string, string | null>>(new Map());
   const [emailMap, setEmailMap] = useState<Map<string, string | null>>(new Map());
+  const [displayNameMap, setDisplayNameMap] = useState<Map<string, string | null>>(new Map());
 
   const fetchLastSignIn = useCallback(async () => {
     if (handle === '' || firebaseUser === null) return;
     try {
-      const res = await apiFetch(`/api/users/members?handle=${encodeURIComponent(handle)}`);
-      if (!res.ok) return;
-      const data = (await res.json()) as { members: Array<{ uid: string; email: string | null; lastSignInTime: string | null }> };
+      const { members } = await mediforce.users.listMembers({ namespace: handle });
       const map = new Map<string, string | null>();
       const emailMapLocal = new Map<string, string | null>();
-      for (const member of data.members) {
+      const displayNameMapLocal = new Map<string, string | null>();
+      for (const member of members) {
         map.set(member.uid, member.lastSignInTime);
         emailMapLocal.set(member.uid, member.email);
+        displayNameMapLocal.set(member.uid, member.displayName);
       }
       setLastSignInMap(map);
       setEmailMap(emailMapLocal);
+      setDisplayNameMap(displayNameMapLocal);
     } catch {
       // non-fatal — lastSignIn just won't show
     }
@@ -212,19 +219,25 @@ export default function WorkspaceConfigPage() {
     void fetchLastSignIn();
   }, [fetchLastSignIn]);
 
-  // Merge realtime members with email + lastSignInTime from API
+  // Merge realtime members with enriched displayName + email + lastSignInTime
   const members = useMemo((): MemberWithLastSignIn[] => {
     return realtimeMembers
-      .map((member) => ({
-        ...member,
-        email: emailMap.get(member.uid),
-        lastSignInTime: lastSignInMap.get(member.uid),
-      }))
+      .map((member) => {
+        const enrichedDisplayName = displayNameMap.get(member.uid);
+        return {
+          ...member,
+          displayName: enrichedDisplayName !== undefined && enrichedDisplayName !== null
+            ? enrichedDisplayName
+            : member.displayName,
+          email: emailMap.get(member.uid),
+          lastSignInTime: lastSignInMap.get(member.uid),
+        };
+      })
       .sort((memberA, memberB) => {
         const roleOrder: Record<string, number> = { owner: 0, admin: 1, member: 2 };
         return (roleOrder[memberA.role] ?? 3) - (roleOrder[memberB.role] ?? 3);
       });
-  }, [realtimeMembers, lastSignInMap, emailMap]);
+  }, [realtimeMembers, lastSignInMap, emailMap, displayNameMap]);
 
   const currentUserMember = useMemo(
     () =>
@@ -251,8 +264,9 @@ export default function WorkspaceConfigPage() {
   const [profileDisplayName, setProfileDisplayName] = useState('');
   const [profileBio, setProfileBio] = useState('');
   const [profileIcon, setProfileIcon] = useState('Building2');
-  const [savingProfile, setSavingProfile] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
+  const updateNamespace = useUpdateNamespace(handle);
+  const savingProfile = updateNamespace.isPending;
 
   // Initialise form fields from namespace once loaded
   useEffect(() => {
@@ -267,16 +281,17 @@ export default function WorkspaceConfigPage() {
     event.preventDefault();
     const trimmedName = profileDisplayName.trim();
     if (trimmedName === '') return;
-    setSavingProfile(true);
+    const trimmedBio = profileBio.trim();
     try {
-      await updateDoc(doc(db, 'namespaces', handle), {
+      await updateNamespace.mutateAsync({
+        handle,
         displayName: trimmedName,
-        bio: profileBio.trim() !== '' ? profileBio.trim() : deleteField(),
+        bio: trimmedBio,
       });
       setProfileSaved(true);
       setTimeout(() => setProfileSaved(false), 2500);
-    } finally {
-      setSavingProfile(false);
+    } catch {
+      // Optimistic snapshot already restored by the hook; nothing to do.
     }
   }
 
@@ -284,9 +299,8 @@ export default function WorkspaceConfigPage() {
   async function handleIconChange(iconKey: string) {
     setProfileIcon(iconKey);
     try {
-      await updateDoc(doc(db, 'namespaces', handle), { icon: iconKey });
+      await updateNamespace.mutateAsync({ handle, icon: iconKey });
     } catch {
-      // Revert to last saved value on error
       setProfileIcon(namespace?.icon ?? 'Building2');
     }
   }
@@ -314,30 +328,28 @@ export default function WorkspaceConfigPage() {
 
     setInviting(true);
     try {
-      const res = await apiFetch('/api/users/invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: trimmedEmail,
-          displayName: inviteName.trim() !== '' ? inviteName.trim() : undefined,
-          namespaceHandle: handle,
-          role: inviteRole,
-          inviterName: firebaseUser?.displayName ?? firebaseUser?.email ?? undefined,
-        }),
+      const data = await mediforce.users.invite({
+        email: trimmedEmail,
+        displayName: inviteName.trim() !== '' ? inviteName.trim() : undefined,
+        namespaceHandle: handle,
+        role: inviteRole,
+        inviterName: firebaseUser?.displayName ?? firebaseUser?.email ?? undefined,
       });
 
-      if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        setError(data.error ?? 'Failed to send invite.');
-        return;
-      }
-
-      const data = (await res.json()) as { uid: string; email: string; temporaryPassword: string; emailSent: boolean; isExisting: boolean };
-      setInviteResult({ email: data.email, temporaryPassword: data.temporaryPassword, emailSent: data.emailSent, isExisting: data.isExisting });
+      setInviteResult({
+        email: data.email,
+        temporaryPassword: data.temporaryPassword,
+        emailSent: data.emailSent,
+        isExisting: data.isExisting,
+      });
       setShowInviteForm(false);
       setInviteEmail('');
       setInviteName('');
       setInviteRole('member');
+      // Refresh the members list — PR4 swapped the previous onSnapshot
+      // subscription for `useNamespace` react-query, so the cache needs an
+      // explicit invalidation now that the invite mutation isn't a hook.
+      await qc.invalidateQueries({ queryKey: queryKeys.namespace(handle) });
       void fetchLastSignIn();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to send invite.');
@@ -350,18 +362,15 @@ export default function WorkspaceConfigPage() {
     setResendResult(null);
     setResendingUid(memberUid);
     try {
-      const res = await apiFetch('/api/users/resend-invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: memberUid, namespaceHandle: handle }),
+      const data = await mediforce.users.resendInvite({
+        uid: memberUid,
+        namespaceHandle: handle,
       });
-      if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        setError(data.error ?? 'Failed to resend invite.');
-        return;
-      }
-      const data = (await res.json()) as { email: string; temporaryPassword: string; emailSent: boolean };
-      setResendResult({ email: data.email, temporaryPassword: data.temporaryPassword, emailSent: data.emailSent });
+      setResendResult({
+        email: data.email,
+        temporaryPassword: data.temporaryPassword,
+        emailSent: data.emailSent,
+      });
       void fetchLastSignIn();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to resend invite.');
@@ -370,73 +379,72 @@ export default function WorkspaceConfigPage() {
     }
   }
 
+  const removeMember = useRemoveMember(handle);
+  const updateMemberRole = useUpdateMemberRole(handle);
+  const leaveNamespace = useLeaveNamespace();
+  const deleteNamespace = useDeleteNamespace();
+
+  // Surface fail-cases for every workspace-altering action via one banner —
+  // member removal, role flips, leave, delete. Optimistic snapshot rollback
+  // hides the underlying error; without this banner an admin would see the
+  // role un-flip and not know why.
+  const [dangerError, setDangerError] = useState<string | null>(null);
+
   async function handleRemoveMember(memberUid: string) {
+    setDangerError(null);
     try {
-      await deleteDoc(doc(db, 'namespaces', handle, 'members', memberUid));
-      await updateDoc(doc(db, 'users', memberUid), {
-        organizations: arrayRemove(handle),
-      });
-    } catch {
-      // realtime subscription reflects actual state
+      await removeMember.mutateAsync({ handle, uid: memberUid });
+      void refreshMembers();
+    } catch (err: unknown) {
+      setDangerError(err instanceof Error ? err.message : 'Failed to remove member.');
     }
   }
 
   async function handleToggleRole(memberUid: string, currentRole: string) {
-    const nextRole = currentRole === 'admin' ? 'member' : 'admin';
+    setDangerError(null);
+    const nextRole: 'admin' | 'member' = currentRole === 'admin' ? 'member' : 'admin';
     try {
-      await updateDoc(doc(db, 'namespaces', handle, 'members', memberUid), { role: nextRole });
-    } catch {
-      // realtime subscription reflects actual state
+      await updateMemberRole.mutateAsync({ handle, uid: memberUid, role: nextRole });
+      void refreshMembers();
+    } catch (err: unknown) {
+      setDangerError(err instanceof Error ? err.message : 'Failed to update member role.');
     }
   }
 
   // ── Danger zone ────────────────────────────────────────────────────────────
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [leaving, setLeaving] = useState(false);
 
   async function handleDeleteWorkspace() {
     if (!confirmDelete) {
       setConfirmDelete(true);
       return;
     }
-    setDeleting(true);
+    setDangerError(null);
     try {
-      const membersSnapshot = await getDocs(collection(db, 'namespaces', handle, 'members'));
-      const batch = writeBatch(db);
-      for (const memberDoc of membersSnapshot.docs) {
-        batch.delete(memberDoc.ref);
-      }
-      batch.delete(doc(db, 'namespaces', handle));
-      await batch.commit();
-
-      await Promise.all(
-        membersSnapshot.docs.map((memberDoc) =>
-          updateDoc(doc(db, 'users', memberDoc.id), {
-            organizations: arrayRemove(handle),
-          }),
-        ),
-      );
-
+      await deleteNamespace.mutateAsync({ handle });
       router.push('/workspace-selection');
-    } catch {
-      setDeleting(false);
+    } catch (err: unknown) {
+      setDangerError(err instanceof Error ? err.message : 'Failed to delete workspace.');
     }
   }
 
   async function handleLeaveWorkspace() {
     if (firebaseUser === null) return;
-    setLeaving(true);
+    setDangerError(null);
     try {
-      await deleteDoc(doc(db, 'namespaces', handle, 'members', firebaseUser.uid));
-      await updateDoc(doc(db, 'users', firebaseUser.uid), {
-        organizations: arrayRemove(handle),
-      });
+      await leaveNamespace.mutateAsync({ handle });
       router.push('/workspace-selection');
-    } catch {
-      setLeaving(false);
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.code === 'precondition_failed') {
+        setDangerError(err.message);
+        return;
+      }
+      setDangerError(err instanceof Error ? err.message : 'Failed to leave workspace.');
     }
   }
+
+  const deleting = deleteNamespace.isPending;
+  const leaving = leaveNamespace.isPending;
 
   const loading = namespaceLoading || membersLoading;
 
@@ -920,6 +928,12 @@ export default function WorkspaceConfigPage() {
         )}
 
         {/* ── Danger zone ───────────────────────────────────────────────────── */}
+        {dangerError !== null && (
+          <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            {dangerError}
+          </div>
+        )}
+
         {!isOwner && currentUserMember !== undefined && (
           <div className="rounded-lg border border-destructive/30 bg-card px-4 py-5">
             <h2 className="text-sm font-semibold mb-1">Leave workspace</h2>

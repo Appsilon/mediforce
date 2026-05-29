@@ -4,24 +4,23 @@ import * as React from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { collection, doc, getDoc, getDocs, query, where, orderBy, limit, updateDoc } from 'firebase/firestore';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Pencil, Check, X, Settings, GitBranch, Plus } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
-import { db } from '@/lib/firebase';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useNamespace } from '@/hooks/use-namespace';
 import { useUserProfiles } from '@/hooks/use-users';
 import { useProcessDefinitions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
 import { useWorkflowDefinitionsApi } from '@/hooks/use-workflows-api';
-import { useMyTasks } from '@/hooks/use-tasks';
+import { useMyActionableTasks } from '@/hooks/use-tasks';
+import { useUserMe } from '@/hooks/use-user-me';
+import { useUpdateNamespace } from '@/hooks/use-namespace-mutations';
 import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons, isActiveStatus } from '@/components/processes/process-card';
 import { WorkflowProblems } from '@/components/processes/workflow-problems';
 import { OpenRouterCreditsIndicator } from '@/components/namespace/openrouter-credits-indicator';
 import { WorkflowSecretKeysProvider } from '@/hooks/use-workflow-secret-keys';
 import { cn } from '@/lib/utils';
-import { NamespaceSchema } from '@mediforce/platform-core';
 import type { Namespace, ProcessInstance } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -34,69 +33,31 @@ type MemberPreview = {
   avatarUrl?: string;
   role: string;
   joinedAt: string;
-  handle?: string;
 };
 
 const MAX_AVATAR_MEMBERS = 20;
 
-function useWorkspaceMembers(handle: string, enabled: boolean) {
-  const [members, setMembers] = React.useState<MemberPreview[]>([]);
-  const [totalCount, setTotalCount] = React.useState<number | null>(null);
+function useWorkspaceMembers(handle: string, enabled: boolean): { members: MemberPreview[]; totalCount: number | null } {
+  const { members: cachedMembers, loading } = useNamespace(enabled ? handle : null);
 
-  React.useEffect(() => {
-    if (!enabled || !handle) return;
-
-    const membersRef = collection(db, 'namespaces', handle, 'members');
-    const previewQuery = query(membersRef, orderBy('joinedAt', 'asc'), limit(MAX_AVATAR_MEMBERS));
-
-    Promise.all([getDocs(previewQuery), getDocs(membersRef)])
-      .then(async ([previewSnapshot, fullSnapshot]) => {
-        const roleOrder: Record<string, number> = { owner: 0, admin: 1, member: 2 };
-        const previews: MemberPreview[] = previewSnapshot.docs
-          .map((docSnap) => {
-            const data = docSnap.data();
-            return {
-              uid: docSnap.id,
-              displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
-              avatarUrl: typeof data.avatarUrl === 'string' ? data.avatarUrl : undefined,
-              role: typeof data.role === 'string' ? data.role : 'member',
-              joinedAt: typeof data.joinedAt === 'string' ? data.joinedAt : '',
-            };
-          })
-          .sort((a, b) => (roleOrder[a.role] ?? 3) - (roleOrder[b.role] ?? 3));
-
-        // Resolve member uid -> personal namespace handle
-        const memberUids = previews.map((m) => m.uid);
-        if (memberUids.length > 0) {
-          try {
-            const namespacesRef = collection(db, 'namespaces');
-            const personalQuery = query(namespacesRef, where('linkedUserId', 'in', memberUids));
-            const personalSnapshot = await getDocs(personalQuery);
-            const uidToHandle = new Map<string, string>();
-            for (const nsDoc of personalSnapshot.docs) {
-              const nsData = nsDoc.data();
-              if (typeof nsData.linkedUserId === 'string') {
-                uidToHandle.set(nsData.linkedUserId, nsDoc.id);
-              }
-            }
-            for (const member of previews) {
-              member.handle = uidToHandle.get(member.uid);
-            }
-          } catch {
-            // handle resolution is best-effort
-          }
-        }
-
-        setMembers(previews);
-        setTotalCount(fullSnapshot.size);
-      })
-      .catch(() => {
-        setMembers([]);
-        setTotalCount(null);
-      });
-  }, [handle, enabled]);
-
-  return { members, totalCount };
+  return useMemo(() => {
+    if (!enabled) return { members: [], totalCount: null };
+    if (loading && cachedMembers.length === 0) return { members: [], totalCount: null };
+    const roleOrder: Record<string, number> = { owner: 0, admin: 1, member: 2 };
+    const sorted = [...cachedMembers].sort((memberA, memberB) => {
+      const order = (roleOrder[memberA.role] ?? 3) - (roleOrder[memberB.role] ?? 3);
+      if (order !== 0) return order;
+      return memberA.joinedAt.localeCompare(memberB.joinedAt);
+    });
+    const previews: MemberPreview[] = sorted.slice(0, MAX_AVATAR_MEMBERS).map((member) => ({
+      uid: member.uid,
+      displayName: member.displayName,
+      avatarUrl: member.avatarUrl,
+      role: member.role,
+      joinedAt: member.joinedAt,
+    }));
+    return { members: previews, totalCount: cachedMembers.length };
+  }, [cachedMembers, enabled, loading]);
 }
 
 // ---------------------------------------------------------------------------
@@ -225,13 +186,7 @@ function MemberAvatars({ namespace, isMember }: { namespace: Namespace; isMember
             <div className="flex -space-x-2">
               {members.map((member, index) => (
                 <div key={member.uid} className="relative" style={{ zIndex: members.length - index }}>
-                  {member.handle !== undefined ? (
-                    <Link href={`/${member.handle}`}>
-                      <MemberTooltipAvatar member={member} resolvedName={resolveName(member)} resolvedAvatar={resolveAvatar(member)} />
-                    </Link>
-                  ) : (
-                    <MemberTooltipAvatar member={member} resolvedName={resolveName(member)} resolvedAvatar={resolveAvatar(member)} />
-                  )}
+                  <MemberTooltipAvatar member={member} resolvedName={resolveName(member)} resolvedAvatar={resolveAvatar(member)} />
                 </div>
               ))}
             </div>
@@ -254,7 +209,8 @@ function InlineEditableBio({
 }) {
   const [editing, setEditing] = React.useState(false);
   const [value, setValue] = React.useState(namespace.bio ?? '');
-  const [saving, setSaving] = React.useState(false);
+  const updateNamespace = useUpdateNamespace(namespace.handle);
+  const saving = updateNamespace.isPending;
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   React.useEffect(() => {
@@ -265,17 +221,15 @@ function InlineEditableBio({
   }, [editing]);
 
   async function handleSave() {
-    setSaving(true);
     try {
       const trimmed = value.trim();
-      await updateDoc(doc(db, 'namespaces', namespace.handle), {
-        bio: trimmed !== '' ? trimmed : null,
+      await updateNamespace.mutateAsync({
+        handle: namespace.handle,
+        bio: trimmed,
       });
       setEditing(false);
     } catch {
-      // keep editing open on error
-    } finally {
-      setSaving(false);
+      // Hook restored the optimistic snapshot; keep editing open on error.
     }
   }
 
@@ -371,45 +325,26 @@ function InlineEditableBio({
 // User workspaces
 // ---------------------------------------------------------------------------
 
-function useUserWorkspaces(namespace: Namespace) {
-  const [workspaces, setWorkspaces] = React.useState<Namespace[]>([]);
-
-  React.useEffect(() => {
-    if (namespace.type !== 'personal' || namespace.linkedUserId === undefined) {
-      setWorkspaces([]);
-      return;
-    }
-
-    getDoc(doc(db, 'users', namespace.linkedUserId))
-      .then(async (userSnap) => {
-        if (!userSnap.exists()) return;
-        const data = userSnap.data();
-        const handles = Array.isArray(data.organizations) ? data.organizations : [];
-        const workspaceDocs = await Promise.all(
-          handles
-            .filter((h: unknown): h is string => typeof h === 'string')
-            .map((h) => getDoc(doc(db, 'namespaces', h))),
-        );
-        setWorkspaces(
-          workspaceDocs
-            .filter((d) => d.exists())
-            .map((d) => {
-              const parsed = NamespaceSchema.safeParse(d.data());
-              return parsed.success ? parsed.data : null;
-            })
-            .filter((ns): ns is Namespace => ns !== null),
-        );
-      })
-      .catch(() => setWorkspaces([]));
-  }, [namespace]);
-
-  return workspaces;
-}
-
+/**
+ * Show org workspaces the signed-in user belongs to — only when viewing
+ * their own personal namespace. Owner-only until a public "workspaces of
+ * uid X" endpoint exists.
+ */
 function UserWorkspaces({ namespace }: { namespace: Namespace }) {
-  const workspaces = useUserWorkspaces(namespace);
+  const { data } = useUserMe();
+  const isSelf =
+    namespace.type === 'personal' &&
+    namespace.linkedUserId !== undefined &&
+    data?.user.uid === namespace.linkedUserId;
+  const workspaces = useMemo(
+    () =>
+      isSelf
+        ? (data?.namespaces ?? []).filter((ns) => ns.type === 'organization')
+        : [],
+    [data, isSelf],
+  );
 
-  if (namespace.type !== 'personal' || workspaces.length === 0) return null;
+  if (!isSelf || workspaces.length === 0) return null;
 
   return (
     <div className="mt-6">
@@ -494,7 +429,7 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
 
   const { definitions, stepsByDefinition, latestDocs, loading: defsLoading } = useProcessDefinitions();
   const { data: allInstances, loading: instancesLoading } = useProcessInstances('all', undefined, false, handle);
-  const { data: activeTasks } = useMyTasks(null);
+  const { data: activeTasks } = useMyActionableTasks();
 
   const loading = defsLoading || instancesLoading;
 

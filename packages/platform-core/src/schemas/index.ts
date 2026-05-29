@@ -218,10 +218,19 @@ export {
   NamespaceTypeSchema,
   NamespaceSchema,
   NamespaceMemberSchema,
+  NamespaceMembershipSchema,
   type NamespaceType,
   type Namespace,
   type NamespaceMember,
+  type NamespaceMembership,
 } from './namespace.js';
+
+export {
+  HandleSchema,
+  HANDLE_REGEX,
+  HANDLE_MAX_LENGTH,
+  type Handle,
+} from './handle.js';
 
 export {
   AgentDefinitionSchema,

@@ -35,6 +35,21 @@ export class AuthorizedHumanTaskRepository extends AuthorizedScope {
       ? this.raw.getByInstanceId(instanceId)
       : this.raw.getByInstanceIdInNamespaces(instanceId, [...this.caller.namespaces]);
 
+  getByInstanceIds = async (instanceIds: readonly string[]): Promise<HumanTask[]> =>
+    this.caller.isSystemActor
+      ? this.raw.getByInstanceIdsAll(instanceIds)
+      : this.raw.getByInstanceIdsInNamespaces(instanceIds, [...this.caller.namespaces]);
+
+  /**
+   * Caller-scope read: every task the caller is allowed to see across all
+   * roles + instances. System actors see the whole store; user callers see
+   * tasks whose parent run belongs to one of their namespaces.
+   */
+  listForCaller = async (): Promise<HumanTask[]> =>
+    this.caller.isSystemActor
+      ? this.raw.listAll()
+      : this.raw.listInNamespaces([...this.caller.namespaces]);
+
   claim = async (taskId: string, userId: string): Promise<HumanTask> => {
     await this.assertCanMutate(taskId);
     return this.raw.claim(taskId, userId);
@@ -48,6 +63,16 @@ export class AuthorizedHumanTaskRepository extends AuthorizedScope {
   cancel = async (taskId: string): Promise<HumanTask> => {
     await this.assertCanMutate(taskId);
     return this.raw.cancel(taskId);
+  };
+
+  /**
+   * Cascade companion for workflow-definition soft-delete. Trust model is
+   * the same as `AuthorizedWorkflowRunRepository.softDeleteByDefinitionName`:
+   * the handler gates the workflow-definition's namespace before invoking;
+   * the raw method takes pre-validated instance IDs.
+   */
+  softDeleteByInstanceIds = async (instanceIds: string[]): Promise<void> => {
+    await this.raw.setDeletedByInstanceIds(instanceIds, true);
   };
 
   private async assertCanMutate(taskId: string): Promise<void> {

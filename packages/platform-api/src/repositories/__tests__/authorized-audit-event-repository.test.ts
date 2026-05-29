@@ -17,7 +17,13 @@ import type { CallerIdentity } from '../../auth.js';
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 
 function userCaller(uid: string, namespaces: readonly string[]): CallerIdentity {
-  return { kind: 'user', uid, namespaces: new Set(namespaces), isSystemActor: false };
+  return {
+    kind: 'user',
+    uid,
+    namespaces: new Set(namespaces),
+    namespaceRoles: new Map(namespaces.map((handle) => [handle, 'member' as const])),
+    isSystemActor: false,
+  };
 }
 
 describe('AuthorizedAuditEventRepository', () => {

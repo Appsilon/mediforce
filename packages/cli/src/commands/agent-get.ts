@@ -1,5 +1,5 @@
 import { defineCommand } from '../define-command.js';
-import { printJson } from '../output.js';
+import { printJson, printKv } from '../output.js';
 
 export const agentGetCommand = defineCommand({
   name: 'mediforce agent get',
@@ -19,22 +19,16 @@ export const agentGetCommand = defineCommand({
     }
     const agent = result.agent;
     output.stdout(`Agent ${agent.id}`);
-    output.stdout(`  name:          ${agent.name}`);
-    output.stdout(`  kind:          ${agent.kind}`);
-    output.stdout(`  model:         ${agent.foundationModel}`);
-    output.stdout(`  description:   ${agent.description}`);
-    if (agent.runtimeId !== undefined) {
-      output.stdout(`  runtimeId:     ${agent.runtimeId}`);
-    }
-    if (agent.visibility !== undefined) {
-      output.stdout(`  visibility:    ${agent.visibility}`);
-    }
-    if (agent.namespace !== undefined) {
-      output.stdout(`  namespace:     ${agent.namespace}`);
-    }
-    if (agent.skillFileNames.length > 0) {
-      output.stdout(`  skills:        ${agent.skillFileNames.join(', ')}`);
-    }
+    printKv(output, [
+      ['name', agent.name],
+      ['kind', agent.kind],
+      ['model', agent.foundationModel],
+      ['description', agent.description],
+      ['runtimeId', agent.runtimeId],
+      ['visibility', agent.visibility],
+      ['namespace', agent.namespace],
+      ['skills', agent.skillFileNames.length > 0 ? agent.skillFileNames.join(', ') : undefined],
+    ]);
     return 0;
   },
 });

@@ -1,74 +1,41 @@
 'use client';
 
-import { orderBy, where } from 'firebase/firestore';
-import { useMemo } from 'react';
-import type { ProcessInstance, HumanTask } from '@mediforce/platform-core';
-import { useCollection } from './use-collection';
+import { useQuery } from '@tanstack/react-query';
+import type { MonitoringSummary } from '@mediforce/platform-api/contract';
+import { ApiError, mediforce } from '@/lib/mediforce';
+import { queryKeys } from '@/lib/query-keys';
 
-export interface MonitoringData {
-  statusCounts: {
-    running: number;
-    paused: number;
-    failed: number;
-    completed: number;
-    created: number;
-  };
-  stuckProcesses: ProcessInstance[]; // paused instances, sorted oldest first
-  roleCounts: Array<{ role: string; pending: number; claimed: number; total: number }>;
+const NICE_LIVE_INTERVAL_MS = 30_000;
+
+/**
+ * Workspace dashboard summary via `mediforce.monitoring.summary`. NICE LIVE
+ * per ADR-0006 §4 — 30 s polling with focus-refetch so dashboards refresh on
+ * tab return without burning RPS while idle.
+ */
+export function useMonitoringSummary(handle: string | undefined): {
+  data: MonitoringSummary | null;
   loading: boolean;
-}
-
-export function useMonitoringData(): MonitoringData {
-  const instanceConstraints = useMemo(() => [orderBy('createdAt', 'desc')], []);
-  const { data: instances, loading: instancesLoading } = useCollection<ProcessInstance>(
-    'processInstances',
-    instanceConstraints,
-  );
-
-  const taskConstraints = useMemo(
-    () => [where('status', 'in', ['pending', 'claimed']), orderBy('createdAt', 'asc')],
-    [],
-  );
-  const { data: tasks, loading: tasksLoading } = useCollection<HumanTask>(
-    'humanTasks',
-    taskConstraints,
-  );
-
-  const statusCounts = useMemo(() => {
-    const counts = { running: 0, paused: 0, failed: 0, completed: 0, created: 0 };
-    for (const inst of instances) {
-      if (inst.status in counts) {
-        counts[inst.status as keyof typeof counts]++;
-      }
-    }
-    return counts;
-  }, [instances]);
-
-  const stuckProcesses = useMemo(
-    () =>
-      instances
-        .filter((i) => i.status === 'paused')
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
-    [instances],
-  );
-
-  const roleCounts = useMemo(() => {
-    const map = new Map<string, { pending: number; claimed: number }>();
-    for (const task of tasks) {
-      const entry = map.get(task.assignedRole) ?? { pending: 0, claimed: 0 };
-      if (task.status === 'pending') entry.pending++;
-      if (task.status === 'claimed') entry.claimed++;
-      map.set(task.assignedRole, entry);
-    }
-    return Array.from(map.entries())
-      .map(([role, counts]) => ({ role, ...counts, total: counts.pending + counts.claimed }))
-      .sort((a, b) => b.total - a.total);
-  }, [tasks]);
+  error: Error | null;
+} {
+  const query = useQuery({
+    queryKey: queryKeys.monitoring.summary(handle ?? ''),
+    queryFn: async () => {
+      const result = await mediforce.monitoring.summary({ handle: handle as string });
+      return result.summary;
+    },
+    enabled: handle !== undefined && handle.length > 0,
+    // ADR-0006 §8a — 403 (not a member) and 404 (workspace gone) are terminal.
+    retry: (failureCount, err) => {
+      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
+      return failureCount < 2;
+    },
+    refetchInterval: (q) => (q.state.error !== null ? false : NICE_LIVE_INTERVAL_MS),
+    refetchOnWindowFocus: true,
+  });
 
   return {
-    statusCounts,
-    stuckProcesses,
-    roleCounts,
-    loading: instancesLoading || tasksLoading,
+    data: query.data ?? null,
+    loading: query.isLoading,
+    error: (query.error as Error | null) ?? null,
   };
 }

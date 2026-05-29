@@ -1,57 +1,38 @@
-import { NextResponse } from 'next/server';
-import { ToolCatalogEntrySchema } from '@mediforce/platform-core';
-import { getPlatformServices } from '@/lib/platform-services';
-import { resolveNamespaceFromQuery, slugifyCommand } from './helpers';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import {
+  CreateToolCatalogEntryInputApiSchema,
+  ListToolCatalogEntriesInputSchema,
+  type CreateToolCatalogEntryInputApi,
+  type ListToolCatalogEntriesInput,
+} from '@mediforce/platform-api/contract';
+import {
+  createToolCatalogEntry,
+  listToolCatalogEntries,
+} from '@mediforce/platform-api/handlers';
 
-export async function GET(request: Request): Promise<NextResponse> {
-  const services = getPlatformServices();
-  const namespace = await resolveNamespaceFromQuery(request, services.namespaceRepo);
-  if (namespace instanceof NextResponse) return namespace;
+export const GET = createRouteAdapter<
+  typeof ListToolCatalogEntriesInputSchema,
+  ListToolCatalogEntriesInput
+>(
+  ListToolCatalogEntriesInputSchema,
+  (req) => ({
+    namespace: new URL(req.url).searchParams.get('namespace') ?? '',
+  }),
+  listToolCatalogEntries,
+);
 
-  const entries = await services.toolCatalogRepo.list(namespace);
-  return NextResponse.json({ entries });
-}
-
-export async function POST(request: Request): Promise<NextResponse> {
-  const services = getPlatformServices();
-  const namespace = await resolveNamespaceFromQuery(request, services.namespaceRepo);
-  if (namespace instanceof NextResponse) return namespace;
-
-  const body = await request.json().catch(() => null);
-  if (!body || typeof body !== 'object') {
-    return NextResponse.json({ error: 'JSON body is required' }, { status: 400 });
-  }
-
-  const incoming = body as Record<string, unknown>;
-  const id =
-    typeof incoming.id === 'string' && incoming.id.length > 0
-      ? incoming.id
-      : typeof incoming.command === 'string'
-        ? slugifyCommand(incoming.command)
-        : '';
-  if (id === '') {
-    return NextResponse.json(
-      { error: 'Unable to derive id: supply `id` or a non-empty `command`.' },
-      { status: 400 },
-    );
-  }
-
-  const parsed = ToolCatalogEntrySchema.safeParse({ ...incoming, id });
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Validation failed', issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
-
-  const existing = await services.toolCatalogRepo.getById(namespace, id);
-  if (existing) {
-    return NextResponse.json(
-      { error: `Catalog entry "${id}" already exists in namespace "${namespace}".` },
-      { status: 409 },
-    );
-  }
-
-  const entry = await services.toolCatalogRepo.upsert(namespace, parsed.data);
-  return NextResponse.json({ entry }, { status: 201 });
-}
+export const POST = createRouteAdapter<
+  typeof CreateToolCatalogEntryInputApiSchema,
+  CreateToolCatalogEntryInputApi
+>(
+  CreateToolCatalogEntryInputApiSchema,
+  async (req) => {
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    return {
+      ...body,
+      namespace: new URL(req.url).searchParams.get('namespace') ?? '',
+    };
+  },
+  createToolCatalogEntry,
+  { successStatus: 201 },
+);

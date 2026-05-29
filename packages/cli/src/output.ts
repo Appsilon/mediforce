@@ -38,6 +38,33 @@ export function printJson(sink: OutputSink, payload: unknown): void {
 }
 
 /**
+ * Print a list of `label: value` rows with the labels padded to the widest
+ * label in the array. Used by `*-get` / `*-claim` / `*-cancel` commands to
+ * keep their human-mode output visually consistent across the CLI.
+ *
+ * `undefined` rows are skipped unless `nullDisplay` is set — that lets a
+ * caller opt into "show even when the field is missing". `null` always
+ * renders as `nullDisplay` (default `(none)`).
+ */
+export function printKv(
+  sink: OutputSink,
+  rows: ReadonlyArray<readonly [label: string, value: string | number | null | undefined]>,
+  options?: { nullDisplay?: string; indent?: number },
+): void {
+  const nullDisplay = options?.nullDisplay ?? '(none)';
+  const indent = ' '.repeat(options?.indent ?? 2);
+  const visible = rows.filter(
+    ([, value]) => value !== undefined || options?.nullDisplay !== undefined,
+  );
+  if (visible.length === 0) return;
+  const width = Math.max(...visible.map(([label]) => label.length));
+  for (const [label, value] of visible) {
+    const rendered = value === null || value === undefined ? nullDisplay : String(value);
+    sink.stdout(`${indent}${`${label}:`.padEnd(width + 1)}  ${rendered}`);
+  }
+}
+
+/**
  * Stream contract — load-bearing, do not change without updating tests:
  *
  *   --json mode:  error payload is written to STDOUT (single channel for

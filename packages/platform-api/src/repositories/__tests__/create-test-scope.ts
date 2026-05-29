@@ -5,6 +5,7 @@
  */
 import {
   InMemoryAgentDefinitionRepository,
+  InMemoryAgentRunRepository,
   InMemoryAuditRepository,
   InMemoryCoworkSessionRepository,
   InMemoryCronTriggerStateRepository,
@@ -15,75 +16,33 @@ import {
   InMemoryProcessRepository,
   InMemoryToolCatalogRepository,
   InMemoryAgentOAuthTokenRepository,
+  InMemoryUserProfileRepository,
 } from '@mediforce/platform-core/testing';
 import type {
-  AgentRun,
   AgentRunRepository,
   ModelRegistryRepository,
   NamespaceRepository,
   NamespaceSecretsRepository,
   ProcessInstanceRepository,
+  UserDirectoryService,
+  UserProfileRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../../auth.js';
 import type { CallerScope } from '../caller-scope.js';
 import { createCallerScope, type CallerScopeServices } from '../create-caller-scope.js';
 import { noopRunKicker, type RunKicker } from '../../runtime/run-kicker.js';
-
-class InMemoryAgentRunRepository implements AgentRunRepository {
-  private readonly byId = new Map<string, AgentRun>();
-
-  constructor(private readonly parents?: ProcessInstanceRepository) {}
-
-  async create(run: AgentRun): Promise<AgentRun> {
-    this.byId.set(run.id, run);
-    return run;
-  }
-  async getById(runId: string): Promise<AgentRun | null> {
-    return this.byId.get(runId) ?? null;
-  }
-  async getByIdInNamespaces(
-    runId: string,
-    allowed: readonly string[],
-  ): Promise<AgentRun | null> {
-    const run = this.byId.get(runId);
-    if (!run) return null;
-    const parent = await this.requireParents().getById(run.processInstanceId);
-    if (!parent || typeof parent.namespace !== 'string') return null;
-    return allowed.includes(parent.namespace) ? run : null;
-  }
-  async getByInstanceId(instanceId: string): Promise<AgentRun[]> {
-    return [...this.byId.values()].filter((r) => r.processInstanceId === instanceId);
-  }
-  async getByInstanceIdInNamespaces(
-    instanceId: string,
-    allowed: readonly string[],
-  ): Promise<AgentRun[]> {
-    const parent = await this.requireParents().getById(instanceId);
-    if (!parent || typeof parent.namespace !== 'string') return [];
-    if (!allowed.includes(parent.namespace)) return [];
-    return this.getByInstanceId(instanceId);
-  }
-  async getAll(limit?: number): Promise<AgentRun[]> {
-    const all = [...this.byId.values()];
-    return limit === undefined ? all : all.slice(0, limit);
-  }
-
-  private requireParents(): ProcessInstanceRepository {
-    if (this.parents === undefined) {
-      throw new Error(
-        'InMemoryAgentRunRepository: ProcessInstanceRepository required for namespace-scoped methods',
-      );
-    }
-    return this.parents;
-  }
-}
+import type { DockerImagesService } from '../../services/docker-images-service.js';
+import type { InviteNotificationService, InviteService } from '../../services/invite-notification.js';
 
 const stubNamespaceRepo: NamespaceRepository = {
   async getNamespace() {
     return null;
   },
   async createNamespace() {
+    /* no-op */
+  },
+  async createNamespaceWithOwner() {
     /* no-op */
   },
   async updateNamespace() {
@@ -98,6 +57,15 @@ const stubNamespaceRepo: NamespaceRepository = {
   async removeMember() {
     /* no-op */
   },
+  async removeMemberWithOrganizations() {
+    /* no-op */
+  },
+  async setMemberRole() {
+    /* no-op */
+  },
+  async deleteNamespaceCascade() {
+    /* no-op */
+  },
   async getMember() {
     return null;
   },
@@ -105,6 +73,9 @@ const stubNamespaceRepo: NamespaceRepository = {
     return [];
   },
   async getUserNamespaces() {
+    return [];
+  },
+  async getMembershipsForUser() {
     return [];
   },
 };
@@ -195,6 +166,12 @@ export interface TestScopeOverrides {
   readonly secretsRepo?: WorkflowSecretsRepository;
   readonly namespaceSecretsRepo?: NamespaceSecretsRepository;
   readonly runKicker?: RunKicker;
+  readonly inviteService?: InviteService | null;
+  readonly inviteNotificationService?: InviteNotificationService | null;
+  readonly dockerImages?: DockerImagesService | null;
+  readonly namespaceRepo?: NamespaceRepository;
+  readonly userProfileRepo?: UserProfileRepository;
+  readonly userDirectory?: UserDirectoryService | null;
 }
 
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
@@ -227,7 +204,8 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     coworkSessionRepo: overrides.coworkSessionRepo ?? new InMemoryCoworkSessionRepository(instanceRepo),
     cronTriggerStateRepo: overrides.cronTriggerStateRepo ?? new InMemoryCronTriggerStateRepository(),
     toolCatalogRepo: overrides.toolCatalogRepo ?? new InMemoryToolCatalogRepository(),
-    namespaceRepo: stubNamespaceRepo,
+    namespaceRepo: overrides.namespaceRepo ?? stubNamespaceRepo,
+    userProfileRepo: overrides.userProfileRepo ?? new InMemoryUserProfileRepository(),
     oauthProviderRepo: overrides.oauthProviderRepo ?? new InMemoryOAuthProviderRepository(),
     agentOAuthTokenRepo: overrides.agentOAuthTokenRepo ?? new InMemoryAgentOAuthTokenRepository(),
     modelRegistryRepo: overrides.modelRegistryRepo ?? stubModelRegistry,
@@ -240,11 +218,36 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     webhookRouter: null as unknown as CallerScopeServices['webhookRouter'],
     agentRunner: null as unknown as CallerScopeServices['agentRunner'],
     runKicker: overrides.runKicker ?? noopRunKicker(),
+    inviteService: overrides.inviteService ?? null,
+    inviteNotificationService: overrides.inviteNotificationService ?? null,
+    dockerImages: overrides.dockerImages ?? null,
+    userDirectory: overrides.userDirectory ?? null,
   };
   return createCallerScope(services, caller);
 }
 
-/** Construct a user caller with the given namespace memberships. */
-export function userCaller(uid: string, namespaces: readonly string[]): CallerIdentity {
-  return { kind: 'user', uid, namespaces: new Set(namespaces), isSystemActor: false };
+/**
+ * Construct a user caller with the given namespace memberships.
+ *
+ * Roles default to `'member'` per namespace — callers that need owner/admin
+ * pass an explicit `roles` map. This default keeps every pre-Phase-2.6 test
+ * site (which never knew about roles) working without modification while
+ * still producing a fully-shaped `CallerIdentity.namespaceRoles`.
+ */
+export function userCaller(
+  uid: string,
+  namespaces: readonly string[],
+  roles?: ReadonlyMap<string, 'owner' | 'admin' | 'member'>,
+): CallerIdentity {
+  const namespaceRoles = new Map<string, 'owner' | 'admin' | 'member'>();
+  for (const handle of namespaces) {
+    namespaceRoles.set(handle, roles?.get(handle) ?? 'member');
+  }
+  return {
+    kind: 'user',
+    uid,
+    namespaces: new Set(namespaces),
+    namespaceRoles,
+    isSystemActor: false,
+  };
 }

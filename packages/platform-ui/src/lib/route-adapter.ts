@@ -30,7 +30,7 @@ import { getAppBaseUrl } from './app-base-url.js';
  *      `PreconditionFailedError`, etc.) map to the ADR-0005 §1 envelope using
  *      `err.code`. Anything else is a 500 (full error logged).
  *
- * Auth note: middleware in `src/middleware.ts` already gates `/api/*` for
+ * Auth note: the proxy in `src/proxy.ts` already gates `/api/*` for
  * presence of credentials — that's the first line of defense and exists so
  * unauthenticated traffic never reaches handler code. The adapter's own
  * resolution step is what turns those credentials into a typed
@@ -51,6 +51,12 @@ export interface RouteAdapterOptions {
   readonly resolveCaller?: (req: NextRequest) => Promise<CallerIdentity | NextResponse>;
   /** Override scope construction. Default wires the platform's real services. */
   readonly buildScope?: (caller: CallerIdentity) => CallerScope;
+  /**
+   * HTTP status returned on successful handler invocation. Defaults to 200.
+   * Set to 201 for routes that create a resource (preserving the inline-route
+   * `NextResponse.json(..., { status: 201 })` contract that clients assert on).
+   */
+  readonly successStatus?: number;
 }
 
 export type RouteHandler<Input, Output> = (
@@ -71,6 +77,7 @@ export function createRouteAdapter<
 ): (req: NextRequest, ctx: Ctx) => Promise<NextResponse> {
   const resolveCaller = options.resolveCaller ?? defaultResolveCaller;
   const buildScope = options.buildScope ?? defaultBuildScope;
+  const successStatus = options.successStatus ?? 200;
 
   return async (req, ctx) => {
     const callerOrResponse = await resolveCaller(req);
@@ -99,10 +106,11 @@ export function createRouteAdapter<
     try {
       const scope = buildScope(caller);
       const result = await handler(parsed.data as NarrowInput, scope);
-      return NextResponse.json(result);
+      return NextResponse.json(result, { status: successStatus });
     } catch (err) {
       if (err instanceof HandlerError) return jsonErrorResponse(err);
       if (err instanceof z.ZodError) {
+        console.error('[route-adapter] handler ZodError:', err.issues);
         return jsonErrorResponse(new HandlerError('validation', 'Invalid input', err.issues));
       }
       console.error('[route-adapter] handler error:', err);

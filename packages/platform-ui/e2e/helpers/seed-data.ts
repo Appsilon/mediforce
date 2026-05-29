@@ -254,6 +254,27 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       error: null,
       assignedRoles: ['reviewer'],
     },
+    // Dedicated completed instance for archive-from-list journey — isolated so
+    // archiving doesn't affect other tests that read proc-completed-1/2.
+    'proc-archive-target': {
+      id: 'proc-archive-target',
+      namespace: 'test',
+      definitionName: 'Data Quality Review',
+      definitionVersion: '2.1.0',
+      configName: 'all-human',
+      configVersion: '1',
+      status: 'completed',
+      currentStepId: null,
+      variables: { studyId: 'study-archive' },
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: twoDaysAgo,
+      createdBy: testUserId,
+      pauseReason: null,
+      error: null,
+      assignedRoles: ['reviewer'],
+    },
     'proc-human-waiting': {
       id: 'proc-human-waiting',
       namespace: 'test',
@@ -1458,6 +1479,16 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       updatedAt: now,
     },
   };
+
+  // Match prod write shape — WorkflowEngine.createInstance writes `deleted: false`
+  // on every instance, and the runs.list query filters server-side via
+  // `.where('deleted','==',false)`. Firestore equality where-clauses do not
+  // match docs missing the field, so seeded rows without `deleted` are hidden.
+  for (const key of Object.keys(processInstances)) {
+    if (processInstances[key].deleted === undefined) {
+      processInstances[key].deleted = false;
+    }
+  }
 
   return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, modelRegistry };
 }

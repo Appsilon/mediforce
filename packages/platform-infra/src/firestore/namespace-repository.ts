@@ -3,9 +3,11 @@ import {
   NamespaceMemberSchema,
   type Namespace,
   type NamespaceMember,
+  type NamespaceMembership,
   type NamespaceRepository,
+  type NamespaceUpdates,
 } from '@mediforce/platform-core';
-import type { Firestore } from 'firebase-admin/firestore';
+import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 
 export class FirestoreNamespaceRepository implements NamespaceRepository {
   private readonly namespacesCollection = 'namespaces';
@@ -29,11 +31,40 @@ export class FirestoreNamespaceRepository implements NamespaceRepository {
       .set(namespace);
   }
 
-  async updateNamespace(handle: string, updates: Partial<Namespace>): Promise<void> {
+  async createNamespaceWithOwner(input: {
+    namespace: Namespace;
+    ownerMember: NamespaceMember;
+  }): Promise<void> {
+    const { namespace, ownerMember } = input;
+    const batch = this.db.batch();
+    const namespaceRef = this.db
+      .collection(this.namespacesCollection)
+      .doc(namespace.handle);
+    const memberRef = namespaceRef
+      .collection(this.membersSubcollection)
+      .doc(ownerMember.uid);
+    const userRef = this.db.collection('users').doc(ownerMember.uid);
+
+    batch.set(namespaceRef, namespace);
+    batch.set(memberRef, ownerMember);
+    batch.set(
+      userRef,
+      { organizations: FieldValue.arrayUnion(namespace.handle) },
+      { merge: true },
+    );
+    await batch.commit();
+  }
+
+  async updateNamespace(handle: string, updates: NamespaceUpdates): Promise<void> {
+    const payload: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === undefined) continue;
+      payload[key] = value;
+    }
     await this.db
       .collection(this.namespacesCollection)
       .doc(handle)
-      .update(updates);
+      .update(payload);
   }
 
   async getNamespacesByUser(uid: string): Promise<Namespace[]> {
@@ -60,12 +91,23 @@ export class FirestoreNamespaceRepository implements NamespaceRepository {
   }
 
   async addMember(handle: string, member: NamespaceMember): Promise<void> {
-    await this.db
-      .collection(this.namespacesCollection)
-      .doc(handle)
-      .collection(this.membersSubcollection)
-      .doc(member.uid)
-      .set(member);
+    // Two writes: the member doc (subcollection) plus a denormalized
+    // `users/{uid}.organizations` arrayUnion entry. The user-doc field is the
+    // primary read path for `getUserNamespaces` (single-doc read, no
+    // collectionGroup index needed); keep it consistent with the member
+    // subcollection here so a new member is reachable via both paths.
+    await Promise.all([
+      this.db
+        .collection(this.namespacesCollection)
+        .doc(handle)
+        .collection(this.membersSubcollection)
+        .doc(member.uid)
+        .set(member),
+      this.db
+        .collection('users')
+        .doc(member.uid)
+        .set({ organizations: FieldValue.arrayUnion(handle) }, { merge: true }),
+    ]);
   }
 
   async removeMember(handle: string, uid: string): Promise<void> {
@@ -75,6 +117,56 @@ export class FirestoreNamespaceRepository implements NamespaceRepository {
       .collection(this.membersSubcollection)
       .doc(uid)
       .delete();
+  }
+
+  async removeMemberWithOrganizations(handle: string, uid: string): Promise<void> {
+    const batch = this.db.batch();
+    const memberRef = this.db
+      .collection(this.namespacesCollection)
+      .doc(handle)
+      .collection(this.membersSubcollection)
+      .doc(uid);
+    const userRef = this.db.collection('users').doc(uid);
+    batch.delete(memberRef);
+    batch.set(
+      userRef,
+      { organizations: FieldValue.arrayRemove(handle) },
+      { merge: true },
+    );
+    await batch.commit();
+  }
+
+  async setMemberRole(handle: string, uid: string, role: NamespaceMember['role']): Promise<void> {
+    await this.db
+      .collection(this.namespacesCollection)
+      .doc(handle)
+      .collection(this.membersSubcollection)
+      .doc(uid)
+      .update({ role });
+  }
+
+  async deleteNamespaceCascade(handle: string): Promise<void> {
+    // Firestore batch cap = 500 ops; 2 ops per member (member doc delete +
+    // user doc arrayRemove) + 1 namespace delete = 2N + 1, so this scales to
+    // ~249 members per workspace. At Mediforce scale (handful of members per
+    // workspace) the cap is not reachable; if/when it becomes one, split into
+    // chunked batches.
+    const membersSnapshot = await this.db
+      .collection(this.namespacesCollection)
+      .doc(handle)
+      .collection(this.membersSubcollection)
+      .get();
+    const batch = this.db.batch();
+    for (const memberDoc of membersSnapshot.docs) {
+      batch.delete(memberDoc.ref);
+      batch.set(
+        this.db.collection('users').doc(memberDoc.id),
+        { organizations: FieldValue.arrayRemove(handle) },
+        { merge: true },
+      );
+    }
+    batch.delete(this.db.collection(this.namespacesCollection).doc(handle));
+    await batch.commit();
   }
 
   async getMember(handle: string, uid: string): Promise<NamespaceMember | null> {
@@ -95,6 +187,72 @@ export class FirestoreNamespaceRepository implements NamespaceRepository {
       .collection(this.membersSubcollection)
       .get();
     return snapshot.docs.map((d) => NamespaceMemberSchema.parse(d.data()));
+  }
+
+  async getMembershipsForUser(uid: string): Promise<readonly NamespaceMembership[]> {
+    // Primary path mirrors `getUserNamespaces`: single doc read on
+    // `users/{uid}.organizations`, then per-handle fetch of the member doc to
+    // get the role. Avoids requiring the `members` collectionGroup index in
+    // dev/emulator environments. Falls back to collectionGroup when the
+    // organizations array is empty/missing.
+    const [userDoc, personalSnapshot] = await Promise.all([
+      this.db.collection('users').doc(uid).get(),
+      this.db
+        .collection(this.namespacesCollection)
+        .where('linkedUserId', '==', uid)
+        .get(),
+    ]);
+
+    const byHandle = new Map<string, NamespaceMembership>();
+
+    const organizations = userDoc.exists ? (userDoc.data()?.organizations as unknown) : undefined;
+    if (Array.isArray(organizations) && organizations.length > 0) {
+      const memberships = await Promise.all(
+        organizations.map(async (handle: string) => {
+          const memberSnap = await this.db
+            .collection(this.namespacesCollection).doc(handle)
+            .collection(this.membersSubcollection).doc(uid)
+            .get();
+          if (!memberSnap.exists) return null;
+          const member = NamespaceMemberSchema.parse(memberSnap.data());
+          return { handle, role: member.role } satisfies NamespaceMembership;
+        }),
+      );
+      for (const m of memberships) {
+        if (m !== null) byHandle.set(m.handle, m);
+      }
+    } else {
+      // Fallback: collectionGroup query (requires deployed
+      // `members.uid ASCENDING` index). Surfaces a console warning when the
+      // index is missing rather than silently returning personal-only.
+      try {
+        const memberSnapshot = await this.db
+          .collectionGroup(this.membersSubcollection)
+          .where('uid', '==', uid)
+          .get();
+        for (const memberDoc of memberSnapshot.docs) {
+          const namespaceRef = memberDoc.ref.parent.parent;
+          if (namespaceRef === null) continue;
+          const member = NamespaceMemberSchema.parse(memberDoc.data());
+          byHandle.set(namespaceRef.id, { handle: namespaceRef.id, role: member.role });
+        }
+      } catch (err: unknown) {
+        const grpcErr = err as { code?: number };
+        if (grpcErr.code !== 9) throw err;
+        console.warn(
+          '[namespace-repository] collectionGroup("members") index missing and users/%s.organizations empty — returning personal-only',
+          uid,
+        );
+      }
+    }
+
+    // Personal namespaces (linkedUserId match) — owner wins over any prior entry.
+    for (const doc of personalSnapshot.docs) {
+      const ns = NamespaceSchema.parse(doc.data());
+      byHandle.set(ns.handle, { handle: ns.handle, role: 'owner' });
+    }
+
+    return [...byHandle.values()];
   }
 
   async getUserNamespaces(uid: string): Promise<Namespace[]> {
