@@ -1,4 +1,4 @@
-import type { ProcessInstance } from '../schemas/process-instance';
+import type { ProcessInstance, RunNameEntry } from '../schemas/process-instance';
 import type { StepExecution } from '../schemas/step-execution';
 import type { InstanceStatus } from '../schemas/process-instance';
 
@@ -69,6 +69,22 @@ export interface ProcessInstanceRepository {
 
   listAll(options: ListInstancesOptions): Promise<ProcessInstance[]>;
   listInNamespaces(allowed: readonly string[], options: ListInstancesOptions): Promise<ProcessInstance[]>;
+
+  /**
+   * Projected `{ id, definitionName }` view of every non-deleted run in a
+   * namespace. Backs the workspace label map (`useProcessNameMap`), which only
+   * reads those two fields — the full-document `listAll` path was 24 s/request
+   * in dev for a 10k-run workspace (issue #588). The Firestore impl uses
+   * `.select('definitionName')` to shrink the wire payload.
+   *
+   * Deliberately UNBOUNDED (no limit): the label map must cover every run the
+   * pre-cutover `processInstances` `onSnapshot` surfaced — which read the whole
+   * collection. The legacy `runs.list({ limit: 10000 })` workaround was a cap
+   * on the full-document path; this projection drops it to restore the
+   * "read all" parity the map depends on. Filters `deleted == false` to match
+   * `listAll`'s soft-delete exclusion.
+   */
+  listDefinitionNames(namespace: string): Promise<RunNameEntry[]>;
 
   getByStatusAll(status: InstanceStatus): Promise<ProcessInstance[]>;
   getByStatusInNamespaces(status: InstanceStatus, allowed: readonly string[]): Promise<ProcessInstance[]>;

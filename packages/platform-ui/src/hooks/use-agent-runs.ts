@@ -8,7 +8,7 @@ import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 import {
   CRITICAL_LIVE_INTERVAL_MS,
-  LEGACY_FIRESTORE_PARITY_LIMIT,
+  NICE_LIVE_INTERVAL_MS,
   STANDARD_LIVE_INTERVAL_MS,
 } from '@/lib/polling-cadence';
 
@@ -136,33 +136,36 @@ export function useAgentRun(runId: string | null): {
 
 /**
  * Definition-name lookup map indexed by process-instance id, scoped to the
- * active workspace `handle`. Uses `mediforce.runs.list({ namespace: handle })`
- * — PR-final replacement for the legacy Firestore `processInstances`
- * subscription. STANDARD LIVE (5 s) keeps labels fresh as new runs land.
+ * active workspace `handle`. Uses the projected `mediforce.runs.listNames`
+ * endpoint (issue #588): only `{ id, definitionName }` per run, not the full
+ * `ProcessInstance` — the full-document `runs.list` path was ~24 s/request in
+ * dev for a 10k-run workspace.
+ *
+ * NICE LIVE (30 s): the map only changes when a new run lands, so a slower
+ * cadence plus `staleTime` cuts read volume on this loop without staleness the
+ * operator would notice.
  */
 export function useProcessNameMap(handle: string): Map<string, string> {
   const query = useQuery({
     queryKey: queryKeys.runs.nameMap(handle),
     enabled: handle.length > 0,
+    staleTime: NICE_LIVE_INTERVAL_MS,
     queryFn: async () => {
-      const result = await mediforce.runs.list({
-        namespace: handle,
-        limit: LEGACY_FIRESTORE_PARITY_LIMIT,
-      });
+      const result = await mediforce.runs.listNames({ namespace: handle });
       return result.runs;
     },
     refetchInterval: (q) => {
       // PRD §9 rule 4: terminate on 4xx so a session whose membership flipped
-      // stops hammering this 5s slice.
+      // stops polling this slice.
       if (q.state.error !== null) return false;
-      return STANDARD_LIVE_INTERVAL_MS;
+      return NICE_LIVE_INTERVAL_MS;
     },
     retry: stopRetryOn4xx,
   });
-  const instances = query.data ?? [];
+  const entries = query.data ?? [];
   return useMemo(() => {
     const map = new Map<string, string>();
-    for (const inst of instances) map.set(inst.id, inst.definitionName);
+    for (const entry of entries) map.set(entry.id, entry.definitionName);
     return map;
-  }, [instances]);
+  }, [entries]);
 }

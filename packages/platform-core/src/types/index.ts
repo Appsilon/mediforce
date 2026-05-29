@@ -29,6 +29,7 @@ export type { StepInput, StepOutput } from '../schemas/step-contract';
 export type {
   InstanceStatus,
   ProcessInstance,
+  RunNameEntry,
 } from '../schemas/process-instance';
 
 export type {
