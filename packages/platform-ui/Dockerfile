@@ -46,6 +46,23 @@ ARG NEXT_PUBLIC_GIT_SHA
 
 RUN pnpm --filter @mediforce/platform-ui build
 
+# --- Migrate (init container) ---
+# ADR-0001 — schema migrations run as a separate short-lived service
+# (see docker-compose.prod.yml `migrate` service), gated by
+# `depends_on: { migrate: { condition: service_completed_successfully } }`
+# on platform-ui. This decouples migrations from the app boot path so the
+# Next.js standalone bundle no longer needs to ship `postgres` /
+# `drizzle-orm` / `drizzle-kit`. STORAGE_BACKEND != 'postgres' is handled
+# inside the CMD so the service still exits 0 in Firestore mode and the
+# init-container gate fires.
+#
+# Derived from `builder` (not `deps`) because the builder already has the
+# full workspace + devDeps including `drizzle-kit` installed. The image
+# is short-lived; size is not a concern.
+FROM builder AS migrate
+WORKDIR /app/packages/platform-infra
+CMD ["sh", "-c", "if [ \"$STORAGE_BACKEND\" != \"postgres\" ]; then echo '[migrate] STORAGE_BACKEND != postgres — skipping.'; exit 0; fi; pnpm exec drizzle-kit migrate"]
+
 # --- Runner ---
 FROM node:24-slim AS runner
 
@@ -67,15 +84,6 @@ COPY --from=builder /app/packages/platform-ui/public ./packages/platform-ui/publ
 # Not reliably picked up by Next.js output file tracing in this build, so copy explicitly.
 COPY --from=builder /app/data ./data
 
-# ADR-0001 — migration runner + Drizzle SQL files. Both live under
-# packages/platform-infra (the package that owns the schema). Migrations
-# are applied by CMD below before server.js starts. Idempotent (drizzle's
-# `drizzle.__drizzle_migrations` ledger) so re-deploys without schema
-# changes are a no-op. STORAGE_BACKEND != 'postgres' makes the runner
-# exit 0 immediately.
-COPY --from=builder /app/packages/platform-infra/src/postgres/migrations ./packages/platform-infra/src/postgres/migrations
-COPY --from=builder /app/packages/platform-infra/scripts/migrate.mjs ./packages/platform-infra/scripts/migrate.mjs
-
 EXPOSE 3000
 
-CMD ["sh", "-c", "node packages/platform-infra/scripts/migrate.mjs && node packages/platform-ui/server.js"]
+CMD ["node", "packages/platform-ui/server.js"]

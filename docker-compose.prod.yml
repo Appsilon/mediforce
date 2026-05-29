@@ -52,6 +52,23 @@ services:
       timeout: 3s
       retries: 5
 
+  # ADR-0001 — Drizzle migration init container. Runs once per `up`,
+  # exits 0 immediately when STORAGE_BACKEND != 'postgres' (Firestore mode).
+  # `platform-ui` waits via service_completed_successfully so the app boot
+  # never races a half-applied schema.
+  migrate:
+    build:
+      context: .
+      dockerfile: packages/platform-ui/Dockerfile
+      target: migrate
+    restart: "no"
+    environment:
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-firestore}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-mediforce}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mediforce}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   platform-ui:
     build:
       context: .
@@ -73,7 +90,8 @@ services:
       - REDIS_URL=redis://redis:6379
       # ADR-0001 — Postgres storage backend. Default still firestore until
       # cutover; flip STORAGE_BACKEND=postgres in the host `.env` when ready.
-      # Auto-migrate runs via Dockerfile CMD (migrate.mjs && server.js).
+      # Migrations run in the `migrate` init container before this service
+      # starts (depends_on: { migrate: { condition: service_completed_successfully } }).
       - STORAGE_BACKEND=${STORAGE_BACKEND:-firestore}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-mediforce}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mediforce}
       - PLATFORM_API_KEY=${PLATFORM_API_KEY}
@@ -111,6 +129,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   container-worker:
     build:

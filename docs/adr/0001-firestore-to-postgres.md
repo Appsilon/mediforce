@@ -133,19 +133,30 @@ Next.js' real boot hook and runs once per server start. Migrations apply
 
 **6. Migrations run as a separate process before app start, not from
 inside Next.js.**
-Production: [`packages/platform-ui/Dockerfile`](../../packages/platform-ui/Dockerfile)
-wraps the container `CMD` with
-[`packages/platform-infra/scripts/migrate.mjs`](../../packages/platform-infra/scripts/migrate.mjs):
-the script applies pending Drizzle migrations, then exec's `server.js`.
+Production: a dedicated `migrate` compose service (init container) runs
+`pnpm exec drizzle-kit migrate` against the Drizzle SQL files in
+[`packages/platform-infra/src/postgres/migrations`](../../packages/platform-infra/src/postgres/migrations).
+The service exits 0 immediately when `STORAGE_BACKEND != postgres`, so
+Firestore-mode deploys still satisfy
+`depends_on: { migrate: { condition: service_completed_successfully } }`
+on `platform-ui`. Build target: `migrate` stage in
+[`packages/platform-ui/Dockerfile`](../../packages/platform-ui/Dockerfile);
+wired up in
+[`docker-compose.prod.yml`](../../docker-compose.prod.yml).
 A first attempt routed migrations through Next.js `instrumentation.ts`,
 but Turbopack's instrumentation pipeline does not honour
 `transpilePackages` for workspace imports, which forced `@ts-expect-error`
 escapes and duplicating `postgres` / `drizzle-orm` as `platform-ui`
-direct deps. The standalone-script approach drops the workarounds, keeps
-the Next.js boot path clean, and lets the same script run as an
-init-container if a future deployment goes multi-replica. Local dev
-runs migrations via `pnpm dev:postgres` (wrapper around `pnpm db:migrate`
-+ `pnpm dev`) or `pnpm db:migrate` directly — same drizzle-kit CLI under
+direct deps. A second attempt (PR #515) chained migrations inline with
+the app `CMD` (`node migrate.mjs && node server.js`) but coupled migrate
+to the Next.js standalone bundle, which doesn't reliably include
+`postgres` / `drizzle-orm` — staging broke with `ERR_MODULE_NOT_FOUND`
+and the workaround (PR #570) was a brittle `outputFileTracingIncludes`
+glob list. The init-container approach drops both: the app standalone
+bundle never sees the DB driver, and migrate has its own image with the
+full workspace + devDeps (drizzle-kit) available. Local dev runs
+migrations via `pnpm dev:postgres` (wrapper around `pnpm db:migrate` +
+`pnpm dev`) or `pnpm db:migrate` directly — same drizzle-kit CLI under
 the hood, just different boot-wrappers.
 
 **5. Per-repo ternary routing inside `getPlatformServices()`, no separate

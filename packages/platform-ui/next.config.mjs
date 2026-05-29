@@ -12,22 +12,6 @@ const nextConfig = {
     : {
         output: 'standalone',
         outputFileTracingRoot: path.resolve(__dirname, '../..'),
-        // ADR-0001 — force `postgres` + `drizzle-orm` into the standalone
-        // bundle. Without this, Next.js may prune them: the postgres branch
-        // in platform-services.ts is gated by a runtime `process.env` check,
-        // which the tracer can fail to follow. migrate.mjs (executed by the
-        // Dockerfile CMD before server.js) needs these resolvable from
-        // /app/packages/platform-infra/scripts/migrate.mjs. Multiple paths
-        // listed because pnpm's monorepo layout symlinks deps in several
-        // places; nonexistent globs are silently ignored.
-        outputFileTracingIncludes: {
-          '*': [
-            '../../node_modules/postgres/**/*',
-            '../../node_modules/drizzle-orm/**/*',
-            '../platform-infra/node_modules/postgres/**/*',
-            '../platform-infra/node_modules/drizzle-orm/**/*',
-          ],
-        },
       }),
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   // Trust loopback hostnames for HMR. Browsers that hit the dev server via

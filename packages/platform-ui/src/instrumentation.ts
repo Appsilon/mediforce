@@ -11,12 +11,14 @@ export async function register(): Promise<void> {
   }
 }
 
-// ADR-0001 — Postgres migrations are NOT applied here. They run via
-// `packages/platform-infra/scripts/migrate.mjs`, invoked by the
-// production Dockerfile's CMD before `server.js`. Local dev runs them
-// via `pnpm dev:postgres` (which calls `pnpm db:migrate` before the dev
-// server) or `pnpm db:migrate` directly. See docs/postgres-local-dev.md.
-// Instrumentation-time migration was tried (commit cd540e85) but
-// Turbopack's instrumentation pipeline doesn't honour `transpilePackages`
-// for workspace imports, which forced @ts-expect-error workarounds and
-// duplicated `postgres`/`drizzle-orm` as platform-ui direct deps.
+// ADR-0001 — Postgres migrations are NOT applied here. They run in a
+// separate `migrate` compose service (init container, see
+// docker-compose.prod.yml) before `platform-ui` starts, gated by
+// `depends_on: { migrate: { condition: service_completed_successfully } }`.
+// Local dev runs them via `pnpm dev:postgres` (which calls `pnpm db:migrate`
+// before the dev server) or `pnpm db:migrate` directly. See
+// docs/postgres-local-dev.md. Instrumentation-time migration was tried
+// (commit cd540e85) but Turbopack's instrumentation pipeline doesn't
+// honour `transpilePackages` for workspace imports, which forced type
+// suppressions and duplicated `postgres`/`drizzle-orm` as platform-ui
+// direct deps.
