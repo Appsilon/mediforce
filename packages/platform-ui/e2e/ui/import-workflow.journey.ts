@@ -43,7 +43,7 @@ test.describe('Import Workflow from Git Journey', () => {
         await route.fulfill({
           status: 201,
           contentType: 'application/json',
-          body: JSON.stringify({ name: 'workflow-designer', version: 1, namespace: TEST_ORG_HANDLE }),
+          body: JSON.stringify({ success: true, name: 'workflow-designer', version: 1, namespace: TEST_ORG_HANDLE }),
         });
       },
     );
