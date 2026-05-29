@@ -63,9 +63,14 @@ test.describe('Workspace bio clear journey', () => {
     await showStep(page);
     await click(page, page.getByRole('button', { name: /^sign in$/i }));
 
+    // Wait for the post-login redirect so auth context is fully established
+    // before we navigate into the app — otherwise the settings GET races the
+    // auth cookie and 401-bounces to /login.
+    await page.waitForURL(/\/(workspace-selection|bio-clear-labs)/, { timeout: 30_000 });
+
     await page.goto(`/${HANDLE}/settings`);
     await expect(page.getByRole('heading', { name: 'Workspace settings' })).toBeVisible({
-      timeout: 15_000,
+      timeout: 30_000,
     });
     await showCaption(page, 'Owner edits workspace bio');
 
