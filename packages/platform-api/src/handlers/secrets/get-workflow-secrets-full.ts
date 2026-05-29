@@ -34,6 +34,7 @@ export async function getWorkflowSecretsFull(
     basis: 'Operator opened workflow secrets editor',
     entityType: 'workflowSecret',
     entityId: `${input.namespace}/${input.workflow}`,
+    namespace: input.namespace,
   });
 
   return { secrets };

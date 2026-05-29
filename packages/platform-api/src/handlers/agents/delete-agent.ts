@@ -21,6 +21,7 @@ export async function deleteAgent(
     basis: 'Agent deleted via API',
     entityType: 'agentDefinition',
     entityId: input.id,
+    ...(existing.namespace !== undefined ? { namespace: existing.namespace } : {}),
   });
   return { success: true };
 }

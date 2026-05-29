@@ -74,6 +74,7 @@ export async function resendInvite(
     basis: 'Invite resent via API',
     entityType: 'invitation',
     entityId: input.uid,
+    namespace: input.namespaceHandle,
   });
 
   return { uid: input.uid, email, temporaryPassword, emailSent };

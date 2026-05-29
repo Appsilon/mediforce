@@ -48,6 +48,7 @@ export async function createOAuthProvider(
     basis: 'OAuth provider created via API',
     entityType: 'oauthProvider',
     entityId: provider.id,
+    namespace,
   });
 
   return { provider: toPublicProvider(provider) };

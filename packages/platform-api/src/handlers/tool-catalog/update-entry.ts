@@ -33,6 +33,7 @@ export async function updateToolCatalogEntry(
     basis: 'Tool catalog entry updated via API',
     entityType: 'toolCatalogEntry',
     entityId: entry.id,
+    namespace,
   });
 
   return { entry };

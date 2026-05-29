@@ -18,6 +18,7 @@ export async function createAgent(
     basis: 'Agent created via API',
     entityType: 'agentDefinition',
     entityId: agent.id,
+    ...(agent.namespace !== undefined ? { namespace: agent.namespace } : {}),
   });
   return { agent };
 }

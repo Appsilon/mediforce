@@ -36,6 +36,7 @@ export async function setDefaultWorkflowVersion(
     basis: 'Workflow default version changed via API',
     entityType: 'workflow_definition',
     entityId: input.name,
+    namespace: input.namespace,
   });
 
   return {

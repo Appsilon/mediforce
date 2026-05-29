@@ -34,6 +34,7 @@ export async function saveWorkflowSecrets(
     basis: 'Operator saved workflow secrets editor (atomic bulk replace)',
     entityType: 'workflowSecret',
     entityId: `${input.namespace}/${input.workflow}`,
+    namespace: input.namespace,
   });
 
   return { ok: true, savedKeyCount: savedKeys.length };

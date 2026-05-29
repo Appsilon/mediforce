@@ -99,6 +99,7 @@ export async function inviteUser(
     basis: 'User invited via API',
     entityType: 'invitation',
     entityId: uid,
+    namespace: input.namespaceHandle,
   });
 
   return { uid, email, temporaryPassword, emailSent, isExisting };
