@@ -4,13 +4,8 @@ import { PreconditionFailedError } from '../../errors.js';
 import { loadOr404 } from '../_helpers.js';
 
 const DEFAULT_REASON = 'Cancelled by user';
+const ACTIONABLE_TASK_STATUSES = new Set(['pending', 'claimed']);
 
-// Reuses scope.runs.update() rather than a dedicated wrapper cancel method
-// (state-machine throw stays in the handler, mirroring claim-task.ts).
-//
-// Audit action `instance.cancelled` aligns with workflow-engine's
-// `instance.*` family (instance.created/started/paused/resumed/aborted/
-// completed). A repo-wide `instance.*` → `run.*` rename is its own pass.
 export async function cancelRun(
   input: CancelRunInput,
   scope: CallerScope,
@@ -36,6 +31,15 @@ export async function cancelRun(
     updatedAt: now,
   });
 
+  const tasks = await scope.tasks.getByInstanceId(input.runId);
+  const cancelledTaskIds: string[] = [];
+  for (const task of tasks) {
+    if (ACTIONABLE_TASK_STATUSES.has(task.status)) {
+      await scope.tasks.cancel(task.id);
+      cancelledTaskIds.push(task.id);
+    }
+  }
+
   const isUser = scope.caller.kind === 'user';
   await scope.system.audit.append({
     actorId: isUser ? scope.caller.uid : 'api',
@@ -45,7 +49,7 @@ export async function cancelRun(
     description: `Run cancelled by operator (was ${run.status}${run.currentStepId ? ` at step '${run.currentStepId}'` : ''})`,
     timestamp: now,
     inputSnapshot: { previousStatus: run.status, currentStepId: run.currentStepId },
-    outputSnapshot: { status: 'failed', error: reason },
+    outputSnapshot: { status: 'failed', error: reason, cancelledTasks: cancelledTaskIds.length },
     basis: 'User-initiated cancel via UI — double-confirm pattern',
     entityType: 'processInstance',
     entityId: input.runId,

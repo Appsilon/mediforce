@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   InMemoryAuditRepository,
+  InMemoryHumanTaskRepository,
   InMemoryProcessInstanceRepository,
+  buildHumanTask,
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
@@ -19,11 +21,13 @@ import {
 describe('cancelRun handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;
   let auditRepo: InMemoryAuditRepository;
+  let humanTaskRepo: InMemoryHumanTaskRepository;
 
   beforeEach(() => {
     resetFactorySequence();
     instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository(instanceRepo);
+    humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
   });
 
   describe('happy path', () => {
@@ -224,6 +228,7 @@ describe('cancelRun handler', () => {
       const scope = createTestScope({
         instanceRepo,
         auditRepo,
+        humanTaskRepo,
         // default caller is apiKey
       });
 
@@ -232,6 +237,69 @@ describe('cancelRun handler', () => {
       const events = await auditRepo.getByProcess('inst-a');
       expect(events[0]!.actorId).toBe('api');
       expect(events[0]!.actorType).toBe('system');
+    });
+  });
+
+  describe('task cascade', () => {
+    it('cancels pending and claimed tasks when the run is cancelled', async () => {
+      await instanceRepo.create(
+        buildProcessInstance({
+          id: 'inst-a',
+          namespace: 'team-alpha',
+          status: 'running',
+        }),
+      );
+      await humanTaskRepo.create(
+        buildHumanTask({ id: 'task-pending', processInstanceId: 'inst-a', status: 'pending' }),
+      );
+      await humanTaskRepo.create(
+        buildHumanTask({ id: 'task-claimed', processInstanceId: 'inst-a', status: 'claimed' }),
+      );
+      await humanTaskRepo.create(
+        buildHumanTask({ id: 'task-completed', processInstanceId: 'inst-a', status: 'completed' }),
+      );
+      const scope = createTestScope({
+        instanceRepo,
+        auditRepo,
+        humanTaskRepo,
+        caller: userCaller('u-1', ['team-alpha']),
+      });
+
+      await cancelRun({ runId: 'inst-a' }, scope);
+
+      const pending = await humanTaskRepo.getById('task-pending');
+      const claimed = await humanTaskRepo.getById('task-claimed');
+      const completed = await humanTaskRepo.getById('task-completed');
+      expect(pending!.status).toBe('cancelled');
+      expect(claimed!.status).toBe('cancelled');
+      expect(completed!.status).toBe('completed');
+    });
+
+    it('records cancelled task count in audit outputSnapshot', async () => {
+      await instanceRepo.create(
+        buildProcessInstance({
+          id: 'inst-a',
+          namespace: 'team-alpha',
+          status: 'running',
+        }),
+      );
+      await humanTaskRepo.create(
+        buildHumanTask({ id: 'task-1', processInstanceId: 'inst-a', status: 'pending' }),
+      );
+      await humanTaskRepo.create(
+        buildHumanTask({ id: 'task-2', processInstanceId: 'inst-a', status: 'pending' }),
+      );
+      const scope = createTestScope({
+        instanceRepo,
+        auditRepo,
+        humanTaskRepo,
+        caller: userCaller('u-1', ['team-alpha']),
+      });
+
+      await cancelRun({ runId: 'inst-a' }, scope);
+
+      const events = await auditRepo.getByProcess('inst-a');
+      expect(events[0]!.outputSnapshot).toMatchObject({ cancelledTasks: 2 });
     });
   });
 });
