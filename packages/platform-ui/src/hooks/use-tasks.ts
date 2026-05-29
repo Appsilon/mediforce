@@ -195,19 +195,17 @@ export function useActiveCoworkSession(
       return mediforce.cowork.getByInstance({ instanceId: processInstanceId });
     },
     enabled,
-    // 404 = no cowork session yet. Stop polling — a state transition from
-    // "no session" to "session exists" originates from a UI mutation
-    // (`mediforce.cowork.create` callsite), which must invalidate this
-    // cache key. Without the stop, every instance page without a session
-    // polls 40 req/min indefinitely.
-    refetchInterval: (q) =>
-      q.state.error instanceof ApiError && q.state.error.status === 404
-        ? false
-        : CRITICAL_LIVE_INTERVAL_MS,
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status === 404) return false;
-      return stopRetryOn4xx(failureCount, err);
+    // Stop polling on any 4xx. 404 = no cowork session yet; the transition to
+    // "session exists" originates from a UI mutation (`mediforce.cowork.create`
+    // callsite) that invalidates this cache key. 403 = membership flipped.
+    // Without the stop, every instance page without a session (or after a lost
+    // membership) polls 40 req/min indefinitely.
+    refetchInterval: (q) => {
+      const err = q.state.error;
+      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
+      return CRITICAL_LIVE_INTERVAL_MS;
     },
+    retry: stopRetryOn4xx,
   });
 
   const err = query.error;

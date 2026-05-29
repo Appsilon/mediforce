@@ -75,6 +75,19 @@ describe('useActiveCoworkSession', () => {
     expect(getByInstanceMock).toHaveBeenCalledTimes(1);
   });
 
+  it('stops polling on a non-404 4xx (e.g. 403 membership flip)', async () => {
+    getByInstanceMock.mockRejectedValue(new ApiError(403, 'forbidden'));
+
+    const { wrapper } = createQueryWrapper();
+    const { result } = renderHook(() => useActiveCoworkSession('inst-a'), { wrapper });
+
+    await vi.waitFor(() => expect(result.current.loading).toBe(false));
+    expect(getByInstanceMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(getByInstanceMock).toHaveBeenCalledTimes(1);
+  });
+
   it('switches in-flight requests when instanceId changes without leaking stale data', async () => {
     let resolveFirst: ((value: CoworkSession) => void) | null = null;
     getByInstanceMock.mockImplementationOnce(
