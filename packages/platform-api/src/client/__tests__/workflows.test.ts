@@ -98,6 +98,7 @@ describe('mediforce.workflows.list', () => {
             latestVersion: 2,
             defaultVersion: 1,
             definition: wd,
+            runSummary: { total: 0, active: 0, latest: [] },
           },
         ],
       }),

@@ -79,6 +79,7 @@ describe('ListWorkflowsOutputSchema', () => {
           latestVersion: 2,
           defaultVersion: 1,
           definition: wd,
+          runSummary: { total: 0, active: 0, latest: [] },
         },
       ],
     });
@@ -94,6 +95,7 @@ describe('ListWorkflowsOutputSchema', () => {
           latestVersion: 1,
           defaultVersion: null,
           definition: null,
+          runSummary: { total: 0, active: 0, latest: [] },
         },
       ],
     });
