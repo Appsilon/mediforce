@@ -36,6 +36,11 @@ export interface NamespaceRepository {
   updateNamespace(handle: string, updates: NamespaceUpdates): Promise<void>;
   getNamespacesByUser(uid: string): Promise<Namespace[]>;
   addMember(handle: string, member: NamespaceMember): Promise<void>;
+  /**
+   * @deprecated No production caller as of PR4.5 — use
+   * `removeMemberWithOrganizations` for the DELETE member / POST leave handlers
+   * (it also keeps `users/{uid}.organizations` in sync). Full delete in PR-final.
+   */
   removeMember(handle: string, uid: string): Promise<void>;
   /**
    * Atomic remove: deletes the member subcollection doc AND arrayRemoves the

@@ -53,7 +53,7 @@ import type {
   RemoveNamespaceMemberInput,
   UpdateNamespaceMemberRoleInput,
 } from '@mediforce/platform-api/contract';
-import type { CallerIdentity } from '@mediforce/platform-api/auth';
+import type { CallerIdentity, NamespaceRole } from '@mediforce/platform-api/auth';
 import { Mediforce, ApiError } from '@mediforce/platform-api/client';
 import { createRouteAdapter } from '../../lib/route-adapter';
 import { InMemoryNamespaceRepo, createTestScope } from '@mediforce/platform-api/testing';
@@ -68,6 +68,43 @@ function loopbackFetch(
     const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
     return route(new NextRequest(absolute, init));
   };
+}
+
+function loopbackFetchWithParams<P>(
+  route: (req: NextRequest, ctx: { params: Promise<P> }) => Promise<Response>,
+  extractParams: (url: URL) => P,
+): typeof fetch {
+  return async (input, init) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
+    const req = new NextRequest(absolute, init);
+    return route(req, { params: Promise.resolve(extractParams(new URL(absolute))) });
+  };
+}
+
+function userCaller(uid: string, role: NamespaceRole, handle: string): CallerIdentity {
+  return {
+    kind: 'user',
+    uid,
+    namespaces: new Set([handle]),
+    namespaceRoles: new Map([[handle, role]]),
+    isSystemActor: false,
+  };
+}
+
+function seedAcmeWithOwnerAndMember(repo: InMemoryNamespaceRepo): void {
+  repo.namespaces.set('acme', {
+    handle: 'acme',
+    type: 'organization',
+    displayName: 'Acme Co.',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  });
+  repo.members.set('acme', [
+    { uid: 'uid-owner', role: 'owner', joinedAt: '2026-01-01T00:00:00.000Z' },
+    { uid: 'uid-member', role: 'member', joinedAt: '2026-01-02T00:00:00.000Z' },
+  ]);
+  repo.userOrganizations.set('uid-owner', ['acme']);
+  repo.userOrganizations.set('uid-member', ['acme']);
 }
 
 describe('Mediforce client ↔ route-adapter ↔ listTasks (in-process)', () => {
@@ -393,21 +430,10 @@ describe('Mediforce client ↔ route-adapter ↔ createNamespace (in-process)', 
   });
 });
 
-// PATCH /api/namespaces/:handle round-trip — owner edits metadata; client
-// sees the entity-echo back; in-memory namespace repo reflects the write.
 describe('Mediforce client ↔ route-adapter ↔ updateNamespace (in-process)', () => {
   let namespaceRepo: InMemoryNamespaceRepo;
   let auditRepo: InMemoryAuditRepository;
   let mediforce: Mediforce;
-  let route: (req: NextRequest) => Promise<Response>;
-
-  const ownerCaller: CallerIdentity = {
-    kind: 'user',
-    uid: 'uid-owner',
-    namespaces: new Set(['acme']),
-    namespaceRoles: new Map([['acme', 'owner']]),
-    isSystemActor: false,
-  };
 
   beforeEach(() => {
     namespaceRepo = new InMemoryNamespaceRepo();
@@ -419,7 +445,7 @@ describe('Mediforce client ↔ route-adapter ↔ updateNamespace (in-process)', 
     });
     auditRepo = new InMemoryAuditRepository();
 
-    route = createRouteAdapter<typeof UpdateNamespaceInputSchema, UpdateNamespaceInput, unknown, { params: Promise<{ handle: string }> }>(
+    const route = createRouteAdapter<typeof UpdateNamespaceInputSchema, UpdateNamespaceInput, unknown, { params: Promise<{ handle: string }> }>(
       UpdateNamespaceInputSchema,
       async (req, ctx) => {
         const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -427,26 +453,16 @@ describe('Mediforce client ↔ route-adapter ↔ updateNamespace (in-process)', 
       },
       updateNamespace,
       {
-        resolveCaller: async () => ownerCaller,
+        resolveCaller: async () => userCaller('uid-owner', 'owner', 'acme'),
         buildScope: (caller) => createTestScope({ caller, namespaceRepo, auditRepo }),
       },
     );
 
     mediforce = new Mediforce({
-      fetch: async (input, init) => {
-        const url = typeof input === 'string' ? input : input.toString();
-        const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
-        const req = new NextRequest(absolute, init);
-        // The path is `/api/namespaces/acme`; in production Next.js injects
-        // ctx from the file-based router. In the loopback test we parse the
-        // last path segment to feed the same ctx shape.
-        const segments = new URL(absolute).pathname.split('/');
-        const handle = segments[segments.length - 1] ?? '';
-        return (route as unknown as (
-          r: NextRequest,
-          c: { params: Promise<{ handle: string }> },
-        ) => Promise<Response>)(req, { params: Promise.resolve({ handle }) });
-      },
+      fetch: loopbackFetchWithParams(route, (url) => {
+        const segments = url.pathname.split('/');
+        return { handle: segments[segments.length - 1] ?? '' };
+      }),
     });
   });
 
@@ -479,15 +495,12 @@ describe('Mediforce client ↔ route-adapter ↔ updateNamespace (in-process)', 
   });
 });
 
-// POST /api/namespaces/:handle/leave round-trip — owner blocked → 409
-// precondition_failed; member succeeds.
 describe('Mediforce client ↔ route-adapter ↔ leaveNamespace (in-process)', () => {
   let namespaceRepo: InMemoryNamespaceRepo;
   let auditRepo: InMemoryAuditRepository;
-  let route: (req: NextRequest, ctx: { params: Promise<{ handle: string }> }) => Promise<Response>;
 
   function buildClient(caller: CallerIdentity): Mediforce {
-    route = createRouteAdapter<typeof LeaveNamespaceInputSchema, LeaveNamespaceInput, unknown, { params: Promise<{ handle: string }> }>(
+    const route = createRouteAdapter<typeof LeaveNamespaceInputSchema, LeaveNamespaceInput, unknown, { params: Promise<{ handle: string }> }>(
       LeaveNamespaceInputSchema,
       async (_req, ctx) => ({ handle: (await ctx.params).handle }),
       leaveNamespace,
@@ -497,43 +510,22 @@ describe('Mediforce client ↔ route-adapter ↔ leaveNamespace (in-process)', (
       },
     );
     return new Mediforce({
-      fetch: async (input, init) => {
-        const url = typeof input === 'string' ? input : input.toString();
-        const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
-        const req = new NextRequest(absolute, init);
-        const segments = new URL(absolute).pathname.split('/');
+      fetch: loopbackFetchWithParams(route, (url) => {
         // path: /api/namespaces/<handle>/leave
-        const handle = segments[segments.length - 2] ?? '';
-        return route(req, { params: Promise.resolve({ handle }) });
-      },
+        const segments = url.pathname.split('/');
+        return { handle: segments[segments.length - 2] ?? '' };
+      }),
     });
   }
 
   beforeEach(() => {
     namespaceRepo = new InMemoryNamespaceRepo();
-    namespaceRepo.namespaces.set('acme', {
-      handle: 'acme',
-      type: 'organization',
-      displayName: 'Acme Co.',
-      createdAt: '2026-01-01T00:00:00.000Z',
-    });
-    namespaceRepo.members.set('acme', [
-      { uid: 'uid-owner', role: 'owner', joinedAt: '2026-01-01T00:00:00.000Z' },
-      { uid: 'uid-member', role: 'member', joinedAt: '2026-01-02T00:00:00.000Z' },
-    ]);
-    namespaceRepo.userOrganizations.set('uid-owner', ['acme']);
-    namespaceRepo.userOrganizations.set('uid-member', ['acme']);
+    seedAcmeWithOwnerAndMember(namespaceRepo);
     auditRepo = new InMemoryAuditRepository();
   });
 
   it('member leaves successfully and is removed from the workspace', async () => {
-    const client = buildClient({
-      kind: 'user',
-      uid: 'uid-member',
-      namespaces: new Set(['acme']),
-      namespaceRoles: new Map([['acme', 'member']]),
-      isSystemActor: false,
-    });
+    const client = buildClient(userCaller('uid-member', 'member', 'acme'));
 
     const result = await client.namespaces.leave({ handle: 'acme' });
 
@@ -543,13 +535,7 @@ describe('Mediforce client ↔ route-adapter ↔ leaveNamespace (in-process)', (
   });
 
   it('owner cannot leave — 409 precondition_failed envelope', async () => {
-    const client = buildClient({
-      kind: 'user',
-      uid: 'uid-owner',
-      namespaces: new Set(['acme']),
-      namespaceRoles: new Map([['acme', 'owner']]),
-      isSystemActor: false,
-    });
+    const client = buildClient(userCaller('uid-owner', 'owner', 'acme'));
 
     const err = await client.namespaces.leave({ handle: 'acme' }).catch((e: unknown) => e);
 
@@ -560,21 +546,11 @@ describe('Mediforce client ↔ route-adapter ↔ leaveNamespace (in-process)', (
   });
 });
 
-// DELETE /api/namespaces/:handle round-trip — owner cascade-deletes the
-// workspace + member docs + each user's organizations entry in one batch.
 describe('Mediforce client ↔ route-adapter ↔ deleteNamespace (in-process)', () => {
   let namespaceRepo: InMemoryNamespaceRepo;
   let auditRepo: InMemoryAuditRepository;
   let mediforce: Mediforce;
   let route: (req: NextRequest, ctx: { params: Promise<{ handle: string }> }) => Promise<Response>;
-
-  const ownerCaller: CallerIdentity = {
-    kind: 'user',
-    uid: 'uid-owner',
-    namespaces: new Set(['acme']),
-    namespaceRoles: new Map([['acme', 'owner']]),
-    isSystemActor: false,
-  };
 
   beforeEach(() => {
     namespaceRepo = new InMemoryNamespaceRepo();
@@ -599,20 +575,19 @@ describe('Mediforce client ↔ route-adapter ↔ deleteNamespace (in-process)', 
       async (_req, ctx) => ({ handle: (await ctx.params).handle }),
       deleteNamespace,
       {
-        resolveCaller: async () => ownerCaller,
+        resolveCaller: async () => userCaller('uid-owner', 'owner', 'acme'),
         buildScope: (caller) => createTestScope({ caller, namespaceRepo, auditRepo }),
       },
     );
 
     mediforce = new Mediforce({
-      fetch: async (input, init) => {
-        const url = typeof input === 'string' ? input : input.toString();
-        const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
-        const req = new NextRequest(absolute, init);
-        const segments = new URL(absolute).pathname.split('/');
-        const handle = segments[segments.length - 1] ?? '';
-        return route(req, { params: Promise.resolve({ handle }) });
-      },
+      fetch: loopbackFetchWithParams(
+        (req, ctx) => route(req, ctx),
+        (url) => {
+          const segments = url.pathname.split('/');
+          return { handle: segments[segments.length - 1] ?? '' };
+        },
+      ),
     });
   });
 
@@ -634,13 +609,7 @@ describe('Mediforce client ↔ route-adapter ↔ deleteNamespace (in-process)', 
       async (_req, ctx) => ({ handle: (await ctx.params).handle }),
       deleteNamespace,
       {
-        resolveCaller: async (): Promise<CallerIdentity> => ({
-          kind: 'user',
-          uid: 'uid-member-a',
-          namespaces: new Set(['acme']),
-          namespaceRoles: new Map([['acme', 'member']]),
-          isSystemActor: false,
-        }),
+        resolveCaller: async () => userCaller('uid-member-a', 'member', 'acme'),
         buildScope: (caller) => createTestScope({ caller, namespaceRepo, auditRepo }),
       },
     );
@@ -653,15 +622,12 @@ describe('Mediforce client ↔ route-adapter ↔ deleteNamespace (in-process)', 
   });
 });
 
-// DELETE /api/namespaces/:handle/members/:uid round-trip — owner/admin
-// removes a member; removing the workspace owner is blocked → 409.
 describe('Mediforce client ↔ route-adapter ↔ removeNamespaceMember (in-process)', () => {
   let namespaceRepo: InMemoryNamespaceRepo;
   let auditRepo: InMemoryAuditRepository;
-  let route: (req: NextRequest, ctx: { params: Promise<{ handle: string; uid: string }> }) => Promise<Response>;
 
   function buildClient(caller: CallerIdentity): Mediforce {
-    route = createRouteAdapter<typeof RemoveNamespaceMemberInputSchema, RemoveNamespaceMemberInput, unknown, { params: Promise<{ handle: string; uid: string }> }>(
+    const route = createRouteAdapter<typeof RemoveNamespaceMemberInputSchema, RemoveNamespaceMemberInput, unknown, { params: Promise<{ handle: string; uid: string }> }>(
       RemoveNamespaceMemberInputSchema,
       async (_req, ctx) => {
         const { handle, uid } = await ctx.params;
@@ -674,44 +640,25 @@ describe('Mediforce client ↔ route-adapter ↔ removeNamespaceMember (in-proce
       },
     );
     return new Mediforce({
-      fetch: async (input, init) => {
-        const url = typeof input === 'string' ? input : input.toString();
-        const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
-        const req = new NextRequest(absolute, init);
-        const segments = new URL(absolute).pathname.split('/');
+      fetch: loopbackFetchWithParams(route, (url) => {
         // path: /api/namespaces/<handle>/members/<uid>
-        const uid = segments[segments.length - 1] ?? '';
-        const handle = segments[segments.length - 3] ?? '';
-        return route(req, { params: Promise.resolve({ handle, uid }) });
-      },
+        const segments = url.pathname.split('/');
+        return {
+          handle: segments[segments.length - 3] ?? '',
+          uid: segments[segments.length - 1] ?? '',
+        };
+      }),
     });
   }
 
   beforeEach(() => {
     namespaceRepo = new InMemoryNamespaceRepo();
-    namespaceRepo.namespaces.set('acme', {
-      handle: 'acme',
-      type: 'organization',
-      displayName: 'Acme Co.',
-      createdAt: '2026-01-01T00:00:00.000Z',
-    });
-    namespaceRepo.members.set('acme', [
-      { uid: 'uid-owner', role: 'owner', joinedAt: '2026-01-01T00:00:00.000Z' },
-      { uid: 'uid-member', role: 'member', joinedAt: '2026-01-02T00:00:00.000Z' },
-    ]);
-    namespaceRepo.userOrganizations.set('uid-owner', ['acme']);
-    namespaceRepo.userOrganizations.set('uid-member', ['acme']);
+    seedAcmeWithOwnerAndMember(namespaceRepo);
     auditRepo = new InMemoryAuditRepository();
   });
 
   it('admin removes a member and the user organizations entry is dropped', async () => {
-    const client = buildClient({
-      kind: 'user',
-      uid: 'uid-owner',
-      namespaces: new Set(['acme']),
-      namespaceRoles: new Map([['acme', 'owner']]),
-      isSystemActor: false,
-    });
+    const client = buildClient(userCaller('uid-owner', 'owner', 'acme'));
 
     const result = await client.namespaces.removeMember({ handle: 'acme', uid: 'uid-member' });
 
@@ -722,13 +669,7 @@ describe('Mediforce client ↔ route-adapter ↔ removeNamespaceMember (in-proce
   });
 
   it('removing the workspace owner → 409 precondition_failed envelope', async () => {
-    const client = buildClient({
-      kind: 'user',
-      uid: 'uid-owner',
-      namespaces: new Set(['acme']),
-      namespaceRoles: new Map([['acme', 'owner']]),
-      isSystemActor: false,
-    });
+    const client = buildClient(userCaller('uid-owner', 'owner', 'acme'));
 
     const err = await client.namespaces
       .removeMember({ handle: 'acme', uid: 'uid-owner' })
@@ -741,15 +682,12 @@ describe('Mediforce client ↔ route-adapter ↔ removeNamespaceMember (in-proce
   });
 });
 
-// PATCH /api/namespaces/:handle/members/:uid round-trip — owner flips
-// member↔admin; flipping the owner's own role is rejected → 409.
 describe('Mediforce client ↔ route-adapter ↔ updateNamespaceMemberRole (in-process)', () => {
   let namespaceRepo: InMemoryNamespaceRepo;
   let auditRepo: InMemoryAuditRepository;
-  let route: (req: NextRequest, ctx: { params: Promise<{ handle: string; uid: string }> }) => Promise<Response>;
 
   function buildClient(caller: CallerIdentity): Mediforce {
-    route = createRouteAdapter<typeof UpdateNamespaceMemberRoleInputSchema, UpdateNamespaceMemberRoleInput, unknown, { params: Promise<{ handle: string; uid: string }> }>(
+    const route = createRouteAdapter<typeof UpdateNamespaceMemberRoleInputSchema, UpdateNamespaceMemberRoleInput, unknown, { params: Promise<{ handle: string; uid: string }> }>(
       UpdateNamespaceMemberRoleInputSchema,
       async (req, ctx) => {
         const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -763,41 +701,24 @@ describe('Mediforce client ↔ route-adapter ↔ updateNamespaceMemberRole (in-p
       },
     );
     return new Mediforce({
-      fetch: async (input, init) => {
-        const url = typeof input === 'string' ? input : input.toString();
-        const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
-        const req = new NextRequest(absolute, init);
-        const segments = new URL(absolute).pathname.split('/');
-        const uid = segments[segments.length - 1] ?? '';
-        const handle = segments[segments.length - 3] ?? '';
-        return route(req, { params: Promise.resolve({ handle, uid }) });
-      },
+      fetch: loopbackFetchWithParams(route, (url) => {
+        const segments = url.pathname.split('/');
+        return {
+          handle: segments[segments.length - 3] ?? '',
+          uid: segments[segments.length - 1] ?? '',
+        };
+      }),
     });
   }
 
   beforeEach(() => {
     namespaceRepo = new InMemoryNamespaceRepo();
-    namespaceRepo.namespaces.set('acme', {
-      handle: 'acme',
-      type: 'organization',
-      displayName: 'Acme Co.',
-      createdAt: '2026-01-01T00:00:00.000Z',
-    });
-    namespaceRepo.members.set('acme', [
-      { uid: 'uid-owner', role: 'owner', joinedAt: '2026-01-01T00:00:00.000Z' },
-      { uid: 'uid-member', role: 'member', joinedAt: '2026-01-02T00:00:00.000Z' },
-    ]);
+    seedAcmeWithOwnerAndMember(namespaceRepo);
     auditRepo = new InMemoryAuditRepository();
   });
 
   it('owner flips member → admin and round-trips the updated entity', async () => {
-    const client = buildClient({
-      kind: 'user',
-      uid: 'uid-owner',
-      namespaces: new Set(['acme']),
-      namespaceRoles: new Map([['acme', 'owner']]),
-      isSystemActor: false,
-    });
+    const client = buildClient(userCaller('uid-owner', 'owner', 'acme'));
 
     const result = await client.namespaces.updateMemberRole({
       handle: 'acme',
@@ -812,13 +733,7 @@ describe('Mediforce client ↔ route-adapter ↔ updateNamespaceMemberRole (in-p
   });
 
   it('flipping the workspace owner’s role → 409 precondition_failed', async () => {
-    const client = buildClient({
-      kind: 'user',
-      uid: 'uid-owner',
-      namespaces: new Set(['acme']),
-      namespaceRoles: new Map([['acme', 'owner']]),
-      isSystemActor: false,
-    });
+    const client = buildClient(userCaller('uid-owner', 'owner', 'acme'));
 
     const err = await client.namespaces
       .updateMemberRole({ handle: 'acme', uid: 'uid-owner', role: 'admin' })
@@ -831,8 +746,6 @@ describe('Mediforce client ↔ route-adapter ↔ updateNamespaceMemberRole (in-p
   });
 });
 
-// POST /api/users/me/clear-must-change-password round-trip — user
-// acknowledges forced password change; flag flips false in the profile repo.
 describe('Mediforce client ↔ route-adapter ↔ clearMustChangePassword (in-process)', () => {
   let userProfileRepo: InMemoryUserProfileRepository;
   let auditRepo: InMemoryAuditRepository;
