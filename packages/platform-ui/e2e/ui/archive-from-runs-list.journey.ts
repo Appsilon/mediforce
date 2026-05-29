@@ -33,7 +33,17 @@ test.describe('Archive run from list — useArchiveRun optimistic', () => {
     // accessible name (icon-only button, no text content).
     const archiveButton = targetRow.getByTitle('Archive run');
     await expect(archiveButton).toBeVisible();
-    await click(page, archiveButton);
+    // The runs list accumulates dynamic rows from the L3 API E2E suite
+    // (`e2e/api/previous-run-outputs.journey.ts` adds workflow runs in the
+    // same `test` namespace per #515). With ~15 + rows the target row sits
+    // below the default 720 px viewport bottom. Scroll via `evaluate` to
+    // centre the button, then dispatch the click programmatically so the
+    // result does not depend on `elementFromPoint` (which the page's main
+    // flex container intercepts under that scrolled layout).
+    await archiveButton.evaluate((el) => {
+      el.scrollIntoView({ block: 'center' });
+      (el as HTMLButtonElement).click();
+    });
 
     // Row disappears: list query invalidates on `useArchiveRun.onSettled`,
     // refetches without archived rows (showArchived=false default).

@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Save } from 'lucide-react';
-import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
+import { useWorkflowVersion } from '@/hooks/use-workflow-versions';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { StartRunButton } from '@/components/processes/start-run-button';
@@ -26,8 +26,7 @@ export default function WorkflowDefinitionVersionPage() {
   const decodedName = decodeURIComponent(name);
   const versionNumber = parseInt(version, 10);
 
-  const { definitions, loading } = useWorkflowDefinitions(decodedName, handle);
-  const definition = definitions.find((def) => def.version === versionNumber) ?? null;
+  const { definition, loading } = useWorkflowVersion(decodedName, handle, versionNumber);
 
   const [editedDescription, setEditedDescription] = useState('');
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });

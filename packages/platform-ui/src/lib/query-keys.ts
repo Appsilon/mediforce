@@ -34,13 +34,19 @@ export const queryKeys = {
   task: (taskId: string) => ['task', taskId] as const,
 
   runs: {
-    /** Prefix matcher — `['runs']` invalidates every list slice. */
+    /** Prefix matcher — `['runs']` invalidates every list slice (including
+     *  the name-map projection). Intentional: any run-set change should
+     *  refresh display-name lookups in the next tick. */
     all: () => ['runs'] as const,
     /** Runs scoped to a workspace handle, optionally narrowed by workflow + status. */
     byHandle: (
       handle: string,
       filters?: { workflow?: string; status?: InstanceStatus; limit?: number },
     ) => ['runs', handle, { ...filters }] as const,
+    /** Workspace-scoped `id → definitionName` map. Lives under the `runs`
+     *  prefix so mutation-driven invalidations refresh labels without per-site
+     *  wiring; keyed by handle so two workspaces don't share a cache entry. */
+    nameMap: (handle: string) => ['runs', 'name-map', handle] as const,
   },
   run: (runId: string) => ['run', runId] as const,
 
@@ -53,6 +59,18 @@ export const queryKeys = {
   workflow: (handle: string, name: string, version: number | undefined) =>
     ['workflow', handle, name, version ?? 'latest'] as const,
 
+  /** Version metadata list for a workflow in a namespace (workflows.versions). */
+  workflowVersions: (namespace: string, name: string) =>
+    ['workflow-versions', namespace, name] as const,
+
+  /** Aggregate step-entry view for a process instance (processes.getSteps). */
+  processSteps: (instanceId: string) => ['process-steps', instanceId] as const,
+
+  /** Agent event log slice. `stepId` undefined fetches every step's events
+   *  on the instance. */
+  agentEvents: (instanceId: string, stepId: string | null | undefined) =>
+    ['agent-events', instanceId, stepId ?? null] as const,
+
   cowork: {
     /** Session metadata key (status, artifact, model, voice config). */
     session: (sessionId: string) => ['cowork', sessionId] as const,
@@ -60,6 +78,10 @@ export const queryKeys = {
      * metadata so chat-mutation optimistic prepends operate on a focused
      * scope without invalidating session metadata. */
     turns: (sessionId: string) => ['cowork', sessionId, 'turns'] as const,
+    /** Lookup by parent process instance — at most one session per instance.
+     * Object-discriminated so it doesn't collide with `['cowork', sessionId]`
+     * under prefix invalidation. */
+    byInstance: (instanceId: string) => ['cowork', { byInstance: instanceId }] as const,
   },
   /**
    * Identity + memberships bundle. ONE-SHOT, `refetchOnWindowFocus: false`

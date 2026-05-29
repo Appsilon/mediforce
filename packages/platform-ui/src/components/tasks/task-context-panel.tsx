@@ -5,8 +5,9 @@ import * as Collapsible from '@radix-ui/react-collapsible';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useTheme } from 'next-themes';
 import { ChevronDown, Code, FileText, MonitorPlay } from 'lucide-react';
-import type { Presentation, StepExecution } from '@mediforce/platform-core';
-import { useSubcollection } from '@/hooks/use-process-instances';
+import type { Presentation } from '@mediforce/platform-core';
+import { useProcessInstance } from '@/hooks/use-process-instances';
+import { useStepExecutions } from '@/hooks/use-step-executions';
 import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 import { buildSrcdoc, clampIframeHeight, isIframeResizeMessage } from './iframe-helpers';
@@ -34,9 +35,10 @@ export function TaskContextPanel({
   stepId,
   onContentLoaded,
 }: TaskContextPanelProps) {
-  const { data: executions, loading } = useSubcollection<StepExecution & { id: string }>(
-    processInstanceId ? `processInstances/${processInstanceId}` : '',
-    'stepExecutions',
+  const { data: instance } = useProcessInstance(processInstanceId);
+  const { data: executions, loading } = useStepExecutions(
+    processInstanceId,
+    instance?.status,
   );
 
   // Find the completed step execution that directly precedes this human task's

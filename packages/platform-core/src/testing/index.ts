@@ -1,3 +1,4 @@
+export { InMemoryAgentEventRepository } from './in-memory-agent-event-repository';
 export { InMemoryAuditRepository } from './in-memory-audit-repository';
 export { InMemoryProcessRepository } from './in-memory-process-repository';
 export { InMemoryAuthService } from './in-memory-auth-service';
@@ -25,6 +26,7 @@ export {
   buildStepExecution,
   buildHumanTask,
   buildAgentRun,
+  buildAgentEvent,
   buildAuditEvent,
   buildProcessConfig,
   buildWorkflowDefinition,

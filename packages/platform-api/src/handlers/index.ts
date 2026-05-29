@@ -6,6 +6,7 @@ export { getModel, type GetModelDeps } from './models/get-model';
 export { syncModels, type SyncModelsDeps } from './models/sync-models';
 export { updateRankings, type UpdateRankingsDeps } from './models/update-rankings';
 
+export { listAgentEvents } from './processes/list-agent-events';
 export { listAuditEvents } from './processes/list-audit-events';
 export { getProcessSteps } from './processes/get-process-steps';
 export { cancelRun } from './processes/cancel-run';
@@ -31,6 +32,7 @@ export {
 } from './agents/oauth-tokens';
 
 export { listWorkflows } from './workflows/list-workflows';
+export { listWorkflowVersions } from './workflows/list-workflow-versions';
 export { getWorkflow } from './workflows/get-workflow';
 export { registerWorkflow } from './workflows/register-workflow';
 export { setWorkflowVisibility } from './workflows/set-visibility';
@@ -44,10 +46,11 @@ export { deleteWorkflow } from './workflows/delete-workflow';
 export { transferWorkflowNamespace } from './workflows/transfer-workflow';
 export { getWorkflowRunCount } from './workflows/get-run-count';
 
-export { getCoworkSessionByInstance } from './cowork/get-cowork-session-by-instance';
 export { chatCoworkSession } from './cowork/chat';
-export { finalizeCoworkSession } from './cowork/finalize';
 export { createVoiceEphemeralKey } from './cowork/voice-ephemeral-key';
+export { finalizeCoworkSession } from './cowork/finalize';
+export { getCoworkSessionByInstance } from './cowork/get-cowork-session-by-instance';
+export { listCoworkSessions } from './cowork/list-cowork-sessions';
 export { synthesizeVoiceArtifact } from './cowork/voice-synthesize';
 
 export { listPlugins } from './plugins/list-plugins';

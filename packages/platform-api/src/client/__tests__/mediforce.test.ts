@@ -343,6 +343,7 @@ describe('Mediforce', () => {
             latestVersion: 1,
             defaultVersion: 1,
             definition: buildWorkflowDefinition(),
+            runSummary: { total: 0, active: 0, latest: [] },
           },
         ],
       },

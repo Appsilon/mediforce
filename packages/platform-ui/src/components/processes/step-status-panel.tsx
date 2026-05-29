@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 import { formatDuration, formatCostUsd } from '@/lib/format';
 import { useUserDisplayNames } from '@/hooks/use-users';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 
 const SYSTEM_ACTOR_IDS = new Set(['auto-runner', 'api-user', 'system']);
 
@@ -176,7 +177,7 @@ function ExecutedBy({ executedBy, executorType, plugin, autonomyLevel, runtime }
   autonomyLevel?: string;
   runtime?: string;
 }) {
-  const userNames = useUserDisplayNames();
+  const userNames = useUserDisplayNames(useHandleFromPath());
 
   if (executorType === 'agent') {
     const agentLabel = plugin ? `agent:${plugin}` : 'Agent unknown';

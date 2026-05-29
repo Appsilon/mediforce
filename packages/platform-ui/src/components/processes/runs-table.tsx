@@ -52,7 +52,7 @@ export function RunsTable({
 }: RunsTableProps) {
   const handle = useHandleFromPath();
   const { toast } = useToast();
-  const userNames = useUserDisplayNames();
+  const userNames = useUserDisplayNames(handle);
   const archiveMutation = useArchiveRun();
   const bulkCancelMutation = useBulkCancelRuns();
   const bulkArchiveMutation = useBulkArchiveRuns();

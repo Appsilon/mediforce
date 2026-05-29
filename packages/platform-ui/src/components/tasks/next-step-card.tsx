@@ -4,9 +4,10 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, Bot, User, CheckCircle2, Loader2 } from 'lucide-react';
-import type { StepExecution, WorkflowStep, HumanTask } from '@mediforce/platform-core';
+import type { WorkflowStep, HumanTask } from '@mediforce/platform-core';
 import { ACTIONABLE_STATUSES } from '@mediforce/platform-api/contract';
-import { useSubcollection, useProcessInstance } from '@/hooks/use-process-instances';
+import { useProcessInstance } from '@/hooks/use-process-instances';
+import { useStepExecutions } from '@/hooks/use-step-executions';
 import { ApiError, mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
@@ -27,14 +28,11 @@ function formatStepName(stepId: string): string {
 
 export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
   const handle = useHandleFromPath();
-  // Step executions still live in Firestore (PR2 scope migrates the agent /
-  // step-execution domain). Keep Firestore-backed here.
-  const { data: executions, loading: execLoading } = useSubcollection<StepExecution & { id: string }>(
-    processInstanceId ? `processInstances/${processInstanceId}` : '',
-    'stepExecutions',
-  );
-
   const { data: instance, loading: instanceLoading } = useProcessInstance(processInstanceId);
+  const { data: executions, loading: execLoading } = useStepExecutions(
+    processInstanceId,
+    instance?.status,
+  );
 
   const stepExecution = React.useMemo(() => {
     if (executions.length === 0) return null;

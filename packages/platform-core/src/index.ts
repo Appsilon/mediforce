@@ -197,6 +197,7 @@ export type {
 
 // Interfaces (repository and service contracts)
 export type {
+  AgentEventRepository,
   AuditRepository,
   AuthService,
   AuthUser,
@@ -205,6 +206,7 @@ export type {
   WorkflowDefinitionGroup,
   ProcessInstanceRepository,
   ListInstancesOptions,
+  WorkflowRunSummaryResult,
   HumanTaskRepository,
   HandoffRepository,
   NotificationService,
@@ -302,6 +304,7 @@ export { formatZodErrors } from './parser/index';
 
 // Testing utilities (in-memory implementations for test doubles)
 export {
+  InMemoryAgentEventRepository,
   InMemoryAuditRepository,
   InMemoryProcessRepository,
   InMemoryAuthService,
@@ -319,6 +322,7 @@ export {
   buildStepExecution,
   buildHumanTask,
   buildAgentRun,
+  buildAgentEvent,
   buildAuditEvent,
   buildProcessConfig,
   buildWorkflowDefinition,

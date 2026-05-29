@@ -43,6 +43,27 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
     );
   }
 
+  async listAll(): Promise<CoworkSession[]> {
+    return [...this.sessions.values()].map((s) => ({ ...s, turns: [...s.turns] }));
+  }
+
+  async listInNamespaces(allowed: readonly string[]): Promise<CoworkSession[]> {
+    return this.filterByParentNamespace(await this.listAll(), allowed);
+  }
+
+  async listByRoleAll(role: string): Promise<CoworkSession[]> {
+    return [...this.sessions.values()]
+      .filter((s) => s.assignedRole === role)
+      .map((s) => ({ ...s, turns: [...s.turns] }));
+  }
+
+  async listByRoleInNamespaces(
+    role: string,
+    allowed: readonly string[],
+  ): Promise<CoworkSession[]> {
+    return this.filterByParentNamespace(await this.listByRoleAll(role), allowed);
+  }
+
   async findMostRecentActive(instanceId: string): Promise<CoworkSession | null> {
     const active = [...this.sessions.values()]
       .filter((s) => s.processInstanceId === instanceId && s.status === 'active')
@@ -134,6 +155,26 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
     };
     this.sessions.set(sessionId, updated);
     return { ...updated, turns: [...updated.turns] };
+  }
+
+  private async filterByParentNamespace(
+    rows: CoworkSession[],
+    allowed: readonly string[],
+  ): Promise<CoworkSession[]> {
+    if (rows.length === 0) return [];
+    const parents = this.requireParents();
+    const instanceIds = [...new Set(rows.map((r) => r.processInstanceId))];
+    const namespaceById = new Map<string, string | undefined>();
+    await Promise.all(
+      instanceIds.map(async (id) => {
+        const parent = await parents.getById(id);
+        namespaceById.set(id, parent?.namespace);
+      }),
+    );
+    return rows.filter((r) => {
+      const ns = namespaceById.get(r.processInstanceId);
+      return typeof ns === 'string' && allowed.includes(ns);
+    });
   }
 
   private requireParents(): ProcessInstanceRepository {

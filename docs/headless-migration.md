@@ -964,12 +964,11 @@ Multi-tab live sync intentionally excluded — no demand. ChatGPT and Claude.ai 
 
 ### Phase 4 — UI off Firestore (gating for ADR-0001 cutover)
 
-**Status:** plan finalized 2026-05-28 — see
+**Status:** **DONE** ([PR-final #591](https://github.com/Appsilon/mediforce/pull/591), 2026-05-29). Zero `firebase/firestore` imports under `packages/platform-ui/src/` — enforced by the `api-boundaries.test.ts` firestore tripwire. PG PR2 ([#534](https://github.com/Appsilon/mediforce/pull/534)) is unblocked. The implementation plan + per-consumer migration table + PR sizing live in
 [`headless-migration-phase-4-plan.md`](./headless-migration-phase-4-plan.md)
-for the authoritative implementation plan + per-consumer migration
-table + PR sizing. Cache architecture in
+(now historical). Cache architecture in
 [`ADR-0006`](./adr/0006-client-side-server-state.md). ADR-0001 §5
-amendment bundled with the plan (SSE deferred; polling at cutover).
+amendment bundled with the original plan (SSE deferred; polling at cutover).
 
 **Folded from previous Phase 4 + Phase 6 (2026-05-27).** Original split —
 "typed apiClient + first hook" vs "remaining UI data fetching" — was

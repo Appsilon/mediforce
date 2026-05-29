@@ -4,7 +4,14 @@ import * as React from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { SlidersHorizontal, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { useMyTasks, useCompletedTasks, useMyCoworkSessions, useFinalizedCoworkSessions } from '@/hooks/use-tasks';
+import {
+  useMyActionableTasks,
+  useMyActionableTasksByRole,
+  useMyCompletedTasks,
+  useCompletedTasksByRole,
+  useMyCoworkSessions,
+  useFinalizedCoworkSessions,
+} from '@/hooks/use-tasks';
 import { TaskGroupedView, type GroupByField } from '@/components/tasks/task-grouped-view';
 import type { ActionItem } from '@/components/tasks/action-type';
 import { cn } from '@/lib/utils';
@@ -95,8 +102,15 @@ export default function TasksPage() {
     });
   }, [firebaseUser]);
 
-  const { data: activeTasks, loading: activeLoading } = useMyTasks(role, firebaseUser?.uid ?? null);
-  const { data: completedTasks, loading: completedLoading } = useCompletedTasks(role);
+  const uid = firebaseUser?.uid ?? null;
+  const roleActive = useMyActionableTasksByRole(role ?? undefined, uid);
+  const callerActive = useMyActionableTasks(uid);
+  const roleCompleted = useCompletedTasksByRole(role ?? undefined);
+  const callerCompleted = useMyCompletedTasks();
+  const activeTasks = role ? roleActive.data : callerActive.data;
+  const activeLoading = role ? roleActive.loading : callerActive.loading;
+  const completedTasks = role ? roleCompleted.data : callerCompleted.data;
+  const completedLoading = role ? roleCompleted.loading : callerCompleted.loading;
   const { data: activeCoworkSessions, loading: coworkLoading } = useMyCoworkSessions(role);
   const { data: finalizedCoworkSessions, loading: finalizedLoading } = useFinalizedCoworkSessions(role);
   const currentUserId = firebaseUser?.uid ?? '';

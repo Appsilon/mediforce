@@ -18,6 +18,11 @@ export interface AgentEventLog {
 //
 // Firestore path: processInstances/{instanceId}/agentEvents/{eventId}
 // (mirrors stepExecutions subcollection pattern from Phase 2)
+//
+// TODO(post-phase-4): unify with `FirestoreAgentEventRepository` in
+// `platform-infra` once the in-memory cache + per-step serialization can move
+// behind the same port. Today the read side lives there (so the UI feed flows
+// through `scope.agentEvents`) and only the write path stays here.
 export class FirestoreAgentEventLog implements AgentEventLog {
   private cache = new Map<string, AgentEvent[]>(); // key: `${instanceId}:${stepId}`
   private writeChains = new Map<string, Promise<unknown>>(); // key: same as cache; tail of the per-step write queue

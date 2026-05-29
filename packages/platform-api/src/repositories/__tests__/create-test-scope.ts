@@ -5,6 +5,7 @@
  */
 import {
   InMemoryAgentDefinitionRepository,
+  InMemoryAgentEventRepository,
   InMemoryAgentRunRepository,
   InMemoryAuditRepository,
   InMemoryCoworkSessionRepository,
@@ -153,6 +154,7 @@ export interface TestScopeOverrides {
   readonly humanTaskRepo?: InMemoryHumanTaskRepository;
   readonly processRepo?: InMemoryProcessRepository;
   readonly auditRepo?: InMemoryAuditRepository;
+  readonly agentEventRepo?: InMemoryAgentEventRepository;
   readonly agentRunRepo?: AgentRunRepository;
   readonly handoffRepo?: InMemoryHandoffRepository;
   readonly agentDefinitionRepo?: InMemoryAgentDefinitionRepository;
@@ -197,6 +199,8 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     instanceRepo,
     processRepo: overrides.processRepo ?? new InMemoryProcessRepository(),
     auditRepo: overrides.auditRepo ?? new InMemoryAuditRepository(instanceRepo),
+    agentEventRepo:
+      overrides.agentEventRepo ?? new InMemoryAgentEventRepository(instanceRepo),
     agentRunRepo: overrides.agentRunRepo ?? new InMemoryAgentRunRepository(instanceRepo),
     humanTaskRepo: overrides.humanTaskRepo ?? new InMemoryHumanTaskRepository(instanceRepo),
     handoffRepo: overrides.handoffRepo ?? new InMemoryHandoffRepository(instanceRepo),

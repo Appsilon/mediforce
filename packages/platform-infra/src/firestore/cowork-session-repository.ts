@@ -1,4 +1,5 @@
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
+import { ZodError } from 'zod';
 import {
   CoworkSessionSchema,
   type CoworkSession,
@@ -6,6 +7,25 @@ import {
   type CoworkSessionRepository,
   type ProcessInstanceRepository,
 } from '@mediforce/platform-core';
+
+/**
+ * Parse a Firestore cowork-session doc against the canonical schema. On
+ * schema drift, log the doc id + zod issues then rethrow so the route
+ * adapter maps to 500 (PRD §9 rule 3 — never silently swallow drift).
+ */
+function parseCoworkSessionDoc(data: Record<string, unknown>, docId: string): CoworkSession {
+  try {
+    return CoworkSessionSchema.parse(sanitizeSessionData(data));
+  } catch (err) {
+    if (err instanceof ZodError) {
+      console.error(
+        `[FirestoreCoworkSessionRepository] CoworkSession parse failed for coworkSessions/${docId}:`,
+        err.issues,
+      );
+    }
+    throw err;
+  }
+}
 
 /**
  * Sanitize raw Firestore data before Zod parse.
@@ -50,7 +70,7 @@ export class FirestoreCoworkSessionRepository implements CoworkSessionRepository
   async getById(sessionId: string): Promise<CoworkSession | null> {
     const snap = await this.db.collection(this.collectionName).doc(sessionId).get();
     if (!snap.exists) return null;
-    return CoworkSessionSchema.parse(sanitizeSessionData(snap.data() as Record<string, unknown>));
+    return parseCoworkSessionDoc(snap.data() as Record<string, unknown>, sessionId);
   }
 
   async getByIdInNamespaces(
@@ -70,18 +90,84 @@ export class FirestoreCoworkSessionRepository implements CoworkSessionRepository
       .where('processInstanceId', '==', instanceId)
       .orderBy('createdAt', 'asc')
       .get();
-    return snap.docs.map((d) => CoworkSessionSchema.parse(sanitizeSessionData(d.data())));
+    return snap.docs.map((d) => parseCoworkSessionDoc(d.data(), d.id));
+  }
+
+  async listAll(): Promise<CoworkSession[]> {
+    // Caller-scope read path; newest first matches the human-queue convention.
+    const snap = await this.db
+      .collection(this.collectionName)
+      .orderBy('createdAt', 'desc')
+      .get();
+    return snap.docs.map((d) => parseCoworkSessionDoc(d.data() as Record<string, unknown>, d.id));
+  }
+
+  async listInNamespaces(allowed: readonly string[]): Promise<CoworkSession[]> {
+    // CoworkSession has no namespace field; workspace is reached via the
+    // parent ProcessInstance. Pre-materialise allowed `processInstanceId`s via
+    // one indexed `where('namespace','==',ns)` read per workspace, then a
+    // single coworkSessions scan + in-memory join. Same two-pass shape the
+    // human-task repo uses (see PR2 #569 perf rationale).
+    const allowedInstanceIds = new Set<string>();
+    await Promise.all(
+      allowed.map(async (ns) => {
+        const snap = await this.db
+          .collection('processInstances')
+          .where('namespace', '==', ns)
+          .get();
+        for (const doc of snap.docs) allowedInstanceIds.add(doc.id);
+      }),
+    );
+    if (allowedInstanceIds.size === 0) return [];
+    const rows = await this.listAll();
+    return rows.filter((s) => allowedInstanceIds.has(s.processInstanceId));
+  }
+
+  async listByRoleAll(role: string): Promise<CoworkSession[]> {
+    const snap = await this.db
+      .collection(this.collectionName)
+      .where('assignedRole', '==', role)
+      .orderBy('createdAt', 'desc')
+      .get();
+    return snap.docs.map((d) => parseCoworkSessionDoc(d.data() as Record<string, unknown>, d.id));
+  }
+
+  async listByRoleInNamespaces(
+    role: string,
+    allowed: readonly string[],
+  ): Promise<CoworkSession[]> {
+    const rows = await this.listByRoleAll(role);
+    if (rows.length === 0) return [];
+    const instanceIds = [...new Set(rows.map((r) => r.processInstanceId))];
+    const namespaceById = new Map<string, string | undefined>();
+    await Promise.all(
+      instanceIds.map(async (id) => {
+        const parent = await this.parents.getById(id);
+        namespaceById.set(id, parent?.namespace);
+      }),
+    );
+    return rows.filter((s) => {
+      const ns = namespaceById.get(s.processInstanceId);
+      return typeof ns === 'string' && allowed.includes(ns);
+    });
   }
 
   async findMostRecentActive(instanceId: string): Promise<CoworkSession | null> {
+    // Equality-only query (served by the existing processInstanceId+status
+    // index); the most-recent pick is done in memory. An instance has at most
+    // a handful of active sessions, so sorting here avoids a third composite
+    // index (processInstanceId+status+createdAt) that Firestore would otherwise
+    // demand.
     const snap = await this.db
       .collection(this.collectionName)
       .where('processInstanceId', '==', instanceId)
       .where('status', '==', 'active')
-      .orderBy('createdAt', 'desc')
       .get();
     if (snap.empty) return null;
-    return CoworkSessionSchema.parse(sanitizeSessionData(snap.docs[0].data()));
+    const mostRecent = snap.docs.reduce((a, b) =>
+      String(a.data().createdAt) >= String(b.data().createdAt) ? a : b,
+    );
+    return parseCoworkSessionDoc(mostRecent.data(), mostRecent.id);
   }
 
   async findMostRecentActiveInNamespaces(

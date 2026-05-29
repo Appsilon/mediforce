@@ -1,4 +1,5 @@
 // Firebase abstraction implementations
+export { FirestoreAgentEventRepository } from './firestore/agent-event-repository';
 export { FirestoreAuditRepository } from './firestore/audit-repository';
 export {
   FirestoreProcessRepository,

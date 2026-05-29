@@ -1,4 +1,5 @@
 import {
+  FirestoreAgentEventRepository,
   FirestoreProcessRepository,
   FirestoreProcessInstanceRepository,
   FirestoreAuditRepository,
@@ -89,6 +90,7 @@ export interface PlatformServices {
   processRepo: FirestoreProcessRepository;
   instanceRepo: FirestoreProcessInstanceRepository;
   auditRepo: FirestoreAuditRepository;
+  agentEventRepo: FirestoreAgentEventRepository;
   agentRunRepo: FirestoreAgentRunRepository;
   humanTaskRepo: FirestoreHumanTaskRepository;
   handoffRepo: FirestoreHandoffRepository;
@@ -238,6 +240,7 @@ export function getPlatformServices(): PlatformServices {
   // resolution inside the namespace-scoped read variants (ADR-0004 §"Storage-
   // layer filter, today").
   const auditRepo = new FirestoreAuditRepository(db, instanceRepo);
+  const agentEventRepo = new FirestoreAgentEventRepository(db, instanceRepo);
   const agentRunRepo = new FirestoreAgentRunRepository(db, instanceRepo);
   const humanTaskRepo = new FirestoreHumanTaskRepository(db, instanceRepo);
   const handoffRepo = new FirestoreHandoffRepository(db, instanceRepo);
@@ -383,6 +386,7 @@ export function getPlatformServices(): PlatformServices {
     processRepo,
     instanceRepo,
     auditRepo,
+    agentEventRepo,
     agentRunRepo,
     humanTaskRepo,
     handoffRepo,

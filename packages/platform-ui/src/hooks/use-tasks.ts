@@ -2,20 +2,21 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { where, orderBy } from 'firebase/firestore';
 import type { HumanTask, CoworkSession } from '@mediforce/platform-core';
 import { ACTIONABLE_STATUSES } from '@mediforce/platform-api/contract';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
-import { useCollection } from './use-collection';
 
-const STANDARD_LIVE_INTERVAL_MS = 5_000;
+import { CRITICAL_LIVE_INTERVAL_MS, STANDARD_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
+
+function retryOn5xx(failureCount: number, err: unknown): boolean {
+  if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
+  return failureCount < 2;
+}
 
 /**
  * Role-scoped actionable task queue, react-query backed (STANDARD LIVE per
- * ADR-0006 §4). Returns the same `{ data, loading, error }` shape as the
- * Firestore-backed `useMyTasks(null, …)` fallback below so callers swap
- * in mechanically once an "all my visible tasks" endpoint axis exists.
+ * ADR-0006 §4).
  */
 export function useMyActionableTasksByRole(
   assignedRole: string | undefined,
@@ -24,14 +25,16 @@ export function useMyActionableTasksByRole(
   const query = useQuery({
     queryKey: queryKeys.tasks.byRole(assignedRole ?? '', { status: [...ACTIONABLE_STATUSES] }),
     queryFn: async () => {
+      if (assignedRole === undefined) throw new Error('unreachable: enabled gates this');
       const result = await mediforce.tasks.list({
-        role: assignedRole as string,
+        role: assignedRole,
         status: [...ACTIONABLE_STATUSES],
       });
       return result.tasks;
     },
     enabled: assignedRole !== undefined && assignedRole.length > 0,
     refetchInterval: STANDARD_LIVE_INTERVAL_MS,
+    retry: retryOn5xx,
   });
 
   const filtered = useMemo(() => {
@@ -66,10 +69,7 @@ export function useMyActionableTasks(
       return result.tasks;
     },
     refetchInterval: STANDARD_LIVE_INTERVAL_MS,
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-      return failureCount < 2;
-    },
+    retry: retryOn5xx,
   });
 
   const filtered = useMemo(() => {
@@ -92,18 +92,47 @@ export function useMyActionableTasks(
  * Sorts `completedAt` desc client-side — the API does not promise an order.
  */
 export function useCompletedTasksByRole(
-  assignedRole: string,
+  assignedRole: string | undefined,
 ): { data: HumanTask[]; loading: boolean; error: Error | null } {
   const query = useQuery({
-    queryKey: queryKeys.tasks.byRole(assignedRole, { status: ['completed'] }),
+    queryKey: queryKeys.tasks.byRole(assignedRole ?? '', { status: ['completed'] }),
     queryFn: async () => {
+      if (assignedRole === undefined) throw new Error('unreachable: enabled gates this');
       const result = await mediforce.tasks.list({
         role: assignedRole,
         status: ['completed'],
       });
       return result.tasks;
     },
+    enabled: assignedRole !== undefined && assignedRole.length > 0,
     refetchInterval: STANDARD_LIVE_INTERVAL_MS,
+    retry: retryOn5xx,
+  });
+
+  const filtered = useMemo(() => {
+    const tasks = (query.data ?? []).filter((t) => !t.deleted);
+    return [...tasks].sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''));
+  }, [query.data]);
+
+  return {
+    data: filtered,
+    loading: query.isLoading && assignedRole !== undefined && assignedRole.length > 0,
+    error: (query.error as Error | null) ?? null,
+  };
+}
+
+/**
+ * Caller-scope completed task list (cross-role). STANDARD LIVE.
+ */
+export function useMyCompletedTasks(): { data: HumanTask[]; loading: boolean; error: Error | null } {
+  const query = useQuery({
+    queryKey: queryKeys.tasks.forCaller({ status: ['completed'] }),
+    queryFn: async () => {
+      const result = await mediforce.tasks.list({ status: ['completed'] });
+      return result.tasks;
+    },
+    refetchInterval: STANDARD_LIVE_INTERVAL_MS,
+    retry: retryOn5xx,
   });
 
   const filtered = useMemo(() => {
@@ -119,168 +148,141 @@ export function useCompletedTasksByRole(
 }
 
 /**
- * @deprecated Firestore `onSnapshot` fallback retained only for the
- * `role === null` caller pattern (cross-role aggregation on workspace home,
- * workflow detail, runs list). Those call sites need an "all tasks visible
- * to me" axis on `mediforce.tasks.list` before they can migrate to
- * react-query — until that endpoint extension lands they keep working
- * against this hook unchanged. For the role-provided path, use
- * `useMyActionableTasksByRole` instead.
+ * Active blocking task for a process instance. CRITICAL LIVE — operators
+ * watch this to know when the run unblocks. Returns `null` when no actionable
+ * task is open against the instance.
  */
-export function useMyTasks(assignedRole: string | null, currentUserId?: string | null) {
-  const constraints = useMemo(
-    () =>
-      assignedRole
-        ? [
-            where('assignedRole', '==', assignedRole),
-            where('status', 'in', ['pending', 'claimed']),
-            orderBy('createdAt', 'asc'),
-          ]
-        : [orderBy('createdAt', 'asc')],
-    [assignedRole],
-  );
-
-  const { data, loading, error } = useCollection<HumanTask>('humanTasks', constraints);
-
-  const filtered = useMemo(
-    () => {
-      const notDeleted = data.filter((task) => !task.deleted);
-      // A task with an assignedUserId is scoped to its owner — only that user
-      // sees it. Unassigned (null) tasks stay visible to everyone with the
-      // role. When no currentUserId is supplied (overview widgets), skip the
-      // scoping and show the role-wide queue.
-      const mine = currentUserId
-        ? notDeleted.filter(
-            (task) => task.assignedUserId === null || task.assignedUserId === currentUserId,
-          )
-        : notDeleted;
-      return assignedRole
-        ? mine
-        : mine.filter((task) => task.status !== 'completed');
+export function useActiveTaskForInstance(
+  processInstanceId: string | null,
+): { task: HumanTask | null; loading: boolean } {
+  const enabled = processInstanceId !== null && processInstanceId.length > 0;
+  const query = useQuery({
+    queryKey: enabled
+      ? queryKeys.tasks.byInstance(processInstanceId, { status: [...ACTIONABLE_STATUSES] })
+      : (['tasks', '__noop__'] as const),
+    queryFn: async () => {
+      if (processInstanceId === null) throw new Error('unreachable: enabled gates this');
+      const result = await mediforce.tasks.list({
+        instanceId: processInstanceId,
+        status: [...ACTIONABLE_STATUSES],
+      });
+      return result.tasks;
     },
-    [data, assignedRole, currentUserId],
+    enabled,
+    refetchInterval: CRITICAL_LIVE_INTERVAL_MS,
+    retry: retryOn5xx,
+  });
+
+  const activeTask = useMemo(
+    () => (query.data ?? []).find((task) => !task.deleted) ?? null,
+    [query.data],
   );
 
-  return { data: filtered, loading, error };
+  return { task: activeTask, loading: enabled && query.isPending };
 }
 
 /**
- * @deprecated Firestore fallback retained only for the `role === null` branch
- * — see `useMyTasks` for the rationale. For the role-provided path, use
- * `useCompletedTasksByRole` instead.
+ * Active cowork session for a process instance, when one exists. CRITICAL
+ * LIVE. The server `getByInstance` endpoint returns the session if any —
+ * a 404 surfaces here as `session: null` so callers can branch cleanly.
  */
-export function useCompletedTasks(assignedRole: string | null) {
-  const constraints = useMemo(
-    () =>
-      assignedRole
-        ? [
-            where('assignedRole', '==', assignedRole),
-            where('status', '==', 'completed'),
-            orderBy('completedAt', 'desc'),
-          ]
-        : [orderBy('createdAt', 'desc')],
-    [assignedRole],
-  );
-
-  const { data, loading, error } = useCollection<HumanTask>('humanTasks', constraints);
-
-  const filtered = useMemo(
-    () => {
-      const notDeleted = data.filter((task) => !task.deleted);
-      return assignedRole
-        ? notDeleted
-        : notDeleted.filter((task) => task.status === 'completed');
+export function useActiveCoworkSession(
+  processInstanceId: string | null,
+): { session: CoworkSession | null; loading: boolean } {
+  const enabled = processInstanceId !== null && processInstanceId.length > 0;
+  const query = useQuery({
+    queryKey: enabled
+      ? queryKeys.cowork.byInstance(processInstanceId)
+      : queryKeys.cowork.byInstance('__noop__'),
+    queryFn: () => {
+      if (processInstanceId === null) throw new Error('unreachable: enabled gates this');
+      return mediforce.cowork.getByInstance({ instanceId: processInstanceId });
     },
-    [data, assignedRole],
-  );
+    enabled,
+    // 404 = no cowork session yet. Stop polling — a state transition from
+    // "no session" to "session exists" originates from a UI mutation
+    // (`mediforce.cowork.create` callsite), which must invalidate this
+    // cache key. Without the stop, every instance page without a session
+    // polls 40 req/min indefinitely.
+    refetchInterval: (q) =>
+      q.state.error instanceof ApiError && q.state.error.status === 404
+        ? false
+        : CRITICAL_LIVE_INTERVAL_MS,
+    retry: (failureCount, err) => {
+      if (err instanceof ApiError && err.status === 404) return false;
+      return retryOn5xx(failureCount, err);
+    },
+  });
 
-  return { data: filtered, loading, error };
+  const err = query.error;
+  const notFound = err instanceof ApiError && err.status === 404;
+  const session = notFound ? null : query.data ?? null;
+  return {
+    session: session !== null && session.status === 'active' ? session : null,
+    loading: enabled && query.isPending,
+  };
 }
 
-export function useActiveTaskForInstance(processInstanceId: string | null) {
-  const constraints = useMemo(
-    () =>
-      processInstanceId
-        ? [
-            where('processInstanceId', '==', processInstanceId),
-            where('status', 'in', ['pending', 'claimed']),
-          ]
-        : [],
-    [processInstanceId],
-  );
+/**
+ * Active cowork sessions assigned to a role, react-query backed (STANDARD
+ * LIVE per ADR-0006 §4). When `role` is `null` returns all sessions visible
+ * to the caller across roles. Sorted `createdAt` asc client-side to preserve
+ * the old Firestore ordering — the contract does not promise an order.
+ */
+export function useMyCoworkSessions(
+  assignedRole: string | null,
+): { data: CoworkSession[]; loading: boolean; error: Error | null } {
+  const query = useQuery({
+    queryKey: ['cowork', 'list', { role: assignedRole, status: ['active'] }] as const,
+    queryFn: async () => {
+      const result = await mediforce.cowork.list({
+        role: assignedRole ?? undefined,
+        status: ['active'],
+      });
+      return result.sessions;
+    },
+    refetchInterval: STANDARD_LIVE_INTERVAL_MS,
+    retry: retryOn5xx,
+  });
 
-  const { data, loading } = useCollection<HumanTask>(
-    processInstanceId ? 'humanTasks' : '',
-    constraints,
-  );
+  const sorted = useMemo(() => {
+    return [...(query.data ?? [])].sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
+  }, [query.data]);
 
-  const activeTask = useMemo(
-    () => data.find((task) => !task.deleted) ?? null,
-    [data],
-  );
-
-  return { task: activeTask, loading };
+  return {
+    data: sorted,
+    loading: query.isLoading,
+    error: (query.error as Error | null) ?? null,
+  };
 }
 
-export function useActiveCoworkSession(processInstanceId: string | null) {
-  const constraints = useMemo(
-    () =>
-      processInstanceId
-        ? [
-            where('processInstanceId', '==', processInstanceId),
-            where('status', '==', 'active'),
-          ]
-        : [],
-    [processInstanceId],
-  );
+/**
+ * Finalized cowork sessions assigned to a role, react-query backed
+ * (STANDARD LIVE). Sorted `finalizedAt` desc client-side.
+ */
+export function useFinalizedCoworkSessions(
+  assignedRole: string | null,
+): { data: CoworkSession[]; loading: boolean; error: Error | null } {
+  const query = useQuery({
+    queryKey: ['cowork', 'list', { role: assignedRole, status: ['finalized'] }] as const,
+    queryFn: async () => {
+      const result = await mediforce.cowork.list({
+        role: assignedRole ?? undefined,
+        status: ['finalized'],
+      });
+      return result.sessions;
+    },
+    refetchInterval: STANDARD_LIVE_INTERVAL_MS,
+    retry: retryOn5xx,
+  });
 
-  const { data, loading } = useCollection<CoworkSession>(
-    processInstanceId ? 'coworkSessions' : '',
-    constraints,
-  );
+  const sorted = useMemo(() => {
+    return [...(query.data ?? [])].sort((a, b) => (b.finalizedAt ?? '').localeCompare(a.finalizedAt ?? ''));
+  }, [query.data]);
 
-  const session = useMemo(
-    () => data[0] ?? null,
-    [data],
-  );
-
-  return { session, loading };
-}
-
-export function useMyCoworkSessions(assignedRole: string | null) {
-  const constraints = useMemo(
-    () =>
-      assignedRole
-        ? [
-            where('assignedRole', '==', assignedRole),
-            where('status', '==', 'active'),
-            orderBy('createdAt', 'asc'),
-          ]
-        : [
-            where('status', '==', 'active'),
-            orderBy('createdAt', 'asc'),
-          ],
-    [assignedRole],
-  );
-
-  return useCollection<CoworkSession>('coworkSessions', constraints);
-}
-
-export function useFinalizedCoworkSessions(assignedRole: string | null) {
-  const constraints = useMemo(
-    () =>
-      assignedRole
-        ? [
-            where('assignedRole', '==', assignedRole),
-            where('status', '==', 'finalized'),
-            orderBy('finalizedAt', 'desc'),
-          ]
-        : [
-            where('status', '==', 'finalized'),
-            orderBy('finalizedAt', 'desc'),
-          ],
-    [assignedRole],
-  );
-
-  return useCollection<CoworkSession>('coworkSessions', constraints);
+  return {
+    data: sorted,
+    loading: query.isLoading,
+    error: (query.error as Error | null) ?? null,
+  };
 }
