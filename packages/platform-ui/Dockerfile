@@ -56,10 +56,17 @@ RUN pnpm --filter @mediforce/platform-ui build
 # inside the CMD so the service still exits 0 in Firestore mode and the
 # init-container gate fires.
 #
-# Derived from `builder` (not `deps`) because the builder already has the
-# full workspace + devDeps including `drizzle-kit` installed. The image
-# is short-lived; size is not a concern.
-FROM builder AS migrate
+# Derived from `deps` + source rather than `builder`: the migration container
+# needs only the workspace, devDeps (`drizzle-kit`), and migration files — not
+# the Next.js build. Deriving from `builder` would force the arg-less `migrate`
+# service build to run `pnpm build`, whose `/workspaces/new` prerender
+# initializes the Firebase client and fails with `auth/invalid-api-key` because
+# the `NEXT_PUBLIC_FIREBASE_*` build args are only passed to the `platform-ui`
+# service. The image is short-lived; size is not a concern.
+FROM base AS migrate
+WORKDIR /app
+COPY --from=deps /app ./
+COPY . .
 WORKDIR /app/packages/platform-infra
 CMD ["sh", "-c", "if [ \"$STORAGE_BACKEND\" != \"postgres\" ]; then echo '[migrate] STORAGE_BACKEND != postgres — skipping.'; exit 0; fi; pnpm exec drizzle-kit migrate"]
 

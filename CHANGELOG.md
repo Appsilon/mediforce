@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Fixed
+- Staging deploy broke after [#572](https://github.com/Appsilon/mediforce/pull/572): the `migrate` init-container stage derived `FROM builder`, so its arg-less build re-ran `next build` whose `/workspaces/new` prerender failed with `auth/invalid-api-key` (Firebase build args reach only the `platform-ui` service). Migrate stage now derives from `deps` + source, skipping the Next build entirely.
 - Flaky `forced-password-change.journey.ts` ([#578](https://github.com/Appsilon/mediforce/pull/578)) — `updatePassword` revokes the session's ID token, so the forced-reset flow now re-authenticates and `clearMustChangePassword` retries on a revoked-token 401 (forcing a token refresh) before clearing the gate, instead of letting the stale-token 401 fail the gate closed and bounce the user back to `/change-password`.
 - `useProcessNameMap` now scopes its `runs.list` poll to the active workspace handle (`namespace: handle`) instead of fetching across every visible workspace every 5 s — a cross-workspace data-scope leak.
 - `useAgentEvents` polls incrementally via a new `afterSequence` cursor on `processes.agentEvents` instead of re-reading the entire `agentEvents` subcollection every 1.5 s — the Phase-4 cutover lost `onSnapshot` deltas and turned a chatty open run into ~20k Firestore reads/min.
