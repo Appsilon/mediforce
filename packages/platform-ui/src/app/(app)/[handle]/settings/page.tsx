@@ -174,7 +174,9 @@ export default function WorkspaceConfigPage() {
     if (handle === '') return;
     try {
       const { members: fetched } = await mediforce.users.listMembers({ namespace: handle });
-      setRealtimeMembers(fetched.map((m) => ({ ...m, id: m.uid })));
+      setRealtimeMembers(
+        fetched.map((m) => ({ ...m, displayName: m.displayName ?? undefined, id: m.uid })),
+      );
     } finally {
       setMembersLoading(false);
     }
