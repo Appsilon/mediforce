@@ -179,6 +179,29 @@
       ]
     },
     {
+      "collectionGroup": "processInstances",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "namespace", "order": "ASCENDING" },
+        { "fieldPath": "definitionName", "order": "ASCENDING" },
+        { "fieldPath": "deleted", "order": "ASCENDING" },
+        { "fieldPath": "archived", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "processInstances",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "namespace", "order": "ASCENDING" },
+        { "fieldPath": "definitionName", "order": "ASCENDING" },
+        { "fieldPath": "deleted", "order": "ASCENDING" },
+        { "fieldPath": "archived", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "stepExecutions",
       "queryScope": "COLLECTION",
       "fields": [
