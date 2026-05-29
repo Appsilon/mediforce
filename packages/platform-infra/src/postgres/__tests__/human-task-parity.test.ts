@@ -33,6 +33,10 @@ const skipPg = !DATABASE_URL;
 class StubProcessInstanceRepository implements ProcessInstanceRepository {
   constructor(private readonly nsByInstance: Map<string, string>) {}
 
+  async getNamespaceById(instanceId: string): Promise<string | null> {
+    return this.nsByInstance.get(instanceId) ?? null;
+  }
+
   async getById(instanceId: string): Promise<ProcessInstance | null> {
     const namespace = this.nsByInstance.get(instanceId);
     if (namespace === undefined) return null;
