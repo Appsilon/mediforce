@@ -1,6 +1,6 @@
 import { test, expect } from '../helpers/test-fixtures';
-import { createTestUser, seedCollection } from '../helpers/emulator';
-import { setupRecording, click, showStep, showResult, showCaption, endRecording } from '../helpers/recording';
+import { createTestUser, deleteAuthUser, seedCollection } from '../helpers/emulator';
+import { setupRecording, allowPageErrors, click, showStep, showResult, showCaption, endRecording } from '../helpers/recording';
 
 const INVITED_EMAIL = 'invited-user@mediforce.dev';
 const INVITED_TEMP_PASSWORD = 'TempPass123!';
@@ -10,6 +10,12 @@ test.describe('Forced Password Change Journey', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeAll(async () => {
+    // On a retry the test has already changed this user's password, so a plain
+    // re-create would sign in with the stale temp password and throw
+    // INVALID_PASSWORD. Drop just this account first (scoped — never wipes the
+    // shared auth-setup state) so the user is always recreated with the temp
+    // password the test signs in with.
+    await deleteAuthUser(INVITED_EMAIL);
     const uid = await createTestUser(INVITED_EMAIL, INVITED_TEMP_PASSWORD, 'Invited User');
 
     await seedCollection('users', {
@@ -34,6 +40,15 @@ test.describe('Forced Password Change Journey', () => {
 
   test('invited user is forced to set a permanent password on first sign-in', async ({ page }, testInfo) => {
     await setupRecording(page, 'forced-password-change', testInfo);
+
+    // Changing the password revokes the user's existing ID token (Firebase
+    // moves `validSince` to now). The client re-authenticates immediately, but
+    // for a sub-second window background providers on the landing page (docker
+    // images, namespace) can fire with a token whose whole-second `auth_time`
+    // has not yet overtaken `validSince`. The Auth emulator's admin SDK rejects
+    // those as revoked — production `verifyIdToken` does not check revocation,
+    // so this transient 401 cannot happen there. Tolerate it here.
+    allowPageErrors(page, ['the server responded with a status of 401']);
 
     await page.goto('/login');
     await expect(page.getByRole('heading', { name: 'Mediforce' })).toBeVisible({ timeout: 10_000 });

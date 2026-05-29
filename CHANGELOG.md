@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Fixed
+- Flaky `forced-password-change.journey.ts` ([#578](https://github.com/Appsilon/mediforce/pull/578)) — `updatePassword` revokes the session's ID token, so the forced-reset flow now re-authenticates and `clearMustChangePassword` retries on a revoked-token 401 (forcing a token refresh) before clearing the gate, instead of letting the stale-token 401 fail the gate closed and bounce the user back to `/change-password`.
 - `StepParamSchema.type` widened from a strict enum to `z.string().min(1).default('string')` so human-task GETs no longer 400 when the param uses a widget hint the UI already renders (e.g. `textarea`, `multiselect`). Non-string `type` still fails parsing — only the enum was the bug. Route adapter also `console.error`s handler ZodErrors so similar mismatches are debuggable from the server log.
 
 ### Changed

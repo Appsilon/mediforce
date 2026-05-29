@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { updatePassword } from 'firebase/auth';
+import { updatePassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 
@@ -44,7 +44,15 @@ export default function ChangePasswordPage() {
     try {
       const currentUser = auth.currentUser;
       if (currentUser === null) throw new Error('Not signed in.');
+      const email = currentUser.email;
+      if (email === null) throw new Error('Account has no email address.');
       await updatePassword(currentUser, newPassword);
+      // updatePassword revokes every existing ID token for the user (their
+      // `validSince` moves to now), so the cached session token the client
+      // keeps serving is rejected and the next authenticated call 401s.
+      // Re-authenticate with the new password to establish a fresh session
+      // whose token clearMustChangePassword and the landing page reuse.
+      await signInWithEmailAndPassword(auth, email, newPassword);
       await clearMustChangePassword();
       router.replace('/workspace-selection');
     } catch (err: unknown) {
