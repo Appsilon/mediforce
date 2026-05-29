@@ -11,6 +11,24 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
  */
 
 const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
+const AUTH_HEADERS = { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' };
+
+async function deleteWorkflowDefinition(
+  request: { delete: (url: string, opts?: object) => Promise<{ ok: boolean }>, get: (url: string, opts?: object) => Promise<{ ok: boolean, json: () => Promise<unknown> }> },
+  name: string,
+): Promise<void> {
+  const countRes = await request.get(
+    `/api/workflow-definitions/${encodeURIComponent(name)}/run-count?namespace=${TEST_ORG_HANDLE}`,
+    { headers: AUTH_HEADERS },
+  );
+  const expectedRunCount = countRes.ok
+    ? ((await countRes.json()) as { count: number }).count
+    : 0;
+  await request.delete(
+    `/api/workflow-definitions/${encodeURIComponent(name)}?namespace=${TEST_ORG_HANDLE}`,
+    { headers: AUTH_HEADERS, data: { expectedRunCount } },
+  );
+}
 
 test.describe('POST /api/cron/heartbeat — API E2E', () => {
   test('requires X-Api-Key (middleware 401)', async ({ request }) => {
@@ -48,32 +66,36 @@ test.describe('POST /api/cron/heartbeat — API E2E', () => {
     const createWdRes = await request.post(
       `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
       {
-        headers: { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' },
+        headers: AUTH_HEADERS,
         data: cronWd,
       },
     );
     expect(createWdRes.status()).toBe(201);
 
-    // Prime trigger state — first heartbeat may fire or skip depending on
-    // isDue() semantics vs def.createdAt. We don't assert on the first
-    // result; the invariant under test is the second back-to-back call.
-    await request.post('/api/cron/heartbeat', {
-      headers: { 'X-Api-Key': API_KEY },
-    });
+    try {
+      // Prime trigger state — first heartbeat may fire or skip depending on
+      // isDue() semantics vs def.createdAt. We don't assert on the first
+      // result; the invariant under test is the second back-to-back call.
+      await request.post('/api/cron/heartbeat', {
+        headers: { 'X-Api-Key': API_KEY },
+      });
 
-    const second = await request.post('/api/cron/heartbeat', {
-      headers: { 'X-Api-Key': API_KEY },
-    });
-    expect(second.status()).toBe(200);
-    const body = (await second.json()) as {
-      triggered: Array<{ definitionName: string }>;
-      skipped: Array<{ definitionName: string; triggerName: string; reason: string }>;
-    };
-    const ourSkip = body.skipped.find(
-      (s) => s.definitionName === wdName && s.triggerName === 'every-15m',
-    );
-    expect(ourSkip?.reason).toBe('Not due');
-    const ourFire = body.triggered.find((t) => t.definitionName === wdName);
-    expect(ourFire).toBeUndefined();
+      const second = await request.post('/api/cron/heartbeat', {
+        headers: { 'X-Api-Key': API_KEY },
+      });
+      expect(second.status()).toBe(200);
+      const body = (await second.json()) as {
+        triggered: Array<{ definitionName: string }>;
+        skipped: Array<{ definitionName: string; triggerName: string; reason: string }>;
+      };
+      const ourSkip = body.skipped.find(
+        (s) => s.definitionName === wdName && s.triggerName === 'every-15m',
+      );
+      expect(ourSkip?.reason).toBe('Not due');
+      const ourFire = body.triggered.find((t) => t.definitionName === wdName);
+      expect(ourFire).toBeUndefined();
+    } finally {
+      await deleteWorkflowDefinition(request, wdName);
+    }
   });
 });
