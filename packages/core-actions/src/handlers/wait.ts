@@ -1,5 +1,6 @@
 import type { WaitActionConfig } from '@mediforce/platform-core';
 import type { WaitActionHandler } from '../types.js';
+import { interpolate } from '../interpolation.js';
 
 export interface WaitActionOutput {
   resumeReason: 'deadline_reached' | 'duration_elapsed' | 'condition_met';
@@ -31,6 +32,13 @@ export function isWaitSentinel(output: Record<string, unknown>): output is WaitS
 
 export const waitActionHandler: WaitActionHandler = async (config, ctx) => {
   const now = new Date();
+  const sources = ctx.sources;
+  const resolvedDeadline = config.deadline
+    ? String(interpolate(config.deadline, sources))
+    : undefined;
+  const resolvedCondition = config.condition
+    ? String(interpolate(config.condition, sources))
+    : undefined;
 
   if (config.duration) {
     const { seconds = 0, minutes = 0, hours = 0 } = config.duration;
@@ -43,14 +51,15 @@ export const waitActionHandler: WaitActionHandler = async (config, ctx) => {
         resumeAt: resumeAt.toISOString(),
         pausedAt: now.toISOString(),
         mode: 'duration' as const,
-        ...(config.condition ? { condition: config.condition } : {}),
+        ...(resolvedCondition ? { condition: resolvedCondition } : {}),
       },
     };
   }
 
-  const parsed = new Date(config.deadline!);
+  const deadline = resolvedDeadline ?? config.deadline!;
+  const parsed = new Date(deadline);
   if (isNaN(parsed.getTime())) {
-    throw new Error(`Invalid deadline: '${config.deadline}'`);
+    throw new Error(`Invalid deadline: '${deadline}'`);
   }
 
   if (parsed <= now) {
@@ -67,7 +76,7 @@ export const waitActionHandler: WaitActionHandler = async (config, ctx) => {
       resumeAt: parsed.toISOString(),
       pausedAt: now.toISOString(),
       mode: 'deadline' as const,
-      ...(config.condition ? { condition: config.condition } : {}),
+      ...(resolvedCondition ? { condition: resolvedCondition } : {}),
     },
   };
 };

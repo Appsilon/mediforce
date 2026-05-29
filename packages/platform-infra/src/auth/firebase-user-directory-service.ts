@@ -29,6 +29,19 @@ export class FirebaseUserDirectoryService implements UserDirectoryService {
       .map((u) => ({ uid: u.uid, email: u.email ?? '' }));
   }
 
+  async resolveUser(identifier: string): Promise<DirectoryUser | null> {
+    try {
+      if (identifier.includes('@')) {
+        const user = await this.adminAuth.getUserByEmail(identifier);
+        return { uid: user.uid, email: user.email ?? '', displayName: user.displayName };
+      }
+      const user = await this.adminAuth.getUser(identifier);
+      return { uid: user.uid, email: user.email ?? '', displayName: user.displayName };
+    } catch {
+      return null;
+    }
+  }
+
   async getUserMetadata(uid: string): Promise<UserAuthMetadata | null> {
     try {
       const record = await this.adminAuth.getUser(uid);
@@ -39,6 +52,7 @@ export class FirebaseUserDirectoryService implements UserDirectoryService {
             ? record.displayName
             : null,
         lastSignInTime: record.metadata.lastSignInTime ?? null,
+        photoURL: record.photoURL ?? null,
       };
     } catch {
       return null;

@@ -92,6 +92,21 @@ importers:
         specifier: workspace:*
         version: link:../../packages/platform-core
 
+  apps/team-pulse:
+    dependencies:
+      '@mediforce/platform-api':
+        specifier: workspace:*
+        version: link:../../packages/platform-api
+      '@mediforce/platform-core':
+        specifier: workspace:*
+        version: link:../../packages/platform-core
+      '@mediforce/platform-infra':
+        specifier: workspace:*
+        version: link:../../packages/platform-infra
+      '@mediforce/workflow-engine':
+        specifier: workspace:*
+        version: link:../../packages/workflow-engine
+
   apps/workflow-designer:
     dependencies:
       '@mediforce/platform-core':

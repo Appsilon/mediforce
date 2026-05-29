@@ -1,0 +1,15 @@
+{
+  "name": "@mediforce/team-pulse",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mediforce/platform-core": "workspace:*",
+    "@mediforce/platform-api": "workspace:*",
+    "@mediforce/platform-infra": "workspace:*",
+    "@mediforce/workflow-engine": "workspace:*"
+  }
+}

@@ -5,27 +5,10 @@ import type {
   EmailActionConfig,
   SpawnActionConfig,
   WaitActionConfig,
+  InterpolationSources,
 } from '@mediforce/platform-core';
 
-/** Sources available to interpolation in action configs.
- *  - `triggerPayload` is the raw webhook body / cron tick / manual payload.
- *  - `steps` is the variables map keyed by previous stepId — read with dot
- *    notation (e.g. `${steps.fetch.body.id}`).
- *  - `variables` is the merged workflow scratch space (alias of `steps` today;
- *    reserved for explicit set/let in future).
- *  - `secrets` is the per-workflow encrypted secret bag, decrypted at action
- *    dispatch time. Accessed via `${secrets.NAME}` in url/body/headers. The
- *    runtime loads this from WorkflowSecretsRepository before invoking
- *    handlers — values must NEVER be persisted to step output or audit logs
- *    by handler code.
- */
-export interface InterpolationSources {
-  triggerPayload: Record<string, unknown>;
-  steps: Record<string, unknown>;
-  variables: Record<string, unknown>;
-  secrets: Record<string, string>;
-  item?: unknown;
-}
+export type { InterpolationSources } from '@mediforce/platform-core';
 
 /** Per-step context passed to every action handler. The runtime fills this
  *  out from the WorkflowStep + ProcessInstance before dispatch. */

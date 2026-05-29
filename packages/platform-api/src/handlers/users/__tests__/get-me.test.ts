@@ -12,7 +12,7 @@ function directoryWith(uid: string, metadata: { email: string | null; displayNam
     },
     async getUserMetadata(requested: string) {
       if (requested !== uid) return null;
-      return { ...metadata, lastSignInTime: null };
+      return { ...metadata, lastSignInTime: null, photoURL: null };
     },
   };
 }

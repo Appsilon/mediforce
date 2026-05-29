@@ -18,7 +18,7 @@ import type {
   WorkflowStep,
 } from '@mediforce/platform-core';
 import type { Selection, TaskVerdict } from '@mediforce/platform-core';
-import { RbacService, RbacError, normalizeSelection, buildTaskVerdicts } from '@mediforce/platform-core';
+import { RbacService, RbacError, normalizeSelection, buildTaskVerdicts, interpolate } from '@mediforce/platform-core';
 import { validateStepGraph } from '../graph/graph-validator.js';
 import { StepExecutor, type StepActor } from './step-executor.js';
 import { RoutingError, InvalidTransitionError, ParentInstanceNotFoundError } from './errors.js';
@@ -298,13 +298,33 @@ export class WorkflowEngine {
           const resolvedVerdicts = buildTaskVerdicts(nextStep.verdicts);
           if (resolvedVerdicts) verdictsField.verdicts = resolvedVerdicts;
 
+          let preAssignedUserId: string | null = null;
+          if (nextStep.assignedTo) {
+            const resolved = interpolate(nextStep.assignedTo, {
+              triggerPayload: (updatedInstance.triggerPayload as Record<string, unknown>) ?? {},
+              steps: updatedInstance.variables,
+              variables: updatedInstance.variables,
+              secrets: {},
+            });
+            if (typeof resolved === 'string' && resolved.length > 0) {
+              if (this.userDirectoryService?.resolveUser) {
+                const user = await this.userDirectoryService.resolveUser(resolved);
+                preAssignedUserId = user?.uid ?? resolved;
+              } else {
+                preAssignedUserId = resolved;
+              }
+            }
+          }
+          const taskAssignedUserId = preAssignedUserId ?? updatedInstance.createdBy ?? null;
+          const taskStatus: 'pending' | 'claimed' = taskAssignedUserId ? 'claimed' : 'pending';
+
           const task: HumanTask = {
             id: crypto.randomUUID(),
             processInstanceId: instanceId,
             stepId: nextStep.id,
             assignedRole,
-            assignedUserId: updatedInstance.createdBy ?? null,
-            status: updatedInstance.createdBy ? 'claimed' : 'pending',
+            assignedUserId: taskAssignedUserId,
+            status: taskStatus,
             deadline: null,
             createdAt: now,
             updatedAt: now,

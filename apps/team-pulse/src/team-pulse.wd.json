@@ -1,0 +1,235 @@
+{
+  "name": "team-pulse",
+  "namespace": "appsilon",
+  "title": "Team Pulse",
+  "description": "Product owner gathers time-boxed perspectives from team members, synthesizes with LLM, and optionally launches backlog triage with insights.",
+  "preamble": "## Domain Context\nSoftware team sprint planning. A product owner poses a question to the team, collects time-boxed perspectives from each member via child workflows, then synthesizes responses with an LLM. The synthesis surfaces themes, agreements, and tensions to inform prioritization. Optionally launches backlog triage seeded with the pulse insights.",
+  "roles": ["product-owner"],
+  "triggers": [
+    { "name": "manual", "type": "manual" }
+  ],
+  "env": {
+    "PLATFORM_API_KEY": "{{PLATFORM_API_KEY}}",
+    "APP_BASE_URL": "{{APP_BASE_URL}}"
+  },
+  "triggerInput": [
+    {
+      "name": "question",
+      "type": "string",
+      "required": false,
+      "description": "Question to ask the team (omit to use built-in sprint prioritization prompt)"
+    },
+    {
+      "name": "durationHours",
+      "type": "number",
+      "required": true,
+      "description": "Hours to collect perspectives (e.g. 0.5 = 30min, 24 = 1 day)"
+    },
+    {
+      "name": "namespace",
+      "type": "string",
+      "required": true,
+      "default": "mediforce",
+      "description": "Namespace handle to fetch team members from"
+    },
+    {
+      "name": "repo",
+      "type": "string",
+      "required": true,
+      "default": "appsilon/mediforce",
+      "description": "GitHub repo for backlog-triage if launched"
+    },
+    {
+      "name": "labelFilter",
+      "type": "string",
+      "required": false,
+      "description": "Optional label filter for backlog-triage (passed to spawn_triage payload when provided)"
+    }
+  ],
+  "steps": [
+    {
+      "id": "fetch_members",
+      "name": "Fetch members",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Fetch organization members from the platform API and output as table-editor options.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const apiKey = process.env.PLATFORM_API_KEY;\n  const baseUrl = process.env.APP_BASE_URL;\n  if (!apiKey || !baseUrl) { console.error('PLATFORM_API_KEY or APP_BASE_URL missing'); process.exit(1); }\n  const namespaces = ['mediforce', 'appsilon'];\n  const seen = new Map();\n  for (const ns of namespaces) {\n    try {\n      const res = await fetch(`${baseUrl}/api/users/members?handle=${encodeURIComponent(ns)}`, {\n        headers: { 'X-Api-Key': apiKey, Accept: 'application/json' },\n      });\n      if (!res.ok) { console.error(`Failed to fetch members from ${ns}: ${res.status}`); continue; }\n      const data = await res.json();\n      for (const m of (data.members || [])) {\n        if (!seen.has(m.uid)) {\n          seen.set(m.uid, { id: m.uid, label: m.displayName || m.email || m.uid, email: m.email || '', role: m.role || 'member', avatarUrl: m.avatarUrl || '' });\n        }\n      }\n    } catch (err) { console.error(`Error fetching ${ns}: ${err?.message || err}`); }\n  }\n  const options = [...seen.values()];\n  writeFileSync('/output/result.json', JSON.stringify({ options }));\n  console.log(`Fetched ${options.length} unique member(s) from ${namespaces.join(', ')}`);\n} catch (err) {\n  console.error('fetch_members crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+      }
+    },
+    {
+      "id": "select_members",
+      "name": "Select team members",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["product-owner"],
+      "description": "Product owner selects which team members to include in this pulse.",
+      "ui": {
+        "component": "table-editor",
+        "config": {
+          "submitLabel": "Confirm selection",
+          "emptyMessage": "No members found in the organization.",
+          "columns": [
+            { "id": "avatar", "kind": "avatar", "label": "", "field": "avatarUrl", "fallbackField": "label", "size": 32 },
+            { "id": "name", "kind": "static", "label": "Name", "field": "label" },
+            { "id": "email", "kind": "static", "label": "Email", "field": "email" },
+            {
+              "id": "include",
+              "kind": "single-select",
+              "label": "Include",
+              "default": "yes",
+              "options": [
+                { "id": "yes", "label": "Yes" },
+                { "id": "no", "label": "No" }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "prepare",
+      "name": "Prepare",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Filter selected members and compute collection deadline.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\nconst DEFAULT_QUESTION = 'Before looking at categories \\u2014 what is your first gut feeling?\\n\\n**0. What frustrates you most or what do you need most in Mediforce right now?**\\n\\nNow, per category:\\n\\n**A. Product** \\u2014 Which features are most critical for this sprint? What customer development conversations should we prioritize? What are we doing to validate the product with the market?\\n\\n**B. UX** \\u2014 What needs improvement from the user\\'s perspective?\\n\\n**C. Workflow** \\u2014 Which workflows do our users need most? What is not ideal in existing workflows? Are there workflows we know clients want that we should prioritize?\\n\\n**D. Engine** \\u2014 What is missing in the platform\\'s expressiveness? What should we change in the workflow execution engine?\\n\\n**E. Tech-debt** \\u2014 What needs cleanup before it grows into a real problem?\\n\\n**F. Infra / Security** \\u2014 What is important? What is urgent?\\n\\n**G. Bug** \\u2014 Which known bugs are most painful?\\n\\nRate priorities where possible: \\ud83d\\udd34 critical, \\ud83d\\udfe0 important, \\ud83d\\udfe1 nice-to-have. A couple of sentences per category is fine, but feel free to go deeper where it matters.';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const rows = input.steps?.select_members?.rows || [];\n  const fetchedMembers = input.steps?.fetch_members?.options || [];\n  const includedIds = new Set(rows.filter(r => r.values?.include === 'yes').map(r => r.itemId));\n  const teamMembers = fetchedMembers.filter(m => includedIds.has(m.id)).map(m => ({ userId: m.id, email: m.email }));\n  if (teamMembers.length === 0) { console.error('No members selected'); process.exit(1); }\n  const hours = Number(input.durationHours);\n  if (!Number.isFinite(hours) || hours <= 0) { console.error('durationHours must be a positive number'); process.exit(1); }\n  const deadline = new Date(Date.now() + hours * 3600000).toISOString();\n  const question = input.question || DEFAULT_QUESTION;\n  writeFileSync('/output/result.json', JSON.stringify({ teamMembers, question, deadline }));\n  console.log(`Selected ${teamMembers.length} member(s), deadline: ${deadline}`);\n} catch (err) {\n  console.error('prepare crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+      }
+    },
+    {
+      "id": "spawn_perspectives",
+      "name": "Spawn perspectives",
+      "type": "creation",
+      "executor": "action",
+      "description": "Spawn a gather-perspective child workflow for each selected team member.",
+      "action": {
+        "kind": "spawn",
+        "config": {
+          "forEach": "${steps.prepare.teamMembers}",
+          "targets": {
+            "definitionName": "gather-perspective",
+            "payload": {
+              "userId": "${item.userId}",
+              "email": "${item.email}",
+              "question": "${steps.prepare.question}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "wait_for_responses",
+      "name": "Wait for responses",
+      "type": "creation",
+      "executor": "action",
+      "description": "Wait until collection deadline passes.",
+      "action": {
+        "kind": "wait",
+        "config": {
+          "deadline": "${steps.prepare.deadline}"
+        }
+      }
+    },
+    {
+      "id": "collect_responses",
+      "name": "Collect responses",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Fetch each spawned child instance and extract the perspective step output.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const spawned = input.steps?.spawn_perspectives?.spawned || [];\n  const apiKey = process.env.PLATFORM_API_KEY;\n  const baseUrl = process.env.APP_BASE_URL;\n  if (!apiKey || !baseUrl) { console.error('PLATFORM_API_KEY or APP_BASE_URL missing'); process.exit(1); }\n  const responses = [];\n  for (const entry of spawned) {\n    const instanceId = entry.instanceId;\n    try {\n      const res = await fetch(`${baseUrl}/api/processes/${instanceId}`, {\n        headers: { 'X-Api-Key': apiKey, Accept: 'application/json' },\n      });\n      if (!res.ok) { console.error(`Failed to fetch instance ${instanceId}: ${res.status}`); continue; }\n      const instance = await res.json();\n      const stepOutput = instance.variables?.provide_perspective;\n      const perspective = stepOutput?.paramValues?.perspective ?? stepOutput;\n      responses.push({ instanceId, perspective: perspective || null });\n    } catch (err) {\n      console.error(`Error fetching instance ${instanceId}: ${err?.message || err}`);\n    }\n  }\n  const summary = `Collected ${responses.length} of ${spawned.length} responses`;\n  console.log(summary);\n  writeFileSync('/output/result.json', JSON.stringify({\n    responses,\n    responseCount: responses.length,\n    totalSpawned: spawned.length,\n    summary\n  }));\n} catch (err) {\n  console.error('collect_responses crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+      }
+    },
+    {
+      "id": "synthesize",
+      "name": "Synthesize perspectives",
+      "type": "creation",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L4",
+      "description": "LLM synthesizes collected perspectives into themes, agreements, tensions, and actionable insights.",
+      "env": {
+        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_API_KEY": "",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+      },
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "model": "sonnet",
+        "timeoutMinutes": 15,
+        "prompt": "# Synthesize Team Perspectives\n\nYou are synthesizing team perspectives collected during a team pulse check. The product owner asked the team a question and each member provided their perspective.\n\n## Input\n\nRead `/output/input.json`. You will find:\n\n- `question` — the original question posed by the product owner (from triggerPayload).\n- `responses[]` — array of `{ instanceId, perspective }` from the collect_responses step.\n- `responseCount` — number of responses collected.\n- `totalSpawned` — total number of child workflows spawned.\n\n## Task\n\nAnalyze all perspectives and produce a structured synthesis:\n\n1. **Themes** — recurring topics or concerns across responses.\n2. **Agreements** — points where multiple team members align.\n3. **Tensions** — areas of disagreement or conflicting viewpoints.\n4. **Insights** — actionable takeaways for the product owner.\n5. **Summary** — a concise 2-3 sentence summary of the team pulse.\n\nBe specific. Quote or paraphrase individual perspectives where relevant. Do not invent perspectives that were not provided.\n\n## Output contract\n\nWrite `/output/result.json` with:\n\n```json\n{\n  \"synthesis\": {\n    \"themes\": [\"theme 1\", \"theme 2\"],\n    \"agreements\": [\"agreement 1\"],\n    \"tensions\": [\"tension 1\"],\n    \"insights\": [\"insight 1\", \"insight 2\"],\n    \"summary\": \"2-3 sentence summary\"\n  },\n  \"question\": \"<copy from input>\",\n  \"responseCount\": 5\n}\n```\n\nOutput strict JSON only — no markdown, no commentary outside the result file."
+      }
+    },
+    {
+      "id": "decide_triage",
+      "name": "Decide triage",
+      "type": "decision",
+      "executor": "human",
+      "allowedRoles": ["product-owner"],
+      "description": "Review the synthesis and decide whether to launch backlog triage with these insights.",
+      "verdicts": {
+        "launch_triage": {
+          "target": "spawn_triage",
+          "label": "Launch triage",
+          "intent": "success"
+        },
+        "skip": {
+          "target": "report",
+          "label": "Done — skip triage",
+          "intent": "neutral"
+        }
+      }
+    },
+    {
+      "id": "spawn_triage",
+      "name": "Spawn triage",
+      "type": "creation",
+      "executor": "action",
+      "description": "Launch backlog-triage workflow seeded with pulse synthesis context.",
+      "action": {
+        "kind": "spawn",
+        "config": {
+          "targets": {
+            "definitionName": "backlog-triage",
+            "payload": {
+              "repo": "${triggerPayload.repo}",
+              "pulseContext": "${steps.synthesize.synthesis.summary}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "report",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "script",
+      "description": "Team pulse complete."
+    }
+  ],
+  "transitions": [
+    { "from": "fetch_members", "to": "select_members" },
+    { "from": "select_members", "to": "prepare" },
+    { "from": "prepare", "to": "spawn_perspectives" },
+    { "from": "spawn_perspectives", "to": "wait_for_responses" },
+    { "from": "wait_for_responses", "to": "collect_responses" },
+    { "from": "collect_responses", "to": "synthesize" },
+    { "from": "synthesize", "to": "decide_triage" },
+    { "from": "decide_triage", "to": "spawn_triage", "when": "verdict == \"launch_triage\"" },
+    { "from": "decide_triage", "to": "report", "when": "verdict == \"skip\"" },
+    { "from": "spawn_triage", "to": "report" }
+  ]
+}

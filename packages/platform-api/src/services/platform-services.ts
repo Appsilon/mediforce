@@ -68,6 +68,7 @@ import {
   createEmailActionHandler,
   waitActionHandler,
 } from '@mediforce/core-actions';
+import { createHttpSelfFetchRunKicker } from '../runtime/run-kicker.js';
 import { WebhookRouter } from '@mediforce/workflow-engine';
 import { seedBuiltinAgentDefinitions } from './seed-agent-definitions.js';
 import { seedBuiltinToolCatalog } from './seed-tool-catalog.js';
@@ -340,7 +341,11 @@ export function getPlatformServices(): PlatformServices {
   const actionRegistry = new ActionRegistry();
   actionRegistry.register('http', httpActionHandler);
   actionRegistry.register('reshape', reshapeActionHandler);
-  actionRegistry.register('spawn', createSpawnActionHandler(manualTrigger, processRepo));
+  const spawnRunKicker = createHttpSelfFetchRunKicker({
+    baseUrl: () => process.env.APP_BASE_URL ?? 'http://localhost:9003',
+    apiKey: () => process.env.PLATFORM_API_KEY ?? '',
+  });
+  actionRegistry.register('spawn', createSpawnActionHandler(manualTrigger, processRepo, spawnRunKicker));
   actionRegistry.register('wait', waitActionHandler);
   if (mailgunSender) {
     actionRegistry.register('email', createEmailActionHandler(mailgunSender));
