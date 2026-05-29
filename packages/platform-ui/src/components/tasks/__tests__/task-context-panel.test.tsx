@@ -4,10 +4,15 @@ import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import type { StepExecution } from '@mediforce/platform-core';
 
-// Mock useSubcollection so we can feed canned step executions to the panel.
-const mockSubcollection = vi.fn();
+// Mock useStepExecutions so we can feed canned step executions to the panel.
+const mockStepExecutions = vi.fn();
+vi.mock('@/hooks/use-step-executions', () => ({
+  useStepExecutions: (...args: unknown[]) => mockStepExecutions(...args),
+}));
+
+const mockProcessInstance = vi.fn(() => ({ data: { status: 'running' }, loading: false }));
 vi.mock('@/hooks/use-process-instances', () => ({
-  useSubcollection: (...args: unknown[]) => mockSubcollection(...args),
+  useProcessInstance: (...args: unknown[]) => mockProcessInstance(...args),
 }));
 
 // Mock apiFetch — Response constructor is available in jsdom environment.
@@ -46,8 +51,8 @@ function buildExecution(overrides: Partial<StepExecutionRecord> = {}): StepExecu
   };
 }
 
-function setSubcollection(executions: StepExecutionRecord[], loading = false): void {
-  mockSubcollection.mockReturnValue({ data: executions, loading, error: null });
+function setStepExecutions(executions: StepExecutionRecord[], loading = false): void {
+  mockStepExecutions.mockReturnValue({ data: executions, loading, error: null });
 }
 
 async function expandPanel(): Promise<void> {
@@ -70,7 +75,9 @@ async function activateReportTab(): Promise<void> {
 describe('TaskContextPanel', () => {
   beforeEach(() => {
     mockApiFetch.mockReset();
-    mockSubcollection.mockReset();
+    mockStepExecutions.mockReset();
+    mockProcessInstance.mockReset();
+    mockProcessInstance.mockReturnValue({ data: { status: 'running' }, loading: false });
     mockUseTheme.mockReturnValue({ resolvedTheme: 'light', setTheme: vi.fn() });
   });
 
@@ -81,7 +88,7 @@ describe('TaskContextPanel', () => {
         presentation: '<section id="agent-report">Inline body</section>',
       },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -121,7 +128,7 @@ describe('TaskContextPanel', () => {
         presentation: '<section id="agent-output-report">Agent output body</section>',
       },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -144,7 +151,7 @@ describe('TaskContextPanel', () => {
         summary: 'Validation completed',
       },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     mockApiFetch.mockResolvedValue(
       new Response('<article id="fetched-report">From file</article>', { status: 200 }),
@@ -182,7 +189,7 @@ describe('TaskContextPanel', () => {
 
   it('falls back to Summary tab when neither presentation nor htmlReportPath is present', async () => {
     const execution = buildExecution({ output: { summary: 'Plain output' } });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -207,7 +214,7 @@ describe('TaskContextPanel', () => {
         summary: 'Has summary text',
       },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     mockApiFetch.mockResolvedValue(
       new Response('Not Found', { status: 404 }),
@@ -249,7 +256,7 @@ describe('TaskContextPanel', () => {
     const execution = buildExecution({
       output: { presentation },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -271,7 +278,7 @@ describe('TaskContextPanel', () => {
     const execution = buildExecution({
       output: { presentation: '<div>resize me</div>' },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -304,7 +311,7 @@ describe('TaskContextPanel', () => {
     const execution = buildExecution({
       output: { presentation: '<div>runaway</div>' },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -337,7 +344,7 @@ describe('TaskContextPanel', () => {
     const execution = buildExecution({
       output: { presentation: '<div>loop</div>' },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -374,7 +381,7 @@ describe('TaskContextPanel', () => {
     const execution = buildExecution({
       output: { presentation: '<div>invalid</div>' },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -429,7 +436,7 @@ describe('TaskContextPanel', () => {
         presentation: { kind: 'markdown', content: '## Status\n\n- one\n- two' },
       },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -465,7 +472,7 @@ describe('TaskContextPanel', () => {
         },
       },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -485,7 +492,7 @@ describe('TaskContextPanel', () => {
     const execution = buildExecution({
       output: { presentation: '<div class="min-h-screen">vh content</div>' },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -513,7 +520,7 @@ describe('TaskContextPanel', () => {
     const execution = buildExecution({
       output: { presentation: '<div>theme-test</div>' },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     mockUseTheme.mockReturnValue({ resolvedTheme: 'light', setTheme: vi.fn() });
 

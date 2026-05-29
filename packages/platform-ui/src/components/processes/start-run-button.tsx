@@ -4,7 +4,7 @@ import * as React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useRouter } from 'next/navigation';
 import { Play, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRound, FileInput } from 'lucide-react';
-import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
+import { useWorkflowVersions, useWorkflowVersion } from '@/hooks/use-workflow-versions';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
@@ -36,7 +36,7 @@ export function StartRunButton({
   const router = useRouter();
   const handle = useHandleFromPath();
   const { firebaseUser } = useAuth();
-  const { definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowDefinitions(workflowName, handle);
+  const { versions: definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowVersions(workflowName, handle);
   const { images: dockerImages, isAvailable: dockerAvailable, isLoading: dockerLoading } = useDockerImages();
   const openRouterCredits = useOpenRouterCredits();
   const [starting, setStarting] = React.useState(false);
@@ -52,10 +52,10 @@ export function StartRunButton({
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   const effectiveVersion = version ?? hookEffectiveVersion;
-
-  const effectiveDefinition = React.useMemo(
-    () => definitions.find((d) => d.version === effectiveVersion),
-    [definitions, effectiveVersion],
+  const { definition: effectiveDefinition } = useWorkflowVersion(
+    workflowName,
+    handle,
+    effectiveVersion,
   );
 
   const hasContext = secretKeysCtx !== null;
@@ -145,7 +145,7 @@ export function StartRunButton({
 
   async function executeStart(v?: number) {
     const targetVersion = v ?? effectiveVersion;
-    if (!firebaseUser || targetVersion === 0) return;
+    if (!firebaseUser || targetVersion === null || targetVersion === 0) return;
 
     setStarting(true);
     setError(null);

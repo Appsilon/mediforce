@@ -87,6 +87,17 @@ export class InMemoryProcessRepository implements ProcessRepository {
     this.workflowDefaults.set(`${namespace}:${name}`, version);
   }
 
+  async listWorkflowVersions(namespace: string, name: string): Promise<WorkflowDefinition[]> {
+    const versions: WorkflowDefinition[] = [];
+    for (const definition of this.workflowDefinitions.values()) {
+      if (definition.name === name && definition.namespace === namespace) {
+        versions.push(definition);
+      }
+    }
+    versions.sort((a, b) => a.version - b.version);
+    return versions;
+  }
+
   async getLatestWorkflowVersion(namespace: string, name: string): Promise<number> {
     let latest = 0;
     for (const definition of this.workflowDefinitions.values()) {

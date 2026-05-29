@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { ConversationTurnSchema, CoworkSessionSchema } from '@mediforce/platform-core';
+import {
+  ConversationTurnSchema,
+  CoworkSessionSchema,
+  CoworkSessionStatusSchema,
+} from '@mediforce/platform-core';
 
 /**
  * Contracts for the `cowork` domain.
@@ -10,6 +14,25 @@ import { ConversationTurnSchema, CoworkSessionSchema } from '@mediforce/platform
  * 404 for anti-enumeration. Namespace gating happens inside the handler via
  * the parent process instance's namespace.
  */
+
+// ---- GET /api/cowork --------------------------------------------------------
+//
+// List cowork sessions visible to the caller. Workspace gating is enforced by
+// the `scope.coworkSessions` wrapper: api-key callers see every session, user
+// callers only see sessions whose parent run belongs to a workspace they're a
+// member of.
+
+export const ListCoworkSessionsInputSchema = z.object({
+  role: z.string().min(1).optional(),
+  status: z.array(CoworkSessionStatusSchema).min(1).optional(),
+});
+
+export const ListCoworkSessionsOutputSchema = z.object({
+  sessions: z.array(CoworkSessionSchema),
+});
+
+export type ListCoworkSessionsInput = z.infer<typeof ListCoworkSessionsInputSchema>;
+export type ListCoworkSessionsOutput = z.infer<typeof ListCoworkSessionsOutputSchema>;
 
 // ---- GET /api/cowork/:sessionId ---------------------------------------------
 

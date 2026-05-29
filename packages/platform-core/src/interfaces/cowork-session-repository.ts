@@ -12,6 +12,15 @@ export interface CoworkSessionRepository {
 
   getByInstanceId(instanceId: string): Promise<CoworkSession[]>;
 
+  /** All sessions visible to system actors (no namespace gate). */
+  listAll(): Promise<CoworkSession[]>;
+  /** Sessions whose parent run belongs to one of `allowed`. */
+  listInNamespaces(allowed: readonly string[]): Promise<CoworkSession[]>;
+  /** Sessions assigned to `role`, intersected with `allowed` namespaces. */
+  listByRoleInNamespaces(role: string, allowed: readonly string[]): Promise<CoworkSession[]>;
+  /** Sessions assigned to `role` across the whole store (system-actor reach). */
+  listByRoleAll(role: string): Promise<CoworkSession[]>;
+
   /** Find the most recent active cowork session for a process instance, or null. */
   findMostRecentActive(instanceId: string): Promise<CoworkSession | null>;
   findMostRecentActiveInNamespaces(

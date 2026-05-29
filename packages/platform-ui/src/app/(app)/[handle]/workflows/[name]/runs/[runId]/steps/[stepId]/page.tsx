@@ -6,8 +6,10 @@ import * as Collapsible from '@radix-ui/react-collapsible';
 import { format } from 'date-fns';
 import { CheckCircle2, Clock, XCircle, Circle, Pause, Bot, User, ExternalLink, FileText, GitBranch, Gauge, ChevronDown, ChevronRight, MessageSquare, DollarSign } from 'lucide-react';
 import type { StepExecution, Step, AgentEvent, HumanTask } from '@mediforce/platform-core';
-import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
-import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
+import { useProcessInstance } from '@/hooks/use-process-instances';
+import { useStepExecutions } from '@/hooks/use-step-executions';
+import { useAgentEvents } from '@/hooks/use-agent-events';
+import { useWorkflowVersion } from '@/hooks/use-workflow-versions';
 import { useInstanceTasks } from '@/hooks/use-instance-tasks';
 import { useAgentRunsForStep } from '@/hooks/use-agent-runs';
 import { getAgentOutput, type AgentOutputData } from '@/components/tasks/task-utils';
@@ -38,25 +40,22 @@ export default function StepDetailPage() {
   const decodedStepId = stepId ? decodeURIComponent(stepId) : '';
 
   const { data: instance, loading: instanceLoading } = useProcessInstance(runId ?? null);
-  const { data: stepExecutions, loading: stepsLoading } = useSubcollection<StepExecution>(
-    runId ? `processInstances/${runId}` : '',
-    'stepExecutions',
+  const { data: stepExecutions, loading: stepsLoading } = useStepExecutions(
+    runId ?? null,
+    instance?.status,
   );
-  const { data: agentEvents, loading: eventsLoading } = useSubcollection<AgentEvent>(
-    runId ? `processInstances/${runId}` : '',
-    'agentEvents',
+  const { data: agentEvents, loading: eventsLoading } = useAgentEvents(
+    runId ?? null,
+    decodedStepId || null,
+    instance?.status,
   );
 
-  const { versions } = useProcessDefinitionVersions(decodedName, handle);
-
-  const definition = useMemo(() => {
-    if (!instance || versions.length === 0) return null;
-    const versionNum = parseInt(instance.definitionVersion, 10);
-    if (!isNaN(versionNum)) {
-      return versions.find((v) => v.version === versionNum) ?? null;
-    }
-    return versions.find((v) => String(v.version) === instance.definitionVersion) ?? null;
-  }, [instance, versions]);
+  const runVersion = instance ? Number.parseInt(instance.definitionVersion, 10) : null;
+  const { definition } = useWorkflowVersion(
+    decodedName,
+    handle,
+    runVersion !== null && !Number.isNaN(runVersion) ? runVersion : null,
+  );
 
   const definitionStep = useMemo((): Step | null => {
     return definition?.steps.find((s) => s.id === decodedStepId) ?? null;

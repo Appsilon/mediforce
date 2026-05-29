@@ -11,7 +11,7 @@ import { queryKeys } from '@/lib/query-keys';
  * One-shot read: `refetchInterval: 0` (the project default per ADR-0006 §3).
  * Intended for historical / contextual views where stale data is acceptable —
  * task detail's sibling list, post-completion next-step lookup. For live task
- * inboxes use the role-scoped hooks (`useMyTasks`).
+ * inboxes use the role-scoped hooks (`useMyActionableTasksByRole`).
  */
 export function useInstanceTasks(instanceId: string | undefined): {
   tasks: HumanTask[];

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, Eye, EyeOff, Copy } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
-import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
+import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
 import { useMyActionableTasks } from '@/hooks/use-tasks';
 import { RunsTable } from '@/components/processes/runs-table';
@@ -184,7 +184,12 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const [activeTab, setActiveTab] = React.useState(initialTab);
   const [showArchivedRuns, setShowArchivedRuns] = React.useState(false);
 
-  const { versions, loading: versionsLoading } = useProcessDefinitionVersions(decodedName, handle);
+  const { versions, loading: versionsLoading } = useWorkflowVersions(decodedName, handle);
+  // The page header reads the full latest definition (visibility, triggers,
+  // steps[], repo, url, copiedFrom) which the metadata summary does not
+  // carry. Fetch it once per workflow.
+  const latestVersionNumber = versions[0]?.version ?? null;
+  const { definition: latest } = useWorkflowVersion(decodedName, handle, latestVersionNumber);
   const { data: runs, loading: runsLoading } = useProcessInstances('all', decodedName, showArchivedRuns, handle);
   const { data: activeTasks } = useMyActionableTasks();
 
@@ -228,7 +233,6 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
     return () => document.removeEventListener('mousedown', handleClick);
   }, [menuOpen]);
 
-  const latest = versions[0] ?? null;
   const currentVisibility = visibilityOverride ?? latest?.visibility ?? 'private';
   const isPrivate = currentVisibility === 'private';
   const hasManualTrigger = latest?.triggers?.some(
@@ -290,16 +294,16 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                   <span className="text-border">·</span>
                 </>
               )}
-              {(latest as WorkflowDefinition | null)?.copiedFrom && (
+              {latest?.copiedFrom && (
                 <>
                   <span className="flex items-center gap-1">
                     <Copy className="h-3 w-3" />
                     Copied from{' '}
                     <Link
-                      href={`/${(latest as WorkflowDefinition).copiedFrom!.namespace}/workflows/${encodeURIComponent((latest as WorkflowDefinition).copiedFrom!.name)}`}
+                      href={`/${latest.copiedFrom!.namespace}/workflows/${encodeURIComponent(latest.copiedFrom!.name)}`}
                       className="rounded-full bg-purple-500/10 px-1.5 py-0.5 text-[11px] font-medium text-purple-600 hover:bg-purple-500/20 transition-colors"
                     >
-                      @{(latest as WorkflowDefinition).copiedFrom!.namespace}/{(latest as WorkflowDefinition).copiedFrom!.name} v{(latest as WorkflowDefinition).copiedFrom!.version}
+                      @{latest.copiedFrom!.namespace}/{latest.copiedFrom!.name} v{latest.copiedFrom!.version}
                     </Link>
                   </span>
                   <span className="text-border">·</span>

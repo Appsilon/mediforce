@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { useMemo } from 'react';
 import Link from 'next/link';
 import * as Popover from '@radix-ui/react-popover';
 import { GitBranch, Plus, Layers, ExternalLink, SlidersHorizontal, Check, ChevronRight } from 'lucide-react';
@@ -10,15 +9,11 @@ import { StartRunButton } from '@/components/processes/start-run-button';
 import { formatStepName } from '@/components/tasks/task-utils';
 import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
-import type { ProcessInstance } from '@mediforce/platform-core';
+import type { WorkflowRunSummary } from '@mediforce/platform-api/contract';
 import type { DefinitionGroup } from '@/hooks/use-process-definitions';
 
 export function isActiveStatus(status: string): boolean {
   return status === 'running' || status === 'created' || status === 'paused';
-}
-
-function isTerminalStatus(status: string): boolean {
-  return status === 'completed' || status === 'failed';
 }
 
 const PREVIEW_LIMIT = 3;
@@ -90,37 +85,22 @@ export function DisplayPopover({
 
 export function ProcessCard({
   definition,
-  instances,
-  showCompleted,
+  runSummary,
   steps,
   handle,
   activeTaskByInstance,
   isMember = true,
 }: {
   definition: DefinitionGroup;
-  instances: ProcessInstance[];
-  showCompleted: boolean;
+  runSummary: WorkflowRunSummary;
   steps?: string[];
   handle: string;
   activeTaskByInstance: Map<string, string>;
   isMember?: boolean;
 }) {
-  const filteredInstances = useMemo(() => {
-    return instances.filter((instance) => {
-      if (!showCompleted && isTerminalStatus(instance.status)) return false;
-      return true;
-    });
-  }, [instances, showCompleted]);
-
-  const sortedInstances = useMemo(() => {
-    return [...filteredInstances].sort((instanceA, instanceB) => {
-      return new Date(instanceB.createdAt).getTime() - new Date(instanceA.createdAt).getTime();
-    });
-  }, [filteredInstances]);
-
-  const activeCount = sortedInstances.filter((instance) => isActiveStatus(instance.status)).length;
-  const totalCount = sortedInstances.length;
-  const previewInstances = sortedInstances.slice(0, PREVIEW_LIMIT);
+  // Counts and preview are computed server-side (honouring `includeCompletedRuns`)
+  // and shipped in `runSummary`; `latest` is already newest-first and capped at 3.
+  const { total: totalCount, active: activeCount, latest: previewInstances } = runSummary;
   const hasMore = totalCount > PREVIEW_LIMIT;
 
   return (

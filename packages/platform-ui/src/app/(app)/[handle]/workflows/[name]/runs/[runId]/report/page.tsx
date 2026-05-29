@@ -2,11 +2,10 @@
 
 import { useParams } from 'next/navigation';
 import { useMemo } from 'react';
-import type { StepExecution } from '@mediforce/platform-core';
-import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
+import { useProcessInstance } from '@/hooks/use-process-instances';
+import { useStepExecutions } from '@/hooks/use-step-executions';
 import { useAuditEvents } from '@/hooks/use-audit-events';
-import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
-import { resolveDefinitionSteps } from '@/lib/resolve-definition-steps';
+import { useWorkflowVersion } from '@/hooks/use-workflow-versions';
 import { RunReport } from '@/components/reports/run-report';
 
 export default function RunReportPage() {
@@ -15,17 +14,18 @@ export default function RunReportPage() {
   const decodedName = name ? decodeURIComponent(name) : '';
 
   const { data: instance, loading: instanceLoading } = useProcessInstance(runId ?? null);
-  const { data: stepExecutions } = useSubcollection<StepExecution>(
-    runId ? `processInstances/${runId}` : '',
-    'stepExecutions',
-  );
+  const { data: stepExecutions } = useStepExecutions(runId ?? null, instance?.status);
   const { data: auditEvents } = useAuditEvents(runId ?? null);
 
-  const { definitions: workflowVersions } = useWorkflowDefinitions(decodedName, handle);
-
+  const runVersion = instance ? Number.parseInt(instance.definitionVersion, 10) : null;
+  const { definition: runDefinition } = useWorkflowVersion(
+    decodedName,
+    handle,
+    Number.isNaN(runVersion) ? null : runVersion,
+  );
   const definitionSteps = useMemo(
-    () => resolveDefinitionSteps(instance, workflowVersions),
-    [instance, workflowVersions],
+    () => runDefinition?.steps ?? [],
+    [runDefinition],
   );
 
   if (instanceLoading) {

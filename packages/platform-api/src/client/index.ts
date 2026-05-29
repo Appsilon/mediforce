@@ -9,6 +9,8 @@ import {
   ListWorkflowsOutputSchema,
   GetWorkflowInputSchema,
   GetWorkflowOutputSchema,
+  ListWorkflowVersionsInputSchema,
+  ListWorkflowVersionsOutputSchema,
   GetRunInputSchema,
   GetRunOutputSchema,
   StartRunInputSchema,
@@ -75,12 +77,16 @@ import {
   GetProcessOutputSchema,
   ListAuditEventsInputSchema,
   ListAuditEventsOutputSchema,
+  ListAgentEventsInputSchema,
+  ListAgentEventsOutputSchema,
   GetProcessStepsInputSchema,
   GetProcessStepsOutputSchema,
   GetCoworkSessionInputSchema,
   GetCoworkSessionOutputSchema,
   GetCoworkSessionByInstanceInputSchema,
   GetCoworkSessionByInstanceOutputSchema,
+  ListCoworkSessionsInputSchema,
+  ListCoworkSessionsOutputSchema,
   ChatCoworkSessionInputSchema,
   ChatCoworkSessionOutputSchema,
   FinalizeCoworkSessionInputSchema,
@@ -211,10 +217,12 @@ import {
   type RegisterWorkflowBody,
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
-  type ListWorkflowsInput,
+  type ListWorkflowsRequest,
   type ListWorkflowsOutput,
   type GetWorkflowInput,
   type GetWorkflowOutput,
+  type ListWorkflowVersionsInput,
+  type ListWorkflowVersionsOutput,
   type ArchiveVersionInput,
   type ArchiveVersionOutput,
   type ArchiveAllInput,
@@ -292,6 +300,8 @@ import {
   type GetProcessOutput,
   type ListAuditEventsInput,
   type ListAuditEventsOutput,
+  type ListAgentEventsInput,
+  type ListAgentEventsOutput,
   type GetProcessStepsInput,
   type GetProcessStepsOutput,
   type CancelRunInput,
@@ -310,6 +320,8 @@ import {
   type GetCoworkSessionOutput,
   type GetCoworkSessionByInstanceInput,
   type GetCoworkSessionByInstanceOutput,
+  type ListCoworkSessionsInput,
+  type ListCoworkSessionsOutput,
   type ChatCoworkSessionInput,
   type ChatCoworkSessionOutput,
   type FinalizeCoworkSessionInput,
@@ -411,10 +423,12 @@ export class Mediforce {
   readonly processes: {
     get: (input: GetProcessInput) => Promise<GetProcessOutput>;
     listAuditEvents: (input: ListAuditEventsInput) => Promise<ListAuditEventsOutput>;
+    agentEvents: (input: ListAgentEventsInput) => Promise<ListAgentEventsOutput>;
     getSteps: (input: GetProcessStepsInput) => Promise<GetProcessStepsOutput>;
   };
 
   readonly cowork: {
+    list: (input?: ListCoworkSessionsInput) => Promise<ListCoworkSessionsOutput>;
     get: (input: GetCoworkSessionInput) => Promise<GetCoworkSessionOutput>;
     getByInstance: (
       input: GetCoworkSessionByInstanceInput,
@@ -440,8 +454,9 @@ export class Mediforce {
       input: RegisterWorkflowBody,
       options: RegisterWorkflowOptions,
     ) => Promise<RegisterWorkflowOutput>;
-    list: (input?: ListWorkflowsInput) => Promise<ListWorkflowsOutput>;
+    list: (input?: ListWorkflowsRequest) => Promise<ListWorkflowsOutput>;
     get: (input: GetWorkflowInput) => Promise<GetWorkflowOutput>;
+    versions: (input: ListWorkflowVersionsInput) => Promise<ListWorkflowVersionsOutput>;
     archiveVersion: (input: ArchiveVersionInput, options: { namespace: string }) => Promise<ArchiveVersionOutput>;
     archiveAll: (input: ArchiveAllInput, options: { namespace: string }) => Promise<ArchiveAllOutput>;
     setVisibility: (input: SetVisibilityInput, options: { namespace: string }) => Promise<SetVisibilityOutput>;
@@ -666,6 +681,21 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.processes.listAuditEvents');
         return ListAuditEventsOutputSchema.parse(body);
       },
+      agentEvents: async (input) => {
+        const validated = ListAgentEventsInputSchema.parse(input);
+        const qs = toSearchParams({
+          stepId: validated.stepId,
+          afterSequence:
+            validated.afterSequence === undefined
+              ? undefined
+              : String(validated.afterSequence),
+        });
+        const res = await this.request(
+          `/api/processes/${encodeURIComponent(validated.instanceId)}/agent-events${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.processes.agentEvents');
+        return ListAgentEventsOutputSchema.parse(body);
+      },
       getSteps: async (input) => {
         const validated = GetProcessStepsInputSchema.parse(input);
         const res = await this.request(
@@ -677,6 +707,16 @@ export class Mediforce {
     };
 
     this.cowork = {
+      list: async (input) => {
+        const validated = ListCoworkSessionsInputSchema.parse(input ?? {});
+        const qs = toSearchParams({
+          role: validated.role,
+          status: validated.status,
+        });
+        const res = await this.request(`/api/cowork${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.cowork.list');
+        return ListCoworkSessionsOutputSchema.parse(body);
+      },
       get: async (input) => {
         const validated = GetCoworkSessionInputSchema.parse(input);
         const res = await this.request(
@@ -764,7 +804,12 @@ export class Mediforce {
       list: async (input) => {
         const validated = input ? ListWorkflowsInputSchema.parse(input) : undefined;
         const qs = validated
-          ? toSearchParams({ namespace: validated.namespace })
+          ? toSearchParams({
+              namespace: validated.namespace,
+              // Forward only when the caller turns "show completed" off; the
+              // server defaults to true, so omitting keeps the common URL clean.
+              includeCompletedRuns: validated.includeCompletedRuns ? undefined : 'false',
+            })
           : '';
         const res = await this.request(`/api/workflow-definitions${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.list');
@@ -781,6 +826,15 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.get');
         return GetWorkflowOutputSchema.parse(body);
+      },
+      versions: async (input) => {
+        const validated = ListWorkflowVersionsInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/workflow-definitions/${encodeURIComponent(validated.name)}/versions${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.versions');
+        return ListWorkflowVersionsOutputSchema.parse(body);
       },
       archiveVersion: (input, options) => {
         const validated = ArchiveVersionInputSchema.parse(input);

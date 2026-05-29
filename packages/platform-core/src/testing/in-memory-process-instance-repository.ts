@@ -4,7 +4,18 @@ import type {
   InstanceStatus,
   StepExecution,
   ListInstancesOptions,
+  WorkflowRunSummaryResult,
 } from '../index';
+
+const ACTIVE_STATUSES: ReadonlySet<InstanceStatus> = new Set([
+  'running',
+  'created',
+  'paused',
+]);
+const TERMINAL_STATUSES: ReadonlySet<InstanceStatus> = new Set([
+  'completed',
+  'failed',
+]);
 
 /**
  * In-memory implementation of ProcessInstanceRepository for testing.
@@ -183,6 +194,29 @@ export class InMemoryProcessInstanceRepository
 
   async setDeletedByDefinitionName(_name: string, _deleted: boolean): Promise<void> {
     // No-op in test double — Firestore uses untyped updateDoc for the `deleted` field
+  }
+
+  async summarizeRunsByWorkflow(
+    namespace: string,
+    name: string,
+    includeCompleted: boolean,
+  ): Promise<WorkflowRunSummaryResult> {
+    const scoped = [...this.instances.values()].filter(
+      (i) =>
+        i.namespace === namespace &&
+        i.definitionName === name &&
+        i.deleted !== true &&
+        i.archived !== true,
+    );
+    const active = scoped.filter((i) => ACTIVE_STATUSES.has(i.status)).length;
+    const counted = includeCompleted
+      ? scoped
+      : scoped.filter((i) => !TERMINAL_STATUSES.has(i.status));
+    const latest = [...counted]
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .slice(0, 3)
+      .map((i) => ({ ...i }));
+    return { total: counted.length, active, latest };
   }
 
   /** Test helper: clear all stored data */

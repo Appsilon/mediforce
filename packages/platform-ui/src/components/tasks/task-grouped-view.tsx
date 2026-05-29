@@ -453,8 +453,9 @@ export function TaskGroupedView({
   currentUserName?: string | null;
   groupByFields: Set<GroupByField>;
 }) {
-  const processNameMap = useProcessNameMap();
-  const userNames = useUserDisplayNames();
+  const handle = useHandleFromPath();
+  const processNameMap = useProcessNameMap(handle);
+  const userNames = useUserDisplayNames(handle);
   const groupByProcess = groupByFields.has('process');
   const groupByAction = groupByFields.has('action');
 

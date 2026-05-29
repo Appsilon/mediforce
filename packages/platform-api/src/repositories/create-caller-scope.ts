@@ -1,6 +1,7 @@
 import type { AgentRunner, PluginRegistry } from '@mediforce/agent-runtime';
 import type {
   AgentDefinitionRepository,
+  AgentEventRepository,
   AgentOAuthTokenRepository,
   AgentRunRepository,
   AuditRepository,
@@ -31,6 +32,7 @@ import type { DockerImagesService } from '../services/docker-images-service';
 import type { InviteNotificationService, InviteService } from '../services/invite-notification';
 import type { CallerScope } from './caller-scope';
 import { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository';
+import { AuthorizedAgentEventRepository } from './authorized-agent-event-repository';
 import { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository';
 import { AuthorizedAgentRunRepository } from './authorized-agent-run-repository';
 import { AuthorizedAuditEventRepository } from './authorized-audit-event-repository';
@@ -53,6 +55,7 @@ export interface CallerScopeServices {
   readonly instanceRepo: ProcessInstanceRepository;
   readonly processRepo: ProcessRepository;
   readonly auditRepo: AuditRepository;
+  readonly agentEventRepo: AgentEventRepository;
   readonly agentRunRepo: AgentRunRepository;
   readonly humanTaskRepo: HumanTaskRepository;
   readonly handoffRepo: HandoffRepository;
@@ -107,6 +110,7 @@ export function createCallerScope(
       services.coworkSessionRepo,
     ),
     agentRuns: new AuthorizedAgentRunRepository(caller, services.agentRunRepo),
+    agentEvents: new AuthorizedAgentEventRepository(caller, services.agentEventRepo),
     auditEvents: new AuthorizedAuditEventRepository(caller, services.auditRepo),
     handoffs: new AuthorizedHandoffRepository(caller, services.handoffRepo),
     toolCatalog: new AuthorizedToolCatalogRepository(caller, services.toolCatalogRepo),
