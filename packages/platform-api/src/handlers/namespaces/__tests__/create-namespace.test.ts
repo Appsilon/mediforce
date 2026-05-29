@@ -6,7 +6,7 @@ import { createNamespace } from '../create-namespace.js';
 import { ConflictError, ForbiddenError } from '../../../errors.js';
 
 function directoryWithMetadata(
-  map: ReadonlyMap<string, { email: string | null; displayName: string | null; lastSignInTime: string | null }>,
+  map: ReadonlyMap<string, { email: string | null; displayName: string | null; lastSignInTime: string | null; photoURL: string | null }>,
 ): UserDirectoryService {
   return {
     async getUsersByRole() {
@@ -93,7 +93,7 @@ describe('createNamespace handler', () => {
   it('stores the caller Firebase Auth displayName on the owner member doc', async () => {
     const directory = directoryWithMetadata(
       new Map([
-        ['uid-marek', { email: 'marek@example.test', displayName: 'Marek R', lastSignInTime: null }],
+        ['uid-marek', { email: 'marek@example.test', displayName: 'Marek R', lastSignInTime: null, photoURL: null }],
       ]),
     );
     const scope = createTestScope({

@@ -12,7 +12,7 @@ const ALPHA_MEMBERS: NamespaceMember[] = [
 function directoryWith(
   map: ReadonlyMap<
     string,
-    { email: string | null; displayName?: string | null; lastSignInTime: string | null } | null
+    { email: string | null; displayName?: string | null; lastSignInTime: string | null; photoURL?: string | null } | null
   >,
 ): UserDirectoryService {
   return {
@@ -22,7 +22,7 @@ function directoryWith(
     async getUserMetadata(uid: string) {
       const entry = map.has(uid) ? map.get(uid) ?? null : null;
       if (entry === null) return null;
-      return { displayName: entry.displayName ?? null, email: entry.email, lastSignInTime: entry.lastSignInTime };
+      return { displayName: entry.displayName ?? null, email: entry.email, lastSignInTime: entry.lastSignInTime, photoURL: entry.photoURL ?? null };
     },
   };
 }
@@ -109,7 +109,7 @@ describe('listNamespaceMembers handler', () => {
       },
       async getUserMetadata(uid: string) {
         if (uid === 'uid-member') throw new Error('boom');
-        return { email: 'owner@alpha.test', displayName: null, lastSignInTime: null };
+        return { email: 'owner@alpha.test', displayName: null, lastSignInTime: null, photoURL: null };
       },
     };
     const scope = createTestScope({ namespaceRepo, userDirectory: flaky });
