@@ -55,6 +55,7 @@ export async function heartbeat(
   const cronDefinitions = definitionGroups
     .map((group) => group.versions.find((v) => v.version === group.latestVersion))
     .filter((def): def is WorkflowDefinition => def !== undefined)
+    .filter((def) => !def.deleted)
     .filter((def) => def.triggers.some((t: Trigger) => t.type === 'cron'));
 
   for (const def of cronDefinitions) {
