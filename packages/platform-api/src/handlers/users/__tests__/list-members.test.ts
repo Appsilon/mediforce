@@ -1,70 +1,19 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type {
-  NamespaceMember,
-  NamespaceRepository,
-  UserDirectoryService,
-} from '@mediforce/platform-core';
+import type { NamespaceMember, UserDirectoryService } from '@mediforce/platform-core';
+import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index.js';
 import { listNamespaceMembers } from '../list-members.js';
 import { NotFoundError } from '../../../errors.js';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
 
 const ALPHA_MEMBERS: NamespaceMember[] = [
-  {
-    uid: 'uid-owner',
-    role: 'owner',
-    displayName: 'Alpha Owner',
-    joinedAt: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    uid: 'uid-member',
-    role: 'member',
-    joinedAt: '2026-02-01T00:00:00.000Z',
-  },
+  { uid: 'uid-owner', role: 'owner', displayName: 'Alpha Owner', joinedAt: '2026-01-01T00:00:00.000Z' },
+  { uid: 'uid-member', role: 'member', joinedAt: '2026-02-01T00:00:00.000Z' },
 ];
 
-function namespaceRepoWith(members: ReadonlyMap<string, NamespaceMember[]>): NamespaceRepository {
-  return {
-    async getNamespace() {
-      return null;
-    },
-    async createNamespace() {
-      /* no-op */
-    },
-    async createNamespaceWithOwner() {
-      /* no-op */
-    },
-    async updateNamespace() {
-      /* no-op */
-    },
-    async getNamespacesByUser() {
-      return [];
-    },
-    async addMember() {
-      /* no-op */
-    },
-    async removeMember() {
-      /* no-op */
-    },
-    async getMember() {
-      return null;
-    },
-    async getMembers(handle: string) {
-      return members.get(handle) ?? [];
-    },
-    async getUserNamespaces() {
-      return [];
-    },
-    async getMembershipsForUser() {
-      return [];
-    },
-  };
-}
-
 function directoryWith(
-  map: ReadonlyMap<string, { email: string | null; lastSignInTime: string | null } | null>,
+  map: ReadonlyMap<
+    string,
+    { email: string | null; displayName?: string | null; lastSignInTime: string | null } | null
+  >,
 ): UserDirectoryService {
   return {
     async getUsersByRole() {
@@ -73,17 +22,18 @@ function directoryWith(
     async getUserMetadata(uid: string) {
       const entry = map.has(uid) ? map.get(uid) ?? null : null;
       if (entry === null) return null;
-      return { ...entry, displayName: null };
+      return { displayName: entry.displayName ?? null, email: entry.email, lastSignInTime: entry.lastSignInTime };
     },
   };
 }
 
 describe('listNamespaceMembers handler', () => {
-  let namespaceRepo: NamespaceRepository;
+  let namespaceRepo: InMemoryNamespaceRepo;
   let directory: UserDirectoryService;
 
   beforeEach(() => {
-    namespaceRepo = namespaceRepoWith(new Map([['alpha', ALPHA_MEMBERS]]));
+    namespaceRepo = new InMemoryNamespaceRepo();
+    for (const m of ALPHA_MEMBERS) namespaceRepo.seedMember('alpha', m);
     directory = directoryWith(
       new Map([
         ['uid-owner', { email: 'owner@alpha.test', lastSignInTime: '2026-05-01T10:00:00.000Z' }],
@@ -172,6 +122,49 @@ describe('listNamespaceMembers handler', () => {
       email: null,
       lastSignInTime: null,
     });
+  });
+
+  it('keeps the workspace-scoped displayName when the member doc has one', async () => {
+    directory = directoryWith(
+      new Map([
+        ['uid-owner', { email: 'owner@alpha.test', displayName: 'Auth Owner Name', lastSignInTime: null }],
+      ]),
+    );
+    const scope = createTestScope({ namespaceRepo, userDirectory: directory });
+
+    const result = await listNamespaceMembers({ namespace: 'alpha' }, scope);
+
+    // Member doc displayName ('Alpha Owner') wins over auth profile name.
+    expect(result.members[0]?.displayName).toBe('Alpha Owner');
+  });
+
+  it('falls back to the Firebase Auth displayName when the member doc has none', async () => {
+    directory = directoryWith(
+      new Map([
+        ['uid-owner', { email: null, lastSignInTime: null }],
+        ['uid-member', { email: null, displayName: 'Auth Member Name', lastSignInTime: null }],
+      ]),
+    );
+    const scope = createTestScope({ namespaceRepo, userDirectory: directory });
+
+    const result = await listNamespaceMembers({ namespace: 'alpha' }, scope);
+
+    expect(result.members[1]?.displayName).toBe('Auth Member Name');
+  });
+
+  it('returns null displayName when neither the member doc nor auth metadata has one', async () => {
+    directory = directoryWith(
+      new Map([
+        ['uid-owner', { email: null, lastSignInTime: null }],
+        ['uid-member', { email: null, lastSignInTime: null }],
+      ]),
+    );
+    const scope = createTestScope({ namespaceRepo, userDirectory: directory });
+
+    const result = await listNamespaceMembers({ namespace: 'alpha' }, scope);
+
+    expect(result.members[1]?.uid).toBe('uid-member');
+    expect(result.members[1]?.displayName).toBeNull();
   });
 
   it('returns null email/lastSignInTime per member when directory is unconfigured', async () => {

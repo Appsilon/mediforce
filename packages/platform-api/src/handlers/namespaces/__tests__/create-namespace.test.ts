@@ -1,76 +1,29 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type {
-  Namespace,
-  NamespaceMember,
-  NamespaceMembership,
-  NamespaceRepository,
-} from '@mediforce/platform-core';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
+import type { UserDirectoryService } from '@mediforce/platform-core';
+import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index.js';
 import { createNamespace } from '../create-namespace.js';
 import { ConflictError, ForbiddenError } from '../../../errors.js';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
 
-class InMemoryNamespaceRepository implements NamespaceRepository {
-  readonly namespaces = new Map<string, Namespace>();
-  readonly members = new Map<string, NamespaceMember[]>();
-  readonly userOrganizations = new Map<string, string[]>();
-
-  async getNamespace(handle: string): Promise<Namespace | null> {
-    return this.namespaces.get(handle) ?? null;
-  }
-  async createNamespace(namespace: Namespace): Promise<void> {
-    this.namespaces.set(namespace.handle, namespace);
-  }
-  async createNamespaceWithOwner(input: {
-    namespace: Namespace;
-    ownerMember: NamespaceMember;
-  }): Promise<void> {
-    this.namespaces.set(input.namespace.handle, input.namespace);
-    const members = this.members.get(input.namespace.handle) ?? [];
-    this.members.set(input.namespace.handle, [
-      ...members.filter((m) => m.uid !== input.ownerMember.uid),
-      input.ownerMember,
-    ]);
-    const orgs = this.userOrganizations.get(input.ownerMember.uid) ?? [];
-    if (!orgs.includes(input.namespace.handle)) {
-      this.userOrganizations.set(input.ownerMember.uid, [...orgs, input.namespace.handle]);
-    }
-  }
-  async updateNamespace(): Promise<void> {
-    /* not exercised */
-  }
-  async getNamespacesByUser(): Promise<Namespace[]> {
-    return [];
-  }
-  async addMember(): Promise<void> {
-    /* not exercised */
-  }
-  async removeMember(): Promise<void> {
-    /* not exercised */
-  }
-  async getMember(handle: string, uid: string): Promise<NamespaceMember | null> {
-    return this.members.get(handle)?.find((m) => m.uid === uid) ?? null;
-  }
-  async getMembers(handle: string): Promise<NamespaceMember[]> {
-    return this.members.get(handle) ?? [];
-  }
-  async getUserNamespaces(): Promise<Namespace[]> {
-    return [];
-  }
-  async getMembershipsForUser(): Promise<readonly NamespaceMembership[]> {
-    return [];
-  }
+function directoryWithMetadata(
+  map: ReadonlyMap<string, { email: string | null; displayName: string | null; lastSignInTime: string | null }>,
+): UserDirectoryService {
+  return {
+    async getUsersByRole() {
+      return [];
+    },
+    async getUserMetadata(uid: string) {
+      return map.get(uid) ?? null;
+    },
+  };
 }
 
 describe('createNamespace handler', () => {
-  let namespaceRepo: InMemoryNamespaceRepository;
+  let namespaceRepo: InMemoryNamespaceRepo;
   let auditRepo: InMemoryAuditRepository;
 
   beforeEach(() => {
-    namespaceRepo = new InMemoryNamespaceRepository();
+    namespaceRepo = new InMemoryNamespaceRepo();
     auditRepo = new InMemoryAuditRepository();
   });
 
@@ -135,6 +88,42 @@ describe('createNamespace handler', () => {
       createNamespace({ handle: 'acme', displayName: 'Acme Co.' }, scope),
     ).rejects.toBeInstanceOf(ConflictError);
     expect(auditRepo.getAll().some((e) => e.action === 'namespace.created')).toBe(false);
+  });
+
+  it('stores the caller Firebase Auth displayName on the owner member doc', async () => {
+    const directory = directoryWithMetadata(
+      new Map([
+        ['uid-marek', { email: 'marek@example.test', displayName: 'Marek R', lastSignInTime: null }],
+      ]),
+    );
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      caller: userCaller('uid-marek', []),
+      userDirectory: directory,
+    });
+
+    await createNamespace({ handle: 'acme', displayName: 'Acme Co.' }, scope);
+
+    expect(namespaceRepo.members.get('acme')).toEqual([
+      expect.objectContaining({ uid: 'uid-marek', role: 'owner', displayName: 'Marek R' }),
+    ]);
+  });
+
+  it('omits owner displayName when directory has no metadata for the caller', async () => {
+    const directory = directoryWithMetadata(new Map());
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      caller: userCaller('uid-marek', []),
+      userDirectory: directory,
+    });
+
+    await createNamespace({ handle: 'acme', displayName: 'Acme Co.' }, scope);
+
+    const owner = namespaceRepo.members.get('acme')?.[0];
+    expect(owner?.uid).toBe('uid-marek');
+    expect(owner?.displayName).toBeUndefined();
   });
 
   it('rejects apiKey caller (no human owner to attribute the workspace to)', async () => {

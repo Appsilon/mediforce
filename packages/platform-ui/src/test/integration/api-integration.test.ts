@@ -14,6 +14,7 @@ import {
   InMemoryHumanTaskRepository,
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
+  InMemoryUserProfileRepository,
   buildHumanTask,
   buildProcessInstance,
 } from '@mediforce/platform-core/testing';
@@ -24,6 +25,12 @@ import {
   createNamespace,
   listRuns,
   listAuditEvents,
+  updateNamespace,
+  leaveNamespace,
+  deleteNamespace,
+  removeNamespaceMember,
+  updateNamespaceMemberRole,
+  clearMustChangePassword,
 } from '@mediforce/platform-api/handlers';
 import {
   ListTasksInputSchema,
@@ -32,17 +39,24 @@ import {
   CreateNamespaceInputSchema,
   ListRunsInputSchema,
   ListAuditEventsInputSchema,
+  UpdateNamespaceInputSchema,
+  LeaveNamespaceInputSchema,
+  DeleteNamespaceInputSchema,
+  RemoveNamespaceMemberInputSchema,
+  UpdateNamespaceMemberRoleInputSchema,
+  ClearMustChangePasswordInputSchema,
 } from '@mediforce/platform-api/contract';
 import type {
-  Namespace,
-  NamespaceMember,
-  NamespaceMembership,
-  NamespaceRepository,
-} from '@mediforce/platform-core';
-import type { CallerIdentity } from '@mediforce/platform-api/auth';
+  UpdateNamespaceInput,
+  LeaveNamespaceInput,
+  DeleteNamespaceInput,
+  RemoveNamespaceMemberInput,
+  UpdateNamespaceMemberRoleInput,
+} from '@mediforce/platform-api/contract';
+import type { CallerIdentity, NamespaceRole } from '@mediforce/platform-api/auth';
 import { Mediforce, ApiError } from '@mediforce/platform-api/client';
 import { createRouteAdapter } from '../../lib/route-adapter';
-import { createTestScope } from '@mediforce/platform-api/testing';
+import { InMemoryNamespaceRepo, createTestScope } from '@mediforce/platform-api/testing';
 
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 
@@ -54,6 +68,43 @@ function loopbackFetch(
     const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
     return route(new NextRequest(absolute, init));
   };
+}
+
+function loopbackFetchWithParams<P>(
+  route: (req: NextRequest, ctx: { params: Promise<P> }) => Promise<Response>,
+  extractParams: (url: URL) => P,
+): typeof fetch {
+  return async (input, init) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
+    const req = new NextRequest(absolute, init);
+    return route(req, { params: Promise.resolve(extractParams(new URL(absolute))) });
+  };
+}
+
+function userCaller(uid: string, role: NamespaceRole, handle: string): CallerIdentity {
+  return {
+    kind: 'user',
+    uid,
+    namespaces: new Set([handle]),
+    namespaceRoles: new Map([[handle, role]]),
+    isSystemActor: false,
+  };
+}
+
+function seedAcmeWithOwnerAndMember(repo: InMemoryNamespaceRepo): void {
+  repo.namespaces.set('acme', {
+    handle: 'acme',
+    type: 'organization',
+    displayName: 'Acme Co.',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  });
+  repo.members.set('acme', [
+    { uid: 'uid-owner', role: 'owner', joinedAt: '2026-01-01T00:00:00.000Z' },
+    { uid: 'uid-member', role: 'member', joinedAt: '2026-01-02T00:00:00.000Z' },
+  ]);
+  repo.userOrganizations.set('uid-owner', ['acme']);
+  repo.userOrganizations.set('uid-member', ['acme']);
 }
 
 describe('Mediforce client ↔ route-adapter ↔ listTasks (in-process)', () => {
@@ -379,54 +430,371 @@ describe('Mediforce client ↔ route-adapter ↔ createNamespace (in-process)', 
   });
 });
 
-class InMemoryNamespaceRepo implements NamespaceRepository {
-  readonly namespaces = new Map<string, Namespace>();
-  readonly members = new Map<string, NamespaceMember[]>();
-  readonly userOrganizations = new Map<string, string[]>();
+describe('Mediforce client ↔ route-adapter ↔ updateNamespace (in-process)', () => {
+  let namespaceRepo: InMemoryNamespaceRepo;
+  let auditRepo: InMemoryAuditRepository;
+  let mediforce: Mediforce;
 
-  async getNamespace(handle: string): Promise<Namespace | null> {
-    return this.namespaces.get(handle) ?? null;
+  beforeEach(() => {
+    namespaceRepo = new InMemoryNamespaceRepo();
+    namespaceRepo.namespaces.set('acme', {
+      handle: 'acme',
+      type: 'organization',
+      displayName: 'Acme Co.',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    auditRepo = new InMemoryAuditRepository();
+
+    const route = createRouteAdapter<typeof UpdateNamespaceInputSchema, UpdateNamespaceInput, unknown, { params: Promise<{ handle: string }> }>(
+      UpdateNamespaceInputSchema,
+      async (req, ctx) => {
+        const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+        return { ...body, handle: (await ctx.params).handle };
+      },
+      updateNamespace,
+      {
+        resolveCaller: async () => userCaller('uid-owner', 'owner', 'acme'),
+        buildScope: (caller) => createTestScope({ caller, namespaceRepo, auditRepo }),
+      },
+    );
+
+    mediforce = new Mediforce({
+      fetch: loopbackFetchWithParams(route, (url) => {
+        const segments = url.pathname.split('/');
+        return { handle: segments[segments.length - 1] ?? '' };
+      }),
+    });
+  });
+
+  it('updates displayName/bio/icon and round-trips the entity-echo', async () => {
+    const result = await mediforce.namespaces.update({
+      handle: 'acme',
+      displayName: 'Acme Inc.',
+      bio: 'Widgets',
+    });
+
+    expect(result.namespace.displayName).toBe('Acme Inc.');
+    expect(result.namespace.bio).toBe('Widgets');
+    expect(namespaceRepo.namespaces.get('acme')?.displayName).toBe('Acme Inc.');
+    expect(auditRepo.getAll().some((e) => e.action === 'namespace.updated')).toBe(true);
+  });
+
+  it('bio: "" clears the field through the full stack', async () => {
+    namespaceRepo.namespaces.set('acme', {
+      handle: 'acme',
+      type: 'organization',
+      displayName: 'Acme Co.',
+      bio: 'old text',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const result = await mediforce.namespaces.update({ handle: 'acme', bio: '' });
+
+    expect(result.namespace.bio).toBe('');
+    expect(namespaceRepo.namespaces.get('acme')?.bio).toBe('');
+  });
+});
+
+describe('Mediforce client ↔ route-adapter ↔ leaveNamespace (in-process)', () => {
+  let namespaceRepo: InMemoryNamespaceRepo;
+  let auditRepo: InMemoryAuditRepository;
+
+  function buildClient(caller: CallerIdentity): Mediforce {
+    const route = createRouteAdapter<typeof LeaveNamespaceInputSchema, LeaveNamespaceInput, unknown, { params: Promise<{ handle: string }> }>(
+      LeaveNamespaceInputSchema,
+      async (_req, ctx) => ({ handle: (await ctx.params).handle }),
+      leaveNamespace,
+      {
+        resolveCaller: async () => caller,
+        buildScope: (c) => createTestScope({ caller: c, namespaceRepo, auditRepo }),
+      },
+    );
+    return new Mediforce({
+      fetch: loopbackFetchWithParams(route, (url) => {
+        // path: /api/namespaces/<handle>/leave
+        const segments = url.pathname.split('/');
+        return { handle: segments[segments.length - 2] ?? '' };
+      }),
+    });
   }
-  async createNamespace(namespace: Namespace): Promise<void> {
-    this.namespaces.set(namespace.handle, namespace);
+
+  beforeEach(() => {
+    namespaceRepo = new InMemoryNamespaceRepo();
+    seedAcmeWithOwnerAndMember(namespaceRepo);
+    auditRepo = new InMemoryAuditRepository();
+  });
+
+  it('member leaves successfully and is removed from the workspace', async () => {
+    const client = buildClient(userCaller('uid-member', 'member', 'acme'));
+
+    const result = await client.namespaces.leave({ handle: 'acme' });
+
+    expect(result).toEqual({ handle: 'acme' });
+    expect(namespaceRepo.members.get('acme')?.map((m) => m.uid)).toEqual(['uid-owner']);
+    expect(namespaceRepo.userOrganizations.get('uid-member')).toEqual([]);
+  });
+
+  it('owner cannot leave — 409 precondition_failed envelope', async () => {
+    const client = buildClient(userCaller('uid-owner', 'owner', 'acme'));
+
+    const err = await client.namespaces.leave({ handle: 'acme' }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(409);
+    expect((err as ApiError).code).toBe('precondition_failed');
+    expect(namespaceRepo.members.get('acme')?.map((m) => m.uid)).toContain('uid-owner');
+  });
+});
+
+describe('Mediforce client ↔ route-adapter ↔ deleteNamespace (in-process)', () => {
+  let namespaceRepo: InMemoryNamespaceRepo;
+  let auditRepo: InMemoryAuditRepository;
+  let mediforce: Mediforce;
+  let route: (req: NextRequest, ctx: { params: Promise<{ handle: string }> }) => Promise<Response>;
+
+  beforeEach(() => {
+    namespaceRepo = new InMemoryNamespaceRepo();
+    namespaceRepo.namespaces.set('acme', {
+      handle: 'acme',
+      type: 'organization',
+      displayName: 'Acme Co.',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    namespaceRepo.members.set('acme', [
+      { uid: 'uid-owner', role: 'owner', joinedAt: '2026-01-01T00:00:00.000Z' },
+      { uid: 'uid-member-a', role: 'member', joinedAt: '2026-01-02T00:00:00.000Z' },
+      { uid: 'uid-member-b', role: 'admin', joinedAt: '2026-01-03T00:00:00.000Z' },
+    ]);
+    namespaceRepo.userOrganizations.set('uid-owner', ['acme']);
+    namespaceRepo.userOrganizations.set('uid-member-a', ['acme', 'other']);
+    namespaceRepo.userOrganizations.set('uid-member-b', ['acme']);
+    auditRepo = new InMemoryAuditRepository();
+
+    route = createRouteAdapter<typeof DeleteNamespaceInputSchema, DeleteNamespaceInput, unknown, { params: Promise<{ handle: string }> }>(
+      DeleteNamespaceInputSchema,
+      async (_req, ctx) => ({ handle: (await ctx.params).handle }),
+      deleteNamespace,
+      {
+        resolveCaller: async () => userCaller('uid-owner', 'owner', 'acme'),
+        buildScope: (caller) => createTestScope({ caller, namespaceRepo, auditRepo }),
+      },
+    );
+
+    mediforce = new Mediforce({
+      fetch: loopbackFetchWithParams(
+        (req, ctx) => route(req, ctx),
+        (url) => {
+          const segments = url.pathname.split('/');
+          return { handle: segments[segments.length - 1] ?? '' };
+        },
+      ),
+    });
+  });
+
+  it('cascades delete: namespace + all members + each user organizations entry', async () => {
+    const result = await mediforce.namespaces.delete({ handle: 'acme' });
+
+    expect(result).toEqual({ handle: 'acme' });
+    expect(namespaceRepo.namespaces.get('acme')).toBeUndefined();
+    expect(namespaceRepo.members.get('acme')).toBeUndefined();
+    expect(namespaceRepo.userOrganizations.get('uid-owner')).toEqual([]);
+    expect(namespaceRepo.userOrganizations.get('uid-member-a')).toEqual(['other']);
+    expect(namespaceRepo.userOrganizations.get('uid-member-b')).toEqual([]);
+    expect(auditRepo.getAll().some((e) => e.action === 'namespace.deleted')).toBe(true);
+  });
+
+  it('non-owner caller gets 403 forbidden', async () => {
+    route = createRouteAdapter<typeof DeleteNamespaceInputSchema, DeleteNamespaceInput, unknown, { params: Promise<{ handle: string }> }>(
+      DeleteNamespaceInputSchema,
+      async (_req, ctx) => ({ handle: (await ctx.params).handle }),
+      deleteNamespace,
+      {
+        resolveCaller: async () => userCaller('uid-member-a', 'member', 'acme'),
+        buildScope: (caller) => createTestScope({ caller, namespaceRepo, auditRepo }),
+      },
+    );
+
+    const err = await mediforce.namespaces.delete({ handle: 'acme' }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(403);
+    expect(namespaceRepo.namespaces.get('acme')).toBeDefined();
+  });
+});
+
+describe('Mediforce client ↔ route-adapter ↔ removeNamespaceMember (in-process)', () => {
+  let namespaceRepo: InMemoryNamespaceRepo;
+  let auditRepo: InMemoryAuditRepository;
+
+  function buildClient(caller: CallerIdentity): Mediforce {
+    const route = createRouteAdapter<typeof RemoveNamespaceMemberInputSchema, RemoveNamespaceMemberInput, unknown, { params: Promise<{ handle: string; uid: string }> }>(
+      RemoveNamespaceMemberInputSchema,
+      async (_req, ctx) => {
+        const { handle, uid } = await ctx.params;
+        return { handle, uid };
+      },
+      removeNamespaceMember,
+      {
+        resolveCaller: async () => caller,
+        buildScope: (c) => createTestScope({ caller: c, namespaceRepo, auditRepo }),
+      },
+    );
+    return new Mediforce({
+      fetch: loopbackFetchWithParams(route, (url) => {
+        // path: /api/namespaces/<handle>/members/<uid>
+        const segments = url.pathname.split('/');
+        return {
+          handle: segments[segments.length - 3] ?? '',
+          uid: segments[segments.length - 1] ?? '',
+        };
+      }),
+    });
   }
-  async createNamespaceWithOwner(input: {
-    namespace: Namespace;
-    ownerMember: NamespaceMember;
-  }): Promise<void> {
-    this.namespaces.set(input.namespace.handle, input.namespace);
-    const members = this.members.get(input.namespace.handle) ?? [];
-    this.members.set(input.namespace.handle, [...members, input.ownerMember]);
-    const orgs = this.userOrganizations.get(input.ownerMember.uid) ?? [];
-    if (!orgs.includes(input.namespace.handle)) {
-      this.userOrganizations.set(input.ownerMember.uid, [...orgs, input.namespace.handle]);
-    }
+
+  beforeEach(() => {
+    namespaceRepo = new InMemoryNamespaceRepo();
+    seedAcmeWithOwnerAndMember(namespaceRepo);
+    auditRepo = new InMemoryAuditRepository();
+  });
+
+  it('admin removes a member and the user organizations entry is dropped', async () => {
+    const client = buildClient(userCaller('uid-owner', 'owner', 'acme'));
+
+    const result = await client.namespaces.removeMember({ handle: 'acme', uid: 'uid-member' });
+
+    expect(result).toEqual({ handle: 'acme', uid: 'uid-member' });
+    expect(namespaceRepo.members.get('acme')?.map((m) => m.uid)).toEqual(['uid-owner']);
+    expect(namespaceRepo.userOrganizations.get('uid-member')).toEqual([]);
+    expect(auditRepo.getAll().some((e) => e.action === 'namespace.member_removed')).toBe(true);
+  });
+
+  it('removing the workspace owner → 409 precondition_failed envelope', async () => {
+    const client = buildClient(userCaller('uid-owner', 'owner', 'acme'));
+
+    const err = await client.namespaces
+      .removeMember({ handle: 'acme', uid: 'uid-owner' })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(409);
+    expect((err as ApiError).code).toBe('precondition_failed');
+    expect(namespaceRepo.members.get('acme')?.map((m) => m.uid)).toContain('uid-owner');
+  });
+});
+
+describe('Mediforce client ↔ route-adapter ↔ updateNamespaceMemberRole (in-process)', () => {
+  let namespaceRepo: InMemoryNamespaceRepo;
+  let auditRepo: InMemoryAuditRepository;
+
+  function buildClient(caller: CallerIdentity): Mediforce {
+    const route = createRouteAdapter<typeof UpdateNamespaceMemberRoleInputSchema, UpdateNamespaceMemberRoleInput, unknown, { params: Promise<{ handle: string; uid: string }> }>(
+      UpdateNamespaceMemberRoleInputSchema,
+      async (req, ctx) => {
+        const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+        const { handle, uid } = await ctx.params;
+        return { ...body, handle, uid };
+      },
+      updateNamespaceMemberRole,
+      {
+        resolveCaller: async () => caller,
+        buildScope: (c) => createTestScope({ caller: c, namespaceRepo, auditRepo }),
+      },
+    );
+    return new Mediforce({
+      fetch: loopbackFetchWithParams(route, (url) => {
+        const segments = url.pathname.split('/');
+        return {
+          handle: segments[segments.length - 3] ?? '',
+          uid: segments[segments.length - 1] ?? '',
+        };
+      }),
+    });
   }
-  async updateNamespace(): Promise<void> {
-    /* not exercised */
-  }
-  async getNamespacesByUser(): Promise<Namespace[]> {
-    return [];
-  }
-  async addMember(): Promise<void> {
-    /* not exercised */
-  }
-  async removeMember(): Promise<void> {
-    /* not exercised */
-  }
-  async getMember(): Promise<NamespaceMember | null> {
-    return null;
-  }
-  async getMembers(handle: string): Promise<NamespaceMember[]> {
-    return this.members.get(handle) ?? [];
-  }
-  async getUserNamespaces(): Promise<Namespace[]> {
-    return [];
-  }
-  async getMembershipsForUser(): Promise<readonly NamespaceMembership[]> {
-    return [];
-  }
-}
+
+  beforeEach(() => {
+    namespaceRepo = new InMemoryNamespaceRepo();
+    seedAcmeWithOwnerAndMember(namespaceRepo);
+    auditRepo = new InMemoryAuditRepository();
+  });
+
+  it('owner flips member → admin and round-trips the updated entity', async () => {
+    const client = buildClient(userCaller('uid-owner', 'owner', 'acme'));
+
+    const result = await client.namespaces.updateMemberRole({
+      handle: 'acme',
+      uid: 'uid-member',
+      role: 'admin',
+    });
+
+    expect(result.member.uid).toBe('uid-member');
+    expect(result.member.role).toBe('admin');
+    expect(namespaceRepo.members.get('acme')?.find((m) => m.uid === 'uid-member')?.role).toBe('admin');
+    expect(auditRepo.getAll().some((e) => e.action === 'namespace.member_role_changed')).toBe(true);
+  });
+
+  it('flipping the workspace owner’s role → 409 precondition_failed', async () => {
+    const client = buildClient(userCaller('uid-owner', 'owner', 'acme'));
+
+    const err = await client.namespaces
+      .updateMemberRole({ handle: 'acme', uid: 'uid-owner', role: 'admin' })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(409);
+    expect((err as ApiError).code).toBe('precondition_failed');
+    expect(namespaceRepo.members.get('acme')?.find((m) => m.uid === 'uid-owner')?.role).toBe('owner');
+  });
+});
+
+describe('Mediforce client ↔ route-adapter ↔ clearMustChangePassword (in-process)', () => {
+  let userProfileRepo: InMemoryUserProfileRepository;
+  let auditRepo: InMemoryAuditRepository;
+  let mediforce: Mediforce;
+
+  const userCaller: CallerIdentity = {
+    kind: 'user',
+    uid: 'uid-forced',
+    namespaces: new Set(),
+    namespaceRoles: new Map(),
+    isSystemActor: false,
+  };
+
+  beforeEach(async () => {
+    userProfileRepo = new InMemoryUserProfileRepository();
+    await userProfileRepo.setMustChangePassword('uid-forced', true);
+    auditRepo = new InMemoryAuditRepository();
+
+    const route = createRouteAdapter(
+      ClearMustChangePasswordInputSchema,
+      async (req) => (await req.json().catch(() => ({}))) as Record<string, unknown>,
+      clearMustChangePassword,
+      {
+        resolveCaller: async () => userCaller,
+        buildScope: (caller) => createTestScope({ caller, userProfileRepo, auditRepo }),
+      },
+    );
+
+    mediforce = new Mediforce({ fetch: loopbackFetch(route) });
+  });
+
+  it('clears the flag for the user caller and round-trips the entity-echo', async () => {
+    const result = await mediforce.users.clearMustChangePassword();
+
+    expect(result.user).toEqual({ uid: 'uid-forced', mustChangePassword: false });
+    expect((await userProfileRepo.getProfile('uid-forced'))?.mustChangePassword).toBe(false);
+    expect(auditRepo.getAll().some((e) => e.action === 'user.password_change_acknowledged')).toBe(true);
+  });
+
+  it('rejects user caller passing a different uid → 403 forbidden', async () => {
+    const err = await mediforce.users
+      .clearMustChangePassword({ uid: 'uid-other' })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(403);
+    expect((await userProfileRepo.getProfile('uid-forced'))?.mustChangePassword).toBe(true);
+  });
+});
 
 // Fourth integration scenario: `runs.list` with the new `namespace` filter.
 // Confirms wire field flows adapter → handler → scope.runs.list → in-memory

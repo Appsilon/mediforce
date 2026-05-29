@@ -1,55 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type {
-  Namespace,
-  NamespaceMember,
-  NamespaceMembership,
-  NamespaceRepository,
-} from '@mediforce/platform-core';
+import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
+import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index.js';
 import { getNamespace } from '../get-namespace.js';
 import { NotFoundError } from '../../../errors.js';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope.js';
-
-class InMemoryNamespaceRepository implements NamespaceRepository {
-  readonly namespaces = new Map<string, Namespace>();
-  readonly members = new Map<string, NamespaceMember[]>();
-
-  async getNamespace(handle: string): Promise<Namespace | null> {
-    return this.namespaces.get(handle) ?? null;
-  }
-  async createNamespace(): Promise<void> {
-    /* not exercised */
-  }
-  async createNamespaceWithOwner(): Promise<void> {
-    /* not exercised */
-  }
-  async updateNamespace(): Promise<void> {
-    /* not exercised */
-  }
-  async getNamespacesByUser(): Promise<Namespace[]> {
-    return [];
-  }
-  async addMember(): Promise<void> {
-    /* not exercised */
-  }
-  async removeMember(): Promise<void> {
-    /* not exercised */
-  }
-  async getMember(): Promise<NamespaceMember | null> {
-    return null;
-  }
-  async getMembers(handle: string): Promise<NamespaceMember[]> {
-    return this.members.get(handle) ?? [];
-  }
-  async getUserNamespaces(): Promise<Namespace[]> {
-    return [];
-  }
-  async getMembershipsForUser(): Promise<readonly NamespaceMembership[]> {
-    return [];
-  }
-}
 
 const ACME: Namespace = {
   handle: 'acme',
@@ -63,10 +16,10 @@ const ACME_MEMBERS: NamespaceMember[] = [
 ];
 
 describe('getNamespace handler', () => {
-  let namespaceRepo: InMemoryNamespaceRepository;
+  let namespaceRepo: InMemoryNamespaceRepo;
 
   beforeEach(() => {
-    namespaceRepo = new InMemoryNamespaceRepository();
+    namespaceRepo = new InMemoryNamespaceRepo();
     namespaceRepo.namespaces.set('acme', ACME);
     namespaceRepo.members.set('acme', ACME_MEMBERS);
   });

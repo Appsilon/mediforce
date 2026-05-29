@@ -181,6 +181,26 @@ export async function deleteDocument(docPath: string): Promise<void> {
   }
 }
 
+/** Fetch the raw Firestore `fields` map for a document via the emulator REST API.
+ *  Returns `null` if the doc does not exist. Used to assert field-level shape
+ *  (e.g. that an optional field was deleted, not stored as null). */
+export async function getDocumentFields(
+  collection: string,
+  docId: string,
+): Promise<Record<string, unknown> | null> {
+  const basePath = `${FIRESTORE_EMULATOR}/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+  const res = await fetch(`${basePath}/${collection}/${encodeURIComponent(docId)}`, {
+    headers: EMULATOR_ADMIN_HEADERS,
+    signal: AbortSignal.timeout(5000),
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`Failed to read ${collection}/${docId}: ${await res.text()}`);
+  }
+  const data = (await res.json()) as { fields?: Record<string, unknown> };
+  return data.fields ?? {};
+}
+
 export async function seedSubcollection(
   parentCollection: string,
   parentId: string,

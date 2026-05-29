@@ -16,6 +16,7 @@ export {
   encodeAgentRunCursor,
   decodeAgentRunCursor,
 } from '../cursors/agent-run-cursor.js';
+export { InMemoryUserProfileRepository } from './in-memory-user-profile-repository.js';
 
 // Test factories
 export {

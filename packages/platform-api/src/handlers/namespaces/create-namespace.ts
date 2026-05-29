@@ -31,6 +31,17 @@ export async function createNamespace(
     throw new ConflictError(`Namespace handle '${input.handle}' is already taken`);
   }
 
+  // Pull the caller's Firebase Auth profile name so the owner member doc
+  // carries a human-readable `displayName` from day one. Without this, the
+  // members list would show the owner's uid until they re-invited themselves.
+  // Best-effort: directory unconfigured or lookup failure → no displayName.
+  const callerMetadata = scope.system.userDirectory !== null
+    ? await scope.system.userDirectory.getUserMetadata(uid).catch(() => null)
+    : null;
+  const ownerDisplayName = typeof callerMetadata?.displayName === 'string' && callerMetadata.displayName.length > 0
+    ? callerMetadata.displayName
+    : undefined;
+
   const now = new Date().toISOString();
   const namespace: Namespace = {
     handle: input.handle,
@@ -43,6 +54,7 @@ export async function createNamespace(
     uid,
     role: 'owner',
     joinedAt: now,
+    ...(ownerDisplayName !== undefined ? { displayName: ownerDisplayName } : {}),
   };
 
   await scope.workspaces.createNamespaceWithOwner({ namespace, ownerMember });

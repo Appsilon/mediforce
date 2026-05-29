@@ -134,10 +134,24 @@ import {
   ResendInviteOutputSchema,
   GetMeInputSchema,
   GetMeOutputSchema,
+  ClearMustChangePasswordInputSchema,
+  ClearMustChangePasswordOutputSchema,
   GetNamespaceInputSchema,
   GetNamespaceOutputSchema,
   CreateNamespaceInputSchema,
   CreateNamespaceOutputSchema,
+  UpdateNamespaceInputSchema,
+  UpdateNamespaceBodySchema,
+  UpdateNamespaceOutputSchema,
+  DeleteNamespaceInputSchema,
+  DeleteNamespaceOutputSchema,
+  LeaveNamespaceInputSchema,
+  LeaveNamespaceOutputSchema,
+  RemoveNamespaceMemberInputSchema,
+  RemoveNamespaceMemberOutputSchema,
+  UpdateNamespaceMemberRoleInputSchema,
+  UpdateNamespaceMemberRoleBodySchema,
+  UpdateNamespaceMemberRoleOutputSchema,
   type ListNamespaceMembersInput,
   type ListNamespaceMembersOutput,
   type InviteUserInput,
@@ -146,10 +160,22 @@ import {
   type ResendInviteOutput,
   type GetMeInput,
   type GetMeOutput,
+  type ClearMustChangePasswordInput,
+  type ClearMustChangePasswordOutput,
   type GetNamespaceInput,
   type GetNamespaceOutput,
   type CreateNamespaceInput,
   type CreateNamespaceOutput,
+  type UpdateNamespaceInput,
+  type UpdateNamespaceOutput,
+  type DeleteNamespaceInput,
+  type DeleteNamespaceOutput,
+  type LeaveNamespaceInput,
+  type LeaveNamespaceOutput,
+  type RemoveNamespaceMemberInput,
+  type RemoveNamespaceMemberOutput,
+  type UpdateNamespaceMemberRoleInput,
+  type UpdateNamespaceMemberRoleOutput,
   DeleteDockerImageInputSchema,
   DeleteDockerImageOutputSchema,
   type DeleteDockerImageInput,
@@ -521,11 +547,17 @@ export class Mediforce {
     invite: (input: InviteUserInput) => Promise<InviteUserOutput>;
     resendInvite: (input: ResendInviteInput) => Promise<ResendInviteOutput>;
     me: (input?: GetMeInput) => Promise<GetMeOutput>;
+    clearMustChangePassword: (input?: ClearMustChangePasswordInput) => Promise<ClearMustChangePasswordOutput>;
   };
 
   readonly namespaces: {
     get: (input: GetNamespaceInput) => Promise<GetNamespaceOutput>;
     create: (input: CreateNamespaceInput) => Promise<CreateNamespaceOutput>;
+    update: (input: UpdateNamespaceInput) => Promise<UpdateNamespaceOutput>;
+    delete: (input: DeleteNamespaceInput) => Promise<DeleteNamespaceOutput>;
+    leave: (input: LeaveNamespaceInput) => Promise<LeaveNamespaceOutput>;
+    removeMember: (input: RemoveNamespaceMemberInput) => Promise<RemoveNamespaceMemberOutput>;
+    updateMemberRole: (input: UpdateNamespaceMemberRoleInput) => Promise<UpdateNamespaceMemberRoleOutput>;
   };
 
   readonly agentRuns: {
@@ -1371,6 +1403,16 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.users.me');
         return GetMeOutputSchema.parse(body);
       },
+      clearMustChangePassword: async (input) => {
+        const validated = ClearMustChangePasswordInputSchema.parse(input ?? {});
+        return this.sendJson(
+          'POST',
+          '/api/users/me/clear-must-change-password',
+          validated,
+          ClearMustChangePasswordOutputSchema,
+          'mediforce.users.clearMustChangePassword',
+        );
+      },
     };
 
     this.namespaces = {
@@ -1391,6 +1433,58 @@ export class Mediforce {
         });
         const body = await parseJsonOrThrow(res, 'mediforce.namespaces.create');
         return CreateNamespaceOutputSchema.parse(body);
+      },
+      update: async (input) => {
+        const validated = UpdateNamespaceInputSchema.parse(input);
+        const body = UpdateNamespaceBodySchema.parse(input);
+        return this.sendJson(
+          'PATCH',
+          `/api/namespaces/${encodeURIComponent(validated.handle)}`,
+          body,
+          UpdateNamespaceOutputSchema,
+          'mediforce.namespaces.update',
+        );
+      },
+      delete: async (input) => {
+        const validated = DeleteNamespaceInputSchema.parse(input);
+        return this.sendJson(
+          'DELETE',
+          `/api/namespaces/${encodeURIComponent(validated.handle)}`,
+          undefined,
+          DeleteNamespaceOutputSchema,
+          'mediforce.namespaces.delete',
+        );
+      },
+      leave: async (input) => {
+        const validated = LeaveNamespaceInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/namespaces/${encodeURIComponent(validated.handle)}/leave`,
+          undefined,
+          LeaveNamespaceOutputSchema,
+          'mediforce.namespaces.leave',
+        );
+      },
+      removeMember: async (input) => {
+        const validated = RemoveNamespaceMemberInputSchema.parse(input);
+        return this.sendJson(
+          'DELETE',
+          `/api/namespaces/${encodeURIComponent(validated.handle)}/members/${encodeURIComponent(validated.uid)}`,
+          undefined,
+          RemoveNamespaceMemberOutputSchema,
+          'mediforce.namespaces.removeMember',
+        );
+      },
+      updateMemberRole: async (input) => {
+        const validated = UpdateNamespaceMemberRoleInputSchema.parse(input);
+        const body = UpdateNamespaceMemberRoleBodySchema.parse(input);
+        return this.sendJson(
+          'PATCH',
+          `/api/namespaces/${encodeURIComponent(validated.handle)}/members/${encodeURIComponent(validated.uid)}`,
+          body,
+          UpdateNamespaceMemberRoleOutputSchema,
+          'mediforce.namespaces.updateMemberRole',
+        );
       },
     };
   }

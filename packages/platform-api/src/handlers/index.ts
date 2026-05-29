@@ -81,9 +81,17 @@ export { listNamespaceMembers } from './users/list-members.js';
 export { inviteUser } from './users/invite-user.js';
 export { resendInvite } from './users/resend-invite.js';
 export { getMe } from './users/get-me.js';
+export { clearMustChangePassword } from './users/clear-must-change-password.js';
 
 export { getNamespace } from './namespaces/get-namespace.js';
 export { createNamespace } from './namespaces/create-namespace.js';
+export {
+  updateNamespace,
+  deleteNamespace,
+  leaveNamespace,
+  removeNamespaceMember,
+  updateNamespaceMemberRole,
+} from './namespaces/namespace-mutations.js';
 
 export { listToolCatalogEntries } from './tool-catalog/list-entries.js';
 export { getToolCatalogEntry } from './tool-catalog/get-entry.js';

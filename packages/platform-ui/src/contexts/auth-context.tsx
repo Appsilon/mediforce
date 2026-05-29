@@ -14,14 +14,10 @@ import {
   type AuthError,
   type User as FirebaseUser,
 } from 'firebase/auth';
-// TODO(phase-4 follow-up): The `mustChangePassword` flag is the last
-// firestore read in this file. Moving it to a dedicated endpoint
-// (`GET /api/users/me` extension + `POST /api/users/me/clear-must-change-password`)
-// requires a new `UserProfileRepository`; tracked separately to keep PR4
-// focused on the namespace + identity bundle. The personal-namespace
-// bootstrap that used to live here moved to the handler-side lazy create.
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { useQueryClient } from '@tanstack/react-query';
+import { auth } from '@/lib/firebase';
+import { mediforce } from '@/lib/mediforce';
+import { queryKeys } from '@/lib/query-keys';
 import { useUserMe } from '@/hooks/use-user-me';
 
 interface AuthContextValue {
@@ -84,19 +80,37 @@ async function probeEmailAuth(): Promise<boolean> {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = React.useState<FirebaseUser | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [mustChangePassword, setMustChangePassword] = React.useState(false);
+  const [firebaseReady, setFirebaseReady] = React.useState(false);
   const [emailAuthEnabled, setEmailAuthEnabled] = React.useState<boolean | null>(null);
   const [googleAuthEnabled, setGoogleAuthEnabled] = React.useState<boolean | null>(null);
   const [pendingGoogleCredential, setPendingGoogleCredential] = React.useState<OAuthCredential | null>(null);
+  const qc = useQueryClient();
 
   // Trigger /api/users/me as soon as the user is signed in. The handler
   // bootstraps the personal namespace on first call (formerly inline here as
   // `ensurePersonalNamespace`), then react-query keeps the cache warm for
   // every selector hook (`useNamespaceRole`, `useAllUserNamespaces`,
-  // `usePersonalNamespace`). The query result is consumed via the cache, not
-  // through this provider, so we just need it to *run*.
-  useUserMe({ enabled: firebaseUser !== null });
+  // `usePersonalNamespace`). The query also carries `user.mustChangePassword`
+  // — derived below into the context value so the layout's forced-reset
+  // gate stays driven by server state, not a parallel firestore read.
+  const userMe = useUserMe({ enabled: firebaseUser !== null });
+
+  // Layout reads both `loading` and `mustChangePassword` before deciding
+  // whether to redirect to `/change-password`. Clearing `loading` before
+  // `useUserMe` resolves would let the layout render under the default
+  // `mustChangePassword: false`, silently bypassing the forced-reset gate.
+  // So we stay loading until either: Firebase Auth resolved no user
+  // (anonymous path), or both auth and the `me` query have settled.
+  const loading =
+    !firebaseReady ||
+    (firebaseUser !== null && userMe.data === undefined && !userMe.isError);
+
+  // Fail-closed for the gate: if the `me` query has errored we default the
+  // flag to `true`, matching the pre-headless firestore-read behaviour.
+  const mustChangePassword =
+    firebaseUser !== null && userMe.isError
+      ? true
+      : userMe.data?.user.mustChangePassword === true;
 
   React.useEffect(() => {
     // In emulator mode both providers are always enabled — skip probes to avoid
@@ -113,32 +127,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
-
-      if (user !== null) {
-        // Resolve mustChangePassword BEFORE clearing loading — layout reads
-        // both flags to decide whether to redirect to /change-password.
-        // Clearing loading first lets layout render with the default
-        // mustChangePassword=false and skip the redirect.
-        getDoc(doc(db, 'users', user.uid)).then((snap) => {
-          if (snap.exists()) {
-            setMustChangePassword(snap.data().mustChangePassword === true);
-          }
-          setLoading(false);
-        }).catch((err) => {
-          // Fail-closed: if we cannot read mustChangePassword, assume it is true so
-          // the forced-reset gate is never silently bypassed by a rules rejection or
-          // transient network error.
-          console.error('[auth] Failed to read user doc for mustChangePassword — failing closed:', err);
-          setMustChangePassword(true);
-          setLoading(false);
-        });
-      } else {
-        setMustChangePassword(false);
-        setLoading(false);
+      setFirebaseReady(true);
+      if (user === null) {
+        qc.removeQueries({ queryKey: queryKeys.users.me() });
       }
     });
     return unsub;
-  }, []);
+  }, [qc]);
 
   const signInWithGoogle = React.useCallback(async () => {
     const provider = new GoogleAuthProvider();
@@ -186,11 +181,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const clearMustChangePassword = React.useCallback(async () => {
-    if (auth.currentUser !== null) {
-      await setDoc(doc(db, 'users', auth.currentUser.uid), { mustChangePassword: false }, { merge: true });
-      setMustChangePassword(false);
-    }
-  }, []);
+    if (auth.currentUser === null) return;
+    await mediforce.users.clearMustChangePassword();
+    await qc.invalidateQueries({ queryKey: queryKeys.users.me() });
+  }, [qc]);
 
   const signOut = React.useCallback(async () => {
     setPendingGoogleCredential(null);
