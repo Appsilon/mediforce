@@ -34,8 +34,8 @@ export class PostgresAuditRepository implements AuditRepository {
   async append(
     event: Omit<AuditEvent, 'serverTimestamp'>,
   ): Promise<AuditEvent> {
-    let workspace: string | undefined;
-    if (typeof event.processInstanceId === 'string') {
+    let workspace: string | undefined = event.namespace;
+    if (workspace === undefined && typeof event.processInstanceId === 'string') {
       const parent = await this.parents.getById(event.processInstanceId);
       if (parent && typeof parent.namespace === 'string') {
         workspace = parent.namespace;
@@ -44,7 +44,7 @@ export class PostgresAuditRepository implements AuditRepository {
     if (workspace === undefined) {
       throw new Error(
         'PostgresAuditRepository.append: cannot resolve workspace — ' +
-          'event.processInstanceId is missing or its parent run has no namespace.',
+          'neither event.namespace nor a parent-instance namespace is available.',
       );
     }
 

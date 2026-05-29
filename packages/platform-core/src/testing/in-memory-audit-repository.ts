@@ -21,8 +21,14 @@ export class InMemoryAuditRepository implements AuditRepository {
   async append(
     event: Omit<AuditEvent, 'serverTimestamp'>,
   ): Promise<AuditEvent> {
+    // Strip the write-time-only `namespace` hint before storing so the
+    // stored shape matches the Postgres read (workspace is derived state
+    // there, not stored on the audit row). Parity with PostgresAuditRepository:
+    // both backends accept `event.namespace` as the workspace-resolution
+    // hint for workspace-scoped events that have no parent process run.
+    const { namespace: _namespace, ...rest } = event;
     const completeEvent = AuditEventSchema.parse({
-      ...event,
+      ...rest,
       serverTimestamp: new Date().toISOString(),
     });
 
