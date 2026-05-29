@@ -52,9 +52,7 @@ RUN pnpm --filter @mediforce/platform-ui build
 # `depends_on: { migrate: { condition: service_completed_successfully } }`
 # on platform-ui. This decouples migrations from the app boot path so the
 # Next.js standalone bundle no longer needs to ship `postgres` /
-# `drizzle-orm` / `drizzle-kit`. STORAGE_BACKEND != 'postgres' is handled
-# inside the CMD so the service still exits 0 in Firestore mode and the
-# init-container gate fires.
+# `drizzle-orm` / `drizzle-kit`.
 #
 # Derived from `deps` + source rather than `builder`: the migration container
 # needs only the workspace, devDeps (`drizzle-kit`), and migration files — not
@@ -68,7 +66,7 @@ WORKDIR /app
 COPY --from=deps /app ./
 COPY . .
 WORKDIR /app/packages/platform-infra
-CMD ["sh", "-c", "if [ \"$STORAGE_BACKEND\" != \"postgres\" ]; then echo '[migrate] STORAGE_BACKEND != postgres — skipping.'; exit 0; fi; pnpm exec drizzle-kit migrate"]
+CMD ["sh", "-c", "pnpm exec drizzle-kit migrate"]
 
 # --- Runner ---
 FROM node:24-slim AS runner

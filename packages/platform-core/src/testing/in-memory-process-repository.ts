@@ -27,10 +27,21 @@ export class InMemoryProcessRepository implements ProcessRepository {
   }
 
   async saveWorkflowDefinition(definition: WorkflowDefinition): Promise<void> {
-    this.workflowDefinitions.set(
-      this.compositeKey(definition.namespace, definition.name, String(definition.version)),
-      definition,
+    const key = this.compositeKey(
+      definition.namespace,
+      definition.name,
+      String(definition.version),
     );
+    if (this.workflowDefinitions.has(key)) {
+      // Mirror Firestore + Postgres semantics: versions are immutable.
+      const err = new Error(
+        `Workflow definition "${definition.name}" version "${definition.version}" already exists and cannot be overwritten. ` +
+          `Create a new version to change the definition.`,
+      );
+      err.name = 'WorkflowDefinitionVersionAlreadyExistsError';
+      throw err;
+    }
+    this.workflowDefinitions.set(key, definition);
   }
 
   async listAllWorkflowDefinitions(
@@ -185,6 +196,7 @@ export class InMemoryProcessRepository implements ProcessRepository {
       this.workflowDefinitions.set(newKey, newDef);
     }
   }
+
 
   /** Test helper: clear all stored data */
   clear(): void {

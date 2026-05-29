@@ -1,4 +1,4 @@
-import type { HandoffEntity } from '../schemas/handoff-entity';
+import { HandoffEntitySchema, type HandoffEntity } from '../schemas/handoff-entity';
 import type { HandoffRepository } from '../interfaces/handoff-repository';
 import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository';
 
@@ -17,8 +17,11 @@ export class InMemoryHandoffRepository implements HandoffRepository {
   constructor(private readonly parents?: ProcessInstanceRepository) {}
 
   async create(entity: HandoffEntity): Promise<HandoffEntity> {
-    this.entities.set(entity.id, { ...entity });
-    return { ...entity };
+    // Parse on write — mirrors the Firestore + Postgres backends (ADR-0001
+    // Implementation pattern 2).
+    const parsed = HandoffEntitySchema.parse(entity);
+    this.entities.set(parsed.id, { ...parsed });
+    return { ...parsed };
   }
 
   async getById(entityId: string): Promise<HandoffEntity | null> {

@@ -21,6 +21,7 @@ export async function updateAgent(
     basis: 'Agent updated via API',
     entityType: 'agentDefinition',
     entityId: agent.id,
+    ...(agent.namespace !== undefined ? { namespace: agent.namespace } : {}),
   });
   return { agent };
 }

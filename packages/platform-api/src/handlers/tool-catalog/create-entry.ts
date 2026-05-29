@@ -64,6 +64,7 @@ export async function createToolCatalogEntry(
     basis: 'Tool catalog entry created via API',
     entityType: 'toolCatalogEntry',
     entityId: entry.id,
+    namespace,
   });
 
   return { entry };

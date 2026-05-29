@@ -132,7 +132,7 @@ export class WorkflowEngine {
       basis: `Triggered by ${triggeredBy} via ${triggerType}`,
       entityType: 'processInstance',
       entityId: instance.id,
-      processInstanceId: String(version),
+      processInstanceId: instance.id,
     });
 
     return instance;

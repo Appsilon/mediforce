@@ -31,6 +31,7 @@ export async function updateOAuthProvider(
     basis: 'OAuth provider updated via API',
     entityType: 'oauthProvider',
     entityId: updated.id,
+    namespace,
   });
 
   return { provider: toPublicProvider(updated) };

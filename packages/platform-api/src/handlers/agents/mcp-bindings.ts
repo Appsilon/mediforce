@@ -35,6 +35,7 @@ export async function upsertAgentMcpBinding(
     basis: 'MCP binding upsert via API',
     entityType: 'agentDefinition',
     entityId: updated.id,
+    ...(updated.namespace !== undefined ? { namespace: updated.namespace } : {}),
   });
   return { mcpServers: updated.mcpServers ?? {} };
 }
@@ -58,6 +59,7 @@ export async function deleteAgentMcpBinding(
     basis: 'MCP binding delete via API',
     entityType: 'agentDefinition',
     entityId: updated.id,
+    ...(updated.namespace !== undefined ? { namespace: updated.namespace } : {}),
   });
   return { mcpServers: updated.mcpServers ?? {} };
 }

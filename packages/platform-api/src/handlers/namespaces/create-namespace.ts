@@ -71,6 +71,7 @@ export async function createNamespace(
     basis: 'User created workspace via API',
     entityType: 'namespace',
     entityId: input.handle,
+    namespace: input.handle,
   });
 
   return { namespace };

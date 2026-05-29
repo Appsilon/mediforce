@@ -1,3 +1,9 @@
+// Cross-backend domain errors
+export {
+  WorkflowDefinitionVersionAlreadyExistsError,
+  WorkflowDefinitionVersionNotFoundError,
+} from './errors';
+
 // Schemas (Zod schema objects + inferred types)
 export {
   VerdictSchema,
@@ -316,6 +322,7 @@ export {
   InMemoryCronTriggerStateRepository,
   InMemoryOAuthProviderRepository,
   InMemoryAgentOAuthTokenRepository,
+  InMemoryAgentRunRepository,
   // Test factories
   buildProcessDefinition,
   buildProcessInstance,

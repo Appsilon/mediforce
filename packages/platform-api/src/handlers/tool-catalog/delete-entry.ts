@@ -31,6 +31,7 @@ export async function deleteToolCatalogEntry(
       basis: 'Tool catalog entry deleted via API',
       entityType: 'toolCatalogEntry',
       entityId: input.id,
+      namespace: input.namespace,
     });
   }
 

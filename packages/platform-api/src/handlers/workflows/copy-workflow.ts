@@ -78,6 +78,7 @@ export async function copyWorkflow(
     basis: 'Workflow copied via API',
     entityType: 'workflow_definition',
     entityId: copyName,
+    namespace: input.targetNamespace,
   });
 
   return {

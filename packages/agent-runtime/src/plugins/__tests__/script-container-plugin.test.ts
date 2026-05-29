@@ -457,7 +457,7 @@ describe('ScriptContainerPlugin', () => {
 
     it('[DATA] result event lands after every preceding live activity event (no UI completed-before-output flicker)', async () => {
       // Plugin issues live emits as fire-and-forget while the container runs, then awaits
-      // the result emit. With FirestoreAgentEventLog's per-step chain serialization,
+      // the result emit. With AgentEventLog's per-step chain serialization,
       // awaiting the result waits for every queued live emit — so result.sequence is
       // strictly greater than every assistant.sequence. Tested here at the plugin level
       // by checking emission order through the in-memory spy (which preserves call order).

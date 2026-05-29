@@ -1,5 +1,5 @@
 import type { AgentOAuthTokenRepository } from '../repositories/agent-oauth-token-repository';
-import type { AgentOAuthToken } from '../schemas/agent-oauth-token';
+import { AgentOAuthTokenSchema, type AgentOAuthToken } from '../schemas/agent-oauth-token';
 
 function keyOf(agentId: string, serverName: string): string {
   return `${agentId}::${serverName}`;
@@ -20,8 +20,9 @@ export class InMemoryAgentOAuthTokenRepository implements AgentOAuthTokenReposit
     serverName: string,
     token: AgentOAuthToken,
   ): Promise<void> {
+    const parsed = AgentOAuthTokenSchema.parse(token);
     const scope = this.store.get(namespace) ?? new Map<string, AgentOAuthToken>();
-    scope.set(keyOf(agentId, serverName), { ...token });
+    scope.set(keyOf(agentId, serverName), { ...parsed });
     this.store.set(namespace, scope);
   }
 

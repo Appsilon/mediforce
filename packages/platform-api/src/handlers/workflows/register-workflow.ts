@@ -73,6 +73,7 @@ export async function registerWorkflow(
     basis: 'Workflow definition registered via API',
     entityType: 'workflow_definition',
     entityId: definition.name,
+    namespace: input.namespace,
   });
 
   return { success: true as const, name: definition.name, version: definition.version };

@@ -300,7 +300,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         // is forwarded to the activity feed as it arrives (local strategy) or replayed
         // line-for-line after exit (queued strategy) — payloads are byte-identical, only
         // the timing differs. We don't await `emit` inside the callback (would block
-        // stream consumption); FirestoreAgentEventLog serializes per-step writes so
+        // stream consumption); AgentEventLog serializes per-step writes so
         // sequence numbers stay monotonic, and the final `await emit({type:'result'})`
         // below waits for all in-flight live emits to land before resolving.
         const strategy = getDockerSpawnStrategy();

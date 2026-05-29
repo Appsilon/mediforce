@@ -52,10 +52,11 @@ services:
       timeout: 3s
       retries: 5
 
-  # ADR-0001 — Drizzle migration init container. Runs once per `up`,
-  # exits 0 immediately when STORAGE_BACKEND != 'postgres' (Firestore mode).
-  # `platform-ui` waits via service_completed_successfully so the app boot
-  # never races a half-applied schema.
+  # ADR-0001 — Drizzle migration init container. Runs once per `up` and
+  # applies any pending Postgres migrations (idempotent via drizzle's
+  # `__drizzle_migrations` ledger). `platform-ui` waits via
+  # service_completed_successfully so the app boot never races a
+  # half-applied schema.
   migrate:
     build:
       context: .
@@ -63,7 +64,6 @@ services:
       target: migrate
     restart: "no"
     environment:
-      - STORAGE_BACKEND=${STORAGE_BACKEND:-firestore}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-mediforce}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mediforce}
     depends_on:
       postgres:
@@ -88,11 +88,9 @@ services:
       - "3000"
     environment:
       - REDIS_URL=redis://redis:6379
-      # ADR-0001 — Postgres storage backend. Default still firestore until
-      # cutover; flip STORAGE_BACKEND=postgres in the host `.env` when ready.
-      # Migrations run in the `migrate` init container before this service
-      # starts (depends_on: { migrate: { condition: service_completed_successfully } }).
-      - STORAGE_BACKEND=${STORAGE_BACKEND:-firestore}
+      # ADR-0001 — Postgres is the only storage backend. Migrations run in
+      # the `migrate` init container before this service starts
+      # (depends_on: { migrate: { condition: service_completed_successfully } }).
       - DATABASE_URL=postgresql://${POSTGRES_USER:-mediforce}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mediforce}
       - PLATFORM_API_KEY=${PLATFORM_API_KEY}
       - SECRETS_ENCRYPTION_KEY=${SECRETS_ENCRYPTION_KEY}

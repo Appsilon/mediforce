@@ -48,15 +48,16 @@ export function validateEnv(existsSync: (path: string) => boolean): void {
     }
   }
 
-  // --- STORAGE_BACKEND (ADR-0001) ---
-  if (process.env.STORAGE_BACKEND === 'postgres') {
-    const dbUrl = process.env.DATABASE_URL;
-    if (typeof dbUrl !== 'string' || dbUrl.length === 0) {
-      errors.push(
-        'STORAGE_BACKEND=postgres requires DATABASE_URL. '
-        + 'Set DATABASE_URL or unset STORAGE_BACKEND to fall back to Firestore.',
-      );
-    }
+  // --- DATABASE_URL (ADR-0001: Postgres-only) ---
+  // Firestore data layer was deleted; getPlatformServices unconditionally
+  // constructs Postgres repos. Missing DATABASE_URL crashes the app on
+  // first request — fail fast at boot instead.
+  const dbUrl = process.env.DATABASE_URL;
+  if (typeof dbUrl !== 'string' || dbUrl.length === 0) {
+    errors.push(
+      'DATABASE_URL is required. Set DATABASE_URL to a Postgres connection string '
+      + '(e.g. postgresql://mediforce:mediforce@localhost:5432/mediforce).',
+    );
   }
 
   // --- MAILGUN EMAIL CONFIG ---

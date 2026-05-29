@@ -12,7 +12,11 @@ export { InMemoryToolCatalogRepository } from './in-memory-tool-catalog-reposito
 export { InMemoryOAuthProviderRepository } from './in-memory-oauth-provider-repository';
 export { InMemoryAgentOAuthTokenRepository } from './in-memory-agent-oauth-token-repository';
 export { InMemoryAgentDefinitionRepository } from './in-memory-agent-definition-repository';
+export { InMemoryNamespaceRepository } from './in-memory-namespace-repository';
 export { InMemoryAgentRunRepository } from './in-memory-agent-run-repository';
+export { InMemoryModelRegistryRepository } from './in-memory-model-registry-repository';
+export { InMemoryNamespaceSecretsRepository } from './in-memory-namespace-secrets-repository';
+export { InMemoryWorkflowSecretsRepository } from './in-memory-workflow-secrets-repository';
 export {
   encodeAgentRunCursor,
   decodeAgentRunCursor,
