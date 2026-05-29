@@ -3,6 +3,7 @@ import type {
   ProcessInstanceRepository,
   StepExecution,
   InstanceStatus,
+  WorkflowRunSummaryResult,
 } from '@mediforce/platform-core';
 import type { ListInstancesOptions } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
@@ -88,6 +89,24 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
 
   softDeleteByDefinitionName = async (definitionName: string): Promise<void> => {
     await this.raw.setDeletedByDefinitionName(definitionName, true);
+  };
+
+  /**
+   * Per-workflow run aggregate for the workspace home cards. Gated on the
+   * named `namespace`: a user caller who isn't a member gets a zeroed summary
+   * (same "out-of-scope reads return absent" contract as the list methods)
+   * rather than an error, so the home page degrades to empty cards instead of
+   * failing the whole response.
+   */
+  summarizeRuns = async (
+    namespace: string,
+    name: string,
+    includeCompleted: boolean,
+  ): Promise<WorkflowRunSummaryResult> => {
+    if (!this.canSeeNamespace(namespace)) {
+      return { total: 0, active: 0, latest: [] };
+    }
+    return this.raw.summarizeRunsByWorkflow(namespace, name, includeCompleted);
   };
 
   update = async (id: string, updates: Partial<ProcessInstance>): Promise<void> => {

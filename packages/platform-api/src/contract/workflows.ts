@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  ProcessInstanceSchema,
   WorkflowDefinitionBaseSchema,
   WorkflowDefinitionSchema,
   WorkflowVisibilitySchema,
@@ -33,17 +34,40 @@ export const RegisterWorkflowOutputSchema = z.object({
   version: z.number().int().positive(),
 });
 
+/**
+ * Per-workflow run aggregate attached to each card on the workspace home page.
+ * Computed server-side via count aggregations + a bounded `latest` query so the
+ * page never ships the whole run collection to the client (the pre-cutover
+ * `onSnapshot` loaded everything; the naive parity poll re-read up to 10k runs
+ * every 5s). `active` = runs in {running, created, paused}; `total` and
+ * `latest` honour `includeCompletedRuns` on the request. Archived runs are
+ * always excluded — the home cards never show them.
+ */
+export const WorkflowRunSummarySchema = z.object({
+  total: z.number().int().nonnegative(),
+  active: z.number().int().nonnegative(),
+  /** Up to 3 newest-first runs for the card preview. */
+  latest: z.array(ProcessInstanceSchema).max(3),
+});
+
 export const WorkflowDefinitionGroupSchema = z.object({
   namespace: z.string().min(1),
   name: z.string().min(1),
   latestVersion: z.number().int().positive(),
   defaultVersion: z.number().int().positive().nullable(),
   definition: WorkflowDefinitionSchema.nullable(),
+  runSummary: WorkflowRunSummarySchema,
 });
 
 export const ListWorkflowsInputSchema = z.object({
   /** Optional namespace filter (caller must still be a member). */
   namespace: z.string().min(1).optional(),
+  /**
+   * When false, each `runSummary.total` and `runSummary.latest` exclude
+   * terminal (completed / failed) runs — mirrors the home page's
+   * "show completed" toggle (default on). `active` is unaffected.
+   */
+  includeCompletedRuns: z.boolean().default(true),
 });
 
 export const ListWorkflowsOutputSchema = z.object({
@@ -68,8 +92,15 @@ export type RegisterWorkflowInput = z.infer<typeof RegisterWorkflowInputSchema>;
  */
 export type RegisterWorkflowBody = z.input<typeof RegisterWorkflowInputSchema>;
 export type RegisterWorkflowOutput = z.infer<typeof RegisterWorkflowOutputSchema>;
+export type WorkflowRunSummary = z.infer<typeof WorkflowRunSummarySchema>;
 export type WorkflowDefinitionGroupSummary = z.infer<typeof WorkflowDefinitionGroupSchema>;
 export type ListWorkflowsInput = z.infer<typeof ListWorkflowsInputSchema>;
+/**
+ * Pre-parse shape accepted by `mediforce.workflows.list()`. `includeCompletedRuns`
+ * is optional here (the schema default fills it in on `.parse()`), so callers
+ * that don't toggle "show completed" can omit it — mirrors `RegisterWorkflowBody`.
+ */
+export type ListWorkflowsRequest = z.input<typeof ListWorkflowsInputSchema>;
 export type ListWorkflowsOutput = z.infer<typeof ListWorkflowsOutputSchema>;
 export type GetWorkflowInput = z.infer<typeof GetWorkflowInputSchema>;
 export type GetWorkflowOutput = z.infer<typeof GetWorkflowOutputSchema>;

@@ -211,7 +211,7 @@ import {
   type RegisterWorkflowBody,
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
-  type ListWorkflowsInput,
+  type ListWorkflowsRequest,
   type ListWorkflowsOutput,
   type GetWorkflowInput,
   type GetWorkflowOutput,
@@ -440,7 +440,7 @@ export class Mediforce {
       input: RegisterWorkflowBody,
       options: RegisterWorkflowOptions,
     ) => Promise<RegisterWorkflowOutput>;
-    list: (input?: ListWorkflowsInput) => Promise<ListWorkflowsOutput>;
+    list: (input?: ListWorkflowsRequest) => Promise<ListWorkflowsOutput>;
     get: (input: GetWorkflowInput) => Promise<GetWorkflowOutput>;
     archiveVersion: (input: ArchiveVersionInput, options: { namespace: string }) => Promise<ArchiveVersionOutput>;
     archiveAll: (input: ArchiveAllInput, options: { namespace: string }) => Promise<ArchiveAllOutput>;
@@ -764,7 +764,12 @@ export class Mediforce {
       list: async (input) => {
         const validated = input ? ListWorkflowsInputSchema.parse(input) : undefined;
         const qs = validated
-          ? toSearchParams({ namespace: validated.namespace })
+          ? toSearchParams({
+              namespace: validated.namespace,
+              // Forward only when the caller turns "show completed" off; the
+              // server defaults to true, so omitting keeps the common URL clean.
+              includeCompletedRuns: validated.includeCompletedRuns ? undefined : 'false',
+            })
           : '';
         const res = await this.request(`/api/workflow-definitions${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.list');

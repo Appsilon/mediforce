@@ -13,8 +13,16 @@ import { z } from 'zod';
 export const GET = createRouteAdapter(
   ListWorkflowsInputSchema,
   (req) => {
-    const namespace = req.nextUrl.searchParams.get('namespace');
-    return namespace !== null ? { namespace } : {};
+    const params = req.nextUrl.searchParams;
+    const namespace = params.get('namespace');
+    // Absent => schema default (true). Only an explicit `false` turns it off,
+    // mirroring the home page's "show completed" toggle.
+    const includeCompletedRuns =
+      params.get('includeCompletedRuns') === 'false' ? false : undefined;
+    return {
+      ...(namespace !== null ? { namespace } : {}),
+      ...(includeCompletedRuns === false ? { includeCompletedRuns } : {}),
+    };
   },
   listWorkflows,
 );
