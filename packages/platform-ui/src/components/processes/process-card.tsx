@@ -9,7 +9,7 @@ import { StartRunButton } from '@/components/processes/start-run-button';
 import { formatStepName } from '@/components/tasks/task-utils';
 import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
-import type { WorkflowRunSummary } from '@mediforce/platform-api';
+import type { WorkflowRunSummary } from '@mediforce/platform-api/contract';
 import type { DefinitionGroup } from '@/hooks/use-process-definitions';
 
 export function isActiveStatus(status: string): boolean {

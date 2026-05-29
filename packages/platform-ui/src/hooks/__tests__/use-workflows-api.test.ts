@@ -46,6 +46,7 @@ describe('mapApiToDefinitionGroups', () => {
       archived: undefined,
       namespace: 'acme',
       visibility: 'public',
+      runSummary: { total: 0, active: 0, latest: [] },
     });
   });
 

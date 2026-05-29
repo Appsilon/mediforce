@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import type { WorkflowRunSummary } from '@mediforce/platform-api';
+import type { WorkflowRunSummary } from '@mediforce/platform-api/contract';
 import { mediforce, ApiError } from '@/lib/mediforce';
 
 export interface DefinitionVersion {

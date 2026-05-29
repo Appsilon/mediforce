@@ -1481,12 +1481,17 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   };
 
   // Match prod write shape — WorkflowEngine.createInstance writes `deleted: false`
-  // on every instance, and the runs.list query filters server-side via
-  // `.where('deleted','==',false)`. Firestore equality where-clauses do not
-  // match docs missing the field, so seeded rows without `deleted` are hidden.
+  // AND `archived: false` on every instance. Both the runs.list query and the
+  // home-card `summarizeRunsByWorkflow` aggregate filter server-side via
+  // `.where('deleted','==',false).where('archived','==',false)`. Firestore
+  // equality where-clauses do not match docs missing the field, so seeded rows
+  // without these fields are hidden (empty run counts + empty card previews).
   for (const key of Object.keys(processInstances)) {
     if (processInstances[key].deleted === undefined) {
       processInstances[key].deleted = false;
+    }
+    if (processInstances[key].archived === undefined) {
+      processInstances[key].archived = false;
     }
   }
 
