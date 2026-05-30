@@ -1,6 +1,6 @@
 import {
   PostgresAgentEventRepository,
-  FirestoreUserProfileRepository,
+  PostgresUserProfileRepository,
   PostgresHandoffRepository,
   PostgresAgentDefinitionRepository,
   PostgresModelRegistryRepository,
@@ -20,7 +20,6 @@ import {
   PostgresAgentEventLog,
   getSharedPostgresClient,
   FirebaseInviteService,
-  getAdminFirestore,
   validateSecretsKey,
   createMailgunSender,
   MailgunNotificationService,
@@ -145,19 +144,6 @@ interface UserRecordPort {
 interface AuthPort {
   getUser(uid: string): Promise<UserRecordPort>;
 }
-interface DocSnapshotPort {
-  readonly exists: boolean;
-  data(): { readonly mustChangePassword?: boolean } | undefined;
-}
-interface DocRefPort {
-  get(): Promise<DocSnapshotPort>;
-}
-interface CollectionPort {
-  doc(id: string): DocRefPort;
-}
-interface FirestorePort {
-  collection(name: string): CollectionPort;
-}
 
 /**
  * Adapts `FirebaseInviteService` onto the framework-free `InviteService`
@@ -169,7 +155,7 @@ class FirebaseInviteServiceAdapter implements InviteService {
   constructor(
     private readonly firebase: FirebaseInviteService,
     private readonly adminAuth: AuthPort,
-    private readonly adminDb: FirestorePort,
+    private readonly userProfileRepo: UserProfileRepository,
   ) {}
 
   async createInvitedUser(email: string, displayName: string | undefined): Promise<InvitedUser> {
@@ -199,8 +185,7 @@ class FirebaseInviteServiceAdapter implements InviteService {
       // Treat unknown users as not pending — handlers will surface a 404.
       return false;
     }
-    const userDoc = await this.adminDb.collection('users').doc(uid).get();
-    const mustChangePassword = userDoc.exists ? userDoc.data()?.mustChangePassword === true : false;
+    const mustChangePassword = (await this.userProfileRepo.getProfile(uid))?.mustChangePassword ?? false;
     const hasNeverSignedIn = lastSignInTime === null || lastSignInTime === '';
     return mustChangePassword || hasNeverSignedIn;
   }
@@ -248,10 +233,6 @@ export function getPlatformServices(): PlatformServices {
   validateSecretsKey();
 
   const pg = getSharedPostgresClient().db;
-  // Firestore handle is still required for repos that haven't migrated to
-  // Postgres yet (user-profile read port) and for the invite service
-  // (Firebase Auth user store + `users` collection).
-  const db = getAdminFirestore();
 
   const processRepo: ProcessRepository = new PostgresProcessRepository(pg);
   const instanceRepo: PostgresProcessInstanceRepository =
@@ -271,7 +252,7 @@ export function getPlatformServices(): PlatformServices {
     new PostgresCronTriggerStateRepository(pg);
   const toolCatalogRepo: ToolCatalogRepository = new PostgresToolCatalogRepository(pg);
   const namespaceRepo: NamespaceRepository = new PostgresNamespaceRepository(pg);
-  const userProfileRepo: UserProfileRepository = new FirestoreUserProfileRepository(db);
+  const userProfileRepo: UserProfileRepository = new PostgresUserProfileRepository(pg);
   const oauthProviderRepo: OAuthProviderRepository = new PostgresOAuthProviderRepository(pg);
   const agentOAuthTokenRepo: AgentOAuthTokenRepository =
     new PostgresAgentOAuthTokenRepository(pg);
@@ -377,13 +358,12 @@ export function getPlatformServices(): PlatformServices {
 
   const webhookRouter = new WebhookRouter(engine, processRepo);
 
-  // FirebaseInviteService writes to the Firebase Auth user store and the
-  // `users` Firestore collection. Auth state and the user docs remain on
-  // Firebase (ADR-0001 moved only the workflow data layer to Postgres), so
-  // the Firestore handle is still required for invite operations.
+  // FirebaseInviteService writes to the Firebase Auth user store (identity
+  // stays on Firebase Auth) and records the must-change-password flag via the
+  // Postgres user-profile repository.
   const adminAuth = getAdminAuth();
-  const firebaseInvite = new FirebaseInviteService(adminAuth, db);
-  const inviteService = new FirebaseInviteServiceAdapter(firebaseInvite, adminAuth, db);
+  const firebaseInvite = new FirebaseInviteService(adminAuth, userProfileRepo);
+  const inviteService = new FirebaseInviteServiceAdapter(firebaseInvite, adminAuth, userProfileRepo);
   // `appUrl` matches the legacy invite route's fallback so dev-without-
   // NEXT_PUBLIC_PLATFORM_URL still renders sensible links.
   const inviteAppUrl =
