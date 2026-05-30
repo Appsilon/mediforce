@@ -60,10 +60,14 @@ visible to handlers.
    handler sees.
 2. **`Authorized<Entity>Repository` wrappers.** Each wraps the matching raw
    repository from `@mediforce/platform-core`'s interfaces and enforces, on
-   every read and write:
+   every **read**:
    (a) workspace membership (caller's reachable workspaces intersect the
    entity's workspace),
    (b) `WorkflowDefinition` visibility filtering (`public` vs `private`).
+   The wrappers expose read methods only — writes are not wrapper-mediated;
+   they call the raw repositories and are authorized at the handler layer.
+   This scoping is therefore read-side, so a write that bypasses its handler
+   check (e.g. a cascade matched by name) is not caught here.
 
    Soft-delete / archived filtering is **not** a wrapper concern. Each raw
    repository decides per-method whether tombstoned rows are excluded; the
