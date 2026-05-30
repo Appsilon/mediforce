@@ -1,5 +1,5 @@
 import {
-  FirestoreAgentEventRepository,
+  PostgresAgentEventRepository,
   FirestoreUserProfileRepository,
   PostgresHandoffRepository,
   PostgresAgentDefinitionRepository,
@@ -249,8 +249,8 @@ export function getPlatformServices(): PlatformServices {
 
   const pg = getSharedPostgresClient().db;
   // Firestore handle is still required for repos that haven't migrated to
-  // Postgres yet (agent-event read port, user-profile read port) and for the
-  // invite service (Firebase Auth user store + `users` collection).
+  // Postgres yet (user-profile read port) and for the invite service
+  // (Firebase Auth user store + `users` collection).
   const db = getAdminFirestore();
 
   const processRepo: ProcessRepository = new PostgresProcessRepository(pg);
@@ -260,7 +260,7 @@ export function getPlatformServices(): PlatformServices {
   // resolution inside the namespace-scoped read variants (ADR-0004 §"Storage-
   // layer filter, today").
   const auditRepo: AuditRepository = new PostgresAuditRepository(pg, instanceRepo);
-  const agentEventRepo: AgentEventRepository = new FirestoreAgentEventRepository(db, instanceRepo);
+  const agentEventRepo: AgentEventRepository = new PostgresAgentEventRepository(instanceRepo);
   const agentRunRepo: AgentRunRepository = new PostgresAgentRunRepository(pg, instanceRepo);
   const humanTaskRepo: HumanTaskRepository = new PostgresHumanTaskRepository(pg, instanceRepo);
   const handoffRepo: HandoffRepository = new PostgresHandoffRepository(pg, instanceRepo);
