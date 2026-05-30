@@ -64,7 +64,7 @@ const coworkAgent = {
   outputDescription: '',
   skillFileNames: [],
   // Namespace owns the FK-valid workspace the binding audit event attributes to.
-  namespace: 'appsilon',
+  namespace: 'acme',
   mcpServers: {
     existing: { type: 'stdio' as const, catalogId: 'existing-mcp' },
   },
