@@ -1,5 +1,6 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
+import { RUN_COMPLETED_1_ID, RUN_ESCALATED_1_ID } from '../helpers/seed-data';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Agent Oversight Journey', () => {
@@ -27,14 +28,14 @@ test.describe('Agent Oversight Journey', () => {
     await expect(page.getByText('L4').first()).toBeVisible();
 
     // Link to detail page
-    const link = page.locator('a[href*="/agents/run-completed-1"]');
+    const link = page.locator(`a[href*="/agents/${RUN_COMPLETED_1_ID}"]`);
     await expect(link).toBeVisible();
-    await expect(link).toHaveAttribute('href', /\/agents\/run-completed-1/);
+    await expect(link).toHaveAttribute('href', new RegExp(`/agents/${RUN_COMPLETED_1_ID}`));
     await showStep(page);
 
     // Navigate to agent run detail by clicking the link
     await click(page, link);
-    await page.waitForURL(`**/${TEST_ORG_HANDLE}/agents/run-completed-1`, { timeout: 20_000 });
+    await page.waitForURL(`**/${TEST_ORG_HANDLE}/agents/${RUN_COMPLETED_1_ID}`, { timeout: 20_000 });
     await expect(page.getByText('openrouter/anthropic/claude-sonnet-4').first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('92%').first()).toBeVisible();
     await expect(page.getByText('Reviewed 12 vendor submissions')).toBeVisible({ timeout: 10_000 });
@@ -52,7 +53,7 @@ test.describe('Agent Oversight Journey', () => {
 
   test('escalated run shows low confidence rationale', async ({ page }, testInfo) => {
     await setupRecording(page, 'agent-escalated-run', testInfo);
-    await page.goto(`/${TEST_ORG_HANDLE}/agents/run-escalated-1`);
+    await page.goto(`/${TEST_ORG_HANDLE}/agents/${RUN_ESCALATED_1_ID}`);
     await expect(page.getByText('Multiple data inconsistencies in lab values')).toBeVisible({ timeout: 10_000 });
     await showResult(page);
   });

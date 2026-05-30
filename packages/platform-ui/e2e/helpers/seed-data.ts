@@ -1,3 +1,12 @@
+// Fixed UUID literals for seeded agent_runs. `agent_runs.id` is a Postgres
+// `uuid` column, so the seed ids must be valid uuids (not readable slugs) or the
+// route's `eq(agentRuns.id, ...)` lookup raises `invalid input syntax for type
+// uuid`. Deterministic v4-shaped uuids keep the seed reproducible.
+export const RUN_COMPLETED_1_ID = '00000000-0000-4000-8000-000000000001';
+export const RUN_ESCALATED_1_ID = '00000000-0000-4000-8000-000000000002';
+export const RUN_RUNNING_1_ID = '00000000-0000-4000-8000-000000000003';
+export const RUN_L4_AUTOPILOT_ID = '00000000-0000-4000-8000-000000000004';
+
 const now = new Date().toISOString();
 const oneHourAgo = new Date(Date.now() - 3600_000).toISOString();
 const twoDaysAgo = new Date(Date.now() - 2 * 86400_000).toISOString();
@@ -416,8 +425,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   };
 
   const agentRuns: Record<string, Record<string, unknown>> = {
-    'run-completed-1': {
-      id: 'run-completed-1',
+    [RUN_COMPLETED_1_ID]: {
+      id: RUN_COMPLETED_1_ID,
       processInstanceId: 'proc-running-1',
       stepId: 'narrative-summary',
       pluginId: 'narrative-summary',
@@ -439,8 +448,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       executorType: 'agent',
       reviewerType: 'none',
     },
-    'run-escalated-1': {
-      id: 'run-escalated-1',
+    [RUN_ESCALATED_1_ID]: {
+      id: RUN_ESCALATED_1_ID,
       processInstanceId: 'proc-paused-1',
       stepId: 'data-quality-check',
       pluginId: 'data-quality',
@@ -462,8 +471,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       executorType: 'agent',
       reviewerType: 'human',
     },
-    'run-running-1': {
-      id: 'run-running-1',
+    [RUN_RUNNING_1_ID]: {
+      id: RUN_RUNNING_1_ID,
       processInstanceId: 'proc-running-1',
       stepId: 'compliance-check',
       pluginId: 'compliance-check',
@@ -475,8 +484,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       completedAt: null,
       executorType: 'agent',
     },
-    'run-l4-autopilot': {
-      id: 'run-l4-autopilot',
+    [RUN_L4_AUTOPILOT_ID]: {
+      id: RUN_L4_AUTOPILOT_ID,
       processInstanceId: 'proc-completed-2',
       stepId: 'vendor-assessment',
       pluginId: 'vendor-assessment',

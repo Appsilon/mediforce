@@ -229,10 +229,11 @@ export async function seedPostgresNamespace(
       const envelope = run.envelope as Record<string, unknown> | null;
       await sql`
         INSERT INTO agent_runs (
-          workspace, process_instance_id, step_id, plugin_id, autonomy_level,
+          id, workspace, process_instance_id, step_id, plugin_id, autonomy_level,
           status, fallback_reason, confidence, model, duration_ms,
           envelope_payload, executor_type, reviewer_type, started_at, completed_at
         ) VALUES (
+          ${run.id as string},
           ${workspace},
           ${run.processInstanceId as string},
           ${run.stepId as string},
