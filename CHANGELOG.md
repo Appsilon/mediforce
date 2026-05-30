@@ -12,6 +12,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Fixed
+- Forced password-change, workspace bio/profile edits, and agent MCP-binding writes no longer 500 — their audit events now carry an FK-valid `workspace` (the acting namespace) instead of throwing against the Postgres NOT NULL column. [#534](https://github.com/Appsilon/mediforce/pull/534)
+- Cutover script maps agent-run `duration_ms` + token counts from the correct envelope keys (`duration_ms`, `tokenUsage.{inputTokens,outputTokens}`), so migrated runs keep their duration/token data. [#534](https://github.com/Appsilon/mediforce/pull/534)
 - Run History / `mediforce agent-run list` no longer 400 on null-envelope runs stored as `'{}'` instead of SQL NULL (read tolerates it, write stores NULL, migration `0015` backfills). [#534](https://github.com/Appsilon/mediforce/pull/534)
 - Soft-deleted workflows no longer leak into the catalog list (regression from the Firestore→REST cutover dropping the UI's `!deleted` filter). [#534](https://github.com/Appsilon/mediforce/pull/534)
 - `PostgresAgentRunRepository.create()` now upserts (`onConflictDoUpdate`) on a repeated run id — the runner writes the same id twice (running → terminal) and the plain insert threw `agent_runs_pkey`, a regression from Firestore `.set()`. [#617](https://github.com/Appsilon/mediforce/issues/617)
