@@ -6,6 +6,7 @@ import {
 import { emitAudit } from '../../audit-helpers';
 import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
+import { resolvePersonalNamespace } from '../_helpers';
 import type {
   DeleteNamespaceInput,
   DeleteNamespaceOutput,
@@ -68,8 +69,22 @@ export async function deleteNamespace(
   const existing = await scope.workspaces.getNamespace(input.handle);
   if (existing === null) throw new NotFoundError(`Namespace "${input.handle}" not found`);
 
-  await scope.workspaces.deleteNamespaceCascade(input.handle);
+  // `audit_events.workspace` is NOT NULL with an FK to `workspaces.handle`
+  // *and* `ON DELETE CASCADE` (ADR-0001). So the deletion event needs a
+  // workspace that (a) exists at insert time and (b) ideally survives this
+  // cascade. For a user owner, their personal namespace satisfies both — the
+  // deletion stays auditable after the workspace is gone. apiKey callers (CLI)
+  // have no personal namespace; fall back to `input.handle` so the delete
+  // still succeeds (FK-valid before the cascade) — the row then cascades away
+  // with the workspace, which is the inherent CASCADE behaviour, not a 500.
+  let auditNamespace = input.handle;
+  if (scope.caller.kind === 'user') {
+    const personal = await resolvePersonalNamespace(scope, scope.caller.uid);
+    if (personal !== null) auditNamespace = personal;
+  }
 
+  // Emit before the cascade so the audit row's workspace FK resolves while
+  // `auditNamespace` still exists; the cascade below removes `input.handle`.
   await emitAudit(scope.system.audit, scope.caller, {
     action: 'namespace.deleted',
     description: `Namespace '${input.handle}' deleted (cascade)`,
@@ -78,7 +93,10 @@ export async function deleteNamespace(
     basis: 'Owner deleted workspace via API',
     entityType: 'namespace',
     entityId: input.handle,
+    namespace: auditNamespace,
   });
+
+  await scope.workspaces.deleteNamespaceCascade(input.handle);
 
   return { handle: input.handle };
 }
@@ -125,6 +143,7 @@ export async function leaveNamespace(
     basis: 'User left workspace via API',
     entityType: 'namespace',
     entityId: input.handle,
+    namespace: input.handle,
   });
 
   return { handle: input.handle };
@@ -164,6 +183,7 @@ export async function removeNamespaceMember(
     basis: 'Owner/admin removed member via API',
     entityType: 'namespace',
     entityId: input.handle,
+    namespace: input.handle,
   });
 
   return { handle: input.handle, uid: input.uid };
@@ -208,6 +228,7 @@ export async function updateNamespaceMemberRole(
     basis: 'Owner changed member role via API',
     entityType: 'namespace',
     entityId: input.handle,
+    namespace: input.handle,
   });
 
   return { member: updated };
