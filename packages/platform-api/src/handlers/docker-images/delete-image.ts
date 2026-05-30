@@ -5,7 +5,6 @@ import type {
   DeleteDockerImageInput,
   DeleteDockerImageOutput,
 } from '../../contract/docker-images';
-import { actorFromCaller } from '../_helpers';
 
 export async function deleteDockerImage(
   input: DeleteDockerImageInput,
@@ -22,18 +21,11 @@ export async function deleteDockerImage(
 
   const result = await deleter.delete(input.imageId);
 
-  const actor = actorFromCaller(scope);
-  await scope.system.audit.append({
-    ...actor,
-    action: 'docker_image.deleted',
-    description: `Docker image '${input.imageId}' deleted from platform image store`,
-    timestamp: new Date().toISOString(),
-    inputSnapshot: { imageId: input.imageId },
-    outputSnapshot: { deleted: result.deleted },
-    basis: 'Docker image deleted via API',
-    entityType: 'dockerImage',
-    entityId: input.imageId,
-  });
+  // TODO(#592): re-enable audit emission once `_system` sentinel workspace
+  // lands. PostgresAuditRepository.append throws here because this
+  // platform-global handler has no workspace context (no processInstanceId,
+  // no namespace), and InMemoryAuditRepository accepts it silently —
+  // ADR-0001 Pattern #2 divergence tracked in #592.
 
   return result;
 }

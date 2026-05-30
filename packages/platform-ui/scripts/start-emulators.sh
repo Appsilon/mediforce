@@ -2,7 +2,7 @@
 export JAVA_HOME=/opt/homebrew/Cellar/openjdk@21/21.0.10/libexec/openjdk.jdk/Contents/Home
 export PATH="$JAVA_HOME/bin:$PATH"
 
-PORTS=(9099 8080 9199 4000)
+PORTS=(9099 9199 4000)
 blocked=()
 
 kill_port() {
@@ -29,5 +29,5 @@ if [ ${#blocked[@]} -gt 0 ]; then
 fi
 
 DATA_DIR="$(cd "$(dirname "$0")/.." && pwd)/.emulator-data"
-exec firebase emulators:start --project demo-mediforce --only auth,firestore,storage \
+exec firebase emulators:start --project demo-mediforce --only auth,storage \
   --import "$DATA_DIR" --export-on-exit "$DATA_DIR" "$@"

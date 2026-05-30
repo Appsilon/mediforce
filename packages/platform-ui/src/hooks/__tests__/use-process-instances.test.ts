@@ -20,13 +20,6 @@ vi.mock('@/lib/mediforce', () => ({
   },
 }));
 
-vi.mock('@/lib/firebase', () => ({ db: {} }));
-vi.mock('firebase/firestore', () => ({
-  doc: vi.fn(),
-  onSnapshot: vi.fn(),
-  collection: vi.fn(),
-}));
-
 const { useProcessInstances, useProcessInstance } = await import('../use-process-instances');
 
 describe('useProcessInstances — react-query backed', () => {

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   InMemoryAgentDefinitionRepository,
   InMemoryAuditRepository,
+  InMemoryNamespaceRepository,
   InMemoryProcessInstanceRepository,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
@@ -14,18 +15,33 @@ import {
 describe('agent MCP binding handlers', () => {
   let agentDefinitionRepo: InMemoryAgentDefinitionRepository;
   let auditRepo: InMemoryAuditRepository;
+  let namespaceRepo: InMemoryNamespaceRepository;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     resetFactorySequence();
     agentDefinitionRepo = new InMemoryAgentDefinitionRepository();
     const instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository(instanceRepo);
+    namespaceRepo = new InMemoryNamespaceRepository();
+    // u-1's personal namespace — the FK-valid workspace a global-agent audit
+    // event is attributed to.
+    await namespaceRepo.createNamespaceWithOwner({
+      namespace: {
+        handle: 'u-1',
+        type: 'personal',
+        displayName: 'U One',
+        linkedUserId: 'u-1',
+        createdAt: new Date().toISOString(),
+      },
+      ownerMember: { uid: 'u-1', role: 'owner', joinedAt: new Date().toISOString() },
+    });
   });
 
   function buildScope(namespaces = ['team-alpha']) {
     return createTestScope({
       agentDefinitionRepo,
       auditRepo,
+      namespaceRepo,
       caller: userCaller('u-1', namespaces),
     });
   }
@@ -103,6 +119,31 @@ describe('agent MCP binding handlers', () => {
       scope,
     );
     expect(Object.keys(mcpServers)).not.toContain('github');
+  });
+
+  it('upsertAgentMcpBinding rejects a global agent when the caller has no namespace', async () => {
+    const created = await agentDefinitionRepo.create({
+      kind: 'plugin',
+      name: 'Claude Code',
+      iconName: 'Bot',
+      description: 'd',
+      foundationModel: 'm',
+      systemPrompt: 'p',
+      inputDescription: 'i',
+      outputDescription: 'o',
+      skillFileNames: [],
+      namespace: undefined,
+      visibility: 'public',
+    });
+    // apiKey caller has no personal namespace → no FK-valid workspace to
+    // attribute the audit event to.
+    const scope = createTestScope({ agentDefinitionRepo, auditRepo, namespaceRepo });
+    await expect(
+      upsertAgentMcpBinding(
+        { id: created.id, name: 'github', binding: { type: 'http', url: 'https://example.com' } },
+        scope,
+      ),
+    ).rejects.toThrow(/no namespace/i);
   });
 
   it('deleteAgentMcpBinding removes binding', async () => {

@@ -1,33 +1,53 @@
 import {
-  FirestoreAgentEventRepository,
-  FirestoreProcessRepository,
-  FirestoreProcessInstanceRepository,
-  FirestoreAuditRepository,
-  FirestoreAgentRunRepository,
-  FirestoreHumanTaskRepository,
-  FirestoreHandoffRepository,
-  FirestoreAgentDefinitionRepository,
-  FirestoreCoworkSessionRepository,
-  FirestoreCronTriggerStateRepository,
-  FirestoreToolCatalogRepository,
-  FirestoreNamespaceRepository,
-  FirestoreUserProfileRepository,
-  FirestoreOAuthProviderRepository,
-  FirestoreAgentOAuthTokenRepository,
-  FirestoreModelRegistryRepository,
-  FirestoreWorkflowSecretsRepository,
-  FirestoreNamespaceSecretsRepository,
-  FirebaseInviteService,
+  PostgresAgentEventRepository,
+  PostgresUserProfileRepository,
+  PostgresHandoffRepository,
+  PostgresAgentDefinitionRepository,
+  PostgresModelRegistryRepository,
+  PostgresNamespaceSecretsRepository,
+  PostgresWorkflowSecretsRepository,
   PostgresToolCatalogRepository,
+  PostgresNamespaceRepository,
+  PostgresAuditRepository,
+  PostgresOAuthProviderRepository,
+  PostgresAgentOAuthTokenRepository,
+  PostgresCronTriggerStateRepository,
+  PostgresAgentRunRepository,
+  PostgresHumanTaskRepository,
+  PostgresCoworkSessionRepository,
+  PostgresProcessInstanceRepository,
+  PostgresProcessRepository,
+  PostgresAgentEventLog,
   getSharedPostgresClient,
-  getAdminFirestore,
+  FirebaseInviteService,
   validateSecretsKey,
   createMailgunSender,
   MailgunNotificationService,
   FirebaseUserDirectoryService,
   getAdminAuth,
 } from '@mediforce/platform-infra';
-import type { SendEmailFn, UserDirectoryService } from '@mediforce/platform-core';
+import type {
+  AgentDefinitionRepository,
+  AgentEventRepository,
+  AgentOAuthTokenRepository,
+  AgentRunRepository,
+  AuditRepository,
+  CoworkSessionRepository,
+  CronTriggerStateRepository,
+  HandoffRepository,
+  HumanTaskRepository,
+  ModelRegistryRepository,
+  NamespaceRepository,
+  NamespaceSecretsRepository,
+  OAuthProviderRepository,
+  ProcessInstanceRepository,
+  ProcessRepository,
+  SendEmailFn,
+  ToolCatalogRepository,
+  UserDirectoryService,
+  UserProfileRepository,
+  WorkflowSecretsRepository,
+} from '@mediforce/platform-core';
 import {
   ContainerWorkerDockerImagesService,
   LocalDockerImagesService,
@@ -42,10 +62,6 @@ import type {
   SendInviteEmailInput,
   SendWorkspaceNotificationEmailInput,
 } from './invite-notification';
-import type {
-  CronTriggerStateRepository,
-  ToolCatalogRepository,
-} from '@mediforce/platform-core';
 import {
   WorkflowEngine,
   ManualTrigger,
@@ -55,7 +71,6 @@ import {
   AgentRunner,
   PluginRegistry,
   OpenRouterLlmClient,
-  FirestoreAgentEventLog,
   ClaudeCodeAgentPlugin,
   MockClaudeCodeAgentPlugin,
   OpenCodeAgentPlugin,
@@ -73,7 +88,6 @@ import { createHttpSelfFetchRunKicker } from '../runtime/run-kicker';
 import { WebhookRouter } from '@mediforce/workflow-engine';
 import { seedBuiltinAgentDefinitions } from './seed-agent-definitions';
 import { seedBuiltinToolCatalog } from './seed-tool-catalog';
-import { backfillInstanceNamespaces } from '@mediforce/platform-infra';
 
 let services: PlatformServices | null = null;
 let seedingStarted = false;
@@ -87,24 +101,24 @@ export interface PlatformServices {
   agentRunner: AgentRunner;
   pluginRegistry: PluginRegistry;
   llmClient: OpenRouterLlmClient;
-  processRepo: FirestoreProcessRepository;
-  instanceRepo: FirestoreProcessInstanceRepository;
-  auditRepo: FirestoreAuditRepository;
-  agentEventRepo: FirestoreAgentEventRepository;
-  agentRunRepo: FirestoreAgentRunRepository;
-  humanTaskRepo: FirestoreHumanTaskRepository;
-  handoffRepo: FirestoreHandoffRepository;
-  agentDefinitionRepo: FirestoreAgentDefinitionRepository;
-  coworkSessionRepo: FirestoreCoworkSessionRepository;
+  processRepo: ProcessRepository;
+  instanceRepo: ProcessInstanceRepository;
+  auditRepo: AuditRepository;
+  agentEventRepo: AgentEventRepository;
+  agentRunRepo: AgentRunRepository;
+  humanTaskRepo: HumanTaskRepository;
+  handoffRepo: HandoffRepository;
+  agentDefinitionRepo: AgentDefinitionRepository;
+  coworkSessionRepo: CoworkSessionRepository;
   cronTriggerStateRepo: CronTriggerStateRepository;
   toolCatalogRepo: ToolCatalogRepository;
-  namespaceRepo: FirestoreNamespaceRepository;
-  userProfileRepo: FirestoreUserProfileRepository;
-  oauthProviderRepo: FirestoreOAuthProviderRepository;
-  agentOAuthTokenRepo: FirestoreAgentOAuthTokenRepository;
-  modelRegistryRepo: FirestoreModelRegistryRepository;
-  secretsRepo: FirestoreWorkflowSecretsRepository;
-  namespaceSecretsRepo: FirestoreNamespaceSecretsRepository;
+  namespaceRepo: NamespaceRepository;
+  userProfileRepo: UserProfileRepository;
+  oauthProviderRepo: OAuthProviderRepository;
+  agentOAuthTokenRepo: AgentOAuthTokenRepository;
+  modelRegistryRepo: ModelRegistryRepository;
+  secretsRepo: WorkflowSecretsRepository;
+  namespaceSecretsRepo: NamespaceSecretsRepository;
   inviteService: InviteService;
   /** `null` when Mailgun env vars are unset (email disabled). */
   inviteNotificationService: InviteNotificationService | null;
@@ -130,19 +144,6 @@ interface UserRecordPort {
 interface AuthPort {
   getUser(uid: string): Promise<UserRecordPort>;
 }
-interface DocSnapshotPort {
-  readonly exists: boolean;
-  data(): { readonly mustChangePassword?: boolean } | undefined;
-}
-interface DocRefPort {
-  get(): Promise<DocSnapshotPort>;
-}
-interface CollectionPort {
-  doc(id: string): DocRefPort;
-}
-interface FirestorePort {
-  collection(name: string): CollectionPort;
-}
 
 /**
  * Adapts `FirebaseInviteService` onto the framework-free `InviteService`
@@ -154,7 +155,7 @@ class FirebaseInviteServiceAdapter implements InviteService {
   constructor(
     private readonly firebase: FirebaseInviteService,
     private readonly adminAuth: AuthPort,
-    private readonly adminDb: FirestorePort,
+    private readonly userProfileRepo: UserProfileRepository,
   ) {}
 
   async createInvitedUser(email: string, displayName: string | undefined): Promise<InvitedUser> {
@@ -184,8 +185,7 @@ class FirebaseInviteServiceAdapter implements InviteService {
       // Treat unknown users as not pending — handlers will surface a 404.
       return false;
     }
-    const userDoc = await this.adminDb.collection('users').doc(uid).get();
-    const mustChangePassword = userDoc.exists ? userDoc.data()?.mustChangePassword === true : false;
+    const mustChangePassword = (await this.userProfileRepo.getProfile(uid))?.mustChangePassword ?? false;
     const hasNeverSignedIn = lastSignInTime === null || lastSignInTime === '';
     return mustChangePassword || hasNeverSignedIn;
   }
@@ -232,33 +232,35 @@ export function getPlatformServices(): PlatformServices {
   // than to boot successfully and fail opaquely mid-workflow.
   validateSecretsKey();
 
-  const db = getAdminFirestore();
+  const pg = getSharedPostgresClient().db;
 
-  const processRepo = new FirestoreProcessRepository(db);
-  const instanceRepo = new FirestoreProcessInstanceRepository(db);
+  const processRepo: ProcessRepository = new PostgresProcessRepository(pg);
+  const instanceRepo: PostgresProcessInstanceRepository =
+    new PostgresProcessInstanceRepository(pg);
   // Indirect-namespace repos depend on instanceRepo for parent-run namespace
   // resolution inside the namespace-scoped read variants (ADR-0004 §"Storage-
   // layer filter, today").
-  const auditRepo = new FirestoreAuditRepository(db, instanceRepo);
-  const agentEventRepo = new FirestoreAgentEventRepository(db, instanceRepo);
-  const agentRunRepo = new FirestoreAgentRunRepository(db, instanceRepo);
-  const humanTaskRepo = new FirestoreHumanTaskRepository(db, instanceRepo);
-  const handoffRepo = new FirestoreHandoffRepository(db, instanceRepo);
-  const agentDefinitionRepo = new FirestoreAgentDefinitionRepository(db);
-  const coworkSessionRepo = new FirestoreCoworkSessionRepository(db, instanceRepo);
-  const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
-  const toolCatalogRepo: ToolCatalogRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresToolCatalogRepository(getSharedPostgresClient().db)
-      : new FirestoreToolCatalogRepository(db);
-  const namespaceRepo = new FirestoreNamespaceRepository(db);
-  const userProfileRepo = new FirestoreUserProfileRepository(db);
-  const oauthProviderRepo = new FirestoreOAuthProviderRepository(db);
-  const agentOAuthTokenRepo = new FirestoreAgentOAuthTokenRepository(db);
-  const modelRegistryRepo = new FirestoreModelRegistryRepository(db);
-  const secretsRepo = new FirestoreWorkflowSecretsRepository(db);
-  const namespaceSecretsRepo = new FirestoreNamespaceSecretsRepository(db);
-  const eventLog = new FirestoreAgentEventLog(db);
+  const auditRepo: AuditRepository = new PostgresAuditRepository(pg, instanceRepo);
+  const agentEventRepo: AgentEventRepository = new PostgresAgentEventRepository(instanceRepo);
+  const agentRunRepo: AgentRunRepository = new PostgresAgentRunRepository(pg, instanceRepo);
+  const humanTaskRepo: HumanTaskRepository = new PostgresHumanTaskRepository(pg, instanceRepo);
+  const handoffRepo: HandoffRepository = new PostgresHandoffRepository(pg, instanceRepo);
+  const agentDefinitionRepo: AgentDefinitionRepository = new PostgresAgentDefinitionRepository(pg);
+  const coworkSessionRepo: CoworkSessionRepository =
+    new PostgresCoworkSessionRepository(pg, instanceRepo);
+  const cronTriggerStateRepo: CronTriggerStateRepository =
+    new PostgresCronTriggerStateRepository(pg);
+  const toolCatalogRepo: ToolCatalogRepository = new PostgresToolCatalogRepository(pg);
+  const namespaceRepo: NamespaceRepository = new PostgresNamespaceRepository(pg);
+  const userProfileRepo: UserProfileRepository = new PostgresUserProfileRepository(pg);
+  const oauthProviderRepo: OAuthProviderRepository = new PostgresOAuthProviderRepository(pg);
+  const agentOAuthTokenRepo: AgentOAuthTokenRepository =
+    new PostgresAgentOAuthTokenRepository(pg);
+  const modelRegistryRepo: ModelRegistryRepository = new PostgresModelRegistryRepository(pg);
+  const secretsRepo: WorkflowSecretsRepository = new PostgresWorkflowSecretsRepository(pg);
+  const namespaceSecretsRepo: NamespaceSecretsRepository =
+    new PostgresNamespaceSecretsRepository(pg);
+  const eventLog = new PostgresAgentEventLog(instanceRepo);
 
   const pluginRegistry = new PluginRegistry();
 
@@ -356,9 +358,12 @@ export function getPlatformServices(): PlatformServices {
 
   const webhookRouter = new WebhookRouter(engine, processRepo);
 
+  // FirebaseInviteService writes to the Firebase Auth user store (identity
+  // stays on Firebase Auth) and records the must-change-password flag via the
+  // Postgres user-profile repository.
   const adminAuth = getAdminAuth();
-  const firebaseInvite = new FirebaseInviteService(adminAuth, db);
-  const inviteService = new FirebaseInviteServiceAdapter(firebaseInvite, adminAuth, db);
+  const firebaseInvite = new FirebaseInviteService(adminAuth, userProfileRepo);
+  const inviteService = new FirebaseInviteServiceAdapter(firebaseInvite, adminAuth, userProfileRepo);
   // `appUrl` matches the legacy invite route's fallback so dev-without-
   // NEXT_PUBLIC_PLATFORM_URL still renders sensible links.
   const inviteAppUrl =
@@ -414,9 +419,6 @@ export function getPlatformServices(): PlatformServices {
     });
     seedBuiltinToolCatalog(toolCatalogRepo).catch((err) => {
       console.error('[platform-services] Failed to seed built-in tool catalog:', err);
-    });
-    backfillInstanceNamespaces(db, processRepo).catch((err) => {
-      console.error('[platform-services] Failed to backfill instance namespaces:', err);
     });
   }
 

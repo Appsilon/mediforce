@@ -12,7 +12,6 @@ function render(ui: React.ReactElement) {
 
 // Mock Firebase — must come before any component imports
 vi.mock('@/lib/firebase', () => ({
-  db: {},
   auth: {},
   storage: {},
 }));
@@ -30,15 +29,6 @@ vi.mock('firebase/storage', () => ({
     return task;
   }),
   getDownloadURL: vi.fn().mockResolvedValue('https://storage.example.com/file.pdf'),
-}));
-
-vi.mock('firebase/firestore', () => ({
-  doc: vi.fn(),
-  where: vi.fn(),
-  orderBy: vi.fn(),
-  collection: vi.fn(),
-  query: vi.fn(),
-  onSnapshot: vi.fn(),
 }));
 
 // Mock next/link

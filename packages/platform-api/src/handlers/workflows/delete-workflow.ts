@@ -38,6 +38,7 @@ export async function deleteWorkflow(
     basis: 'User-initiated workflow deletion',
     entityType: 'workflow_definition',
     entityId: input.name,
+    namespace: input.namespace,
   });
 
   await scope.workflowDefinitions.setDeleted(input.namespace, input.name, true);

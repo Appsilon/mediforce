@@ -100,6 +100,7 @@ async function ensurePersonalNamespace(
     basis: 'Lazy bootstrap on GET /api/users/me',
     entityType: 'namespace',
     entityId: handle,
+    namespace: handle,
   });
 
   return namespace;

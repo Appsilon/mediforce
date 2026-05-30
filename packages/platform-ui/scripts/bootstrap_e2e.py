@@ -28,7 +28,6 @@ ENV_LOCAL = PLATFORM_UI / ".env.local"
 FIREBASE_CONFIG = Path("/tmp/firebase-e2e.json")
 # Emulator ports
 AUTH_PORT = 9099
-FIRESTORE_PORT = 8080
 DEV_SERVER_PORT = 9007
 
 # Colors for terminal output
@@ -115,26 +114,12 @@ def ensure_env_local() -> bool:
 def ensure_firebase_config() -> None:
     """Create Firebase emulator config without UI (avoids proxy/download issues).
 
-    Points the emulator at firestore.e2e.rules — a permissive test-only
-    rules file. The production firestore.rules enforce role-scoped reads that
-    Playwright journey tests do not model, which causes collection queries to
-    be rejected and the retry loop to trigger firebase-js-sdk#9267 (a
-    Firestore internal assertion that breaks every subsequent listener).
-
-    Uses absolute path so the emulator finds it regardless of cwd. A relative
-    path would be resolved against the config file location (/tmp/) — no rules
-    there — so the emulator falls back to default deny-all.
+    Only the Auth emulator is needed — Firestore is fully removed (ADR-0001
+    final cutover, #534). Firebase Auth remains the identity provider.
     """
-    rules_path = ROOT / "firestore.e2e.rules"
-    if not rules_path.exists():
-        log(f"firestore.e2e.rules not found at {rules_path}", RED)
-        sys.exit(1)
-
     config = {
-        "firestore": {"rules": str(rules_path)},
         "emulators": {
             "auth": {"port": AUTH_PORT},
-            "firestore": {"port": FIRESTORE_PORT},
             "ui": {"enabled": False},
         },
     }
@@ -144,7 +129,7 @@ def ensure_firebase_config() -> None:
 
 def start_emulators() -> subprocess.Popen[bytes] | None:
     """Start Firebase emulators if not already running."""
-    if check_port(AUTH_PORT) and check_port(FIRESTORE_PORT):
+    if check_port(AUTH_PORT):
         log("Firebase emulators already running", YELLOW)
         return None
 
@@ -162,13 +147,13 @@ def start_emulators() -> subprocess.Popen[bytes] | None:
     if "JAVA_HOME" in os.environ:
         clean_env["JAVA_HOME"] = os.environ["JAVA_HOME"]
 
-    log("Starting Firebase emulators (auth + firestore)...")
+    log("Starting Firebase emulators (auth)...")
     proc = subprocess.Popen(
         [
             "firebase",
             "emulators:start",
             "--project", "demo-mediforce",
-            "--only", "auth,firestore",
+            "--only", "auth",
             "--config", str(FIREBASE_CONFIG),
         ],
         cwd=str(PLATFORM_UI),
@@ -179,7 +164,7 @@ def start_emulators() -> subprocess.Popen[bytes] | None:
 
     # Wait for emulators to be ready
     for attempt in range(30):
-        if check_port(AUTH_PORT) and check_port(FIRESTORE_PORT):
+        if check_port(AUTH_PORT):
             log("Firebase emulators ready")
             return proc
         time.sleep(1)

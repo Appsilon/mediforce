@@ -1,4 +1,9 @@
-import type { CoworkSession, ConversationTurn } from '../schemas/cowork-session';
+import {
+  CoworkSessionSchema,
+  ConversationTurnSchema,
+  type CoworkSession,
+  type ConversationTurn,
+} from '../schemas/cowork-session';
 import type { CoworkSessionRepository } from '../interfaces/cowork-session-repository';
 import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository';
 
@@ -16,8 +21,9 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
   constructor(private readonly parents?: ProcessInstanceRepository) {}
 
   async create(session: CoworkSession): Promise<CoworkSession> {
-    this.sessions.set(session.id, { ...session, turns: [...session.turns] });
-    return { ...session, turns: [...session.turns] };
+    const parsed = CoworkSessionSchema.parse(session);
+    this.sessions.set(parsed.id, { ...parsed, turns: [...parsed.turns] });
+    return { ...parsed, turns: [...parsed.turns] };
   }
 
   async getById(sessionId: string): Promise<CoworkSession | null> {
@@ -44,7 +50,9 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
   }
 
   async listAll(): Promise<CoworkSession[]> {
-    return [...this.sessions.values()].map((s) => ({ ...s, turns: [...s.turns] }));
+    return [...this.sessions.values()]
+      .map((s) => ({ ...s, turns: [...s.turns] }))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   async listInNamespaces(allowed: readonly string[]): Promise<CoworkSession[]> {
@@ -54,7 +62,8 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
   async listByRoleAll(role: string): Promise<CoworkSession[]> {
     return [...this.sessions.values()]
       .filter((s) => s.assignedRole === role)
-      .map((s) => ({ ...s, turns: [...s.turns] }));
+      .map((s) => ({ ...s, turns: [...s.turns] }))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   async listByRoleInNamespaces(
@@ -82,12 +91,13 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
   }
 
   async addTurn(sessionId: string, turn: ConversationTurn): Promise<CoworkSession> {
+    const parsedTurn = ConversationTurnSchema.parse(turn);
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`CoworkSession not found: ${sessionId}`);
     const now = new Date().toISOString();
     const updated: CoworkSession = {
       ...session,
-      turns: [...session.turns, turn],
+      turns: [...session.turns, parsedTurn],
       updatedAt: now,
     };
     this.sessions.set(sessionId, updated);

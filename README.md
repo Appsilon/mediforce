@@ -105,12 +105,10 @@ We're building the standard for human-agent collaboration in pharma — and we'r
 
 **[Getting Started Guide](GETTING-STARTED.md)** — Quick start with emulators and demo data, no setup required.
 
-> **Datastore transition (ADR-0001).** Mediforce is moving from Firestore to
-> self-hosted Postgres. The Postgres path is opt-in via
-> `STORAGE_BACKEND=postgres`; default is still `firestore` until the cutover.
-> Local-dev instructions below cover **both** modes. See
-> [`docs/postgres-local-dev.md`](docs/postgres-local-dev.md) and
+> **Datastore (ADR-0001).** Server data layer runs on self-hosted Postgres.
+> See [`docs/postgres-local-dev.md`](docs/postgres-local-dev.md) and
 > [`docs/adr/0001-firestore-to-postgres.md`](docs/adr/0001-firestore-to-postgres.md).
+
 
 ### Fastest start (no setup)
 
@@ -125,19 +123,16 @@ Open `http://localhost:9007`. Use this to click through the UI without configuri
 
 | Command | What it gives you |
 |---|---|
-| `pnpm dev` | Default. Real Firebase per `.env.local`, agents in Docker. The main dev loop. |
+| `pnpm dev` | Default full local stack. Boots a local Postgres via the docker overlay, runs migrations, then starts the UI; agents run inline via Docker (no Redis). Firebase Auth/Storage + the `users/{uid}` profile collection still come from `.env.local`. The main dev loop. |
 | `pnpm dev:mock` | Mocked agents + seeded local emulator data, port 9007. No cloud keys, no Docker, no Firebase project. |
-| `pnpm dev:no-docker` | Like `dev`, but agents run via host `claude` CLI instead of Docker. |
-| `pnpm dev:queue` | Like `dev`, but agent execution goes through BullMQ queue (production architecture). Requires Redis + worker running — see below. |
-| `pnpm dev:postgres` | One-command Postgres mode. Boots `postgres` + `redis` via docker compose, runs `pnpm db:migrate`, then starts the dev server with `STORAGE_BACKEND=postgres`. Idempotent — safe to re-run after pulling new migrations. |
+| `pnpm dev:no-docker` | Docker-free, UI-only. Agents run via host `claude` CLI instead of Docker. |
+| `pnpm dev:queue` | Like `dev`, but agent execution goes through the BullMQ queue (production architecture). Boots `redis` alongside Postgres; requires the worker running — see below. |
+| `pnpm dev:postgres` | Explicit Postgres + Redis mode. Boots `postgres` + `redis` via docker compose, runs `pnpm db:migrate`, then starts the dev server. Idempotent — safe to re-run after pulling new migrations. |
 
 ### Postgres mode (ADR-0001)
 
-The new path. Bring up Postgres + Redis, point the app at them, set
-`STORAGE_BACKEND=postgres` to route migrated repositories through Postgres
-(today: `tool_catalog_entries`; more land per the [PLAN-0001 build order](docs/adr/PLAN-0001.md#52-build-order-postgres-implementations)).
-
-One command does all of the above:
+Bring up Postgres + Redis and point the app at them. One command does all
+of the above:
 
 ```bash
 pnpm dev:postgres                                  # docker compose up + migrate + dev
@@ -149,7 +144,6 @@ external Postgres):
 ```bash
 docker compose up postgres redis -d                # boot Postgres 16 + Redis
 # in packages/platform-ui/.env.local:
-#   STORAGE_BACKEND=postgres
 #   DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce
 pnpm db:migrate                                    # apply Drizzle migrations once
 pnpm dev                                           # start the app
@@ -178,7 +172,7 @@ pnpm dev:queue             # native UI pointed at compose Redis
 docker compose down        # stop infra when you're done
 ```
 
-### Emulator + own seed data (Firestore path, default until cutover)
+### Emulator + own seed data (legacy Firestore demo path)
 
 ```bash
 cp packages/platform-ui/.env.example packages/platform-ui/.env.local
@@ -300,21 +294,12 @@ Idempotent (drizzle's `__drizzle_migrations` ledger), exits 0 immediately
 when `STORAGE_BACKEND != postgres`. No separate migration step in the
 deploy pipeline.
 
-`STORAGE_BACKEND` defaults to `firestore` until the ADR-0001 §8 data
-cutover. Until then, Postgres runs on staging but the app routes only
-`tool-catalog` reads/writes through it (when the flag is flipped).
-
-> **Current cutover (one-off):** existing staging needs the prep run
-> once before PR #515 lands. See
-> [`docs/staging-postgres-prep.md`](docs/staging-postgres-prep.md). That
-> file gets deleted after the cutover succeeds — long-term ops content
-> stays here.
 
 ## Deep Dives
 
 | | |
 |---|---|
-| **[Getting Started](GETTING-STARTED.md)** | Set up your development environment with Firebase |
+| **[Getting Started](GETTING-STARTED.md)** | Set up your development environment — local Postgres data layer plus Firebase Auth/Storage |
 | **[Vision](docs/vision.md)** | Why this needs to exist, what agents actually do in pharma, and where we're headed |
 | **[Architecture](docs/architecture.md)** | Processes, steps, agents, compliance — the technical foundation |
 | **[How We Work](docs/how-we-work.md)** | Building bottom-up, in public, with real processes |

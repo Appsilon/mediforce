@@ -1,6 +1,6 @@
 # Getting Started
 
-Get the app running locally in minutes. Start with Firebase emulators and demo data, then progress to building your own workflows.
+Get the app running locally in minutes. Start with mocked agents and demo data, then progress to the full local stack (Postgres data layer + Firebase Auth) and building your own workflows.
 
 ## Prerequisites
 
@@ -291,15 +291,20 @@ Workflows combine human tasks and AI agent tasks with configurable autonomy leve
 
 ---
 
-## 5. Persistent Data with Your Firebase
+## 5. Persistent Data (local Postgres + your Firebase)
 
-When you need data that persists between sessions, use your own Firebase project.
+When you need data that persists between sessions, run the full local stack:
+the server data layer (workflows, processes, agent runs, agent events, human
+tasks, secrets) lives in a local Postgres (ADR-0001), while Firebase still
+provides Auth, Storage, and the `users/{uid}` profile + invite collection in
+Firestore. Use your own Firebase project for the Auth/Firestore-users side.
 
 ### Create Firebase Project
 
 1. Go to [Firebase Console](https://console.firebase.google.com/)
 2. "Add project" → name it (e.g., "mediforce-dev")
-3. Enable **Firestore Database** (production mode, choose region)
+3. Enable **Firestore Database** (production mode, choose region) — backs the
+   `users/{uid}` profile + invite data
 4. Enable **Authentication** → Email/Password provider
 
 ### Get Credentials
@@ -333,7 +338,7 @@ Required: `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `N
 
 ### Service-account credentials (Firebase Admin SDK)
 
-When NOT using emulators, the server needs a Firebase service-account JSON to talk to Firestore with admin privileges.
+When NOT using emulators, the server needs a Firebase service-account JSON to talk to Firebase Auth and the `users/{uid}` Firestore collection with admin privileges. (Workflow/process data lives in Postgres, not Firestore.)
 
 1. Firebase Console → Project Settings → Service Accounts → **Generate new private key**
 2. Save the downloaded JSON outside the repo (e.g. `~/.config/mediforce/firebase-sa.json`)
@@ -345,16 +350,23 @@ GOOGLE_APPLICATION_CREDENTIALS=/Users/<you>/.config/mediforce/firebase-sa.json
 
 Use an absolute path — the server validates the file exists on startup.
 
-### Run with Production Firebase
+### Run the full local stack
 
 ```bash
 pnpm dev
 ```
 
-**Important:** The UI starts empty. Your workflows and data are private to your Firebase project. Create workflows via UI or API to populate.
+This boots a local Postgres (via the dev docker overlay), runs migrations, then
+starts the UI against it — agents run inline via Docker (no Redis/queue worker
+needed). Local secrets in the `mediforce` namespace decrypt with the local
+`SECRETS_ENCRYPTION_KEY`, so no extra seeding step is required.
+
+**Important:** The UI starts empty. Create workflows via UI or API to populate.
 
 ### Firestore Security Rules (Development)
 
+Firestore now only backs the `users/{uid}` profile + invite collection (all
+other data is in Postgres), but its rules still apply to that collection.
 Firebase Console → Firestore → Rules:
 
 ```
@@ -435,9 +447,9 @@ Make sure:
 | `pnpm emulators` | Start Firebase emulators (Auth + Firestore + Storage) |
 | `pnpm seed` | Seed demo data into running emulators |
 | `NEXT_PUBLIC_USE_EMULATORS=true pnpm dev` | Run with emulators (port 9003) |
-| `pnpm dev` | Run with production Firebase (per `.env.local`) |
-| `pnpm dev:no-docker` | Like `dev`, agents via host `claude` CLI |
-| `pnpm dev:queue` | Like `dev`, production-like queue mode (run `docker compose up -d` first) |
+| `pnpm dev` | Full local stack: boots Postgres, migrates, runs the UI (port 9003) |
+| `pnpm dev:no-docker` | Like `dev` but docker-free — UI only, agents via host `claude` CLI |
+| `pnpm dev:queue` | Like `dev` plus Redis + BullMQ queued agent execution |
 | `pnpm test:unit` | vitest unit + integration |
 | `pnpm test:affected` | vitest, only files changed |
 | `pnpm test:e2e` | All Playwright E2E (L3 + L4) |

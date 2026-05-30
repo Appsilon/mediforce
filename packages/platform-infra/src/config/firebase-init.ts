@@ -1,7 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import type { FirebaseApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import type { Firestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import type { Auth } from 'firebase/auth';
 
@@ -34,21 +32,6 @@ export function initializeFirebase(config: FirebaseConfig): FirebaseApp {
 
   firebaseApp = initializeApp(config);
   return firebaseApp;
-}
-
-/**
- * Get the Firestore database instance.
- * Throws if Firebase has not been initialized.
- */
-export function getFirestoreDb(): Firestore {
-  if (!firebaseApp && getApps().length === 0) {
-    throw new Error(
-      'Firebase has not been initialized. Call initializeFirebase() first.',
-    );
-  }
-
-  const app = firebaseApp ?? getApp();
-  return getFirestore(app);
 }
 
 /**

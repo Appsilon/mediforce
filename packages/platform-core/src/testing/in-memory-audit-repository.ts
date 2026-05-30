@@ -1,9 +1,13 @@
-import type { AuditRepository, AuditEvent } from '../index';
+import { AuditEventSchema, type AuditEvent } from '../schemas/audit-event';
+import type { AuditRepository } from '../interfaces/audit-repository';
 import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository';
 
 /**
  * In-memory implementation of AuditRepository for testing.
  * Stores events in an array, simulates serverTimestamp with current time.
+ *
+ * Mirrors the Firestore + Postgres backends — every write parses through
+ * Zod (parity with both real backends, ADR-0001 Implementation pattern 2).
  *
  * Namespace-scoped read (`getByProcessInNamespaces`) resolves the parent
  * run's namespace via the injected `ProcessInstanceRepository`. Tests that
@@ -17,10 +21,16 @@ export class InMemoryAuditRepository implements AuditRepository {
   async append(
     event: Omit<AuditEvent, 'serverTimestamp'>,
   ): Promise<AuditEvent> {
-    const completeEvent: AuditEvent = {
-      ...event,
+    // Strip the write-time-only `namespace` hint before storing so the
+    // stored shape matches the Postgres read (workspace is derived state
+    // there, not stored on the audit row). Parity with PostgresAuditRepository:
+    // both backends accept `event.namespace` as the workspace-resolution
+    // hint for workspace-scoped events that have no parent process run.
+    const { namespace: _namespace, ...rest } = event;
+    const completeEvent = AuditEventSchema.parse({
+      ...rest,
       serverTimestamp: new Date().toISOString(),
-    };
+    });
 
     this.events.push(completeEvent);
     return completeEvent;
@@ -38,7 +48,7 @@ export class InMemoryAuditRepository implements AuditRepository {
   async getByProcess(processInstanceId: string): Promise<AuditEvent[]> {
     return this.events
       .filter((e) => e.processInstanceId === processInstanceId)
-      .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   }
 
   async getByProcessInNamespaces(

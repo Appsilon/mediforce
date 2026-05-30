@@ -76,7 +76,8 @@ describe('DELETE /api/admin/docker-images', () => {
     expect(res.status).toBe(200);
     expect(json.deleted).toBe('sha256:abc');
     expect(mockDeleterDelete).toHaveBeenCalledWith('sha256:abc');
-    expect(mockAuditAppend).toHaveBeenCalledTimes(1);
+    // Audit emission disabled — see TODO(#592) in delete-image.ts.
+    expect(mockAuditAppend).not.toHaveBeenCalled();
   });
 
   it('[AUTHZ] api-key caller passes', async () => {

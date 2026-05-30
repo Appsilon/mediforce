@@ -762,6 +762,7 @@ describe('Mediforce client ↔ route-adapter ↔ updateNamespaceMemberRole (in-p
 describe('Mediforce client ↔ route-adapter ↔ clearMustChangePassword (in-process)', () => {
   let userProfileRepo: InMemoryUserProfileRepository;
   let auditRepo: InMemoryAuditRepository;
+  let namespaceRepo: InMemoryNamespaceRepo;
   let mediforce: Mediforce;
 
   const userCaller: CallerIdentity = {
@@ -776,6 +777,20 @@ describe('Mediforce client ↔ route-adapter ↔ clearMustChangePassword (in-pro
     userProfileRepo = new InMemoryUserProfileRepository();
     await userProfileRepo.setMustChangePassword('uid-forced', true);
     auditRepo = new InMemoryAuditRepository();
+    namespaceRepo = new InMemoryNamespaceRepo();
+    // The forced-password-change audit event is attributed to the user's
+    // personal namespace (FK-valid `audit_events.workspace`).
+    const now = new Date().toISOString();
+    await namespaceRepo.createNamespaceWithOwner({
+      namespace: {
+        handle: 'uid-forced',
+        type: 'personal',
+        displayName: 'Forced User',
+        linkedUserId: 'uid-forced',
+        createdAt: now,
+      },
+      ownerMember: { uid: 'uid-forced', role: 'owner', joinedAt: now },
+    });
 
     const route = createRouteAdapter(
       ClearMustChangePasswordInputSchema,
@@ -783,7 +798,8 @@ describe('Mediforce client ↔ route-adapter ↔ clearMustChangePassword (in-pro
       clearMustChangePassword,
       {
         resolveCaller: async () => userCaller,
-        buildScope: (caller) => createTestScope({ caller, userProfileRepo, auditRepo }),
+        buildScope: (caller) =>
+          createTestScope({ caller, userProfileRepo, auditRepo, namespaceRepo }),
       },
     );
 

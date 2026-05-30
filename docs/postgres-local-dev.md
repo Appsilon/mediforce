@@ -45,7 +45,7 @@ TEST_DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce \
   pnpm --filter @mediforce/platform-infra exec vitest run src/postgres
 ```
 
-CI runs the same suite (job `postgres-tests`) plus an L3 API E2E job
+CI runs the same suite (job `postgres-repository-tests`) plus an L3 API E2E job
 (`e2e-tests-postgres`) exercising the route handler → repo → DB trip.
 
 ## Troubleshooting

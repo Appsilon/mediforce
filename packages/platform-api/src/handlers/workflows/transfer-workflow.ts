@@ -39,6 +39,7 @@ export async function transferWorkflowNamespace(
     basis: 'Workflow namespace transferred via API',
     entityType: 'workflow_definition',
     entityId: input.name,
+    namespace: input.targetNamespace,
   });
 
   return {

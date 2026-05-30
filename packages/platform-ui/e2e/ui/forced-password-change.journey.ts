@@ -1,5 +1,6 @@
 import { test, expect } from '../helpers/test-fixtures';
-import { createTestUser, deleteAuthUser, seedCollection } from '../helpers/emulator';
+import { createTestUser, deleteAuthUser } from '../helpers/emulator';
+import { seedPostgresPersonalNamespace, seedPostgresUserProfile } from '../helpers/postgres-seed';
 import { setupRecording, allowPageErrors, click, showStep, showResult, showCaption, endRecording } from '../helpers/recording';
 
 const INVITED_EMAIL = 'invited-user@mediforce.dev';
@@ -18,24 +19,13 @@ test.describe('Forced Password Change Journey', () => {
     await deleteAuthUser(INVITED_EMAIL);
     const uid = await createTestUser(INVITED_EMAIL, INVITED_TEMP_PASSWORD, 'Invited User');
 
-    await seedCollection('users', {
-      [uid]: {
-        uid,
-        email: INVITED_EMAIL,
-        displayName: 'Invited User',
-        mustChangePassword: true,
-        handle: 'invited-personal',
-      },
-    });
-    await seedCollection('namespaces', {
-      'invited-personal': {
-        handle: 'invited-personal',
-        type: 'personal',
-        displayName: 'Invited User',
-        linkedUserId: uid,
-        createdAt: new Date().toISOString(),
-      },
-    });
+    // The `(app)` layout reads mustChangePassword from GET /api/users/me, which
+    // resolves it from the Postgres `user_profiles` row (ADR-0001 #534, the
+    // former Firestore `users/{uid}.mustChangePassword`). Seed the flag plus a
+    // personal workspace so the post-change redirect lands on a known handle
+    // instead of the lazily-bootstrapped one.
+    await seedPostgresUserProfile(uid, true);
+    await seedPostgresPersonalNamespace('invited-personal', uid, 'Invited User');
   });
 
   test('invited user is forced to set a permanent password on first sign-in', async ({ page }, testInfo) => {

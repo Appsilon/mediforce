@@ -85,6 +85,7 @@ export async function deleteAgentOAuthToken(
     basis: 'OAuth token revoked via API',
     entityType: 'agentDefinition',
     entityId: input.id,
+    namespace: input.namespace,
   });
   return { success: true };
 }

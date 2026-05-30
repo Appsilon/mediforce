@@ -25,6 +25,13 @@ export const AuditEventSchema = z.object({
   entityType: z.string(),
   entityId: z.string(),
   processInstanceId: z.string().optional(),
+  // Workspace handle — required when no processInstanceId. The Postgres
+  // backend resolves the audit row's workspace column from the parent run
+  // when processInstanceId is set; for workspace-scoped events with no
+  // parent run (e.g. tool_catalog.entry.created, namespace.created,
+  // cron.trigger.fired) the caller must pass `namespace` explicitly.
+  // Not persisted as its own column — Postgres stores it in `workspace`.
+  namespace: z.string().min(1).optional(),
   stepId: z.string().optional(),
 
   // --- Consistent: linked to process version ---
