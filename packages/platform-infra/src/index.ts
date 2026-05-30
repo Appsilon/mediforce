@@ -1,16 +1,11 @@
-// Firestore read ports for the two domains still served from Firebase
-// (agent-event log, user profile) — Auth-adjacent, out of ADR-0001 scope.
-export { FirestoreAgentEventRepository } from './firestore/agent-event-repository';
-export { FirestoreUserProfileRepository } from './firestore/user-profile-repository';
-
 // Auth / Firebase wiring (kept — Firebase Auth is the identity provider).
-export { FirebaseAuthService } from './auth/firebase-auth-service';
+// Firestore is fully removed (ADR-0001 final cutover, #534); only Auth and
+// Storage remain on Firebase.
 export { FirebaseUserDirectoryService } from './auth/firebase-user-directory-service';
 export { FirebaseInviteService } from './auth/firebase-invite-service';
-export { getAdminAuth, getAdminFirestore } from './auth/firebase-admin-init';
+export { getAdminAuth } from './auth/firebase-admin-init';
 export {
   initializeFirebase,
-  getFirestoreDb,
   getFirebaseAuth,
 } from './config/firebase-init';
 export type { FirebaseConfig } from './config/firebase-init';

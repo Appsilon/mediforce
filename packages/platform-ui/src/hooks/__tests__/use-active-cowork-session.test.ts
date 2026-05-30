@@ -12,12 +12,6 @@ vi.mock('@/lib/mediforce', () => ({
   mediforce: { cowork: { getByInstance: getByInstanceMock } },
   ApiError,
 }));
-vi.mock('@/lib/firebase', () => ({ db: {} }));
-vi.mock('firebase/firestore', () => ({
-  where: vi.fn(),
-  orderBy: vi.fn(),
-}));
-
 const { useActiveCoworkSession } = await import('../use-tasks');
 
 describe('useActiveCoworkSession', () => {

@@ -12,12 +12,6 @@ vi.mock('@/lib/mediforce', () => ({
   mediforce: { tasks: { list: listMock } },
   ApiError,
 }));
-vi.mock('@/lib/firebase', () => ({ db: {} }));
-vi.mock('firebase/firestore', () => ({
-  where: vi.fn(),
-  orderBy: vi.fn(),
-}));
-
 const { useMyCompletedTasks } = await import('../use-tasks');
 
 describe('useMyCompletedTasks', () => {

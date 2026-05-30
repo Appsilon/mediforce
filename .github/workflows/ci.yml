@@ -151,17 +151,14 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      # Firestore emulator is still required: the server-side user-profile
-      # read port + invite service use the Firestore `users` collection
-      # (Auth-adjacent, out of ADR-0001 scope), which auth-setup seeds. The
-      # namespace / member / workflow-def seeds are now redundant with the
-      # Postgres seed and pending cleanup.
+      # Only the Auth emulator is needed: Firestore is fully removed
+      # (ADR-0001 final cutover, #534). Firebase Auth remains the identity
+      # provider, so auth-setup still seeds users here.
       - name: Start Firebase Emulators
         working-directory: packages/platform-ui
         run: |
-          firebase emulators:start --project demo-mediforce --only auth,firestore --config firebase.ci.json &
+          firebase emulators:start --project demo-mediforce --only auth --config firebase.ci.json &
           curl --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:9099/
-          curl --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:8080/
 
       # NEXT_PUBLIC_* values are baked into the bundle, so cache key includes
       # them as a literal suffix. Bump the suffix if you change any value below.
