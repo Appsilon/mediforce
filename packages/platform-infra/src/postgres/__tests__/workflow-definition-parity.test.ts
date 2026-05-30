@@ -270,6 +270,37 @@ function contract(
       );
     });
 
+    it('listAllWorkflowDefinitions excludes soft-deleted workflows', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      await repo.saveWorkflowDefinition(definitionFor('ws-1', { version: 1 }));
+      await repo.setWorkflowDeleted('ws-1', 'supply-chain-review', true);
+
+      const visible = await repo.listAllWorkflowDefinitions(false);
+      expect(
+        visible.definitions.find((d) => d.name === 'supply-chain-review'),
+      ).toBeUndefined();
+
+      const withArchived = await repo.listAllWorkflowDefinitions(true);
+      expect(
+        withArchived.definitions.find((d) => d.name === 'supply-chain-review'),
+      ).toBeUndefined();
+    });
+
+    it('listWorkflowDefinitionsVisibleTo excludes soft-deleted workflows', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      await repo.saveWorkflowDefinition(
+        definitionFor('ws-1', { version: 1, visibility: 'public' }),
+      );
+      await repo.setWorkflowDeleted('ws-1', 'supply-chain-review', true);
+
+      const visible = await repo.listWorkflowDefinitionsVisibleTo(['ws-1'], false);
+      expect(
+        visible.definitions.find((d) => d.name === 'supply-chain-review'),
+      ).toBeUndefined();
+    });
+
     it('unique (workspace, name, version) — duplicate save throws', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');

@@ -140,6 +140,7 @@ export class PostgresProcessRepository implements ProcessRepository {
 
     const grouped = new Map<string, WorkflowDefinition[]>();
     for (const row of rows) {
+      if (row.deletedAt !== null) continue;
       if (!includeArchived && row.archivedAt !== null) continue;
       const parsed = WorkflowDefinitionSchema.safeParse(toDefinition(row));
       if (!parsed.success) {

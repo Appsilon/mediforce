@@ -68,6 +68,7 @@ export class InMemoryProcessRepository implements ProcessRepository {
   ): WorkflowDefinitionListResult {
     const grouped = new Map<string, WorkflowDefinition[]>();
     for (const definition of this.workflowDefinitions.values()) {
+      if (definition.deleted === true) continue;
       if (!includeArchived && definition.archived === true) continue;
       const key = this.compositeKey(definition.namespace, definition.name, '');
       const existing = grouped.get(key) ?? [];
