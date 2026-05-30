@@ -24,6 +24,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - `CoworkSession` schema now defaults `agent`→`chat` and `voiceConfig`→`null` so legacy chat-only sessions (predating the voice fields) survive the cutover's full-scan Zod reads instead of 400ing the whole `cowork.list`. `findMostRecentActive` drops its `createdAt` orderBy (picks the latest in memory) so the by-instance lookup no longer needs an undeployed composite index — fixes the 500 that hid the run page's "Open cowork" button.
 
 ### Changed
+- ADR-0001 final cutover — `users/{uid}` profile migrated to Postgres `user_profiles` (`mustChangePassword` only); invite + forced-password writes now route through `PostgresUserProfileRepository`. [#534](https://github.com/Appsilon/mediforce/pull/534)
+- Firestore fully removed — only Firebase Auth + Storage remain. Dropped the Firestore repos, admin/client handles, rules/indexes, and the emulator from every config. [#534](https://github.com/Appsilon/mediforce/pull/534)
 - Plain `pnpm dev` now boots the full local stack (Postgres up + migrate + UI); `dev:local` removed, `dev:no-docker` stays docker-free, `dev:queue` opts into Redis/BullMQ.
 - Workspace-home run counts + 3-run preview now come from a server-side `runSummary` on `workflows.list` instead of polling up to 10k runs every 5 s and grouping client-side; `includeCompletedRuns` mirrors the "show completed" toggle.
 - Phase 4 done ([PR-final #591](https://github.com/Appsilon/mediforce/pull/591)) — zero `firebase/firestore` in `platform-ui` (`api-boundaries.test.ts` tripwire); PG PR2 ([#534](https://github.com/Appsilon/mediforce/pull/534)) unblocked.
