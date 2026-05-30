@@ -123,11 +123,11 @@ Open `http://localhost:9007`. Use this to click through the UI without configuri
 
 | Command | What it gives you |
 |---|---|
-| `pnpm dev` | Default. Real Firebase per `.env.local`, agents in Docker. The main dev loop. |
+| `pnpm dev` | Default full local stack. Boots a local Postgres via the docker overlay, runs migrations, then starts the UI; agents run inline via Docker (no Redis). Firebase Auth/Storage + the `users/{uid}` profile collection still come from `.env.local`. The main dev loop. |
 | `pnpm dev:mock` | Mocked agents + seeded local emulator data, port 9007. No cloud keys, no Docker, no Firebase project. |
-| `pnpm dev:no-docker` | Like `dev`, but agents run via host `claude` CLI instead of Docker. |
-| `pnpm dev:queue` | Like `dev`, but agent execution goes through BullMQ queue (production architecture). Requires Redis + worker running — see below. |
-| `pnpm dev:postgres` | One-command Postgres mode. Boots `postgres` + `redis` via docker compose, runs `pnpm db:migrate`, then starts the dev server. Idempotent — safe to re-run after pulling new migrations. |
+| `pnpm dev:no-docker` | Docker-free, UI-only. Agents run via host `claude` CLI instead of Docker. |
+| `pnpm dev:queue` | Like `dev`, but agent execution goes through the BullMQ queue (production architecture). Boots `redis` alongside Postgres; requires the worker running — see below. |
+| `pnpm dev:postgres` | Explicit Postgres + Redis mode. Boots `postgres` + `redis` via docker compose, runs `pnpm db:migrate`, then starts the dev server. Idempotent — safe to re-run after pulling new migrations. |
 
 ### Postgres mode (ADR-0001)
 
@@ -172,7 +172,7 @@ pnpm dev:queue             # native UI pointed at compose Redis
 docker compose down        # stop infra when you're done
 ```
 
-### Emulator + own seed data (Firestore path, default until cutover)
+### Emulator + own seed data (legacy Firestore demo path)
 
 ```bash
 cp packages/platform-ui/.env.example packages/platform-ui/.env.local
@@ -299,7 +299,7 @@ deploy pipeline.
 
 | | |
 |---|---|
-| **[Getting Started](GETTING-STARTED.md)** | Set up your development environment with Firebase |
+| **[Getting Started](GETTING-STARTED.md)** | Set up your development environment — local Postgres data layer plus Firebase Auth/Storage |
 | **[Vision](docs/vision.md)** | Why this needs to exist, what agents actually do in pharma, and where we're headed |
 | **[Architecture](docs/architecture.md)** | Processes, steps, agents, compliance — the technical foundation |
 | **[How We Work](docs/how-we-work.md)** | Building bottom-up, in public, with real processes |

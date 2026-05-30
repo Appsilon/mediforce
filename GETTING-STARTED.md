@@ -1,6 +1,6 @@
 # Getting Started
 
-Get the app running locally in minutes. Start with Firebase emulators and demo data, then progress to building your own workflows.
+Get the app running locally in minutes. Start with mocked agents and demo data, then progress to the full local stack (Postgres data layer + Firebase Auth) and building your own workflows.
 
 ## Prerequisites
 
@@ -291,15 +291,20 @@ Workflows combine human tasks and AI agent tasks with configurable autonomy leve
 
 ---
 
-## 5. Persistent Data with Your Firebase
+## 5. Persistent Data (local Postgres + your Firebase)
 
-When you need data that persists between sessions, use your own Firebase project.
+When you need data that persists between sessions, run the full local stack:
+the server data layer (workflows, processes, agent runs, agent events, human
+tasks, secrets) lives in a local Postgres (ADR-0001), while Firebase still
+provides Auth, Storage, and the `users/{uid}` profile + invite collection in
+Firestore. Use your own Firebase project for the Auth/Firestore-users side.
 
 ### Create Firebase Project
 
 1. Go to [Firebase Console](https://console.firebase.google.com/)
 2. "Add project" → name it (e.g., "mediforce-dev")
-3. Enable **Firestore Database** (production mode, choose region)
+3. Enable **Firestore Database** (production mode, choose region) — backs the
+   `users/{uid}` profile + invite data
 4. Enable **Authentication** → Email/Password provider
 
 ### Get Credentials
@@ -333,7 +338,7 @@ Required: `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `N
 
 ### Service-account credentials (Firebase Admin SDK)
 
-When NOT using emulators, the server needs a Firebase service-account JSON to talk to Firestore with admin privileges.
+When NOT using emulators, the server needs a Firebase service-account JSON to talk to Firebase Auth and the `users/{uid}` Firestore collection with admin privileges. (Workflow/process data lives in Postgres, not Firestore.)
 
 1. Firebase Console → Project Settings → Service Accounts → **Generate new private key**
 2. Save the downloaded JSON outside the repo (e.g. `~/.config/mediforce/firebase-sa.json`)
@@ -360,6 +365,8 @@ needed). Local secrets in the `mediforce` namespace decrypt with the local
 
 ### Firestore Security Rules (Development)
 
+Firestore now only backs the `users/{uid}` profile + invite collection (all
+other data is in Postgres), but its rules still apply to that collection.
 Firebase Console → Firestore → Rules:
 
 ```
