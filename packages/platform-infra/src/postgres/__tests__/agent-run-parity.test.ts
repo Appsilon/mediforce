@@ -151,6 +151,43 @@ function contract(
       expect(fetched?.envelope).toBeNull();
     });
 
+    it('create upserts on repeated id (running → terminal status transition)', async () => {
+      const instanceId = randomUUID();
+      await registerInstance(instanceId, 'ws-1');
+      const runId = randomUUID();
+
+      // Initial write: step starts, no envelope yet.
+      await repo.create(
+        runFor(instanceId, {
+          id: runId,
+          status: 'running',
+          envelope: null,
+          completedAt: null,
+        }),
+      );
+
+      // Terminal write: same id, now completed with an envelope. The runner
+      // re-issues create() rather than a dedicated update() — backends MUST
+      // treat this as an upsert (Firestore .set() / InMemory Map.set parity).
+      await repo.create(
+        runFor(instanceId, {
+          id: runId,
+          status: 'completed',
+          envelope: buildAgentOutputEnvelope({ confidence: 0.9 }),
+          completedAt: '2026-01-01T12:00:00.000Z',
+        }),
+      );
+
+      const fetched = await repo.getById(runId);
+      expect(fetched?.status).toBe('completed');
+      expect(fetched?.envelope?.confidence).toBe(0.9);
+      expect(fetched?.completedAt).toBe('2026-01-01T12:00:00.000Z');
+
+      // Still a single row — upsert, not a second insert.
+      const all = await repo.getByInstanceId(instanceId);
+      expect(all).toHaveLength(1);
+    });
+
     it('getById returns null for unknown id', async () => {
       const missing = await repo.getById(randomUUID());
       expect(missing).toBeNull();

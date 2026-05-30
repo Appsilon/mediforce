@@ -47,29 +47,39 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
     }
     const envelope = parsed.envelope;
     const { extracted, payload } = splitEnvelope(envelope);
+    const values = {
+      id: parsed.id,
+      workspace: parent.namespace,
+      processInstanceId: parsed.processInstanceId,
+      stepId: parsed.stepId,
+      pluginId: parsed.pluginId,
+      autonomyLevel: parsed.autonomyLevel,
+      status: parsed.status,
+      fallbackReason: parsed.fallbackReason,
+      confidence: extracted.confidence,
+      model: extracted.model,
+      durationMs: extracted.durationMs,
+      promptTokens: extracted.promptTokens,
+      completionTokens: extracted.completionTokens,
+      costUsd: extracted.costUsd,
+      envelopePayload: payload,
+      executorType: parsed.executorType ?? null,
+      reviewerType: parsed.reviewerType ?? null,
+      startedAt: new Date(parsed.startedAt),
+      completedAt: parsed.completedAt ? new Date(parsed.completedAt) : null,
+    };
+    // AgentRunner writes the same id twice — once at start (status 'running')
+    // and once at the terminal transition (completed/escalated/error). The
+    // Firestore + in-memory backends implement create() as an upsert
+    // (.set() / Map.set), so we mirror that here to preserve parity; a plain
+    // insert throws on the second write (agent_runs_pkey).
+    // TODO(#617): replace this implicit upsert with an explicit create()/update()
+    // split across all repository backends and fix the callers in agent-runner.ts.
+    const { id: _, ...mutable } = values;
     const [row] = await this.db
       .insert(agentRuns)
-      .values({
-        id: parsed.id,
-        workspace: parent.namespace,
-        processInstanceId: parsed.processInstanceId,
-        stepId: parsed.stepId,
-        pluginId: parsed.pluginId,
-        autonomyLevel: parsed.autonomyLevel,
-        status: parsed.status,
-        fallbackReason: parsed.fallbackReason,
-        confidence: extracted.confidence,
-        model: extracted.model,
-        durationMs: extracted.durationMs,
-        promptTokens: extracted.promptTokens,
-        completionTokens: extracted.completionTokens,
-        costUsd: extracted.costUsd,
-        envelopePayload: payload,
-        executorType: parsed.executorType ?? null,
-        reviewerType: parsed.reviewerType ?? null,
-        startedAt: new Date(parsed.startedAt),
-        completedAt: parsed.completedAt ? new Date(parsed.completedAt) : null,
-      })
+      .values(values)
+      .onConflictDoUpdate({ target: agentRuns.id, set: mutable })
       .returning();
     return AgentRunSchema.parse(toAgentRun(row));
   }
