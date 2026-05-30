@@ -14,3 +14,4 @@ export * from './agent-definition';
 export * from './model-registry';
 export * from './namespace-secret';
 export * from './workflow-secret';
+export * from './user-profile';
