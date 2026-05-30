@@ -52,6 +52,7 @@ export async function updateNamespace(
     basis: 'Owner/admin edited workspace via API',
     entityType: 'namespace',
     entityId: input.handle,
+    namespace: input.handle,
   });
 
   return { namespace };
