@@ -93,13 +93,14 @@ jobs:
       - run: pnpm --filter @mediforce/platform-infra exec vitest run src/postgres
 
   e2e-tests:
-    # ADR-0001: L3 API E2E against Postgres. Runs the `api` Playwright project
-    # (browserless HTTP journeys) against a real Postgres container with the
-    # Firebase Auth emulator. The full UI Playwright project is gated on the
-    # NextAuth migration (ADR-0002) and is not run here; the API journeys give
-    # the storage swap its coverage.
+    # ADR-0001: L3 API + L4 UI E2E against Postgres. Runs the `api` Playwright
+    # project (browserless HTTP journeys) and then the `authenticated` UI
+    # project (Chromium journeys) against a real Postgres container with the
+    # Firebase Auth emulator. Sign-in uses the Auth emulator (no NextAuth), so
+    # both lanes share this job's setup. UI runs under workers:1, adding
+    # wall-clock for ~30 journeys.
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:16-alpine
@@ -185,6 +186,23 @@ jobs:
 
       - name: Run API E2E against Postgres
         run: pnpm test:e2e:api
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: fake-api-key
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-mediforce
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: demo-mediforce.appspot.com
+          FIREBASE_PROJECT_ID: demo-mediforce
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
+          NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:fake'
+          PLATFORM_API_KEY: ci-e2e-test-key
+          SECRETS_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+          MEDIFORCE_DISABLE_EMAIL: 'true'
+
+      # L4 UI journeys reuse the same prebuilt server (start:e2e,
+      # reuseExistingServer) + Auth emulator + Postgres as the API lane.
+      # workspace-docker.journey.ts self-skips under CI (#239).
+      - name: Run UI E2E against Postgres
+        run: pnpm test:e2e:ui
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: fake-api-key
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
