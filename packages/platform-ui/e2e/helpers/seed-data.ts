@@ -894,21 +894,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
   };
 
-  // User profile document — required by Firestore security rules.
-  // humanTasks and handoffEntities rules call get(/users/{uid}).data.roles
-  // to verify the reader has a matching role.
-  const users: Record<string, Record<string, unknown>> = {
-    [testUserId]: {
-      uid: testUserId,
-      email: 'test@mediforce.dev',
-      displayName: 'Test User',
-      handle: 'test',
-      organizations: [],
-      role: 'admin',
-      roles: ['reviewer', 'analyst', 'operator'],
-    },
-  };
-
   const workflowDefinitions: Record<string, Record<string, unknown>> = {
     // Example workflow that exercises the run-scoped git workspace with a
     // small real-shaped data pipeline: step 1 generates a CSV dataset, step 2
@@ -1495,5 +1480,5 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     }
   }
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, modelRegistry };
+  return { humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, modelRegistry };
 }

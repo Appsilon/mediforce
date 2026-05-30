@@ -3,15 +3,14 @@ const AUTH_EMULATOR = 'http://127.0.0.1:9099';
 const FIRESTORE_EMULATOR = 'http://127.0.0.1:8080';
 const API_KEY = 'fake-api-key';
 
+/** Reset the Auth emulator's accounts. Firestore is fully removed (ADR-0001
+ *  #534) — server-side state lives in Postgres and is reset by
+ *  `seedPostgresNamespace`'s TRUNCATE. */
 export async function clearEmulators() {
   await fetch(`${AUTH_EMULATOR}/emulator/v1/projects/${PROJECT_ID}/accounts`, {
     method: 'DELETE',
     signal: AbortSignal.timeout(5000),
   });
-  await fetch(
-    `${FIRESTORE_EMULATOR}/emulator/v1/projects/${PROJECT_ID}/databases/(default)/documents`,
-    { method: 'DELETE', signal: AbortSignal.timeout(5000) },
-  );
 }
 
 export async function createTestUser(

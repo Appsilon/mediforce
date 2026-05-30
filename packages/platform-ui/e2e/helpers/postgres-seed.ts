@@ -22,7 +22,10 @@ import { buildSeedData } from './seed-data';
  * Idempotent: every insert uses ON CONFLICT DO NOTHING so re-running the
  * setup (e.g. after a flaky retry) does not blow up.
  */
-export async function seedPostgresNamespace(testUserId: string): Promise<void> {
+export async function seedPostgresNamespace(
+  testUserId: string,
+  options: { mockOAuthBaseUrl?: string } = {},
+): Promise<void> {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error('DATABASE_URL must be set to seed Postgres for E2E.');
@@ -30,10 +33,10 @@ export async function seedPostgresNamespace(testUserId: string): Promise<void> {
 
   const sql = postgres(url, { max: 1, onnotice: () => {} });
   try {
-    const data = buildSeedData(testUserId);
+    const data = buildSeedData(testUserId, { mockOAuthBaseUrl: options.mockOAuthBaseUrl });
 
     // ── 0. Wipe prior fixture rows ──────────────────────────────────────────
-    // Auth-setup `clearEmulators` resets Firestore + Auth but does not touch
+    // Auth-setup `clearEmulators` resets the Auth emulator but does not touch
     // Postgres, so a re-run of the setup task (Playwright retries, dev-mode
     // re-auth) would dupe human_tasks / agent_runs / audit_events (uuid PKs,
     // no business-key unique constraints) and conflict on workflow_definitions
@@ -435,6 +438,73 @@ export async function seedPostgresNamespace(testUserId: string): Promise<void> {
         ON CONFLICT (workspace, id) DO NOTHING
       `;
     }
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
+ * Seed a `user_profiles` row (ADR-0001 final cutover, #534). Replaces the
+ * former Firestore `users/{uid}.mustChangePassword` write — the only
+ * application-owned profile field anything reads live. Used by the
+ * forced-password-change journey to flag an invited user as pending a
+ * permanent password before first sign-in.
+ *
+ * Idempotent: re-running the setup (Playwright retries) upserts the flag.
+ */
+export async function seedPostgresUserProfile(
+  uid: string,
+  mustChangePassword: boolean,
+): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL must be set to seed Postgres for E2E.');
+  }
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    await sql`
+      INSERT INTO user_profiles (uid, must_change_password)
+      VALUES (${uid}, ${mustChangePassword})
+      ON CONFLICT (uid) DO UPDATE SET
+        must_change_password = EXCLUDED.must_change_password,
+        updated_at = now()
+    `;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
+ * Seed a personal `workspaces` row + its owner `workspace_members` row.
+ * Replaces the former Firestore `namespaces/{handle}` +
+ * `namespaces/{handle}/members/{uid}` writes for journeys that pre-seed an
+ * extra workspace (e.g. the invited user's personal namespace) so the
+ * post-sign-in redirect resolves to a known handle instead of relying on the
+ * lazy bootstrap in GET /api/users/me.
+ *
+ * Idempotent via ON CONFLICT DO NOTHING.
+ */
+export async function seedPostgresPersonalNamespace(
+  handle: string,
+  uid: string,
+  displayName: string,
+): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL must be set to seed Postgres for E2E.');
+  }
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    await sql`
+      INSERT INTO workspaces (handle, type, display_name, linked_user_id, created_at)
+      VALUES (${handle}, 'personal', ${displayName}, ${uid}, now())
+      ON CONFLICT (handle) DO NOTHING
+    `;
+    await sql`
+      INSERT INTO workspace_members (workspace, uid, role, joined_at)
+      VALUES (${handle}, ${uid}, 'owner', now())
+      ON CONFLICT (workspace, uid) DO NOTHING
+    `;
   } finally {
     await sql.end({ timeout: 5 });
   }
