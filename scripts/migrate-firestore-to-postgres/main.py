@@ -708,10 +708,12 @@ def migrate_agent_runs(fs, pg, *, dry_run: bool, ws_cache: dict[str, str]) -> di
                 "fallback_reason": data.get("fallbackReason"),
                 "confidence": env.get("confidence"),
                 "model": env.get("model"),
-                "duration_ms": env.get("durationMs"),
-                "prompt_tokens": (env.get("usage") or {}).get("promptTokens"),
-                "completion_tokens": (env.get("usage") or {}).get("completionTokens"),
-                "cost_usd": env.get("costUsd"),
+                # Envelope keys per AgentOutputEnvelopeSchema: `duration_ms` and
+                # `tokenUsage.{inputTokens,outputTokens}`. The envelope carries
+                # no cost field, so `cost_usd` is left to the column default.
+                "duration_ms": env.get("duration_ms"),
+                "prompt_tokens": (env.get("tokenUsage") or {}).get("inputTokens"),
+                "completion_tokens": (env.get("tokenUsage") or {}).get("outputTokens"),
                 "envelope_payload": env,
                 "executor_type": data.get("executorType"),
                 "reviewer_type": data.get("reviewerType"),
