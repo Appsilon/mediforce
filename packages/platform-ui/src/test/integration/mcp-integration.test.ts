@@ -120,6 +120,8 @@ const COWORK_AGENT: AgentDefinition = {
   inputDescription: '',
   outputDescription: '',
   skillFileNames: [],
+  // Namespace owns the FK-valid workspace the binding audit event attributes to.
+  namespace: 'appsilon',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
