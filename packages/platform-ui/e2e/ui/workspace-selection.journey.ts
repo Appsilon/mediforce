@@ -1,5 +1,6 @@
 import { test, expect } from '../helpers/test-fixtures';
-import { createTestUser, patchDocumentFields, seedCollection, seedSubcollection } from '../helpers/emulator';
+import { createTestUser } from '../helpers/emulator';
+import { seedPostgresOrganizationNamespace } from '../helpers/postgres-seed';
 import { setupRecording, click, showStep, showResult, showCaption, endRecording } from '../helpers/recording';
 
 const TEST_EMAIL = 'test@mediforce.dev';
@@ -11,18 +12,11 @@ test.describe('Workspace Selection Journey', () => {
     // createTestUser signs in if the user already exists (auth-setup creates them)
     const uid = await createTestUser(TEST_EMAIL, TEST_PASSWORD, TEST_DISPLAY_NAME);
 
-    await seedCollection('namespaces', {
-      'acme-labs': {
-        handle: 'acme-labs',
-        type: 'organization',
-        displayName: 'Acme Labs',
-        createdAt: new Date().toISOString(),
-      },
-    });
-    await seedSubcollection('namespaces', 'acme-labs', 'members', {
-      [uid]: { uid, role: 'owner', joinedAt: new Date().toISOString() },
-    });
-    await patchDocumentFields('users', uid, { organizations: ['acme-labs'] });
+    // Give the test user a second, org-kind workspace they own. The picker
+    // then shows their personal "My workspace" alongside "Acme Labs". Org
+    // membership derives from `workspace_members`, so the owner row is all
+    // that's needed — the legacy `users/{uid}.organizations` array is gone.
+    await seedPostgresOrganizationNamespace('acme-labs', uid, 'Acme Labs');
   });
 
   test('user sees workspace picker and selects an org workspace', async ({ page }, testInfo) => {

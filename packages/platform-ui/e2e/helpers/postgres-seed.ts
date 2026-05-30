@@ -509,3 +509,96 @@ export async function seedPostgresPersonalNamespace(
     await sql.end({ timeout: 5 });
   }
 }
+
+/**
+ * Seed an organization `workspaces` row plus an owner `workspace_members` row.
+ * Replaces the former Firestore `namespaces/{handle}` (type organization) +
+ * `namespaces/{handle}/members/{uid}` writes — the legacy `users/{uid}`
+ * doc's `organizations` array is not carried over (org membership now derives
+ * solely from `workspace_members`, per the user-profile schema note).
+ *
+ * Pass `bio` to pre-populate the optional workspace bio (the bio-clear journey
+ * needs a non-empty starting value to clear).
+ *
+ * Idempotent via ON CONFLICT DO NOTHING.
+ */
+export async function seedPostgresOrganizationNamespace(
+  handle: string,
+  ownerUid: string,
+  displayName: string,
+  options: { bio?: string } = {},
+): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL must be set to seed Postgres for E2E.');
+  }
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    await sql`
+      INSERT INTO workspaces (handle, type, display_name, bio, created_at)
+      VALUES (${handle}, 'organization', ${displayName}, ${options.bio ?? null}, now())
+      ON CONFLICT (handle) DO NOTHING
+    `;
+    await sql`
+      INSERT INTO workspace_members (workspace, uid, role, joined_at)
+      VALUES (${handle}, ${ownerUid}, 'owner', now())
+      ON CONFLICT (workspace, uid) DO NOTHING
+    `;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
+ * Read the persisted `workspaces` row for a handle, or `null` if absent.
+ * Returns the raw column values so a journey can assert field-level shape
+ * (e.g. that a cleared bio is stored as an empty string, not NULL) — the
+ * Postgres equivalent of the former `getDocumentFields('namespaces', handle)`.
+ */
+export async function readPostgresWorkspace(
+  handle: string,
+): Promise<{ handle: string; displayName: string; bio: string | null } | null> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL must be set to read Postgres for E2E.');
+  }
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    const rows = await sql<{ handle: string; display_name: string; bio: string | null }[]>`
+      SELECT handle, display_name, bio FROM workspaces WHERE handle = ${handle}
+    `;
+    const row = rows[0];
+    if (!row) return null;
+    return { handle: row.handle, displayName: row.display_name, bio: row.bio };
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
+ * Delete a single `agent_oauth_tokens` row (workspace, agent_id, server_name).
+ * Replaces the former Firestore `deleteDocument` of the per-agent OAuth token
+ * doc. Missing rows are a no-op, so the OAuth journey can call it to stay
+ * idempotent across Playwright retries.
+ */
+export async function deletePostgresAgentOAuthToken(
+  workspace: string,
+  agentId: string,
+  serverName: string,
+): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL must be set to delete from Postgres for E2E.');
+  }
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    await sql`
+      DELETE FROM agent_oauth_tokens
+      WHERE workspace = ${workspace}
+        AND agent_id = ${agentId}
+        AND server_name = ${serverName}
+    `;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}

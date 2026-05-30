@@ -1,12 +1,10 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { deleteDocument } from '../helpers/emulator';
+import { deletePostgresAgentOAuthToken } from '../helpers/postgres-seed';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 const OAUTH_AGENT_ID = 'oauth-test-agent';
 const OAUTH_SERVER_NAME = 'github-mcp';
-const OAUTH_TOKEN_DOC_PATH =
-  `namespaces/${TEST_ORG_HANDLE}/agentOAuthTokens/${OAUTH_AGENT_ID}__${OAUTH_SERVER_NAME}`;
 
 /**
  * Journey 4 — Agent MCP OAuth (Step 5)
@@ -32,8 +30,8 @@ const OAUTH_TOKEN_DOC_PATH =
  *
  * The fixture agent + provider live in `e2e/helpers/seed-data.ts`. The mock
  * OAuth server lives in `e2e/helpers/mock-oauth-server.ts` and its base URL
- * is written into Firestore at auth-setup time so the provider config
- * points at the live port.
+ * is seeded into the `oauth_providers` Postgres row at auth-setup time so the
+ * provider config points at the live port.
  */
 
 test.describe('Agent MCP OAuth Journey', () => {
@@ -42,11 +40,11 @@ test.describe('Agent MCP OAuth Journey', () => {
 
     // Playwright re-runs the full test on retry, but `auth-setup` runs once
     // globally — so a token written by an earlier failed attempt would still
-    // be in Firestore here. That makes the binding row render "Connected as
+    // be in Postgres here. That makes the binding row render "Connected as
     // @mock-user" before any user action, with no Connect button to click.
-    // Delete any leftover token via the emulator REST API to make this
-    // journey idempotent across retries.
-    await deleteDocument(OAUTH_TOKEN_DOC_PATH);
+    // Delete any leftover `agent_oauth_tokens` row to make this journey
+    // idempotent across retries.
+    await deletePostgresAgentOAuthToken(TEST_ORG_HANDLE, OAUTH_AGENT_ID, OAUTH_SERVER_NAME);
 
     // ── Admin view: provider is listed ───────────────────────────────────
     await page.goto(`/${TEST_ORG_HANDLE}/admin/oauth-providers`);

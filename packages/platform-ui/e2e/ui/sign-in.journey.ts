@@ -1,5 +1,6 @@
 import { test, expect } from '../helpers/test-fixtures';
-import { createTestUser, seedCollection } from '../helpers/emulator';
+import { createTestUser } from '../helpers/emulator';
+import { seedPostgresPersonalNamespace } from '../helpers/postgres-seed';
 import { setupRecording, click, showStep, showResult, showCaption, endRecording } from '../helpers/recording';
 
 const SIGN_IN_EMAIL = 'signin-journey@mediforce.dev';
@@ -10,18 +11,11 @@ test.describe('Sign-in Journey', () => {
 
   test.beforeAll(async () => {
     const uid = await createTestUser(SIGN_IN_EMAIL, SIGN_IN_PASSWORD, 'Journey User');
-    await seedCollection('users', {
-      [uid]: { uid, email: SIGN_IN_EMAIL, displayName: 'Journey User', handle: 'journey-user' },
-    });
-    await seedCollection('namespaces', {
-      'journey-user': {
-        handle: 'journey-user',
-        type: 'personal',
-        displayName: 'Journey User',
-        linkedUserId: uid,
-        createdAt: new Date().toISOString(),
-      },
-    });
+    // The user's single personal workspace. handle + displayName live on the
+    // `workspaces` row now (the legacy `users/{uid}` doc fields are not carried
+    // over — identity comes from Firebase Auth, membership from
+    // `workspace_members`). Post-sign-in resolves to this one handle.
+    await seedPostgresPersonalNamespace('journey-user', uid, 'Journey User');
   });
 
   test('user signs in with email and password', async ({ page }, testInfo) => {
