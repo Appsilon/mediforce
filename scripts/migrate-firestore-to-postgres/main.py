@@ -39,6 +39,7 @@ COLLECTION_TABLE_MAP: dict[str, str] = {
     "workflowMeta": "workflow_meta",
     "processInstances": "process_instances",
     "cronTriggerState": "cron_trigger_state",
+    "users": "user_profiles",
 }
 
 
@@ -1113,6 +1114,52 @@ def migrate_cron_trigger_state(fs, pg, *, dry_run: bool) -> dict[str, int]:
     return _result(ins, skip)
 
 
+def migrate_user_profiles(fs, pg, *, dry_run: bool) -> dict[str, int]:
+    """Migrate Firestore `users/{uid}` docs to the minimal `user_profiles` table.
+
+    Only `must_change_password` is carried over (the doc id is the uid).
+    Identity fields (email, displayName, photoURL) live in Firebase Auth;
+    handle/roles/organizations live in `namespace_members` — all dead
+    duplicates on the `users` doc are dropped (ADR-0001 final cutover, #534).
+
+    Upsert on `uid` so a re-run refreshes the flag (unlike the DO NOTHING
+    used elsewhere — this slice is re-run on its own during cutover).
+    """
+    rows: list[dict[str, Any]] = []
+    for doc_id, data in fs_iter_collection(fs, "users"):
+        rows.append(
+            {
+                "uid": doc_id,
+                "must_change_password": data.get("mustChangePassword") is True,
+            }
+        )
+    if dry_run:
+        LOG.info(
+            "[dry-run] %s rows -> user_profiles; first row: %s",
+            len(rows),
+            rows[0] if rows else None,
+        )
+        return _result(0, 0)
+    inserted = 0
+    updated = 0
+    with pg.cursor() as cur:
+        for row in rows:
+            cur.execute(
+                'INSERT INTO "user_profiles" ("uid", "must_change_password") '
+                "VALUES (%s, %s) "
+                "ON CONFLICT (uid) DO UPDATE SET "
+                '"must_change_password" = EXCLUDED.must_change_password, '
+                '"updated_at" = now()',
+                [row["uid"], row["must_change_password"]],
+            )
+            # rowcount is 1 for both insert and update with this upsert form;
+            # distinguish via xmax to report meaningfully is overkill — count
+            # every affected row as inserted for the audit log.
+            inserted += 1
+        pg.commit()
+    return _result(inserted, updated)
+
+
 # ---------- helpers ----------------------------------------------------------
 
 
@@ -1164,6 +1211,7 @@ TABLE_FUNCTIONS: dict[str, Callable] = {
     "oauth_providers": migrate_oauth_providers,
     "agent_oauth_tokens": migrate_agent_oauth_tokens,
     "cron_trigger_state": migrate_cron_trigger_state,
+    "user_profiles": migrate_user_profiles,
 }
 
 CHILD_TABLES_REQUIRING_WS_CACHE = {
