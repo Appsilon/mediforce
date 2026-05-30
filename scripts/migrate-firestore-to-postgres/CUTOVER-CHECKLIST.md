@@ -29,8 +29,8 @@ merge + deploy gates around them.
 |---|---|---|---|---|
 | **A** | Staging host prep | Re-run `bootstrap-server.py --from-step 10 --dry-run` then real, against existing staging server. Adds `POSTGRES_PASSWORD`, creates `/var/lib/mediforce/postgres-data` with UID 999. | `grep POSTGRES_PASSWORD /opt/mediforce/.env` returns one line; dir owned by 999:999 | [`docs/staging-postgres-prep.md`](../../docs/staging-postgres-prep.md) |
 | **B** | Deploy Postgres container (dormant) | CI deploys the migration build to staging — Postgres container starts alongside the app, schema migrated, no data yet. | `docker compose ps` shows `postgres` healthy; `psql … '\dt'` shows the migrated schema | Smoke section of staging-postgres-prep.md |
-| **D** | Local dry-run + per-table iteration | Pull staging Firestore export to local emulator. Run `main.py --dry-run` against local Postgres. Iterate per-table until verify.py clean. | All §2 tables verified locally | §0–§3 below |
-| **E** | Staging data cutover (script execution) | Run `main.py` against staging Postgres (SSH-tunnel `5432` or `scp` script onto host). Accept staging Firestore writes lost between cut and the Postgres-only deploy. | `verify.py` exits 0 | §0–§3 (against staging) |
+| **D** | Local dry-run + per-table iteration | Pull staging Firestore export to local emulator. Run `main.py --dry-run` against local Postgres, then a real run. Iterate per-table until verify.py clean. The local Postgres now holds the **full** migrated dataset. | All §2 tables verified locally | §0–§3 below |
+| **E** | Staging data cutover (dump-restore + `user_profiles` slice) | Restore the local full PG dump to staging instead of re-downloading from Firestore, then migrate just the tiny remaining slice. See §E below. | `verify.py` exits 0 | §E below |
 | **F** | Cut staging over to Postgres | Deploy the migration build; container reboots reading from Postgres (the only backend). | App boots; `pnpm exec mediforce workflow list` returns staging workflows; no 500s on `/api/*` | §4 below |
 | **G** | Post-cutover cleanup | Watch staging 24h. If clean: delete `docs/staging-postgres-prep.md`. | No errors 24h | — |
 | **H** | Production cutover (later, separate change) | Repeat A–F against production. Pre-conditions: staging has been on Postgres cleanly for ≥1 week, Firestore export to GCS taken, maintenance window announced, read-only flag wired. | `verify.py` exits 0 on prod | §5 below |
@@ -165,6 +165,41 @@ duplicates rows. To re-run, `TRUNCATE` those tables first.
 - [ ] No errors
 - [ ] If a uuid-PK table needs a re-run: `TRUNCATE <table>;` first, then
       `--only=<table>`
+
+## E. Staging data cutover — dump-restore + `user_profiles` slice (~20 min)
+
+The local Postgres from §D already holds the full migrated dataset, verified
+clean. Don't re-download everything from Firestore against staging — restore
+the local dump and migrate only the tiny `user_profiles` slice that the §D
+run did not cover (it was added last, in #534).
+
+- [ ] Dump the verified local Postgres:
+      ```sh
+      pg_dump --no-owner --no-privileges \
+        'postgresql://mediforce:mediforce@localhost:5432/mediforce' \
+        -Fc -f mediforce-staging.dump
+      ```
+- [ ] Restore onto staging (SSH-tunnel `5432` or run on the host). Use
+      `--clean --if-exists` so an already-migrated staging schema is replaced
+      cleanly:
+      ```sh
+      pg_restore --no-owner --no-privileges --clean --if-exists \
+        -d "$STAGING_DATABASE_URL" mediforce-staging.dump
+      ```
+- [ ] Apply the latest drizzle migrations against staging (no-op if the dump
+      already carried the current schema):
+      ```sh
+      DATABASE_URL="$STAGING_DATABASE_URL" pnpm db:migrate
+      ```
+- [ ] Migrate only the `user_profiles` slice from staging Firestore
+      (does not need the workspace cache):
+      ```sh
+      python3 main.py \
+        --firebase-project <staging-project> \
+        --database-url "$STAGING_DATABASE_URL" \
+        --only user_profiles
+      ```
+- [ ] `verify.py` exits 0 against staging.
 
 ## 4. Smoke test under Postgres backend (~15 min)
 

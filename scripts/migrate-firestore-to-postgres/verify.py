@@ -61,6 +61,9 @@ TABLES: list[tuple[str, str, str]] = [
     ("cg:oauthProviders", "oauth_providers", "count_only"),
     ("cg:agentOAuthTokens", "agent_oauth_tokens", "count_only"),
     ("cronTriggerState", "cron_trigger_state", "composite_cron"),
+    # Count-only: the row carries a single derived boolean, not a 1:1 copy,
+    # so a field-level diff would false-positive on docs lacking the flag.
+    ("users", "user_profiles", "count_only"),
 ]
 
 
@@ -221,7 +224,7 @@ def sample_diff(
     if lookup == "no_verify":
         return 0, 0, ["skipped: table inserted with synthetic UUIDs, no natural key"]
     if lookup == "count_only":
-        return 0, 0, ["skipped: count-only sub-collection (composite/synthetic PK)"]
+        return 0, 0, ["skipped: count-only (composite/synthetic PK or derived fields)"]
 
     field_map = FIELD_MAPS.get(collection, {})
     if not field_map:
