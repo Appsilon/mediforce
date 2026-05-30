@@ -2,6 +2,7 @@ import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import {
   AgentDefinitionSchema,
+  parseRow,
   type AgentDefinition,
   type AgentDefinitionRepository,
   type CreateAgentDefinitionInput,
@@ -182,7 +183,7 @@ function toRow(id: string, input: CreateAgentDefinitionInput) {
 }
 
 function toAgent(row: typeof agents.$inferSelect): AgentDefinition {
-  const out: Record<string, unknown> = {
+  return parseRow(AgentDefinitionSchema, {
     id: row.id,
     kind: row.kind,
     name: row.name,
@@ -196,10 +197,9 @@ function toAgent(row: typeof agents.$inferSelect): AgentDefinition {
     visibility: row.visibility,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-  };
-  if (row.runtimeId !== null) out.runtimeId = row.runtimeId;
-  if (row.mcpServers !== null) out.mcpServers = row.mcpServers;
-  if (row.namespace !== null) out.namespace = row.namespace;
-  return AgentDefinitionSchema.parse(out);
+    runtimeId: row.runtimeId ?? undefined,
+    mcpServers: row.mcpServers ?? undefined,
+    namespace: row.namespace ?? undefined,
+  });
 }
 

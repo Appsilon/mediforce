@@ -372,3 +372,4 @@ export {
 export { createLineStreamReader } from './utils/line-stream';
 export type { LineStreamReader } from './utils/line-stream';
 export { calculateEstimatedCost } from './utils/cost';
+export { compact, parseRow } from './utils/compact';

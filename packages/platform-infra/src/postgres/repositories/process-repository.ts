@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 import {
+  compact,
   WorkflowDefinitionSchema,
   WorkflowDefinitionVersionAlreadyExistsError,
   WorkflowDefinitionVersionNotFoundError,
@@ -400,7 +401,7 @@ export class PostgresProcessRepository implements ProcessRepository {
 function toDefinition(
   row: typeof workflowDefinitions.$inferSelect,
 ): WorkflowDefinition {
-  const out: Record<string, unknown> = {
+  return compact({
     namespace: row.workspace,
     name: row.name,
     version: row.version,
@@ -408,22 +409,21 @@ function toDefinition(
     steps: row.steps,
     transitions: row.transitions,
     triggers: row.triggers,
-  };
-  if (row.title !== null) out.title = row.title;
-  if (row.description !== null) out.description = row.description;
-  if (row.preamble !== null) out.preamble = row.preamble;
-  if (row.triggerInput !== null) out.triggerInput = row.triggerInput;
-  if (row.roles !== null) out.roles = row.roles;
-  if (row.env !== null) out.env = row.env;
-  if (row.notifications !== null) out.notifications = row.notifications;
-  if (row.gitWorkspace !== null) out.workspace = row.gitWorkspace;
-  if (row.metadata !== null) out.metadata = row.metadata;
-  if (row.repo !== null) out.repo = row.repo;
-  if (row.url !== null) out.url = row.url;
-  if (row.copiedFrom !== null) out.copiedFrom = row.copiedFrom;
-  if (row.inputForNextRun !== null) out.inputForNextRun = row.inputForNextRun;
-  if (row.archivedAt !== null) out.archived = true;
-  if (row.deletedAt !== null) out.deleted = true;
-  if (row.createdAt !== null) out.createdAt = row.createdAt.toISOString();
-  return out as unknown as WorkflowDefinition;
+    title: row.title ?? undefined,
+    description: row.description ?? undefined,
+    preamble: row.preamble ?? undefined,
+    triggerInput: row.triggerInput ?? undefined,
+    roles: row.roles ?? undefined,
+    env: row.env ?? undefined,
+    notifications: row.notifications ?? undefined,
+    workspace: row.gitWorkspace ?? undefined,
+    metadata: row.metadata ?? undefined,
+    repo: row.repo ?? undefined,
+    url: row.url ?? undefined,
+    copiedFrom: row.copiedFrom ?? undefined,
+    inputForNextRun: row.inputForNextRun ?? undefined,
+    archived: row.archivedAt !== null ? true : undefined,
+    deleted: row.deletedAt !== null ? true : undefined,
+    createdAt: row.createdAt !== null ? row.createdAt.toISOString() : undefined,
+  }) as unknown as WorkflowDefinition;
 }

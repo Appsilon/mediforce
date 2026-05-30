@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import {
   HumanTaskSchema,
+  parseRow,
   type HumanTask,
   type HumanTaskRepository,
   type ProcessInstanceRepository,
@@ -70,7 +71,7 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
         updatedAt: new Date(parsed.updatedAt),
       })
       .returning();
-    return HumanTaskSchema.parse(toHumanTask(row));
+    return toHumanTask(row);
   }
 
   async getById(taskId: string): Promise<HumanTask | null> {
@@ -80,7 +81,7 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
       .where(eq(humanTasks.id, taskId))
       .limit(1);
     const row = rows[0];
-    return row ? HumanTaskSchema.parse(toHumanTask(row)) : null;
+    return row ? toHumanTask(row) : null;
   }
 
   async getByIdInNamespaces(
@@ -99,7 +100,7 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
       )
       .limit(1);
     const row = rows[0];
-    return row ? HumanTaskSchema.parse(toHumanTask(row)) : null;
+    return row ? toHumanTask(row) : null;
   }
 
   async getByRoleAll(role: string): Promise<HumanTask[]> {
@@ -115,7 +116,7 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
         and(eq(humanTasks.assignedRole, role), isNull(humanTasks.deletedAt)),
       )
       .orderBy(asc(humanTasks.createdAt));
-    return rows.map((r) => HumanTaskSchema.parse(toHumanTask(r)));
+    return rows.map((r) => toHumanTask(r));
   }
 
   async getByRoleInNamespaces(
@@ -134,7 +135,7 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
         ),
       )
       .orderBy(asc(humanTasks.createdAt));
-    return rows.map((r) => HumanTaskSchema.parse(toHumanTask(r)));
+    return rows.map((r) => toHumanTask(r));
   }
 
   async getByInstanceId(instanceId: string): Promise<HumanTask[]> {
@@ -142,7 +143,7 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
       .select()
       .from(humanTasks)
       .where(eq(humanTasks.processInstanceId, instanceId));
-    return rows.map((r) => HumanTaskSchema.parse(toHumanTask(r)));
+    return rows.map((r) => toHumanTask(r));
   }
 
   async getByInstanceIdInNamespaces(
@@ -159,7 +160,7 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
           inArray(humanTasks.workspace, [...allowed]),
         ),
       );
-    return rows.map((r) => HumanTaskSchema.parse(toHumanTask(r)));
+    return rows.map((r) => toHumanTask(r));
   }
 
   async getByInstanceIdsAll(instanceIds: readonly string[]): Promise<HumanTask[]> {
@@ -168,7 +169,7 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
       .select()
       .from(humanTasks)
       .where(inArray(humanTasks.processInstanceId, [...instanceIds]));
-    return rows.map((r) => HumanTaskSchema.parse(toHumanTask(r)));
+    return rows.map((r) => toHumanTask(r));
   }
 
   async getByInstanceIdsInNamespaces(
@@ -185,12 +186,12 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
           inArray(humanTasks.workspace, [...allowed]),
         ),
       );
-    return rows.map((r) => HumanTaskSchema.parse(toHumanTask(r)));
+    return rows.map((r) => toHumanTask(r));
   }
 
   async listAll(): Promise<HumanTask[]> {
     const rows = await this.db.select().from(humanTasks);
-    return rows.map((r) => HumanTaskSchema.parse(toHumanTask(r)));
+    return rows.map((r) => toHumanTask(r));
   }
 
   async listInNamespaces(allowed: readonly string[]): Promise<HumanTask[]> {
@@ -199,7 +200,7 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
       .select()
       .from(humanTasks)
       .where(inArray(humanTasks.workspace, [...allowed]));
-    return rows.map((r) => HumanTaskSchema.parse(toHumanTask(r)));
+    return rows.map((r) => toHumanTask(r));
   }
 
   async claim(taskId: string, userId: string): Promise<HumanTask> {
@@ -210,7 +211,7 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
       .where(eq(humanTasks.id, taskId))
       .returning();
     if (!row) throw new Error(`HumanTask not found: ${taskId}`);
-    return HumanTaskSchema.parse(toHumanTask(row));
+    return toHumanTask(row);
   }
 
   async complete(
@@ -227,7 +228,7 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
       .where(eq(humanTasks.id, taskId))
       .returning();
     if (!row) throw new Error(`HumanTask not found: ${taskId}`);
-    return HumanTaskSchema.parse(toHumanTask(row));
+    return toHumanTask(row);
   }
 
   async cancel(taskId: string): Promise<HumanTask> {
@@ -237,7 +238,7 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
       .where(eq(humanTasks.id, taskId))
       .returning();
     if (!row) throw new Error(`HumanTask not found: ${taskId}`);
-    return HumanTaskSchema.parse(toHumanTask(row));
+    return toHumanTask(row);
   }
 
   async setDeletedByInstanceIds(
@@ -253,7 +254,7 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
 }
 
 function toHumanTask(row: typeof humanTasks.$inferSelect): HumanTask {
-  const out: Record<string, unknown> = {
+  return parseRow(HumanTaskSchema, {
     id: row.id,
     processInstanceId: row.processInstanceId,
     stepId: row.stepId,
@@ -266,12 +267,11 @@ function toHumanTask(row: typeof humanTasks.$inferSelect): HumanTask {
     completedAt: row.completedAt ? row.completedAt.toISOString() : null,
     completionData: row.completionData as Record<string, unknown> | null,
     creationReason: row.creationReason,
-  };
-  if (row.ui !== null) out.ui = row.ui;
-  if (row.params !== null) out.params = row.params;
-  if (row.selection !== null) out.selection = row.selection;
-  if (row.options !== null) out.options = row.options;
-  if (row.verdicts !== null) out.verdicts = row.verdicts;
-  if (row.deletedAt !== null) out.deleted = true;
-  return out as HumanTask;
+    ui: row.ui ?? undefined,
+    params: row.params ?? undefined,
+    selection: row.selection ?? undefined,
+    options: row.options ?? undefined,
+    verdicts: row.verdicts ?? undefined,
+    deleted: row.deletedAt !== null ? true : undefined,
+  });
 }
