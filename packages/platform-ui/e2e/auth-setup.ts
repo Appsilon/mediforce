@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test as setup } from '@playwright/test';
 import { TEST_ORG_HANDLE } from './helpers/constants';
-import { clearEmulators, createTestUser, seedCollection, seedSubcollection } from './helpers/emulator';
+import { clearEmulators, createTestUser, seedCollection } from './helpers/emulator';
 import { seedPostgresNamespace } from './helpers/postgres-seed';
 import { buildSeedData } from './helpers/seed-data';
 
@@ -33,21 +33,17 @@ setup('authenticate and seed data', async ({ page }) => {
   // 2. Create test user and get UID
   const testUserId = await createTestUser(TEST_EMAIL, TEST_PASSWORD, TEST_DISPLAY_NAME);
 
-  // 3. Seed Firestore — the `users` collection is still read by the
+  // 3. Seed Firestore — only the `users` collection, still read by the
   // server-side user-profile read port + invite service (Auth-adjacent, out
   // of ADR-0001 scope). The server-side data layer (processes, instances,
   // tasks, audits, agent runs, handoffs, cowork, model registry, tool
-  // catalog, oauth, agent defs, namespaces) lives in Postgres — seeded via
-  // seedPostgresNamespace below. The namespace / member / workflow-def
-  // Firestore seeds here are now redundant with that and pending cleanup.
+  // catalog, oauth, agent defs, namespaces, workflow defs) lives in Postgres
+  // — seeded via seedPostgresNamespace below.
   const mockOAuthBaseUrl = readMockOAuthBaseUrl();
   const data = buildSeedData(testUserId, { mockOAuthBaseUrl });
   await seedCollection('users', data.users);
-  await seedCollection('workflowDefinitions', data.workflowDefinitions);
-  await seedCollection('namespaces', data.namespaces);
-  await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'members', data.namespaceMembers);
-  // Mirror the namespace + members fixture into Postgres so server-side
-  // handlers (e.g. /api/admin/tool-catalog) can resolve `?namespace=test`.
+  // Mirror the namespace + members + workflow-def fixture into Postgres so
+  // server-side handlers (e.g. /api/admin/tool-catalog) resolve `?namespace=test`.
   await seedPostgresNamespace(testUserId);
 
   // 4. Sign in via test-login page to capture auth state

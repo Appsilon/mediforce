@@ -9,21 +9,19 @@
  *   - Firebase Auth emulator running (port 9099)
  *   - Postgres running with the latest migrations applied (`pnpm db:migrate`)
  *
- * The server-side data layer is Postgres. The Firestore emulator still backs
- * the `users` collection that the server-side user-profile read port + invite
- * service depend on (Auth-adjacent, out of ADR-0001 scope). The namespace /
- * member / workflow-def Firestore seeds are now redundant with the Postgres
- * seed and pending cleanup.
+ * The server-side data layer is Postgres (seeded via seedPostgresNamespace).
+ * The Firestore emulator only backs the `users` collection that the
+ * server-side user-profile read port + invite service depend on
+ * (Auth-adjacent, out of ADR-0001 scope).
  */
 
-import { clearEmulators, createTestUser, seedCollection, seedSubcollection } from '../e2e/helpers/emulator';
+import { clearEmulators, createTestUser, seedCollection } from '../e2e/helpers/emulator';
 import { buildSeedData } from '../e2e/helpers/seed-data';
 import { seedPostgresNamespace } from '../e2e/helpers/postgres-seed';
 
 const TEST_EMAIL = 'test@mediforce.dev';
 const TEST_PASSWORD = 'test123456';
 const TEST_DISPLAY_NAME = 'Test User';
-const TEST_ORG_HANDLE = 'test-org';
 
 async function main() {
   console.log('\nSeeding development data...\n');
@@ -39,21 +37,11 @@ async function main() {
     // 3. Build seed data
     const data = buildSeedData(testUserId);
 
-    // 4. Seed the UI-realtime Firestore collections
-    console.log('Seeding UI-realtime Firestore collections:');
-    const collections = [
-      ['users', data.users],
-      ['workflowDefinitions', data.workflowDefinitions],
-      ['namespaces', data.namespaces],
-    ] as const;
-
-    for (const [name, docs] of collections) {
-      await seedCollection(name, docs);
-      console.log(`  ${name} (${Object.keys(docs).length} docs)`);
-    }
-
-    await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'members', data.namespaceMembers);
-    console.log(`  namespaces/${TEST_ORG_HANDLE}/members (${Object.keys(data.namespaceMembers).length} docs)`);
+    // 4. Seed the Firestore `users` collection (still read by the server-side
+    // user-profile read port + invite service; Auth-adjacent, out of ADR-0001
+    // scope). Everything else lives in Postgres — mirrored below.
+    await seedCollection('users', data.users);
+    console.log(`  users (${Object.keys(data.users).length} docs)`);
 
     // 5. Mirror fixture into Postgres (server-side data layer).
     console.log('\nMirroring fixture to Postgres:');
