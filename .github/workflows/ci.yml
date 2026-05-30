@@ -60,7 +60,7 @@ jobs:
         run: docker build -t mediforce-node:latest -f packages/agent-runtime/container/Dockerfile.node .
       - run: pnpm test:unit
 
-  postgres-tests:
+  postgres-repository-tests:
     # ADR-0001 parity: every Postgres-backed repository test runs against a
     # real Postgres instance. Set TEST_DATABASE_URL so the parity suites
     # exercise the Postgres branch instead of skipping it.
