@@ -10,16 +10,13 @@
  * cross-namespace access surfaces as 404, while the seeded `test` user
  * verifies the happy path with a real bearer token.
  *
- * Idempotent: subcollection seeds use PATCH upsert so re-running across
- * journeys (each spec runs against the same emulator instance) is safe.
+ * Idempotent: the Postgres namespace/member seeds use `ON CONFLICT DO
+ * NOTHING` so re-running across journeys (each spec shares one database) is
+ * safe.
  */
 import { TEST_ORG_HANDLE } from './constants';
-import {
-  createTestUser,
-  seedCollection,
-  seedSubcollection,
-  signInAndGetIdToken,
-} from './emulator';
+import { createTestUser, signInAndGetIdToken } from './emulator';
+import { seedPostgresPersonalNamespace } from './postgres-seed';
 
 export const TEST_USER_EMAIL = 'test@mediforce.dev';
 export const TEST_USER_PASSWORD = 'test123456';
@@ -44,9 +41,9 @@ export interface MultiNamespaceFixture {
  * Ensures the outsider user, the `other` namespace, and the outsider's
  * membership row all exist, then returns fresh ID tokens for both users.
  *
- * Safe to call from any journey's `beforeAll` — the underlying emulator
- * writes are upserts, and Firebase doesn't care if a user already exists
- * (we re-sign-in to mint a token).
+ * Safe to call from any journey's `beforeAll` — the Postgres seed upserts,
+ * and Firebase doesn't care if the Auth user already exists (we re-sign-in
+ * to mint a token).
  */
 export async function setupMultiNamespaceCallers(): Promise<MultiNamespaceFixture> {
   const memberToken = await signInAndGetIdToken(
@@ -59,24 +56,7 @@ export async function setupMultiNamespaceCallers(): Promise<MultiNamespaceFixtur
     'Outsider',
   );
 
-  await seedCollection('namespaces', {
-    [OUTSIDER_NAMESPACE]: {
-      id: OUTSIDER_NAMESPACE,
-      handle: OUTSIDER_NAMESPACE,
-      type: 'personal',
-      displayName: 'Outsider Org',
-      linkedUserId: outsiderUid,
-      createdAt: '2024-01-01T00:00:00.000Z',
-    },
-  });
-  await seedSubcollection('namespaces', OUTSIDER_NAMESPACE, 'members', {
-    [outsiderUid]: {
-      id: outsiderUid,
-      uid: outsiderUid,
-      role: 'owner',
-      joinedAt: '2024-01-01T00:00:00.000Z',
-    },
-  });
+  await seedPostgresPersonalNamespace(OUTSIDER_NAMESPACE, outsiderUid, 'Outsider Org');
 
   const outsiderToken = await signInAndGetIdToken(
     OUTSIDER_EMAIL,
