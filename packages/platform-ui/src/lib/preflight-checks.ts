@@ -31,7 +31,13 @@ export function runPreflightChecks(
   const imageMap = new Map<string, string[]>();
   const secretMap = new Map<string, { stepNames: string[]; envVar: string }>();
 
-  for (const step of definition.steps) {
+  // `steps` is typed required, but a definition reaching the UI from a stale
+  // bundle, a persisted react-query cache, or a partial fetch can lack it.
+  // Treat a missing/non-array `steps` as empty rather than throwing
+  // `definition.steps is not iterable` and taking down the whole page.
+  const steps = Array.isArray(definition.steps) ? definition.steps : [];
+
+  for (const step of steps) {
     if (step.executor !== 'agent' && step.executor !== 'script') continue;
 
     if (options.dockerAvailable && options.dockerImages) {
@@ -91,7 +97,7 @@ export function runPreflightChecks(
   }
 
   if (options.openRouterCredits?.available && options.openRouterCredits.remaining <= LOW_CREDITS_THRESHOLD) {
-    const agentSteps = definition.steps
+    const agentSteps = steps
       .filter((s) => s.executor === 'agent')
       .map((s) => s.name);
     if (agentSteps.length > 0) {
