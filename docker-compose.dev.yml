@@ -3,7 +3,7 @@
 # the per-directory copy compose creates by default (project name defaults to
 # the working directory, so each worktree otherwise gets its own empty volume).
 #
-# Used only by `pnpm dev:local`:
+# Loaded by `pnpm dev` / `dev:queue` / `dev:postgres`:
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up postgres -d
 #
 # Staging/prod NEVER load this file (docker-compose.staging.yml / .prod.yml stay
