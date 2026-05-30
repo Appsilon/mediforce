@@ -345,13 +345,18 @@ GOOGLE_APPLICATION_CREDENTIALS=/Users/<you>/.config/mediforce/firebase-sa.json
 
 Use an absolute path — the server validates the file exists on startup.
 
-### Run with Production Firebase
+### Run the full local stack
 
 ```bash
 pnpm dev
 ```
 
-**Important:** The UI starts empty. Your workflows and data are private to your Firebase project. Create workflows via UI or API to populate.
+This boots a local Postgres (via the dev docker overlay), runs migrations, then
+starts the UI against it — agents run inline via Docker (no Redis/queue worker
+needed). Local secrets in the `mediforce` namespace decrypt with the local
+`SECRETS_ENCRYPTION_KEY`, so no extra seeding step is required.
+
+**Important:** The UI starts empty. Create workflows via UI or API to populate.
 
 ### Firestore Security Rules (Development)
 
@@ -435,9 +440,9 @@ Make sure:
 | `pnpm emulators` | Start Firebase emulators (Auth + Firestore + Storage) |
 | `pnpm seed` | Seed demo data into running emulators |
 | `NEXT_PUBLIC_USE_EMULATORS=true pnpm dev` | Run with emulators (port 9003) |
-| `pnpm dev` | Run with production Firebase (per `.env.local`) |
-| `pnpm dev:no-docker` | Like `dev`, agents via host `claude` CLI |
-| `pnpm dev:queue` | Like `dev`, production-like queue mode (run `docker compose up -d` first) |
+| `pnpm dev` | Full local stack: boots Postgres, migrates, runs the UI (port 9003) |
+| `pnpm dev:no-docker` | Like `dev` but docker-free — UI only, agents via host `claude` CLI |
+| `pnpm dev:queue` | Like `dev` plus Redis + BullMQ queued agent execution |
 | `pnpm test:unit` | vitest unit + integration |
 | `pnpm test:affected` | vitest, only files changed |
 | `pnpm test:e2e` | All Playwright E2E (L3 + L4) |
