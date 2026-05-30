@@ -149,6 +149,11 @@ function contract(
 
       const fetched = await repo.getById(run.id);
       expect(fetched?.envelope).toBeNull();
+
+      // Regression #534: list() must not throw on null-envelope rows.
+      const page = await repo.list({ namespace: 'ws-1', limit: 50 });
+      expect(page.items.map((r) => r.id)).toContain(run.id);
+      expect(page.items.find((r) => r.id === run.id)?.envelope).toBeNull();
     });
 
     it('create upserts on repeated id (running → terminal status transition)', async () => {
@@ -317,6 +322,27 @@ describe.skipIf(skipPg)('PostgresAgentRunRepository (parity)', () => {
     }
   });
 
+  const setupRow = async (instanceId: string, namespace: string) => {
+    const db = drizzle(testClient, { schema });
+    const nsRepo = new PostgresNamespaceRepository(db);
+    if (!(await nsRepo.getNamespace(namespace))) {
+      await nsRepo.createNamespace({
+        handle: namespace,
+        type: 'organization',
+        displayName: namespace,
+        createdAt: '2026-05-27T00:00:00.000Z',
+      });
+    }
+    await testClient.unsafe(
+      `INSERT INTO "${schemaName}"."process_instances" ` +
+        `(id, workspace, definition_name, definition_version, status, ` +
+        `variables, trigger_type, trigger_payload) ` +
+        `VALUES ($1, $2, 'stub-def', '1.0.0', 'completed', '{}'::jsonb, 'manual', '{}'::jsonb) ` +
+        `ON CONFLICT (id) DO NOTHING`,
+      [instanceId, namespace],
+    );
+  };
+
   contract('PostgresAgentRunRepository', async () => {
     const db = drizzle(testClient, { schema });
     await testClient.unsafe(
@@ -327,29 +353,45 @@ describe.skipIf(skipPg)('PostgresAgentRunRepository (parity)', () => {
     const nsByInstance = new Map<string, string>();
     const parents = new StubProcessInstanceRepository(nsByInstance);
     const repo = new PostgresAgentRunRepository(db, parents);
-    const nsRepo = new PostgresNamespaceRepository(db);
     return {
       repo,
       registerInstance: async (id, namespace) => {
         nsByInstance.set(id, namespace);
-        if (!(await nsRepo.getNamespace(namespace))) {
-          await nsRepo.createNamespace({
-            handle: namespace,
-            type: 'organization',
-            displayName: namespace,
-            createdAt: '2026-05-27T00:00:00.000Z',
-          });
-        }
-        // Parent process_instances row required by FK from agent_runs.
-        await testClient.unsafe(
-          `INSERT INTO "${schemaName}"."process_instances" ` +
-            `(id, workspace, definition_name, definition_version, status, ` +
-            `variables, trigger_type, trigger_payload) ` +
-            `VALUES ($1, $2, 'stub-def', '1.0.0', 'completed', '{}'::jsonb, 'manual', '{}'::jsonb) ` +
-            `ON CONFLICT (id) DO NOTHING`,
-          [id, namespace],
-        );
+        await setupRow(id, namespace);
       },
     };
+  });
+
+  // Regression #534: legacy rows persisted a null envelope as the jsonb
+  // literal '{}' (empty object) instead of SQL NULL. The read path must
+  // decode '{}' back to `envelope: null` rather than throwing on the missing
+  // required AgentOutputEnvelopeSchema fields.
+  it('decodes a legacy empty-object envelope_payload as a null envelope', async () => {
+    const db = drizzle(testClient, { schema });
+    const nsByInstance = new Map<string, string>();
+    const parents = new StubProcessInstanceRepository(nsByInstance);
+    const repo = new PostgresAgentRunRepository(db, parents);
+
+    const instanceId = randomUUID();
+    const runId = randomUUID();
+    nsByInstance.set(instanceId, 'ws-legacy');
+    await setupRow(instanceId, 'ws-legacy');
+
+    // Simulate a legacy row: envelope_payload stored as '{}' (not NULL).
+    await testClient.unsafe(
+      `INSERT INTO "${schemaName}"."agent_runs" ` +
+        `(id, workspace, process_instance_id, step_id, plugin_id, ` +
+        `autonomy_level, status, envelope_payload, started_at) ` +
+        `VALUES ($1, 'ws-legacy', $2, 'step-1', 'plugin-1', 'L1', ` +
+        `'running', '{}'::jsonb, now())`,
+      [runId, instanceId],
+    );
+
+    const fetched = await repo.getById(runId);
+    expect(fetched?.envelope).toBeNull();
+
+    const page = await repo.list({ namespace: 'ws-legacy', limit: 50 });
+    expect(page.items.map((r) => r.id)).toContain(runId);
+    expect(page.items.find((r) => r.id === runId)?.envelope).toBeNull();
   });
 });

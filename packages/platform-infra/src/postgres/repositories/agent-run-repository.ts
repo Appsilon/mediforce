@@ -257,6 +257,7 @@ function splitEnvelope(
     tokenUsage,
     ...rest
   } = envelope;
+  const restPayload = rest as Record<string, unknown>;
   return {
     extracted: {
       confidence: confidence.toString(),
@@ -267,13 +268,21 @@ function splitEnvelope(
       // cost_usd not on the envelope today — column reserved for follow-up.
       costUsd: null,
     },
-    payload: rest as Record<string, unknown>,
+    // Never persist an empty object: the read path decodes '{}' as a null
+    // envelope, so writing it would round-trip a present envelope to null.
+    // Store SQL NULL instead to keep read/write symmetric (#534).
+    payload: Object.keys(restPayload).length === 0 ? null : restPayload,
   };
 }
 
 function toAgentRun(row: typeof agentRuns.$inferSelect): AgentRun {
   const payload = (row.envelopePayload ?? null) as Record<string, unknown> | null;
-  const envelope = payload === null
+  // A null envelope is the canonical form (running runs, non-LLM steps).
+  // Legacy rows (pre-#534) persisted it as the jsonb literal '{}' instead of
+  // SQL NULL; treat an empty object the same as NULL so those rows decode
+  // without tripping the required AgentOutputEnvelopeSchema fields.
+  const isNullEnvelope = payload === null || Object.keys(payload).length === 0;
+  const envelope = isNullEnvelope
     ? null
     : {
         ...payload,
