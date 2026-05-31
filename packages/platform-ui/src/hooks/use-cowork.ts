@@ -9,15 +9,11 @@ import type {
 import { ApiError, mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { snapshotCache } from '@/lib/optimistic';
+import { stopRetryOn4xx } from '@/lib/retry';
 
 const ACTIVE_POST_INTERVAL_MS = 1000;
 const IDLE_INTERVAL_MS = 5000;
 const TERMINAL: ReadonlySet<CoworkSessionStatus> = new Set(['finalized', 'abandoned']);
-
-function clientRetry(failureCount: number, err: Error): boolean {
-  if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-  return failureCount < 2;
-}
 
 /**
  * Session metadata fetch (`mediforce.cowork.get`) keyed under
@@ -39,7 +35,7 @@ export function useCoworkSession(
     queryKey: queryKeys.cowork.session(sessionId ?? ''),
     queryFn: () => mediforce.cowork.get({ sessionId: sessionId as string }),
     enabled: sessionId !== undefined,
-    retry: clientRetry,
+    retry: stopRetryOn4xx,
     refetchInterval: (q) => {
       if (q.state.error !== null) return false;
       const status = q.state.data?.status;
@@ -103,7 +99,7 @@ export function useCoworkTurns(
       return stillPending.length === 0 ? serverTurns : [...serverTurns, ...stillPending];
     },
     enabled: sessionId !== undefined,
-    retry: clientRetry,
+    retry: stopRetryOn4xx,
     refetchInterval: (q) => {
       if (q.state.error !== null) return false;
       return isSending ? ACTIVE_POST_INTERVAL_MS : IDLE_INTERVAL_MS;

@@ -1,8 +1,9 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { ApiError, mediforce } from '@/lib/mediforce';
+import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
+import { stopRetryOn4xx } from '@/lib/retry';
 import type { GetMeOutput } from '@mediforce/platform-api/contract';
 
 /**
@@ -24,9 +25,6 @@ export function useUserMe(options?: { enabled?: boolean }) {
     queryKey: queryKeys.users.me(),
     queryFn: () => mediforce.users.me(),
     enabled: options?.enabled ?? true,
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-      return failureCount < 2;
-    },
+    retry: stopRetryOn4xx,
   });
 }

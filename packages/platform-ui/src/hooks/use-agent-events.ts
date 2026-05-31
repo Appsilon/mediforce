@@ -3,9 +3,10 @@
 import { useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { AgentEvent, InstanceStatus } from '@mediforce/platform-core';
-import { ApiError, mediforce } from '@/lib/mediforce';
+import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { CRITICAL_LIVE_INTERVAL_MS, TERMINAL_STATUSES } from '@/lib/polling-cadence';
+import { stopRetryOn4xx } from '@/lib/retry';
 
 /**
  * Agent event log for a process instance, react-query backed. Mirrors the
@@ -67,10 +68,7 @@ export function useAgentEvents(
       if (q.state.error !== null) return false;
       return isTerminal ? false : CRITICAL_LIVE_INTERVAL_MS;
     },
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-      return failureCount < 2;
-    },
+    retry: stopRetryOn4xx,
   });
 
   return {

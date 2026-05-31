@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { HumanTask, HumanTaskStatus } from '@mediforce/platform-core';
 import { ApiError, mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
+import { stopRetryOn4xx } from '@/lib/retry';
 
 const TERMINAL: ReadonlySet<HumanTaskStatus> = new Set(['completed', 'cancelled']);
 const CRITICAL_LIVE_INTERVAL_MS = 1500;
@@ -27,10 +28,7 @@ export function useTask(taskId: string | undefined): {
     enabled: taskId !== undefined,
     // Validation / authorisation failures are not transient — a 4xx will keep
     // failing. Don't waste two retry attempts before showing the error.
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-      return failureCount < 2;
-    },
+    retry: stopRetryOn4xx,
     refetchInterval: (q) => {
       // Stop polling once the query has errored — a persistent 4xx (validation,
       // not-found, forbidden) does not recover on its own, and a 1.5s retry

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
 import { ApiError, mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
+import { stopRetryOn4xx } from '@/lib/retry';
 
 export interface UseNamespaceResult {
   namespace: Namespace | null;
@@ -24,10 +25,7 @@ export function useNamespace(handle: string | undefined | null): UseNamespaceRes
     queryFn: () => mediforce.namespaces.get({ handle: handle as string }),
     enabled,
     refetchOnWindowFocus: true,
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-      return failureCount < 2;
-    },
+    retry: stopRetryOn4xx,
   });
 
   const err = enabled ? (query.error as Error | null) ?? null : null;

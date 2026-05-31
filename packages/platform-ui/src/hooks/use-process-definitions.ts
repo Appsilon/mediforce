@@ -4,7 +4,8 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 import type { WorkflowRunSummary } from '@mediforce/platform-api/contract';
-import { mediforce, ApiError } from '@/lib/mediforce';
+import { mediforce } from '@/lib/mediforce';
+import { stopRetryOn4xx } from '@/lib/retry';
 
 export interface DefinitionVersion {
   version: string;
@@ -30,11 +31,6 @@ export interface DefinitionGroup {
   runSummary: WorkflowRunSummary;
 }
 
-function retryOn5xx(failureCount: number, err: unknown): boolean {
-  if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-  return failureCount < 2;
-}
-
 /**
  * Workspace-home workflow cards data. ONE-SHOT per ADR-0006 §4 —
  * `refetchOnWindowFocus: true` (default) is enough; mutations to workflows
@@ -52,7 +48,7 @@ export function useProcessDefinitions(includeCompletedRuns: boolean = true) {
       const result = await mediforce.workflows.list({ includeCompletedRuns });
       return result.definitions;
     },
-    retry: retryOn5xx,
+    retry: stopRetryOn4xx,
   });
 
   const groups = query.data ?? [];
