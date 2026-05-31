@@ -17,7 +17,7 @@ describe('formatCliError', () => {
         port: 9003,
       },
       hints: expect.arrayContaining([
-        'Is the dev server running? Start with: pnpm dev:local',
+        'Is the dev server running? Start with: pnpm dev',
       ]),
     });
   });
@@ -145,7 +145,7 @@ describe('formatCliError', () => {
         code: 'ETIMEDOUT',
         message: 'server unreachable, took too long',
       },
-      hints: expect.arrayContaining(['Is the dev server running? Start with: pnpm dev:local']),
+      hints: expect.arrayContaining(['Is the dev server running? Start with: pnpm dev']),
     });
   });
 

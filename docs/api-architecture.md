@@ -119,7 +119,7 @@ Trivial reads skip the handler file entirely via `listAdapter` /
 ## What never goes in a handler
 
 - `NextRequest`, `NextResponse`, `cookies()`, any Next.js import.
-- Firestore / Firebase Admin SDK imports.
+- Postgres / Drizzle imports (Firebase Admin SDK is Auth-only now).
 - Raw repositories from `@mediforce/platform-core/interfaces`.
   Handler receives `CallerScope` only; the static guard
   `no-raw-repo-imports.test.ts` (ADR-0004 §9) enforces this in CI.

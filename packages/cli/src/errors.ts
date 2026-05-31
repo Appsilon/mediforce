@@ -121,7 +121,7 @@ function networkHints(baseUrl?: string): string[] {
   const hints: string[] = [];
 
   if (isLocalBaseUrl(baseUrl) === true) {
-    hints.push('Is the dev server running? Start with: pnpm dev:local');
+    hints.push('Is the dev server running? Start with: pnpm dev');
   }
 
   hints.push('To use a different host: export MEDIFORCE_BASE_URL=https://staging.mediforce.ai');

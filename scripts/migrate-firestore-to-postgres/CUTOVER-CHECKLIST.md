@@ -12,9 +12,8 @@ Bugs are expected. Iterate per-table, fix, re-run, verify.
 > together; path references in this doc resolve against the repo root.
 >
 > Pre-cutover host prep (`POSTGRES_PASSWORD` in `/opt/mediforce/.env`,
-> bind-mount data dir) lives in
-> [`docs/staging-postgres-prep.md`](../../docs/staging-postgres-prep.md).
-> Do that before §0 Pre-flight below.
+> bind-mount data dir) lived in `docs/staging-postgres-prep.md`, deleted
+> after the cutover succeeded. Do that before §0 Pre-flight below.
 
 ---
 
@@ -27,8 +26,8 @@ merge + deploy gates around them.
 
 | Phase | What | Owner action | Exit gate | Details |
 |---|---|---|---|---|
-| **A** | Staging host prep | Re-run `bootstrap-server.py --from-step 10 --dry-run` then real, against existing staging server. Adds `POSTGRES_PASSWORD`, creates `/var/lib/mediforce/postgres-data` with UID 999. | `grep POSTGRES_PASSWORD /opt/mediforce/.env` returns one line; dir owned by 999:999 | [`docs/staging-postgres-prep.md`](../../docs/staging-postgres-prep.md) |
-| **B** | Deploy Postgres container (dormant) | CI deploys the migration build to staging — Postgres container starts alongside the app, schema migrated, no data yet. | `docker compose ps` shows `postgres` healthy; `psql … '\dt'` shows the migrated schema | Smoke section of staging-postgres-prep.md |
+| **A** | Staging host prep | Re-run `bootstrap-server.py --from-step 10 --dry-run` then real, against existing staging server. Adds `POSTGRES_PASSWORD`, creates `/var/lib/mediforce/postgres-data` with UID 999. | `grep POSTGRES_PASSWORD /opt/mediforce/.env` returns one line; dir owned by 999:999 | `docs/staging-postgres-prep.md` (deleted post-cutover) |
+| **B** | Deploy Postgres container (dormant) | CI deploys the migration build to staging — Postgres container starts alongside the app, schema migrated, no data yet. | `docker compose ps` shows `postgres` healthy; `psql … '\dt'` shows the migrated schema | Smoke section of staging-postgres-prep.md (deleted post-cutover) |
 | **D** | Local dry-run + per-table iteration | Pull staging Firestore export to local emulator. Run `main.py --dry-run` against local Postgres, then a real run. Iterate per-table until verify.py clean. The local Postgres now holds the **full** migrated dataset. | All §2 tables verified locally | §0–§3 below |
 | **E** | Staging data cutover (dump-restore + `user_profiles` slice) | Restore the local full PG dump to staging instead of re-downloading from Firestore, then migrate just the tiny remaining slice. See §E below. | `verify.py` exits 0 | §E below |
 | **F** | Cut staging over to Postgres | Deploy the migration build; container reboots reading from Postgres (the only backend). | App boots; `pnpm exec mediforce workflow list` returns staging workflows; no 500s on `/api/*` | §4 below |
@@ -204,8 +203,7 @@ run did not cover (it was added last, in #534).
 ## 4. Smoke test under Postgres backend (~15 min)
 
 ```sh
-DATABASE_URL='postgresql://mediforce:mediforce@localhost:5432/mediforce' \
-  pnpm dev:postgres
+pnpm dev
 ```
 
 - [ ] App boots without DATABASE_URL fail-fast

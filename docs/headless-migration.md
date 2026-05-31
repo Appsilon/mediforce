@@ -1,5 +1,8 @@
 # Headless migration plan
 
+> **Status: Completed** — concluded in PR #534 (2026-05-31). Historical
+> record; active design decisions live in docs/adr/ (0005, 0006).
+
 ## Why
 
 Mediforce is evolving into a headless platform: every data path goes through the HTTP API contract, business logic is framework-free, and the Next.js UI is one of several clients (the others being agents, CLI, MCP servers, and future partner integrations).

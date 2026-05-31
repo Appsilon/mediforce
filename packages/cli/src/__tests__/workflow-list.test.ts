@@ -121,7 +121,7 @@ describe('workflow list command', () => {
     const text = output.stderrLines.join('\n');
     expect(text).toContain('Cannot reach Mediforce API at http://localhost:9003');
     expect(text).toContain('Reason: connection refused (ECONNREFUSED 127.0.0.1:9003)');
-    expect(text).toContain('pnpm dev:local');
+    expect(text).toContain('pnpm dev');
     expect(text).not.toContain('TypeError: fetch failed');
   });
 

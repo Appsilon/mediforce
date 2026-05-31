@@ -1,7 +1,7 @@
 # 0001 — Move primary datastore from Firestore to self-hosted Postgres
 
-- **Status:** Proposed
-- **Date:** 2026-05-19
+- **Status:** Accepted
+- **Date:** 2026-05-19 (accepted 2026-05-31)
 - **Authors:** Marek Rogala (@marekrogala)
 - **Reviewers:** Filip Stachura (@filipstachura), Paweł Przytuła (@przytu1)
 - **Implementation plan:** [PLAN-0001.md](./PLAN-0001.md)
@@ -136,10 +136,9 @@ inside Next.js.**
 Production: a dedicated `migrate` compose service (init container) runs
 `pnpm exec drizzle-kit migrate` against the Drizzle SQL files in
 [`packages/platform-infra/src/postgres/migrations`](../../packages/platform-infra/src/postgres/migrations).
-The service exits 0 immediately when `STORAGE_BACKEND != postgres`, so
-Firestore-mode deploys still satisfy
-`depends_on: { migrate: { condition: service_completed_successfully } }`
-on `platform-ui`. Build target: `migrate` stage in
+`platform-ui` waits for it via
+`depends_on: { migrate: { condition: service_completed_successfully } }`.
+Build target: `migrate` stage in
 [`packages/platform-ui/Dockerfile`](../../packages/platform-ui/Dockerfile);
 wired up in
 [`docker-compose.prod.yml`](../../docker-compose.prod.yml).
@@ -155,27 +154,26 @@ and the workaround (PR #570) was a brittle `outputFileTracingIncludes`
 glob list. The init-container approach drops both: the app standalone
 bundle never sees the DB driver, and migrate has its own image with the
 full workspace + devDeps (drizzle-kit) available. Local dev runs
-migrations via `pnpm dev:postgres` (wrapper around `pnpm db:migrate` +
-`pnpm dev`) or `pnpm db:migrate` directly — same drizzle-kit CLI under
+migrations via `pnpm dev` (which calls `pnpm db:migrate` before the dev
+server) or `pnpm db:migrate` directly — same drizzle-kit CLI under
 the hood, just different boot-wrappers.
 
-**5. Per-repo ternary routing inside `getPlatformServices()`, no separate
+**5. Repository wiring lives inside `getPlatformServices()`, no separate
 backend factory.**
 [`platform-services.ts`](../../packages/platform-api/src/services/platform-services.ts)
-selects the backend with a one-line ternary at the repo's declaration
-site:
+constructs each repository at its declaration site:
 
 ```ts
 const toolCatalogRepo: ToolCatalogRepository =
-  process.env.STORAGE_BACKEND === 'postgres'
-    ? new PostgresToolCatalogRepository(getSharedPostgresClient().db)
-    : new FirestoreToolCatalogRepository(db);
+  new PostgresToolCatalogRepository(getSharedPostgresClient().db);
 ```
 
+During the migration this was a `STORAGE_BACKEND` ternary selecting the
+Firestore or Postgres implementation per repo; the cutover (§8.4) removed
+the flag and the Firestore branch, leaving Postgres as the sole backend.
 Rationale: `getPlatformServices()` *is* the factory. A separate
-`createBackend(flag)` abstraction would just rename it and add a layer of
-indirection. The inline ternary is local, explicit, greppable, and
-removable in one sweep after the cutover (§8.4).
+`createBackend()` abstraction would just rename it and add a layer of
+indirection.
 
 ## Considered alternatives
 
