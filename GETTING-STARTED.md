@@ -1,96 +1,109 @@
 # Getting Started
 
-Get the app running locally in minutes. Start with mocked agents and demo data, then progress to the full local stack (Postgres data layer + Firebase Auth) and building your own workflows.
+Get the app running locally in minutes. Start with mocked agents and demo data,
+then move to the full local stack (Postgres data layer + Firebase Auth) and
+build your own workflows.
+
+Agents / quick lookups: see [docs/dev-quickref.md](docs/dev-quickref.md).
 
 ## Prerequisites
 
-- Node.js 20+
-- pnpm 10+ (`corepack enable && corepack prepare pnpm@latest --activate`)
-- Firebase CLI (`npm install -g firebase-tools`)
+- **Node.js** 20+
+- **pnpm** 10+ (`corepack enable && corepack prepare pnpm@latest --activate`)
+- **Docker** (Docker Desktop or engine) — for the Postgres data layer and Docker agents
+- **Firebase service account** — only for cloud Auth/Storage (the optional path below).
+  **Not** needed for data: all server data lives in Postgres (ADR-0001).
 
 ---
 
-## 1. Fastest start — click through the app (no setup)
+## 1. Fastest start — `pnpm dev:mock` (~30s, no Docker)
 
 ```bash
 pnpm install
 pnpm dev:mock
 ```
 
-Open http://localhost:9007. No Firebase project, cloud keys, Docker, or real agents.
-The launcher starts local Firebase emulators, seeds demo data, and uses mocked
-agent execution.
-Use this to explore the UI before configuring anything real.
+Open **http://localhost:9007**.
+
+Zero cloud, zero Docker, zero Postgres: the launcher starts local Firebase
+emulators (Auth + Storage), seeds demo data, runs the UI, and mocks agent
+execution. Best for UI work and exploring the app before configuring anything
+real.
 
 ---
 
-## 2. Emulator + seeded demo data
-
-Run the app with pre-seeded demo workflows against Firebase emulators.
-
-### Step 1: Install + env
+## 2. Full local stack — `pnpm dev` (Postgres + UI)
 
 ```bash
 pnpm install
-cp packages/platform-ui/.env.example packages/platform-ui/.env.local
+pnpm dev
 ```
 
-The example file's defaults already target the emulator (project id `demo-mediforce`).
+Open **http://localhost:9003**. `pnpm dev`:
 
-### Step 2: Start emulators (separate terminal)
+1. starts a local Postgres container (`docker-compose.dev.yml`),
+2. applies migrations (`pnpm db:migrate`),
+3. runs the UI against it (agents run inline via Docker — no Redis needed).
 
-```bash
-pnpm emulators
-```
+`DATABASE_URL` is wired by the script; you don't set it. Data persists in the
+named volume **`mediforce-dev-pgdata`** under the stable `mediforce-dev` compose
+project, so **every git worktree shares the same Postgres + data**, and it
+survives restarts.
 
-This starts Firebase Auth (:9099), Firestore (:8080), and Storage (:9199),
-persisting state to `packages/platform-ui/.emulator-data/`.
+Port override: `PORT=9999 pnpm dev`.
 
-### Step 3: Seed demo data
+The UI starts **empty** — create workflows via the UI or CLI to populate it
+(see sections 3–4).
 
-```bash
-pnpm seed
-```
+### Demo sign-in
 
-Seeds:
-- Workflow definitions (Supply Chain Review, Protocol to TFL, Workflow Designer)
-- Process instances in various states (running, paused, completed)
-- Human tasks ready for action
-- Agent runs with results
+When running against emulators (`dev:mock`, or the optional emulator path
+below), use:
 
-### Step 4: Start the app
+- **Email**: `test@mediforce.dev`
+- **Password**: `test123456`
 
-```bash
-NEXT_PUBLIC_USE_EMULATORS=true pnpm dev
-```
-
-Open http://localhost:9003
-
-### Step 5: Sign in
-
-Demo credentials:
-- **Email**: test@mediforce.dev
-- **Password**: test123456
-
-**You'll see:**
-- Workflow Dashboard with demo workflows
-- Process instances in various states
-- Tasks assigned to the test user
-
-**Emulator ports:**
-- App: http://localhost:9003
-- Firebase Auth: http://localhost:9099
-- Firestore: http://localhost:8080
-
-**Limitations:**
-- Data disappears when emulators stop
-- For persistent data, see [Step 5](#5-persistent-data-with-your-firebase)
+A real Firebase project uses your own accounts.
 
 ---
 
-## 2. Add Your First Workflow
+## Which dev command?
 
-Workflows are defined in JSON. You can create them via API or UI.
+| Command              | What runs                                                   | Port | When to use                                  |
+|----------------------|-------------------------------------------------------------|------|----------------------------------------------|
+| `pnpm dev`           | Postgres + auto-migrate + UI, Docker agents                 | 9003 | Default full local stack                     |
+| `pnpm dev:mock`      | Mocked agents, in-memory data, Firebase emulators (no Docker) | 9007 | Fastest; best for UI work                 |
+| `pnpm dev:no-docker` | UI + host `claude` CLI agents, **no** Docker                | 9003 | Agent debugging without containers           |
+| `pnpm dev:queue`     | `pnpm dev` + Redis + BullMQ queue worker                    | 9003 | Testing queue-based agent runs               |
+
+**`dev:no-docker` caveat:** it's docker-free but the app still requires Postgres
+on `:5432` (`DATABASE_URL` is required at boot). It does **not** start Postgres —
+run `pnpm dev` once to leave a container running, or point `DATABASE_URL` at your
+own DB.
+
+Full decision table + ports + migration steps: [docs/dev-quickref.md](docs/dev-quickref.md).
+
+---
+
+## 3. Run the CLI
+
+The `mediforce` CLI is the supported way to drive the platform from a terminal
+(dogfood rule: CLI > REST).
+
+```bash
+pnpm exec mediforce --help
+pnpm exec mediforce workflow list
+```
+
+Auth via `MEDIFORCE_API_KEY`; base URL defaults to `http://localhost:9003`. See
+the [use-mediforce skill](.claude/skills/use-mediforce/SKILL.md) for the full
+command list and the REST fallback ladder.
+
+---
+
+## 4. Add your first workflow
+
+Workflows are defined in JSON. Create them via API or UI.
 
 ### Via API
 
@@ -150,17 +163,11 @@ The API returns:
 - `transitions` — rules for moving between steps
 - `verdicts` — for review steps, define where each outcome goes
 
-**Step types:**
-- `creation` — creates or modifies data
-- `review` — requires human verdict (approve/revise)
-- `decision` — conditional branching logic
-- `terminal` — end of workflow
+**Step types:** `creation` (creates/modifies data), `review` (human verdict),
+`decision` (conditional branch), `terminal` (end).
 
-**Executor types:**
-- `human` — task assigned to human role
-- `agent` — AI agent executes
-- `script` — containerized script (Docker)
-- `cowork` — interactive coworker session
+**Executor types:** `human`, `agent` (AI), `script` (Docker container),
+`cowork` (interactive session).
 
 ### Via UI
 
@@ -171,9 +178,7 @@ The API returns:
 
 ---
 
-## 3. Run Your First Workflow
-
-Start a process instance from a workflow definition.
+## 5. Run your first workflow
 
 ### Via API
 
@@ -187,7 +192,7 @@ curl -X POST http://localhost:9003/api/processes \
   }'
 ```
 
-The API returns:
+Returns:
 ```json
 { "instanceId": "proc-abc123", "status": "running" }
 ```
@@ -195,33 +200,29 @@ The API returns:
 ### Via UI
 
 1. Go to http://localhost:9003/workflows
-2. Click on your workflow
-3. Click "Run"
-4. Configure variables if needed
-5. Start the run
+2. Click your workflow → "Run"
+3. Configure variables if needed → Start
 
-**What happens:**
-- New process instance created
-- Workflow execution begins at first step
-- Tasks appear in Tasks view as execution progresses
+**What happens:** a new process instance is created, execution begins at the
+first step, and tasks appear in the Tasks view as it progresses.
 
 ---
 
-## 4. Build Your Own Workflow
+## 6. Build your own workflow
 
-Workflows combine human tasks and AI agent tasks with configurable autonomy levels.
+Workflows combine human tasks and AI agent tasks with configurable autonomy.
 
-### Autonomy Levels
+### Autonomy levels
 
-| Level | Agent Role | Human Involvement |
-|-------|-----------|-------------------|
-| L0 | None | Full human control |
-| L1 | Suggests | Human decides |
-| L2 | Drafts | Human approves |
-| L3 | Acts, reviews | Periodic human review |
-| L4 | Autonomous | Exception handling only |
+| Level | Agent role     | Human involvement        |
+|-------|----------------|--------------------------|
+| L0    | None           | Full human control       |
+| L1    | Suggests       | Human decides            |
+| L2    | Drafts         | Human approves           |
+| L3    | Acts, reviews  | Periodic human review    |
+| L4    | Autonomous     | Exception handling only  |
 
-### Example: Document Review with AI Assistance
+### Example: document review with AI assistance
 
 ```json
 {
@@ -283,7 +284,9 @@ Workflows combine human tasks and AI agent tasks with configurable autonomy leve
 }
 ```
 
-**Note:** The `skillsDir` path (`apps/document-review/skills`) is illustrative. Create this directory structure if you're building a custom agent plugin, or reference an existing plugin like `apps/community-digest/plugins/community-digest/skills`.
+**Note:** The `skillsDir` path (`apps/document-review/skills`) is illustrative.
+Create it if you're building a custom plugin, or reference an existing one like
+`apps/community-digest/plugins/community-digest/skills`.
 
 **See real examples:**
 - `apps/community-digest/src/community-digest.wd.json` — Daily GitHub digest
@@ -291,175 +294,118 @@ Workflows combine human tasks and AI agent tasks with configurable autonomy leve
 
 ---
 
-## 5. Persistent Data (local Postgres + your Firebase)
+## Auth & test setup (optional)
 
-When you need data that persists between sessions, run the full local stack:
-the server data layer (workflows, processes, agent runs, agent events, human
-tasks, secrets) lives in a local Postgres (ADR-0001), while Firebase still
-provides Auth, Storage, and the `users/{uid}` profile + invite collection in
-Firestore. Use your own Firebase project for the Auth/Firestore-users side.
+You only need this for cloud Firebase Auth/Storage or for running the E2E
+suite — **not** for the data layer (Postgres covers that).
 
-### Create Firebase Project
+### Firebase emulators (for E2E / auth tests)
 
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. "Add project" → name it (e.g., "mediforce-dev")
-3. Enable **Firestore Database** (production mode, choose region) — backs the
-   `users/{uid}` profile + invite data
-4. Enable **Authentication** → Email/Password provider
-
-### Get Credentials
-
-Firebase Console → Project Settings (gear) → General → Your apps → Web app (`</>`)
-
-Copy the config object values.
-
-### Configure `.env.local`
-
-Edit `packages/platform-ui/.env.local`:
+The Firebase Auth + Storage emulators back authentication in `dev:mock` and the
+Playwright suite. They are **not** a data backend.
 
 ```bash
-# Firebase (required)
+pnpm emulators     # Auth :9099, Storage :9199
+```
+
+### Your own Firebase project (cloud Auth)
+
+To run against real Firebase Auth instead of emulators:
+
+1. [Firebase Console](https://console.firebase.google.com/) → Add project.
+2. Enable **Authentication** → Email/Password provider.
+3. Project Settings → General → Your apps (`</>`) → copy the web config.
+4. Project Settings → Service Accounts → **Generate new private key**; save the
+   JSON outside the repo (e.g. `~/.config/mediforce/firebase-sa.json`).
+
+Configure `packages/platform-ui/.env.local`:
+
+```bash
 NEXT_PUBLIC_FIREBASE_API_KEY=your-api-key
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.appspot.com  # optional
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-sender-id       # optional
-NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id                       # optional
-
-# API key for server-to-server calls (required)
-# This key gates all API write operations — keep it secret
 PLATFORM_API_KEY=your-secret-key
-
-# Optional: LLM keys for agent execution
-OPENROUTER_API_KEY=your-openrouter-key
-```
-
-Required: `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `PLATFORM_API_KEY`.
-
-### Service-account credentials (Firebase Admin SDK)
-
-When NOT using emulators, the server needs a Firebase service-account JSON to talk to Firebase Auth and the `users/{uid}` Firestore collection with admin privileges. (Workflow/process data lives in Postgres, not Firestore.)
-
-1. Firebase Console → Project Settings → Service Accounts → **Generate new private key**
-2. Save the downloaded JSON outside the repo (e.g. `~/.config/mediforce/firebase-sa.json`)
-3. Add to `.env.local`:
-
-```bash
 GOOGLE_APPLICATION_CREDENTIALS=/Users/<you>/.config/mediforce/firebase-sa.json
+# optional: OPENROUTER_API_KEY for agent LLM calls
 ```
 
-Use an absolute path — the server validates the file exists on startup.
-
-### Run the full local stack
-
-```bash
-pnpm dev
-```
-
-This boots a local Postgres (via the dev docker overlay), runs migrations, then
-starts the UI against it — agents run inline via Docker (no Redis/queue worker
-needed). Local secrets in the `mediforce` namespace decrypt with the local
-`SECRETS_ENCRYPTION_KEY`, so no extra seeding step is required.
-
-**Important:** The UI starts empty. Create workflows via UI or API to populate.
-
-### Firestore Security Rules (Development)
-
-Firestore now only backs the `users/{uid}` profile + invite collection (all
-other data is in Postgres), but its rules still apply to that collection.
-Firebase Console → Firestore → Rules:
-
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
-    }
-  }
-}
-```
-
-⚠️ **Never use permissive rules in production.**
+Use an absolute path for `GOOGLE_APPLICATION_CREDENTIALS` — the server validates
+the file exists on startup.
 
 ---
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
-### Port already in use
+### `DATABASE_URL is required` (FATAL at boot)
+
+You're in a non-mock mode without a database. Run `pnpm dev` (starts Postgres),
+or set `DATABASE_URL` if you have your own. `pnpm dev:mock` is the only mode that
+runs without it.
+
+### Port 9003 already in use
 
 ```bash
 lsof -ti:9003 | xargs kill -9
 ```
 
-### Emulators fail to start
+Or run on another port: `PORT=9999 pnpm dev`.
+
+### `docker compose` hangs / Postgres won't start
+
+Docker isn't running — start Docker Desktop (or the engine), then retry.
+
+### Migration error / `relation "..." does not exist`
 
 ```bash
-pnpm emulators
+pnpm db:migrate
 ```
 
-If the port is occupied, the script prompts to kill blocking processes. If Java is missing, install with `brew install openjdk@21` (macOS) or `apt-get install openjdk-21-jre` (Linux).
+### Reset local data
 
-### "Permission denied" Firestore errors
+Wipes the persistent Postgres volume and starts fresh:
 
-Ensure security rules allow read/write (see Step 5).
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v && pnpm dev
+```
+
+### Emulators fail to start
+
+Re-run `pnpm emulators`. If a port is occupied it prompts to kill the blocker;
+if Java is missing, `brew install openjdk@21` (macOS) or
+`apt-get install openjdk-21-jre` (Linux).
 
 ### Workflow POST returns 400
 
-Common issues:
-- Missing `namespace` query param
-- Invalid step `type` (must be: `creation`, `review`, `decision`, `terminal`)
-- Missing required fields (`name`, `triggers`, `steps`, `transitions`)
-
-### No workflows appear after POST
-
-Check the namespace matches. List all workflows:
-
-```bash
-curl -H "X-Api-Key: test-api-key" \
-  http://localhost:9003/api/workflow-definitions
-```
-
-### Process instance doesn't start
-
-Ensure the workflow definition exists:
-
-```bash
-curl -H "X-Api-Key: test-api-key" \
-  "http://localhost:9003/api/workflow-definitions?namespace=my-namespace"
-```
-
-### Demo data doesn't appear after seed
-
-Make sure:
-1. Emulators are running (`pnpm emulators`)
-2. You ran `pnpm seed`
-3. You're using `NEXT_PUBLIC_USE_EMULATORS=true` when starting the app
+Check: `namespace` query param present, valid step `type`
+(`creation`/`review`/`decision`/`terminal`), required fields (`name`,
+`triggers`, `steps`, `transitions`).
 
 ---
 
-## Commands Reference
+## Commands reference
 
-| Command | Description |
-|---------|-------------|
-| `pnpm install` | Install dependencies |
-| `pnpm dev:mock` | Mocked agents + seeded local emulator data, port 9007 |
-| `pnpm emulators` | Start Firebase emulators (Auth + Firestore + Storage) |
-| `pnpm seed` | Seed demo data into running emulators |
-| `NEXT_PUBLIC_USE_EMULATORS=true pnpm dev` | Run with emulators (port 9003) |
-| `pnpm dev` | Full local stack: boots Postgres, migrates, runs the UI (port 9003) |
-| `pnpm dev:no-docker` | Like `dev` but docker-free — UI only, agents via host `claude` CLI |
-| `pnpm dev:queue` | Like `dev` plus Redis + BullMQ queued agent execution |
-| `pnpm test:unit` | vitest unit + integration |
-| `pnpm test:affected` | vitest, only files changed |
-| `pnpm test:e2e` | All Playwright E2E (L3 + L4) |
-| `pnpm test` | Everything (unit + e2e) |
+| Command                | Description                                       |
+|------------------------|---------------------------------------------------|
+| `pnpm install`         | Install dependencies                              |
+| `pnpm dev:mock`        | Mocked agents + emulator demo data, port 9007     |
+| `pnpm dev`             | Full local stack: Postgres + migrate + UI, 9003   |
+| `pnpm dev:no-docker`   | Docker-free; UI + host `claude` agents (needs Postgres on :5432) |
+| `pnpm dev:queue`       | `dev` + Redis + BullMQ queued agent execution     |
+| `pnpm emulators`       | Firebase Auth + Storage emulators                 |
+| `pnpm db:generate`     | Generate a migration (drizzle-kit)                |
+| `pnpm db:migrate`      | Apply migrations                                  |
+| `pnpm test:unit`       | vitest unit + integration                         |
+| `pnpm test:affected`   | vitest, only changed files                        |
+| `pnpm test:e2e`        | All Playwright E2E (L3 + L4)                       |
+| `pnpm test`            | Everything (unit + e2e)                           |
 
 ---
 
-## Next Steps
+## Next steps
 
-- [Architecture](docs/architecture.md) — processes, steps, agents, compliance
+- [Dev quick reference](docs/dev-quickref.md) — terse command/decision/port lookup
 - [Development Guide](docs/development.md) — monorepo structure, testing, deployment
+- [Postgres local dev](docs/postgres-local-dev.md) — reset, migrations, inspecting the DB
+- [Architecture](docs/architecture.md) — processes, steps, agents, compliance
 - [AGENTS.md](AGENTS.md) — contribution guidelines for AI-assisted development
 - [Features](docs/features/FEATURES.md) — feature gallery with recorded walkthroughs
