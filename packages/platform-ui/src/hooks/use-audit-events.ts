@@ -3,8 +3,9 @@
 import { useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AuditEvent, InstanceStatus, ProcessInstance } from '@mediforce/platform-core';
-import { ApiError, mediforce } from '@/lib/mediforce';
+import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
+import { stopRetryOn4xx } from '@/lib/retry';
 
 const CRITICAL_LIVE_INTERVAL_MS = 1500;
 const TERMINAL_RUN_STATUSES: ReadonlySet<InstanceStatus> = new Set(['completed', 'failed']);
@@ -31,10 +32,7 @@ export function useAuditEvents(processInstanceId: string | null): {
       return result.events;
     },
     enabled,
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-      return failureCount < 2;
-    },
+    retry: stopRetryOn4xx,
     refetchInterval: (q) => {
       if (q.state.error !== null) return false;
       if (!enabled) return false;

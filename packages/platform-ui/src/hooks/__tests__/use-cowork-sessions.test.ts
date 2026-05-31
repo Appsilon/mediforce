@@ -99,3 +99,30 @@ describe('useFinalizedCoworkSessions', () => {
     expect(listMock).toHaveBeenCalledWith({ role: undefined, status: ['finalized'] });
   });
 });
+
+// PRD §9 rule 4: polling must stop on 4xx — covers both cowork session hooks.
+describe('polling stops on 4xx error (PRD §9 rule 4)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    listMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    ['useMyCoworkSessions', () => useMyCoworkSessions('reviewer')],
+    ['useFinalizedCoworkSessions', () => useFinalizedCoworkSessions('analyst')],
+  ] as const)('%s stops polling after a 4xx error', async (_name, hookFactory) => {
+    listMock.mockRejectedValue(new ApiError(403, 'forbidden'));
+    const { wrapper } = createQueryWrapper();
+
+    renderHook(hookFactory, { wrapper });
+
+    await vi.waitFor(() => expect(listMock).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(listMock).toHaveBeenCalledTimes(1);
+  });
+});

@@ -4,13 +4,9 @@ import { useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 import type { WorkflowVersionSummary } from '@mediforce/platform-api/contract';
-import { ApiError, mediforce } from '@/lib/mediforce';
+import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
-
-function retryOn5xx(failureCount: number, err: unknown): boolean {
-  if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-  return failureCount < 2;
-}
+import { stopRetryOn4xx } from '@/lib/retry';
 
 /**
  * Version metadata list for a workflow in a namespace, react-query backed.
@@ -48,7 +44,7 @@ export function useWorkflowVersions(
       return mediforce.workflows.versions({ name, namespace });
     },
     enabled,
-    retry: retryOn5xx,
+    retry: stopRetryOn4xx,
   });
 
   // Sort versions desc by `version` so callers iterate "latest first" without
@@ -101,7 +97,7 @@ export function useWorkflowVersion(
       return result.definition;
     },
     enabled,
-    retry: retryOn5xx,
+    retry: stopRetryOn4xx,
   });
 
   return {

@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { InstanceStatus } from '@mediforce/platform-core';
 import { ApiError, mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
+import { stopRetryOn4xx } from '@/lib/retry';
 import {
   CRITICAL_LIVE_INTERVAL_MS,
   LEGACY_FIRESTORE_PARITY_LIMIT,
@@ -50,11 +51,8 @@ export function useProcessInstances(
       return result.runs;
     },
     enabled: namespace.length > 0,
-    refetchInterval: STANDARD_LIVE_INTERVAL_MS,
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-      return failureCount < 2;
-    },
+    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
+    retry: stopRetryOn4xx,
   });
 
   const data = useMemo(() => {
@@ -89,10 +87,7 @@ export function useProcessInstance(instanceId: string | null) {
     queryKey: enabled ? queryKeys.run(instanceId) : (['run', '__noop__'] as const),
     queryFn: () => mediforce.processes.get({ instanceId: instanceId as string }),
     enabled,
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-      return failureCount < 2;
-    },
+    retry: stopRetryOn4xx,
     refetchInterval: (q) => {
       if (q.state.error !== null) return false;
       const status = q.state.data?.status;

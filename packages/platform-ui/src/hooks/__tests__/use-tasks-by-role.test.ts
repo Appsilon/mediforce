@@ -18,7 +18,7 @@ vi.mock('../use-collection', () => ({
   useCollection: () => ({ data: [], loading: false, error: null }),
 }));
 
-const { useMyActionableTasksByRole, useCompletedTasksByRole } = await import('../use-tasks');
+const { useMyActionableTasksByRole, useMyActionableTasks, useCompletedTasksByRole, useMyCompletedTasks } = await import('../use-tasks');
 
 describe('useMyActionableTasksByRole', () => {
   beforeEach(() => {
@@ -115,5 +115,36 @@ describe('useCompletedTasksByRole', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(listMock).toHaveBeenCalledWith({ role: 'reviewer', status: ['completed'] });
     expect(result.current.data.map((t) => t.id)).toEqual(['newer', 'older']);
+  });
+});
+
+// PRD §9 rule 4: polling must stop on 4xx — one parametrised test covers the
+// shared refetchInterval gate across all four STANDARD LIVE task hooks.
+describe('polling stops on 4xx error (PRD §9 rule 4)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    listMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each([
+    ['useMyActionableTasksByRole', () => useMyActionableTasksByRole('reviewer')],
+    ['useMyActionableTasks', () => useMyActionableTasks()],
+    ['useCompletedTasksByRole', () => useCompletedTasksByRole('reviewer')],
+    ['useMyCompletedTasks', () => useMyCompletedTasks()],
+  ] as const)('%s stops polling after a 4xx error', async (_name, hookFactory) => {
+    listMock.mockRejectedValue(new ApiError(403, 'forbidden'));
+    const { wrapper } = createQueryWrapper();
+
+    renderHook(hookFactory, { wrapper });
+
+    await vi.waitFor(() => expect(listMock).toHaveBeenCalledTimes(1));
+
+    // Advance well past the STANDARD_LIVE_INTERVAL_MS (5 s) — poll must not fire again.
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(listMock).toHaveBeenCalledTimes(1);
   });
 });
