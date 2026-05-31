@@ -78,3 +78,46 @@ describe('mediforce.runs.get', () => {
     expect((error as ApiError).status).toBe(404);
   });
 });
+
+describe('mediforce.runs.listNames', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('GETs /api/runs/names with the namespace query param and validates the response', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({
+        runs: [
+          { id: 'r1', definitionName: 'wf-a' },
+          { id: 'r2', definitionName: 'wf-b' },
+        ],
+      }),
+    );
+
+    const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+    const result = await mediforce.runs.listNames({ namespace: 'alpha' });
+
+    expect(result.runs).toEqual([
+      { id: 'r1', definitionName: 'wf-a' },
+      { id: 'r2', definitionName: 'wf-b' },
+    ]);
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://localhost/api/runs/names?namespace=alpha');
+  });
+
+  it('rejects an empty namespace before firing a request', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+
+    await expect(mediforce.runs.listNames({ namespace: '' })).rejects.toThrow();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('throws on a response entry missing definitionName (fail loud)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ runs: [{ id: 'r1' }] }),
+    );
+
+    const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+    await expect(mediforce.runs.listNames({ namespace: 'alpha' })).rejects.toThrow();
+  });
+});

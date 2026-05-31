@@ -8,6 +8,7 @@ import {
   type ListInstancesOptions,
   type WorkflowRunSummaryResult,
 } from '../index';
+import { RunNameEntrySchema, type RunNameEntry } from '../schemas/process-instance';
 
 const ACTIVE_STATUSES: ReadonlySet<InstanceStatus> = new Set([
   'running',
@@ -81,6 +82,12 @@ export class InMemoryProcessInstanceRepository
       allowed.includes(i.namespace ?? ''),
     );
     return this.applyListFilters(inScope, options);
+  }
+
+  async listDefinitionNames(namespace: string): Promise<RunNameEntry[]> {
+    return [...this.instances.values()]
+      .filter((i) => i.deleted !== true && i.namespace === namespace)
+      .map((i) => RunNameEntrySchema.parse({ id: i.id, definitionName: i.definitionName }));
   }
 
   private applyListFilters(

@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { InstanceStatusSchema, ProcessInstanceSchema } from '@mediforce/platform-core';
+import {
+  InstanceStatusSchema,
+  ProcessInstanceSchema,
+  RunNameEntrySchema,
+} from '@mediforce/platform-core';
 
 /**
  * Contract for `GET /api/runs/<runId>`.
@@ -87,3 +91,24 @@ export const ListRunsOutputSchema = z.object({
 
 export type ListRunsInput = z.infer<typeof ListRunsInputSchema>;
 export type ListRunsOutput = z.infer<typeof ListRunsOutputSchema>;
+
+/**
+ * Contract for `GET /api/runs/names`.
+ *
+ * Projected `{ id, definitionName }` slice scoped to one workspace — backs the
+ * UI label map (`useProcessNameMap`). Unlike `runs.list` (which is unscoped by
+ * default), `namespace` is REQUIRED: the map is always per-workspace, and the
+ * projection has no `limit`, so an unscoped call would be a whole-deployment
+ * read. Asking for a workspace the caller isn't in returns an empty list
+ * (intersection semantics, not an access check).
+ */
+export const ListRunNamesInputSchema = z.object({
+  namespace: z.string().min(1),
+});
+
+export const ListRunNamesOutputSchema = z.object({
+  runs: z.array(RunNameEntrySchema),
+});
+
+export type ListRunNamesInput = z.infer<typeof ListRunNamesInputSchema>;
+export type ListRunNamesOutput = z.infer<typeof ListRunNamesOutputSchema>;

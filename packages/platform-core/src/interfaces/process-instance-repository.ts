@@ -1,4 +1,4 @@
-import type { ProcessInstance } from '../schemas/process-instance';
+import type { ProcessInstance, RunNameEntry } from '../schemas/process-instance';
 import type { StepExecution } from '../schemas/step-execution';
 import type { InstanceStatus } from '../schemas/process-instance';
 
@@ -69,6 +69,24 @@ export interface ProcessInstanceRepository {
 
   listAll(options: ListInstancesOptions): Promise<ProcessInstance[]>;
   listInNamespaces(allowed: readonly string[], options: ListInstancesOptions): Promise<ProcessInstance[]>;
+
+  /**
+   * Projected `{ id, definitionName }` view of every non-deleted run in a
+   * namespace. Backs the workspace label map (`useProcessNameMap`), which only
+   * reads those two fields — the full-document `listAll` path was 24 s/request
+   * in dev for a 10k-run workspace (issue #588). Projects only those two
+   * columns instead of `SELECT *`, so it never pulls the large
+   * `variables`/`trigger_payload`/`previous_run` jsonb blobs that `runs.list`
+   * returns by contract.
+   *
+   * Deliberately UNBOUNDED (no limit) to mirror `listAll`'s
+   * `deleted_at IS NULL` filter — returns one entry per non-deleted run in the
+   * namespace. The legacy `runs.list({ limit: 10000 })` workaround was a cap on
+   * the full-document path; this projection drops it to restore the "read all"
+   * parity the map depends on. Fails loud on a row missing `definitionName`
+   * rather than defaulting.
+   */
+  listDefinitionNames(namespace: string): Promise<RunNameEntry[]>;
 
   getByStatusAll(status: InstanceStatus): Promise<ProcessInstance[]>;
   getByStatusInNamespaces(status: InstanceStatus, allowed: readonly string[]): Promise<ProcessInstance[]>;

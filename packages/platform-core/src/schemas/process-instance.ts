@@ -57,3 +57,20 @@ export const ProcessInstanceSchema = z.object({
 
 export type InstanceStatus = z.infer<typeof InstanceStatusSchema>;
 export type ProcessInstance = z.infer<typeof ProcessInstanceSchema>;
+
+/**
+ * Projected `{ id, definitionName }` view of a run. Backs the workspace
+ * `id → definitionName` label map (`useProcessNameMap`), which only ever reads
+ * those two fields — the full `ProcessInstance` wire shape was 24 s/request in
+ * dev for a 10k-run workspace (issue #588).
+ *
+ * Both fields are REQUIRED: a row missing `definitionName` is corruption, not a
+ * default. No `.catch()` — parsing fails loud rather than papering over a bad
+ * row (repo "no silent fallbacks" rule).
+ */
+export const RunNameEntrySchema = ProcessInstanceSchema.pick({
+  id: true,
+  definitionName: true,
+});
+
+export type RunNameEntry = z.infer<typeof RunNameEntrySchema>;

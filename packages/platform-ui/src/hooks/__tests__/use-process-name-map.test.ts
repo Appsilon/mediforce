@@ -1,15 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import type { ProcessInstance } from '@mediforce/platform-core';
-import { buildProcessInstance } from '@mediforce/platform-core/testing';
+import type { RunNameEntry } from '@mediforce/platform-core';
 import { createQueryWrapper } from '@/test/react-query';
 
-const listMock = vi.fn<(...args: unknown[]) => Promise<{ runs: ProcessInstance[] }>>();
+const listNamesMock = vi.fn<(...args: unknown[]) => Promise<{ runs: RunNameEntry[] }>>();
 class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 vi.mock('@/lib/mediforce', () => ({
-  mediforce: { runs: { list: listMock } },
+  mediforce: { runs: { listNames: listNamesMock } },
   ApiError,
 }));
 
@@ -18,7 +17,7 @@ const { useProcessNameMap } = await import('../use-agent-runs');
 describe('useProcessNameMap', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    listMock.mockReset();
+    listNamesMock.mockReset();
   });
 
   afterEach(() => {
@@ -26,11 +25,11 @@ describe('useProcessNameMap', () => {
     vi.restoreAllMocks();
   });
 
-  it('starts with an empty Map and populates it from runs.list', async () => {
-    listMock.mockResolvedValue({
+  it('starts with an empty Map and populates it from runs.listNames', async () => {
+    listNamesMock.mockResolvedValue({
       runs: [
-        buildProcessInstance({ id: 'inst-a', definitionName: 'workflow-a' }),
-        buildProcessInstance({ id: 'inst-b', definitionName: 'workflow-b' }),
+        { id: 'inst-a', definitionName: 'workflow-a' },
+        { id: 'inst-b', definitionName: 'workflow-b' },
       ],
     });
 
@@ -44,40 +43,40 @@ describe('useProcessNameMap', () => {
     expect(result.current.get('inst-b')).toBe('workflow-b');
   });
 
-  it('scopes runs.list to the handle namespace with limit 10000 (issue #588 workaround)', async () => {
-    listMock.mockResolvedValue({ runs: [] });
+  it('scopes runs.listNames to the handle namespace (projected endpoint, issue #588)', async () => {
+    listNamesMock.mockResolvedValue({ runs: [] });
 
     const { wrapper } = createQueryWrapper();
     renderHook(() => useProcessNameMap('some-handle'), { wrapper });
 
-    await vi.waitFor(() => expect(listMock).toHaveBeenCalledTimes(1));
-    expect(listMock).toHaveBeenCalledWith({ namespace: 'some-handle', limit: 10000 });
+    await vi.waitFor(() => expect(listNamesMock).toHaveBeenCalledTimes(1));
+    expect(listNamesMock).toHaveBeenCalledWith({ namespace: 'some-handle' });
   });
 
   it('surfaces 4xx errors without retrying and stops polling', async () => {
-    listMock.mockRejectedValue(new ApiError(403, 'forbidden'));
+    listNamesMock.mockRejectedValue(new ApiError(403, 'forbidden'));
 
     const { wrapper } = createQueryWrapper();
     renderHook(() => useProcessNameMap('some-handle'), { wrapper });
 
-    await vi.waitFor(() => expect(listMock).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(listNamesMock).toHaveBeenCalledTimes(1));
 
-    // Past the 5 s STANDARD interval — refetchInterval is disabled while errored.
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(listMock).toHaveBeenCalledTimes(1);
+    // Past the 30 s NICE interval — refetchInterval is disabled while errored.
+    await vi.advanceTimersByTimeAsync(35_000);
+    expect(listNamesMock).toHaveBeenCalledTimes(1);
   });
 
-  it('polls again after STANDARD_LIVE_INTERVAL_MS (5 s)', async () => {
-    listMock.mockResolvedValue({
-      runs: [buildProcessInstance({ id: 'inst-a', definitionName: 'workflow-a' })],
+  it('polls again after NICE_LIVE_INTERVAL_MS (30 s)', async () => {
+    listNamesMock.mockResolvedValue({
+      runs: [{ id: 'inst-a', definitionName: 'workflow-a' }],
     });
 
     const { wrapper } = createQueryWrapper();
     renderHook(() => useProcessNameMap('some-handle'), { wrapper });
 
-    await vi.waitFor(() => expect(listMock).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(listNamesMock).toHaveBeenCalledTimes(1));
 
-    await vi.advanceTimersByTimeAsync(5_500);
-    await vi.waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
+    await vi.advanceTimersByTimeAsync(31_000);
+    await vi.waitFor(() => expect(listNamesMock).toHaveBeenCalledTimes(2));
   });
 });

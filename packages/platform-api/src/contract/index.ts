@@ -160,12 +160,16 @@ export {
   StartRunOutputSchema,
   ListRunsInputSchema,
   ListRunsOutputSchema,
+  ListRunNamesInputSchema,
+  ListRunNamesOutputSchema,
   type GetRunInput,
   type GetRunOutput,
   type StartRunInput,
   type StartRunOutput,
   type ListRunsInput,
   type ListRunsOutput,
+  type ListRunNamesInput,
+  type ListRunNamesOutput,
 } from './runs';
 
 export {

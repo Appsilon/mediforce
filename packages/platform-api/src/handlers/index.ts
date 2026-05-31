@@ -58,6 +58,7 @@ export { listPlugins } from './plugins/list-plugins';
 export { heartbeat as cronHeartbeat } from './cron/heartbeat';
 
 export { listRuns } from './runs/list-runs';
+export { listRunNames } from './runs/list-run-names';
 export { getRun } from './runs/get-run';
 export { startRun } from './runs/start-run';
 

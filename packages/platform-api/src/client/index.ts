@@ -17,6 +17,8 @@ import {
   StartRunOutputSchema,
   ListRunsInputSchema,
   ListRunsOutputSchema,
+  ListRunNamesInputSchema,
+  ListRunNamesOutputSchema,
   ArchiveVersionInputSchema,
   ArchiveVersionOutputSchema,
   ArchiveAllInputSchema,
@@ -246,6 +248,8 @@ import {
   type StartRunOutput,
   type ListRunsInput,
   type ListRunsOutput,
+  type ListRunNamesInput,
+  type ListRunNamesOutput,
   type DockerInfoResponse,
   type OpenRouterCreditsInput,
   type OpenRouterCreditsOutput,
@@ -469,6 +473,7 @@ export class Mediforce {
 
   readonly runs: {
     list: (input?: ListRunsInput) => Promise<ListRunsOutput>;
+    listNames: (input: ListRunNamesInput) => Promise<ListRunNamesOutput>;
     get: (input: GetRunInput) => Promise<GetRunOutput>;
     start: (input: StartRunInput) => Promise<StartRunOutput>;
     cancel: (input: CancelRunInput) => Promise<CancelRunOutput>;
@@ -1076,6 +1081,13 @@ export class Mediforce {
         const res = await this.request(`/api/runs${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.runs.list');
         return ListRunsOutputSchema.parse(body);
+      },
+      listNames: async (input) => {
+        const validated = ListRunNamesInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/runs/names${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.runs.listNames');
+        return ListRunNamesOutputSchema.parse(body);
       },
       get: async (input) => {
         const validated = GetRunInputSchema.parse(input);

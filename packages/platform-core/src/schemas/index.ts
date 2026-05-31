@@ -59,8 +59,10 @@ export {
 export {
   InstanceStatusSchema,
   ProcessInstanceSchema,
+  RunNameEntrySchema,
   type InstanceStatus,
   type ProcessInstance,
+  type RunNameEntry,
 } from './process-instance';
 
 export {

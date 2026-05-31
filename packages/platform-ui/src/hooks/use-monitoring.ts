@@ -5,8 +5,7 @@ import type { MonitoringSummary } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
-
-const NICE_LIVE_INTERVAL_MS = 30_000;
+import { NICE_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
 
 /**
  * Workspace dashboard summary via `mediforce.monitoring.summary`. NICE LIVE

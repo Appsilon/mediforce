@@ -3,6 +3,7 @@ import {
   ProcessInstanceSchema,
   StepExecutionSchema,
   AgentEventSchema,
+  RunNameEntrySchema,
   parseRow,
   type ProcessInstance,
   type ProcessInstanceRepository,
@@ -11,6 +12,7 @@ import {
   type AgentEvent,
   type ListInstancesOptions,
   type WorkflowRunSummaryResult,
+  type RunNameEntry,
 } from '@mediforce/platform-core';
 import type { Database } from '../client';
 import {
@@ -180,6 +182,22 @@ export class PostgresProcessInstanceRepository
       .orderBy(desc(processInstances.createdAt))
       .limit(options.limit ?? 20);
     return rows.map((r) => toInstance(r));
+  }
+
+  async listDefinitionNames(namespace: string): Promise<RunNameEntry[]> {
+    const rows = await this.db
+      .select({
+        id: processInstances.id,
+        definitionName: processInstances.definitionName,
+      })
+      .from(processInstances)
+      .where(
+        and(
+          eq(processInstances.workspace, namespace),
+          isNull(processInstances.deletedAt),
+        ),
+      );
+    return rows.map((r) => RunNameEntrySchema.parse(r));
   }
 
   async getByStatusAll(status: InstanceStatus): Promise<ProcessInstance[]> {
