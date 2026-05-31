@@ -132,7 +132,8 @@ export async function seedPostgresNamespace(
         INSERT INTO process_instances (
           id, workspace, definition_name, definition_version, status,
           current_step_id, variables, trigger_type, trigger_payload,
-          pause_reason, error, assigned_roles, created_by, created_at, updated_at
+          pause_reason, error, assigned_roles, created_by, created_at, updated_at,
+          deleted_at
         ) VALUES (
           ${proc.id as string},
           ${proc.namespace as string},
@@ -148,7 +149,8 @@ export async function seedPostgresNamespace(
           ${(proc.assignedRoles as string[] | undefined) ?? null},
           ${(proc.createdBy as string | null) ?? null},
           ${proc.createdAt as string},
-          ${proc.updatedAt as string}
+          ${proc.updatedAt as string},
+          ${(proc.deletedAt as string | null) ?? null}
         )
         ON CONFLICT (id) DO NOTHING
       `;

@@ -422,6 +422,63 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       error: 'API rate limit exceeded — retried 3 times',
       assignedRoles: ['reviewer'],
     },
+    // Dedicated runs for runs-names.journey.ts (GET /api/runs/names, #588).
+    // Unique definitionNames + ids so the projected { id, definitionName }
+    // assertions are deterministic. `proc-names-deleted` carries a non-null
+    // `deletedAt` tombstone so the journey can assert soft-deleted runs are
+    // excluded by the `isNull(deletedAt)` filter.
+    'proc-names-journey-1': {
+      id: 'proc-names-journey-1',
+      namespace: 'test',
+      definitionName: 'Names Journey Workflow A',
+      definitionVersion: '1.0.0',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: twoDaysAgo,
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+    },
+    'proc-names-journey-2': {
+      id: 'proc-names-journey-2',
+      namespace: 'test',
+      definitionName: 'Names Journey Workflow B',
+      definitionVersion: '1.0.0',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: twoDaysAgo,
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+    },
+    'proc-names-journey-deleted': {
+      id: 'proc-names-journey-deleted',
+      namespace: 'test',
+      definitionName: 'Names Journey Soft Deleted',
+      definitionVersion: '1.0.0',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: twoDaysAgo,
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+      deletedAt: twoDaysAgo,
+    },
   };
 
   const agentRuns: Record<string, Record<string, unknown>> = {

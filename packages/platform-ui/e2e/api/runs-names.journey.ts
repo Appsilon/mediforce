@@ -6,7 +6,6 @@ import {
   TEST_ORG_HANDLE,
   type MultiNamespaceFixture,
 } from '../helpers/multi-namespace';
-import { seedCollection } from '../helpers/emulator';
 
 /**
  * L3 API E2E for GET /api/runs/names?namespace=<handle> (issue #588).
@@ -17,57 +16,25 @@ import { seedCollection } from '../helpers/emulator';
  * caller gets an empty list — intersection semantics, NOT a 403), the
  * required-namespace 400, and that soft-deleted runs are excluded (parity with
  * the pre-cutover name-map filter).
+ *
+ * The seeded runs come from the central Postgres fixture (`buildSeedData`,
+ * seeded by `postgres-seed.ts` before any worker starts) — `proc-names-journey-1/2`
+ * are live, `proc-names-journey-deleted` carries a non-null `deletedAt`
+ * tombstone. Ids/names are unique to this spec so the projected-shape
+ * assertions are deterministic.
  */
 
-// Dedicated runs seeded into the `test` namespace so this journey doesn't
-// depend on the exact contents of the shared auth-setup fixture. Ids/names are
-// unique to this spec so the projected-shape assertions are deterministic.
 const RUN_ONE_ID = 'proc-names-journey-1';
 const RUN_TWO_ID = 'proc-names-journey-2';
 const RUN_DELETED_ID = 'proc-names-journey-deleted';
 const RUN_ONE_NAME = 'Names Journey Workflow A';
 const RUN_TWO_NAME = 'Names Journey Workflow B';
-const RUN_DELETED_NAME = 'Names Journey Soft Deleted';
-
-function seededRun(
-  id: string,
-  definitionName: string,
-  deleted: boolean,
-): Record<string, unknown> {
-  return {
-    id,
-    namespace: TEST_ORG_HANDLE,
-    definitionName,
-    definitionVersion: '1.0.0',
-    configName: 'all-human',
-    configVersion: '1',
-    status: 'completed',
-    currentStepId: null,
-    variables: {},
-    triggerType: 'manual',
-    triggerPayload: {},
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z',
-    createdBy: 'system',
-    pauseReason: null,
-    error: null,
-    assignedRoles: [],
-    archived: false,
-    deleted,
-  };
-}
 
 test.describe('GET /api/runs/names — API E2E', () => {
   let callers: MultiNamespaceFixture;
 
   test.beforeAll(async () => {
     callers = await setupMultiNamespaceCallers();
-    // Idempotent upserts — safe across Playwright retries / sibling journeys.
-    await seedCollection('processInstances', {
-      [RUN_ONE_ID]: seededRun(RUN_ONE_ID, RUN_ONE_NAME, false),
-      [RUN_TWO_ID]: seededRun(RUN_TWO_ID, RUN_TWO_NAME, false),
-      [RUN_DELETED_ID]: seededRun(RUN_DELETED_ID, RUN_DELETED_NAME, true),
-    });
   });
 
   test('api-key caller: 200 projected { id, definitionName } shape, seeded runs present', async ({ request }) => {
