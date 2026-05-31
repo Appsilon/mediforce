@@ -3,5 +3,8 @@
   "extends": [
     "config:recommended"
   ],
-  "minimumReleaseAge": "7 days"
+  "minimumReleaseAge": "7 days",
+  "ignorePaths": [
+    "scripts/migrate-firestore-to-postgres/requirements.txt"
+  ]
 }
