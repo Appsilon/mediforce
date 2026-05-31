@@ -18,7 +18,6 @@ import { workflowListVersionsCommand } from './commands/workflow-list-versions';
 import { workflowGetCommand } from './commands/workflow-get';
 import { runGetCommand } from './commands/run-get';
 import { runListCommand } from './commands/run-list';
-import { runNamesCommand } from './commands/run-names';
 import { runStartCommand } from './commands/run-start';
 import { runCancelCommand } from './commands/run-cancel';
 import { runArchiveCommand } from './commands/run-archive';
@@ -104,7 +103,6 @@ export const TREE: Record<string, BranchEntry> = {
     description: 'Workflow runs (list, start, get, cancel, archive, bulk)',
     leaves: {
       list: { description: 'List recent runs', fn: runListCommand },
-      names: { description: 'List projected { id, definitionName } per run', fn: runNamesCommand },
       start: { description: 'Start a new run (manual trigger)', fn: runStartCommand },
       get: { description: "Fetch a single run's status", fn: runGetCommand },
       cancel: { description: 'Cancel a running or paused run', fn: runCancelCommand },
