@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import {
   AuditEventSchema,
+  parseRow,
   type AuditEvent,
   type AuditRepository,
   type ProcessInstanceRepository,
@@ -72,7 +73,7 @@ export class PostgresAuditRepository implements AuditRepository {
         },
       })
       .returning();
-    return AuditEventSchema.parse(toAuditEvent(row));
+    return toAuditEvent(row);
   }
 
   async getByEntity(
@@ -89,7 +90,7 @@ export class PostgresAuditRepository implements AuditRepository {
         ),
       )
       .orderBy(desc(auditEvents.timestamp));
-    return rows.map((r) => AuditEventSchema.parse(toAuditEvent(r)));
+    return rows.map((r) => toAuditEvent(r));
   }
 
   async getByProcess(processInstanceId: string): Promise<AuditEvent[]> {
@@ -98,7 +99,7 @@ export class PostgresAuditRepository implements AuditRepository {
       .from(auditEvents)
       .where(eq(auditEvents.processInstanceId, processInstanceId))
       .orderBy(asc(auditEvents.timestamp));
-    return rows.map((r) => AuditEventSchema.parse(toAuditEvent(r)));
+    return rows.map((r) => toAuditEvent(r));
   }
 
   async getByProcessInNamespaces(
@@ -116,7 +117,7 @@ export class PostgresAuditRepository implements AuditRepository {
         ),
       )
       .orderBy(asc(auditEvents.timestamp));
-    return rows.map((r) => AuditEventSchema.parse(toAuditEvent(r)));
+    return rows.map((r) => toAuditEvent(r));
   }
 
   async getByActor(
@@ -129,13 +130,13 @@ export class PostgresAuditRepository implements AuditRepository {
       .where(eq(auditEvents.actorId, actorId))
       .orderBy(desc(auditEvents.timestamp));
     const rows = options?.limit ? await base.limit(options.limit) : await base;
-    return rows.map((r) => AuditEventSchema.parse(toAuditEvent(r)));
+    return rows.map((r) => toAuditEvent(r));
   }
 }
 
 function toAuditEvent(row: typeof auditEvents.$inferSelect): AuditEvent {
   const payload = row.payload;
-  const out: Record<string, unknown> = {
+  return parseRow(AuditEventSchema, {
     actorId: row.actorId,
     actorType: row.actorType,
     actorRole: row.actorRole,
@@ -148,12 +149,10 @@ function toAuditEvent(row: typeof auditEvents.$inferSelect): AuditEvent {
     basis: payload.basis,
     entityType: row.entityType,
     entityId: row.entityId,
-  };
-  if (row.processInstanceId !== null) out.processInstanceId = row.processInstanceId;
-  if (row.stepId !== null) out.stepId = row.stepId;
-  if (row.processDefinitionVersion !== null)
-    out.processDefinitionVersion = row.processDefinitionVersion;
-  if (row.executorType !== null) out.executorType = row.executorType;
-  if (row.reviewerType !== null) out.reviewerType = row.reviewerType;
-  return out as AuditEvent;
+    processInstanceId: row.processInstanceId ?? undefined,
+    stepId: row.stepId ?? undefined,
+    processDefinitionVersion: row.processDefinitionVersion ?? undefined,
+    executorType: row.executorType ?? undefined,
+    reviewerType: row.reviewerType ?? undefined,
+  });
 }

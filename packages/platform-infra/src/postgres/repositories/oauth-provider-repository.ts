@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import {
   OAuthProviderConfigSchema,
+  parseRow,
   ProviderAlreadyExistsError,
   type CreateOAuthProviderInput,
   type OAuthProviderConfig,
@@ -33,7 +34,7 @@ export class PostgresOAuthProviderRepository implements OAuthProviderRepository 
       .from(oauthProviders)
       .where(eq(oauthProviders.workspace, namespace));
     return rows
-      .map((r) => OAuthProviderConfigSchema.parse(toConfig(r)))
+      .map((r) => toConfig(r))
       .sort((a, b) => a.id.localeCompare(b.id));
   }
 
@@ -49,7 +50,7 @@ export class PostgresOAuthProviderRepository implements OAuthProviderRepository 
       )
       .limit(1);
     const row = rows[0];
-    return row ? OAuthProviderConfigSchema.parse(toConfig(row)) : null;
+    return row ? toConfig(row) : null;
   }
 
   async create(
@@ -89,7 +90,7 @@ export class PostgresOAuthProviderRepository implements OAuthProviderRepository 
         iconUrl: input.iconUrl ?? null,
       })
       .returning();
-    return OAuthProviderConfigSchema.parse(toConfig(row));
+    return toConfig(row);
   }
 
   async update(
@@ -130,7 +131,7 @@ export class PostgresOAuthProviderRepository implements OAuthProviderRepository 
         ),
       )
       .returning();
-    return row ? OAuthProviderConfigSchema.parse(toConfig(row)) : null;
+    return row ? toConfig(row) : null;
   }
 
   async delete(namespace: string, id: string): Promise<boolean> {
@@ -148,7 +149,7 @@ export class PostgresOAuthProviderRepository implements OAuthProviderRepository 
 }
 
 function toConfig(row: typeof oauthProviders.$inferSelect): OAuthProviderConfig {
-  const out: Record<string, unknown> = {
+  return parseRow(OAuthProviderConfigSchema, {
     id: row.id,
     name: row.name,
     clientId: row.clientId,
@@ -157,16 +158,13 @@ function toConfig(row: typeof oauthProviders.$inferSelect): OAuthProviderConfig 
     scopes: row.scopes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-  };
-  if (row.clientSecret !== null) out.clientSecret = row.clientSecret;
-  if (row.revokeUrl !== null) out.revokeUrl = row.revokeUrl;
-  if (row.userInfoUrl !== null) out.userInfoUrl = row.userInfoUrl;
-  if (row.tokenEndpointAuthMethod !== null)
-    out.tokenEndpointAuthMethod = row.tokenEndpointAuthMethod;
-  if (row.issuer !== null) out.issuer = row.issuer;
-  if (row.registrationEndpoint !== null)
-    out.registrationEndpoint = row.registrationEndpoint;
-  if (row.resourceUrl !== null) out.resourceUrl = row.resourceUrl;
-  if (row.iconUrl !== null) out.iconUrl = row.iconUrl;
-  return out as OAuthProviderConfig;
+    clientSecret: row.clientSecret ?? undefined,
+    revokeUrl: row.revokeUrl ?? undefined,
+    userInfoUrl: row.userInfoUrl ?? undefined,
+    tokenEndpointAuthMethod: row.tokenEndpointAuthMethod ?? undefined,
+    issuer: row.issuer ?? undefined,
+    registrationEndpoint: row.registrationEndpoint ?? undefined,
+    resourceUrl: row.resourceUrl ?? undefined,
+    iconUrl: row.iconUrl ?? undefined,
+  });
 }

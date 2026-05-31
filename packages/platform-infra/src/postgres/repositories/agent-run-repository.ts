@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import {
   AgentRunSchema,
+  parseRow,
   decodeAgentRunCursor,
   encodeAgentRunCursor,
   type AgentRun,
@@ -81,7 +82,7 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
       .values(values)
       .onConflictDoUpdate({ target: agentRuns.id, set: mutable })
       .returning();
-    return AgentRunSchema.parse(toAgentRun(row));
+    return toAgentRun(row);
   }
 
   async getById(runId: string): Promise<AgentRun | null> {
@@ -91,7 +92,7 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
       .where(eq(agentRuns.id, runId))
       .limit(1);
     const row = rows[0];
-    return row ? AgentRunSchema.parse(toAgentRun(row)) : null;
+    return row ? toAgentRun(row) : null;
   }
 
   async getByIdInNamespaces(
@@ -110,7 +111,7 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
       )
       .limit(1);
     const row = rows[0];
-    return row ? AgentRunSchema.parse(toAgentRun(row)) : null;
+    return row ? toAgentRun(row) : null;
   }
 
   async getByInstanceId(instanceId: string): Promise<AgentRun[]> {
@@ -119,7 +120,7 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
       .from(agentRuns)
       .where(eq(agentRuns.processInstanceId, instanceId))
       .orderBy(desc(agentRuns.startedAt));
-    return rows.map((r) => AgentRunSchema.parse(toAgentRun(r)));
+    return rows.map((r) => toAgentRun(r));
   }
 
   async getByInstanceIdInNamespaces(
@@ -137,7 +138,7 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
         ),
       )
       .orderBy(desc(agentRuns.startedAt));
-    return rows.map((r) => AgentRunSchema.parse(toAgentRun(r)));
+    return rows.map((r) => toAgentRun(r));
   }
 
   async getAll(limitN = 100): Promise<AgentRun[]> {
@@ -146,7 +147,7 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
       .from(agentRuns)
       .orderBy(desc(agentRuns.startedAt))
       .limit(limitN);
-    return rows.map((r) => AgentRunSchema.parse(toAgentRun(r)));
+    return rows.map((r) => toAgentRun(r));
   }
 
   async list(opts: ListAgentRunsOptions): Promise<ListAgentRunsPage> {
@@ -202,7 +203,7 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
       .limit(opts.limit + 1);
     const hasMore = rows.length > opts.limit;
     const pageRows = hasMore ? rows.slice(0, opts.limit) : rows;
-    const items = pageRows.map((r) => AgentRunSchema.parse(toAgentRun(r)));
+    const items = pageRows.map((r) => toAgentRun(r));
     const last = pageRows[pageRows.length - 1];
     if (hasMore && last !== undefined) {
       return {
@@ -299,7 +300,7 @@ function toAgentRun(row: typeof agentRuns.$inferSelect): AgentRun {
           : {}),
       };
 
-  const out: Record<string, unknown> = {
+  return parseRow(AgentRunSchema, {
     id: row.id,
     processInstanceId: row.processInstanceId,
     stepId: row.stepId,
@@ -310,8 +311,7 @@ function toAgentRun(row: typeof agentRuns.$inferSelect): AgentRun {
     fallbackReason: row.fallbackReason,
     startedAt: row.startedAt.toISOString(),
     completedAt: row.completedAt ? row.completedAt.toISOString() : null,
-  };
-  if (row.executorType !== null) out.executorType = row.executorType;
-  if (row.reviewerType !== null) out.reviewerType = row.reviewerType;
-  return out as AgentRun;
+    executorType: row.executorType ?? undefined,
+    reviewerType: row.reviewerType ?? undefined,
+  });
 }

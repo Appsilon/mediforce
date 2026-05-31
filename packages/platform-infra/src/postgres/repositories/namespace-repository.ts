@@ -2,6 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import {
   NamespaceSchema,
   NamespaceMemberSchema,
+  parseRow,
   type Namespace,
   type NamespaceMember,
   type NamespaceMembership,
@@ -32,7 +33,7 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       .where(eq(workspaces.handle, handle))
       .limit(1);
     const row = rows[0];
-    return row ? NamespaceSchema.parse(toNamespace(row)) : null;
+    return row ? toNamespace(row) : null;
   }
 
   async createNamespace(namespace: Namespace): Promise<void> {
@@ -97,7 +98,7 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       .select()
       .from(workspaces)
       .where(eq(workspaces.linkedUserId, uid));
-    const personal = personalRows.map((r) => NamespaceSchema.parse(toNamespace(r)));
+    const personal = personalRows.map((r) => toNamespace(r));
 
     const organizations = await this.getUserNamespaces(uid);
 
@@ -198,7 +199,7 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       )
       .limit(1);
     const row = rows[0];
-    return row ? NamespaceMemberSchema.parse(toMember(row)) : null;
+    return row ? toMember(row) : null;
   }
 
   async getMembers(handle: string): Promise<NamespaceMember[]> {
@@ -206,7 +207,7 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       .select()
       .from(workspaceMembers)
       .where(eq(workspaceMembers.workspace, handle));
-    return rows.map((r) => NamespaceMemberSchema.parse(toMember(r)));
+    return rows.map((r) => toMember(r));
   }
 
   async getUserNamespaces(uid: string): Promise<Namespace[]> {
@@ -220,7 +221,7 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       .select()
       .from(workspaces)
       .where(inArray(workspaces.handle, handles));
-    return rows.map((r) => NamespaceSchema.parse(toNamespace(r)));
+    return rows.map((r) => toNamespace(r));
   }
 
   async getMembershipsForUser(uid: string): Promise<readonly NamespaceMembership[]> {
@@ -251,26 +252,24 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
 }
 
 function toNamespace(row: typeof workspaces.$inferSelect): Namespace {
-  const out: Record<string, unknown> = {
+  return parseRow(NamespaceSchema, {
     handle: row.handle,
     type: row.type,
     displayName: row.displayName,
     createdAt: row.createdAt.toISOString(),
-  };
-  if (row.avatarUrl !== null && row.avatarUrl !== undefined) out.avatarUrl = row.avatarUrl;
-  if (row.icon !== null && row.icon !== undefined) out.icon = row.icon;
-  if (row.linkedUserId !== null && row.linkedUserId !== undefined) out.linkedUserId = row.linkedUserId;
-  if (row.bio !== null && row.bio !== undefined) out.bio = row.bio;
-  return out as Namespace;
+    avatarUrl: row.avatarUrl ?? undefined,
+    icon: row.icon ?? undefined,
+    linkedUserId: row.linkedUserId ?? undefined,
+    bio: row.bio ?? undefined,
+  });
 }
 
 function toMember(row: typeof workspaceMembers.$inferSelect): NamespaceMember {
-  const out: Record<string, unknown> = {
+  return parseRow(NamespaceMemberSchema, {
     uid: row.uid,
     role: row.role,
     joinedAt: row.joinedAt.toISOString(),
-  };
-  if (row.displayName !== null && row.displayName !== undefined) out.displayName = row.displayName;
-  if (row.avatarUrl !== null && row.avatarUrl !== undefined) out.avatarUrl = row.avatarUrl;
-  return out as NamespaceMember;
+    displayName: row.displayName ?? undefined,
+    avatarUrl: row.avatarUrl ?? undefined,
+  });
 }

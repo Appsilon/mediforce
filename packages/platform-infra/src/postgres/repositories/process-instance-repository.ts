@@ -3,6 +3,7 @@ import {
   ProcessInstanceSchema,
   StepExecutionSchema,
   AgentEventSchema,
+  parseRow,
   type ProcessInstance,
   type ProcessInstanceRepository,
   type InstanceStatus,
@@ -93,7 +94,7 @@ export class PostgresProcessInstanceRepository
         updatedAt: new Date(parsed.updatedAt),
       })
       .returning();
-    return ProcessInstanceSchema.parse(toInstance(row));
+    return toInstance(row);
   }
 
   async getById(instanceId: string): Promise<ProcessInstance | null> {
@@ -103,7 +104,7 @@ export class PostgresProcessInstanceRepository
       .where(eq(processInstances.id, instanceId))
       .limit(1);
     const row = rows[0];
-    return row ? ProcessInstanceSchema.parse(toInstance(row)) : null;
+    return row ? toInstance(row) : null;
   }
 
   async getNamespaceById(instanceId: string): Promise<string | null> {
@@ -131,7 +132,7 @@ export class PostgresProcessInstanceRepository
       )
       .limit(1);
     const row = rows[0];
-    return row ? ProcessInstanceSchema.parse(toInstance(row)) : null;
+    return row ? toInstance(row) : null;
   }
 
   async listAll(options: ListInstancesOptions): Promise<ProcessInstance[]> {
@@ -151,7 +152,7 @@ export class PostgresProcessInstanceRepository
       .where(and(...conditions))
       .orderBy(desc(processInstances.createdAt))
       .limit(options.limit ?? 20);
-    return rows.map((r) => ProcessInstanceSchema.parse(toInstance(r)));
+    return rows.map((r) => toInstance(r));
   }
 
   async listInNamespaces(
@@ -178,7 +179,7 @@ export class PostgresProcessInstanceRepository
       .where(and(...conditions))
       .orderBy(desc(processInstances.createdAt))
       .limit(options.limit ?? 20);
-    return rows.map((r) => ProcessInstanceSchema.parse(toInstance(r)));
+    return rows.map((r) => toInstance(r));
   }
 
   async getByStatusAll(status: InstanceStatus): Promise<ProcessInstance[]> {
@@ -187,7 +188,7 @@ export class PostgresProcessInstanceRepository
       .from(processInstances)
       .where(eq(processInstances.status, status))
       .orderBy(desc(processInstances.createdAt));
-    return rows.map((r) => ProcessInstanceSchema.parse(toInstance(r)));
+    return rows.map((r) => toInstance(r));
   }
 
   async getByStatusInNamespaces(
@@ -205,7 +206,7 @@ export class PostgresProcessInstanceRepository
         ),
       )
       .orderBy(desc(processInstances.createdAt));
-    return rows.map((r) => ProcessInstanceSchema.parse(toInstance(r)));
+    return rows.map((r) => toInstance(r));
   }
 
   async update(
@@ -253,7 +254,7 @@ export class PostgresProcessInstanceRepository
           eq(processInstances.definitionVersion, version),
         ),
       );
-    return rows.map((r) => ProcessInstanceSchema.parse(toInstance(r)));
+    return rows.map((r) => toInstance(r));
   }
 
   async getLastCompletedByDefinitionName(
@@ -275,7 +276,7 @@ export class PostgresProcessInstanceRepository
       .orderBy(desc(processInstances.updatedAt))
       .limit(1);
     const row = rows[0];
-    return row ? ProcessInstanceSchema.parse(toInstance(row)) : null;
+    return row ? toInstance(row) : null;
   }
 
   async addStepExecution(
@@ -303,7 +304,7 @@ export class PostgresProcessInstanceRepository
         completedAt: parsed.completedAt ? new Date(parsed.completedAt) : null,
       })
       .returning();
-    return StepExecutionSchema.parse(toStepExecution(row, instanceId));
+    return toStepExecution(row, instanceId);
   }
 
   async getStepExecutions(instanceId: string): Promise<StepExecution[]> {
@@ -313,7 +314,7 @@ export class PostgresProcessInstanceRepository
       .where(eq(stepExecutions.processInstanceId, instanceId))
       .orderBy(asc(stepExecutions.startedAt));
     return rows.map((r) =>
-      StepExecutionSchema.parse(toStepExecution(r, instanceId)),
+      toStepExecution(r, instanceId),
     );
   }
 
@@ -333,7 +334,7 @@ export class PostgresProcessInstanceRepository
       .orderBy(desc(stepExecutions.startedAt))
       .limit(1);
     const row = rows[0];
-    return row ? StepExecutionSchema.parse(toStepExecution(row, instanceId)) : null;
+    return row ? toStepExecution(row, instanceId) : null;
   }
 
   async updateStepExecution(
@@ -424,7 +425,7 @@ export class PostgresProcessInstanceRepository
       .orderBy(desc(processInstances.createdAt))
       .limit(3);
     const latest = latestRows.map((r) =>
-      ProcessInstanceSchema.parse(toInstance(r)),
+      toInstance(r),
     );
 
     return { total, active, latest };
@@ -475,7 +476,7 @@ export class PostgresProcessInstanceRepository
 }
 
 function toInstance(row: typeof processInstances.$inferSelect): ProcessInstance {
-  const out: Record<string, unknown> = {
+  return parseRow(ProcessInstanceSchema, {
     id: row.id,
     namespace: row.workspace,
     definitionName: row.definitionName,
@@ -493,24 +494,20 @@ function toInstance(row: typeof processInstances.$inferSelect): ProcessInstance 
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     createdBy: row.createdBy ?? '',
-  };
-  if (row.previousRun !== null) {
-    out.previousRun = row.previousRun as Record<string, unknown>;
-  }
-  if (row.previousRunSourceId !== null) {
-    out.previousRunSourceId = row.previousRunSourceId;
-  }
-  if (row.totalCostUsd !== null) {
-    out.totalCostUsd = Number(row.totalCostUsd);
-  }
-  return out as unknown as ProcessInstance;
+    previousRun:
+      row.previousRun !== null
+        ? (row.previousRun as Record<string, unknown>)
+        : undefined,
+    previousRunSourceId: row.previousRunSourceId ?? undefined,
+    totalCostUsd: row.totalCostUsd !== null ? Number(row.totalCostUsd) : undefined,
+  });
 }
 
 function toStepExecution(
   row: typeof stepExecutions.$inferSelect,
   instanceId: string,
 ): StepExecution {
-  const out: Record<string, unknown> = {
+  return parseRow(StepExecutionSchema, {
     id: row.id,
     instanceId,
     stepId: row.stepId,
@@ -526,14 +523,9 @@ function toStepExecution(
       : new Date(0).toISOString(),
     completedAt: row.completedAt ? row.completedAt.toISOString() : null,
     iterationNumber: row.iterationNumber,
-  };
-  if (row.reviewVerdicts !== null) {
-    out.reviewVerdicts = row.reviewVerdicts;
-  }
-  if (row.agentOutput !== null) {
-    out.agentOutput = row.agentOutput;
-  }
-  return out as unknown as StepExecution;
+    reviewVerdicts: row.reviewVerdicts ?? undefined,
+    agentOutput: row.agentOutput ?? undefined,
+  });
 }
 
 function toAgentEvent(

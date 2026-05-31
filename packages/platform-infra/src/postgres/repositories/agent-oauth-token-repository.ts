@@ -1,6 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm';
 import {
   AgentOAuthTokenSchema,
+  parseRow,
   type AgentOAuthToken,
   type AgentOAuthTokenRepository,
 } from '@mediforce/platform-core';
@@ -41,7 +42,7 @@ export class PostgresAgentOAuthTokenRepository implements AgentOAuthTokenReposit
       )
       .limit(1);
     const row = rows[0];
-    return row ? AgentOAuthTokenSchema.parse(toToken(row)) : null;
+    return row ? toToken(row) : null;
   }
 
   async put(
@@ -122,14 +123,14 @@ export class PostgresAgentOAuthTokenRepository implements AgentOAuthTokenReposit
       )
       .orderBy(asc(agentOAuthTokens.serverName));
     return rows.map((row) => {
-      const token = AgentOAuthTokenSchema.parse(toToken(row));
+      const token = toToken(row);
       return { ...token, serverName: row.serverName };
     });
   }
 }
 
 function toToken(row: typeof agentOAuthTokens.$inferSelect): AgentOAuthToken {
-  const out: Record<string, unknown> = {
+  return parseRow(AgentOAuthTokenSchema, {
     provider: row.providerId,
     accessToken: row.accessToken,
     scope: row.scope,
@@ -137,8 +138,7 @@ function toToken(row: typeof agentOAuthTokens.$inferSelect): AgentOAuthToken {
     accountLogin: row.accountLogin,
     connectedAt: row.connectedAt,
     connectedBy: row.connectedBy,
-  };
-  if (row.refreshToken !== null) out.refreshToken = row.refreshToken;
-  if (row.expiresAt !== null) out.expiresAt = row.expiresAt;
-  return out as AgentOAuthToken;
+    refreshToken: row.refreshToken ?? undefined,
+    expiresAt: row.expiresAt ?? undefined,
+  });
 }

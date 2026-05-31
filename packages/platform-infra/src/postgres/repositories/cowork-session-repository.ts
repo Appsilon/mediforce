@@ -428,16 +428,15 @@ function toTurn(row: typeof coworkTurns.$inferSelect): ConversationTurn {
     artifactDelta: (row.artifactDelta as Record<string, unknown> | null) ?? null,
   };
   if (row.role === 'tool') {
-    const toolTurn: ConversationTurn = {
+    return {
       ...base,
       role: 'tool',
       toolName: row.toolName ?? '',
       toolArgs: (row.toolArgs as Record<string, unknown>) ?? {},
       toolStatus: (row.toolStatus ?? 'running') as 'running' | 'success' | 'error',
       serverName: row.serverName ?? '',
+      toolResult: row.toolResult ?? undefined,
     };
-    if (row.toolResult !== null) toolTurn.toolResult = row.toolResult;
-    return toolTurn;
   }
   return {
     ...base,
