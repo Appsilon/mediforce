@@ -1,4 +1,4 @@
-firebase-admin==6.5.0
+firebase-admin==6.9.0
 psycopg2-binary==2.9.12
 google-cloud-firestore==2.16.0
 pytest==8.4.2
