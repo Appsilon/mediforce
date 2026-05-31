@@ -127,22 +127,21 @@ Open `http://localhost:9007`. Use this to click through the UI without configuri
 | `pnpm dev:mock` | Mocked agents + seeded local emulator data, port 9007. No cloud keys, no Docker, no Firebase project. |
 | `pnpm dev:no-docker` | Docker-free, UI-only. Agents run via host `claude` CLI instead of Docker. |
 | `pnpm dev:queue` | Like `dev`, but agent execution goes through the BullMQ queue (production architecture). Boots `redis` alongside Postgres; requires the worker running — see below. |
-| `pnpm dev:postgres` | Explicit Postgres + Redis mode. Boots `postgres` + `redis` via docker compose, runs `pnpm db:migrate`, then starts the dev server. Idempotent — safe to re-run after pulling new migrations. |
 
 ### Postgres mode (ADR-0001)
 
-Bring up Postgres + Redis and point the app at them. One command does all
+Bring up Postgres and point the app at it. One command does all
 of the above:
 
 ```bash
-pnpm dev:postgres                                  # docker compose up + migrate + dev
+pnpm dev                                           # docker compose up + migrate + dev
 ```
 
 Manual equivalent if you need to wire your own env (e.g. point at an
 external Postgres):
 
 ```bash
-docker compose up postgres redis -d                # boot Postgres 16 + Redis
+docker compose up postgres -d                      # boot Postgres 16
 # in packages/platform-ui/.env.local:
 #   DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce
 pnpm db:migrate                                    # apply Drizzle migrations once
@@ -150,7 +149,7 @@ pnpm dev                                           # start the app
 ```
 
 `pnpm db:migrate` is idempotent — re-run after pulling new migrations
-from main. Same script runs inside `pnpm dev:postgres` and inside the
+from main. Same script runs inside `pnpm dev` and inside the
 production Dockerfile's CMD, so dev and prod share the migration path.
 See [Staging / production ops](#staging--production-ops-postgres) below.
 
@@ -282,17 +281,14 @@ the bind-mount data dir with the right ownership as part of its
 
 **Already-bootstrapped deployments** (the current staging) — bootstrap
 is not re-run against them. Add `POSTGRES_PASSWORD` + create the dir
-manually via ssh. See
-[`docs/staging-postgres-prep.md`](docs/staging-postgres-prep.md) for
-the one-off checklist.
+manually via ssh.
 
 Drizzle migrations run in a short-lived `migrate` compose service (init
 container, see [`docker-compose.prod.yml`](docker-compose.prod.yml))
 before `platform-ui` starts. `platform-ui` waits via
 `depends_on: { migrate: { condition: service_completed_successfully } }`.
-Idempotent (drizzle's `__drizzle_migrations` ledger), exits 0 immediately
-when `STORAGE_BACKEND != postgres`. No separate migration step in the
-deploy pipeline.
+Idempotent (drizzle's `__drizzle_migrations` ledger). No separate
+migration step in the deploy pipeline.
 
 
 ## Deep Dives

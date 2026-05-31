@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Changed
+- Removed redundant `dev:postgres` script (use `pnpm dev`); `dev:no-docker` now sets `DATABASE_URL` so it boots post-#534; doc cleanup (ADR-0001 Accepted, `STORAGE_BACKEND` refs scrubbed, headless-migration docs marked Completed).
+
 ### Fixed
 - Forced password-change, workspace bio/profile edits, agent MCP-binding writes, and namespace member/delete mutations no longer 500 — their audit events now carry an FK-valid `workspace` (the acting/affected namespace) instead of throwing against the Postgres NOT NULL column; `namespace.deleted` emits before the cascade and is anchored to the owner's surviving personal namespace. [#534](https://github.com/Appsilon/mediforce/pull/534)
 - Cutover script maps agent-run `duration_ms` + token counts from the correct envelope keys (`duration_ms`, `tokenUsage.{inputTokens,outputTokens}`), so migrated runs keep their duration/token data. [#534](https://github.com/Appsilon/mediforce/pull/534)

@@ -99,9 +99,9 @@ generate-tlg-shells                    generate-adam
 |------|----------|-----|
 | Code outputs (R scripts, specs, markdown) | Git repo | Reviewable, versioned, reproducible |
 | Input files (SDTM .xpt, PDFs) | Firebase Storage → mounted at `/data` | Large binaries don't belong in git |
-| Agent activity logs | Platform (Firestore) | Real-time observability |
-| Commit SHAs, branch names | Platform (Firestore, on step execution record) | Audit trail linking run to exact code |
-| Reviewer feedback (revise comments) | Platform (Firestore, via verdict form) | Fed to agent as step input on retry |
+| Agent activity logs | Platform (Postgres) | Real-time observability |
+| Commit SHAs, branch names | Platform (Postgres, on step execution record) | Audit trail linking run to exact code |
+| Reviewer feedback (revise comments) | Platform (Postgres, via verdict form) | Fed to agent as step input on retry |
 
 ### Branching Model
 
@@ -339,8 +339,8 @@ User                Platform              Docker              GitHub
 1. **Mock first**: Update `MockClaudeCodeAgentPlugin` to return git metadata. Update review panel to show GitHub links. UAT the full flow with fake data.
 2. **Entrypoint + image**: Build the base Docker image with Claude CLI + R + git. Write `entrypoint.sh`. Test locally with `docker run`.
 3. **Plugin swap**: Replace `spawn('claude')` with `spawn('docker', ['run', ...])` in `ClaudeCodeAgentPlugin`. Wire up git credential mounting and env vars.
-4. **Schema + recording**: Add git fields to `AgentConfig` and step execution records. Store commit SHA in Firestore.
-5. **Network isolation**: Add Docker network rules to restrict container access to essentials only (Anthropic API, GitHub, Firestore).
+4. **Schema + recording**: Add git fields to `AgentConfig` and step execution records. Store commit SHA in Postgres.
+5. **Network isolation**: Add Docker network rules to restrict container access to essentials only (Anthropic API, GitHub, the platform API).
 
 ## Git Auth in Containers
 

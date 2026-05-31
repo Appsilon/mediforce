@@ -184,3 +184,5 @@ trigger phrases match the action you're about to take. List with
     "regression", never "risk".
 
 See `README.md` for one-time env setup (Node, pnpm, Firebase CLI, `.env.local`).
+For the day-to-day dev loop (which `pnpm dev*` to run, test levels, CLI,
+migrations, ports, troubleshooting) see [`docs/dev-quickref.md`](docs/dev-quickref.md).
