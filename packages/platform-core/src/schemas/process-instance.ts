@@ -64,7 +64,7 @@ export type ProcessInstance = z.infer<typeof ProcessInstanceSchema>;
  * those two fields — the full `ProcessInstance` wire shape was 24 s/request in
  * dev for a 10k-run workspace (issue #588).
  *
- * Both fields are REQUIRED: a doc missing `definitionName` is corruption, not a
+ * Both fields are REQUIRED: a row missing `definitionName` is corruption, not a
  * default. No `.catch()` — parsing fails loud rather than papering over a bad
  * row (repo "no silent fallbacks" rule).
  */
