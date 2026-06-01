@@ -304,7 +304,14 @@ export function RunsTable({
                   <ProcessStatusBadge status={run.status} pauseReason={run.pauseReason} error={run.error} />
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
-                  {run.createdBy ? (userNames.get(run.createdBy) ?? run.createdBy) : '—'}
+                  {run.parentInstanceId && run.parentDefinitionName ? (
+                    <Link
+                      href={`/${handle}/workflows/${encodeURIComponent(run.parentDefinitionName)}/runs/${run.parentInstanceId}`}
+                      className="text-primary hover:underline"
+                    >
+                      {run.parentDefinitionName}
+                    </Link>
+                  ) : run.createdBy ? (userNames.get(run.createdBy) ?? run.createdBy) : '—'}
                 </td>
                 <td className="px-4 py-3 text-xs">
                   {run.currentStepId ? (

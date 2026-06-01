@@ -26,6 +26,7 @@ const baseCtx: ActionContext = {
   stepId: 'spawn-step',
   processInstanceId: 'parent-inst-1',
   namespace: 'test-ns',
+  definitionName: 'parent-workflow',
   sources: {
     triggerPayload: { focusArea: 'security' },
     steps: {
@@ -66,8 +67,10 @@ describe('createSpawnActionHandler', () => {
         definitionName: 'child-wf',
         definitionVersion: 3,
         triggerName: 'manual',
-        triggeredBy: 'spawn:parent-inst-1',
+        triggeredBy: 'spawn',
         payload: { key: 'val' },
+        parentInstanceId: 'parent-inst-1',
+        parentDefinitionName: 'parent-workflow',
       }),
     );
     expect(result.spawnedCount).toBe(1);

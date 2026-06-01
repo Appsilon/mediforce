@@ -19,6 +19,8 @@ export interface ActionContext {
   processInstanceId: string;
   /** Namespace of the parent workflow instance. Used by spawn action. */
   namespace?: string;
+  /** Definition name of the parent workflow instance. Used by spawn action. */
+  definitionName?: string;
   /** Sources for interpolation. The handler is free to walk these manually
    *  for advanced cases (path access into nested objects). */
   sources: InterpolationSources;

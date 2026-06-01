@@ -478,6 +478,7 @@ export async function POST(
                 stepId: instance.currentStepId,
                 processInstanceId: instanceId,
                 namespace: instance.namespace ?? '',
+                definitionName: instance.definitionName,
                 sources: {
                   triggerPayload: (instance.triggerPayload as Record<string, unknown>) ?? {},
                   steps: instance.variables,

@@ -15,6 +15,8 @@ interface WorkflowTrigger {
     triggerName: string;
     triggeredBy: string;
     payload?: Record<string, unknown>;
+    parentInstanceId?: string;
+    parentDefinitionName?: string;
   }): Promise<TriggerResult>;
 }
 
@@ -88,8 +90,10 @@ export function createSpawnActionHandler(
           definitionName: target.definitionName,
           definitionVersion: version,
           triggerName: target.triggerName ?? 'manual',
-          triggeredBy: `spawn:${ctx.processInstanceId}`,
+          triggeredBy: 'spawn',
           payload: interpolatedPayload,
+          parentInstanceId: ctx.processInstanceId,
+          parentDefinitionName: ctx.definitionName,
         });
 
         spawned.push({
@@ -102,7 +106,7 @@ export function createSpawnActionHandler(
 
         if (runKicker) {
           await runKicker.kick(result.instanceId, {
-            triggeredBy: `spawn:${ctx.processInstanceId}`,
+            triggeredBy: 'spawn',
           });
         }
       } catch (err) {

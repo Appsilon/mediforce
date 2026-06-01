@@ -53,6 +53,8 @@ export const ProcessInstanceSchema = z.object({
   /** ID of the ProcessInstance whose outputs populated `previousRun`. */
   previousRunSourceId: z.string().optional(),
   totalCostUsd: z.number().optional(),
+  parentInstanceId: z.string().min(1).optional(),
+  parentDefinitionName: z.string().min(1).optional(),
 });
 
 export type InstanceStatus = z.infer<typeof InstanceStatusSchema>;

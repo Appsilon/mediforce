@@ -9,6 +9,8 @@ export interface WorkflowTriggerContext {
   triggerName: string;        // matches Trigger.name from WorkflowDefinition
   triggeredBy: string;        // actor ID who fired the trigger
   payload?: Record<string, unknown>;
+  parentInstanceId?: string;
+  parentDefinitionName?: string;
 }
 
 export interface TriggerResult {

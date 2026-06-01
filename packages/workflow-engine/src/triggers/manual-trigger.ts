@@ -56,6 +56,7 @@ export class ManualTrigger {
       context.triggeredBy,
       'manual',
       context.payload,
+      { parentInstanceId: context.parentInstanceId, parentDefinitionName: context.parentDefinitionName },
     );
 
     await this.engine.startInstance(instance.id);
