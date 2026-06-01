@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-05-31]
+
 ### Changed
 - Removed redundant `dev:postgres` script (use `pnpm dev`); `dev:no-docker` now sets `DATABASE_URL` so it boots post-#534; doc cleanup (ADR-0001 Accepted, `STORAGE_BACKEND` refs scrubbed, headless-migration docs marked Completed).
 
