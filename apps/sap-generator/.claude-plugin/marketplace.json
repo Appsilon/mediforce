@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "sap-generator",
+  "description": "Local skills for AI-driven Statistical Analysis Plan (SAP) generation from clinical trial protocols (CDISC AI Challenge, Use Case 2)",
+  "owner": {
+    "name": "Appsilon"
+  },
+  "plugins": [
+    {
+      "name": "sap-generator",
+      "description": "Skills for extracting study design from a protocol, authoring a SAP, and building CDISC ARS-aligned traceability artifacts",
+      "version": "0.1.0",
+      "author": {
+        "name": "Appsilon"
+      },
+      "source": "./plugins/sap-generator",
+      "category": "clinical-research"
+    }
+  ]
+}

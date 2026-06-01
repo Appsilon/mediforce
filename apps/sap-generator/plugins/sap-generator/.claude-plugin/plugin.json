@@ -1,0 +1,7 @@
+{
+  "name": "sap-generator",
+  "description": "Skills for AI-driven generation of a Statistical Analysis Plan (SAP) from a clinical trial protocol: extracting a structured study-design record, authoring the SAP document against the ICH E9 layout, and building CDISC ARS-aligned traceability artifacts that link study design to planned analyses and displays.",
+  "author": {
+    "name": "Appsilon"
+  }
+}

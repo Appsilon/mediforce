@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Added
+- `apps/sap-generator` — workflow for the CDISC AI Challenge Use Case 2 (AI-driven SAP generation). Protocol PDF → study-design extraction → SAP draft → CDISC ARS-aligned traceability matrix → biostatistician review (revise loops back) → finalize. Produces the SAP that the existing `protocol-to-tfl` pipeline consumes, so the two apps chain.
+
 ### Changed
 - Removed redundant `dev:postgres` script (use `pnpm dev`); `dev:no-docker` now sets `DATABASE_URL` so it boots post-#534; doc cleanup (ADR-0001 Accepted, `STORAGE_BACKEND` refs scrubbed, headless-migration docs marked Completed).
 

@@ -1,0 +1,24 @@
+version: "1.0"
+generated: "2026-06-01"
+standard: "agentskills.io/specification"
+total_skills: 3
+
+domains:
+  statistical-reporting:
+    description: SAP generation pipeline skills (protocol -> study design -> SAP -> traceability)
+    skills:
+      - id: extract-study-design
+        path: extract-study-design/SKILL.md
+        complexity: advanced
+        language: multi
+        description: Extract a structured study-design record from a clinical trial protocol
+      - id: draft-sap
+        path: draft-sap/SKILL.md
+        complexity: advanced
+        language: multi
+        description: Author a Statistical Analysis Plan from the study-design record
+      - id: build-traceability
+        path: build-traceability/SKILL.md
+        complexity: advanced
+        language: multi
+        description: Build traceability matrix and CDISC ARS-aligned analysis metadata
