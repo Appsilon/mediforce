@@ -9,15 +9,15 @@
 
 - [ ] **SYNC-01**: Model registry syncs from OpenRouter daily via cron (`0 3 * * *`)
 - [ ] **SYNC-02**: Migrate container runs eager sync on boot if last sync >24h ago
-- [ ] **SYNC-03**: Failed sync retries 3 times at 1hr intervals before waiting for next cron
-- [ ] **SYNC-04**: Rankings (request counts) update in same sync job
-- [ ] **SYNC-05**: Sync retires models removed from OpenRouter (sets `retired_at`)
+- [x] **SYNC-03**: Failed sync retries 3 times at 1hr intervals before waiting for next cron
+- [x] **SYNC-04**: Rankings (request counts) update in same sync job
+- [x] **SYNC-05**: Sync retires models removed from OpenRouter (sets `retired_at`)
 
 ### Retirement
 
 - [x] **RET-01**: `model_registry_entries` has `retired_at` timestamp column
-- [ ] **RET-02**: Models not in OpenRouter response get `retired_at = NOW()` during sync
-- [ ] **RET-03**: Models reappearing in OpenRouter get `retired_at` cleared
+- [x] **RET-02**: Models not in OpenRouter response get `retired_at = NOW()` during sync
+- [x] **RET-03**: Models reappearing in OpenRouter get `retired_at` cleared
 
 ### Workflow Editor
 
@@ -59,11 +59,11 @@
 | RET-01 | Phase 18 | Complete |
 | SYNC-01 | Phase 19 | Pending |
 | SYNC-02 | Phase 19 | Pending |
-| SYNC-03 | Phase 19 | Pending |
-| SYNC-04 | Phase 19 | Pending |
-| SYNC-05 | Phase 19 | Pending |
-| RET-02 | Phase 19 | Pending |
-| RET-03 | Phase 19 | Pending |
+| SYNC-03 | Phase 19 | Complete |
+| SYNC-04 | Phase 19 | Complete |
+| SYNC-05 | Phase 19 | Complete |
+| RET-02 | Phase 19 | Complete |
+| RET-03 | Phase 19 | Complete |
 | EDIT-01 | Phase 20 | Pending |
 | EDIT-02 | Phase 20 | Pending |
 | EDIT-03 | Phase 20 | Pending |

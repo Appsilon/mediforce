@@ -49,7 +49,10 @@ Plans:
   2. The migrate container, when started after >24 h since last sync, completes a full sync before platform-ui accepts traffic.
   3. If the OpenRouter API is unavailable, the sync retries up to 3 times at 1-hour intervals before standing down until the next cron window.
   4. After a successful sync, model rankings (request counts) are updated in the same database transaction/pass — no separate job required.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 19-01-PLAN.md — Core sync logic: retirement, rankings, retry wrapper, repository interface extensions
+- [ ] 19-02-PLAN.md — Scheduling: cron route, eager boot sync, migrate container update, CLI output
 
 ### Phase 20: Editor and Pre-flight Validation
 **Goal**: Users cannot accidentally configure or start a workflow that depends on a retired model — the editor prevents it visually, and the run route blocks it programmatically.
@@ -79,6 +82,6 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 18. Schema Foundation | 1/1 | Complete    | 2026-06-02 | - |
-| 19. Sync and Retirement | v1.4 | 0/TBD | Not started | - |
+| 19. Sync and Retirement | 1/2 | In Progress|  | - |
 | 20. Editor and Pre-flight Validation | v1.4 | 0/TBD | Not started | - |
 | 21. Alerting | v1.4 | 0/TBD | Not started | - |

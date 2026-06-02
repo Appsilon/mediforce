@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Model Registry Reliability
 status: planning
-stopped_at: Completed 18-01-PLAN.md
-last_updated: "2026-06-02T12:08:09.552Z"
+stopped_at: Completed 19-01-PLAN.md
+last_updated: "2026-06-02T12:27:22.223Z"
 last_activity: 2026-06-02 — Roadmap created (4 phases, 16 requirements mapped)
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  total_plans: 3
+  completed_plans: 2
   percent: 0
 ---
 
@@ -47,6 +47,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 18-schema-foundation P01 | 3m23s | 1 tasks | 12 files |
+| Phase 19-sync-and-retirement P01 | 4m42s | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -62,6 +63,8 @@ Progress: [░░░░░░░░░░] 0%
 - Pre-flight blocks run with retired model (422 with named model + step + date)
 - [Phase 18-01]: retiredAt: null is required in CreateModelRegistryEntryInput (not omitted) — forces all callers to explicitly opt-in to null
 - [Phase 18-01]: Additive-only migration: nullable retired_at with no DEFAULT — existing rows get NULL implicitly
+- [Phase 19-01]: Use .returning({ id }) instead of rowCount for Drizzle UPDATE affected-row counting
+- [Phase 19-01]: syncFromOpenRouter returns lastSyncedAt directly; handler no longer overrides with new Date()
 
 ### Pending Todos
 
@@ -73,6 +76,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-02T12:05:28.036Z
-Stopped at: Completed 18-01-PLAN.md
+Last session: 2026-06-02T12:27:22.221Z
+Stopped at: Completed 19-01-PLAN.md
 Resume file: None
