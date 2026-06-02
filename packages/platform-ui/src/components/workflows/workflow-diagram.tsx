@@ -290,6 +290,10 @@ const nodeTypes = { step: StepNode, branchPlaceholder: BranchPlaceholderNode };
 
 type AddStepEdgeData = {
   onAdd?: (type: WorkflowStep['type'], executor: WorkflowStep['executor']) => void;
+  onOpenPopover?: (pos: { top: number; left: number }, onAdd: (type: WorkflowStep['type'], executor: WorkflowStep['executor']) => void) => void;
+  onClosePopover?: () => void;
+  popoverEdgeId?: string | null;
+  edgeId?: string;
 };
 
 const STEP_TYPE_OPTIONS = [
@@ -306,51 +310,28 @@ function AddStepEdge({
   label, labelStyle, labelBgStyle, labelBgPadding, labelBgBorderRadius,
   data,
 }: EdgeProps & { data?: AddStepEdgeData }) {
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const [pendingType, setPendingType] = useState<WorkflowStep['type'] | null>(null);
-  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!popoverOpen) return;
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (
-        popoverRef.current && !popoverRef.current.contains(e.target as HTMLElement) &&
-        buttonRef.current && !buttonRef.current.contains(e.target as HTMLElement)
-      ) {
-        setPopoverOpen(false);
-        setPendingType(null);
-      }
-    };
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [popoverOpen]);
 
   const [path, midX, midY] = getSmoothStepPath({
     sourceX, sourceY, sourcePosition,
     targetX, targetY, targetPosition,
   });
 
-  // Position the button 40% along the source→target vector (10% closer to source than midpoint).
   const buttonX = sourceX + 0.4 * (targetX - sourceX);
   const buttonY = sourceY + 0.4 * (targetY - sourceY);
 
   const handleButtonClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (popoverOpen) {
-      setPopoverOpen(false);
-      setPendingType(null);
-      setPopoverPos(null);
+    if (data?.popoverEdgeId === id) {
+      data?.onClosePopover?.();
     } else {
       const rect = buttonRef.current?.getBoundingClientRect();
-      if (rect) {
-        setPopoverPos({
+      if (rect && data?.onAdd) {
+        data.onOpenPopover?.({
           top: rect.bottom + window.scrollY + 8,
           left: rect.left + window.scrollX + rect.width / 2,
-        });
+        }, data.onAdd);
       }
-      setPopoverOpen(true);
     }
   };
 
@@ -390,61 +371,6 @@ function AddStepEdge({
             </button>
           </div>
         </EdgeLabelRenderer>
-      )}
-      {popoverOpen && popoverPos && data?.onAdd && createPortal(
-        <div
-          ref={popoverRef}
-          style={{
-            position: 'absolute',
-            top: popoverPos.top,
-            left: popoverPos.left,
-            transform: 'translateX(-50%)',
-            zIndex: 9999,
-          }}
-          className="bg-background border rounded-xl shadow-xl p-3 w-80 space-y-3"
-        >
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Step type</p>
-            <div className="flex flex-col gap-1">
-              {STEP_TYPE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.type}
-                  onClick={(e) => { e.stopPropagation(); setPendingType(opt.type); }}
-                  className={cn(
-                    'rounded-lg px-3 py-2 text-left transition-all w-full',
-                    pendingType === opt.type ? opt.activeBg : 'hover:bg-muted',
-                  )}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <opt.icon className={cn('h-3.5 w-3.5 shrink-0', opt.color)} strokeWidth={1.5} />
-                    <span className={cn('text-xs font-semibold', opt.color)}>{opt.label}</span>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{opt.description}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-          {pendingType && (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Who handles this step?</p>
-              <div className="flex gap-1.5">
-                {(pendingType === 'creation'
-                  ? (['human', 'agent', 'script', 'cowork'] as const)
-                  : (['human', 'agent'] as const)
-                ).map((executor) => (
-                  <button
-                    key={executor}
-                    onClick={(e) => { e.stopPropagation(); data.onAdd?.(pendingType, executor); setPopoverOpen(false); setPendingType(null); setPopoverPos(null); }}
-                    className="flex-1 rounded-lg py-1.5 text-xs font-semibold hover:bg-muted transition-all capitalize border"
-                  >
-                    {executor}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>,
-        document.body,
       )}
     </>
   );
@@ -747,10 +673,39 @@ interface WorkflowDiagramProps {
 
 export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, onPaneClick, selectedStepId, errorStepIds, warningStepIds, canMoveUp, canMoveDown }: WorkflowDiagramProps) {
   const [expandedBranches, setExpandedBranches] = useState<Map<string, number>>(new Map());
+  const [popover, setPopover] = useState<{
+    pos: { top: number; left: number };
+    onAdd: (type: WorkflowStep['type'], executor: WorkflowStep['executor']) => void;
+    edgeId: string;
+  } | null>(null);
+  const [pendingType, setPendingType] = useState<WorkflowStep['type'] | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setExpandedBranches(new Map());
   }, [definition]);
+
+  useEffect(() => {
+    if (!popover) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as HTMLElement)) {
+        setPopover(null);
+        setPendingType(null);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [popover]);
+
+  const handleOpenPopover = useCallback((edgeId: string, pos: { top: number; left: number }, onAdd: (type: WorkflowStep['type'], executor: WorkflowStep['executor']) => void) => {
+    setPopover({ pos, onAdd, edgeId });
+    setPendingType(null);
+  }, []);
+
+  const handleClosePopover = useCallback(() => {
+    setPopover(null);
+    setPendingType(null);
+  }, []);
 
   const { nodes: layoutNodes, edges: layoutEdges, height } = useMemo(
     () => buildLayout(definition, expandedBranches),
@@ -795,13 +750,19 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
         return {
           ...e,
           type: 'addStep',
-          data: { onAdd: (type, executor) => onEdgeAdd(e.source, type, executor) } satisfies AddStepEdgeData,
+          data: {
+            onAdd: (type: WorkflowStep['type'], executor: WorkflowStep['executor']) => onEdgeAdd(e.source, type, executor),
+            onOpenPopover: (pos: { top: number; left: number }, onAdd: (type: WorkflowStep['type'], executor: WorkflowStep['executor']) => void) => handleOpenPopover(e.id, pos, onAdd),
+            onClosePopover: handleClosePopover,
+            popoverEdgeId: popover?.edgeId ?? null,
+            edgeId: e.id,
+          } satisfies AddStepEdgeData,
         };
       }
       return e;
     });
     return { nodes: styledNodes as Node[], edges: styledEdges };
-  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, warningStepIds, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, canMoveUp, canMoveDown]);
+  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, warningStepIds, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, canMoveUp, canMoveDown, handleOpenPopover, handleClosePopover, popover?.edgeId]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<StepNodeData>) => {
@@ -817,9 +778,6 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
         style={{ width: '100%', height: `${Math.max(360, height)}px`, ...style }}
       >
         <ReactFlow
-          // ReactFlow infers Node<StepNodeData> from nodeTypes; mixed node types
-          // (step + branchPlaceholder) require this cast. Safe at runtime because
-          // nodeTypes dispatches rendering by the `type` string, not the generic.
           nodes={nodes as Node<StepNodeData>[]}
           edges={edges}
           nodeTypes={nodeTypes}
@@ -838,6 +796,61 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
           proOptions={{ hideAttribution: true }}
         />
       </div>
+      {popover && createPortal(
+        <div
+          ref={popoverRef}
+          style={{
+            position: 'absolute',
+            top: popover.pos.top,
+            left: popover.pos.left,
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+          }}
+          className="bg-background border rounded-xl shadow-xl p-3 w-80 space-y-3"
+        >
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Step type</p>
+            <div className="flex flex-col gap-1">
+              {STEP_TYPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.type}
+                  onClick={(e) => { e.stopPropagation(); setPendingType(opt.type); }}
+                  className={cn(
+                    'rounded-lg px-3 py-2 text-left transition-all w-full',
+                    pendingType === opt.type ? opt.activeBg : 'hover:bg-muted',
+                  )}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <opt.icon className={cn('h-3.5 w-3.5 shrink-0', opt.color)} strokeWidth={1.5} />
+                    <span className={cn('text-xs font-semibold', opt.color)}>{opt.label}</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{opt.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+          {pendingType && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Who handles this step?</p>
+              <div className="flex gap-1.5">
+                {(pendingType === 'creation'
+                  ? (['human', 'agent', 'script', 'cowork'] as const)
+                  : (['human', 'agent'] as const)
+                ).map((executor) => (
+                  <button
+                    key={executor}
+                    onClick={(e) => { e.stopPropagation(); popover.onAdd(pendingType, executor); setPopover(null); setPendingType(null); }}
+                    className="flex-1 rounded-lg py-1.5 text-xs font-semibold hover:bg-muted transition-all capitalize border"
+                  >
+                    {executor}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>,
+        document.body,
+      )}
     </ReactFlowProvider>
   );
 }

@@ -46,10 +46,9 @@ test.describe('Personal namespace lazy bootstrap journey', () => {
     await page.waitForURL(/\/(bootstrap-journey|workspace-selection)/, { timeout: 25_000 });
     await showCaption(page, 'Personal namespace appears in switcher');
 
-    // Sidebar workspace switcher shows the personal entry (label "My workspace"
-    // per the OrgCard rendering), proving the GET /api/users/me cache
-    // populated.
-    await expect(page.getByText(/my workspace/i)).toBeVisible({ timeout: 10_000 });
+    // Sidebar workspace switcher shows the personal entry (label "My profile"
+    // in the app shell), proving the GET /api/users/me cache populated.
+    await expect(page.getByText(/my profile/i)).toBeVisible({ timeout: 10_000 });
     await showResult(page);
     await endRecording(page);
   });
