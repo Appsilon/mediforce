@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 import {
   ModelRegistryEntrySchema,
   type ModelRegistryEntry,
@@ -39,6 +39,45 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
   async list(): Promise<ModelRegistryEntry[]> {
     const rows = await this.db.select().from(modelRegistryEntries);
     return rows.map((r) => ModelRegistryEntrySchema.parse(toEntry(r)));
+  }
+
+  async listIds(): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: modelRegistryEntries.id })
+      .from(modelRegistryEntries);
+    return rows.map((r) => r.id);
+  }
+
+  async retireAbsentModels(presentIds: string[]): Promise<{ retired: number; reinstated: number }> {
+    if (presentIds.length === 0) {
+      // Retire all active models
+      const retired = await this.db
+        .update(modelRegistryEntries)
+        .set({ retiredAt: sql`NOW()` })
+        .where(isNull(modelRegistryEntries.retiredAt))
+        .returning({ id: modelRegistryEntries.id });
+      return { retired: retired.length, reinstated: 0 };
+    }
+
+    // Retire models absent from presentIds
+    const retiredRows = await this.db
+      .update(modelRegistryEntries)
+      .set({ retiredAt: sql`NOW()` })
+      .where(
+        sql`${notInArray(modelRegistryEntries.id, presentIds)} AND ${isNull(modelRegistryEntries.retiredAt)}`,
+      )
+      .returning({ id: modelRegistryEntries.id });
+
+    // Reinstate models that reappear
+    const reinstatedRows = await this.db
+      .update(modelRegistryEntries)
+      .set({ retiredAt: null })
+      .where(
+        sql`${inArray(modelRegistryEntries.id, presentIds)} AND ${isNotNull(modelRegistryEntries.retiredAt)}`,
+      )
+      .returning({ id: modelRegistryEntries.id });
+
+    return { retired: retiredRows.length, reinstated: reinstatedRows.length };
   }
 
   async upsert(entry: CreateModelRegistryEntryInput): Promise<ModelRegistryEntry> {

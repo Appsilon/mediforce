@@ -198,6 +198,58 @@ function contract(name: string, factory: () => Promise<ModelRegistryRepository>)
       expect(a?.retiredAt).toBeNull();
       expect(b?.retiredAt).toBe('2026-06-01T00:00:00.000Z');
     });
+
+    it('listIds returns all model IDs', async () => {
+      await repo.upsert(entryInput({ id: 'x/alpha' }));
+      await repo.upsert(entryInput({ id: 'x/beta' }));
+      const ids = await repo.listIds();
+      expect(ids.sort()).toEqual(['x/alpha', 'x/beta']);
+    });
+
+    it('retireAbsentModels retires models not in present list', async () => {
+      await repo.upsert(entryInput({ id: 'keep/one', retiredAt: null }));
+      await repo.upsert(entryInput({ id: 'gone/two', retiredAt: null }));
+      const result = await repo.retireAbsentModels(['keep/one']);
+      expect(result.retired).toBe(1);
+      expect(result.reinstated).toBe(0);
+      const gone = await repo.getById('gone/two');
+      expect(gone?.retiredAt).not.toBeNull();
+      const kept = await repo.getById('keep/one');
+      expect(kept?.retiredAt).toBeNull();
+    });
+
+    it('retireAbsentModels reinstates models that reappear', async () => {
+      const retiredAt = '2026-05-01T00:00:00.000Z';
+      await repo.upsert(entryInput({ id: 'back/one', retiredAt }));
+      await repo.upsert(entryInput({ id: 'still/gone', retiredAt }));
+      const result = await repo.retireAbsentModels(['back/one']);
+      expect(result.reinstated).toBe(1);
+      expect(result.retired).toBe(0);
+      const back = await repo.getById('back/one');
+      expect(back?.retiredAt).toBeNull();
+      const stillGone = await repo.getById('still/gone');
+      expect(stillGone?.retiredAt).not.toBeNull();
+    });
+
+    it('retireAbsentModels with empty presentIds retires all active models', async () => {
+      await repo.upsert(entryInput({ id: 'all/one', retiredAt: null }));
+      await repo.upsert(entryInput({ id: 'all/two', retiredAt: null }));
+      const result = await repo.retireAbsentModels([]);
+      expect(result.retired).toBe(2);
+      expect(result.reinstated).toBe(0);
+      const one = await repo.getById('all/one');
+      const two = await repo.getById('all/two');
+      expect(one?.retiredAt).not.toBeNull();
+      expect(two?.retiredAt).not.toBeNull();
+    });
+
+    it('retireAbsentModels with all present IDs retires nothing', async () => {
+      await repo.upsert(entryInput({ id: 'pres/one', retiredAt: null }));
+      await repo.upsert(entryInput({ id: 'pres/two', retiredAt: null }));
+      const result = await repo.retireAbsentModels(['pres/one', 'pres/two']);
+      expect(result.retired).toBe(0);
+      expect(result.reinstated).toBe(0);
+    });
   });
 }
 

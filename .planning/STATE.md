@@ -4,7 +4,7 @@ milestone: v1.4
 milestone_name: Model Registry Reliability
 status: planning
 stopped_at: Completed 18-01-PLAN.md
-last_updated: "2026-06-02T12:05:28.038Z"
+last_updated: "2026-06-02T12:08:09.552Z"
 last_activity: 2026-06-02 — Roadmap created (4 phases, 16 requirements mapped)
 progress:
   total_phases: 4

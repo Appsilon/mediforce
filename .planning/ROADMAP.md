@@ -78,7 +78,7 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 18. Schema Foundation | 1/1 | Complete   | 2026-06-02 | - |
+| 18. Schema Foundation | 1/1 | Complete    | 2026-06-02 | - |
 | 19. Sync and Retirement | v1.4 | 0/TBD | Not started | - |
 | 20. Editor and Pre-flight Validation | v1.4 | 0/TBD | Not started | - |
 | 21. Alerting | v1.4 | 0/TBD | Not started | - |
