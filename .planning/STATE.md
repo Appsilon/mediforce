@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Model Registry Reliability
 status: planning
-stopped_at: Completed 21-alerting/21-01-PLAN.md
-last_updated: "2026-06-02T16:44:15.071Z"
+stopped_at: Completed 21-alerting/21-02-PLAN.md
+last_updated: "2026-06-02T16:53:49.769Z"
 last_activity: 2026-06-02 — Roadmap created (4 phases, 16 requirements mapped)
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
   percent: 0
 ---
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 20-editor-preflight-validation P02 | 2min | 1 tasks | 1 files |
 | Phase 20-editor-preflight-validation P01 | 4m | 2 tasks | 6 files |
 | Phase 21-alerting P01 | 8min | 2 tasks | 18 files |
+| Phase 21-alerting P02 | 7min | 2 tasks | 20 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,9 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 21-alerting]: Migration 0019 created manually — drizzle-kit generate fails on this branch due to pre-existing snapshot UUID collision (0016/0017 share the same UUID)
 - [Phase 21-alerting]: emitAudit/auditActorFrom exported from @mediforce/platform-api public index to allow platform-ui cron route to use system-actor auditing
 - [Phase 21-alerting]: eagerSyncIfStale uses auditRepo.append directly (not emitAudit) to maintain dep direction: platform-infra must not depend on platform-api
+- [Phase 21-alerting]: Renamed private constructor field from config to clientConfig in Mediforce class to expose readonly config namespace
+- [Phase 21-alerting]: Config routes use direct NextResponse pattern (not createRouteAdapter) — system-level ops without CallerScope
+- [Phase 21-alerting]: sendSyncFailureWebhook is fire-and-forget: try/catch wraps fetch, errors logged but never rethrown to cron route
 
 ### Pending Todos
 
@@ -90,6 +94,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-02T16:44:15.069Z
-Stopped at: Completed 21-alerting/21-01-PLAN.md
+Last session: 2026-06-02T16:53:49.767Z
+Stopped at: Completed 21-alerting/21-02-PLAN.md
 Resume file: None

@@ -24,7 +24,7 @@ Archived in `.planning/milestones/`.
 - [x] **Phase 18: Schema Foundation** — Add `retired_at` column to `model_registry_entries` (completed 2026-06-02)
 - [x] **Phase 19: Sync and Retirement** — Daily cron sync, boot-time eager sync, retry logic, rankings, and retirement writes (completed 2026-06-02)
 - [x] **Phase 20: Editor and Pre-flight Validation** — Model picker hides/warns retired models; save and run blocked on retired model (completed 2026-06-02)
-- [ ] **Phase 21: Alerting** — Audit log and webhook notification on sync failure
+- [x] **Phase 21: Alerting** — Audit log and webhook notification on sync failure (completed 2026-06-02)
 
 ## Phase Details
 
@@ -90,4 +90,4 @@ Plans:
 | 18. Schema Foundation | 1/1 | Complete    | 2026-06-02 | - |
 | 19. Sync and Retirement | 2/2 | Complete    | 2026-06-02 | - |
 | 20. Editor and Pre-flight Validation | 2/2 | Complete    | 2026-06-02 | - |
-| 21. Alerting | 1/2 | In Progress|  | - |
+| 21. Alerting | 2/2 | Complete   | 2026-06-02 | - |
