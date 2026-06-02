@@ -101,9 +101,13 @@ export async function syncFromOpenRouter(
 
 export async function syncWithRetry(
   repo: ModelRegistryRepository,
-  opts: { maxRetries?: number; intervalMs?: number } = {},
+  opts: {
+    maxRetries?: number;
+    intervalMs?: number;
+    onAttemptFail?: (attempt: number, error: Error) => void | Promise<void>;
+  } = {},
 ): Promise<SyncResult> {
-  const { maxRetries = 3, intervalMs = 3_600_000 } = opts;
+  const { maxRetries = 3, intervalMs = 3_600_000, onAttemptFail } = opts;
   let lastError: Error | undefined;
   for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
     try {
@@ -112,6 +116,7 @@ export async function syncWithRetry(
       lastError = err instanceof Error ? err : new Error(String(err));
       if (attempt <= maxRetries) {
         console.log(`[model-sync] Attempt ${attempt} failed: ${lastError.message}. Retrying in ${intervalMs / 1000}s...`);
+        await onAttemptFail?.(attempt, lastError);
         await new Promise((r) => setTimeout(r, intervalMs));
       }
     }
