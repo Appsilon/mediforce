@@ -14,7 +14,20 @@
 --
 -- All replacements are idempotent: rows already using "/" are untouched.
 
--- 1. model_registry_entries — PK update
+-- 1a. model_registry_entries — delete __ duplicates where / version exists
+DELETE FROM "model_registry_entries" AS old
+WHERE old."id" LIKE '%\_\_%' ESCAPE '\'
+  AND old."id" NOT LIKE '%/%'
+  AND EXISTS (
+    SELECT 1 FROM "model_registry_entries" AS canonical
+    WHERE canonical."id" = CONCAT(
+      SUBSTRING(old."id" FROM 1 FOR POSITION('__' IN old."id") - 1),
+      '/',
+      SUBSTRING(old."id" FROM POSITION('__' IN old."id") + 2)
+    )
+  );
+
+-- 1b. model_registry_entries — update remaining __ rows (no / conflict)
 UPDATE "model_registry_entries"
 SET "id" = CONCAT(
       SUBSTRING("id" FROM 1 FOR POSITION('__' IN "id") - 1),
