@@ -134,6 +134,13 @@
       "when": 1780401748745,
       "tag": "0018_add_retired_at",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1780418027000,
+      "tag": "0019_platform_settings",
+      "breakpoints": true
     }
   ]
 }

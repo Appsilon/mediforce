@@ -35,6 +35,7 @@ export { PostgresModelRegistryRepository } from './postgres/repositories/model-r
 export { PostgresNamespaceSecretsRepository } from './postgres/repositories/namespace-secrets-repository';
 export { PostgresWorkflowSecretsRepository } from './postgres/repositories/workflow-secrets-repository';
 export { PostgresUserProfileRepository } from './postgres/repositories/user-profile-repository';
+export { PostgresPlatformSettingsRepository } from './postgres/repositories/platform-settings-repository';
 export { createPostgresClient, getSharedPostgresClient } from './postgres/client';
 export type { Database } from './postgres/client';
 export { PostgresAgentEventLog } from './postgres/agent-event-log';
