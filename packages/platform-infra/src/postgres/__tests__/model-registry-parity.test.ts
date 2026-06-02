@@ -37,6 +37,7 @@ function entryInput(overrides: Partial<CreateModelRegistryEntryInput> = {}): Cre
     source: 'openrouter',
     requestCount: null,
     lastSyncedAt: '2026-05-27T00:00:00.000Z',
+    retiredAt: null,
     ...overrides,
   };
 }
@@ -158,6 +159,44 @@ function contract(name: string, factory: () => Promise<ModelRegistryRepository>)
     it('rejects upsert with invalid payload (wrong source enum)', async () => {
       const bad = { ...entryInput(), source: 'invalid' as 'openrouter' };
       await expect(repo.upsert(bad)).rejects.toThrow();
+    });
+
+    it('upsert with retiredAt: null round-trips null', async () => {
+      const created = await repo.upsert(entryInput({ retiredAt: null }));
+      expect(created.retiredAt).toBeNull();
+      const got = await repo.getById('anthropic/claude-sonnet-4');
+      expect(got?.retiredAt).toBeNull();
+    });
+
+    it('upsert with retiredAt ISO timestamp round-trips the value', async () => {
+      const retiredAt = '2026-06-01T00:00:00.000Z';
+      await repo.upsert(entryInput({ retiredAt }));
+      const got = await repo.getById('anthropic/claude-sonnet-4');
+      expect(got?.retiredAt).toBe(retiredAt);
+    });
+
+    it('update sets retiredAt then clears it back to null', async () => {
+      await repo.upsert(entryInput({ retiredAt: null }));
+      const retired = await repo.update({
+        id: 'anthropic/claude-sonnet-4',
+        retiredAt: '2026-06-01T00:00:00.000Z',
+      });
+      expect(retired.retiredAt).toBe('2026-06-01T00:00:00.000Z');
+      const cleared = await repo.update({
+        id: 'anthropic/claude-sonnet-4',
+        retiredAt: null,
+      });
+      expect(cleared.retiredAt).toBeNull();
+    });
+
+    it('list includes retiredAt in returned entries', async () => {
+      await repo.upsert(entryInput({ id: 'a/one', retiredAt: null }));
+      await repo.upsert(entryInput({ id: 'b/two', retiredAt: '2026-06-01T00:00:00.000Z' }));
+      const list = await repo.list();
+      const a = list.find((e) => e.id === 'a/one');
+      const b = list.find((e) => e.id === 'b/two');
+      expect(a?.retiredAt).toBeNull();
+      expect(b?.retiredAt).toBe('2026-06-01T00:00:00.000Z');
     });
   });
 }

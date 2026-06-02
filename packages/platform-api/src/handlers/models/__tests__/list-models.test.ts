@@ -20,6 +20,7 @@ function makeEntry(overrides: Partial<ModelRegistryEntry> & { id: string }): Mod
     lastSyncedAt: '2026-05-04T00:00:00Z',
     createdAt: '2026-05-04T00:00:00Z',
     updatedAt: '2026-05-04T00:00:00Z',
+    retiredAt: null,
     ...overrides,
   };
 }

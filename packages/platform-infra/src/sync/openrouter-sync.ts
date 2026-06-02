@@ -55,6 +55,7 @@ function transformModel(model: OpenRouterModel): CreateModelRegistryEntryInput {
     source: 'openrouter' as const,
     requestCount: null,
     lastSyncedAt: new Date().toISOString(),
+    retiredAt: null,
   };
 }
 

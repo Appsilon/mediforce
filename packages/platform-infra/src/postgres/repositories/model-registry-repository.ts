@@ -63,6 +63,7 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
           source: values.source,
           requestCount: values.requestCount,
           lastSyncedAt: values.lastSyncedAt,
+          retiredAt: values.retiredAt,
           // updated_at advanced by the set_updated_at() trigger on UPDATE.
         },
       });
@@ -88,6 +89,7 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
     if (rest.source !== undefined) set.source = rest.source;
     if (rest.requestCount !== undefined) set.requestCount = rest.requestCount;
     if (rest.lastSyncedAt !== undefined) set.lastSyncedAt = new Date(rest.lastSyncedAt);
+    if (rest.retiredAt !== undefined) set.retiredAt = rest.retiredAt ? new Date(rest.retiredAt) : null;
 
     if (Object.keys(set).length > 0) {
       await this.db.update(modelRegistryEntries).set(set).where(eq(modelRegistryEntries.id, id));
@@ -128,6 +130,7 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
             source: sql`excluded.source`,
             requestCount: sql`excluded.request_count`,
             lastSyncedAt: sql`excluded.last_synced_at`,
+            retiredAt: sql`excluded.retired_at`,
           },
         });
       synced += chunk.length;
@@ -223,6 +226,7 @@ function toRowValues(entry: CreateModelRegistryEntryInput) {
     source: entry.source,
     requestCount: entry.requestCount,
     lastSyncedAt: new Date(entry.lastSyncedAt),
+    retiredAt: entry.retiredAt ? new Date(entry.retiredAt) : null,
   };
 }
 
@@ -245,5 +249,6 @@ function toEntry(row: typeof modelRegistryEntries.$inferSelect): ModelRegistryEn
     lastSyncedAt: row.lastSyncedAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    retiredAt: row.retiredAt ? row.retiredAt.toISOString() : null,
   };
 }

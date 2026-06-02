@@ -21,6 +21,7 @@ function makeEntry(id: string): ModelRegistryEntry {
     lastSyncedAt: '2026-05-04T00:00:00Z',
     createdAt: '2026-05-04T00:00:00Z',
     updatedAt: '2026-05-04T00:00:00Z',
+    retiredAt: null,
   };
 }
 
