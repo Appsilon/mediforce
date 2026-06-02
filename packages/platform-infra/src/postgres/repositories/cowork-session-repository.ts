@@ -70,6 +70,8 @@ export class PostgresCoworkSessionRepository
         voiceConfig: parsed.voiceConfig,
         mcpServers: parsed.mcpServers,
         artifact: parsed.artifact,
+        validationResult: parsed.validationResult,
+        presentation: parsed.presentation,
         finalizedAt: parsed.finalizedAt ? new Date(parsed.finalizedAt) : null,
         createdAt: new Date(parsed.createdAt),
         updatedAt: new Date(parsed.updatedAt),
@@ -340,6 +342,29 @@ export class PostgresCoworkSessionRepository
     return (await this.getById(sessionId))!;
   }
 
+  async updateValidationResult(
+    sessionId: string,
+    result: { valid: boolean; errors: string[] },
+  ): Promise<CoworkSession> {
+    const [row] = await this.db
+      .update(coworkSessions)
+      .set({ validationResult: result })
+      .where(eq(coworkSessions.id, sessionId))
+      .returning({ id: coworkSessions.id });
+    if (!row) throw new Error(`CoworkSession not found: ${sessionId}`);
+    return (await this.getById(sessionId))!;
+  }
+
+  async updatePresentation(sessionId: string, html: string): Promise<CoworkSession> {
+    const [row] = await this.db
+      .update(coworkSessions)
+      .set({ presentation: html })
+      .where(eq(coworkSessions.id, sessionId))
+      .returning({ id: coworkSessions.id });
+    if (!row) throw new Error(`CoworkSession not found: ${sessionId}`);
+    return (await this.getById(sessionId))!;
+  }
+
   async finalize(
     sessionId: string,
     artifact: Record<string, unknown>,
@@ -412,6 +437,8 @@ function toSession(
     outputSchema: row.outputSchema as CoworkSession['outputSchema'],
     voiceConfig: row.voiceConfig as CoworkSession['voiceConfig'],
     artifact: row.artifact as CoworkSession['artifact'],
+    validationResult: row.validationResult as CoworkSession['validationResult'],
+    presentation: row.presentation as CoworkSession['presentation'] ?? null,
     mcpServers: row.mcpServers as CoworkSession['mcpServers'],
     turns: turnRows.map(toTurn),
     createdAt: row.createdAt.toISOString(),

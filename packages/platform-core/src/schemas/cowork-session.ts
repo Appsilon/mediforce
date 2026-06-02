@@ -85,6 +85,13 @@ export const CoworkSessionSchema = z.object({
   // Default null keeps full-scan reads tolerant of those docs.
   voiceConfig: CoworkVoiceConfigSchema.nullable().default(null),
   artifact: z.record(z.string(), z.unknown()).nullable(),
+  /** Validation result from the last update_artifact call */
+  validationResult: z.object({
+    valid: z.boolean(),
+    errors: z.array(z.string()),
+  }).nullable().default(null),
+  /** HTML presentation produced by the agent via update_presentation */
+  presentation: z.string().nullable().default(null),
   /** MCP servers available during this cowork session */
   mcpServers: z.array(McpServerConfigSchema).nullable().default(null),
   turns: z.array(ConversationTurnSchema),

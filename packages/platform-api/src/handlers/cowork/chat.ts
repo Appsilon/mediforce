@@ -24,6 +24,7 @@ import {
   callOpenRouter,
   type OpenRouterToolCall,
 } from '../../services/openrouter-client';
+import { validateOutputSchema } from '@mediforce/agent-runtime';
 
 const MAX_TOOL_LOOP_ITERATIONS = 10;
 const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
@@ -223,8 +224,11 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
     const artifactCalls = response.toolCalls.filter(
       (tc) => tc.function.name === 'update_artifact',
     );
+    const presentationCalls = response.toolCalls.filter(
+      (tc) => tc.function.name === 'update_presentation',
+    );
     const mcpCalls = response.toolCalls.filter(
-      (tc) => tc.function.name !== 'update_artifact',
+      (tc) => tc.function.name !== 'update_artifact' && tc.function.name !== 'update_presentation',
     );
 
     for (const call of artifactCalls) {
@@ -232,6 +236,24 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
       if (parsed !== null) {
         artifact = parsed;
         await scope.coworkSessions.updateArtifact(ctx.session.id, parsed);
+
+        if (ctx.session.outputSchema) {
+          const error = validateOutputSchema(
+            parsed,
+            ctx.session.outputSchema as { type?: string; required?: string[]; properties?: Record<string, { type?: string }> },
+          );
+          const validationResult = error === null
+            ? { valid: true, errors: [] as string[] }
+            : { valid: false, errors: [error] };
+          await scope.coworkSessions.updateValidationResult(ctx.session.id, validationResult);
+        }
+      }
+    }
+
+    for (const call of presentationCalls) {
+      const html = applyPresentationUpdate(call);
+      if (html !== null) {
+        await scope.coworkSessions.updatePresentation(ctx.session.id, html);
       }
     }
 
@@ -315,6 +337,17 @@ function applyArtifactUpdate(
       artifact: Record<string, unknown>;
     };
     return parsed.artifact;
+  } catch {
+    return null;
+  }
+}
+
+function applyPresentationUpdate(
+  call: OpenRouterToolCall,
+): string | null {
+  try {
+    const parsed = JSON.parse(call.function.arguments) as { html: string };
+    return typeof parsed.html === 'string' ? parsed.html : null;
   } catch {
     return null;
   }

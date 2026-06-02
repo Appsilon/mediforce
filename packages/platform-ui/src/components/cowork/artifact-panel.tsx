@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import {
-  Loader2, CheckCircle, Lock, Check, Circle,
+  Loader2, CheckCircle, Lock, Check, Circle, AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -39,6 +39,8 @@ function checkRequiredFields(
 interface ArtifactPanelProps {
   artifact: Record<string, unknown> | null;
   outputSchema: Record<string, unknown> | null;
+  validationResult: { valid: boolean; errors: string[] } | null;
+  presentation: string | null;
   onFinalize: () => void;
   finalizing: boolean;
   finalized: boolean;
@@ -47,6 +49,8 @@ interface ArtifactPanelProps {
 export function ArtifactPanel({
   artifact,
   outputSchema,
+  validationResult,
+  presentation,
   onFinalize,
   finalizing,
   finalized,
@@ -58,6 +62,26 @@ export function ArtifactPanel({
   );
   const fulfilledCount = [...fieldStatus.values()].filter(Boolean).length;
   const allFulfilled = requiredFields.length === 0 || fulfilledCount === requiredFields.length;
+
+  const [activeTab, setActiveTab] = React.useState<'data' | 'preview'>('data');
+
+  const presentationHtml = React.useMemo(() => {
+    if (!presentation) return '';
+    return `<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body { margin: 0; padding: 1rem; font-family: system-ui, sans-serif; }</style>
+</head>
+<body>${presentation}</body>
+</html>`;
+  }, [presentation]);
+
+  React.useEffect(() => {
+    if (presentation && activeTab === 'data') {
+      setActiveTab('preview');
+    }
+  }, [presentation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className={cn(
@@ -113,15 +137,87 @@ export function ArtifactPanel({
         </div>
       )}
 
-      <div className={cn('flex-1 overflow-auto p-4', finalized && 'opacity-80')}>
-        {artifact ? (
-          <pre className="rounded-md bg-muted p-3 text-xs overflow-auto whitespace-pre-wrap break-words font-mono">
-            {JSON.stringify(artifact, null, 2)}
-          </pre>
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            No artifact yet. Start a conversation to build one.
+      {/* Validation status */}
+      {validationResult && !finalized && (
+        <div className={cn(
+          'border-b px-4 py-2',
+          validationResult.valid ? 'bg-green-50 dark:bg-green-950/20' : 'bg-red-50 dark:bg-red-950/20',
+        )}>
+          <div className="flex items-center gap-1.5">
+            {validationResult.valid ? (
+              <>
+                <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                <span className="text-xs font-medium text-green-700 dark:text-green-400">Valid</span>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                <span className="text-xs font-medium text-red-700 dark:text-red-400">
+                  {validationResult.errors.length} error{validationResult.errors.length !== 1 ? 's' : ''}
+                </span>
+              </>
+            )}
           </div>
+          {!validationResult.valid && validationResult.errors.length > 0 && (
+            <ul className="mt-1 space-y-0.5">
+              {validationResult.errors.map((error, i) => (
+                <li key={i} className="text-xs text-red-600 dark:text-red-400">
+                  {error}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Tab bar — only show if presentation exists */}
+      {presentation && !finalized && (
+        <div className="flex border-b">
+          <button
+            onClick={() => setActiveTab('data')}
+            className={cn(
+              'px-4 py-2 text-xs font-medium transition-colors',
+              activeTab === 'data'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Data
+          </button>
+          <button
+            onClick={() => setActiveTab('preview')}
+            className={cn(
+              'px-4 py-2 text-xs font-medium transition-colors',
+              activeTab === 'preview'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Preview
+          </button>
+        </div>
+      )}
+
+      <div className={cn('flex-1 overflow-auto', finalized && 'opacity-80')}>
+        {activeTab === 'data' || !presentation ? (
+          <div className="p-4">
+            {artifact ? (
+              <pre className="rounded-md bg-muted p-3 text-xs overflow-auto whitespace-pre-wrap break-words font-mono">
+                {JSON.stringify(artifact, null, 2)}
+              </pre>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                No artifact yet. Start a conversation to build one.
+              </div>
+            )}
+          </div>
+        ) : (
+          <iframe
+            srcDoc={presentationHtml}
+            className="h-full w-full border-0"
+            sandbox="allow-scripts"
+            title="Artifact presentation"
+          />
         )}
       </div>
 
@@ -129,7 +225,7 @@ export function ArtifactPanel({
         <div className="border-t p-4">
           <button
             onClick={onFinalize}
-            disabled={!artifact || !allFulfilled || finalizing}
+            disabled={!artifact || !allFulfilled || finalizing || (validationResult !== null && !validationResult.valid)}
             className={cn(
               'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
               artifact && allFulfilled
