@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
-import { syncWithRetry } from '@mediforce/platform-infra';
+import { syncWithRetry, sendSyncFailureWebhook } from '@mediforce/platform-infra';
 import { emitAudit } from '@mediforce/platform-api';
 import type { CallerIdentity } from '@mediforce/platform-api';
 
@@ -27,7 +27,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
   }
 
-  const { modelRegistryRepo, auditRepo } = getPlatformServices();
+  const { modelRegistryRepo, auditRepo, platformSettingsRepo } = getPlatformServices();
   const systemCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 
   try {
@@ -63,6 +63,11 @@ export async function GET(request: Request): Promise<NextResponse> {
       basis: 'cron-0-3-daily',
       inputSnapshot: {},
       outputSnapshot: { error: err instanceof Error ? err.message : 'Sync failed after retries' },
+    });
+    await sendSyncFailureWebhook(platformSettingsRepo, {
+      errorMessage: err instanceof Error ? err.message : 'Sync failed after retries',
+      attemptCount: 4,
+      timestamp: new Date().toISOString(),
     });
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Sync failed after retries' },

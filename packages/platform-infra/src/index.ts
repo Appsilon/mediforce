@@ -46,3 +46,7 @@ export { syncFromOpenRouter, syncWithRetry } from './sync/openrouter-sync';
 export type { SyncResult } from './sync/openrouter-sync';
 export { eagerSyncIfStale } from './sync/eager-sync';
 export { isRegistryStale, MODEL_SYNC_CRON } from './sync/model-sync-scheduler';
+
+// Sync alert webhook
+export { sendSyncFailureWebhook, sendTestWebhook } from './notifications/sync-alert-webhook';
+export type { SyncFailureContext, TestWebhookResult } from './notifications/sync-alert-webhook';
