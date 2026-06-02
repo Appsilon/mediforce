@@ -63,6 +63,9 @@ import { namespaceLeaveCommand } from './commands/namespace-leave';
 import { namespaceRemoveMemberCommand } from './commands/namespace-remove-member';
 import { namespaceSetMemberRoleCommand } from './commands/namespace-set-member-role';
 import { processesAgentEventsCommand } from './commands/processes-agent-events';
+import { configSetCommand } from './commands/config-set';
+import { configGetCommand } from './commands/config-get';
+import { configTestWebhookCommand } from './commands/config-test-webhook';
 import { type CommandFn } from './define-command';
 import { consoleOutput, type OutputSink } from './output';
 
@@ -203,6 +206,14 @@ export const TREE: Record<string, BranchEntry> = {
       rmi: { description: 'Remove a Docker image by ID or name:tag', fn: systemRmiCommand },
       disk: { description: 'Docker disk usage breakdown', fn: systemDiskCommand },
       credits: { description: 'OpenRouter credit balance for a workspace', fn: systemCreditsCommand },
+    },
+  },
+  config: {
+    description: 'Platform configuration',
+    leaves: {
+      set: { description: 'Set a config value', fn: configSetCommand },
+      get: { description: 'Get a config value or all values matching a prefix', fn: configGetCommand },
+      'test-webhook': { description: 'Send a test webhook notification', fn: configTestWebhookCommand },
     },
   },
 };

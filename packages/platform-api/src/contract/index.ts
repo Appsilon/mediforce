@@ -460,3 +460,20 @@ export {
   type UpdateNamespaceMemberRoleInput,
   type UpdateNamespaceMemberRoleOutput,
 } from './namespaces';
+
+export {
+  GetConfigInputSchema,
+  GetConfigOutputSchema,
+  GetConfigByPrefixInputSchema,
+  GetConfigByPrefixOutputSchema,
+  SetConfigInputSchema,
+  SetConfigOutputSchema,
+  TestWebhookOutputSchema,
+  type GetConfigInput,
+  type GetConfigOutput,
+  type GetConfigByPrefixInput,
+  type GetConfigByPrefixOutput,
+  type SetConfigInput,
+  type SetConfigOutput,
+  type TestWebhookOutput,
+} from './config';

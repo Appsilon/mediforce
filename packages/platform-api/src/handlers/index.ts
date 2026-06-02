@@ -106,4 +106,8 @@ export { deleteToolCatalogEntry } from './tool-catalog/delete-entry';
 export { listAgentRuns } from './agent-runs/list-agent-runs';
 export { getMonitoringSummary } from './monitoring/get-monitoring-summary';
 
+export { getConfig, getConfigByPrefix } from './config/get-config';
+export { setConfig } from './config/set-config';
+export { testWebhook } from './config/test-webhook';
+
 export { listAdapter, getByIdAdapter } from './_generic';
