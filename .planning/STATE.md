@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Model Registry Reliability
 status: planning
-stopped_at: Completed 20-01-PLAN.md
-last_updated: "2026-06-02T13:04:11.767Z"
+stopped_at: Completed 21-alerting/21-01-PLAN.md
+last_updated: "2026-06-02T16:44:15.071Z"
 last_activity: 2026-06-02 — Roadmap created (4 phases, 16 requirements mapped)
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
   percent: 0
 ---
 
@@ -51,6 +51,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 19-sync-and-retirement P02 | 4m24s | 2 tasks | 10 files |
 | Phase 20-editor-preflight-validation P02 | 2min | 1 tasks | 1 files |
 | Phase 20-editor-preflight-validation P01 | 4m | 2 tasks | 6 files |
+| Phase 21-alerting P01 | 8min | 2 tasks | 18 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,9 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 20-editor-preflight-validation]: validateRetiredModels takes Map<modelId, retiredAt> not full model list — caller builds the map, function stays pure
 - [Phase 20-editor-preflight-validation]: register-workflow throws ValidationError (400) on retired model; run route returns 422 — matches existing unknown-model equivalents
 - [Phase 20-editor-preflight-validation]: allModels hoisted above both unknown-model and retired-model blocks in run route — single list() call covers both checks
+- [Phase 21-alerting]: Migration 0019 created manually — drizzle-kit generate fails on this branch due to pre-existing snapshot UUID collision (0016/0017 share the same UUID)
+- [Phase 21-alerting]: emitAudit/auditActorFrom exported from @mediforce/platform-api public index to allow platform-ui cron route to use system-actor auditing
+- [Phase 21-alerting]: eagerSyncIfStale uses auditRepo.append directly (not emitAudit) to maintain dep direction: platform-infra must not depend on platform-api
 
 ### Pending Todos
 
@@ -86,6 +90,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-02T13:04:11.765Z
-Stopped at: Completed 20-01-PLAN.md
+Last session: 2026-06-02T16:44:15.069Z
+Stopped at: Completed 21-alerting/21-01-PLAN.md
 Resume file: None

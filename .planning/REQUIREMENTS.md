@@ -32,9 +32,9 @@
 
 ### Alerting
 
-- [ ] **ALERT-01**: Failed sync logged in audit trail with error details
+- [x] **ALERT-01**: Failed sync logged in audit trail with error details
 - [ ] **ALERT-02**: Failed sync triggers Slack/Discord webhook notification
-- [ ] **ALERT-03**: Webhook is configurable (URL, enabled/disabled) via env var or platform config
+- [x] **ALERT-03**: Webhook is configurable (URL, enabled/disabled) via env var or platform config
 
 ## Future Requirements
 
@@ -69,9 +69,9 @@
 | EDIT-03 | Phase 20 | Complete |
 | VAL-01 | Phase 20 | Complete |
 | VAL-02 | Phase 20 | Complete |
-| ALERT-01 | Phase 21 | Pending |
+| ALERT-01 | Phase 21 | Complete |
 | ALERT-02 | Phase 21 | Pending |
-| ALERT-03 | Phase 21 | Pending |
+| ALERT-03 | Phase 21 | Complete |
 
 **Coverage:**
 - v1.4 requirements: 16 total
