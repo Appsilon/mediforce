@@ -10,7 +10,10 @@ Agents / quick lookups: see [docs/dev-quickref.md](docs/dev-quickref.md).
 
 - **Node.js** 20+
 - **pnpm** 10+ (`corepack enable && corepack prepare pnpm@latest --activate`)
-- **Docker** (Docker Desktop or engine) — for the Postgres data layer and Docker agents
+- **Docker + Docker Compose v2** — for the Postgres data layer and Docker agents.
+  Docker Desktop (macOS/Windows) bundles Compose. On a Linux engine-only install
+  (Ubuntu's `docker.io`) Compose is a separate package — install both:
+  `sudo apt install docker.io docker-compose-v2`. Verify with `docker compose version`.
 - **Firebase service account** — only for cloud Auth/Storage (the optional path below).
   **Not** needed for data: all server data lives in Postgres (ADR-0001).
 
@@ -353,6 +356,19 @@ Or run on another port: `PORT=9999 pnpm dev`.
 ### `docker compose` hangs / Postgres won't start
 
 Docker isn't running — start Docker Desktop (or the engine), then retry.
+
+### `pnpm dev` exits with "Docker Compose v2 is not installed"
+
+`docker compose version` fails because the engine-only `docker.io` package ships
+without Compose. Install it:
+
+```bash
+sudo apt install docker-compose-v2   # Ubuntu / Debian
+```
+
+Docker Desktop (macOS/Windows) already includes Compose — make sure it's running
+and up to date. `pnpm dev` now preflight-checks this and stops with an
+actionable message instead of booting against a missing database.
 
 ### Migration error / `relation "..." does not exist`
 
