@@ -81,5 +81,6 @@ Branch-collision rename rule: [postgres-local-dev.md](postgres-local-dev.md).
 | `DATABASE_URL is required` FATAL at boot | Non-mock mode without a DB — run `pnpm dev`, or set `DATABASE_URL`. |
 | Port 9003 in use                         | `lsof -ti:9003 \| xargs kill -9` or `PORT=9999 pnpm dev`.        |
 | `docker compose` hangs                   | Docker Desktop isn't running — start it.                         |
+| `pnpm dev`: "Docker Compose v2 is not installed" | Engine-only `docker.io` lacks Compose — `sudo apt install docker-compose-v2` (Ubuntu); Docker Desktop bundles it. |
 | `relation "..." does not exist`          | `pnpm db:migrate`.                                               |
 | Stale / corrupt local data               | `docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v && pnpm dev` (wipes the pg volume). |
