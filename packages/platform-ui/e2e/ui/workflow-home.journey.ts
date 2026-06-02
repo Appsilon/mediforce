@@ -17,9 +17,9 @@ test.describe('Workflow Home Journey', () => {
     await expect(page.getByText(/\d+ runs/).first()).toBeVisible();
     await expect(page.getByText(/\d+ active/).first()).toBeVisible();
 
-    // Instance row data
+    // Instance row data — proc-review-target is paused at Manager Approval
     await expect(page.getByText('#proc-r')).toBeVisible();
-    await expect(page.getByText('Narrative Summary').first()).toBeVisible();
+    await expect(page.getByText('Manager Approval').first()).toBeVisible();
 
     // Display popover
     await click(page, page.getByRole('button', { name: /display/i }));
