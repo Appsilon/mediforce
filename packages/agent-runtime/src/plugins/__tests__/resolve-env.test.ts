@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveStepEnv, validateWorkflowEnv, resolveValue } from '../resolve-env';
+import { resolveStepEnv, validateWorkflowEnv, validateWorkflowModels, resolveValue } from '../resolve-env';
 
 describe('resolve-env', () => {
   // ---------------------------------------------------------------------------
@@ -230,6 +230,62 @@ describe('resolveValue', () => {
     it('[ERROR] throws when {{OAUTH:github}} is used as an env/header value', () => {
       expect(() => resolveValue('{{OAUTH:github}}', {})).toThrow(/OAUTH/);
       expect(() => resolveValue('{{OAUTH:github}}', {})).toThrow(/auth.*oauth/i);
+    });
+  });
+
+  describe('validateWorkflowModels', () => {
+    const known = new Set(['deepseek/deepseek-chat', 'deepseek/deepseek-v4-flash:free', 'anthropic/claude-sonnet-4']);
+
+    it('returns empty when all models exist', () => {
+      const result = validateWorkflowModels({
+        steps: [
+          { id: 's1', name: 'Step 1', executor: 'agent', agent: { model: 'deepseek/deepseek-chat' } },
+        ],
+      }, known);
+      expect(result).toEqual([]);
+    });
+
+    it('normalises __ to / before lookup', () => {
+      const result = validateWorkflowModels({
+        steps: [
+          { id: 's1', name: 'Step 1', executor: 'agent', agent: { model: 'deepseek__deepseek-v4-flash:free' } },
+        ],
+      }, known);
+      expect(result).toEqual([]);
+    });
+
+    it('reports unknown models with affected steps', () => {
+      const result = validateWorkflowModels({
+        steps: [
+          { id: 's1', name: 'Collect', executor: 'agent', agent: { model: 'nonexistent/model' } },
+          { id: 's2', name: 'Process', executor: 'agent', agent: { model: 'deepseek/deepseek-chat' } },
+        ],
+      }, known);
+      expect(result).toHaveLength(1);
+      expect(result[0].model).toBe('nonexistent/model');
+      expect(result[0].steps).toEqual([{ stepId: 's1', stepName: 'Collect' }]);
+    });
+
+    it('skips non-agent steps and steps without model', () => {
+      const result = validateWorkflowModels({
+        steps: [
+          { id: 's1', name: 'Human', executor: 'human' },
+          { id: 's2', name: 'Agent', executor: 'agent', agent: {} },
+          { id: 's3', name: 'Action', executor: 'action' },
+        ],
+      }, known);
+      expect(result).toEqual([]);
+    });
+
+    it('groups multiple steps using the same unknown model', () => {
+      const result = validateWorkflowModels({
+        steps: [
+          { id: 's1', name: 'A', executor: 'agent', agent: { model: 'bad/model' } },
+          { id: 's2', name: 'B', executor: 'agent', agent: { model: 'bad/model' } },
+        ],
+      }, known);
+      expect(result).toHaveLength(1);
+      expect(result[0].steps).toHaveLength(2);
     });
   });
 });

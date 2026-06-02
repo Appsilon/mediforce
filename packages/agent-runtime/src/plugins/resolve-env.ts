@@ -102,6 +102,58 @@ export function validateWorkflowEnv(
   return Array.from(missingMap.values());
 }
 
+// ---------------------------------------------------------------------------
+// Pre-flight validation — model IDs exist in the registry
+// ---------------------------------------------------------------------------
+
+export interface UnknownModel {
+  model: string;
+  steps: Array<{ stepId: string; stepName: string }>;
+}
+
+/** Normalise Firestore-encoded model IDs ("a__b" → "a/b"). */
+function normaliseModelId(raw: string): string {
+  if (raw.includes('/')) return raw;
+  const idx = raw.indexOf('__');
+  return idx < 0 ? raw : `${raw.slice(0, idx)}/${raw.slice(idx + 2)}`;
+}
+
+/**
+ * Validate that every agent step's model exists in the model registry.
+ * `knownModelIds` should contain normalised IDs (with `/` separator).
+ * The function normalises step model IDs before lookup so both `__` and
+ * `/` formats match. Returns the list of unknown models (empty = all good).
+ */
+export function validateWorkflowModels(
+  definition: {
+    steps: Array<{
+      id: string;
+      name: string;
+      executor: string;
+      agent?: { model?: string };
+    }>;
+  },
+  knownModelIds: Set<string>,
+): UnknownModel[] {
+  const unknownMap = new Map<string, UnknownModel>();
+
+  for (const step of definition.steps) {
+    if (step.executor !== 'agent') continue;
+    const raw = step.agent?.model;
+    if (!raw) continue;
+
+    const normalised = normaliseModelId(raw);
+    if (knownModelIds.has(normalised) || knownModelIds.has(raw)) continue;
+
+    if (!unknownMap.has(normalised)) {
+      unknownMap.set(normalised, { model: normalised, steps: [] });
+    }
+    unknownMap.get(normalised)!.steps.push({ stepId: step.id, stepName: step.name });
+  }
+
+  return Array.from(unknownMap.values());
+}
+
 export function resolveStepEnv(
   configEnv: Record<string, string> | undefined,
   stepEnv: Record<string, string> | undefined,

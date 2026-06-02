@@ -34,7 +34,7 @@ export type { AgentRunResult } from './runner/agent-runner';
 export { FallbackHandler } from './runner/fallback-handler';
 
 // Env validation
-export { validateWorkflowEnv } from './plugins/resolve-env';
+export { validateWorkflowEnv, validateWorkflowModels } from './plugins/resolve-env';
 export type { MissingEnvVar } from './plugins/resolve-env';
 
 // MCP resolution helpers
