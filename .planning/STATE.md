@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Model Registry Reliability
 status: planning
-stopped_at: Completed 20-02-PLAN.md
-last_updated: "2026-06-02T13:01:21.365Z"
+stopped_at: Completed 20-01-PLAN.md
+last_updated: "2026-06-02T13:04:11.767Z"
 last_activity: 2026-06-02 — Roadmap created (4 phases, 16 requirements mapped)
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -50,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 19-sync-and-retirement P01 | 4m42s | 2 tasks | 9 files |
 | Phase 19-sync-and-retirement P02 | 4m24s | 2 tasks | 10 files |
 | Phase 20-editor-preflight-validation P02 | 2min | 1 tasks | 1 files |
+| Phase 20-editor-preflight-validation P01 | 4m | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,9 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 19-sync-and-retirement]: eagerSyncIfStale never retries — init container is short-lived; retry would stall boot
 - [Phase 19-sync-and-retirement]: eagerSyncIfStale catches errors and returns them — sync failure must never block database migrations
 - [Phase 20-editor-preflight-validation]: Retired model stays visible as selected option (isCustom logic) — user sees what's configured but cannot select it from the list
+- [Phase 20-editor-preflight-validation]: validateRetiredModels takes Map<modelId, retiredAt> not full model list — caller builds the map, function stays pure
+- [Phase 20-editor-preflight-validation]: register-workflow throws ValidationError (400) on retired model; run route returns 422 — matches existing unknown-model equivalents
+- [Phase 20-editor-preflight-validation]: allModels hoisted above both unknown-model and retired-model blocks in run route — single list() call covers both checks
 
 ### Pending Todos
 
@@ -82,6 +86,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-02T13:01:21.364Z
-Stopped at: Completed 20-02-PLAN.md
+Last session: 2026-06-02T13:04:11.765Z
+Stopped at: Completed 20-01-PLAN.md
 Resume file: None

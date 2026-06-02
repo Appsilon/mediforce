@@ -23,12 +23,12 @@
 
 - [x] **EDIT-01**: Model picker hides retired models from selection list
 - [x] **EDIT-02**: Model picker shows warning if workflow already uses a retired model
-- [ ] **EDIT-03**: Workflow save blocked when step uses a retired model
+- [x] **EDIT-03**: Workflow save blocked when step uses a retired model
 
 ### Run Validation
 
-- [ ] **VAL-01**: Pre-flight validation blocks run start (422) when step uses a retired model
-- [ ] **VAL-02**: Error message names the retired model, affected step(s), and retirement date
+- [x] **VAL-01**: Pre-flight validation blocks run start (422) when step uses a retired model
+- [x] **VAL-02**: Error message names the retired model, affected step(s), and retirement date
 
 ### Alerting
 
@@ -66,9 +66,9 @@
 | RET-03 | Phase 19 | Complete |
 | EDIT-01 | Phase 20 | Complete |
 | EDIT-02 | Phase 20 | Complete |
-| EDIT-03 | Phase 20 | Pending |
-| VAL-01 | Phase 20 | Pending |
-| VAL-02 | Phase 20 | Pending |
+| EDIT-03 | Phase 20 | Complete |
+| VAL-01 | Phase 20 | Complete |
+| VAL-02 | Phase 20 | Complete |
 | ALERT-01 | Phase 21 | Pending |
 | ALERT-02 | Phase 21 | Pending |
 | ALERT-03 | Phase 21 | Pending |
