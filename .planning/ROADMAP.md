@@ -76,7 +76,10 @@ Plans:
   1. A failed sync produces an audit log entry that includes the error details and is visible in the platform audit trail.
   2. A failed sync triggers an HTTP POST to a configured Slack or Discord webhook URL containing a human-readable failure summary.
   3. The webhook URL and enabled/disabled state are configurable via an environment variable (or platform config) without code changes; disabling it suppresses the webhook call but not the audit log entry.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 21-01-PLAN.md — platform_settings table, PlatformSettingsRepository, audit logging in sync flows
+- [ ] 21-02-PLAN.md — Webhook sender (Slack/Discord), config API routes, CLI commands (config set/get/test-webhook)
 
 ## Progress
 
@@ -86,5 +89,5 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 18. Schema Foundation | 1/1 | Complete    | 2026-06-02 | - |
 | 19. Sync and Retirement | 2/2 | Complete    | 2026-06-02 | - |
-| 20. Editor and Pre-flight Validation | 2/2 | Complete   | 2026-06-02 | - |
-| 21. Alerting | v1.4 | 0/TBD | Not started | - |
+| 20. Editor and Pre-flight Validation | 2/2 | Complete    | 2026-06-02 | - |
+| 21. Alerting | v1.4 | 0/2 | Not started | - |
