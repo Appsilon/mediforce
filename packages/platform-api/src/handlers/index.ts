@@ -107,3 +107,6 @@ export { listAgentRuns } from './agent-runs/list-agent-runs';
 export { getMonitoringSummary } from './monitoring/get-monitoring-summary';
 
 export { listAdapter, getByIdAdapter } from './_generic';
+
+export { renderWorkflowDiagram, renderWorkflowDiagramHandler, RenderWorkflowDiagramInputSchema } from './renders/workflow-diagram';
+export type { RenderWorkflowDiagramInput } from './renders/workflow-diagram';
