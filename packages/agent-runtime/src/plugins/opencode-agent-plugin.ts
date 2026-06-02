@@ -12,6 +12,19 @@ import { isWorkflowAgentContext } from './container-plugin';
 const DEFAULT_MODEL = 'deepseek/deepseek-chat';
 
 /**
+ * Normalise Firestore-encoded model IDs: "deepseek__deepseek-chat" →
+ * "deepseek/deepseek-chat".  Firestore doc IDs can't contain "/" so the
+ * model registry historically used "__"; Postgres has no such limitation.
+ * Only the FIRST occurrence of "__" is replaced (the provider/model boundary).
+ */
+export function normaliseModelId(raw: string): string {
+  if (raw.includes('/')) return raw;
+  const idx = raw.indexOf('__');
+  if (idx < 0) return raw;
+  return `${raw.slice(0, idx)}/${raw.slice(idx + 2)}`;
+}
+
+/**
  * OpenCode agent plugin — runs the OpenCode CLI inside a Docker container.
  *
  * OpenCode supports multiple LLM providers including local models via Ollama,
@@ -80,20 +93,23 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
 
   /** Build the full provider/model string for the --model CLI flag. */
   private resolveModelArg(model: string): string {
-    // Already has a recognised provider prefix — use as-is.
-    if (model.startsWith('openrouter/') || !model.includes('/')) {
-      return model;
+    // Normalise legacy Firestore-encoded IDs: "deepseek__deepseek-chat"
+    // → "deepseek/deepseek-chat".  Firestore doc IDs can't contain "/",
+    // so the model registry used "__" as separator; Postgres has no such
+    // limitation but old IDs may still exist in workflow definitions.
+    const normalised = normaliseModelId(model);
+
+    if (normalised.startsWith('openrouter/') || !normalised.includes('/')) {
+      return normalised;
     }
     const workflowSecrets = isWorkflowAgentContext(this.context)
       ? this.context.workflowSecrets
       : undefined;
     const openrouterKey = this.resolvedEnv.vars.OPENROUTER_API_KEY ?? workflowSecrets?.OPENROUTER_API_KEY;
     if (openrouterKey) {
-      // model is e.g. "deepseek/deepseek-chat" (an OpenRouter model path).
-      // Prefix with "openrouter/" so OpenCode routes to the openrouter provider.
-      return `openrouter/${model}`;
+      return `openrouter/${normalised}`;
     }
-    return model;
+    return normalised;
   }
 
   getMockDockerArgs(stepId: string): string[] {
@@ -287,18 +303,12 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
   }
 
   protected override async prepareOutputDir(outputDir: string): Promise<void> {
-    // Write OpenCode config with provider configuration.
-    // Register the model in the appropriate provider so OpenCode can find it.
-    const model = this.agentConfig.model ?? DEFAULT_MODEL;
+    const model = normaliseModelId(this.agentConfig.model ?? DEFAULT_MODEL);
     const config: Record<string, unknown> = {
       $schema: 'https://opencode.ai/config.json',
       permission: 'allow',
     };
 
-    // Auth keys are resolved from two sources with the same priority:
-    // 1. Step/workflow env vars (explicit {{KEY}} references) — already in resolvedEnv.vars
-    // 2. Workflow secrets directly — users can store OPENROUTER_API_KEY / DEEPSEEK_API_KEY
-    //    in workflow secrets without needing to wire them through the env section.
     const workflowSecrets = isWorkflowAgentContext(this.context)
       ? this.context.workflowSecrets
       : undefined;
@@ -306,7 +316,6 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     const openrouterKey = this.resolvedEnv.vars.OPENROUTER_API_KEY ?? workflowSecrets?.OPENROUTER_API_KEY;
     const deepseekKey = this.resolvedEnv.vars.DEEPSEEK_API_KEY ?? workflowSecrets?.DEEPSEEK_API_KEY;
 
-    // Auto-register model in the correct provider based on model ID and available keys.
     if (openrouterKey && model.includes('/')) {
       config.provider = { openrouter: { models: { [model]: {} } } };
     } else if (deepseekKey && model.startsWith('deepseek/')) {

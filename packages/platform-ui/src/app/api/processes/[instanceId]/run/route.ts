@@ -2,7 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
-import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv } from '@mediforce/agent-runtime';
+import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels } from '@mediforce/agent-runtime';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -134,6 +134,33 @@ export async function POST(
         runLockAcquired = false;
         return NextResponse.json(
           { error: 'Missing environment variables', missing: allMissing, instanceId },
+          { status: 422 },
+        );
+      }
+    }
+
+    // Pre-flight: validate agent step models exist in the registry.
+    {
+      const { modelRegistryRepo } = getPlatformServices();
+      const allModels = await modelRegistryRepo.list();
+      const knownIds = new Set(allModels.map((m) => m.id));
+      const unknownModels = validateWorkflowModels(workflowDefinition, knownIds);
+      if (unknownModels.length > 0) {
+        const detail = unknownModels
+          .map((u) => `model '${u.model}' in step(s) ${u.steps.map((s) => `'${s.stepId}'`).join(', ')}`)
+          .join('; ');
+        const message = `Unknown model(s): ${detail}. Check the model name or sync the model registry.`;
+        console.log(`[auto-runner] ${message}`);
+        await instanceRepo.update(instanceId, {
+          status: 'paused',
+          pauseReason: 'missing_env',
+          error: message,
+          updatedAt: new Date().toISOString(),
+        });
+        releaseRunLock(instanceId);
+        runLockAcquired = false;
+        return NextResponse.json(
+          { error: message, unknownModels, instanceId },
           { status: 422 },
         );
       }

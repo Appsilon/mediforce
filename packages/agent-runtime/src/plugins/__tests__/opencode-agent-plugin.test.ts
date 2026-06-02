@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin';
 import type { ProcessConfig } from '@mediforce/platform-core';
-import { OpenCodeAgentPlugin } from '../opencode-agent-plugin';
+import { OpenCodeAgentPlugin, normaliseModelId } from '../opencode-agent-plugin';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 
 const originalAllowLocal = process.env.ALLOW_LOCAL_AGENTS;
@@ -71,6 +71,29 @@ function buildEmitSpy(): { emit: EmitFn; events: EmitPayload[] } {
 function openCodeJsonOutput(response: string): string {
   return JSON.stringify({ type: 'text', part: { type: 'text', text: response } });
 }
+
+describe('normaliseModelId', () => {
+  it('converts first __ to /', () => {
+    expect(normaliseModelId('deepseek__deepseek-v4-flash:free')).toBe('deepseek/deepseek-v4-flash:free');
+  });
+
+  it('handles tilde-prefixed provider', () => {
+    expect(normaliseModelId('~anthropic__claude-haiku-latest')).toBe('~anthropic/claude-haiku-latest');
+  });
+
+  it('leaves already-normalised IDs unchanged', () => {
+    expect(normaliseModelId('deepseek/deepseek-chat')).toBe('deepseek/deepseek-chat');
+    expect(normaliseModelId('openrouter/deepseek/deepseek-chat')).toBe('openrouter/deepseek/deepseek-chat');
+  });
+
+  it('leaves bare model names unchanged', () => {
+    expect(normaliseModelId('gpt-4o')).toBe('gpt-4o');
+  });
+
+  it('only replaces the first __ occurrence', () => {
+    expect(normaliseModelId('provider__model__variant')).toBe('provider/model__variant');
+  });
+});
 
 describe('OpenCodeAgentPlugin', () => {
   let plugin: OpenCodeAgentPlugin;
