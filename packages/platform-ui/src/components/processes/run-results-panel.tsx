@@ -2,9 +2,11 @@
 
 import * as React from 'react';
 import { CheckCircle2, ExternalLink, Gauge, GitBranch, Clock, FileText, DollarSign } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import type { StepExecution, AgentOutputSnapshot } from '@mediforce/platform-core';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
 import { formatDuration, formatStepName, formatCostUsd } from '@/lib/format';
+import { buildSrcdoc, clampIframeHeight, isIframeResizeMessage } from '@/components/tasks/iframe-helpers';
 
 interface RunResultsPanelProps {
   stepExecutions: StepExecution[];
@@ -45,6 +47,49 @@ function isEmptyResultValue(value: unknown): boolean {
   return false;
 }
 
+function isHtmlString(value: string): boolean {
+  const trimmed = value.trimStart().toLowerCase();
+  return trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html');
+}
+
+function HtmlPreview({ html }: { html: string }) {
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = React.useState(300);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+
+  React.useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (
+        isIframeResizeMessage(event.data) &&
+        iframeRef.current &&
+        event.source === iframeRef.current.contentWindow
+      ) {
+        setHeight((prev) => {
+          const next = clampIframeHeight(event.data.height);
+          return next > 0 ? next : prev;
+        });
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  React.useEffect(() => {
+    iframeRef.current?.contentWindow?.postMessage({ type: 'theme', dark: isDark }, '*');
+  }, [isDark]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      srcDoc={buildSrcdoc(html, null, isDark)}
+      sandbox="allow-scripts"
+      style={{ width: '100%', height, border: 'none' }}
+      title="HTML output preview"
+    />
+  );
+}
+
 function ResultValue({ value }: { value: unknown }) {
   if (typeof value === 'boolean') {
     return <span className="text-sm">{value ? 'Yes' : 'No'}</span>;
@@ -62,6 +107,9 @@ function ResultValue({ value }: { value: unknown }) {
           <ExternalLink className="h-3 w-3 shrink-0" />
         </a>
       );
+    }
+    if (isHtmlString(value)) {
+      return <HtmlPreview html={value} />;
     }
     return <span className="text-sm font-mono break-all">{value}</span>;
   }
@@ -310,14 +358,17 @@ export function RunResultsPanel({ stepExecutions }: RunResultsPanelProps) {
                     Output
                   </h4>
                   <dl className="space-y-1.5">
-                    {remainingEntries.map(([key, value]) => (
-                      <div key={key} className="flex flex-wrap items-baseline gap-2 text-sm">
-                        <dt className="text-muted-foreground">{formatResultKey(key)}:</dt>
-                        <dd className="min-w-0 flex-1">
-                          <ResultValue value={value} />
-                        </dd>
-                      </div>
-                    ))}
+                    {remainingEntries.map(([key, value]) => {
+                      const isHtml = typeof value === 'string' && isHtmlString(value);
+                      return (
+                        <div key={key} className={isHtml ? 'space-y-1 text-sm' : 'flex flex-wrap items-baseline gap-2 text-sm'}>
+                          <dt className="text-muted-foreground">{formatResultKey(key)}:</dt>
+                          <dd className="min-w-0 flex-1">
+                            <ResultValue value={value} />
+                          </dd>
+                        </div>
+                      );
+                    })}
                   </dl>
                 </div>
               )}
