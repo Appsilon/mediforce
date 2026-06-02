@@ -7,8 +7,8 @@
 
 ### Sync Infrastructure
 
-- [ ] **SYNC-01**: Model registry syncs from OpenRouter daily via cron (`0 3 * * *`)
-- [ ] **SYNC-02**: Migrate container runs eager sync on boot if last sync >24h ago
+- [x] **SYNC-01**: Model registry syncs from OpenRouter daily via cron (`0 3 * * *`)
+- [x] **SYNC-02**: Migrate container runs eager sync on boot if last sync >24h ago
 - [x] **SYNC-03**: Failed sync retries 3 times at 1hr intervals before waiting for next cron
 - [x] **SYNC-04**: Rankings (request counts) update in same sync job
 - [x] **SYNC-05**: Sync retires models removed from OpenRouter (sets `retired_at`)
@@ -57,8 +57,8 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | RET-01 | Phase 18 | Complete |
-| SYNC-01 | Phase 19 | Pending |
-| SYNC-02 | Phase 19 | Pending |
+| SYNC-01 | Phase 19 | Complete |
+| SYNC-02 | Phase 19 | Complete |
 | SYNC-03 | Phase 19 | Complete |
 | SYNC-04 | Phase 19 | Complete |
 | SYNC-05 | Phase 19 | Complete |

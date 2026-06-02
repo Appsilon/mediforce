@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveStepEnv, validateWorkflowEnv, validateWorkflowModels, resolveValue } from '../resolve-env';
+import { resolveStepEnv, validateWorkflowEnv, validateWorkflowModels, validateRetiredModels, resolveValue } from '../resolve-env';
 
 describe('resolve-env', () => {
   // ---------------------------------------------------------------------------
@@ -230,6 +230,80 @@ describe('resolveValue', () => {
     it('[ERROR] throws when {{OAUTH:github}} is used as an env/header value', () => {
       expect(() => resolveValue('{{OAUTH:github}}', {})).toThrow(/OAUTH/);
       expect(() => resolveValue('{{OAUTH:github}}', {})).toThrow(/auth.*oauth/i);
+    });
+  });
+
+  describe('validateRetiredModels', () => {
+    const retiredMap = new Map<string, string>([
+      ['openai/gpt-4', '2026-01-15T00:00:00Z'],
+      ['anthropic/claude-2', '2025-06-01T00:00:00Z'],
+    ]);
+
+    it('returns empty array when no steps use retired models', () => {
+      const result = validateRetiredModels({
+        steps: [
+          { id: 's1', name: 'Step 1', executor: 'agent', agent: { model: 'anthropic/claude-sonnet-4' } },
+        ],
+      }, retiredMap);
+      expect(result).toEqual([]);
+    });
+
+    it('returns retired model info when step uses a retired model', () => {
+      const result = validateRetiredModels({
+        steps: [
+          { id: 's1', name: 'Analyze', executor: 'agent', agent: { model: 'openai/gpt-4' } },
+        ],
+      }, retiredMap);
+      expect(result).toHaveLength(1);
+      expect(result[0].model).toBe('openai/gpt-4');
+      expect(result[0].retiredAt).toBe('2026-01-15T00:00:00Z');
+      expect(result[0].steps).toEqual([{ stepId: 's1', stepName: 'Analyze' }]);
+    });
+
+    it('ignores steps with no model set (model is optional)', () => {
+      const result = validateRetiredModels({
+        steps: [
+          { id: 's1', name: 'Agent', executor: 'agent', agent: {} },
+        ],
+      }, retiredMap);
+      expect(result).toEqual([]);
+    });
+
+    it('ignores non-agent executor steps', () => {
+      const result = validateRetiredModels({
+        steps: [
+          { id: 's1', name: 'Human', executor: 'human' },
+          { id: 's2', name: 'Action', executor: 'action' },
+        ],
+      }, retiredMap);
+      expect(result).toEqual([]);
+    });
+
+    it('groups multiple steps using the same retired model into one entry', () => {
+      const result = validateRetiredModels({
+        steps: [
+          { id: 's1', name: 'Step A', executor: 'agent', agent: { model: 'openai/gpt-4' } },
+          { id: 's2', name: 'Step B', executor: 'agent', agent: { model: 'openai/gpt-4' } },
+        ],
+      }, retiredMap);
+      expect(result).toHaveLength(1);
+      expect(result[0].model).toBe('openai/gpt-4');
+      expect(result[0].steps).toHaveLength(2);
+      expect(result[0].steps).toEqual([
+        { stepId: 's1', stepName: 'Step A' },
+        { stepId: 's2', stepName: 'Step B' },
+      ]);
+    });
+
+    it('normalises Firestore-encoded model IDs ("a__b" to "a/b") before lookup', () => {
+      const result = validateRetiredModels({
+        steps: [
+          { id: 's1', name: 'Encode Step', executor: 'agent', agent: { model: 'openai__gpt-4' } },
+        ],
+      }, retiredMap);
+      expect(result).toHaveLength(1);
+      expect(result[0].model).toBe('openai/gpt-4');
+      expect(result[0].retiredAt).toBe('2026-01-15T00:00:00Z');
     });
   });
 

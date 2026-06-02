@@ -22,7 +22,7 @@ Archived in `.planning/milestones/`.
 **Milestone Goal:** Model registry stays fresh via daily sync, retired models are surfaced to users, and workflows can't silently fail on stale or missing models.
 
 - [x] **Phase 18: Schema Foundation** — Add `retired_at` column to `model_registry_entries` (completed 2026-06-02)
-- [ ] **Phase 19: Sync and Retirement** — Daily cron sync, boot-time eager sync, retry logic, rankings, and retirement writes
+- [x] **Phase 19: Sync and Retirement** — Daily cron sync, boot-time eager sync, retry logic, rankings, and retirement writes (completed 2026-06-02)
 - [ ] **Phase 20: Editor and Pre-flight Validation** — Model picker hides/warns retired models; save and run blocked on retired model
 - [ ] **Phase 21: Alerting** — Audit log and webhook notification on sync failure
 
@@ -63,7 +63,10 @@ Plans:
   2. Opening a workflow whose saved config references a retired model shows an inline warning identifying which step(s) are affected.
   3. Attempting to save a workflow step that references a retired model is blocked — the save button is disabled or the API returns a validation error.
   4. Attempting to start a run whose workflow config references a retired model returns HTTP 422 with an error message that names the retired model, the affected step(s), and the retirement date.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 20-01-PLAN.md — Backend validation: validateRetiredModels function, register-workflow block, run route 422
+- [ ] 20-02-PLAN.md — Model picker UI: hide retired from list, show inline retirement warning
 
 ### Phase 21: Alerting
 **Goal**: Platform administrators are notified when a sync fails, both via a persistent audit record and via a configurable push notification, so failures are caught without requiring anyone to check the UI proactively.
@@ -82,6 +85,6 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 18. Schema Foundation | 1/1 | Complete    | 2026-06-02 | - |
-| 19. Sync and Retirement | 1/2 | In Progress|  | - |
-| 20. Editor and Pre-flight Validation | v1.4 | 0/TBD | Not started | - |
+| 19. Sync and Retirement | 2/2 | Complete    | 2026-06-02 | - |
+| 20. Editor and Pre-flight Validation | v1.4 | 0/2 | Not started | - |
 | 21. Alerting | v1.4 | 0/TBD | Not started | - |
