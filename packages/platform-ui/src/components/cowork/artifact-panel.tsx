@@ -81,6 +81,8 @@ export function ArtifactPanel({
     if (presentation && activeTab === 'data') {
       setActiveTab('preview');
     }
+  // activeTab intentionally excluded — including it would snap the user back
+  // to preview every time they manually switch to the data tab.
   }, [presentation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

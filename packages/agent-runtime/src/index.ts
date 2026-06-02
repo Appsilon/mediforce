@@ -18,7 +18,7 @@ export type {
 
 // Plugins
 export { BaseContainerAgentPlugin, isLocalExecutionAllowed, OAuthTokenUnavailableError, validateOutputSchema } from './plugins/base-container-agent-plugin';
-export type { AgentCommandSpec, SpawnCliOptions, SpawnDockerResult } from './plugins/base-container-agent-plugin';
+export type { AgentCommandSpec, OutputSchema, SpawnCliOptions, SpawnDockerResult } from './plugins/base-container-agent-plugin';
 export { ClaudeCodeAgentPlugin } from './plugins/claude-code-agent-plugin';
 export { MockClaudeCodeAgentPlugin } from './plugins/mock-claude-code-agent-plugin';
 export { OpenCodeAgentPlugin } from './plugins/opencode-agent-plugin';

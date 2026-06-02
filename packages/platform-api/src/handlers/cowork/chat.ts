@@ -24,7 +24,7 @@ import {
   callOpenRouter,
   type OpenRouterToolCall,
 } from '../../services/openrouter-client';
-import { validateOutputSchema } from '@mediforce/agent-runtime';
+import { validateOutputSchema, type OutputSchema } from '@mediforce/agent-runtime';
 
 const MAX_TOOL_LOOP_ITERATIONS = 10;
 const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
@@ -240,7 +240,7 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
         if (ctx.session.outputSchema) {
           const error = validateOutputSchema(
             parsed,
-            ctx.session.outputSchema as { type?: string; required?: string[]; properties?: Record<string, { type?: string }> },
+            ctx.session.outputSchema as OutputSchema,
           );
           const validationResult = error === null
             ? { valid: true, errors: [] as string[] }

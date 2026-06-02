@@ -203,7 +203,7 @@ function buildHttpHeaders(
   return { [bundle.headerName]: headerValue };
 }
 
-interface OutputSchema {
+export interface OutputSchema {
   type?: string;
   required?: string[];
   properties?: Record<string, { type?: string }>;

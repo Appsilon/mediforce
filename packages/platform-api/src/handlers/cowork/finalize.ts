@@ -5,7 +5,7 @@ import type {
   FinalizeCoworkSessionInput,
   FinalizeCoworkSessionOutput,
 } from '../../contract/cowork';
-import { validateOutputSchema } from '@mediforce/agent-runtime';
+import { validateOutputSchema, type OutputSchema } from '@mediforce/agent-runtime';
 
 /**
  * Finalize a cowork session and resume its parent process instance.
@@ -52,7 +52,7 @@ export async function finalizeCoworkSession(
   if (session.outputSchema) {
     const error = validateOutputSchema(
       input.artifact,
-      session.outputSchema as { type?: string; required?: string[]; properties?: Record<string, { type?: string }> },
+      session.outputSchema as OutputSchema,
     );
     if (error !== null) {
       throw new PreconditionFailedError(
