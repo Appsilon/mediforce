@@ -105,6 +105,12 @@ const stubModelRegistry: ModelRegistryRepository = {
   async updateRankings() {
     return 0;
   },
+  async listIds() {
+    return [];
+  },
+  async retireAbsentModels() {
+    return { retired: 0, reinstated: 0 };
+  },
   async getMeta() {
     return {} as never;
   },

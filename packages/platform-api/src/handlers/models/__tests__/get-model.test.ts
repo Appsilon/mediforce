@@ -35,6 +35,8 @@ function makeRepo(entries: ModelRegistryEntry[]): ModelRegistryRepository {
     bulkUpsert: async (items: CreateModelRegistryEntryInput[]) => items.length,
     updateRankings: async (rankings) => rankings.length,
     getMeta: async () => ({ rankingsUpdatedAt: null }),
+    listIds: async () => [],
+    retireAbsentModels: async () => ({ retired: 0, reinstated: 0 }),
   };
 }
 

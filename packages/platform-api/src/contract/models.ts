@@ -33,6 +33,9 @@ export type GetModelOutput = z.infer<typeof GetModelOutputSchema>;
 export const SyncModelsOutputSchema = z.object({
   synced: z.number(),
   total: z.number(),
+  retired: z.number(),
+  reinstated: z.number(),
+  rankingsUpdated: z.number(),
   lastSyncedAt: z.string(),
 });
 

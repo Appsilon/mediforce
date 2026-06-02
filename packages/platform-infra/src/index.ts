@@ -41,4 +41,5 @@ export { PostgresAgentEventLog } from './postgres/agent-event-log';
 
 // Crypto + sync
 export { validateSecretsKey } from './crypto/secrets-cipher';
-export { syncFromOpenRouter } from './sync/openrouter-sync';
+export { syncFromOpenRouter, syncWithRetry } from './sync/openrouter-sync';
+export type { SyncResult } from './sync/openrouter-sync';
