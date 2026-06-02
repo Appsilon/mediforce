@@ -21,8 +21,8 @@
 
 ### Workflow Editor
 
-- [ ] **EDIT-01**: Model picker hides retired models from selection list
-- [ ] **EDIT-02**: Model picker shows warning if workflow already uses a retired model
+- [x] **EDIT-01**: Model picker hides retired models from selection list
+- [x] **EDIT-02**: Model picker shows warning if workflow already uses a retired model
 - [ ] **EDIT-03**: Workflow save blocked when step uses a retired model
 
 ### Run Validation
@@ -64,8 +64,8 @@
 | SYNC-05 | Phase 19 | Complete |
 | RET-02 | Phase 19 | Complete |
 | RET-03 | Phase 19 | Complete |
-| EDIT-01 | Phase 20 | Pending |
-| EDIT-02 | Phase 20 | Pending |
+| EDIT-01 | Phase 20 | Complete |
+| EDIT-02 | Phase 20 | Complete |
 | EDIT-03 | Phase 20 | Pending |
 | VAL-01 | Phase 20 | Pending |
 | VAL-02 | Phase 20 | Pending |

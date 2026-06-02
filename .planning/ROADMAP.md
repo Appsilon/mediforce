@@ -86,5 +86,5 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 18. Schema Foundation | 1/1 | Complete    | 2026-06-02 | - |
 | 19. Sync and Retirement | 2/2 | Complete    | 2026-06-02 | - |
-| 20. Editor and Pre-flight Validation | v1.4 | 0/2 | Not started | - |
+| 20. Editor and Pre-flight Validation | 1/2 | In Progress|  | - |
 | 21. Alerting | v1.4 | 0/TBD | Not started | - |
