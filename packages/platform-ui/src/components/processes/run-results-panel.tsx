@@ -5,6 +5,7 @@ import { CheckCircle2, ExternalLink, Gauge, GitBranch, Clock, FileText, DollarSi
 import type { StepExecution, AgentOutputSnapshot } from '@mediforce/platform-core';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
 import { formatDuration, formatStepName, formatCostUsd } from '@/lib/format';
+import { SandboxedHtmlIframe } from '@/components/tasks/sandboxed-html-iframe';
 
 interface RunResultsPanelProps {
   stepExecutions: StepExecution[];
@@ -45,6 +46,15 @@ function isEmptyResultValue(value: unknown): boolean {
   return false;
 }
 
+function isHtmlString(value: string): boolean {
+  const trimmed = value.trimStart().toLowerCase();
+  return (
+    trimmed.startsWith('<!doctype html') ||
+    trimmed.startsWith('<html>') ||
+    trimmed.startsWith('<html ')
+  );
+}
+
 function ResultValue({ value }: { value: unknown }) {
   if (typeof value === 'boolean') {
     return <span className="text-sm">{value ? 'Yes' : 'No'}</span>;
@@ -62,6 +72,9 @@ function ResultValue({ value }: { value: unknown }) {
           <ExternalLink className="h-3 w-3 shrink-0" />
         </a>
       );
+    }
+    if (isHtmlString(value)) {
+      return <SandboxedHtmlIframe html={value} title="HTML output preview" />;
     }
     return <span className="text-sm font-mono break-all">{value}</span>;
   }
@@ -310,14 +323,17 @@ export function RunResultsPanel({ stepExecutions }: RunResultsPanelProps) {
                     Output
                   </h4>
                   <dl className="space-y-1.5">
-                    {remainingEntries.map(([key, value]) => (
-                      <div key={key} className="flex flex-wrap items-baseline gap-2 text-sm">
-                        <dt className="text-muted-foreground">{formatResultKey(key)}:</dt>
-                        <dd className="min-w-0 flex-1">
-                          <ResultValue value={value} />
-                        </dd>
-                      </div>
-                    ))}
+                    {remainingEntries.map(([key, value]) => {
+                      const isHtml = typeof value === 'string' && isHtmlString(value);
+                      return (
+                        <div key={key} className={isHtml ? 'space-y-1 text-sm' : 'flex flex-wrap items-baseline gap-2 text-sm'}>
+                          <dt className="text-muted-foreground">{formatResultKey(key)}:</dt>
+                          <dd className="min-w-0 flex-1">
+                            <ResultValue value={value} />
+                          </dd>
+                        </div>
+                      );
+                    })}
                   </dl>
                 </div>
               )}
