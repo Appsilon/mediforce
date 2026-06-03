@@ -7,8 +7,8 @@
     },
     {
       "id": "platform-mcp",
-      "command": "node",
-      "args": ["--import", "tsx/esm", "packages/platform-mcp/src/server.ts"],
+      "command": "node_modules/.bin/tsx",
+      "args": ["packages/platform-mcp/src/server.ts"],
       "description": "Platform MCP — Mediforce platform utilities (workflow diagram rendering, etc.)."
     }
   ]
