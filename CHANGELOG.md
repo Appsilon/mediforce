@@ -20,6 +20,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
   - Artifact panel: collapsible JSON tree explorer replaces raw `JSON.stringify`; tabbed Data/Preview view.
   - Built-in tool calls (`update_artifact`, `update_presentation`) now persist as live tool turns visible in the cowork chat UI.
   - Postgres migration 0018: `validation_result` (jsonb) + `presentation` (text) columns on `cowork_sessions`.
+
 ## [2026-05-31]
 
 ### Changed
