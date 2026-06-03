@@ -1,0 +1,6933 @@
+# LDX3 London 2026 — Full Agenda
+
+**LeadDev's festival of engineering leadership** · 2–3 June 2026 · InterContinental London – The O2
+
+Scraped from <https://leaddev.com/leaddev-london/agenda/> — **264 sessions** across 2 days and 8 stages/zones.
+
+---
+
+# Day 1 – June 2, 2026
+
+## Leading your Organization stage
+
+### 09:00 – 09:14 — Welcome to LDX3 London 2026
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Meri Williams (CTO, NED & Advisor, ChromeRose)
+
+**Abstract**
+
+Host’s opening address.
+
+**Speaker bio(s)**
+
+*Meri Williams* — CTO, NED & Advisor, ChromeRose
+
+Meri is an experienced CTO and leader of technology organisations. They particularly enjoy helping others to level up as technical leaders and managers of organizations by working as a CTO coach and tech advisor / NED to various companies in this capacity through micro-consultancy ChromeRose.
+
+They have led teams ranging in size from 30 to 300, in a range of organizations from Procter & Gamble, to the Government Digital Service, award-winning online print company MOO, mobile-first challenger bank Monzo and patient-inspired AI-driven rare disease treatment discovery company Healx, amongst others.
+
+Together with their wife, they run the micro-charity One Goes Up, which supports young women and non-binary folks in pursuing STEM education and careers.
+
+---
+
+### 09:20 – 09:45 — The story box
+
+**Type:** Keynote  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** communication
+
+**Speaker(s):** Michael Lopp (Founder of Rands Slack, Author of Managing Humans)
+
+**Abstract**
+
+In this talk, Michael Lopp will tell you a story about stories. From almost 30 years of leadership, Lopp will not only tell you stories from Slack, Pinterest, Netscape, Borland, and that start-up you’ve never heard of, but also why the art of storytelling is integral to your leadership toolkit.
+
+**Speaker bio(s)**
+
+*Michael Lopp* — Founder of Rands Slack, Author of Managing Humans
+
+Michael Lopp is a veteran Silicon Valley-based engineering leader who builds both people and product at historic companies such as Slack, Borland, Netscape, Palantir, Pinterest, and Apple. When he’s not deeply worrying about staying relevant, he writes about backpacks, bridges, humans, and leadership at the popular weblog, Rands in Repose. He currently works at Apple. This is the way.
+
+---
+
+### 10:05 – 10:30 — Inclusive leadership across cultures: Practical patterns for global engineering teams
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** leadership
+
+**Speaker(s):** Christopher Egemba (CEO, Lightenet Technologies)
+
+**Abstract**
+
+Practical, repeatable inclusive-leadership patterns for global engineering teams—aligning assumptions on hierarchy, disagreement, and feedback using working agreements, inclusive meeting mechanics, decision recaps, and repair scripts to build trust and move faster.
+
+Global teams don’t fail because people lack good intentions—they fail because they carry different assumptions about hierarchy, feedback, speed, and what “good work” looks like. Inclusive leadership across cultures is less about slogans and more about building shared operating agreements that make collaboration safe and predictable.
+
+Drawing on my experience as the only African Joint Institute Student Ambassador in a UK–China AI institute partnership, and my leadership roles coordinating large technical cohorts in Nigerian higher education (including supervising/appraising 50+ technologists and leading a lab through external accreditation), I’ll share a practical toolkit for leading across cultural divides.
+
+We’ll cover three common cross-cultural failure modes and how to fix them:
+
+You’ll learn lightweight mechanisms you can adopt immediately: a “Working Agreements” template, inclusive meeting patterns (pre-reads, async input, rotating airtime), a decision recap format, and scripts for repairing misunderstandings when identity and power dynamics are in play.
+
+You’ll leave with repeatable patterns to help distributed teams move faster—with less friction, more trust, and more meaningful participation.
+
+**Speaker bio(s)**
+
+*Christopher Egemba* — CEO, Lightenet Technologies
+
+Christopher Egemba is an Artificial Intelligence and IT consultant with 15+ years’ experience across lab operations. He earned an MSc in Artificial Intelligence and Adaptive Systems from the University of Sussex , UK (2024) and a BSc in Computer Science. At Nnamdi Azikiwe University, he was Head of Laboratory, leading labs through Universities Commission accreditation and coordinating and appraising 50+ technologists. He represented Sussex as the only African Joint Institute Student Ambassador with Zhejiang Gongshang University, China supporting students and developing capability. A Sussex Nigeria Scholarship recipient, he won the Spirit of Sussex Gold Award and was a Pitch for the Planet competition finalist.
+
+---
+
+### 11:05 – 11:30 — Mentoring that actually changes careers
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** career-development
+
+**Speaker(s):** Lenni Ojala (Senior Engineering Manager, RELEX Solutions)
+
+**Abstract**
+
+Mentoring isn’t coaching or teaching. Learn how to find mentors who genuinely invest in your growth, and how to mentor others by sharing real experience.
+
+Last year, a recent graduate approached me at a tech conference. She was working at a convenience store kiosk, running their systems, handling post office services, and onboarding new staff. She wanted to break into tech but couldn’t get interviews. Within months of working together, she landed her first paid job in tech.
+
+What made it work wasn’t magic. It was seeing transferable skills she’d dismissed as “just retail.” It was rewriting her CV to show what she actually did. It was being direct about which unpaid coding projects were worth her time and which were draining energy she needed elsewhere.
+
+This is what mentoring actually is: sharing your lived experience to guide someone’s growth. It’s not coaching (asking questions), sponsoring (taking action on their behalf), or teaching (transferring knowledge). Early in my mentoring journey, I got this wrong. I kept asking coaching questions when someone needed practical examples from my experience. They disengaged. I learned that mentoring means being direct about what you’ve seen and done, not performing neutrality.
+
+As an engineering manager leading a distributed team across three countries, I’ve relied heavily on my own mentors and connected team members with mentors outside our immediate group. I’ve seen what works from both sides.
+
+This talk covers practical approaches to finding mentors beyond formal programs (peer mentors, next-level career mentors, reverse mentors) and how to build relationships that go beyond surface advice. You’ll learn how to mentor effectively: seeing potential others miss, sharing experience directly, and knowing when someone needs a mentor versus a coach. Through real stories from both sides, you’ll leave with concrete next steps.
+
+**Speaker bio(s)**
+
+*Lenni Ojala* — Senior Engineering Manager, RELEX Solutions
+
+Lenni leads a distributed team building mobile apps, backend services, and integrations for retail store operations. After 20+ years in tech, mentors have been their first call when navigating challenges. They organize a 4,000-member tech community for underrepresented people and actively mentor others.
+
+---
+
+### 11:50 – 12:15 — The state of AI in software development: Insights across 400+ organizations
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** velocity
+
+**Speaker(s):** Justin Reock (Deputy CTO, DX)
+
+**Abstract**
+
+Sponsored by
+
+Headlines claim AI is transforming software engineering overnight. Across more than 400 engineering organizations, we see patterns that challenge the hype and reveal what’s really working, and what isn’t, when AI enters the software development lifecycle.
+
+In this talk, Justin Reock, Deputy CTO at DX, will share a data-driven “state of the union” on AI in engineering, grounded in both quantitative data from thousands of developers and on-the-ground observations.
+
+You’ll learn:
+
+The session will conclude with a practical framework for measuring AI’s impact, helping leaders cut through hype and understand the impact AI is having in their own organizations.
+
+Five key questions are used to highlight areas for you to focus your learning:
+
+---
+
+### 13:50 – 14:15 — Up and down the management track: Equalising your leadership style across the pressure of scale
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager  ·  **Topics:** management
+
+**Speaker(s):** Karen Lee Rigg (Director of Engineering, Global Intelligence Platforms, Just Eat Takeaway.com)
+
+**Abstract**
+
+This talk is about the difference between being a manager, a manager of managers, and a manager of managers of managers.
+
+Most management advice treats leadership as a linear ladder, but the reality is more like a series of “vibe shifts” that force you to reinvent yourself at every level. If you try to manage a Director the same way you managed a Junior Engineer, you’re going to fail—and probably burn out in the process.
+
+In this talk, I’ll share what I’ve learned from the unique experience of moving up and down the management chain, from 1st-line lead to 3rd-line executive and back again. We’ll skip the theory and get into the messy reality of three distinct roles:
+
+Whether you’re eyeing your first lead role or you’re a seasoned Director, you’ll leave with a better understanding of how to adjust your “flight altitude” and avoid the trap of using yesterday’s skills to solve today’s problems.
+
+**Speaker bio(s)**
+
+*Karen Lee Rigg* — Director of Engineering, Global Intelligence Platforms, Just Eat Takeaway.com
+
+Karen is a Director of Engineering at Just Eat Takeaway.com, a leading global online food delivery marketplace, connecting consumers and partners to empower everyday convenience. Previously, Karen was a Director of Engineering at Permutive, a best in class audience platform for advertisers and publishers, and a Tech Lead at Thoughtworks, a leading global technology consultancy.
+
+Outside of work, she can be found rock climbing in the Peak District, snowboarding in the Alps and occasionally sailing in the Caribbean.
+
+---
+
+### 14:35 – 15:00 — What does a CTO even do?
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** career-development
+
+**Speaker(s):** Dee Kitchen (VP, Engineering, Grafana Labs)
+
+**Abstract**
+
+Many EMs and Directors struggle to understand how to drive their own career and personal growth, this session seeks to use the destination as a way to reverse engineer the path to personal growth.
+
+Many EMs and Directors are type-cast into a single area of excellence, whether this is people management, technical operations, or some other thing. This can lead to an artificial ceiling on your own growth, you know how to do this one thing so well that you fall back on it too often, and you may find that roles that you aspire to evade your reach, that you’re overlooked in favour of others. In my experience this can be overcome by not asking what you need to learn, but instead asking what those who have those roles further in your career path are doing, and then to reverse engineer the path to that destination by looking at which skills gaps exist for you today.
+
+I use a simple framework for this, a set of a few questions that will help show what other aspects of your current role you can start developing. To those managers I’ve mentored in the past, these questions have unlocked self-learning and drive, and helped accelerate their growth and steepen career trajectory, it’s all very accessible as a set of concepts, and applicable to any manager from those starting their people management career through to those at Director level, and I hope those above this level have already figured this out.
+
+This talk is also applicable of Staff+ IC levels, as a lot of the basics are directly transferrable to IC leadership skills too.
+
+Five key questions are used to highlight areas for you to focus your learning:
+
+**Speaker bio(s)**
+
+*Dee Kitchen* — VP, Engineering, Grafana Labs
+
+An engineer since 1996 and a people and project leader since 2005, Dee is a deeply technical senior leader who stays hands-on with technical direction while maintaining a strong commitment to developing engineers and engineering managers. Dee focuses on ensuring teams have both the right technology and the right support to successfully deliver on their mission.
+
+Over the past decade, Dee’s technical work has centered on observability, distributed databases, and privacy at Grafana Labs, as well as security products at Cloudflare, including firewalls, denial-of-service protection, traffic matching, and end-user protection. Alongside this work, Dee has led with a strong emphasis on mental health and wellbeing, diversity, and the personal growth of direct reports.
+
+---
+
+### 15:35 – 16:00 — The Staff Engineer’s playbook: Intellectual shift to systemic impact
+
+**Type:** Talk  ·  **For:** Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** leadership
+
+**Speaker(s):** Anna Selway (Staff Analytics Engineer, Monzo)
+
+**Abstract**
+
+The jump to Staff IC is a fundamental shift. It requires you to become both an exceptional problem-solver and an organisational direction-setter. Learn the framework to make this intellectual leap.
+
+The transition to a Staff IC role is often vaguely defined, yet it requires a fundamental intellectual shift. You must progress from expertly solving assigned problems to rigorously defining and architecting the solution to the most critical systemic, high-leverage problems – thereby setting the technical strategy. This talk introduces a rigorous, actionable framework, derived from intensive research and deep-dive interviews with Staff+ leaders at Monzo, to codify the true intellectual shift required to reach senior IC positions.
+
+The methodology is directly inspired by my own experience earning a PhD, where the necessary approach, drive, and passion for defining the *unsolved* problem are identical.
+
+It focuses on the bias for action and proactive ownership of the intellectual pipeline.
+
+I’ll talk to how I use this methodology to identify high-impact Staff work by pursuing an organisational playbook: a high-conviction, principled argument for systemic change. This involves navigating four distinct phases:
+
+1. The Research Gap 🔎:
+
+Systematically surveying the organisation (e.g., Operations) to find critical ‘open loops’ and opportunities that significantly impact the business.
+
+2. The Conviction 💪:
+
+Developing T-Shaped authority and cross-domain empathy to define the correct, often difficult, architectural solution, turning a simple problem into a strategic mandate.
+
+3. The Validation & Alignment 🤝:
+
+Gaining cross-functional adoption by acting as the technically accountable strategic partner (the “PM’s Best Friend”), proactively steering product and engineering decisions.
+
+4. The Multiplication 🌳:
+
+Scaling impact by executing the strategy through others and deliberately building a Coaching Tree of future Staff Engineers.Using a real-world case study, how we architected the solution to a critical scheduling ‘open loop’ in our Operations platform, we will provide practical lessons on turning deep technical insights into lasting organisational leverage.
+
+**Speaker bio(s)**
+
+*Anna Selway* — Staff Analytics Engineer, Monzo
+
+Anna’s journey into data and technology was unconventional. Initially trained as a classical singer, she became fascinated by the intersection of traditional music theory and computer science, specifically the idea of computationally extracting musical features based on traditional theory – such as harmony and rhythm – to calculate and recommend musical similarity.
+
+This led to a sharp pivot into a PhD, where she learnt to be resourceful, analyse different types of data, and build her own tools to conduct her research.
+
+Towards the end of her PhD, Anna joined a local tech company, solving technical customer issues. However, her passion truly ignited as she started exploring the entire tech stack. She fell in love with data-driven decision-making and moved into engineering and analytics.
+
+---
+
+### 16:20 – 16:30 — AI productivity at enterprise scale
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** ai
+
+**Speaker(s):** Hywel Carver (CTO-turned-Founder, Skiller Whale)
+
+**Abstract**
+
+Sponsored by
+
+Selecting and rolling out AI tools is the easy part. Changing behaviour, and levelling up productivity across an organisation has always been hard, and still is with AI. This talk will describe how the right approach to learning can help enterprise organisations improve their AI abilities, and realise the promised gains in productivity.
+
+**Speaker bio(s)**
+
+*Hywel Carver* — CTO-turned-Founder, Skiller Whale
+
+Hywel wrote his first program in C aged 9. After graduating with an MEng from Cambridge, he dropped out of his PhD programme to co-found his first start-up. Today, Hywel is Skiller Whale’s Co-Founder and CEO. He runs a dinner club for CTOs, a podcast for tech leaders called ‘Primarily Context-Based’, and is designing and building his own 8-bit computer for playing Pong. In his 12+ year career, he’s been building and scaling start-ups. With Skiller Whale, he is drawing on that experience to solve the biggest problem he faced as a CTO: learning for engineering teams.
+
+---
+
+### 16:35 – 16:50 — One silver bullet: Adaptability
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** hiring
+
+**Speaker(s):** Daniel Wagner-Hall (Director of Technical Education, CodeYourFuture)
+
+**Abstract**
+
+Tech NGO partner
+
+Software is constantly changing. Headcount pressures mean we’re all spending too much time trying to hire exactly that one pedigreed senior engineer with the perfect experience. Deep down we all know we should be hiring more for adaptability and growth. AI changing the industry is making this more clear by the day. But people often still reach for pedigree over adaptability, because hiring for adaptability feels much harder.
+
+Together we’ll explore how CodeYourFuture trains people with a focus on this adaptability and learning to learn, and how this can help you hire better people faster so you can focus on shipping and growing rather than recruiting and interviewing.
+
+**Speaker bio(s)**
+
+*Daniel Wagner-Hall* — Director of Technical Education, CodeYourFuture
+
+Daniel Wagner-Hall is the Director of Technical Education at CodeYourFuture.
+
+---
+
+### 17:05 – 17:35 — Engineering at scale: Why developer experience is your competitive advantage
+
+**Type:** Keynote  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** velocity
+
+**Speaker(s):** Nicole Forsgren (Lead Author – "Frictionless" and "Accelerate")
+
+**Abstract**
+
+Engineering friction compounds across your organization, costing you velocity, quality, and talent. This talk provides a data-driven framework for measuring, prioritizing, and scaling DevEx improvements that deliver measurable business impact.
+
+Your engineers spend hours waiting on builds, navigating undocumented systems, and context-switching between 12 different tools. That’s not just frustrating—it’s expensive. Every friction point compounds across your organization, costing you velocity, quality, and your ability to retain top talent.
+
+As AI transforms software development, this problem is about to get worse. AI-generated code increases deployment frequency and system complexity. If your baseline friction is already high, AI won’t speed you up—it will amplify every bottleneck and create new categories of problems you haven’t seen yet.
+
+This talk presents a systematic framework for identifying and eliminating engineering friction at scale. You’ll learn how to measure what’s actually slowing your teams down, build data-driven business cases for DevEx investment, and prioritize changes that deliver measurable ROI. We’ll cover how to scale improvements from a single team to your entire engineering organization, and why the teams that fix their DevEx foundation now will outpace competitors in the AI era.
+
+You’ll walk away with practical frameworks, measurement approaches, and stakeholder templates you can use immediately—whether you’re making the case for investment, leading an improvement initiative, or scaling best practices across teams.
+
+**Speaker bio(s)**
+
+*Nicole Forsgren* — Lead Author – "Frictionless" and "Accelerate"
+
+Dr. Nicole Forsgren is considered one of the most prominent and important minds in DevOps and developer productivity. She has led efforts to improve DevEx and AI-native developer productivity at some of the largest companies in the world. She is author of two best-selling, award-winning books: Accelerate: The Science of Lean Software and DevOps, which netted a Shingo Publication Award, and The DevOps Handbook: How to Create World-Class Agility, Reliability & Security in Technology Organizations, now in its second edition. Her latest book, Frictionless: 7 Steps to Remove Barriers, Unlock Value, and Outpace Your Competition in the AI Era was recently released. She is best known for her work measuring the technology process and as the lead investigator on the largest DevOps studies to date. She has been an entrepreneur, professor, developer, sysadmin, and performance engineer.
+
+Nicole’s work has been published in several peer-reviewed journals and conferences. Nicole earned her PhD in Management Information Systems and Masters in Accounting from the University of Arizona. She lives in the Southwest and recharges her brain with gym time, tacos, and Diet Coke.
+
+---
+
+### 17:50 – 17:55 — End of day wrap-up
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Meri Williams (CTO, NED & Advisor, ChromeRose)
+
+**Abstract**
+
+Host’s closing remarks.
+
+**Speaker bio(s)**
+
+*Meri Williams* — CTO, NED & Advisor, ChromeRose
+
+Meri is an experienced CTO and leader of technology organisations. They particularly enjoy helping others to level up as technical leaders and managers of organizations by working as a CTO coach and tech advisor / NED to various companies in this capacity through micro-consultancy ChromeRose.
+
+They have led teams ranging in size from 30 to 300, in a range of organizations from Procter & Gamble, to the Government Digital Service, award-winning online print company MOO, mobile-first challenger bank Monzo and patient-inspired AI-driven rare disease treatment discovery company Healx, amongst others.
+
+Together with their wife, they run the micro-charity One Goes Up, which supports young women and non-binary folks in pursuing STEM education and careers.
+
+---
+
+### 18:15 – 18:55 — Refactoring LIVE – In conversation with Rands
+
+**Type:** After Hours Session  ·  **For:** Director+, Experienced Manager, New Manager, Tech Lead  ·  **Topics:** leadership
+
+**Speaker(s):** Luca Rossi (Founder, Refactoring), Michael Lopp (Founder of Rands Slack, Author of Managing Humans)
+
+**Abstract**
+
+As AI changes how engineering teams work, the people side of leadership only gets more important.
+
+Join us for a live recording of Refactoring, the podcast hosted by Luca Rossi . In this session, Luca sits down with Rands , a veteran engineering leader whose career spans Apple, Slack, and Pinterest, and the author of Managing Humans and The Art of Leadership, to dig into what managing humans in the age of AI really looks like.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Luca Rossi* — Founder, Refactoring
+
+Luca Rossi is the founder of Refactoring — a newsletter and podcast with 150,000+ subscribers, about writing good software and working well with humans.
+
+Luca has written 250+ articles, that are read every week by VPs, managers and engineers at big tech and high-growth startups, and the Refactoring community includes some of the brightest minds in the industry.
+
+Before Refactoring, Luca has been Head of Engineering at Translated, and co-founder and CTO of Wanderio, where he grew the product and tech from 0 to 25M customers.
+
+*Michael Lopp* — Founder of Rands Slack, Author of Managing Humans
+
+Michael Lopp is a veteran Silicon Valley-based engineering leader who builds both people and product at historic companies such as Slack, Borland, Netscape, Palantir, Pinterest, and Apple. When he’s not deeply worrying about staying relevant, he writes about backpacks, bridges, humans, and leadership at the popular weblog, Rands in Repose. He currently works at Apple. This is the way.
+
+---
+
+### 19:00 – 22:00 — LDX3 Summer Boat Party
+
+**Type:** After Party  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Abstract**
+
+Sponsored by
+
+All aboard the LDX3 Summer Boat Party!
+
+You’ve survived the sessions, soaked up the knowledge, and networked like a pro. Now it’s time to swap the conference floor for the river – come celebrate the end of Day 1 of LDX3 with an evening cruise along the Thames.
+
+⚓️ Board from 6:45pm (departs 7pm sharp
+
+Board at North Greenwich Pier (15 minute walk from the InterContinental O2)
+
+🏁 Back on dry land by 10pm
+
+Don’t be the one left on the pier – grab your spot by RSVPing via the app.
+
+---
+
+### 19:30 – 22:00 — LDX3 After Party
+
+**Type:** After Party  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Abstract**
+
+Sponsored by
+
+Join us after day one at Boom Battle Bar (Upstairs @ The O2) to unwind with other attendees.
+
+Expect a relaxed evening with games including darts, pool, axe throwing, and shuffleboard, plus a street food buffet.
+
+A chance to switch off, have some fun, and continue the conversations from the day – without the slides.
+
+---
+
+## Making technical choices stage
+
+### 09:00 – 09:14 — Welcome to LDX3 London 2026
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Suhail Patel (Principal Engineer, Monzo)
+
+**Abstract**
+
+Host’s opening address.
+
+**Speaker bio(s)**
+
+*Suhail Patel* — Principal Engineer, Monzo
+
+Suhail is the Principal Engineer at Monzo focused on building the Core Banking and Infrastructure Platform. His role involves serving as a technical authority on Monzo’s infrastructure which spans over two thousand microservices and leverages key infrastructure components like Kubernetes, Cassandra, Kafka, Etcd and more. He focuses specifically in investigating deviant behaviour and ensuring services continue to work reliably in the face of a constantly shifting environment in the cloud.
+
+---
+
+### 09:20 – 09:45 — Things fall apart – Architecture to avoid progressive collapse
+
+**Type:** Keynote  ·  **For:** Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Sam Newman (Independent Tech Consultant & Author, Sam Newman & Associates)
+
+**Abstract**
+
+Small things going wrong can quickly snowball. The cascading failure is often a nightmare scenario for any system. An initial problem, which in isolation seems like such a minor problem, can kick off a chain reaction of ever-increasing failures, potentially leading to catastrophic results.
+
+When a failure of a single component results in the failure of other connected elements, this is known as a progressive collapse. In this talk, Sam Newman looks at this phenomenon in more detail, and he’ll examine how it has manifested in major disasters. Based on lessons learned from other industries, Sam will share three key techniques that can be used to mitigate against the progressive collapse occurring in your own system.
+
+This talk will help you understand how to architect your systems in such a way that small failures stay small.
+
+---
+
+### 10:05 – 10:30 — The mechanics of scaling: Why delivery slows as you grow, and what to do about it
+
+**Type:** Talk  ·  **For:** Experienced Manager, Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Maryia Tarpachova (Senior Software Engineer, Octopus Electroverse)
+
+**Abstract**
+
+Every organisation has its speed limits. When more effort starts producing fewer results, you’ve likely hit one. What drives speed has shifted, and so must your approach.
+
+In the early days of scaling, your organisation feels almost unstoppable. You think you may have cracked the code for success, and even start wondering if you should maybe write a book about it. But then the balance begins to shift. First slowly and almost imperceptibly, then faster and faster, until it feels like the whole thing is about to spin off the handle.
+
+I have seen the same pattern repeat in very different environments. The details changed, but the slowdown always looked the same. At some point, execution just stopped being a convincing explanation. That’s when I came across systems thinking.
+
+What I learned is that when issues keep repeating despite capable teams and good intentions, the problem is rarely people. It’s the structure of the system itself: the limits built into it, the stocks that quietly accumulate over time, and the feedback loops that shape behaviour whether we notice them or not.
+
+In this talk, I will show how rising incidents, fragile systems, slower delivery and constant firefighting are often signs of hitting systemic limits rather than execution failure. We’ll look at how growth alone changes the dynamics of organisations over time, and why the things that once made teams successful can eventually start slowing them down. I will also explain why pushing harder is almost always the wrong response to limits to growth, and what can be done instead to regain momentum.
+
+This talk helps make sense of why organisations behave the way they do as they scale. It shows how familiar problems often point to structural limits rather than execution gaps, and explains how to recognise when the system itself is shaping the outcome
+
+**Speaker bio(s)**
+
+*Maryia Tarpachova* — Senior Software Engineer, Octopus Electroverse
+
+Maryia Tarpachova is a Senior Software Engineer at Octopus Electroverse. She taught herself to code during the pandemic, fitting 4am study sessions around an energetic toddler and her job at a human rights foundation.
+
+Before moving into software engineering, she worked across a range of sectors including non-profit and healthcare, where she began to notice the same organisational patterns resurfacing in very different environments. Discovering systems thinking gave her a way to make sense of those recurring dynamics. She is now exploring how understanding the underlying structure of a system, rather than just its visible problems, can help teams build resilience into how they scale and deliver software.
+
+---
+
+### 11:05 – 11:30 — Quantifying technical debt to modernise critical systems
+
+**Type:** Talk  ·  **For:** Experienced Manager, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Ejber Ozkan (Director of Engineering, ITV)
+
+**Abstract**
+
+Replacing a 20-year-old system while remaining on-air is the ultimate engineering stress test. Talk shares ITV’s framework for visualising “invisible” technical debt to justify the modernisation of critical infrastructure, moving from gut-feel to data-driven decommissioning.
+
+Every engineering leader fears the “untouchable” legacy system, the 20-year-old monolith that runs the core business but blocks innovation. At ITV, this was our linear scheduling infrastructure, a critical system underpinning our broadcast channels, yet it was effectively difficult to maintain and manage.
+
+We couldn’t afford a high-risk “big bang” rewrite, nor could we let the debt continue to accumulate. In this session, I will share the “Technical Debt Framework” that we used to derisk this modernisation.
+
+We moved beyond the abstract by categorising debt (Visible vs. Invisible, Positive vs. Negative Value) to secure stakeholder buy-in on a modernisation strategy.
+
+I will cover:
+
+**Speaker bio(s)**
+
+*Ejber Ozkan* — Director of Engineering, ITV
+
+Ejber Ozkan is a seasoned technology executive with more than 25 years of experience in cloud architecture, platform engineering, and IT strategy. As Director of Engineering at ITV, he leads high-performing teams and delivers large-scale digital transformation initiatives that drive measurable business impact. Known for his collaborative leadership style, Ejber excels at stakeholder engagement, technical strategy, and aligning engineering excellence with organizational goals through innovative, scalable solutions.
+
+---
+
+### 11:50 – 12:15 — Production AI agents: The gap between promise and reality
+
+**Type:** Talk  ·  **For:** Director+, Staff+, Tech Lead  ·  **Topics:** ai
+
+**Speaker(s):** João Freitas (VP of Engineering, AI & Automation, PagerDuty)
+
+**Abstract**
+
+Sponsored by
+
+AI agents are easy to demo but hard to deploy at scale – learn the engineering frameworks for reliability, observability, and safety that make production-ready autonomous agents possible.
+
+Building AI agents that work in demos is easy – making them production-ready is hard. João Freitas, VP of Engineering for AI And Automation at PagerDuty, shares hard-won lessons from deploying autonomous AI agents at scale. Discover the complexities and risks that derail most agent projects, and learn practical frameworks for reliability, observability, and evaluation that separate successful deployments from failures. From multi-agent architectures to guardrails against prompt injection, hear the engineering realities behind AI agents that diagnose incidents, automate remediation, and operate safely in enterprise environments. These are essential insights for anyone building agents beyond the prototype stage.
+
+**Speaker bio(s)**
+
+*João Freitas* — VP of Engineering, AI & Automation, PagerDuty
+
+João Freitas is VP of Engineering, AI & Automation at PagerDuty. João leads PagerDuty AI initiatives and is responsible for scaling engineering excellence, technical innovation, and fostering a high-performance engineering culture. With about 20 years of experience in Software Development, Machine Learning, and as a People Manager, he was previously CTO at a startup in the area of Artificial Intelligence and has taken several roles at Microsoft in the areas of Speech Technologies and Data Engineering. João also holds a PhD in the areas of speech technology and human-computer interaction, filed several patents, and published over 40 articles in peer-reviewed international conferences and journals. He is also a regular speaker at AI conferences and the author and co-author of book chapters and one book.
+
+---
+
+### 12:35 – 13:00 — Crowdsourcing platform engineering
+
+**Type:** Talk  ·  **For:** Experienced Manager, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Marianna Budnikova (Staff Software Engineer, Adobe)
+
+**Abstract**
+
+How Cash App built a culture of shared ownership in platform engineering–where empathy, collaboration, and visibility drive developer experience and delivery velocity.
+
+Platform engineering often conjures images of large, specialized teams. But at Cash App, it began with volunteers–and eventually, with me as the first full-time Android Developer Experience (MDX) engineer. This talk explores how a grassroots, crowdsourced approach to platform engineering can scale from one motivated individual to an organization-wide culture of shared ownership and empathy-driven leadership.
+
+Through real stories from Cash App’s Mobile Developer Experience and Release Automation teams, I’ll share how feature engineers contributed directly to developer tooling, while platform engineers stayed grounded by building product features. This created powerful feedback loops that improved collaboration, accelerated delivery, and increased build reliability across mobile teams.
+
+Attendees will learn practical leadership patterns for enabling this kind of culture: embedding DX tooling in monorepos to lower contribution barriers, recognizing cross-team contributions publicly, running regular qualitative feedback sessions, and rotating engineers between platform and product work to build empathy and skill breadth.
+
+In a world of AI and constrained resources, the ability to “do more with less” depends on trust, empowerment, and shared purpose. This talk shows how engineering leaders can intentionally cultivate those qualities–shifting platform engineering from a service function to a collective movement.
+
+Whether you’re a tech lead, staff engineer, or manager, you’ll leave with repeatable strategies to:
+
+**Speaker bio(s)**
+
+*Marianna Budnikova* — Staff Software Engineer, Adobe
+
+Marianna is a multipotentialite engineer and tech lead with a BS and MS in Computer Science. Her experience spans Android development, data science, machine learning, augmented reality, and developer experience. She believes the hardest part of software engineering isn’t code—it’s humans. She is currently a Staff Software Engineer at Adobe, where she works on the native Android video editing experience for Premiere. Previously, at Cash App, she led Release Automation and Tooling Systems initiatives focused on improving engineering culture to be more human-centered for both developers and customers. Earlier in her career, she worked at Microsoft and Dropbox. Marianna lives in Portland, Oregon, with her husband, parents, and son.
+
+---
+
+### 14:35 – 15:00 — Updatable repos: Duolingo’s journey to a golden path
+
+**Type:** Talk  ·  **For:** Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Max Blaze (Senior Staff Platform Engineer, Duolingo)
+
+**Abstract**
+
+Facing fragmented microservices, Duolingo launched a Golden Path to standardize development. By packaging best practices into templates with superior tooling and automated security, adoption followed organically, boosting velocity without mandates while empowering autonomous engineering teams.
+
+After more than a decade of rapid growth, Duolingo’s microservice ecosystem was highly functional, but also highly fragmented. This technical diversity created significant friction, slowing down developer velocity and making consistent security and maintenance a formidable challenge. To address this, we initiated a “Golden Path” project to standardize how services are built and operated, but we immediately confronted a classic dilemma: how to drive adoption across autonomous engineering teams without affecting productivity. The traditional “stick” approach of enforcing mandates from the top-down felt counter to our culture, while a “carrot” approach required genuine value to development teams in order to gain long-term traction. For example, security, while its importance was universally acknowledged in principle, in practice it was often deprioritized by developers focused on shipping features.
+
+Our breakthrough came from realizing that we could use our existing microservice templates as the central place to improve and commit standards, essentially treating repositories as updatable packages. Instead of prescribing standards from the top down, we systematically identified, refined, and codified the best practices and tools that had emerged organically within our engineering culture over the past ten years. We focused on making the Golden Path the path of least resistance by providing superior tooling, faster build and deployment times, and automated security that was seamlessly integrated and provided immediate benefits to existing microservices. This transformed security and cost controls from compliance burdens into free features. By standardizing our most successful homegrown solutions, we achieved widespread adoption not through heavy enforcement, but by offering a tangible competitive advantage that empowers our developers to build faster and more securely.
+
+**Speaker bio(s)**
+
+*Max Blaze* — Senior Staff Platform Engineer, Duolingo
+
+Max is a Senior Staff Platform Engineer at Duolingo and is currently optimizing infrastructure for cost, stability, and compliance through standardization and automation. Before diving into the chaotic world of cloud computing, he managed application operations for multiple physical data centers in the healthcare sector. Max holds an MS and Certificate of Advanced Study in Telecommunications from the University of Pittsburgh, where he focused on network security and critical infrastructure.
+
+---
+
+### 15:35 – 16:00 — Most MCP servers are collecting dust. How to avoid that.
+
+**Type:** Talk  ·  **For:** Experienced Manager, Tech Lead  ·  **Topics:** ai
+
+**Speaker(s):** Thomas Johnson (Co-founder and CTO, Multiplayer)
+
+**Abstract**
+
+Many MCP servers are built out of curiosity rather than necessity. In this talk, we’ll see how the team at Multiplayer approached building a production-grade MCP server and the hard lessons learned along the way to get AI the right data at the right time.
+
+Today, many MCP servers are built to “connect AI to your systems”, often exposing too much data, too little intent, or unnecessary security risk. In this talk, we’ll start with one of the core pain points: giving AI coding tools access to high quality, system-specific data that was previously too fragmented or costly to assemble.
+
+From there, we’ll explore why solving the data problem requires rethinking observability practices, how to design MCP servers that don’t inherit this problem, and why data collection is only half the equation: you also need agents that can act on that data.
+
+This session is a candid look at what it takes to move beyond hype and build AI tools that are both useful and safe. Where less is more, context beats completeness, and AI workflows fit naturally into existing developer workflows.
+
+**Speaker bio(s)**
+
+*Thomas Johnson* — Co-founder and CTO, Multiplayer
+
+Thomas Johnson is the Co-founder and CTO at Multiplayer, with 30+ years of experience as an engineering leader and backend developer building large-scale distributed software (and robots!)
+
+---
+
+### 16:20 – 16:45 — Don’t wait for an outage to improve your reliability
+
+**Type:** Talk  ·  **For:** Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Leo Papaloizos (Product Engineer, incident.io)
+
+**Abstract**
+
+A reliable system isn’t just about your infrastructure. Learn to effectively leverage game days to train engineers and build resilience before real incidents force you to.
+
+No one likes responding to incidents – but they’re also where you learn the most. Every outage reveals weaknesses across your systems and processes that you might not have found any other way.
+
+The problem is, waiting for your biggest incidents isn’t a realistic strategy for building a more reliable system. You can introduce stress tests or extrapolate worst-case behaviours, but there’s an unpredictability to how systems and people behave in combination under real pressure that is hard to fully account for.
+
+Game days are your opportunity to test that combination without frantic firefighting. If you’re not running realistic tests, your safeguards are theoretical: you don’t want to learn whether they work in a disaster scenario.
+
+At incident.io, we use game days to train engineers, validate fixes from past outages, and build genuine confidence in our systems and response processes. Most recently, we ran game days to successfully validate that we would be resilient in the face of an AWS outage. Every time we run a game day, engineers are asking when the next one will be.
+
+It’s easy to run a simple drill, but half the value of a game day comes from thorough preparation. Figuring out what’s actually feasible to break gives you confidence in the parts of your system that are solid. Finding the holes you *can* poke through gives you avenues to follow up, even before you’ve run anything. And preparing for the different response paths your engineers might take lets you create realistic pressure, making it feel like a real incident rather than a repetitive drill.
+
+In this this talk, I’ll cover what we’ve learned running game days, and how you can get the most value out of them. Running a successful game day can make your systems more resilient, but you’ll also be building a culture of reliability in your organisation.
+
+**Speaker bio(s)**
+
+*Leo Papaloizos* — Product Engineer, incident.io
+
+Leo Papaloizos is currently a Product Engineer at incident.io. She was part of the foundational team that built their On-call product, which thousands of responders use to get paged for their most critical issues. She loves building products that get used daily. Through her experience of building and using an On-call product, she’s developed a particular interest in making what might be the most stressful time of someone’s week the least stressful it can be.
+
+In her spare time, she plays football and knits.
+
+---
+
+### 17:05 – 17:30 — Shipping secure, reliable and high performance AI agents
+
+**Type:** Keynote  ·  **For:** Experienced Manager, Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Danai Antoniou (Co-Founder & Chief Scientist, Gradient Labs), Devan Kuleindiren (Engineer, Gradient Labs)
+
+**Abstract**
+
+We dive into the technical details of three areas in the context of shipping AI agents: security, reliability and performance.
+
+This is a talk written by engineers, for engineers. At Gradient Labs we build AI agents for financial services companies. In this talk, we share techniques and best practices that we’ve developed in shipping AI agents in high-stakes environments. Specifically, we cover three areas, outlined below.
+
+Security
+
+We talk about how we apply the principle of least privilege to AI agents, as well as some specific practical examples where we’ve had to think through security (e.g. identity verification with voice agents).
+
+Reliability
+
+We talk about how we handle failures, rate limits, latency spikes, durable execution and retries, as well as how we protect our agent from external factors like spikes in load.
+
+Performance
+
+We talk about testing non-deterministic systems using production conversations as test fixtures, LLM-as-judge evaluation, and the metrics that actually predict customer satisfaction.
+
+**Speaker bio(s)**
+
+*Danai Antoniou* — Co-Founder & Chief Scientist, Gradient Labs
+
+Danai is the Co-Founder and Chief Scientist at Gradient Labs.
+
+Previously, she was a Staff Machine Learning Engineer at Monzo, where she led the creation of an industry-first fraud detection system. Prior to that: JustEat and Oxford.
+
+*Devan Kuleindiren* — Engineer, Gradient Labs
+
+Devan is an Engineer at Gradient Labs.
+
+Previously, he was a Senior Staff Engineer at Monzo, where he worked on financial crime and customer support. Prior to that: Google and Cambridge.
+
+---
+
+### 17:50 – 17:55 — End of day wrap-up
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Suhail Patel (Principal Engineer, Monzo)
+
+**Abstract**
+
+Host’s closing remarks.
+
+**Speaker bio(s)**
+
+*Suhail Patel* — Principal Engineer, Monzo
+
+Suhail is the Principal Engineer at Monzo focused on building the Core Banking and Infrastructure Platform. His role involves serving as a technical authority on Monzo’s infrastructure which spans over two thousand microservices and leverages key infrastructure components like Kubernetes, Cassandra, Kafka, Etcd and more. He focuses specifically in investigating deviant behaviour and ensuring services continue to work reliably in the face of a constantly shifting environment in the cloud.
+
+---
+
+## Building for production stage
+
+### 09:00 – 09:14 — Welcome to LDX3 London 2026
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Sarah Wells (Independent Technical Consultant & Author)
+
+**Abstract**
+
+Host’s opening address.
+
+**Speaker bio(s)**
+
+*Sarah Wells* — Independent Technical Consultant & Author
+
+Sarah is a technology leader, consultant and conference speaker with a focus on engineering effectiveness, microservices, incident management, platform engineering, optimising for flow and technical strategy. She has over 20 years’ experience as a developer, principal engineer and tech director across product, platform, SRE and DevOps teams.
+
+She spent over a decade working at the Financial Times, as it transformed from 12 releases a year to more than 20,000, embracing autonomous empowered teams and adopting microservices, DevOps, containers and platform engineering.
+
+She is the author of the O’Reilly book Enabling Microservice Success: Managing Technical, Organizational and Cultural Challenges.
+
+---
+
+### 09:20 – 09:45 — 30 to 70 PRs a day: How we managed to not wreck our systems
+
+**Type:** Keynote  ·  **For:** Staff+, Tech Lead  ·  **Topics:** velocity
+
+**Speaker(s):** Liz Fong-Jones (Technical Fellow, Honeycomb)
+
+**Abstract**
+
+What tools and techniques do top-performing teams incorporate into their software delivery practices in 2026? In this talk, you’ll learn about ways to improve your DORA metrics to become an elite-performing team that can effectively leverage AI-assisted development, and how benefits compound exponentially from adopting the interlocking modern developer productivity and platform engineering stack.
+
+You’ll see concrete, vendor-agnostic examples of teams gaining confidence in their delivery process through hermetic build artifacts, continuous delivery pipelines, feature flagging, observability, code ownership, blameless incident analysis, shared platforms/infrastructure, Service Level Objectives (SLOs), and chaos engineering.
+
+**Speaker bio(s)**
+
+*Liz Fong-Jones* — Technical Fellow, Honeycomb
+
+Liz is a developer advocate, labor and ethics organizer, and Site Reliability Engineer (SRE) with over two decades of experience. She is currently a Technical Fellow at honeycomb.io, and previously was an SRE working on products ranging from the Google Cloud Load Balancer to Google Flights.
+
+She lives in Vancouver, BC with her wife Elly and partners, and in Sydney, NSW. She plays classical piano, leads an EVE Online alliance , and advocates for transgender rights.
+
+---
+
+### 10:05 – 10:30 — Finding the 80/20: Lessons from delivering our first LLM feature
+
+**Type:** Talk  ·  **For:** Staff+, Tech Lead  ·  **Topics:** ai
+
+**Speaker(s):** Thordis Thorsteins (Lead AI Data Scientist, Panaseer)
+
+**Abstract**
+
+Shipping your first LLM feature requires more than code. This talk explains how we navigated new strategic demands, from opt-in stances to evaluation workflows, to find a pragmatic path to production.
+
+Even for mature engineering organisations, the first LLM-powered feature introduces a paradigm shift. The actual coding often feels like the easy part. The real challenge lies in a daunting list of new “supporting” activities. From defining evaluation frameworks and prompt versioning to deciding on customer “opt-out” stances and communication strategies, how do you decide where to focus your limited energy?
+
+In this session, I will share the “battle scars” from our journey to production. I’ll break down our approach to the 80/20 rule: identifying the activities that required deep investment, those we found a “light” way to handle, and those we intentionally parked for later.
+
+We will explore:
+
+This isn’t a prescriptive guide, but a look behind the curtain at how we defined our own “production-ready” standard. You will leave with a framework for auditing your own AI roadmap to ensure you’re focused on the activities that truly drive reliability and trust.
+
+**Speaker bio(s)**
+
+*Thordis Thorsteins* — Lead AI Data Scientist, Panaseer
+
+Thordis Thorsteins is a Lead AI Data Scientist at Panaseer. She works in cybersecurity and has defined the AI strategy of her company as well as led the work to develop the company’s first four production AI features. Her earlier background focused on mathematics. teaching and credit risk. She is interested in making the seemingly complicated understandable.
+
+---
+
+### 11:05 – 11:35 — Escaping the feature factory: Building strategic team identity
+
+**Type:** Talk  ·  **For:** Experienced Manager, New Manager, Tech Lead  ·  **Topics:** velocity
+
+**Speaker(s):** Priya Athipatla (Engineering Manager, ITV)
+
+**Abstract**
+
+A framework for transforming an engineering team from a ticket-churning “feature factory” into a trusted strategic partner using specific rituals, product-mindset shifts, and outcome-based metrics.
+
+Many engineering teams fall into the trap of becoming a “Feature Factory.” We become highly efficient at shipping code but remain disconnected from the business value it creates. With the advent of AI and LLMs commoditizing code generation, this “order-taker” model is becoming obsolete. The future belongs to teams that provide strategic insight, not just faster syntax.
+
+In this session, I will share my experience at one of UK’s major media organisations, where I led the transformation of a fragmented engineering team into a high-performing strategic partner for the Marketing department. We moved from a transactional relationship defined by urgent tickets to a collaborative partnership defined by shared business goals.
+
+This talk is for any leader who wants to stop managing a service desk and start leading a strategic engineering function. You will leave with a playbook for building teams that don’t just write code, but build the business. This ensures your human talent remains indispensable in an AI-augmented world.
+
+**Speaker bio(s)**
+
+*Priya Athipatla* — Engineering Manager, ITV
+
+Priya Athipatla is an Engineering Leader with over 17 years of experience scaling enterprise platforms at ITV, ServiceNow, and Oracle. Currently leading teams in Streaming and MarTech engineering at ITV, she holds a dual mission: engineering the robust viewer platforms that underpin the ITVX legacy, and driving digital enablement strategies to unlock efficiency for ITV’s Marketing teams.
+
+Priya’s leadership philosophy is defined by a shift from “shipping code” to “delivering impact” – a perspective cemented while delivering critical enterprise workflow systems for healthcare, retail, and public sector clients during the global pandemic. She specialises in bridging technical architecture with user empathy, ensuring engineering teams never lose sight of the human at the end of the screen.
+
+Shaped by a personal journey of resilience through career breaks and international relocation, she is a vocal advocate for normalising non-linear career paths for women in tech. Priya speaks 5 languages and is learning her 6th. An avid reader, she can usually be found in her natural habitat on a park bench, nose buried in a book, oblivious to the world around her.
+
+---
+
+### 11:50 – 12:15 — Your agents lack context: Here’s how to fix “You’re absolutely right!”
+
+**Type:** Talk  ·  **For:** Director+, Staff+, Tech Lead  ·  **Topics:** ai
+
+**Speaker(s):** Dennis Pilarinos (Founder & CEO, Unblocked)
+
+**Abstract**
+
+Sponsored by
+
+Every AI coding tool can generate code. Very few can generate the right code for your organization, because they’re missing context. They don’t know why your team chose Redis over DynamoDB, what the team decided in a Slack thread from two months ago about the auth migration, or which architectural patterns your principal engineers actually enforce in review. This talk is a practitioner’s guide to building a context engine: the reasoning layer that continuously synthesizes organizational knowledge across disparate sources into unified, queryable understanding. I’ll walk through the problems you actually have to solve — reasoning across systems that don’t agree with each other, searching globally before you can reason, maintaining identity-scoped permissions so every user and agent only sees what they should, and personalizing results based on who’s asking and what they’re working on. These are the engineering challenges that make naive RAG fall short, drawn from real lessons building this at scale.
+
+**Speaker bio(s)**
+
+*Dennis Pilarinos* — Founder & CEO, Unblocked
+
+Dennis has spent his career building products that remove friction for software engineers.
+
+He started on the ground floor of Microsoft Azure, helping build the early cloud platform from scratch. At Amazon he became the first AWS employee in the Vancouver office, built the team, and worked on the Kindle Fire stack along with developer-focused tooling and infrastructure.
+
+Dennis founded buddybuild to fix how mobile teams shipped software. The product became the go to CI platform for tens of thousands of developers worldwide – that traction led to the acquisition by Apple.
+
+Dennis now runs Unblocked, where they focus on giving AI the context it needs to be useful in real software development. He focuses on practical impact and measure success by how much time and confusion we remove from engineering workflows.
+
+---
+
+### 12:35 – 12:45 — Inclusion: What works, and why I’m still talking about it
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Becky Pauley (Member of Technical Staff, Tailscale)
+
+**Abstract**
+
+Sponsored by
+
+This is a story of inclusion done right. Together, we’ll take a whirlwind tour of practical things that make the difference: from how we communicate our personalities and ways of working, to decision-making, to the ‘small’ shifts and changes that matter. Expect to come away with fresh ideas and practical resources you can apply in your own teams and organisations!
+
+**Speaker bio(s)**
+
+*Becky Pauley* — Member of Technical Staff, Tailscale
+
+Becky Pauley is a Member of Technical Staff at Tailscale.
+
+---
+
+### 12:50 – 13:15 — Moving accessibility from debt to done at giffgaff
+
+**Type:** Talk  ·  **For:** Experienced Manager, Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Abi Harrison-Nye (Software Engineer, giffgaff)
+
+**Abstract**
+
+Accessibility is often seen as a velocity killer. I’ll share how giffgaff transformed our legacy monolith. We proved inclusive code costs zero extra time and unlocks the massive economic potential of the ‘Purple Pound’.
+
+Accessibility is often treated as a compliance checkbox or a final cleanup phase. It becomes a form of exclusionary tech debt that teams fear. With the ‘Purple Pound’ (the spending power of disabled households) worth an estimated £446 billion in the UK alone, the business case is clear. Yet at giffgaff, we faced a hard reality with our legacy monolith. We had a daunting backlog, and it was feared that fixing it would destroy productivity and derail our roadmap.
+
+In this talk, I’ll share how we turned this challenge into an opportunity to build a high-performing, inclusive engineering culture. We moved beyond reactive bug fixes to prove a controversial truth. Writing accessible code doesn’t have to take extra time.
+
+I will demonstrate how we built an accessibility-first mindset by:
+
+This talk is for leaders looking to move accessibility from the backlog to the definition of done, proving that quality, inclusion, and speed are not trade-offs.
+
+**Speaker bio(s)**
+
+*Abi Harrison-Nye* — Software Engineer, giffgaff
+
+Abi is a Software Engineer in the Future Capabilities team and Lead for the Accessibility and Neurodiversity ERG at giffgaff, driving technical and cultural transformation. She moves beyond code to champion inclusive engineering, leading strategies that shift accessibility from a backlog burden to a core engineering value. Through internal advocacy and scalable training programmes, she equips leaders and teams with the tools to build a truly accessible web.
+
+---
+
+### 14:35 – 15:00 — How we introduced quality engineering and made everything better!
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager  ·  **Topics:** software-quality
+
+**Speaker(s):** Stuart Thomas (Engineering Leader)
+
+**Abstract**
+
+How modernising our quality practices created a cycle of continuous improvement, transforming tools, processes, and culture, and ultimately delivering organisational change that achieved what had previously been considered impossible.
+
+This talk shares how we introduced modern quality engineering into a legacy environment and in doing so reduced our lead time to deployment by 480 hours while also dramatically improving the developer experience. We’ll break down the technical, cultural, and procedural shifts that enabled faster feedback loops, more reliable deployments, and higher team confidence. From early test-automation efforts and the introduction of ephemeral environments, to standardising deployments and gradually replacing brittle manual steps, this is a practical, honest account of how meaningful change actually happens. Attendees will leave with a clear understanding of what quality engineering really looks like in practice, how to introduce it sustainably, and what timescales to expect when pursuing long-term ROI and organisational transformation.
+
+Here’s what we’ll cover:
+
+Background
+
+First steps
+
+Unlocking deployments
+
+Shifting left
+
+Trust takes time
+
+Replacing manual with automated
+
+Summary
+
+**Speaker bio(s)**
+
+*Stuart Thomas* — Engineering Leader
+
+Stuart Thomas is an engineering leader passionate about modernising software delivery and building high-performing teams. He specialises in quality engineering, test automation, and creating sustainable processes that improve developer experience. Combining technical expertise with practical leadership, Stuart helps organisations transform culture and ways of working. He enjoys sharing real-world lessons from engineering transformations, inspiring and equipping other leaders to drive meaningful change in their teams and organisations, and mentoring others to build more effective, collaborative, and quality-focused engineering practices.
+
+---
+
+### 15:35 – 16:00 — Building resilient engineering teams when failure is the default
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** King-Immanuel Edoh (Senior Product & Engineering Lead, Digital Planet X & Code Campus)
+
+**Abstract**
+
+In established ecosystems, “Chaos Engineering” is a simulation. In Nigeria, it is a daily reality. Learn the “Zero-Trust” patterns and leadership strategies we use to build bulletproof systems when the infrastructure is constantly failing us.
+
+In established ecosystems, engineering leaders obsess over “Chaos Monkey”, software designed to randomly crash servers to test resilience. In Abuja Nigeria, we don’t need Chaos Monkey. We operate on a national power grid that collapsed over 20 times in the last two years, amidst hundreds of fiber cuts and network disruptions.
+
+For my team, failure isn’t a theoretical risk to be simulated; it is the default state of our existence.
+
+This session explores the unique engineering discipline required to build world-class products in a “low-trust” infrastructure environment. I will share the war story of a Black Friday launch for our high-volume fintech platform where we faced the “Perfect Storm”: a major fiber cut took our office offline, our primary payment partner suffered a latency spike, and the power grid collapsed, all within an hour.
+
+Most teams would have folded. Mine didn’t even pause.
+
+I will detail the “Zero-Trust” framework that allowed us to survive, and how you can apply it to your own stack:
+
+Attendees will leave with a new perspective: You don’t need to be in Africa to face failure. By applying these “survivalist” constraints, you can build systems that are bulletproof anywhere.
+
+**Speaker bio(s)**
+
+*King-Immanuel Edoh* — Senior Product & Engineering Lead, Digital Planet X & Code Campus
+
+King Immanuel Edoh is a senior product and engineering lead with experience building and scaling software products across startups, agencies, and developer education platforms. He works with Code Campus and also leads Digital Planet X, where he partners with companies to deliver pragmatic, production-ready solutions under real-world constraints. His work focuses on making sound technical and product decisions in environments where reliability, cost, and team capacity matter more than hype. Drawing from hands-on experience across emerging markets and global teams, King-Immanuel brings a grounded perspective on leadership, trade-offs, and sustainable engineering practices.
+
+---
+
+### 16:05 – 16:15 — Ship 10x code safely with agents
+
+**Type:** Talk  ·  **For:** Director+, Staff+, Tech Lead  ·  **Topics:** ai
+
+**Speaker(s):** Mark Lechner (CISO, Docker)
+
+**Abstract**
+
+Sponsored by
+
+Discover how to close the trust gap and safely turn AI generated code into shipped software without compromising enterprise security.
+
+AI agents hold incredible potential and now write the majority of today’s code to help teams build faster than ever. Yet enterprise shipping velocity remains bottlenecked. This happens because AI agents do much more than just generate text. They actively access private data, interact with internal systems and communicate externally. This new reality creates a massive trust gap where organizations must either cripple developer velocity with constant manual approvals or accept severe risk by letting agents run in YOLO mode. In this session we will explore how to provide the secure foundation needed to solve this problem. Learn how to grant developers true agent autonomy without sacrificing enterprise governance and finally turn 10x code into 10x shipped.
+
+**Speaker bio(s)**
+
+*Mark Lechner* — CISO, Docker
+
+Mark Lechner is CISO at Docker, where he leads security across the platform millions of developers use to build, ship, and run software – including the agentic workloads reshaping modern engineering. Before Docker, he was CISO at DeepOpinion/Otera driving enterprise AI and LLM agentic security, CISO at Bitpanda scaling security through Europe’s largest crypto platform, and Head of Cybersecurity at Solaris Bank. Before that he spent nearly a decade at Morgan Stanley in various security roles including the global leadership of security tooling. His focus today: supply chain integrity, agentic AI security, and secure-by-default developer platforms. Based in Berlin.
+
+---
+
+### 16:20 – 16:45 — Taming the legacy system monster
+
+**Type:** Talk  ·  **For:** Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Adam Harley (Technical Architect, The University of Sheffield)
+
+**Abstract**
+
+Replace fragile legacy scripts with cloud-native stability by mastering documentation, phased delivery, and knowledge transfer to eliminate single points of failure in your architecture.
+
+Moving legacy systems to the cloud is often sold as a solution, but a “lift-and-shift” without a longer-term plan only relocates the problem. When mission-critical architecture relies on decades of legacy Bash and PL/SQL scripts maintained by a single person, that individual becomes a single point of failure. Their departure doesn’t just leave a vacancy; it leaves a “black box” monster that no one understands and everyone is afraid to touch.
+
+This platform-agnostic session provides a survival guide for inheriting these systems. We will explore why the foundation of modernization isn’t code, but documentation and knowledge gathering. We’ll discuss how to audit undocumented scripts to build a source of truth before a single line of code is rewritten.
+
+A key focus will be practical application of the strangler fig pattern. Instead of a risky “big bang” rewrite, we examine how to balance ongoing maintenance of the old system with the development of the new. You will learn how to establish realistic dates and deliverables that prioritize stability—such as replacing outer Bash wrappers first while letting complex but stable PL/SQL logic run until a later phase. This talk provides a blueprint for turning a fragile, person-dependent script library into a resilient, documented, and modernisable cloud asset.
+
+**Speaker bio(s)**
+
+*Adam Harley* — Technical Architect, The University of Sheffield
+
+Adam is a Technical Architect at the University of Sheffield, having started out as a self-taught developer and embraced the rise of the cloud era in an institutional environment.
+
+---
+
+### 17:05 – 17:30 — 400 Tech Leads. Same problems. None of them technical.
+
+**Type:** Talk  ·  **For:** Experienced Manager, New Manager, Tech Lead  ·  **Topics:** leadership
+
+**Speaker(s):** Anemari Fiser (Tech Lead Trainer)
+
+**Abstract**
+
+After training and coaching 400+ tech leads, one thing is clear: their hardest problems aren’t technical. This talk explores the real blockers and what helps.
+
+After training and coaching more than 400 tech leads across different companies, industries, and levels of experience, one pattern keeps repeating: when tech leads struggle, it’s rarely a technical gap.
+
+In this talk, Anemari Fiser shares the most common challenges tech leads bring into coaching sessions and why “getting better technically” almost never fixes them. Instead, the real blockers show up as overload, unclear expectations, ownership confusion, and assumed alignment. These patterns consistently lead to slow decisions, delivery friction, and burned-out tech leads, even in teams with strong engineers and modern tooling.
+
+Drawing from real coaching sessions, training group discussions, and concrete case studies, this talk explores where tech leads consistently get stuck. For each pattern, it looks at what the tech lead thought the problem was, what it turned out to be, and the small but meaningful shifts that helped them move forward: from rethinking 1-on-1s, to making expectations explicit, to letting go without losing trust.
+
+This isn’t a talk about abstract “soft skills.” It’s about the invisible leadership work tech leads are expected to do without ever being taught how. Attendees will leave with concrete ways to spot people problems early, make expectations explicit, and reduce the load they carry as tech leads.
+
+If you’ve ever thought, “I didn’t expect the role to be this hard,” this talk is for you.
+
+**Speaker bio(s)**
+
+*Anemari Fiser* — Tech Lead Trainer
+
+Anemari Fiser is a tech leadership coach and trainer who helps engineers grow into confident, people-centered tech leads. She is the author of O’Reilly’s book Leveling Up as a Tech Lead and the creator of the O’Reilly course Soft Skills for Tech Leads.
+
+With over a decade of experience in the tech industry, she has held roles ranging from software engineer to engineering leader. As an independent coach and trainer, Anemari has coached 500+ engineers and trained 400+ tech leads across organisations worldwide. She also shares practical leadership insights with a community of 30,000+ tech professionals on LinkedIn.
+
+---
+
+### 17:50 – 17:55 — End of day wrap-up
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Sarah Wells (Independent Technical Consultant & Author)
+
+**Abstract**
+
+Host’s closing remarks.
+
+**Speaker bio(s)**
+
+*Sarah Wells* — Independent Technical Consultant & Author
+
+Sarah is a technology leader, consultant and conference speaker with a focus on engineering effectiveness, microservices, incident management, platform engineering, optimising for flow and technical strategy. She has over 20 years’ experience as a developer, principal engineer and tech director across product, platform, SRE and DevOps teams.
+
+She spent over a decade working at the Financial Times, as it transformed from 12 releases a year to more than 20,000, embracing autonomous empowered teams and adopting microservices, DevOps, containers and platform engineering.
+
+She is the author of the O’Reilly book Enabling Microservice Success: Managing Technical, Organizational and Cultural Challenges.
+
+---
+
+## DirectorPlus zone
+
+### 11:05 – 12:35 — The AI story: Practical speculation about your organization in 2028
+
+**Type:** DirectorPlus Plenary Session  ·  **For:** Director+  ·  **Topics:** technical-direction
+
+**Speaker(s):** David Yee (VP of Engineering, The New York Times)
+
+**Abstract**
+
+When you hear from the CEOs of the largest engineering firms in history that the average software engineer can now produce impact an order of magnitude more than they did four years ago, that engineers (or managers) are obsolete, that one CEO can manage six thousand employees directly, you are being told a story. That story is almost certainly at odds with the story of your organization as it is today: The day-to-day life of the engineers on your teams, of the managers who facilitate their work, of peers in other functions, and of your leadership teams at every level.
+
+The story is: everything has changed. This all raises the normal questions we have learned to ask as engineering leaders: Will the structures and rules that work today work tomorrow? Will tomorrow’s rules work in the same way for me as for other organizations? How often do you wish for an accurate glimpse of the future? What if you could tell the story yourself? In this workshop, we will, together.
+
+In this session, we will discuss:
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*David Yee* — VP of Engineering, The New York Times
+
+David Yee is the VP of Engineering at the New York Times. As an engineering leader, he’s built and scaled teams at both small and enormous companies in the worlds of journalism, music, and art—with an emphasis on product-oriented engineering and humane management.
+
+His career has included roles as Chief Architect and co-founder at 20×200, co-founder and CTO at Editorially, and Engineering Director of Chorus at Vox Media
+
+---
+
+### 11:05 – 12:05 — Engineer identity as AI reshapes how you work: How to lead teams through uncertainty and change
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** leadership
+
+**Speaker(s):** James Da Costa (VP of Engineering at Cint)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders support the motivation, confidence, and professional identity of engineers navigating rapid and disorienting change.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*James Da Costa* — VP of Engineering at Cint
+
+James Da Costa is VP of Engineering at Cint where he leads teams building services which connect researchers with respondents at scale. He is passionate about coaching managers, building collaborative teams and creating delightful products.
+
+James has over 20 years of experience in tech and has worked in UI design, frontend and backend technologies.
+
+Outside of work, he loves competitive sports, a good mystery novel and listening to his favourite podcast (You Are Not So Smart).
+
+---
+
+### 11:05 – 12:05 — Building inclusive teams under pressure: How to maintain culture when delivery doesn’t slow down
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** technical-direction
+
+**Speaker(s):** Dan Blundell (Engineering Director, Gymshark)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders build and sustain genuinely inclusive team cultures while managing performance, delivery pressure, and constant organizational change.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Dan Blundell* — Engineering Director, Gymshark
+
+Dan is an engineering leader and builder of technical teams. He aims to create environments where each person feels valued, supported and can learn continuously, together. At Gymshark, Dan heads up Core Engineering and is responsible for data pipelines, API and integration development and platform reliability engineering.
+
+Dan will forever be a student of leadership, values feedback above almost anything else and would love to hear how best to help you. His latest side project is taming the tantrums of two toddlers and aims to coach them in the ways of empathy, responsibility and being a good human. Dan will eventually write a book but for now, tweets irregularly at @danblundell and posts sporadically at danblundell.com
+
+---
+
+### 11:05 – 12:05 — Fairness vs performance in the age of AI: How to design systems that develop, motivate, and retain top engineers
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** management
+
+**Speaker(s):** JooBee Yeow (Adviser to Founders, Learngility)
+
+**Abstract**
+
+Performance systems were once designed to solve for fairness through structure, process, and documentation. But as AI starts to remove some of that burden, the focus shifts to a deeper question: do managers have the judgment and capability to use those systems well?
+
+Discussion includes:
+
+Pre-read: How exceptional managers use AI differently to manage performance Post-session watch: From code to commerce: Engineering’s role in driving business growth
+
+**Speaker bio(s)**
+
+*JooBee Yeow* — Adviser to Founders, Learngility
+
+JooBee Yeow is a business strategist, systems thinker and start-up scaling architect. A trained Systems Engineer with a PhD in Leadership Development, she operates at the intersection of people, strategy and business as a Chief People Officer.
+
+With experience spanning 2-, 20-, and 200-year-old companies and revenues from £10M to £1B, she helps founders transition from ‘STARTing to Build’ to ‘BUILDing to Scale’—designing scalable operating systems that fuel start-up growth.
+
+JooBee is the creator of the Scaling Start-Ups Blog & Newsletter and a trusted voice in the start-up ecosystem, contributing insights to Sifted, Notion Capital, Atomico, Balderton, Forestay and beyond.
+
+---
+
+### 11:05 – 12:05 — Aligning engineering with the business: How to connect technical decisions to commercial outcomes
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** leadership
+
+**Speaker(s):** Randy Shoup (SVP Engineering, Thrive Market)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders translate technical priorities into commercial language – and ensure engineering is making decisions that the business can understand, trust, and invest in.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Randy Shoup* — SVP Engineering, Thrive Market
+
+Randy Shoup serves as SVP of Engineering at Thrive Market. With more than 30 years of experience building distributed systems and leading high-performing teams, he has held senior technology leadership roles at eBay, Google, Stitch Fix, and WeWork. He also mentors CTOs, advises organizations, and shares his perspectives widely. A frequent conference speaker on software and engineering leadership, he is particularly interested in how culture, technology, and organizational design intersect.
+
+---
+
+### 11:05 – 12:05 — Observability: Are you measuring what actually matters?
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** software-quality
+
+**Speaker(s):** Colin Burke (Director of Customer Success – EMEA, Honeycomb)
+
+**Abstract**
+
+Sponsored by
+
+A roundtable on how senior engineering leaders redefine what good observability looks like when traditional metrics no longer reflect the complexity of modern systems or the outcomes the business actually cares about.
+
+Uptime, error rates, MTTR. They prove your systems are running. They do not prove your AI-powered features are behaving, your customers are getting value, or your business is defended against risks you cannot yet see. AI has raised the floor. Competence is being commoditized. The metrics that won budget last year are now table stakes. Observability used to have one buyer. It now has four. CTO, CPO, CISO, CFO. Same data, four readings. The leaders who can hold all four get the budget.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Colin Burke* — Director of Customer Success – EMEA, Honeycomb
+
+Colin Burke is the Director of Customer Success for EMEA at Honeycomb.io, where he helps engineering and technology leaders harness the full potential of observability to drive business outcomes. With more than a decade of experience at industry leaders like VMware and Pivotal, Colin has worked at the intersection of enterprise platforms, developer productivity, and system resilience.
+
+Throughout his career, Colin has partnered closely with product and engineering teams to scale modern platforms and improve velocity – always with a sharp focus on connecting technical excellence to strategic advantage. At Honeycomb, he empowers teams to shift observability from a reactive tool to a proactive driver of innovation and performance.
+
+---
+
+### 11:05 – 12:05 — Scaling delivery in the AI era: How to stay in control when velocity is no longer the constraint
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** technical-direction
+
+**Speaker(s):** Martin Reynolds (Field CTO, Harness)
+
+**Abstract**
+
+Sponsored by
+
+A roundtable on how senior engineering leaders maintain governance, quality, and accountability as delivery expectations grow faster than the structures designed to manage them.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Martin Reynolds* — Field CTO, Harness
+
+With 30 years working in software, Martin has done a lot of things. Over that time working to deliver software at scale, to multiple platforms, with multiple technologies. He is now working with Harness, the modern software delivery platform to enable organizations and teams to deliver their software faster, more reliably, and more securely.
+
+---
+
+### 12:35 – 13:35 — From engineering leader to business partner: How to influence beyond your function
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** leadership, technical-direction
+
+**Speaker(s):** Claire Knight (Director of Engineering, n8n)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders build the credibility, language, and relationships needed to influence decisions at the executive and board level.
+
+As engineering becomes more central to commercial strategy, leaders are expected to operate well beyond their function, shaping priorities, managing up, and making the case for investment in business terms.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Claire Knight* — Director of Engineering, n8n
+
+Dr Claire Knight is a Director of Engineering at n8n. She served plenty of time in the coal code mine before making the move into wrangling folks rather than just bits. With many years of engineering leadership at companies such as GitHub and Netlify, Claire now leads the Enterprise Engineering function at n8n. Claire lives in Berkshire, UK, with her husband and three cats who from time to time also like to be involved in video calls. When not working, she likes to lift heavy things, only to put them down again and is a 2023, 2024, and 2025 AWPC World Champion Powerlifter.
+
+---
+
+### 12:35 – 13:35 — Working with Product: How to align on priorities, trade-offs, and outcomes
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** technical-direction
+
+**Speaker(s):** Oge Opara-Nadi (VP of Engineering)
+
+**Abstract**
+
+A roundtable on how engineering leaders build effective working relationships with Product when priorities shift quickly, and assumptions about what’s possible don’t always align.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Oge Opara-Nadi* — VP of Engineering
+
+Oge Opara-Nadi is an engineering leader focused on building high-performing technology organisations, scaling teams and turning complex technical challenges into practical business outcomes.
+
+She has led engineering across startup and scale-up environments, with experience spanning platform strategy, organisational design, developer experience and AI-enabled product development.
+
+An experienced public speaker, Oge regularly shares insights on engineering leadership, delivery, organisational culture and building inclusive environments where teams can do their best work.
+
+---
+
+### 12:35 – 13:35 — Leading through burnout: How to protect your team’s capacity when the pace doesn’t slow down
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** management
+
+**Speaker(s):** Claire Donald (CPTO Partner, Rational Partners)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders recognize and respond to burnout in teams operating under sustained pressure, without waiting for the business to slow down.
+
+AI is adding cognitive load faster than organizations are acknowledging it. Engineers and leaders are feeling it, but the pressure to keep moving rarely lets up.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Claire Donald* — CPTO Partner, Rational Partners
+
+Claire Donald is a CPTO Partner at Rational Partners.
+
+---
+
+### 12:35 – 13:35 — Leading engineering when AI turns delivery into R&D
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** management
+
+**Speaker(s):** Lawrence Jones (Product Engineer, incident.io)
+
+**Abstract**
+
+Sponsored by
+
+A roundtable on how senior engineering leaders adapt their strategy, planning, and quality bar when the work itself becomes R&D-shaped.
+
+Building AI products isn’t like building software. Strategy gets rewritten quarterly as model capabilities shift, delivery looks more like research than execution, and “is this working?” is a question you can’t answer with QA or acceptance tests.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Lawrence Jones* — Product Engineer, incident.io
+
+Lawrence Jones is a Founding Engineer at incident.io, where he’s spent the last few years helping take the product from zero to the AI-native incident platform it is today. He now leads engineering on AI SRE — an agent that investigates production incidents autonomously, digging through logs, metrics, traces and code changes to tell teams what’s gone wrong and how to fix it. Before incident.io he was a Principal Engineer at GoCardless, working across the SRE space and product. He’s a regular speaker at engineering conferences including LeadDev, and writes about AI engineering and incident response at blog.lawrencejones.dev.
+
+---
+
+### 12:35 – 13:35 — AI in the SDLC: Where does trust end and risk begin?
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** velocity
+
+**Speaker(s):** Michael Nguyen (SVP, WW Technical Success, Octopus Deploy)
+
+**Abstract**
+
+Sponsored by
+
+A roundtable on how senior engineering leaders determine how much autonomy to extend to AI across the development lifecycle, and where human judgment must stay in the loop.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Michael Nguyen* — SVP, WW Technical Success, Octopus Deploy
+
+Michael Nguyen is the SVP, WW Technical Success at Octopus Deploy.
+
+---
+
+### 14:05 – 15:35 — From reactivity to clarity: Build organizational observability to know & lead what matters
+
+**Type:** DirectorPlus Plenary Session  ·  **For:** Director+  ·  **Topics:** management
+
+**Speaker(s):** Lena Reinhard (Engineering Leader, Organizational Developer, Coach, Facilitator)
+
+**Abstract**
+
+Engineering leaders are caught in a worsening visibility crisis:
+
+The result: You have less time to see, more things to see, and more noise obscuring what matters. Most leaders juggle more and more, feel constantly behind, and don’t even have time to think about how to handle all this better. So how do you shift gears and get from noise to clarity? What can you put in place to get the visibility and confidence you need, without relying on heroic efforts or micromanaging everyone? How do you spot issues and course-correct quickly when your capacity for sensing is shrinking?
+
+Let’s change that, together. You’ve built observability systems for your software. Now it’s time to build one for your organization. From this session run by a seasoned senior leader, you’ll take away concrete ideas to start exactly where you and your org are at right now, improve your organizational observability, and get a kit to help you evolve from there.
+
+How to participate This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Lena Reinhard* — Engineering Leader, Organizational Developer, Coach, Facilitator
+
+Lena Reinhard is a seasoned technology leader, currently helping leaders and their teams succeed through her work as a leadership coach, organizational developer, and facilitator. Having served the majority of her 20-year career in leadership roles, such as VP Engineering with CircleCI, Travis CI, and a SaaS startup co-founder & CEO, she has partnered with a variety of remote, hybrid, and co-located companies at all stages, from startups, to scale-ups, corporations, and NGOs. Lena loves to paint, read, and ride her bike around the forests and lakes of her home, Berlin, in Germany. She hosts O’Reilly’s Tech Leadership Tuesday podcast.
+
+---
+
+### 14:05 – 15:05 — AI and the software development lifecycle: what will change and what will stay the same?
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** career-development
+
+**Speaker(s):** Hywel Carver (CTO-turned-Founder, Skiller Whale)
+
+**Abstract**
+
+A roundtable on how AI is reshaping and reinventing the software development process, and what it means for individual developers, teams, and leadership.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Hywel Carver* — CTO-turned-Founder, Skiller Whale
+
+Hywel wrote his first program in C aged 9. After graduating with an MEng from Cambridge, he dropped out of his PhD programme to co-found his first start-up. Today, Hywel is Skiller Whale’s Co-Founder and CEO. He runs a dinner club for CTOs, a podcast for tech leaders called ‘Primarily Context-Based’, and is designing and building his own 8-bit computer for playing Pong. In his 12+ year career, he’s been building and scaling start-ups. With Skiller Whale, he is drawing on that experience to solve the biggest problem he faced as a CTO: learning for engineering teams.
+
+---
+
+### 14:05 – 15:05 — Developing engineers in the age of AI: How to build skills when the learning pathways are disappearing
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** communication, leadership
+
+**Abstract**
+
+A roundtable on how senior engineering leaders identify and develop the skills their teams need as AI changes not just what engineers do, but how they learn to do it.
+
+The traditional pathways for growing engineers – writing code, debugging, reviewing pull requests – are being compressed or removed. The challenge is developing talent when the old scaffolding no longer exists.
+
+---
+
+### 14:05 – 15:05 — Managing managers when everything is changing
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** leadership
+
+**Speaker(s):** Suzan Bond (Founder & CEO, Constellary)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders build and sustain a strong management layer as organizations grow, flatten, and face increasing pressure.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Suzan Bond* — Founder & CEO, Constellary
+
+Suzan Bond is the founder and CEO of Constellary . With nearly two decades in tech, Suzan has worked with hundreds of engineering leaders and leadership teams to help them navigate change and meet the challenges of organizational leadership. Her work these days includes preparing new directors for the role, coaching senior engineering leaders and creating cohesive leadership teams.
+
+---
+
+### 14:05 – 15:05 — Managing up in the AI era: Closing the gap between board expectations and engineering reality
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** leadership, velocity
+
+**Speaker(s):** Gary Stevens (VP of Engineering, Trainline)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders align boards and executives with the real capabilities, costs, and risks of AI, without being sidelined as blockers.
+
+As AI creates unrealistic expectations at the top, technology leaders are caught between advocacy and self-preservation. The challenge is building credibility with leadership while staying honest about what’s actually possible.
+
+**Speaker bio(s)**
+
+*Gary Stevens* — VP of Engineering, Trainline
+
+Gary is an Engineering Director at the European Travel business Trainline. He is passionate about developing leaders, empowering high-performing teams, and continuous improvement. His interests include coaching, sports, and spending time with his wife and two children.
+
+---
+
+### 14:05 – 15:05 — Reactive operations at scale are unsustainable: How to move from firefighting to prevention
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** management
+
+**Speaker(s):** Lee Fredricks (Director Solutions Consulting, EMEA, PagerDuty)
+
+**Abstract**
+
+Sponsored by
+
+Reactive operations at scale are unsustainable: How to move from firefighting to prevention
+
+A roundtable on how senior engineering leaders shift their organizations from responding to incidents in a reactive way to anticipating and autonomously resolving them. Agentic AI creates new tools to achieve this, and introduces new risks to manage.
+
+Reactive operations at scale are unsustainable. As systems grow more complex and the cost of failure rises, the question is how to build the processes and culture that reduce firefighting before it burns out your teams.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Lee Fredricks* — Director Solutions Consulting, EMEA, PagerDuty
+
+Lee Fredricks is a Director Solutions Consulting, EMEA at PagerDuty.
+
+---
+
+### 14:05 – 15:05 — From adoption to proficiency: How to grow AI effectiveness across your engineering organization
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** software-quality
+
+**Abstract**
+
+Sponsored by
+
+A roundtable on how engineering leaders move their organizations beyond raw AI adoption (and tokenmaxxing) toward effective leverage – at both the individual and organizational level.
+
+Discussion includes:
+
+---
+
+### 15:35 – 16:35 — Testing in the age of AI: How to maintain software correctness when output is faster and less predictable
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** culture
+
+**Speaker(s):** Marco Primi (Distributed Systems Bug Hunter, Antithesis)
+
+**Abstract**
+
+Sponsored by
+
+A roundtable on how senior engineering leaders maintain confidence in what their organizations are shipping as AI dramatically increases output, and where accountability sits when things go wrong.
+
+Shipping faster with AI is straightforward. Knowing that what you’re shipping is correct is harder. As code volume increases and human authorship decreases, leaders face a genuine question: how much can they trust what goes to production?
+
+Discussion includes
+
+**Speaker bio(s)**
+
+*Marco Primi* — Distributed Systems Bug Hunter, Antithesis
+
+Marco Primi is the official Chaos Monkey at Antithesis, where he focuses on software reliability and intelligent testing strategies. He is a prolific researcher and author on distributed systems, whose research is often cited in both academic and professional publications.
+
+---
+
+### 15:35 – 16:35 — AI in production: How to maintain quality as output scales
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** ai
+
+**Speaker(s):** Hila Fox (AI Product Manager, Qodo)
+
+**Abstract**
+
+Sponsored by
+
+A roundtable on how senior engineering leaders maintain accountability for software quality as AI dramatically increases the volume of code being written, and redefine what “good enough” means at an organizational scale.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Hila Fox* — AI Product Manager, Qodo
+
+Hila Fox is an AI Product Manager at Qodo.
+
+---
+
+### 15:35 – 16:35 — Beyond DORA: How to measure developer productivity in a way that actually drives change
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** technical-direction
+
+**Speaker(s):** Justin Reock (Deputy CTO, DX)
+
+**Abstract**
+
+Sponsored by
+
+A roundtable on how senior engineering leaders move beyond vanity metrics and build a meaningful picture of developer productivity- one that reflects how engineering teams actually work and what’s genuinely holding them back.
+
+Most productivity frameworks measure what’s easy to count. The harder challenge is choosing the right signals, getting buy-in across the organization, and turning data into decisions that improve how engineers work day to day.
+
+---
+
+### 17:05 – 18:05 — Designing organizations that scale: Teams, ownership, and boundaries
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** management
+
+**Speaker(s):** Kevin Stewart
+
+**Abstract**
+
+A roundtable on how senior engineering leaders design team structures and ownership models that hold up as systems grow more complex and delivery expectations increase.
+
+Discussion includes:
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Kevin Stewart*
+
+Kevin Stewart is an engineering executive focused on building teams to build products. He has helped shape the engineering culture at a number of startups, digital agencies and cloud companies. Kevin is particularly experienced in leading remote and distributed teams to consistently deliver quality products. Although he currently resides in Seattle, Kevin is a lifelong New Yorker with dreams of relocating to a sunny island in the Caribbean.
+
+---
+
+### 17:05 – 18:05 — Balancing speed and risk: How to move fast on AI without exposing the business to irreversible harm
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** ai, technical-direction, velocity
+
+**Speaker(s):** David Kavanagh (Chief Technology Officer, Tillo)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders navigate the tension between competitive pressure to adopt AI quickly and the responsibility to protect customers, teams, and the organization.
+
+Discussion includes:
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*David Kavanagh* — Chief Technology Officer, Tillo
+
+David Kavanagh is CTO at Tillo, a PE-backed global fintech infrastructure company powering branded currencies and rewards at scale. He has spent 25 years in technology, starting as an engineer and spending a decade in France before leading engineering through hypergrowth at Purplebricks, Chip, Salary Finance and Boomin. He specialises in the dangerous middle phase: scaling product and engineering organisations, embedding AI into a builder culture, and translating complex technical decisions for boards and investors. He writes and speaks on engineering leadership, AI adoption, and building teams that last.
+
+---
+
+## SolutionS ZONE
+
+### 10:35 – 11:05 — Meet the author: Pramod J. Sadalage
+
+**Type:** Meet the author  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Pramod Sadalage (Director, Thoughtworks)
+
+**Abstract**
+
+Bring a book and get it signed, or just have a chat with the author.
+
+**Speaker bio(s)**
+
+*Pramod Sadalage* — Director, Thoughtworks
+
+Pramod Sadalage is Director at ThoughtWorks leading the Modern Data Architecture service for North America, he enjoys the rare role of bridging the divide between database professionals and application developers. He is usually sent in to clients with particularly challenging data needs, which require new technologies and techniques. In the early 00’s he developed techniques to allow relational databases to be designed in an evolutionary manner based on version-controlled schema migrations. He is co-author of Software Architecture: The Hard Parts: Modern Trade-Off Analyses for Distributed Architectures, co-author author for Building Evolutionary Architectures: Automated Software Governance, co-author of Refactoring Databases: Evolutionary Database Design, co-author of NoSQL Distilled: A Brief Guide to the Emerging World of Polyglot Persistence, author of Recipes for Continuous Database Integration and continues to speak and write about the insights he and his clients learn.
+
+---
+
+### 10:40 – 10:50 — Live demo: How to test AI-generated code for unintended behavior with Antithesis
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Luis Marcano (Senior Solutions Engineer, Antithesis)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+In this demo, you will see how we can run your software under a variety of conditions, and report any unintended behavior. Antithesis will create simulated environments that mirror production, and allow truly unique debugging and system testing.
+
+**Speaker bio(s)**
+
+*Luis Marcano* — Senior Solutions Engineer, Antithesis
+
+Luis Marcano is an expert in testing distributed systems. At Antithesis, he brings deep experience in hunting and triaging bugs in both open and closed source projects. In his spare time, he enjoys coding in the robotics space.
+
+---
+
+### 10:40 – 10:50 — Live demo: How to give AI agents safe local execution environments with Docker
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Per Krogslund (Sr Director, Docker)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+Watch a live technical demonstration of Docker’s micro-VM sandboxing in action. We will show how to give AI agents local autonomy to execute code while enforcing 360 degree governance to prevent unauthorized access to internal systems.
+
+**Speaker bio(s)**
+
+*Per Krogslund* — Sr Director, Docker
+
+Per Krogslund is the Sr Director at Docker.
+
+---
+
+### 10:55 – 11:05 — Live demo: How AI code review works at scale – and how to make it more effective with CodeRabbit
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Adam Spindler (Enterprise Solutions Engineer, CodeRabbit)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+AI plans, AI writes, AI reviews. What is the influences the AI behavior for these actions and how to make AI effective in its actions? We will share CodeRabbit learnings based on doing the code review over millions of PRs and using real life review examples.
+
+**Speaker bio(s)**
+
+*Adam Spindler* — Enterprise Solutions Engineer, CodeRabbit
+
+Adam Spindler is an Enterprise Solutions Engineer at CodeRabbit.
+
+---
+
+### 10:55 – 11:05 — Live demo: How to keep AI-generated releases under control with LaunchDarkly
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Kevin Holler (Enterprise Solutions Engineer, LaunchDarkly)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues
+
+AI-generated code is already running in production. But what happens when it takes down prod and there’s no kill switch? In this live demo, see a release go bad in real time as agents ship high volumes of code to production, and how LaunchDarkly contains the blast: monitored releases, automated rollbacks, and targeted fixes before customers notice. If your team is wrestling with AI velocity, release safety, or MTTR, this session shows what “safe at scale” actually looks like.
+
+**Speaker bio(s)**
+
+*Kevin Holler* — Enterprise Solutions Engineer, LaunchDarkly
+
+Kevin Holler is an Enterprise Solutions Engineer at LaunchDarkly, working with the companies biggest customers in the DACH region to de-risk their software and AI-driven product releases.
+
+---
+
+### 11:50 – 12:20 — Tackling the role of Tech Lead
+
+**Type:** Next Steps AMA  ·  **For:** Tech Lead  ·  **Topics:** career-development
+
+**Speaker(s):** James Alexander (Lead Engineer, ITV), Rui Posse (Engineering Manager, Raaft), Andrew Huang (Technical Lead, Softwire), Simone Casciaroli (Head of Engineering, Kraken), Humayra Hanif (Lead Software Engineer, thisdotsoftware)
+
+**Abstract**
+
+Dedicated sessions on how to take the next step in your career for tackling the role of a Tech Lead
+
+**Speaker bio(s)**
+
+*James Alexander* — Lead Engineer, ITV
+
+James Alexander is a Lead Engineer at ITVX, the UK’s fastest-growing streaming service, helping shape the architecture and delivery of its platform for over 45 million users. With more than two decades in software engineering, he focuses on building resilient systems and improving collaboration at scale. His recent work spans subscriptions, payments, and Minimum Viable Company initiatives. He promotes experimentation through A/B testing and Long Term Holdout Groups and leads on compliance, setting standards and guidance across ITV. James champions ITV’s neurodiversity network and working class group, and enjoys mentoring and supporting students and colleagues to achieve their potential.
+
+*Rui Posse* — Engineering Manager, Raaft
+
+Engineering Manager and Full-Stack engineer with 10+ years’ experience leading remote teams, Rui specialises in JavaScript/TypeScript, Vue.js and Node.js. Passionate about mentoring and team culture, he focuses on clear direction, modern engineering practices and pragmatic delivery that balances business impact with technical quality. He is passionate about tech communities and actively engages in sharing knowledge and supporting other engineers.
+
+*Andrew Huang* — Technical Lead, Softwire
+
+A mentor and coach to engineers of all levels, Andrew is a Technical Lead at Softwire. They are impactful in accelerating the careers and personal development of all the people they lead, supporting ambitious colleagues with career guidance, role mentorship and job satisfaction.
+
+*Simone Casciaroli* — Head of Engineering, Kraken
+
+Simone Casciaroli is a technology leader who helps autonomous teams ship meaningful customer value, continuously and incrementally. Over the past two decades, he has led product and platform teams across startups and scale-ups including NOW TV, Babylon Health, Onto, and Doccla. His work sits at the intersection of product, delivery, and technology. He has also co-founded two startups in health and personal development, and recently joined Kraken Technologies as Head of Engineering.
+
+*Humayra Hanif* — Lead Software Engineer, thisdotsoftware
+
+With a decade of experience as a software engineer, Humayra has established herself as a Lead Software Engineer while concurrently co-founding Hulm Club – a Muslim-focussed community of visionaries and innovators.
+
+She has navigated various roles in engineering leadership at startups, accumulating extensive expertise along the way. Her expertise spans various sectors including finance, data, health, and retail marketing, where she has led teams to consistently deliver innovative solutions.
+
+Outside of her professional pursuits, Humayra actively engages as a writer, speaker, and mentor, contributing to the growth and diversity of the tech community. Her overarching objective remains focused on leveraging technology to drive positive change on a global scale.
+
+---
+
+### 11:50 – 12:20 — Diving into the role of Engineering Director
+
+**Type:** Next Steps AMA  ·  **For:** Director+, Experienced Manager  ·  **Topics:** career-development
+
+**Speaker(s):** Daniela Remogna (Director of Engineering, CrowdStrike), Mark Harley (Director of Engineering, Wise), Stephanie Dreyer (Senior Director of Engineering, Payoneer), Kaushik Chaubal (Senior Engineering Director, BlackRock), Simone Casciaroli (Head of Engineering, Kraken)
+
+**Abstract**
+
+Dedicated sessions on how to take the next step in your career for diving into the role of Engineering Director
+
+**Speaker bio(s)**
+
+*Daniela Remogna* — Director of Engineering, CrowdStrike
+
+Daniela Remogna is a Director of Engineering at CrowdStrike.
+
+*Mark Harley* — Director of Engineering, Wise
+
+Mark Harley is a Director of Engineering at Wise.
+
+*Stephanie Dreyer* — Senior Director of Engineering, Payoneer
+
+Stephanie Dreyer is a Senior Director of Engineering at Payoneer.
+
+*Kaushik Chaubal* — Senior Engineering Director, BlackRock
+
+Kaushik Chaubal is a Senior Engineering Director, leading the ETF Systems technology team in EMEA within the Global Markets Technology organization at BlackRock. Additionally, he co-leads the strategic ‘GMT AI Program’ focused on solving customer enablement challenges and improving engineering efficiencies within the organization.
+
+*Simone Casciaroli* — Head of Engineering, Kraken
+
+Simone Casciaroli is a technology leader who helps autonomous teams ship meaningful customer value, continuously and incrementally. Over the past two decades, he has led product and platform teams across startups and scale-ups including NOW TV, Babylon Health, Onto, and Doccla. His work sits at the intersection of product, delivery, and technology. He has also co-founded two startups in health and personal development, and recently joined Kraken Technologies as Head of Engineering.
+
+---
+
+### 12:25 – 12:35 — DevOps won’t save you at runtime: Enter FeatureOps
+
+**Type:** Solution Talk  ·  **For:** Director+, Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Wojtek Gawroński (Developer Advocate, Unleash)
+
+**Abstract**
+
+Sponsored by
+
+Your DevOps maturity is high. Your CI/CD is fast. Yet your platform has a blind spot: the worst incidents occur after deployment succeeds. This talk reveals why runtime is the new frontier for platform teams, especially in the AI-driven era, and how FeatureOps gives you control where it matters most.
+
+**Speaker bio(s)**
+
+*Wojtek Gawroński* — Developer Advocate, Unleash
+
+Wojtek Gawroński is a Developer Advocate at Unleash.
+
+---
+
+### 12:40 – 12:50 — Live demo: How to securely connect agents to your apps with Agen.co by Frontegg
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Bogdan Tsiganiuk (Software Developer, Frontegg)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+As internal agents and copilots proliferate, controlling what enterprise data and systems they can access becomes critical. This demo shows how Agen.co ‘s identity-aware control layer governs agent access, reducing risk and giving teams centralized visibility over AI workflows.
+
+**Speaker bio(s)**
+
+*Bogdan Tsiganiuk* — Software Developer, Frontegg
+
+Bogdan Tsiganiuk is a software engineer at Frontegg and previously worked as a backend engineer at ThriveDX Labs. He holds a degree in Applied Mathematics and Algorithms and is passionate about mathematics and machine learning.
+
+---
+
+### 12:50 – 13:00 — From slop to slope: Rethinking engineering productivity in the age of AI
+
+**Type:** Solution Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Stephen Poletto (Field CTO, Span)
+
+**Abstract**
+
+Sponsored by
+
+Based on patterns from several dozen teams, this talk shows how AI is shifting engineering bottlenecks—and how leaders are adapting workflows, metrics, and practices to improve real outcomes, not just output.
+
+**Speaker bio(s)**
+
+*Stephen Poletto* — Field CTO, Span
+
+Stephen Poletto is the Field CTO at Span.
+
+---
+
+### 12:55 – 13:05 — Breaking the chain: Why software supply chain attacks are surging – and how to quietly build resilience
+
+**Type:** Solution Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Tom Finch (Sales Engineering Manager, EMEA, Chainguard)
+
+**Abstract**
+
+Sponsored by
+
+Software supply chain attacks have shifted from niche threat to board-level concern, as adversaries increasingly target the components, pipelines, and partners we all rely on. In this talk, we’ll unpack why these attacks are on the rise, walk through recent real-world incidents to understand how they actually unfold, and explore the systemic weaknesses they exploit across open source dependencies, build systems, and delivery workflows. We’ll then look at practical ways teams can harden their software factory – from provenance and attestation to minimal, trusted artifacts and policy-driven controls – highlighting patterns and capabilities that organizations can adopt without disrupting developer velocity or turning the session into a product pitch
+
+**Speaker bio(s)**
+
+*Tom Finch* — Sales Engineering Manager, EMEA, Chainguard
+
+Tom Finch is a technical leader at Chainguard specialising in software supply chain security, minimal container images, and secure-by-default cloud-native architectures. He works hands-on with platform and engineering teams to reduce CVE exposure, harden container environments, and modernise build pipelines using distroless and minimal base images.
+
+Previously at Wiz, Tom advised enterprises on cloud security posture management across complex multi-cloud environments. At Puppet, he helped organisations automate infrastructure and implement policy-driven configuration management at scale.
+
+With deep expertise in Kubernetes, containers, CI/CD pipelines, and infrastructure as code, Tom focuses on practical security outcomes — reducing attack surface, improving SBOM transparency, and shifting security left without slowing development velocity.
+
+---
+
+### 13:05 – 13:15 — Live demo: Vercel – How to build a conversational commerce agent with the Vercel AI Cloud
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Matt Froggett (Manager, Sales Engineering, Vercel)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+Agentic commerce inside ChatGPT fell flat. Its real value is removing the parts of shopping nobody wants to do. In this 10-minute demo I’ll show how I built a WhatsApp supermarket agent on the Vercel AI Cloud that turns the weekly shop chore into a tool customers come to depend on — and a relationship retailers can build on.
+
+**Speaker bio(s)**
+
+*Matt Froggett* — Manager, Sales Engineering, Vercel
+
+Matt Froggett is a Manager – Sales Engineering at Vercel.
+
+---
+
+### 13:10 – 13:20 — Live demo: How to run AI agents securely in self-hosted infrastructure with Coder
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Eric Paulsen (Field CTO – EMEA, Coder)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+AI agents are rapidly moving from experiments to production systems. But when agents can run code, access APIs, and interact with infrastructure, governance and security become critical. In this live demo, we’ll show how engineering teams can safely run AI agents within self-hosted environments. See how controlled execution environments, access management, and infrastructure boundaries allow teams to harness AI agents while maintaining security, visibility, and governance over what those agents can do.
+
+**Speaker bio(s)**
+
+*Eric Paulsen* — Field CTO – EMEA, Coder
+
+Eric Paulsen is the EMEA Field CTO at Coder, an open-source, self-hosted cloud development environment platform. A developer at heart, Eric began his career writing code and quickly became known for his ability to support and uplift fellow engineers. That passion for technology and collaboration evolved into guiding enterprise organisations, particularly in highly regulated industries, through their Developer Experience transformations. As Coder’s Founding Sales Engineer, Eric has remained deeply hands-on, continuously expanding his knowledge in emerging areas such as AI agents and automation. Today, he blends technical depth with strategic insight to help customers modernise secure, scalable development environments.
+
+---
+
+### 13:20 – 13:30 — Scaling from 0 to 100; A real life example
+
+**Type:** Solution Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Shama Hamid (Senior Software Engineering Manager, Capital One), Dora Chatzinaki (Software Engineering Manager, Capital One)
+
+**Abstract**
+
+Sponsored by
+
+The learnings from a mobile rebuild journey sharing the highs, the lows and what we would do next time.
+
+**Speaker bio(s)**
+
+*Shama Hamid* — Senior Software Engineering Manager, Capital One
+
+Shama Hamid is a Senior Software Engineering Manager at Capital One.
+
+*Dora Chatzinaki* — Software Engineering Manager, Capital One
+
+Dora is a Software Engineering Manager with over 15 years of experience across diverse sectors including gaming, consultancy, fintech and startup innovation. She began her career as a programmer and has since grown into a leadership role, mentoring engineers while creating inclusive, high performing teams.
+
+Dora’s passion for technology extends beyond the workplace. She is an active advocate in the Women in Tech community and volunteers her time to support the growth of emerging engineers. She also hosts Verified Geek, a podcast where she invites guests to share their personal journeys in tech, shedding light on the diverse paths that lead to success in the industry. Check it out here! https://verifiedgeek.buzzsprout.com/
+
+---
+
+### 13:20 – 13:50 — Meet the author: Michael Lopp
+
+**Type:** Meet the author  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Michael Lopp (Founder of Rands Slack, Author of Managing Humans)
+
+**Abstract**
+
+Bring a book and get it signed, or just have a chat with the author.
+
+**Speaker bio(s)**
+
+*Michael Lopp* — Founder of Rands Slack, Author of Managing Humans
+
+Michael Lopp is a veteran Silicon Valley-based engineering leader who builds both people and product at historic companies such as Slack, Borland, Netscape, Palantir, Pinterest, and Apple. When he’s not deeply worrying about staying relevant, he writes about backpacks, bridges, humans, and leadership at the popular weblog, Rands in Repose. He currently works at Apple. This is the way.
+
+---
+
+### 13:25 – 13:35 — Failure happens. Your code shouldn’t care.
+
+**Type:** Solution Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Simon Emms (Staff Solutions Architect, Temporal)
+
+**Abstract**
+
+Sponsored by
+
+Stop engineering around failure, and start writing workflows where failure is just another expected path.
+
+**Speaker bio(s)**
+
+*Simon Emms* — Staff Solutions Architect, Temporal
+
+Simon Emms is a Staff Solutions Architect at Temporal.
+
+---
+
+### 13:35 – 13:45 — Live demo: How to give every user their own AI agent sandbox with Cloudflare Dynamic Workers
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Felipe Fischel (Solutions Engineer, Cloudflare)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+In this live demo session, Cloudflare’s Solution Engineer, Felipe will cover:
+
+**Speaker bio(s)**
+
+*Felipe Fischel* — Solutions Engineer, Cloudflare
+
+Felipe Fischel is a Solutions Engineer at Cloudflare.
+
+---
+
+### 13:40 – 13:50 — Live demo: How to make access control explicit and identity-driven with Tailscale ACLs
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Conal Ryan (Customer Success Engineer, Tailscale)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+If access control depends on subnets or traffic paths, it’s really just a side effect of topology. In this demo, we’ll use Tailscale ACLs to define access in code and change it in real time. A request flips from denied to allowed based on identity and policy, not where it originates. The result is access that is explicit, testable, and part of how you build—not something hidden in the network. Short Version: See how to use Tailscale ACLs to make access control explicit and identity-driven, instead of relying on network layout. Who it’s for: Engineers responsible for access, auth, or internal service connectivity.
+
+**Speaker bio(s)**
+
+*Conal Ryan* — Customer Success Engineer, Tailscale
+
+Conal Ryan is a Customer Success Engineer at Tailscale.
+
+---
+
+### 13:50 – 14:00 — What we learned rolling out AI-assisted development across 40+ client teams
+
+**Type:** Solution Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Johann Beukes (Chief AI Officer & CTO (Fractional), Svitla Systems)
+
+**Abstract**
+
+Sponsored by
+
+AI in engineering is not about hype but about readiness, adoption traps, and the real conditions that determine whether AI tools actually improve delivery across real teams and codebases.
+
+**Speaker bio(s)**
+
+*Johann Beukes* — Chief AI Officer & CTO (Fractional), Svitla Systems
+
+Johann Beukes is the Chief AI Officer & CTO (Fractional) at Svitla Systems.
+
+---
+
+### 13:55 – 14:05 — A better way for teams to run, understand, and scale testing
+
+**Type:** Solution Talk  ·  **For:** Experienced Manager, Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Ole Lensmar (CTO, Testkube)
+
+**Abstract**
+
+Sponsored by
+
+How modern engineering teams are using AI and centralized workflows to make testing faster, clearer, and easier to scale.
+
+**Speaker bio(s)**
+
+*Ole Lensmar* — CTO, Testkube
+
+Ole started building with XML APIs in the late 90s and has since then worked with multiple technologies and startups, most notably as creator of SoapUI in 2004 and Chairman of the Swagger / OpenAPI Initiative in 2015.
+
+He joined Testkube at its inception in 2021 and is now entirely focused on ensuring its success at bringing continuous testing to the cloud-native space.
+
+When not at his laptop he can be found playing a guitar or riding a bike, but rarely both at the same time.
+
+---
+
+### 14:05 – 14:15 — Live demo: How to automate mobile app build, test, and deployment pipelines with Bitrise
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Olivér Falvai (Staff Software Engineer, Bitrise)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+This demo provides an overview of the Bitrise platform, showing how it helps teams automate the process of building, testing, and deploying mobile applications more efficiently and reliably. It covers key features including the Workflow Editor, Pipelines, Stacks & Machines, Insights, and Release Management.
+
+**Speaker bio(s)**
+
+*Olivér Falvai* — Staff Software Engineer, Bitrise
+
+Olivér Falvai is a Staff Software Engineer at Bitrise.
+
+---
+
+### 14:10 – 14:20 — Live demo: How to give AI agents the context to generate mergeable code with Unblocked
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Peter Werry (Software Engineer, Unblocked)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+Your agents are fast, capable, and completely context-blind. They generate code that compiles but doesn’t reflect how your system actually works. You’re likely already seeing the impact: ballooning token costs, longer review cycles, and inconsistent outputs. More MCPs, rules, and bigger context windows give agents access to information, but not understanding. In this session, we dissect how teams pulling ahead use a context engine to give agents exactly what they need for the task at hand. Includes a short demo showing a real coding task with and without a context engine.
+
+**Speaker bio(s)**
+
+*Peter Werry* — Software Engineer, Unblocked
+
+Peter Werry is a Software Engineer at Unblocked.
+
+---
+
+### 14:20 – 14:30 — Move fast, don’t break things: How to verify AI code at scale
+
+**Type:** Solution Talk  ·  **For:** Director+, Experienced Manager, Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Ekaterina Okuneva (Senior Marketing Manager, Sonar)
+
+**Abstract**
+
+Sponsored by
+
+Join us to learn how to make sure that the force multiplier effect of AI doesn’t become a risk multiplier.
+
+**Speaker bio(s)**
+
+*Ekaterina Okuneva* — Senior Marketing Manager, Sonar
+
+Ekaterina Okuneva is a Senior Marketing Manager at Sonar.
+
+---
+
+### 14:35 – 15:05 — Making the leap to Engineering Manager
+
+**Type:** Next Steps AMA  ·  **For:** Experienced Manager, New Manager, Tech Lead  ·  **Topics:** career-development
+
+**Speaker(s):** Denise Granville (Engineering Manager, Novata), Amélie Thery (Senior Engineering Manager, Prima), Aaron Moses (Software Engineering Team Lead, BBC), Simone Casciaroli (Head of Engineering, Kraken), Theo Nicolaou (Front End Engineering Manager, ITV)
+
+**Abstract**
+
+Dedicated sessions on how to take the next step in your career for making the leap to Engineering Manager
+
+**Speaker bio(s)**
+
+*Denise Granville* — Engineering Manager, Novata
+
+Denise Granville is an Engineering Manager at Novata.
+
+*Amélie Thery* — Senior Engineering Manager, Prima
+
+Amélie is a passionate and empathetic leader. She aims to build resilient and high-performing teams, led by caring and high-performing individuals. She is French and lives in London, and currently works for Prima, the leading Italian digital insurance company.
+
+*Simone Casciaroli* — Head of Engineering, Kraken
+
+Simone Casciaroli is a technology leader who helps autonomous teams ship meaningful customer value, continuously and incrementally. Over the past two decades, he has led product and platform teams across startups and scale-ups including NOW TV, Babylon Health, Onto, and Doccla. His work sits at the intersection of product, delivery, and technology. He has also co-founded two startups in health and personal development, and recently joined Kraken Technologies as Head of Engineering.
+
+*Theo Nicolaou* — Front End Engineering Manager, ITV
+
+Theo is an Engineering Manager in the Viewer Technology department at ITV. He has a background in front-end development, and uses his expertise to grow and lead teams working on the ITVX streaming platform. Outside of work he can be found learning the ropes of parenting, laughing/crying about Spurs and following the F1 racing.
+
+---
+
+### 14:35 – 15:05 — The path to CTO
+
+**Type:** Next Steps AMA  ·  **For:** Director+  ·  **Topics:** career-development
+
+**Speaker(s):** Alex Canessa (Fractional Head of Engineering, Self employed), Thomas Johnson (Co-founder and CTO, Multiplayer), Crystal Hirschorn (CTO, Zoa), Nicky Wrightson (CTO, BeZero Carbon)
+
+**Abstract**
+
+Dedicated sessions on how to take the next step in your career for the path to CTO
+
+**Speaker bio(s)**
+
+*Alex Canessa* — Fractional Head of Engineering, Self employed
+
+Alex Canessa works fractionally across multiple organisations as Head of Engineering at Fortivex, Agent Ecosystem Support at the MACH Alliance, and Tech Lead for Unomundi. He started as a developer and still thinks like one, with a strong focus on architecture, clarity, and delivery. His work explores composable systems and emerging agent patterns in real product environments. He is a dad, practises improv theatre, and has a long-standing fascination with etymology.
+
+*Thomas Johnson* — Co-founder and CTO, Multiplayer
+
+Thomas Johnson is the Co-founder and CTO at Multiplayer, with 30+ years of experience as an engineering leader and backend developer building large-scale distributed software (and robots!)
+
+*Crystal Hirschorn* — CTO, Zoa
+
+Crystal is an experienced Technology & Data Leader with a career spanning more than 20 years across many sectors. She has held CTO, VP, and Senior Director of Software Engineering, and Principal Engineer roles. She is currently CTO at Zoa who are on a mission to revolutionise the adoption of green energy with intelligent technologies.
+
+*Nicky Wrightson* — CTO, BeZero Carbon
+
+Nicky is the CTO at BeZero Carbon. She has been leading teams for more than 15 years, across a wide range of industries: travel, banking, media and telecommunications. She passionately drives forward cloud native architectures and approaches that allow engineers to deliver business value quickly whilst also reducing the support overhead needed for complex distributed systems.
+
+---
+
+### 15:05 – 15:35 — Meet the author: Liz Fong-Jones
+
+**Type:** Meet the author  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Liz Fong-Jones (Technical Fellow, Honeycomb)
+
+**Abstract**
+
+Bring a book and get it signed, or just have a chat with the author.
+
+**Speaker bio(s)**
+
+*Liz Fong-Jones* — Technical Fellow, Honeycomb
+
+Liz is a developer advocate, labor and ethics organizer, and Site Reliability Engineer (SRE) with over two decades of experience. She is currently a Technical Fellow at honeycomb.io, and previously was an SRE working on products ranging from the Google Cloud Load Balancer to Google Flights.
+
+She lives in Vancouver, BC with her wife Elly and partners, and in Sydney, NSW. She plays classical piano, leads an EVE Online alliance , and advocates for transgender rights.
+
+---
+
+### 15:10 – 15:20 — Live demo: How to debug faster with AI, without guesswork with Honeycomb
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Martin Thwaites (Principal Developer Advocate, Honeycomb)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+As AI accelerates development it also increases the speed of failure. Investigations need to run at agent speed, without ignoring your team’s hard-won experience. Martin Thwaite of Honeycomb shows new ways for humans and agents investigate together, working from shared context and building on each other’s insights, to solve the hard problems fast.
+
+**Speaker bio(s)**
+
+*Martin Thwaites* — Principal Developer Advocate, Honeycomb
+
+Martin is a Developer Advocate at Honeycomb, o11y enthusiast, and a delivery-focused Developer from the UK. With over 20 years experience in development in the .NET ecosystem, he’s worked with many companies on scaling up engineering teams and products. The past few years have been spent working on solving complex problems with some of the UK’s big names, including e-commerce retailers and credit lenders.
+
+---
+
+### 15:10 – 15:20 — Live demo: How to go from feature flags to full release control with Harness
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Iram Khan (Enterprise Sales Engineer, Harness)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+Feature flags are just the beginning. In this 10-minute demonstration, discover how Harness goes beyond traditional flagging tools by combining feature management, experimentation, release monitoring, and governance into a unified platform. See how teams can run experiments without extra tooling, monitor releases in real time with automated rollback triggers, enforce guardrails with built-in policies, and gain real-time insights—all while maintaining enterprise-grade scalability and reliability.​​​​​​​​​​​​​​​​
+
+**Speaker bio(s)**
+
+*Iram Khan* — Enterprise Sales Engineer, Harness
+
+Iram Khan is an Enterprise Sales Engineer at Harness.
+
+---
+
+### 15:25 – 15:35 — Live demo: Watch a live incident start to finish with incident.io
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Hamed Darvishian (Commercial CSM, Incident)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+Things break. What matters is what happens next.
+
+In this 10-minute live demo, we’ll run a real production incident end-to-end: from the first alert to post-mortem, no cuts, no slides, no hypotheticals. Just incident.io doing its thing.
+
+See what changes when response stops being a heroic effort and starts being a repeatable system.
+
+**Speaker bio(s)**
+
+*Hamed Darvishian* — Commercial CSM, Incident
+
+Hamed Darvishian is a Commercial CSM at Incident.
+
+---
+
+### 15:25 – 15:35 — Live demo: How to rapidly develop and secure custom internal software with Retool
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Amar Shah (Solutions Engineer, Retool)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+The cost of software is zero, but the deployment, governance and maintenance pieces are still not solved problems. In this demo we’ll explore how Retool can be used as a secure, centralised platform to rapidly develop custom software.
+
+**Speaker bio(s)**
+
+*Amar Shah* — Solutions Engineer, Retool
+
+Amar Shah is a Solutions Engineer at Retool.
+
+---
+
+### 16:20 – 16:50 — Preparing for the role of Principal Engineer
+
+**Type:** Next Steps AMA  ·  **For:** Staff+, Tech Lead  ·  **Topics:** career-development
+
+**Speaker(s):** Steven Withey (Principal Security Engineer, ASOS.com), Michael Tweed (Principal Software Engineer, Skyscanner), Simone Casciaroli (Head of Engineering, Kraken), Nayana Shetty (Principal Engineer, The Lego Group)
+
+**Abstract**
+
+Dedicated sessions on how to take the next step in your career for preparing for the role of a Principal Engineer
+
+**Speaker bio(s)**
+
+*Steven Withey* — Principal Security Engineer, ASOS.com
+
+Steven Withey is a Principal Security Engineer at ASOS.com.
+
+*Michael Tweed* — Principal Software Engineer, Skyscanner
+
+Michael is currently a Principal Software Engineer at Skyscanner where he is responsible for leading their Mobile Platform squads. He also has a keen interest in Mobile Observability and Data Production, and is helping drive Skyscanner’s long-term vision in these areas.
+
+*Simone Casciaroli* — Head of Engineering, Kraken
+
+Simone Casciaroli is a technology leader who helps autonomous teams ship meaningful customer value, continuously and incrementally. Over the past two decades, he has led product and platform teams across startups and scale-ups including NOW TV, Babylon Health, Onto, and Doccla. His work sits at the intersection of product, delivery, and technology. He has also co-founded two startups in health and personal development, and recently joined Kraken Technologies as Head of Engineering.
+
+*Nayana Shetty* — Principal Engineer, The Lego Group
+
+Nayana Shetty is a Principal Engineer at the Lego Group. The Lego Group is going through a massive digital transformation and she is helping with the architecture and engineering practices especially in the Ecommerce, Marketing and Channels technology. Over the years, she has led teams building products and tools that help organizations with site reliability and getting on the devops journey. Starting her career as a Quality Engineer she is passionate about building quality into products from the start rather than an afterthought and creating a culture of quality using devops practices within teams.
+
+---
+
+### 16:20 – 17:05 — What will AI-accelerated engineering teams actually look like?
+
+**Type:** The Big Debate  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Luke Marsden (CEO, HelixML), Hannah Foxwell (Co-Founder, Bimp), Yenny Cheung (VP of Engineering, Bluefish), Liz Fong-Jones (Technical Fellow, Honeycomb)
+
+**Abstract**
+
+AI is reshaping how software gets built, but what does that mean for the size, structure, and composition of engineering teams? As AI tools reduce certain types of work while amplifying others, long-held assumptions about team design are being challenged.
+
+Will we need fewer engineers – or simply different ones? Does the rise of “product engineers” who span disciplines make traditional role boundaries obsolete? And how should organisations rethink hiring, career paths, and team topology in an AI-accelerated world?
+
+Join this discussion as we bring together engineering leaders with differing perspectives on what the future shape of engineering teams will be. Expect thought-provoking conversation, as well as a clear-eyed look at what’s changing and how industry experts are preparing for it.
+
+Discussions include:
+
+**Speaker bio(s)**
+
+*Luke Marsden* — CEO, HelixML
+
+Luke Marsden is the CEO at HelixML.
+
+*Hannah Foxwell* — Co-Founder, Bimp
+
+With over a decade of experience in Platform Engineering Hannah Foxwell has always advocated for the human aspects of technology transformation and evolution. Hannah is relentlessly curious about the tools, technologies, processes, and practices that make life better for the people involved in software development, using this knowledge to build happy, high-performing engineering teams. Hannah now works as an independent advisor, writer and creator at the intersection of Platform Engineering, Security and Artificial Intelligence.
+
+*Yenny Cheung* — VP of Engineering, Bluefish
+
+Yenny Cheung is Vice President of Engineering at Bluefish, where she leads the development of the marketing platform in the age of generative search.
+
+She has built and scaled global teams across conversational commerce, developer platforms, and Adtech, with a proven record of translating complex technology into measurable business outcomes.
+
+An experienced B2B SaaS leader, Yenny specializes in guiding startups through enterprise-grade transformations: aligning product, engineering, and go-to-market functions for rapid growth. She is known for her clarity of thought, operational rigor, and ability to empower teams with the strategic context to lead.
+
+*Liz Fong-Jones* — Technical Fellow, Honeycomb
+
+Liz is a developer advocate, labor and ethics organizer, and Site Reliability Engineer (SRE) with over two decades of experience. She is currently a Technical Fellow at honeycomb.io, and previously was an SRE working on products ranging from the Google Cloud Load Balancer to Google Flights.
+
+She lives in Vancouver, BC with her wife Elly and partners, and in Sydney, NSW. She plays classical piano, leads an EVE Online alliance , and advocates for transgender rights.
+
+---
+
+### 18:15 – 18:45 — Become a contributor AMA
+
+**Type:** Becoming a Contributor AMA  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** career-development
+
+**Speaker(s):** Melinda Seckington (Fractional EM, Coach ; Trainer, Learn Build Share), Scott Carey (Editor in Chief, LeadDev), Ishaan Singh (Content and Community Manager), Ruth Yarnit (CEO & Co-founder, LeadDev)
+
+**Abstract**
+
+Want to contribute to LeadDev but don’t know how?
+
+Then join the LeadDev’s content team in one of these relaxed AMA sessions where they’ll be on hand to answer questions about how you can get involved.
+
+Come along if you’re interested in speaking on stage or writing an article for us, and we’ll share the secrets of crafting winning speaker submissions and effective article proposals.
+
+**Speaker bio(s)**
+
+*Melinda Seckington* — Fractional EM, Coach ; Trainer, Learn Build Share
+
+Melinda Seckington is a trainer and coach, working with engineering teams and leaders to improve their communication, management and collaboration skills. She previously was an engineering manager at companies such as the Wikimedia Foundation and FutureLearn, where she focused on creating great internal engineering cultures. She’s an international conference speaker and has spoken at over 50 conferences, covering topics from good management practices to becoming a better speaker.
+
+*Scott Carey* — Editor in Chief, LeadDev
+
+Scott Carey is the Editor in Chief at LeadDev. An experienced technology journalist, he has covered software development for Computerworld, CIO, and InfoWorld before joining LeadDev.
+
+*Ishaan Singh* — Content and Community Manager
+
+Ishaan works closely with our audience to curate content for software engineering leaders to address their pain points and help them become more effective in their roles. Ishaan explores new topical themes for future content and exciting new formats for its delivery to drive engagement across our platform.
+
+She’s recently started leading on the global rollout of LeadDev meetups and other community initiatives.
+
+*Ruth Yarnit* — CEO & Co-founder, LeadDev
+
+Ruth Yarnit co-founded White October Events with Dave Fletcher in 2013 to run human-centred events for the tech industry. The White October Events team creates content and conferences for the leaders and changemakers in software engineering teams around the world, developing their tech, team and tools to advance their businesses. Lead Dev is their flagship event with conferences in London, New York, Berlin and San Francisco. Ruth is interested in human beings and teams, both in her own business and in the wider tech industry. Outside of work she is particularly interested in two small human beings, aged 1 and 3.
+
+---
+
+### 18:15 – 18:45 — Meet the author: Sam Newman
+
+**Type:** Meet the author  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Sam Newman (Independent Tech Consultant & Author, Sam Newman & Associates)
+
+**Abstract**
+
+Bring a book and get it signed, or just have a chat with the author.
+
+---
+
+## Workshop Zone
+
+### 11:05 – 12:25 — How to train your 𝖽̶𝗋̶𝖺̶𝗀̶𝗈̶𝗇̶ boss
+
+**Type:** Workshop  ·  **For:** Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** career-development
+
+**Speaker(s):** Lena Reinhard (Engineering Leader, Organizational Developer, Coach, Facilitator)
+
+**Abstract**
+
+Having a boss isn’t always as fun as it sounds, and many of us struggle to make the most out of our work with the manager we have, leading to misalignment, friction, and frustration for all parties involved. But how effectively you manage up is a crucial skill, even more as you advance in your career. That’s why you’ll learn how to make more out of your work with your boss in this workshop with someone who’s been on all sides of this challenge: I’ve managed hundreds of people, had dozens of bosses all from great to terrible, and coached engineers and managers on working better with theirs. You’ll learn how to reverse engineer the way your boss works and walk away with a practical framework and tools that you can start using immediately and that will improve your work with your manager, including. This workshop is for anyone who has a manager, no matter if you’re an engineer, technical lead, or manager yourself, you will take away practical approaches to transform your relationship with your manager and accelerate your career growthHow to use your technical expertise to identify hidden system issues by analyzing code patterns, PR structures, and team interactions.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Lena Reinhard* — Engineering Leader, Organizational Developer, Coach, Facilitator
+
+Lena Reinhard is a seasoned technology leader, currently helping leaders and their teams succeed through her work as a leadership coach, organizational developer, and facilitator. Having served the majority of her 20-year career in leadership roles, such as VP Engineering with CircleCI, Travis CI, and a SaaS startup co-founder & CEO, she has partnered with a variety of remote, hybrid, and co-located companies at all stages, from startups, to scale-ups, corporations, and NGOs. Lena loves to paint, read, and ride her bike around the forests and lakes of her home, Berlin, in Germany. She hosts O’Reilly’s Tech Leadership Tuesday podcast.
+
+---
+
+### 11:05 – 12:25 — Leading through change
+
+**Type:** Workshop  ·  **For:** Director+  ·  **Topics:** technical-direction
+
+**Speaker(s):** Hywel Carver (CTO-turned-Founder, Skiller Whale)
+
+**Abstract**
+
+Sponsored by
+
+Change happens to us. Change happens because of us.
+
+The difference between reactive survival and intentional transformation defines great tech leaders. This interactive workshop will explore both how we understand and respond to change, but also how we strategize and make our own changes happening. You will leave with:
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Hywel Carver* — CTO-turned-Founder, Skiller Whale
+
+Hywel wrote his first program in C aged 9. After graduating with an MEng from Cambridge, he dropped out of his PhD programme to co-found his first start-up. Today, Hywel is Skiller Whale’s Co-Founder and CEO. He runs a dinner club for CTOs, a podcast for tech leaders called ‘Primarily Context-Based’, and is designing and building his own 8-bit computer for playing Pong. In his 12+ year career, he’s been building and scaling start-ups. With Skiller Whale, he is drawing on that experience to solve the biggest problem he faced as a CTO: learning for engineering teams.
+
+---
+
+### 11:05 – 12:25 — Team building at the age of AI
+
+**Type:** Workshop  ·  **For:** Experienced Manager, New Manager, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Suzan Bond (Founder & CEO, Constellary)
+
+**Abstract**
+
+The integration of AI into engineering teams isn’t just changing how work gets done – it’s fundamentally shifting team dynamics, individual roles, and the emotional landscape of leadership. In this interactive workshop, you’ll tackle the real challenges: creating clear agreements about AI use on your team, evolving your leadership approach in the age of AI, and identifying the skills your team needs to succeed in this new reality.. You’ll leave with practical tools including a framework for building your team’s AI charter, strategies for navigating your evolving leadership role, and a clear approach for developing the human skills that become more valuable as AI handles routine work.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Suzan Bond* — Founder & CEO, Constellary
+
+Suzan Bond is the founder and CEO of Constellary . With nearly two decades in tech, Suzan has worked with hundreds of engineering leaders and leadership teams to help them navigate change and meet the challenges of organizational leadership. Her work these days includes preparing new directors for the role, coaching senior engineering leaders and creating cohesive leadership teams.
+
+---
+
+### 11:05 – 12:25 — Consensus protocols: The lego brick from hell
+
+**Type:** Workshop  ·  **For:** Director+, Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Marco Primi (Distributed Systems Bug Hunter, Antithesis)
+
+**Abstract**
+
+Sponsored by
+
+Consensus protocols are a fundamental building block to for a wide variety of distributed systems, from databases to message queues, to storage systems to orchestration layers.
+
+As such you’d expect consensus to be widely commoditized, a one-click drop-in that doesn’t require much thinking. Reality is quite the opposite. Integrating consensus always creates challenges and unexpected difficulties.
+
+In this workshop, we’ll go over practical examples of recurring pains and pitfalls of developing, integrating and testing consensus-based systems. For each category, we’ll stop and discuss, trade ideas, lessons, and techniques. As well as share success and failure stories.
+
+The second part of the workshop will expand the scope and broaden the discussion to other mission-critical distributed systems and infrastructure.
+
+You’ll leave with:
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Marco Primi* — Distributed Systems Bug Hunter, Antithesis
+
+Marco Primi is the official Chaos Monkey at Antithesis, where he focuses on software reliability and intelligent testing strategies. He is a prolific researcher and author on distributed systems, whose research is often cited in both academic and professional publications.
+
+---
+
+### 13:20 – 14:40 — Telling the story of technical debt: From case study to business buy-in
+
+**Type:** Workshop  ·  **For:** Staff+, Tech Lead  ·  **Topics:** communication
+
+**Speaker(s):** Blanca Garcia Gil (Principal Engineer, Transformational Coach & Founder, StaffPlusEngineer.com)
+
+**Abstract**
+
+Moving from “complaining about code” to “proposing a business solution” is the most critical shift a technical leader can make.
+
+In this focused session, we will analyse real-world case studies to understand why some technical debt initiatives thrive while others fail. You will learn how to translate technical pain into business risk and opportunity, framing your proposal in a way that aligns with organisational goals. Leave with a toolkit to communicate the impact of debt so that stakeholders don’t just understand the problem, they want to be part of the solution.
+
+How to participate This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Blanca Garcia Gil* — Principal Engineer, Transformational Coach & Founder, StaffPlusEngineer.com
+
+Blanca is the founder of staffplusengineer.com , leadership coach, workshop facilitator and public speaker.
+
+Before taking the leap into coaching, she worked as a principal engineer, building resilient data analytics platforms. She spent nearly two decades working for different corporations in a variety of tech roles before making the transition to working with data. Her most recent roles were at the BBC and the fintech startup topi .
+
+---
+
+### 13:20 – 14:40 — Diagnosing performance problems without the guesswork
+
+**Type:** Workshop  ·  **For:** Experienced Manager, Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Elena Tanasoiu (Staff Software Engineer, GitHub)
+
+**Abstract**
+
+Your app is slow. You add caching, tweak a database index, maybe throw more hardware at it. Sometimes it works, but mostly you’re guessing. This workshop changes that.
+
+You’ll learn to use flamegraphs, the single most effective tool for understanding where your application actually spends time. Through live demos and interactive diagnosis of real-world profiles, you’ll build the intuition to spot N+1 queries, GC pressure, serialisation costs, and hidden middleware overhead in seconds.
+
+We’ll profile in Ruby (Vernier) and Go (pprof), proving the mental model transfers across languages. You’ll also get an AI-assisted prompt template that cuts initial triage from 20 minutes to 2.
+
+You’ll leave with a concrete skill, a reference card, and a specific task to try Monday morning. No vendor lock-in, no theory.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Elena Tanasoiu* — Staff Software Engineer, GitHub
+
+Elena Tanasoiu is a Staff Engineer on GitHub’s Performance Engineering team. She spends her time making one of the world’s largest Ruby on Rails applications faster by profiling production traffic, diagnosing bottlenecks, and occasionally convincing teams they don’t need more hardware. She has a fondness for flamegraphs because they never lie.
+
+---
+
+### 13:20 – 14:40 — Reclaim your time, reclaim your leadership
+
+**Type:** Workshop  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** leadership
+
+**Speaker(s):** Joel Chippindale (CTO Coach, Monkey's Thumb Ltd)
+
+**Abstract**
+
+Do you feel that you are perpetually overwhelmed by meetings, emails, and the demands of others? Do you feel like you’ve lost control of your most valuable asset—your time? If you do, then you are not alone and this is the workshop for you.
+
+In this transformative workshop, we will challenge the limiting beliefs preventing you from managing your time. You will gain clarity on the power of managing your time, how to increase your impact and identify areas for change. Additionally, you will develop practical strategies to prioritise what truly matters and lead with purpose.
+
+You will leave the workshop with a specific set of actions and experiments for you to take back into your work.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Joel Chippindale* — CTO Coach, Monkey's Thumb Ltd
+
+Joel Chippindale is a CTO Coach who supports talented start-up and scale-up CTOs to successfully navigate the many changes in their roles as their companies evolve.
+
+He also has over 20 years experience building, scaling and leading software development teams, including CTO roles at Econsultancy, FutureLearn and Unmade.
+
+---
+
+### 13:20 – 14:40 — Translating up: Engineering advocacy for the C-suite
+
+**Type:** Workshop  ·  **For:** Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Rob Zuber (CTO, CircleCI), Shelly Stuart (Director of Engineering, CircleCI)
+
+**Abstract**
+
+Sponsored by
+
+You know what needs to change. You see the technical opportunities clearly. But when you bring initiatives to executives, they hear “risky change” not “controlled experiment.” The result? Great ideas die in planning, technical debt compounds, and your team runs obsolete processes while competitors experiment their way forward.
+
+The gap isn’t your technical competence—it’s translation. Executives operate in a different context with different constraints and accountabilities. They evaluate initiatives using frameworks like opportunity cost, customer impact, and risk management. Most staff+ engineers never learn to speak this language.
+
+In this workshop, CircleCI CTO Rob Zuber pulls back the curtain on how executives actually evaluate technical initiatives. You’ll learn how to better communicate and leverage technical frameworks to shift perception from “this sounds risky” to “this is a smart opportunity.” Discover how to frame experimentation as hypothesis testing, turn one-way doors into two-way doors, and position engineering investments using the same frameworks executives use for any strategic decision.
+
+You’ll leave with practical tools to drive better alignment between your engineering and the board so you can advocate for and focus on outcomes that drive the business forward.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Rob Zuber* — CTO, CircleCI
+
+Rob Zuber is a 20-year veteran of software startups; a three-time founder, and a five-time CTO. Since joining CircleCI, Rob has seen the company through its Series F funding and delivered on product innovation at scale while leading a team of 150+ engineers distributed worldwide.
+
+*Shelly Stuart* — Director of Engineering, CircleCI
+
+Shelly is an experienced engineering leader who is passionate about building a strong and supportive engineering culture that fosters diversity and growth. She is currently the Director of Engineering at CircleCI.
+
+---
+
+### 15:50 – 17:10 — Leadership competencies for Directors & beyond
+
+**Type:** Workshop  ·  **For:** Director+  ·  **Topics:** leadership
+
+**Speaker(s):** Suzan Bond (Founder & CEO, Constellary)
+
+**Abstract**
+
+You’ve made it to Director or beyond – congratulations! But now what?
+
+The career ladder gets fuzzy, expectations aren’t clear, and you’re left wondering: “Am I actually doing this right?”
+
+You’ve moved further away from managing the day-to-day work to developing other leaders, influencing strategy, and navigating complex organizational dynamics. The stakes feel higher, but the roadmap for success isn’t obvious.
+
+This workshop gives you a framework to answer that question and more. We’ll walk through the core competencies that define effective senior engineering leaders. You’ll assess yourself against these competencies, identify your strengths and gaps, and create your own customized development plan to chart your continued growth as a leader.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Suzan Bond* — Founder & CEO, Constellary
+
+Suzan Bond is the founder and CEO of Constellary . With nearly two decades in tech, Suzan has worked with hundreds of engineering leaders and leadership teams to help them navigate change and meet the challenges of organizational leadership. Her work these days includes preparing new directors for the role, coaching senior engineering leaders and creating cohesive leadership teams.
+
+---
+
+### 15:50 – 17:10 — Product sense for product engineering with AI
+
+**Type:** Workshop  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** leadership
+
+**Speaker(s):** Oana May (FAANG Product Leadership Coach, Founder of MOATCRAFT™, MOATCRAFT™)
+
+**Abstract**
+
+80% of the features built are barely or never used ( Pendo Report ).
+
+Now, AI makes it easier to build even more of the wrong things. While for engineers, the real advantage is no longer just execution, but judgment. Knowing what is worth building: why it matters for customers, for the business, in the market, etc.
+
+In this interactive session, Oana May, ex-Meta and founder of MOATCRAFT, will share the practical product sense system she has used to coach 500+ product leaders in the Bay Area, NY, Seattle, etc.
+
+You will learn:
+
+Through live collaborative exercises, you will practice applying this framework in real time.
+
+You will leave with practical tools to sharpen your own product sense, coach stronger decision-making on your team, and help engineers move from execution-focused thinking to business-aligned problem solving.
+
+How to participate This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Oana May* — FAANG Product Leadership Coach, Founder of MOATCRAFT™, MOATCRAFT™
+
+Oana May is an ex-Meta leader, FAANG product coach, and 3x founder. She recently launched MOATCRAFT™, where she helps software developers learn to choose what problems are worth solving and make better business-aligned decisions. Using the systems she developed coaching 500+ product leaders across the Bay Area, New York, and Seattle, she teaches builders how to navigate ambiguity and sharpen their judgment, the key skill in a world where AI is writing the code. Her background includes Harvard Business School and a track record of seeing around corners as a founder and product leader, and helping builders earn promotions, land dream roles, and think beyond execution into making smarter bets.
+
+Additional bio options: https://docs.google.com/document/d/12Y2qtSv0Rt6NGFvZZHWA7KIiL9WSasoqZL1C4QIkWrE/edit?usp=sharing
+
+---
+
+### 15:50 – 17:10 — How engineering leaders can go deeper without losing ground
+
+**Type:** Workshop  ·  **For:** Director+, Experienced Manager, Tech Lead  ·  **Topics:** leadership
+
+**Speaker(s):** Rob Zuber (CTO, CircleCI)
+
+**Abstract**
+
+Sponsored by
+
+There’s a message going around leadership circles right now: if you want to understand what AI is doing to your engineers’ day-to-day work, you need to experience it yourself. Pick up a keyboard. Ship something.
+
+Most engineering leaders hear this and feel two things simultaneously: “Yes, absolutely” and “Are you kidding me?”
+
+Because here’s the bind: the very thing that makes you want to engage – genuine curiosity about AI, real care for your teams – is what you’re already stretched thin trying to accomplish in a normal workweek. Getting hands-on sounds like strategy until it compromises your ability to do your actual job.
+
+This session is an interactive workshop where Rob will walk you through using hand-on AI explorations not as a distraction, but as a path to make you even more effective at your job.
+
+Drawing on Richard Rumelt’s concept of the strategy kernel (diagnosis, guiding policy, coherent action) we’ll work through how to apply that same structured thinking to your own re-engagement with technical work. You will walk away with an action plan, ready to engage in AI experimentation as a disciplined, time-bounded, high-signal practice that makes you better at your leadership responsibilities, not worse.
+
+You’ll leave with:
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Rob Zuber* — CTO, CircleCI
+
+Rob Zuber is a 20-year veteran of software startups; a three-time founder, and a five-time CTO. Since joining CircleCI, Rob has seen the company through its Series F funding and delivered on product innovation at scale while leading a team of 150+ engineers distributed worldwide.
+
+---
+
+### 15:50 – 17:10 — Crisis simulation: Navigating leadership challenges in real-time
+
+**Type:** Workshop  ·  **For:** Experienced Manager, New Manager  ·  **Topics:** leadership
+
+**Speaker(s):** Sally Lait (Fractional technology leader and advisor)
+
+**Abstract**
+
+In this interactive workshop, you’ll engage in a high-pressure crisis simulation tailored for engineering leadership roles. Drawing from real-world scenarios, you’ll collaborate in teams to practice and share response strategies… but you’ll need to stay on your toes for extra doses of chaos throughout.
+
+This workshop addresses the critical need for engineering leaders to be adept at managing crises that extend beyond technical failures. By simulating real-world challenges, participants will be better equipped to lead their teams through uncertainty, maintain operational continuity, and uphold organizational values under pressure. The session aims to give you a safe way to practice decision-making, communication, and team alignment under pressure, learn from others’ experiences, plus hopefully have some fun with it along the way!
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Sally Lait* — Fractional technology leader and advisor
+
+Sally Lait specialises in building strong engineering culture, and aims to create supportive and inclusive environments for managers, developers, and teams to thrive and do fantastic technical work.
+
+Her roles have included helping to change the way the world deals with death as VP of Engineering (plus IT & Data and Insights) at Farewill, prior to which she led Monzo’s web discipline and engineering across Operations through hypergrowth. Other experience involves founding a digital transformation consultancy with clients including the Manor Racing F1 team and RNLI, and working as Head of Technology for a global digital agency. Sally’s a strong advocate for building software and teams alike with empathy, responsibility, and accessibility in mind. She’s spoken at events around the world, is on Mastodon at @ https://mastodon.social/@sally , and you can find out more about her at sally.dev .
+
+---
+
+## Community Zone
+
+### 10:35 – 11:05 — Connecting Black leaders
+
+**Type:** Community Representation Groups  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Ben Mmari (Product Engineer, Intercom), Jessie Auguste (Software Engineer, CybSafe), Phillipa Rodney (Engineering Manager, Crowdstrike)
+
+**Abstract**
+
+Connect with folks over shared experiences
+
+Everyone’s journey into leadership is tough, but folks who are underrepresented in tech often face their own unique set of challenges. And that can lead to people feeling isolated in their experiences.
+
+Come to the community representation groups, where you’ll be able to connect with folks who might have similar backgrounds and experiences to yours, and where you’ll be able to build a peer network for support throughout your journey.
+
+**Speaker bio(s)**
+
+*Ben Mmari* — Product Engineer, Intercom
+
+Ben Mmari is a Tanzanian engineering leader and entrepreneur based in London, with over a decade of experience building and scaling businesses, software, products, and teams. He currently works as a Product Engineer at Fin (formerly Intercom), the #1 AI agent for customer service.
+
+He is also the technical co-founder of Tini Express, a cross-border delivery service operating in Southern Africa. Since launching in 2023, the company has grown into one of the region’s preferred last-mile delivery providers, enabling customers to shop from leading online retailers and receive deliveries within days. Ben leads all engineering at Tini Express.
+
+Ben approaches his work with a builder’s mindset, driven by a love of product, software, entrepreneurship, and problem-solving.
+
+*Jessie Auguste* — Software Engineer, CybSafe
+
+As an award-winning Software Engineer at CybSafe, Jessie drives secure software development practices while scaling engineering teams in the UK’s fast-paced startup ecosystem. Her technical expertise spans cybersecurity, application security, and building resilient systems that protect organisations from evolving threats.
+
+Beyond her engineering contributions, Jessie is a recognized leader in fostering inclusive tech cultures. She founded and hosts Glowing in Tech , a platform that has become a vital resource for tech leaders seeking to build more diverse and innovative teams. Through this work, she’s helped hundreds of underrepresented professionals advance their careers while providing actionable insights for leadership teams on creating inclusive environments that drive business results.
+
+As a sought-after technical speaker, Jessie has delivered keynotes and workshops at leading industry events including LeadDev, DevConf, React Miami, and BeJS, as well as for organizations like Docker and codebar. Her presentations focus on practical leadership strategies, secure coding practices, and building high-performing diverse teams.
+
+Jessie’s leadership extends to curriculum development, where she’s created and delivered specialised technical training programs, including OWASP secure coding principles courses. Her educational initiatives have equipped both individual contributors and engineering leaders with the skills needed to build secure, scalable systems while advancing DEI objectives.
+
+Through her board position with Girl Dreamer and active involvement with Coding Black Females, Jessie provides strategic guidance to organisations looking to transform their hiring, retention, and promotion practices in tech.
+
+*Phillipa Rodney* — Engineering Manager, Crowdstrike
+
+Phillipa is an experienced engineering manager, passionate about people leadership and building great engineering cultures.
+
+Phillipa leads with empathy and trust; by demonstrating the importance of building relationships and coaching others to realise their full potential, she empowers engineers to bring their best selves to the workplace, promotes best practices and encourages excellence across teams to build the best products.
+
+---
+
+### 11:05 – 11:35 — How do you balance strong security with a seamless agent-driven developer experience?
+
+**Type:** Table Talk  ·  **For:** Director+, Staff+, Tech Lead  ·  **Topics:** ai
+
+**Speaker(s):** Bogdan Tsiganiuk (Software Developer, Frontegg), Łukasz Lesiak (Engineering Manager, IDEMIA Public Security), JP Huynh (Engineering Manager, Spendesk)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Bogdan Tsiganiuk* — Software Developer, Frontegg
+
+Bogdan Tsiganiuk is a software engineer at Frontegg and previously worked as a backend engineer at ThriveDX Labs. He holds a degree in Applied Mathematics and Algorithms and is passionate about mathematics and machine learning.
+
+*Łukasz Lesiak* — Engineering Manager, IDEMIA Public Security
+
+Łukasz Lesiak is an Engineering Manager at IDEMIA Public Security.
+
+*JP Huynh* — Engineering Manager, Spendesk
+
+JP Huynh is an Engineering Manager at Spendesk who leads platform and infrastructure teams focused on helping product engineers move faster without sacrificing reliability.
+
+He has worked across open source companies, early-stage startups, and scale-ups where he spent much of his career building the systems and platforms that power modern engineering organisations.
+
+His work focuses on the intersection of cloud infrastructure, developer experience, and engineering leadership, helping teams scale both their systems and their impact.
+
+---
+
+### 11:05 – 11:35 — How do you apply AI safely in regulated environments without blocking developer productivity?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** ai
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+---
+
+### 11:50 – 12:20 — How do you measure and communicate software delivery in a way that resonates with leadership?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** reporting
+
+**Speaker(s):** Madhulika Mitra (QA Manager, Runa.io), Abhi Thatte-Carrino (Senior Engineering Manager, Typeform), Olaf Molenveld (Technology Advisor, CircleCI)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Madhulika Mitra* — QA Manager, Runa.io
+
+Madhulika Mitra is a Software QA Manager with a passion for building smarter, more reliable testing systems. She specializes in modern test engineering using tools like Playwright, TypeScript, and AI-assisted workflows, and actively explores emerging practices such as LLM-driven testing and model-connected pipelines. Known for combining technical depth with thoughtful leadership, she focuses on improving engineering quality while mentoring teams and fostering empathetic feedback cultures. Madhulika also shares her insights through writing and experimentation, helping bridge the gap between traditional QA practices and the rapidly evolving world of AI-powered software development.
+
+*Abhi Thatte-Carrino* — Senior Engineering Manager, Typeform
+
+Abhi is a Senior Engineering Manager with a proven track record of scaling high-performing engineering teams and driving technical excellence in fast-paced, high-growth environments. With over 14 years of experience in software engineering, she has built autonomous, motivated, and results-driven teams that thrive on ownership and innovation.
+
+At Typeform, Abhi oversees the core product and end-to-end customer journey that form the Create and Respond domains. Abhi leads cross-functional, multinational teams across Europe and the US.
+
+Prior to Typeform, Abhi led engineering teams at Matillion for Product-led Growth, Data Pipeline Designer, and Data Loader, while also driving initiatives in performance optimizations, incident management, security and engineering best practices. Her leadership ensured teams built scalable, maintainable, and high-performing software solutions.
+
+Beyond technology, Abhi is deeply passionate about mentoring future leaders, optimizing team dynamics, and fostering a culture of psychological safety and continuous growth. She believes in empowering engineers with the right tools, support, and environment to maximize both their impact and career growth.
+
+Abhi has two cats, Yuki and Winston, and lives 5 minutes from Wayne Manor. She also holds additional degrees in Indian classical music, and she appeared on Indian Pop Idol as a contestant.
+
+*Olaf Molenveld* — Technology Advisor, CircleCI
+
+Olaf is a seasoned technology leader with over 25 years of experience in the software industry, excelling in both technical and leadership roles. He has a strong foundation in software development, architecture, and consulting, with a focus on aligning business challenges with cutting-edge technology solutions. As the founder and former CTO of Vamp.io, he played a key role in developing DevOps tools for containers, Kubernetes, and microservices. Following Vamp’s acquisition by CircleCI, Olaf now serves as a Technology Advisor, working closely with CTO Rob Zuber to advance CircleCI’s offerings. His expertise continues to drive technical innovation and excellence for the company and its customers.
+
+---
+
+### 11:50 – 12:20 — How do you ensure AI augments engineering judgement rather than replacing it?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** ai
+
+**Speaker(s):** Johann Beukes (Chief AI Officer & CTO (Fractional), Svitla Systems), Georgia Gage (Lead Software Engineer, Kraken), Lewis Holmes (Principal Engineer, ASOS.com)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Johann Beukes* — Chief AI Officer & CTO (Fractional), Svitla Systems
+
+Johann Beukes is the Chief AI Officer & CTO (Fractional) at Svitla Systems.
+
+*Georgia Gage* — Lead Software Engineer, Kraken
+
+Georgia Gage is a Lead Software Engineer at Kraken.
+
+*Lewis Holmes* — Principal Engineer, ASOS.com
+
+Lewis Holmes is a Principal Engineer and AI Strategist with over 20 years’ experience leading teams and helping organisations build enterprise-scale distributed systems. At ASOS.com, he supports engineering teams in adopting agentic AI through practical training, community-building, tooling and workflow design. With a background in developer experience, engineering productivity and technical training, he has trained more than 1,000 engineers across cloud computing, Kubernetes and CI/CD. He also co-created and hosted the ASOS Tech Podcast, sharing ideas on AI, automation and modern engineering.
+
+---
+
+### 11:50 – 12:20 — Connecting engineering leaders in banking and financial services
+
+**Type:** Industry Interest Groups  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Stephane Moreau (Senior Engineering Manager, Zopa Bank), Samane Igder (API Engineering Director, Barclays), Dan Abel (Senior Staff Engineer, Pleo)
+
+**Abstract**
+
+Connect with folks over shared experiences
+
+Building great software comes with unique challenges in every industry, and often, the best insights come from others who are in the same boat. Join our relaxed sessions where you can meet peers working in similar domains to share ideas, collaborate on challenges, and exchange solutions.
+
+**Speaker bio(s)**
+
+*Stephane Moreau* — Senior Engineering Manager, Zopa Bank
+
+Stephane Moreau is a Senior Engineering Manager at Zopa Bank, where he leads AI and Open Banking teams. He’s passionate about the human side of engineering – how teams grow, how careers evolve, and what good leadership actually looks like in practice. Outside work, he runs Blog4EMs.com, a newsletter helping engineers navigate the path into leadership, and builds tools for EMs at em-tools.io.
+
+*Samane Igder* — API Engineering Director, Barclays
+
+Samane Igder is an API Engineering Director at Barclays.
+
+*Dan Abel* — Senior Staff Engineer, Pleo
+
+Dan has spent more than 30 years as a software engineer and technical leader, learning better ways to ship and get feedback the team needs. He’s been the Dev in Ops teams, built new paved paths, guided engineering groups to better security, and trained folk in Agile engineering.
+
+He uses his experience in people and coaching to lead and guide teams, strengthen technical excellence and grow technical leadership. He works as a Senior Staff Engineer at Pleo.io
+
+---
+
+### 12:35 – 13:05 — How do you give AI tools the context they need to generate reliable, production-ready code?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** ai
+
+**Speaker(s):** Dennis Pilarinos (Founder & CEO, Unblocked), Madhura Chaganty (Engineering Manager, Elliptic), Blanca Rojo Martin (Distinguished Engineer, UBS)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Dennis Pilarinos* — Founder & CEO, Unblocked
+
+Dennis has spent his career building products that remove friction for software engineers.
+
+He started on the ground floor of Microsoft Azure, helping build the early cloud platform from scratch. At Amazon he became the first AWS employee in the Vancouver office, built the team, and worked on the Kindle Fire stack along with developer-focused tooling and infrastructure.
+
+Dennis founded buddybuild to fix how mobile teams shipped software. The product became the go to CI platform for tens of thousands of developers worldwide – that traction led to the acquisition by Apple.
+
+Dennis now runs Unblocked, where they focus on giving AI the context it needs to be useful in real software development. He focuses on practical impact and measure success by how much time and confusion we remove from engineering workflows.
+
+*Madhura Chaganty* — Engineering Manager, Elliptic
+
+As an Engineering Manager at Elliptic, Madhura Chaganty focuses on building high-performing teams, driving timely project deliveries, and optimising processes for greater efficiency and impact.
+
+With over 20 years of software development experience, she empowers teams to deliver complex projects by embracing innovation, sustainability, and emerging technologies.
+
+Outside of work, she is leader in Women Coding Community, actively supporting women in advancing their tech careers. By mentoring and offering strategic guidance, she helps foster a more inclusive and equitable tech community.
+
+*Blanca Rojo Martin* — Distinguished Engineer, UBS
+
+Blanca is a Distinguished Engineer @ UBS, working in London. She has worked as a Software Engineer for 10 years and is now transitioning into Data Engineering.
+
+She specialises in solving tricky problems using code, while also leveraging the power of the engineering community within her organisation. She has been the UBS UK lead for Women in Tech and is now the co-lead of the Software Engineering Guild for EMEA.
+
+She believes that only by understanding people’s intersectionalities we can truly make a difference in the way we work.
+
+In her free time she enjoys travelling, going out, reading and playing video games, and has recently started teaching her 5 year old son to code.
+
+---
+
+### 12:35 – 13:05 — How do you set an engineering and AI strategy and translate it into actionable work for teams?
+
+**Type:** Table Talk  ·  **For:** Experienced Manager, New Manager  ·  **Topics:** leadership
+
+**Speaker(s):** Vidhya Karthikeyan (Senior Director, Engineering (Data & AI), Storio Group), Maurizio Del Corno (Head of Domain, Senior Engineering Manager, Prima), Arjit Srivastava (Senior Engineering Manager, Delivery Hero)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Vidhya Karthikeyan* — Senior Director, Engineering (Data & AI), Storio Group
+
+Vidhya Karthikeyan is a Senior Director, Engineering (Data & AI) at Storio Group.
+
+*Maurizio Del Corno* — Head of Domain, Senior Engineering Manager, Prima
+
+Maurizio Del Corno is a Head of Domain, Senior Engineering Manager at Prima.
+
+*Arjit Srivastava* — Senior Engineering Manager, Delivery Hero
+
+Arjit is the Engineering Lead for Quick Commerce domain at Delivery Hero. A software engineer at heart, he thrives at the intersection of leadership and technology, bringing a wealth of experience from various industries. Arjit is passionate about building intentional team culture and operational excellence. He excels in chaotic situations, finding clarity and direction. Outside of work, Arjit enjoys reading, playing video games, and writing.
+
+---
+
+### 13:05 – 13:35 — Connecting leaders with disabilities
+
+**Type:** Community Representation Groups  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Matt Field (SRE, PostHog), Aaron Moses (Software Engineering Team Lead, BBC), Andrew Hayward (Staff Accessibility Engineer, Miro), Ben Gamble (Field CTO, Ververica), Dianing Yudono (Career Coach)
+
+**Abstract**
+
+Connect with folks over shared experiences
+
+Everyone’s journey into leadership is tough, but folks who are underrepresented in tech often face their own unique set of challenges. And that can lead to people feeling isolated in their experiences.
+
+Come to the community representation groups, where you’ll be able to connect with folks who might have similar backgrounds and experiences to yours, and where you’ll be able to build a peer network for support throughout your journey.
+
+**Speaker bio(s)**
+
+*Matt Field* — SRE, PostHog
+
+Matt is a seasoned SRE and Platform Engineer with over fifteen years of experience in building and operating scalable, reliable, high-performance systems, platforms, and infrastructure, as well as management of engineering teams. He is also an ADHD Works Certified Coach and core team member of the CNCF Merge Forward Buddy Program.
+
+*Andrew Hayward* — Staff Accessibility Engineer, Miro
+
+Andrew is a lead accessibility engineer, passionate about creating inclusive solutions for user problems. His attention to detail bridges disciplines, from code through documentation and design to project strategy. He loves nothing more than bringing product owners, designers, and other engineers together to ensure that access needs are assessed and accommodated from initial concept through to final product delivery.
+
+*Ben Gamble* — Field CTO, Ververica
+
+After many years of building teams & technology, Ben is now Field CTO at Ververica, Helping people get the most out of Streaming, data and Open source technology.
+
+*Dianing Yudono* — Career Coach
+
+Dianing Yudono is a neurodivergent software engineer and professional coach who helps technologists navigate career transitions, leadership challenges, and organisational change. Having experienced multiple role changes, reorgs, and the loss of her own support network, she learned how critical the right support can be. She now coaches engineers, designers, and managers to identify the support they need, regain confidence, and thrive in evolving roles.
+
+---
+
+### 13:20 – 14:20 — Fundraising for technical founders
+
+**Type:** VC Office Hours  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Dana Oshiro (Investor, Heavybit)
+
+**Abstract**
+
+Have a startup idea? Join SF-based Heavybit investor Dana Oshiro to craft your narrative as a technical founder; discuss what investors actually evaluate at pre-seed and seed; learn how dilution works over time; and build a pragmatic capital strategy.
+
+**Speaker bio(s)**
+
+*Dana Oshiro* — Investor, Heavybit
+
+Dana Oshiro is a Partner at Heavybit where she’s built the venture firm’s brand, accelerator, and team from the ground up. In addition to sourcing and closing deals, she’s led more than 60 startup company launches. Previously as a senior marketer and journalist, she’s built strategy for Heroku and Salesforce, rebranded and sold a blogging network, and covered hundreds of startups.
+
+---
+
+### 13:50 – 14:20 — Connecting women leaders
+
+**Type:** Community Representation Groups  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Nazlı Sahin (Director of Security, Risk and Compliance, Accedo), Madhura Chaganty (Engineering Manager, Elliptic), Dianing Yudono (Career Coach), Amber Shand (Founder, She Bytes Back), Phillipa Rodney (Engineering Manager, Crowdstrike)
+
+**Abstract**
+
+Connect with folks over shared experiences
+
+Everyone’s journey into leadership is tough, but folks who are underrepresented in tech often face their own unique set of challenges. And that can lead to people feeling isolated in their experiences.
+
+Come to the community representation groups, where you’ll be able to connect with folks who might have similar backgrounds and experiences to yours, and where you’ll be able to build a peer network for support throughout your journey.
+
+**Speaker bio(s)**
+
+*Nazlı Sahin* — Director of Security, Risk and Compliance, Accedo
+
+Nazli leads security strategy, risk management, and compliance for a global organization. Over a decade in leadership, she has shaped security policies, controls, and governance frameworks, from incident response and AI governance to ISO 27001 and GDPR compliance. She has built teams that operate independently while she focuses on strategic direction and organizational security posture. Nazli believes effective leadership means seeing potential in others and creating environments where, with the right balance of challenge, support, and trust, people grow and elevate those around them.
+
+*Madhura Chaganty* — Engineering Manager, Elliptic
+
+As an Engineering Manager at Elliptic, Madhura Chaganty focuses on building high-performing teams, driving timely project deliveries, and optimising processes for greater efficiency and impact.
+
+With over 20 years of software development experience, she empowers teams to deliver complex projects by embracing innovation, sustainability, and emerging technologies.
+
+Outside of work, she is leader in Women Coding Community, actively supporting women in advancing their tech careers. By mentoring and offering strategic guidance, she helps foster a more inclusive and equitable tech community.
+
+*Dianing Yudono* — Career Coach
+
+Dianing Yudono is a neurodivergent software engineer and professional coach who helps technologists navigate career transitions, leadership challenges, and organisational change. Having experienced multiple role changes, reorgs, and the loss of her own support network, she learned how critical the right support can be. She now coaches engineers, designers, and managers to identify the support they need, regain confidence, and thrive in evolving roles.
+
+*Amber Shand* — Founder, She Bytes Back
+
+Amber Shand is a former software engineer (AMEX, Skyscanner) turned keynote speaker who’s delivered 100+ talks for Google, Salesforce, Sage, and Kraken.
+
+She founded She Bytes Back, a 3,000+ member community for women in tech, partnering with companies like Canva, Figma, and Depop. Through bi-monthly events and BRAVE on Stage, her 6-week speaking accelerator, she helps technical professionals become magnetic speakers who attract career-defining opportunities.
+
+Amber works with tech companies to get their engineers speaking at industry conferences, building visibility that attracts talent and strengthens their brand. She helps technical leaders develop teams who can confidently represent the company on stage, turning brilliant engineers into recognised voices in their field.
+
+*Phillipa Rodney* — Engineering Manager, Crowdstrike
+
+Phillipa is an experienced engineering manager, passionate about people leadership and building great engineering cultures.
+
+Phillipa leads with empathy and trust; by demonstrating the importance of building relationships and coaching others to realise their full potential, she empowers engineers to bring their best selves to the workplace, promotes best practices and encourages excellence across teams to build the best products.
+
+---
+
+### 14:35 – 15:05 — How do you define ownership and accountability when AI is generating part of your system?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** management
+
+**Speaker(s):** Gerta Salillari (Strategic AI Transformation Lead, Softwire), Annjana Ramesh (Senior Engineering Manager, Monzo), Mariana Pasichnyk (Senior Engineering Director, IDEMIA)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Gerta Salillari* — Strategic AI Transformation Lead, Softwire
+
+Gerta is Data Science Principal and Strategic AI Transformation Practice Lead at Softwire. With a decade of experience designing and delivering data-driven systems across financial services, venture capital, and enterprise technology, she specialises in applying AI in high-stakes, regulated environments.
+
+Her work focuses on translating data and AI capabilities into commercially viable, scalable solutions. Gerta works closely with senior stakeholders to shape AI strategy, de-risk adoption, and turn emerging technologies into measurable business outcomes.
+
+*Annjana Ramesh* — Senior Engineering Manager, Monzo
+
+Annjana Ramesh is an engineering leader at Monzo, building the bank’s mortgage brokerage experience. She previously led engineering teams responsible for launching Monzo’s expansion into Europe, establishing presence in Ireland.
+
+Annjana has over a decade of experience building and scaling engineering teams across fintech, AI and bigtech. Prior to Monzo, she held leadership roles at Wayve, Twitter and Goldman Sachs, working on SW infrastructure / platform supporting products used by millions.
+
+She is passionate about developing strong engineering leaders, building resilient teams, and advancing diversity and inclusion within the tech industry. Alongside her day job, Annjana runs Gaido, a leadership coaching and advisory practice that supports engineering leaders and growing organisations.
+
+*Mariana Pasichnyk* — Senior Engineering Director, IDEMIA
+
+Mariana is a Senior Engineering Director of the Digital ID Platform at IDEMIA, where she leads cross-functional teams across development, QA, DevOps, and delivery. She drives engineering excellence while ensuring the delivery of scalable, secure digital identity solutions. Deeply committed to talent development and team engagement, she focuses on building high-performing teams and nurturing leadership growth. Mariana brings a collaborative, people centric approach to engineering. She combines strategic vision with strong execution to deliver impactful solutions. Outside of work, she enjoys running, swimming, hiking in the mountains, learning tennis, and mentoring others.
+
+---
+
+### 14:35 – 15:05 — How do you build AI native teams as an engineering leader?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, Tech Lead  ·  **Topics:** leadership
+
+**Speaker(s):** Ameya Kanitkar (Co-founder & CTO, Larridin), Nishanth Thomas (Software Engineering Manager, Utility Warehouse), Simon Bruins (Engineering Lead, Wise)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+The shift from coding to verification doesn’t just change what engineers do – it changes how you structure, hire for, and run the team. A leader’s playbook.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Ameya Kanitkar* — Co-founder & CTO, Larridin
+
+Ameya Kanitkar is the Co-founder & CTO at Larridin.
+
+*Nishanth Thomas* — Software Engineering Manager, Utility Warehouse
+
+Nishanth Thomas is an engineering manager with 20 years of experience in software and 8 years leading engineering teams. He is currently at Utility Warehouse, and previously spent a decade at Red Hat and IBM, where he owned the UI platform and observability charter for OpenShift Data Foundation. His work sits deeply in the cloud-native and developer infrastructure space.
+
+*Simon Bruins* — Engineering Lead, Wise
+
+Simon Bruins is an Engineering Lead at Wise.
+
+---
+
+### 15:05 – 15:35 — Connecting neurodivergent leaders
+
+**Type:** Community Representation Groups  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Matt Field (SRE, PostHog), Elizabeth Hanson (Head of Data Engineering, DeepL), Aaron Moses (Software Engineering Team Lead, BBC), Ben Gamble (Field CTO, Ververica), Dianing Yudono (Career Coach), Amber Shand (Founder, She Bytes Back)
+
+**Abstract**
+
+Connect with folks over shared experiences
+
+Everyone’s journey into leadership is tough, but folks who are underrepresented in tech often face their own unique set of challenges. And that can lead to people feeling isolated in their experiences.
+
+Come to the community representation groups, where you’ll be able to connect with folks who might have similar backgrounds and experiences to yours, and where you’ll be able to build a peer network for support throughout your journey.
+
+**Speaker bio(s)**
+
+*Matt Field* — SRE, PostHog
+
+Matt is a seasoned SRE and Platform Engineer with over fifteen years of experience in building and operating scalable, reliable, high-performance systems, platforms, and infrastructure, as well as management of engineering teams. He is also an ADHD Works Certified Coach and core team member of the CNCF Merge Forward Buddy Program.
+
+*Elizabeth Hanson* — Head of Data Engineering, DeepL
+
+Elizabeth Hanson is Head of Engineering at DeepL, one of Europe’s leading AI companies, where she leads the Data Track supporting business and engineering users with their analytical and data needs. With over 20 years of experience in technology and more than six years in engineering leadership, Elizabeth has spent the last five years building data and AI products to support various businesses. She previously held roles at Just Eat Takeaway, Civica, and Fasthosts. Elizabeth has been actively supporting neurodiverse team members for many years being and active leader of the Neurodiversity support networks at Just Eat, Benchsci and DeepL.
+
+*Ben Gamble* — Field CTO, Ververica
+
+After many years of building teams & technology, Ben is now Field CTO at Ververica, Helping people get the most out of Streaming, data and Open source technology.
+
+*Dianing Yudono* — Career Coach
+
+Dianing Yudono is a neurodivergent software engineer and professional coach who helps technologists navigate career transitions, leadership challenges, and organisational change. Having experienced multiple role changes, reorgs, and the loss of her own support network, she learned how critical the right support can be. She now coaches engineers, designers, and managers to identify the support they need, regain confidence, and thrive in evolving roles.
+
+*Amber Shand* — Founder, She Bytes Back
+
+Amber Shand is a former software engineer (AMEX, Skyscanner) turned keynote speaker who’s delivered 100+ talks for Google, Salesforce, Sage, and Kraken.
+
+She founded She Bytes Back, a 3,000+ member community for women in tech, partnering with companies like Canva, Figma, and Depop. Through bi-monthly events and BRAVE on Stage, her 6-week speaking accelerator, she helps technical professionals become magnetic speakers who attract career-defining opportunities.
+
+Amber works with tech companies to get their engineers speaking at industry conferences, building visibility that attracts talent and strengthens their brand. She helps technical leaders develop teams who can confidently represent the company on stage, turning brilliant engineers into recognised voices in their field.
+
+---
+
+### 15:35 – 16:05 — How do you safely integrate AI coding agents into your development lifecycle without creating new bottlenecks?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Shraddha Nayak (Director of Engineering, Altus Group), Eric Paulsen (Field CTO – EMEA, Coder)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Shraddha Nayak* — Director of Engineering, Altus Group
+
+Shraddha Nayak is the Director of Engineering at Altus Group.
+
+*Eric Paulsen* — Field CTO – EMEA, Coder
+
+Eric Paulsen is the EMEA Field CTO at Coder, an open-source, self-hosted cloud development environment platform. A developer at heart, Eric began his career writing code and quickly became known for his ability to support and uplift fellow engineers. That passion for technology and collaboration evolved into guiding enterprise organisations, particularly in highly regulated industries, through their Developer Experience transformations. As Coder’s Founding Sales Engineer, Eric has remained deeply hands-on, continuously expanding his knowledge in emerging areas such as AI agents and automation. Today, he blends technical depth with strategic insight to help customers modernise secure, scalable development environments.
+
+---
+
+### 15:35 – 16:05 — How do you put AI guardrails in place that enable teams to move fast without increasing risk?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, Staff+  ·  **Topics:** ai
+
+**Speaker(s):** Kratika Jain (Engineering Manager), Ekaterina Okuneva (Senior Marketing Manager, Sonar), Anastasia Lopez (Engineering Lead, Unmind)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Kratika Jain* — Engineering Manager
+
+Kratika Jain is an Engineering Manager with 16 years of fintech experience, having held senior roles at JP Morgan Chase, Adyen, and FIS/Clear2Pay. Her expertise spans payment systems, regulatory engineering, and high-stakes infrastructure, along with building and leading high performing teams.
+
+*Ekaterina Okuneva* — Senior Marketing Manager, Sonar
+
+Ekaterina Okuneva is a Senior Marketing Manager at Sonar.
+
+*Anastasia Lopez* — Engineering Lead, Unmind
+
+Anastasia is an Engineering Lead currently working at Unmind. She is passionate about people and building teams that have a great psychological safety. She is also a public speaker and likes bringing the human side to technology conferences.
+
+---
+
+### 16:20 – 16:50 — How do you balance speed and quality when AI is part of the delivery process?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** velocity
+
+**Speaker(s):** Bogdana-Elena A (Engineering Manager, Zoopla), Matt Reid (Sales Engineering Manager, Vercel), Tom Young (Senior Engineering Manager, ClearScore)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Bogdana-Elena A* — Engineering Manager, Zoopla
+
+Bogdana-Elena A is an Engineering Manager at Zoopla.
+
+*Matt Reid* — Sales Engineering Manager, Vercel
+
+Matt is a Sales Engineering Manager with extensive experience guiding high-traffic web projects from planning through long-term support. Skilled in shaping practical, scalable solutions for organisations of all sizes, drawing on a background that spans both technical delivery and customer-focused pre-sales work.
+
+*Tom Young* — Senior Engineering Manager, ClearScore
+
+A people-first engineering leader who previously worked for companies including the BBC, Bloomberg and The Economist, Tom spent a decade working in software quality before transitioning into team leadership. He has a background in education and lives in East London with 4 cats. If you want to have a chat, coming up to him and asking to see pictures of his pets is always a good icebreaker!
+
+---
+
+### 16:20 – 16:50 — How do you maintain confidence in your frontend as AI writes more of it
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Gabriel Spencer-Harper (CEO & Co-Founder, Meticulous), Zoë Bryant (Senior Full Stack Software Engineer, Umbel Works Ltd.), Katherine Spice (Head of Engineering, Octopus Electric Vehicles)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+AI has enabled designers, product managers and the interns to ship code, but verification and review falls solely upon engineers – this talk discusses various verification approaches and the trade-offs.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Gabriel Spencer-Harper* — CEO & Co-Founder, Meticulous
+
+Gabriel is the co-founder and CEO of Meticulous, which exhaustively tests web applications with zero developer effort. He previously worked in engineering at Dropbox.
+
+*Zoë Bryant* — Senior Full Stack Software Engineer, Umbel Works Ltd.
+
+Zoë is a Senior Full Stack Software Engineer with over 13 years of experience on both new and well-established products across a variety of industries.
+
+*Katherine Spice* — Head of Engineering, Octopus Electric Vehicles
+
+Katherine Spice is a Head of Engineering at Octopus Electric Vehicle.
+
+---
+
+### 16:20 – 16:50 — Connecting engineering leaders in retail
+
+**Type:** Industry Interest Groups  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Ilya Savin (Engineering Manager, Qonto), Joice Marinay (Staff Software Engineer, Marks & Spencer), Tom Maddocks (Software Development Manager, JD Sports), Dan Abel (Senior Staff Engineer, Pleo)
+
+**Abstract**
+
+Connect with folks over shared experiences
+
+Building great software comes with unique challenges in every industry, and often, the best insights come from others who are in the same boat. Join our relaxed sessions where you can meet peers working in similar domains to share ideas, collaborate on challenges, and exchange solutions.
+
+**Speaker bio(s)**
+
+*Joice Marinay* — Staff Software Engineer, Marks & Spencer
+
+Joice is a Staff Software Engineer who has worked in companies of different scales in different industries such as health, fintech, edtech, entertainment, and e-commerce. She’s passionate about personal development and fostering team collaboration.
+
+*Tom Maddocks* — Software Development Manager, JD Sports
+
+Tom is Head of Product Engineering at JD Sports, championing high‑performing teams and supporting engineers to fulfil their potential. He’s passionate about people, continuous improvement, and building products that make a difference. Beyond work, Tom is a keen reader and a brown belt in Brazilian Jiu Jitsu.
+
+*Dan Abel* — Senior Staff Engineer, Pleo
+
+Dan has spent more than 30 years as a software engineer and technical leader, learning better ways to ship and get feedback the team needs. He’s been the Dev in Ops teams, built new paved paths, guided engineering groups to better security, and trained folk in Agile engineering.
+
+He uses his experience in people and coaching to lead and guide teams, strengthen technical excellence and grow technical leadership. He works as a Senior Staff Engineer at Pleo.io
+
+---
+
+## Connection Zone
+
+### 10:00 – 10:30 — Meet the speakers
+
+**Type:** Office hours  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Abstract**
+
+Ask speakers more about their talk.
+
+---
+
+### 11:05 – 11:30 — Speed coaching with Mathias Meyer
+
+**Type:** Speed coaching  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Mathias Meyer (Founding Partner & Executive Coach, The Intentional Organization)
+
+**Abstract**
+
+Watch or participate in free 1:1 coaching with Mathias Meyer.
+
+Learning new information is always great, but sometimes solutions can feel too one-size-fits-all for your specific circumstances. How can advice be applied to a team of 10 or a team of 10,000?
+
+On the other hand, coaching is directly tailored to your specific challenges and the specific environment they exist in. Mathias will be hosting one-on-one coaching sessions with attendees to get into the nuts and bolts of the challenges they’re facing. Come and have a conversation, or peek into the challenges other leaders are facing.
+
+**Speaker bio(s)**
+
+*Mathias Meyer* — Founding Partner & Executive Coach, The Intentional Organization
+
+Mathias Meyer is an executive coach, advisor, and co-author of the book The Intentional Organization . As Founding Partner at The Intentional Organization, he works with founders, CTOs, and senior leaders to build purposeful organizations grounded in clarity, inclusion, and learning. Previously, he co-founded two successful developer tools companies and held leadership roles including CEO of Travis CI and CTO of Reaction Commerce, bringing deep experience in scaling distributed teams and organizations.
+
+---
+
+### 12:35 – 13:00 — My team seemed brilliant to begin with, but things quickly went south. How (not) to lose your people in 90 days
+
+**Type:** Solution Swap  ·  **For:** Director+, Experienced Manager, New Manager  ·  **Topics:** culture
+
+**Speaker(s):** Ceri Newton-Sargunar (OD & Interactions specialist, Thirsty Horse Consulting)
+
+**Abstract**
+
+Quiet quitting. Rage quitting. Disengagement, burnout, mental health breaks. Stalled careers, unclear expectations, slanging matches, stolen credit, and betrayal. Poisoned relationships, broken promises. Politics.
+
+There are endless stupid ways we can accidentally lose our best people, or turn them into our worst – this is a session to share some of your people-related mistakes, and hear about the worst mistakes of your peers.
+
+Supported by Ceri Newton-Sargunar , a behavioural scientist and skilled senior leadership coach, you’ll also get some understanding along the way, of why things go as badly as they do – so you can take steps to make sure they, and you don’t fall into the same traps (again).
+
+**Speaker bio(s)**
+
+*Ceri Newton-Sargunar* — OD & Interactions specialist, Thirsty Horse Consulting
+
+Ceri is an Interactions Specialist, Chaologist, and trainee Neuroscientist who helps people at all levels work together more effectively.
+
+With a background in teaching and psychology, she makes evidence-based research practical and accessible for leaders seeking more effective approaches. A qualified coach, and Systemic Interventions Consultant specialising in complex Team Dynamics, she brings a huge wealth of experience working with senior leadership teams across government, multinational organisations and start-ups.
+
+She speaks globally, about the magnificent intermingling of behavioural science and hopeful, impactful change – and, of course, brains.
+
+---
+
+### 13:20 – 13:45 — Meet the author: Mathias Meyer
+
+**Type:** Meet the author  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Mathias Meyer (Founding Partner & Executive Coach, The Intentional Organization)
+
+**Abstract**
+
+The Intentional Organization is a practical guide for leaders and managers navigating the realities of modern management. Drawing from real-world experience by its authors, Sara Hicks and Mathias Meyer , the book shows how to build organizations where people feel valued, heard, and empowered to achieve meaningful results together. Mathias will bring copies of the book to purchase and sign.
+
+**Speaker bio(s)**
+
+*Mathias Meyer* — Founding Partner & Executive Coach, The Intentional Organization
+
+Mathias Meyer is an executive coach, advisor, and co-author of the book The Intentional Organization . As Founding Partner at The Intentional Organization, he works with founders, CTOs, and senior leaders to build purposeful organizations grounded in clarity, inclusion, and learning. Previously, he co-founded two successful developer tools companies and held leadership roles including CEO of Travis CI and CTO of Reaction Commerce, bringing deep experience in scaling distributed teams and organizations.
+
+---
+
+### 13:20 – 14:15 — StaffPlus huddle
+
+**Type:** StaffPlus Huddle  ·  **For:** Staff+  ·  **Topics:** career-development
+
+**Speaker(s):** Ritesh Modi (Staff Engineer, Wise Payments Limited), Polly McEldowney (Senior Staff Engineer, Mozilla), Dan Abel (Senior Staff Engineer, Pleo)
+
+**Abstract**
+
+Discuss core StaffPlus challenges with your peers.
+
+The best solutions don’t come from isolated thinking – they come from candid conversations with people who’ve been there. Join fellow senior ICs, throw your challenge into the mix, learn from each other’s experiences, and leave with perspectives you couldn’t have found on your own.
+
+**Speaker bio(s)**
+
+*Ritesh Modi* — Staff Engineer, Wise Payments Limited
+
+Ritesh is a Staff+ Engineer at Wise Payments where he is leading a Data Platform which is accessible, secure and compliant. He has 15+ years of experience building and leading complex products, including privacy platforms for Meta, monetization products for Omio, ML-based network security solutions, and low-latency, high-scale bidding platform for AdTech. He is passionate about working with people to lead the most impactful problem for the business.
+
+*Polly McEldowney* — Senior Staff Engineer, Mozilla
+
+Polly likes building cool stuff for phones and solving difficult problems by collaborating with nice people. She currently works on Firefox for Android, a lovely web browser that values user privacy and choice and doesn’t use Chromium. Before Mozilla Polly worked at the BBC for 12 years on such delightful apps as BBC Sounds, iPlayer Radio and some tv based versions of iPlayer. Her other interests include, but are not exclusively limited to, knitting, playing board games, running, sewing, making bad puns, reading sci-fi and fantasy books, watching telly, going to the pub and eating crisps.
+
+*Dan Abel* — Senior Staff Engineer, Pleo
+
+Dan has spent more than 30 years as a software engineer and technical leader, learning better ways to ship and get feedback the team needs. He’s been the Dev in Ops teams, built new paved paths, guided engineering groups to better security, and trained folk in Agile engineering.
+
+He uses his experience in people and coaching to lead and guide teams, strengthen technical excellence and grow technical leadership. He works as a Senior Staff Engineer at Pleo.io
+
+---
+
+### 13:50 – 14:15 — Tech Lead hangout
+
+**Type:** Peer Hangouts  ·  **For:** Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** James Alexander (Lead Engineer, ITV), Rui Posse (Engineering Manager, Raaft), Humayra Hanif (Lead Software Engineer, thisdotsoftware)
+
+**Abstract**
+
+Comparing notes on shared challenges that come with your role has never been easier. Peer Hangouts are 30-minute, casual networking sessions for folks to talk through their experiences and challenges with peers who understand the context they’re working in. Drop in and join a conversation!
+
+**Speaker bio(s)**
+
+*James Alexander* — Lead Engineer, ITV
+
+James Alexander is a Lead Engineer at ITVX, the UK’s fastest-growing streaming service, helping shape the architecture and delivery of its platform for over 45 million users. With more than two decades in software engineering, he focuses on building resilient systems and improving collaboration at scale. His recent work spans subscriptions, payments, and Minimum Viable Company initiatives. He promotes experimentation through A/B testing and Long Term Holdout Groups and leads on compliance, setting standards and guidance across ITV. James champions ITV’s neurodiversity network and working class group, and enjoys mentoring and supporting students and colleagues to achieve their potential.
+
+*Rui Posse* — Engineering Manager, Raaft
+
+Engineering Manager and Full-Stack engineer with 10+ years’ experience leading remote teams, Rui specialises in JavaScript/TypeScript, Vue.js and Node.js. Passionate about mentoring and team culture, he focuses on clear direction, modern engineering practices and pragmatic delivery that balances business impact with technical quality. He is passionate about tech communities and actively engages in sharing knowledge and supporting other engineers.
+
+*Humayra Hanif* — Lead Software Engineer, thisdotsoftware
+
+With a decade of experience as a software engineer, Humayra has established herself as a Lead Software Engineer while concurrently co-founding Hulm Club – a Muslim-focussed community of visionaries and innovators.
+
+She has navigated various roles in engineering leadership at startups, accumulating extensive expertise along the way. Her expertise spans various sectors including finance, data, health, and retail marketing, where she has led teams to consistently deliver innovative solutions.
+
+Outside of her professional pursuits, Humayra actively engages as a writer, speaker, and mentor, contributing to the growth and diversity of the tech community. Her overarching objective remains focused on leveraging technology to drive positive change on a global scale.
+
+---
+
+### 15:35 – 16:00 — Principal Engineer hangout
+
+**Type:** Peer Hangouts  ·  **For:** Staff+  ·  **Topics:** culture
+
+**Speaker(s):** Steven Withey (Principal Security Engineer, ASOS.com), Jonathan Courtois (Distinguished Engineer, Sky), Michael Tweed (Principal Software Engineer, Skyscanner), Nayana Shetty (Principal Engineer, The Lego Group)
+
+**Abstract**
+
+Comparing notes on shared challenges that come with your role has never been easier. Peer Hangouts are 30-minute, casual networking sessions for folks to talk through their experiences and challenges with peers who understand the context they’re working in. Drop in and join a conversation!
+
+**Speaker bio(s)**
+
+*Steven Withey* — Principal Security Engineer, ASOS.com
+
+Steven Withey is a Principal Security Engineer at ASOS.com.
+
+*Jonathan Courtois* — Distinguished Engineer, Sky
+
+Jonathan Courtois is a Distinguished Engineer at Sky, leading the development in C++/Qt of the immersive UI experience of Entertainment OS as well as the companion apps on personal devices (Mobile/Web). Entertainment OS is powering Sky Glass, Sky Stream (EU), Xumo, Xfinity Stream (USA) and Hubbl (AUS). Deeply passionate about software excellence, Jonathan advocates for the seamless integration of CI/CD and industry best practices. He fervently believes in the cross-collaboration of Product, UI/UX, and Developer teams within agile frameworks. His mission? Ensuring that teams consistently deliver top-tier software to customers in a swift and iterative manner.
+
+*Michael Tweed* — Principal Software Engineer, Skyscanner
+
+Michael is currently a Principal Software Engineer at Skyscanner where he is responsible for leading their Mobile Platform squads. He also has a keen interest in Mobile Observability and Data Production, and is helping drive Skyscanner’s long-term vision in these areas.
+
+*Nayana Shetty* — Principal Engineer, The Lego Group
+
+Nayana Shetty is a Principal Engineer at the Lego Group. The Lego Group is going through a massive digital transformation and she is helping with the architecture and engineering practices especially in the Ecommerce, Marketing and Channels technology. Over the years, she has led teams building products and tools that help organizations with site reliability and getting on the devops journey. Starting her career as a Quality Engineer she is passionate about building quality into products from the start rather than an afterthought and creating a culture of quality using devops practices within teams.
+
+---
+
+### 15:35 – 16:00 — My feedback either doesn’t land, doesn’t change anything or causes a big reaction. What can I do?
+
+**Type:** Solution Swap  ·  **For:** Director+, Experienced Manager, New Manager, Tech Lead  ·  **Topics:** communication
+
+**Speaker(s):** Ceri Newton-Sargunar (OD & Interactions specialist, Thirsty Horse Consulting)
+
+**Abstract**
+
+With great change comes great uncertainty. Sadly, the resulting pace + pressure combination often means well-intended feedback derails even our best people. When it goes catastrophically wrong, the whole team is affected – seriously risking our ability to deliver quality at speed, in the exact moments we need everyone at the top of their game.
+
+So let’s have a serious conversation about how we fix feedback in high-stakes environments.
+
+Led by Ceri Newton-Sargunar – neuroscientist, experienced senior leadership coach and team dynamics specialist – this session offers you a unique opportunity: invaluable facilitated peer exchanges, informed by in-the-moment crucial insights from behavioural science and neuroscience.
+
+You’ll leave the room with a clear understanding of exactly why feedback conversations go wrong, and how to guard against it. And you’ll walk into your next conversation confident, better-equipped to stop things falling apart, and keeping your team focused on the goal rather than the drama.
+
+**Speaker bio(s)**
+
+*Ceri Newton-Sargunar* — OD & Interactions specialist, Thirsty Horse Consulting
+
+Ceri is an Interactions Specialist, Chaologist, and trainee Neuroscientist who helps people at all levels work together more effectively.
+
+With a background in teaching and psychology, she makes evidence-based research practical and accessible for leaders seeking more effective approaches. A qualified coach, and Systemic Interventions Consultant specialising in complex Team Dynamics, she brings a huge wealth of experience working with senior leadership teams across government, multinational organisations and start-ups.
+
+She speaks globally, about the magnificent intermingling of behavioural science and hopeful, impactful change – and, of course, brains.
+
+---
+
+### 16:20 – 16:45 — Engineering Manager hangout
+
+**Type:** Peer Hangouts  ·  **For:** Experienced Manager, New Manager  ·  **Topics:** culture
+
+**Speaker(s):** Amélie Thery (Senior Engineering Manager, Prima), Matej Strašek (Senior Engineering Manager, Exoticca), Theo Nicolaou (Front End Engineering Manager, ITV)
+
+**Abstract**
+
+Comparing notes on shared challenges that come with your role has never been easier. Peer Hangouts are 30-minute, casual networking sessions for folks to talk through their experiences and challenges with peers who understand the context they’re working in. Drop in and join a conversation!
+
+**Speaker bio(s)**
+
+*Amélie Thery* — Senior Engineering Manager, Prima
+
+Amélie is a passionate and empathetic leader. She aims to build resilient and high-performing teams, led by caring and high-performing individuals. She is French and lives in London, and currently works for Prima, the leading Italian digital insurance company.
+
+*Matej Strašek* — Senior Engineering Manager, Exoticca
+
+Matej Strašek drives AI transformation within his teams at Exoticca, where he currently leads engineers building intelligent customer experiences and empowers operations with AI—from voicebots and chatbots to automated travel processes. He helps people evolve into problem solvers, creating outcome-driven groups that use AI to multiply their impact. His teams align around company moonshots, combining a technical mindset with the real world to deliver real impact. His way of resetting? Singing and flying over the landscapes of Slovenia.
+
+*Theo Nicolaou* — Front End Engineering Manager, ITV
+
+Theo is an Engineering Manager in the Viewer Technology department at ITV. He has a background in front-end development, and uses his expertise to grow and lead teams working on the ITVX streaming platform. Outside of work he can be found learning the ropes of parenting, laughing/crying about Spurs and following the F1 racing.
+
+---
+
+### 16:20 – 16:45 — I’ve got people doing brilliant things, but I don’t have any budget for promotions. How can I motivate them without spending anything?
+
+**Type:** Solution Swap  ·  **For:** Director+, Experienced Manager, New Manager, Tech Lead  ·  **Topics:** leadership
+
+**Speaker(s):** Ceri Newton-Sargunar (OD & Interactions specialist, Thirsty Horse Consulting)
+
+**Abstract**
+
+Budgets are strapped. Spend is fixed. Every penny has to be signed off in a process that can take weeks – so how on earth do you motivate people to do well, without using a financial reward?
+
+This solution swap will explore exactly that: tips and tools from your peers, plus insights from behavioural science to help you find the options that are best for you, your people, and your organisation. We’ll look at motivation, accountability and ownership, preventing disengagement and “quiet quitting” so you understand what helps create engagement – and what might trip you up.
+
+Facilitated by Ceri Newton-Sargunar , experienced senior leadership coach, behavioural scientist and team dynamics specialist, You’ll walk away with a page full of notes, your head full of ideas, and some practical steps to take when you get back to your team.
+
+**Speaker bio(s)**
+
+*Ceri Newton-Sargunar* — OD & Interactions specialist, Thirsty Horse Consulting
+
+Ceri is an Interactions Specialist, Chaologist, and trainee Neuroscientist who helps people at all levels work together more effectively.
+
+With a background in teaching and psychology, she makes evidence-based research practical and accessible for leaders seeking more effective approaches. A qualified coach, and Systemic Interventions Consultant specialising in complex Team Dynamics, she brings a huge wealth of experience working with senior leadership teams across government, multinational organisations and start-ups.
+
+She speaks globally, about the magnificent intermingling of behavioural science and hopeful, impactful change – and, of course, brains.
+
+---
+
+### 18:15 – 18:40 — Connecting senior managers from underrepresented groups
+
+**Type:** Community Representation Groups  ·  **For:** Director+, Experienced Manager  ·  **Topics:** culture
+
+**Speaker(s):** Elizabeth Hanson (Head of Data Engineering, DeepL), Linn Foster (Director of Engineering Management, Exclaimer), Dan Blundell (Engineering Director, Gymshark), Sally Lait (Fractional technology leader and advisor), Lena Reinhard (Engineering Leader, Organizational Developer, Coach, Facilitator)
+
+**Abstract**
+
+LGBTQIA+ and BIPOC communities, neurodivergent, disabled people, and women have long been grossly underrepresented in tech, and even more so at senior management levels, where being “the first [insert your identity here]” in your company at your level is a common experience. We want to create this space specifically for you to connect and find community. During the session, you will receive guiding questions to discuss with your peers and a space to get to know, learn from, and celebrate each other, together.
+
+Who this is for: We welcome any senior managers (Director and above) who are members of underrepresented groups in tech. We want to create a space for the many groups with little representation at those levels, so if you belong to a group that isn’t specifically mentioned here, please join and let the hosts know. You don’t need a DirectorPlus pass to attend.
+
+**Speaker bio(s)**
+
+*Elizabeth Hanson* — Head of Data Engineering, DeepL
+
+Elizabeth Hanson is Head of Engineering at DeepL, one of Europe’s leading AI companies, where she leads the Data Track supporting business and engineering users with their analytical and data needs. With over 20 years of experience in technology and more than six years in engineering leadership, Elizabeth has spent the last five years building data and AI products to support various businesses. She previously held roles at Just Eat Takeaway, Civica, and Fasthosts. Elizabeth has been actively supporting neurodiverse team members for many years being and active leader of the Neurodiversity support networks at Just Eat, Benchsci and DeepL.
+
+*Linn Foster* — Director of Engineering Management, Exclaimer
+
+As Director of Engineering Management at Exclaimer, Linn leads Exclaimer’s Engineering department with a strong focus on people leadership, continuous improvement, and technical excellence. She is passionate about building highly engaged and collaborative teams by fostering a people-first culture.
+
+*Dan Blundell* — Engineering Director, Gymshark
+
+Dan is an engineering leader and builder of technical teams. He aims to create environments where each person feels valued, supported and can learn continuously, together. At Gymshark, Dan heads up Core Engineering and is responsible for data pipelines, API and integration development and platform reliability engineering.
+
+Dan will forever be a student of leadership, values feedback above almost anything else and would love to hear how best to help you. His latest side project is taming the tantrums of two toddlers and aims to coach them in the ways of empathy, responsibility and being a good human. Dan will eventually write a book but for now, tweets irregularly at @danblundell and posts sporadically at danblundell.com
+
+*Sally Lait* — Fractional technology leader and advisor
+
+Sally Lait specialises in building strong engineering culture, and aims to create supportive and inclusive environments for managers, developers, and teams to thrive and do fantastic technical work.
+
+Her roles have included helping to change the way the world deals with death as VP of Engineering (plus IT & Data and Insights) at Farewill, prior to which she led Monzo’s web discipline and engineering across Operations through hypergrowth. Other experience involves founding a digital transformation consultancy with clients including the Manor Racing F1 team and RNLI, and working as Head of Technology for a global digital agency. Sally’s a strong advocate for building software and teams alike with empathy, responsibility, and accessibility in mind. She’s spoken at events around the world, is on Mastodon at @ https://mastodon.social/@sally , and you can find out more about her at sally.dev .
+
+*Lena Reinhard* — Engineering Leader, Organizational Developer, Coach, Facilitator
+
+Lena Reinhard is a seasoned technology leader, currently helping leaders and their teams succeed through her work as a leadership coach, organizational developer, and facilitator. Having served the majority of her 20-year career in leadership roles, such as VP Engineering with CircleCI, Travis CI, and a SaaS startup co-founder & CEO, she has partnered with a variety of remote, hybrid, and co-located companies at all stages, from startups, to scale-ups, corporations, and NGOs. Lena loves to paint, read, and ride her bike around the forests and lakes of her home, Berlin, in Germany. She hosts O’Reilly’s Tech Leadership Tuesday podcast.
+
+---
+
+# Day 2 – June 3, 2026
+
+## Leading your Organization stage
+
+### 09:00 – 09:05 — Welcome to Day 2 of LDX3 London 2026
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Meri Williams (CTO, NED & Advisor, ChromeRose)
+
+**Abstract**
+
+Host’s opening address.
+
+**Speaker bio(s)**
+
+*Meri Williams* — CTO, NED & Advisor, ChromeRose
+
+Meri is an experienced CTO and leader of technology organisations. They particularly enjoy helping others to level up as technical leaders and managers of organizations by working as a CTO coach and tech advisor / NED to various companies in this capacity through micro-consultancy ChromeRose.
+
+They have led teams ranging in size from 30 to 300, in a range of organizations from Procter & Gamble, to the Government Digital Service, award-winning online print company MOO, mobile-first challenger bank Monzo and patient-inspired AI-driven rare disease treatment discovery company Healx, amongst others.
+
+Together with their wife, they run the micro-charity One Goes Up, which supports young women and non-binary folks in pursuing STEM education and careers.
+
+---
+
+### 09:10 – 09:35 — How to grow your engineers into great leaders
+
+**Type:** Keynote  ·  **For:** Experienced Manager, New Manager, Tech Lead  ·  **Topics:** career-development
+
+**Speaker(s):** Charles Duncan (Senior Engineering Leader, Netflix)
+
+**Abstract**
+
+Your future leaders are already on your teams. They span every level from junior engineers to staff engineers, and they’re watching closely. They’re learning not just from what you say, but from how you lead, how you make decisions, and how you create opportunities for others.
+
+So, how do we intentionally prepare individual contributors for leadership roles? How do we equip them with the skills, context, and confidence to step into leadership roles and succeed as top-tier managers within our organizations?
+
+Because scaling teams doesn’t start with headcount or org charts. It starts with scaling yourself as a leader.
+
+**Speaker bio(s)**
+
+*Charles Duncan* — Senior Engineering Leader, Netflix
+
+Charles Duncan Jr. is an Senior Engineering Leader at Netflix, where he leads teams that drive global user acquisition and fan engagement. Previously, he was a VP leading Engineering and Product teams at firms supporting clients such as Apple, Nike and NBC/Peacock. Charles is renowned for his leadership in innovation and creativity. Passionate about diversity, he advocates for greater representation in tech and creative industries, inspired by his early work in technology education for underserved communities. Charles remains dedicated to mentoring and fostering change in the industry.
+
+---
+
+### 09:55 – 10:10 — Engineering leadership in 2026
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** leadership
+
+**Speaker(s):** Scott Carey (Editor in Chief, LeadDev)
+
+**Abstract**
+
+We asked 600+ engineering leaders how their roles are changing in response to a rapidly changing economic landscape. Here’s what we found.
+
+**Speaker bio(s)**
+
+*Scott Carey* — Editor in Chief, LeadDev
+
+Scott Carey is the Editor in Chief at LeadDev. An experienced technology journalist, he has covered software development for Computerworld, CIO, and InfoWorld before joining LeadDev.
+
+---
+
+### 10:10 – 10:20 — Technology advances; history repeats itself
+
+**Type:** Talk  ·  **For:** 
+
+**Speaker(s):** Zoe Cunningham (Director, Softwire)
+
+**Abstract**
+
+Sponsored by
+
+Learn the leadership skills and perspectives that will allow you to outperform in a fast moving technological landscape.
+
+People haven’t changed, but the environment we are in has. The rate of change of tech is increasing faster than ever. At the same time young people are relearning the lessons we have all gained and take for granted. Did we just copy the leaders before us? Absolutely not, however we did observe and build on what they did (even when what we learnt was to do the opposite).
+
+And when we didn’t learn? History repeated itself. We replicated the failings that we observed in the previous generation.
+
+Fast forward to how things are now. We are flat out in our roles with everyday implementation. Organisations are hiring fewer junior engineers, fewer junior managers; we have less time to spend developing them, and people are training themselves how to lead by talking to ChatGPT.
+
+If we don’t remember to prioritise implementing our hard won lessons: values, culture, relationships, deep tech understanding; how will we pass it on? How will we stop history repeating itself?
+
+**Speaker bio(s)**
+
+*Zoe Cunningham* — Director, Softwire
+
+Zoe is an award-winning lifelong technologist and currently works as a Director at Softwire, voted Best Large Company to Work for in 2023 & 2024. A seasoned professional speaker, author and film actor, she is the host of The Digital Lighthouse, a podcast for CTOs and tech leaders. With 15+ years of delivering talks, workshops, and hosting panels, she is skilled at connecting with audiences of all sizes. She has been a main conference host, introducing speakers and sharing key insights at events such as the BBC’s Develop conference and her speaking engagements span diverse venues, including Oxford University, the OECD in Paris, and the UK Treasury. Zoe has appeared as a news guest and presenter on major platforms including BBC One, BBC Worldwide, Sky News, Channel 4, and ITN.
+
+---
+
+### 10:55 – 11:20 — AI killed the coding interviews. Here’s what Meta built instead
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** hiring
+
+**Speaker(s):** Danit Nativ Navon (Software Engineer Manager, Meta)
+
+**Abstract**
+
+When Meta’s senior engineers couldn’t explain ‘vibe-coding,’ we knew something broke. Traditional leadership tools failed, and we had to evolve. Learn how, at Meta, we changed how we hire, evaluate, and lead.
+
+A while back, during one of Meta’s new hire orientations, a senior manager froze when new hires asked him about “vibe-coding.” He nodded politely but clearly had no idea what they meant. That moment exposed more than a generational gap, it was a warning; The gap between how fast technology evolves and how fast leaders adapt is widening, and we must do something about it. ASAP.
+
+Junior engineers now arrive with AI superpowers. The competitive advantage shifted from raw technical skill to adaptation speed, from code quality to communication, and from knowing frameworks to catching AI hallucinations. This forced Meta to rethink how we hire, evaluate, and lead.
+
+We built AI-native coding interviews that measure adaptation, not memorization. We learned to evaluate talent without the traditional technical signals, and shifted the skills we look for when hiring, promoting, and assessing performance.
+
+We also changed how we lead: leaders have to use AI themselves before teaching their teams. They learn to adapt , rather than using specific tools, so they can evaluate whatever shows up next. They needed to learn how to leverage AI without the price of dependency. We realized AI accelerates junior engineers faster than any technology we’ve seen, but despite the panic about job losses, AI can help ambitious engineers break in and move up, but only if their leaders understand how to guide them.
+
+In this talk, I’ll share what we learned, and the frameworks we developed. I’ll share the mistakes we made, and what actually works when there’s no playbook. You’ll leave knowing what skills matter now, how to evaluate talent differently, and how to lead when yesterday’s answers don’t apply anymore.
+
+**Speaker bio(s)**
+
+*Danit Nativ Navon* — Software Engineer Manager, Meta
+
+At Meta, Danit pioneered AI-enabled coding interviews, making it the first major tech company to adopt AI-native evaluation for engineering talent.
+
+She also coaches leaders through AI-driven change and helps new hires to integrate AI skills into Meta’s engineering environment. A self-described late adopter who chose to evolve rather than fall behind, Danit now helps others step confidently into the AI era. Her global journey across Israel, Singapore, Mexico, and London informs her practical, people-first approach to engineering leadership.
+
+---
+
+### 11:40 – 12:05 — Reading the game: Mental skills for high-performing engineering teams
+
+**Type:** Talk  ·  **For:** Experienced Manager, New Manager, Tech Lead  ·  **Topics:** leadership
+
+**Speaker(s):** Cathy Pank (Engineering & AI Enablement Lead, Snappet)
+
+**Abstract**
+
+A knee injury turned me from player to coach. Watching from the sidelines taught me that understanding how people work matters more than technical skills alone.
+
+Two years ago, a serious knee injury stopped me from playing sports. Instead of losing contact with my over-30s women’s football team whilst I recovered, I volunteered to coach from the sidelines—something I’d never done before. Suddenly, I was watching the same game from a completely different angle.
+
+On the pitch, I’d naturally lead by example and being a good team player. From the sidelines, I started seeing the whole picture and all the people interacting with each other: Who goes quiet when they make a mistake versus who gets visibly frustrated? Who needs a confidence boost before they’ll attempt something challenging? Who plays better with direct instructions versus space to be creative? Who says they are fine but actually are struggling inside?
+
+In my work life I’d focused on balancing teams with skills, experience and temperaments but hadn’t consciously considered the psychology of teams. When I started to do this with my sport team the parallels to motivating engineering teams hit me immediately. Sports coaches often say “”the game is 80% mental and 20% physical.”” If you relate this to software engineering, we are saying that performance of a team is 20% technical skills and 80% mental skills. Yet in attempting to improve teams we are regularly focusing on the technical skills and process improvements.
+
+This talk is about learning to “”read the game””—to observe your team as a whole and the individual parts at the same time, and the importance of them understanding about each other.
+
+The best teams aren’t just technically capable—they understand each other.
+
+**Speaker bio(s)**
+
+*Cathy Pank* — Engineering & AI Enablement Lead, Snappet
+
+Cathy is an Engineering Lead at Snappet, an edtech company in the Netherlands. Originally from the UK, she’s spent the last decade working in the Netherlands and earlier a year in Spain. With 30 years in IT spanning roles between developer and CTO, she’s learned that technical skills alone don’t make teams perform well.
+
+A serious knee injury two years ago paused her playing field hockey and football but started her coaching journey from the sidelines. This shift revealed insights about team dynamics and psychological safety that enhanced how she leads engineering teams.
+
+Cathy is passionate about coaching, continuous learning, and showing up authentically at work.
+
+---
+
+### 13:40 – 14:05 — Guardrails, not gates: Scaling juniors in the AI era
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** hiring
+
+**Speaker(s):** Rick Clegg (Developer Experience Lead, Wise)
+
+**Abstract**
+
+Wise onboards 50 grads annually. AI helps them code fast, but batch size is causing real senior review fatigue. I’ll share how we use automated guardrails to maintain safety without burning out the team.
+
+I’ve spent over a decade leading engineering teams and lately the industry has shifted. Companies are asking why they should hire juniors when AI can just do the work.
+
+At Wise we take the opposite view. We continue to hire 50 graduates every year because we believe AI is a massive enabler for unlocking early careers talent.
+
+However, this opportunity brings a new challenge. AI allows our juniors to move incredibly fast. Our power users are producing 37% more Pull Requests than their peers. This surge in velocity proves their potential, but it brings concerns about work slop and growing PR batch sizes. We simply cannot rely on human reviewers to catch every quality issue in this new volume of code.
+
+In this talk, I will share what guardrails we have put in place to let them move at the speed of a start up. We have introduced systems such as automated canary analysis and engineering maturity checks. This isn’t just about preventing bugs. It is about giving juniors the psychological safety to ship to production and learn faster.
+
+I worry that if we reject early careers now, we lose our next seniors. I’ll share real stories from our academy, like interns fixing production issues on day one. You will leave with a plan to turn the AI uncertainty into your biggest advantage, using guardrails to make high velocity hiring safe and scalable.
+
+**Speaker bio(s)**
+
+*Rick Clegg* — Developer Experience Lead, Wise
+
+Rick is the Developer Experience Lead at Wise, where he owns the internal developer platform built on Backstage. He drives productivity by engineering “paved roads”—golden paths with automated guardrails that balance startup velocity with banking-grade security. With over 20 years of engineering leadership experience, Rick specializes in scaling DevEx and DevOps cultures. He also directs the WiseStart Academy, ensuring early-career engineers are rapidly enabled to contribute meaningfully. Rick is passionate about creating environments where platform engineering allows teams to move fast without breaking things.
+
+---
+
+### 14:25 – 14:50 — Four dimensions of burnout: An anti-burnout framework for the AI era
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** management
+
+**Speaker(s):** Dominika Rogala (Founder and Tech Leaders Advisor, Good Job Coffee)
+
+**Abstract**
+
+Burnout hits the engaged leaders who keep giving, not the ones who don’t care. Using the four-dimensional burnout model and the resources vs. demands framework, this talk gives you and your team practical tools to navigate burnout, overload, and sustainable leadership in the AI era.
+
+Here’s what surprised me most about leadership burnout: you have to burn to burn out. It’s not the checked-out managers who struggle – it’s the caring, committed ones.
+
+For the past few years, leaders’ mental well-being has been my main focus. Through coaching engineering managers and navigating high-pressure leadership roles myself, I’ve built a practical anti-burnout framework based on burnout research – and, unexpectedly, parenting psychology.
+
+Typical “just take a vacation” advice ignores why leaders burn out in the first place. Modern tech work is changing fast, and AI, hyperconnectivity, constant adaptation, and endless responsiveness are increasing not only the pace of work, but also the emotional and cognitive load behind it.
+
+Here’s what actually works.
+
+The four dimensions of burnout – exhaustion, emotional distance, loss of efficacy, and the gap between who you think you should be and who you actually are. Learn to recognize how each dimension shows up in yourself, your team, and modern engineering culture.
+
+Resources vs. demands framework – a systematic way to map emotional, physical, and mental loads against the resources actually available to individuals, teams, and organizations. Find the dangerous imbalances before they quietly become the default.
+
+Practical ways to reduce overload and work more sustainably – what leaders can change in their own habits, teams, and organizations to support performance without burning out the people who care the most.
+
+Taking care of yourself is hard, especially for engineering brains that want clear systems. That’s why I built this anti-burnout framework – to turn well-being into something understandable and actually doable.
+
+Because the leaders we need most are the ones who care deeply – and we need you to stay healthy.
+
+**Speaker bio(s)**
+
+*Dominika Rogala* — Founder and Tech Leaders Advisor, Good Job Coffee
+
+Dominika works with CTOs, engineering managers, and tech leads — as a partner helping them navigate organizational complexity. With a system-first, evidence-based approach, she helps leaders see what’s really going on in their teams and change how things actually work. She served as VP of Engineering at NeuroDevice, and Engineering Manager at Vector Technologies and Intel. As a mother of three, she finds daily parallels between parenting and leadership — and brings that perspective to her work with tech teams. When she wants to celebrate something, you’ll find her with a good cup of coffee – hence the name Good Job Coffee!
+
+---
+
+### 15:10 – 15:35 — The AI-augmented leader: Architecting your own virtual Chief of Staff
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager  ·  **Topics:** ai
+
+**Speaker(s):** Simone Casciaroli (Head of Engineering, Kraken)
+
+**Abstract**
+
+Engineers have Cursor; leaders play “Calendar Tetris.” This case study shows how to build a personal AI assistant using commercial tools. Learn to automate toil, manage high-volume context, and reclaim time for strategic impact.
+
+The AI market is currently obsessed with the Individual Contributor. Tools like Cursor and Cloud Code have revolutionized the IDE, allowing engineers to ship features and crush complexity at record speeds. But as Engineering Leaders, we have been largely left out of this revolution. Our “IDE” isn’t a code editor; it is a fragmented ecosystem of calendars, documents, and messaging apps.
+
+While our teams move faster, we find ourselves bogged down, playing “Calendar Tetris” and drowning in context switching. Since the release of ChatGPT 2.5, I have been on a mission to fix this imbalance. I wanted to answer a simple question: Can I build a personal AI assistant that actually understands the context of engineering leadership?
+
+In this session, I will walk you through the architecture of my personal AI system built using existing commercial tools. We will move beyond basic chat prompts and look at how to automate the “heavy lifting” of management. We will cover how to use AI to:
+
+You will leave with a blueprint for building your own assistant—one that handles the noise so you can focus on the signal, the strategy, and your people.
+
+**Speaker bio(s)**
+
+*Simone Casciaroli* — Head of Engineering, Kraken
+
+Simone Casciaroli is a technology leader who helps autonomous teams ship meaningful customer value, continuously and incrementally. Over the past two decades, he has led product and platform teams across startups and scale-ups including NOW TV, Babylon Health, Onto, and Doccla. His work sits at the intersection of product, delivery, and technology. He has also co-founded two startups in health and personal development, and recently joined Kraken Technologies as Head of Engineering.
+
+---
+
+### 16:10 – 16:35 — Rethinking how distributed teams deliver complex tech
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** velocity
+
+**Speaker(s):** Diane-Lee Pretorius (Director of Engineering, Paymentology)
+
+**Abstract**
+
+A practical playbook for empowering individuals and delivering complex technical products across distributed teams without sacrificing inclusion or autonomy.
+
+In a world where teams are more distributed than ever, managers and senior ICs need to evolve their collaboration styles and step into the future of work. Gone are the days of huddling 10 people in a room with a whiteboard, dry erase markers, sticky notes and way too much coffee in the hope that somehow intellectual osmosis happens and we’re miraculously all aligned. That approach does kinda get the job done, let’s be honest here, but while we’re at the honesty bit, let’s also concede that eating a hamburger with a spoon also gets the job done with the same degree of efficiency.
+
+Old-school collab can also lend itself heavily to the “get in that room and don’t come out til you’re done” vibe that not only strips autonomy and trust away from our most highly respected engineers but also creates ridiculously expensive meetings (hello, 6 staff engineers and 2 principals in one room). Don’t get me started on the impact this has on inclusion (and yes, I still care deeply about this, and you should too).
+
+In my experience, some of the best technical decisions have been a byproduct of allowing folk to simmer over what was being discussed — to think asynchronously, sketch ideas in their own time, pressure-test assumptions, and come back sharper. The quieter, more pensive folk who aren’t the loudest in meetings tend to stare deeply into the Miro/Notion abyss… sometimes with a little help from modern tools that help them organise thoughts or explore alternatives — and then → lightbulb!
+
+Inclusion isn’t giving someone your paint and letting them paint their own canvas. It’s allowing people to add colour to your monochromatic genius and, fam, this method we’ve been using to fuel some of our biggest projects in Pleo has resulted in some pretty spectacular technicolor masterpieces!
+
+If you’ll have me, I have some A-M-A-Z-I-N-G tips and tricks to share about how to successfully build and launch technically complex features requiring cross-domain/cross-team collaboration with engineers, PMs and domain leads distributed all over this beautiful blue speck of ours (aka the Earth), while empowering our teams to be the best versions of themselves yet.
+
+The next evolution of collaboration is human-led, AI-assisted, and designed to amplify thinking and level the playing field — so no one feels like they don’t belong.
+
+**Speaker bio(s)**
+
+*Diane-Lee Pretorius* — Director of Engineering, Paymentology
+
+Diane Lee Pretorius is an engineering leader who thrives at the intersection of people, systems, and delivery. With over a decade of experience across startups and global organisations, she specialises in building empowered, high-performing teams that ship complex technical products in distributed environments. D-Lee is known for her human-first approach to leadership, pairing strong technical judgement with inclusive collaboration and asynchronous ways of working. Passionate about mentoring and growing future leaders, she shares practical lessons from real-world delivery to help engineering teams work better together.
+
+---
+
+### 16:50 – 17:05 — Game time: A playbook to (unsuccessfully) 10x in a week and (successfully) 10x in a year
+
+**Type:** Keynote  ·  **For:** Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Plum Ertz (Senior Director, Engineering, Ro)
+
+**Abstract**
+
+Regardless of if someone is going through hypergrowth, just onboarding their first customers, or has already scaled ten times over, this talk will cover how to not let perfect get in the way of good when on a tight timeline, and how “more time” needs to be paired with removal of bias towards existing patterns, continuous cross-functional advocacy, and strong metrics and milestones to drive success.
+
+“If you build it, they will come” works great for sports fiction, but the reality is we don’t start out building for scale – we build to see if it works first. For some, the scale never comes. For one telehealth company, the scale came pretty much overnight – and we fumbled it pretty hard.
+
+In this talk, we’ll follow the story of how to prepare for high scale (and the gotchas that got us) with a scrappier approach in a seven-day timeframe, and how having more time alone didn’t guarantee us the win next time around. We’ll dive into the playbook for scaling the architecture while operating it in parallel – not only the services and tools, but also the larger technical strategy and cultural shifts that were required to break us out of our structural slump and help us score a major scaling goal.
+
+When approaching scaling challenges (or any large system-wide architectural challenge):
+
+We will discuss load testing tooling, automation approaches, system benchmarking, as well as organizational/technical strategy elements.
+
+**Speaker bio(s)**
+
+*Plum Ertz* — Senior Director, Engineering, Ro
+
+Plum Ertz is a Senior Director of Engineering, baker of noms, and casual economist, with a degree in one of those things. Their main areas of expertise are on the front end, with a focus on accessibility and web standards. They have applied those skills as employee number 8 and number 800 in the marketing, media, and fintech spaces, building everything from interactive multimedia experiences at live events to quizzes about sexy fruits. Plum is presently bolstering a strong culture of accessibility in the direct-to-patient healthcare space as a Director of Software Engineering at Ro.
+
+---
+
+### 17:20 – 17:35 — LDX3 London 2026 wrap-up
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Suhail Patel (Principal Engineer, Monzo), Sarah Wells (Independent Technical Consultant & Author), Meri Williams (CTO, NED & Advisor, ChromeRose)
+
+**Abstract**
+
+Closing remarks from the hosts: Meri Williams , Sarah Wells , and Suhail Patel .
+
+**Speaker bio(s)**
+
+*Suhail Patel* — Principal Engineer, Monzo
+
+Suhail is the Principal Engineer at Monzo focused on building the Core Banking and Infrastructure Platform. His role involves serving as a technical authority on Monzo’s infrastructure which spans over two thousand microservices and leverages key infrastructure components like Kubernetes, Cassandra, Kafka, Etcd and more. He focuses specifically in investigating deviant behaviour and ensuring services continue to work reliably in the face of a constantly shifting environment in the cloud.
+
+*Sarah Wells* — Independent Technical Consultant & Author
+
+Sarah is a technology leader, consultant and conference speaker with a focus on engineering effectiveness, microservices, incident management, platform engineering, optimising for flow and technical strategy. She has over 20 years’ experience as a developer, principal engineer and tech director across product, platform, SRE and DevOps teams.
+
+She spent over a decade working at the Financial Times, as it transformed from 12 releases a year to more than 20,000, embracing autonomous empowered teams and adopting microservices, DevOps, containers and platform engineering.
+
+She is the author of the O’Reilly book Enabling Microservice Success: Managing Technical, Organizational and Cultural Challenges.
+
+*Meri Williams* — CTO, NED & Advisor, ChromeRose
+
+Meri is an experienced CTO and leader of technology organisations. They particularly enjoy helping others to level up as technical leaders and managers of organizations by working as a CTO coach and tech advisor / NED to various companies in this capacity through micro-consultancy ChromeRose.
+
+They have led teams ranging in size from 30 to 300, in a range of organizations from Procter & Gamble, to the Government Digital Service, award-winning online print company MOO, mobile-first challenger bank Monzo and patient-inspired AI-driven rare disease treatment discovery company Healx, amongst others.
+
+Together with their wife, they run the micro-charity One Goes Up, which supports young women and non-binary folks in pursuing STEM education and careers.
+
+---
+
+## Making technical choices stage
+
+### 09:00 – 09:14 — Welcome to Day 2 of LDX3 London 2026
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Suhail Patel (Principal Engineer, Monzo)
+
+**Abstract**
+
+Host’s opening address.
+
+**Speaker bio(s)**
+
+*Suhail Patel* — Principal Engineer, Monzo
+
+Suhail is the Principal Engineer at Monzo focused on building the Core Banking and Infrastructure Platform. His role involves serving as a technical authority on Monzo’s infrastructure which spans over two thousand microservices and leverages key infrastructure components like Kubernetes, Cassandra, Kafka, Etcd and more. He focuses specifically in investigating deviant behaviour and ensuring services continue to work reliably in the face of a constantly shifting environment in the cloud.
+
+---
+
+### 09:10 – 09:35 — We doubled engineering productivity at eBay, but couldn’t change culture
+
+**Type:** Keynote  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Randy Shoup (SVP Engineering, Thrive Market)
+
+**Abstract**
+
+This is the story of eBay’s company-wide Velocity initiative, which doubled engineering productivity across all 5000 engineers, but still could not save the company from its own pathological organizational culture.
+
+Once a stock market darling and a pioneering hyperscaler in the 1990s and early 2000s, eBay has been in steady decline since the 2010s. A household name with a flat business, eBay has been unable to make substantive strides in its market reach or its engineering outcomes in the last 15 years. What happened?
+
+Randy was a Distinguished Architect at eBay from 2004 to 2011, and returned as Chief Architect and VP of Platform Engineering from 2020 to 2022. As Chief Architect, he led the company-wide Velocity initiative, which has continued to double engineering productivity across the board. By executing a pretty standard DevOps playbook, this has been an unqualified success on the engineering side. In the three years since, teams have improved on all of the DORA software delivery metrics, and report better collaboration and developer satisfaction.
+
+At the same time, improvements have stagnated, and teams consistently struggle to reach Elite status or to alter the overall trajectory of the business. This talk is an insider’s attempt to make sense of this seeming contradiction between micro-successes and macro-failures, and attempts to abstract 20 years of participation and observation into a set of actionable lessons for any organization attempting to transform itself.
+
+We will deep dive into the following:
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Randy Shoup* — SVP Engineering, Thrive Market
+
+Randy Shoup serves as SVP of Engineering at Thrive Market. With more than 30 years of experience building distributed systems and leading high-performing teams, he has held senior technology leadership roles at eBay, Google, Stitch Fix, and WeWork. He also mentors CTOs, advises organizations, and shares his perspectives widely. A frequent conference speaker on software and engineering leadership, he is particularly interested in how culture, technology, and organizational design intersect.
+
+---
+
+### 09:55 – 10:20 — Agentic triage for tackling technical debt
+
+**Type:** Talk  ·  **For:** Experienced Manager, Staff+, Tech Lead  ·  **Topics:** ai
+
+**Speaker(s):** Sam Edwards (Senior Solutions Architect, Vercel)
+
+**Abstract**
+
+Sponsored by
+
+The dreaded ‘monitoring review’ meeting is a time sink for most developers.
+
+It’s rare to see even the most polished production systems running without any errors. The more logging and alerting you introduce, the harder it is to distinguish between signals that must be fixed, what should be addressed soon, and what can safely live on a backlog until the end of time.
+
+In this session we look at what happens when you stop trying to fix everything, and start using agents to focus on what’s important. We’ll explore what it looks like to hand off the reading, ranking, and even the first pass of remediation to agents, whilst maintaining the human in the loop and the code quality and safety guardrails that matter.
+
+We’ll share a practical approach to agent-assisted error triage you can apply to your own systems, alongside a clear picture of where human judgement remains essential.
+
+**Speaker bio(s)**
+
+*Sam Edwards* — Senior Solutions Architect, Vercel
+
+Sam Edwards is a London-based Solutions Architect at Vercel who works with large enterprises on frontend infrastructure and agentic workflows. Before Vercel, he helped lead a full-stack migration for a luxury retail site and held engineering roles across broadcast media and health tech. Sam has a particular interest in monitoring, observability and productionisation, as well as how the emerging craft of orchestrating agentic fleets is touching nearly every role in the technical sphere.
+
+---
+
+### 10:55 – 11:20 — Designing neuro-inclusive incident management
+
+**Type:** Talk  ·  **For:** Experienced Manager, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Dianing Yudono (Career Coach)
+
+**Abstract**
+
+Incident response processes can disproportionately disadvantage neurodivergent engineers. This talk shows how small, intentional changes to incident management can reduce cognitive load, support neurodivergent engineers, and improve reliability for everyone.
+
+When incidents happen, on-call engineers are expected to reason about complex systems under intense time pressure, ambiguity, and social stress. Yet most incident management practices quietly assume strong working memory, rapid context switching, comfort with implicit rules, and emotional resilience under impact escalation. Those assumptions disproportionately disadvantage neurodivergent engineers.
+
+ADHD responders pay heavily for context switching and memory load. Autistic responders are forced to infer implicit expectations under stress. Anxious responders face amplified threat perception when escalation, severity, or stakeholder expectations are unclear. The current processes also increase operational risk for teams as a whole. Unclear ownership, emotional escalation, misunderstood decisions, mistaken actions, fragmented communication and missed handoffs are not just human problems; they are systemic problems.
+
+This talk reframes incident management as a designed system, not just a runbook. If anything, the more complex and detailed a runbook is written, the quicker it gets out-of-sync, becomes inconsistent, and too overwhelming to read. Drawing on real incident patterns and leadership experience from various organisation sizes and structures as a neurodivergent engineer, this talk explores how cognitive load, ambiguity, and emotional pressure show up during incidents and how leaders can redesign response processes to be more predictable, explicit, and humane without slowing teams down.
+
+Attendees will learn practical, low-cost changes they can make immediately: reducing cognitive complexity in runbooks and alert descriptions, making expectations explicit, eliminating backchannels (with a caveat), narrating visuals and metrics, defining severity by impact rather than emotion, allowing emotional processing (separately from execution), permission to slow down/have a break/hand over, designing clearer on-call and recovery practices, and building the incident management muscle memory through trainings, game days/hours and shadowings. These changes improve inclusion, decision-making, and system reliability at the same time.
+
+**Speaker bio(s)**
+
+*Dianing Yudono* — Career Coach
+
+Dianing Yudono is a neurodivergent software engineer and professional coach who helps technologists navigate career transitions, leadership challenges, and organisational change. Having experienced multiple role changes, reorgs, and the loss of her own support network, she learned how critical the right support can be. She now coaches engineers, designers, and managers to identify the support they need, regain confidence, and thrive in evolving roles.
+
+---
+
+### 11:40 – 12:05 — Dojo’s leap from 90 clusters to one golden path
+
+**Type:** Talk  ·  **For:** Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Ell Sullivan (Senior Staff Engineer, Dojo)
+
+**Abstract**
+
+A case study on taming extreme tech sprawl of 90 K8s clusters, 11 databases technologies, 4 SDLCs. I’ll share how our ‘One PR, One YAML’ tool, Orchestra, created one golden path to operational leverage.
+
+How does tech sprawl happen? You wake up one day to find your organisation is running 90 Kubernetes clusters, supporting 11 different database technologies, and trying to manage 4 distinct, incompatible SDLCs. That was our reality. This is the case study of Dojo’s journey from chaos to centralisation.
+
+The cost of this sprawl was enormous: disparate security implementations and reliability practices, and a developer experience full of friction. This talk details our “”Platform Leap”” on a strategic initiative to centralise by building the Dojo Creator Platform and treating our internal platform as a first-class product.
+
+The catalyst for success was Orchestra: our ‘One PR, One YAML’ workload specification and CLI. This single, self-service abstraction became our “”golden path.”” It allowed us to enforce reliability, quality, and security standards by design, not by committee.
+
+This platform leap solved our sprawl problem and delivered immense operational leverage. By enabling true self-service, we allowed our engineering organisation to scale, delivering more features with less friction and without a linear increase in platform team overhead.
+
+**Speaker bio(s)**
+
+*Ell Sullivan* — Senior Staff Engineer, Dojo
+
+Ell Sullivan is a Senior Staff Engineer at Dojo and a staff-plus technical leader based in London. He drives high-impact technical strategy and recently led the rollout of Dojo’s Centralized Infrastructure Platform, navigating complex organizational and engineering challenges to transform a bottlenecked DevOps model into a scalable, self-service, product-led platform.
+
+A trusted architectural advisor to VPs and senior engineering leaders, Ell defines the golden paths that unlock operational leverage across the organization. As Chair of the Engineering Forum, he amplifies this impact by scaling technical thinking and best practices across teams. He is a passionate mentor, a key contributor to senior talent hiring, and a proud father of three daughters.
+
+---
+
+### 12:25 – 12:35 — Unlocking ROI through development, release, and experimentation velocity
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, Staff+, Tech Lead  ·  **Topics:** velocity
+
+**Speaker(s):** Martin Reynolds (Field CTO, Harness)
+
+**Abstract**
+
+Sponsored by
+
+Most organizations invest in experimentation, expecting better decisions, faster learning, and higher ROI. Most don’t get it—not because their analysis is wrong, but because their delivery systems can’t keep up.
+
+A best-in-class experimentation platform running on a monthly deployment cycle still limits teams to ~12 experiments per year. With a typical win rate, that results in only a handful of meaningful outcomes. The constraint isn’t insight—it’s throughput.
+
+This talk reframes experimentation as a delivery problem. Traditional experimentation tools sit on top of a velocity ceiling they cannot raise, while most unrealized ROI sits beneath that ceiling—in manual approvals, fragmented tooling, and brittle release processes.
+
+Drawing on patterns from regulated industries, we’ll explore how leading organizations are breaking through: moving to high-frequency, reliable delivery by standardizing workflows, embedding governance into pipelines, and adopting AI-assisted delivery models.
+
+The takeaway is simple: when delivery velocity increases, every downstream metric improves—from experimentation throughput to reliability and cost efficiency.
+
+If your experimentation ROI has plateaued, the problem isn’t your analysis. It’s your ceiling.
+
+**Speaker bio(s)**
+
+*Martin Reynolds* — Field CTO, Harness
+
+With 30 years working in software, Martin has done a lot of things. Over that time working to deliver software at scale, to multiple platforms, with multiple technologies. He is now working with Harness, the modern software delivery platform to enable organizations and teams to deliver their software faster, more reliably, and more securely.
+
+---
+
+### 12:40 – 13:05 — Building for reliability
+
+**Type:** Talk  ·  **For:** Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Matej Pfajfar (CTO, Monzo)
+
+**Abstract**
+
+Building reliable systems is a core tenet of good engineering. Yet, when reliable components are glued together, deviant behaviour often emerges. These can manifest as tricky bugs that take significant time and effort to identify, or broader incidents that hamper availability. Reliability needs to be considered across the sum of all parts rather than in just individual components.
+
+The Monzo engineering teams have built the UKs largest digital bank from scratch over a period of many years. In this talk, Matej discusses lessons learned and the properties engineering organisations need to have to build and maintain reliability at the core.
+
+**Speaker bio(s)**
+
+*Matej Pfajfar* — CTO, Monzo
+
+Matej Pfajfar is the Chief Technology Officer (CTO) of Monzo, the UK’s largest digital bank with more than 13m customers. Before joining Monzo, Matej was an Engineering Director at Google from 2018, where he led engineering teams on Android. Prior to that, Matej was the Executive Director of Adacta, where he worked for nearly 16 years and led the development of one of the top rated core systems for insurance. Matej holds a Computer Science degree from the University of Cambridge.
+
+---
+
+### 14:25 – 14:50 — Planning next moves: Improving performance when half your stack is someone else’s problem
+
+**Type:** Talk  ·  **For:** Experienced Manager, Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Maude Lemaire (Engineer, Cursor)
+
+**Abstract**
+
+Most of my career has been spent making one big backend stay up, and go fast. My new job description is harder: keep a product fast when half the latency budget lives inside somebody else’s GPU cluster, every model provider degrades differently, and the honest answer to “”what is our time to first token?”” is “”which of the five numbers do you want?””
+
+So, what does building a reliable and performant product on top of a notoriously unreliable and under-performant AI models look like at Cursor? We’ll walk through the time-to-first-token pipeline from a user’s keystroke through client, network, agent server, inference proxy, and model provider: all the way through the (sometimes comical) ways each layer lies to you about where time went. We’ll learn about how you can’t skimp on the basics (good observability), how to set aggressive-but-achievable goals, and how sometimes, just a handful of relatively simple changes can make all the difference.
+
+If you work on a product that sits downstream of dependencies you don’t own, providers you can’t fire mid-request, and users who think your product is slow when really it’s the weather, this one’s for you.
+
+**Speaker bio(s)**
+
+*Maude Lemaire* — Engineer, Cursor
+
+Maude is an engineer at Cursor, working on the big, thorny problems that come hand-in-hand with rapid growth. Previously, she was a Principal Engineer at GitHub, where she worked on Copilot Code Review, data partitioning, and domain isolation.
+
+Before GitHub, Maude was a Senior Staff Engineer at Slack, where she founded and led the backend performance infrastructure team. Over nearly 8 years, she was responsible for large-scale load test tooling, performance regression monitoring, and successfully onboarding the world’s largest companies to Slack as the product scaled from 60,000 users per team to over 2 million.
+
+When she doesn’t have her nose in a flamegraph, you can find Maude building strong, empathetic engineering cultures. In October 2020, Maude published “Refactoring at Scale” with O’Reilly Media, a blueprint for how technical leaders can successfully navigate large, complex refactors.
+
+---
+
+### 15:10 – 15:35 — Accelerating sustainably with AI
+
+**Type:** Talk  ·  **For:** Experienced Manager, New Manager  ·  **Topics:** ai
+
+**Speaker(s):** Lawrence Jones (Product Engineer, incident.io)
+
+**Abstract**
+
+Sponsored by
+
+AI tools now write the majority of code at incident.io. Every engineer uses them, and the acceleration is real. But getting here was harder than anyone expected, and the hardest parts had nothing to do with the tools themselves.
+
+I’ve spent the last year watching this shift across our engineering team. We went from early skepticism to a messy middle–some engineers seeing huge productivity boosts while others barely engaged–to eventually getting the whole team on board. It took real investment to get there, and just installing the tools was the easy part.
+
+How do you maintain engineering standards when AI writes most of your code? How do you onboard new engineers when leaning on AI too early means they never learn the system? What do you do when half your team is flying and the other half feels left behind?
+
+The ROI of almost all typical software tasks needs to be reconsidered. For example: we document our codebase more thoroughly than ever, because AI can’t follow conventions nobody wrote down. We’re codifying standards we kept in our heads for years so we can automate review. And we’ve learned that the time AI frees up might be its most valuable output — not to ship more, but to spend more time with the product, testing and scrutinising what’s being built rather than rushing to the next thing.
+
+In this talk, I’ll share what worked, what didn’t, and what we still haven’t figured out. You’ll see how we closed the adoption gap across our team, the cultural norms we built around responsible use, and the uncomfortable trade-offs that come with going all-in. Everything you need if you want not only to go fast, but to keep going.
+
+**Speaker bio(s)**
+
+*Lawrence Jones* — Product Engineer, incident.io
+
+Lawrence Jones is a Founding Engineer at incident.io, where he’s spent the last few years helping take the product from zero to the AI-native incident platform it is today. He now leads engineering on AI SRE — an agent that investigates production incidents autonomously, digging through logs, metrics, traces and code changes to tell teams what’s gone wrong and how to fix it. Before incident.io he was a Principal Engineer at GoCardless, working across the SRE space and product. He’s a regular speaker at engineering conferences including LeadDev, and writes about AI engineering and incident response at blog.lawrencejones.dev.
+
+---
+
+### 16:10 – 16:35 — Your problem isn’t the monolith. It’s the data.
+
+**Type:** Talk  ·  **For:** Experienced Manager, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Pramod Sadalage (Director, Thoughtworks), Prem Chandrasekaran (Tech Director, Thoughtworks)
+
+**Abstract**
+
+Every architecture tells a story, and most tragedies begin with messy data. This talk shows how clear ownership, contracts, and events can turn complexity into clarity and evolution into design.
+
+We often blame the shape of a system for its troubles: “It’s the monolith,” or “We moved too slowly to microservices.” In practice, the rot sets in earlier and deeper. It begins when anyone can write to any table, when cross-domain joins sneak into hot paths, when lifecycle and retention rules are inconsistently applied, and when teams share a database but not a vocabulary. The result is a system that erodes from the inside out. Not because it is a monolith, but because ownership ends at the code and never reaches the data.
+
+This talk argues that data must be the structuring force of architecture. We will journey with Penultimate Markets, a global marketplace that scaled from a single deployment to a distributed platform, and see how disciplined data ownership shaped every step. In the monolith phase, aggregates anchored transactional boundaries; write logic lived inside the owning domain; other teams consumed contract-based read models rather than reaching into tables. Architectural fitness functions made these rules executable: blocking cross-domain joins, enforcing expand/contract migrations, and validating event and read-model contracts continuously.
+
+As the platform expanded, different domains began to pull outward. Search needed low-latency regional scaling; tax required immutable records and long retention; payments demanded isolated failure domains and stricter SLAs. Instead of a flag day, the same data-first discipline guided decomposition. Seams defined by aggregates, events, and read models became extraction boundaries. Autonomy followed data ownership; duplication became intentional; consistency was managed with explicit choreography or orchestration rather than sprawling transactions.
+
+The point is not to romanticize monoliths or glorify microservices. It is to show that architectures endure when teams align on data lifecycles, not just APIs. If you can define, defend, and evolve data boundaries, your monolith will remain modular longer, and your inevitable decompositions will be evolutionary, not traumatic. You leave with pragmatic techniques you can adopt on Monday: encode ownership, publish contracts, verify them in CI, and make migrations safe by design. Do this, and your system will grow with your business rather than against it.
+
+**Speaker bio(s)**
+
+*Pramod Sadalage* — Director, Thoughtworks
+
+Pramod Sadalage is Director at ThoughtWorks leading the Modern Data Architecture service for North America, he enjoys the rare role of bridging the divide between database professionals and application developers. He is usually sent in to clients with particularly challenging data needs, which require new technologies and techniques. In the early 00’s he developed techniques to allow relational databases to be designed in an evolutionary manner based on version-controlled schema migrations. He is co-author of Software Architecture: The Hard Parts: Modern Trade-Off Analyses for Distributed Architectures, co-author author for Building Evolutionary Architectures: Automated Software Governance, co-author of Refactoring Databases: Evolutionary Database Design, co-author of NoSQL Distilled: A Brief Guide to the Emerging World of Polyglot Persistence, author of Recipes for Continuous Database Integration and continues to speak and write about the insights he and his clients learn.
+
+*Prem Chandrasekaran* — Tech Director, Thoughtworks
+
+Prem is a technology leader and change agent with a solid track record of leading large technology teams and helping businesses tackle mission-critical challenges. Currently serving as the Market Tech Director at Thoughtworks, a global technology consulting company, he has close to 30 years of experience in leading software teams. He strives to enrich the lives of stakeholders and end-users while maintaining high internal and external quality. Passionate about the application of iterative methods and the use of open source software, Prem attempts to rapidly realize value. Over the past three decades, he has assisted a diverse range of clients across sectors such as financial services, online retail, education, and healthcare startups. His specialties include technical innovation, architecture, continuous delivery, agile/iterative transformation, and employee development.
+
+---
+
+### 17:20 – 17:35 — LDX3 London 2026 wrap-up
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Suhail Patel (Principal Engineer, Monzo), Sarah Wells (Independent Technical Consultant & Author), Meri Williams (CTO, NED & Advisor, ChromeRose)
+
+**Abstract**
+
+Closing remarks from the hosts: Meri Williams , Sarah Wells , and Suhail Patel .
+
+**Speaker bio(s)**
+
+*Suhail Patel* — Principal Engineer, Monzo
+
+Suhail is the Principal Engineer at Monzo focused on building the Core Banking and Infrastructure Platform. His role involves serving as a technical authority on Monzo’s infrastructure which spans over two thousand microservices and leverages key infrastructure components like Kubernetes, Cassandra, Kafka, Etcd and more. He focuses specifically in investigating deviant behaviour and ensuring services continue to work reliably in the face of a constantly shifting environment in the cloud.
+
+*Sarah Wells* — Independent Technical Consultant & Author
+
+Sarah is a technology leader, consultant and conference speaker with a focus on engineering effectiveness, microservices, incident management, platform engineering, optimising for flow and technical strategy. She has over 20 years’ experience as a developer, principal engineer and tech director across product, platform, SRE and DevOps teams.
+
+She spent over a decade working at the Financial Times, as it transformed from 12 releases a year to more than 20,000, embracing autonomous empowered teams and adopting microservices, DevOps, containers and platform engineering.
+
+She is the author of the O’Reilly book Enabling Microservice Success: Managing Technical, Organizational and Cultural Challenges.
+
+*Meri Williams* — CTO, NED & Advisor, ChromeRose
+
+Meri is an experienced CTO and leader of technology organisations. They particularly enjoy helping others to level up as technical leaders and managers of organizations by working as a CTO coach and tech advisor / NED to various companies in this capacity through micro-consultancy ChromeRose.
+
+They have led teams ranging in size from 30 to 300, in a range of organizations from Procter & Gamble, to the Government Digital Service, award-winning online print company MOO, mobile-first challenger bank Monzo and patient-inspired AI-driven rare disease treatment discovery company Healx, amongst others.
+
+Together with their wife, they run the micro-charity One Goes Up, which supports young women and non-binary folks in pursuing STEM education and careers.
+
+---
+
+## Building for production stage
+
+### 09:00 – 09:14 — Welcome to Day 2 of LDX3 London 2026
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Sarah Wells (Independent Technical Consultant & Author)
+
+**Abstract**
+
+Host’s opening address.
+
+**Speaker bio(s)**
+
+*Sarah Wells* — Independent Technical Consultant & Author
+
+Sarah is a technology leader, consultant and conference speaker with a focus on engineering effectiveness, microservices, incident management, platform engineering, optimising for flow and technical strategy. She has over 20 years’ experience as a developer, principal engineer and tech director across product, platform, SRE and DevOps teams.
+
+She spent over a decade working at the Financial Times, as it transformed from 12 releases a year to more than 20,000, embracing autonomous empowered teams and adopting microservices, DevOps, containers and platform engineering.
+
+She is the author of the O’Reilly book Enabling Microservice Success: Managing Technical, Organizational and Cultural Challenges.
+
+---
+
+### 09:10 – 09:35 — Look for the Helpers
+
+**Type:** Keynote  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Ian Coldwater (Kubernetes SIG Security Chair, CNCF)
+
+**Abstract**
+
+In dark times, we are told to look for the helpers. There are always people helping, and when you see the helpers, you’ll know that there’s hope. As leaders, people look to us. How can we be the examples people are wishing to see?
+
+Technology is built by the people who show up. This is a talk about showing up for each other, in the work we do and in our communities at home. Our work can be quiet and unseen, but every action makes a difference. From welcoming new contributors and growing new leaders to fighting for the users or helping our neighbors, every one of us can do so much good.
+
+From a longtime organizer in both local and open source communities, here is a call to action with practical advice about steps we can take at work and at home to make things better for the people around us today.
+
+We are the ones we’ve been waiting for.
+
+---
+
+### 09:55 – 10:25 — Lessons from 100 P0 incidents
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Dileep Kumar Pandiya (Principal Engineer, ZoomInfo)
+
+**Abstract**
+
+Practical lessons from handling 100 P0 production incidents over 20 years, focusing on system design, incident response, observability, and leadership decisions that reduce impact and recovery time.
+
+Over the past 20 years, I have been directly involved in handling more than 100 P0 production incidents across large-scale, distributed systems. These incidents included full outages, severe performance degradation, and data integrity failures, often under significant time pressure and business impact.
+
+This talk shares the most important lessons learned from being on the front line of those incidents. Rather than walking through individual war stories, it focuses on the recurring technical and organizational patterns that consistently shaped outcomes, both good and bad.
+
+I will explain how early system design decisions, alerting quality, ownership boundaries, and operational practices influence incident severity long before anything breaks. The talk also examines what actually helps teams stay effective during high-stress incidents and what tends to increase confusion, delay recovery or lead to burnout.
+
+Drawing from real experience as a hands-on engineer and technical leader, this session offers practical guidance on improving incident response, building more resilient systems and leading teams through P0 situations with clarity and confidence. The goal is not to eliminate incidents entirely, but to reduce their impact and help teams respond better when failures inevitably occur.
+
+**Speaker bio(s)**
+
+*Dileep Kumar Pandiya* — Principal Engineer, ZoomInfo
+
+Dileep Pandiya is a Principal Engineer and AI strategist with over 20 years of experience building scalable, enterprise-grade systems at Fortune 500 companies including ZoomInfo, Wayfair, Walmart, and IBM. At ZoomInfo he leads foundational engineering efforts that enhance reliability, AI-driven capabilities and data platform performance. Dileep regularly speaks at industry events, contributes to thought leadership on AI and distributed systems and mentors engineers worldwide.
+
+Beyond coding and architecture, Dileep is passionate about sharing knowledge, whether it’s through speaking at conferences or writing about the future of AI and automation. His work has been recognized through industry awards, published research, and thought leadership in enterprise software.
+
+---
+
+### 10:55 – 11:20 — Platform engineering for developers, architects & the rest of us (AI agents)
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Daniel Bryant (Head of Product Marketing, Syntasso)
+
+**Abstract**
+
+AI is accelerating software creation faster than organizations can safely operationalize it, increasing the demand for effective platform engineering. In this talk, Daniel Bryant explores why platform architecture is now as important as software architecture, introducing a practical three-layer model spanning applications, platform capabilities, and infrastructure. Attendees will learn how to design platforms as products, measure their impact, and create self-service capabilities that maximize the flow of value for both developers and AI-powered systems.
+
+**Speaker bio(s)**
+
+*Daniel Bryant* — Head of Product Marketing, Syntasso
+
+Daniel Bryant is a long-time coder and platform engineer turned product marketer. He writes for InfoQ, O’Reilly, and The New Stack and regularly presents at international conferences. In his copious amounts of free time, he enjoys running, reading, and travelling.
+
+---
+
+### 11:40 – 12:05 — Detecting the dip: Turning noisy metrics into reliable production signals
+
+**Type:** Talk  ·  **For:** Experienced Manager, Staff+, Tech Lead  ·  **Topics:** reporting
+
+**Speaker(s):** Karina Celis Jones (Senior Engineer Manager, TrueLayer)
+
+**Abstract**
+
+Detecting anomalies sounds simple–until real client traffic enters the picture. I’ll share how we learned to spot volume and conversion dips that matter, tune out the noise, and turn detection into trust.
+
+When we first started looking for anomalies in our payment metrics data, the goal was simple: catch issues before clients did. The reality, of course, wasn’t that simple.
+
+Our first version looked only for “volume zero” – complete outages. It worked for big events, but we quickly realised most of the pain lived in the subtle dips: the 10% drop at lunchtime, the steady weekend decline, the provider that failed only for one type of payments or even device. None of that showed up in the old alerts.
+
+So we built something smarter. We started calculating a predicted line for each client, based on the data we hold – recognising that every one of them has their own traffic rhythm. Then we added anomaly lines above and below it to capture what “too high” or “too low” really means in their context. It wasn’t perfect, but with every iteration, the framework got better at noticing the right things, not just everything.
+
+This talk is about how we evolved the way we use our data: how we went from total outages to anticipating small dips, from arguing over false alarms to trusting our signals. I’ll share what worked, what didn’t, and how this journey taught us about technical patterns.
+
+**Speaker bio(s)**
+
+*Karina Celis Jones* — Senior Engineer Manager, TrueLayer
+
+Karina is a Venezuelan-born software engineering leader with over 15 years of experience turning complex systems into reliable, human-centred solutions. She has led engineering teams in travel, publishing, advertising, and now fintech at TrueLayer, where she focuses on performance, reliability, and people-first leadership. With a background in software development and a passion for team culture, she helps engineers grow through clarity, empathy, and practical problem-solving. Karina is a strong advocate for inclusive workplaces and believes the best teams are those that feel supported and challenged to do meaningful work.
+
+---
+
+### 12:25 – 12:35 — From code to confidence: The missing layer in AI-powered development
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, Staff+, Tech Lead  ·  **Topics:** ai
+
+**Speaker(s):** Matt Collier (Staff Solutions Architect, Vercel)
+
+**Abstract**
+
+Sponsored by
+
+AI coding tools are rapidly improving our ability to produce code. But for engineering teams, producing code is not the bottleneck. Landing it is.
+
+At Vercel, we already feel this tension. A small CSS performance improvement, a layout shift fix, or an apparently harmless selector change can sit in review for weeks because the cost of being wrong is high. Every change has the potential to affect millions of customers, break critical product flows, introduce security risk, or wake someone up on pager duty. The hard part is not writing the diff. The hard part is building enough confidence to ship it.
+
+Matt has worked on agentic workflow adoption across many of the top enterprise teams worldwide. This talk explores the shift from code production to code landing as the next frontier for AI-assisted engineering. Today’s AI coding conversation is mostly focused on generating more code, faster. But in a world where code becomes cheap, the most valuable thing is confidence: confidence that the change builds, passes the right tests, avoids regressions, rolls out safely, and can recover when something goes wrong.
+
+---
+
+### 12:40 – 13:05 — AI in the trenches: Real-world wins without breaking things
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, Staff+  ·  **Topics:** ai
+
+**Speaker(s):** Yiğit Darçın (Director of Engineering, Trendyol)
+
+**Abstract**
+
+Discover how the biggest e-commerce company in Turkey, used LLMs and automation workflows to boost engineering speed by 30%–improving tests, documentation, and delivery, while keeping production stable, developers confident, and AI adoption practical, measurable.
+
+Every engineering leader wants AI-driven productivity–but few achieve it without chaos. In this talk, I’ll share how our teams integrated LLMs and automation tools like n8n, Cursor, A2A, and MCPs into a 2,000-engineer organization to deliver a 30% improvement in delivery speed while keeping production stable.
+
+This isn’t a story about hype or magic prompts–it’s about engineering discipline, governance, and workflow design. You’ll see how we automated testing, documentation, and code reviews; built smart pipelines; and measured impact in ways that developers trusted. I’ll also share what didn’t work–over-automation, misaligned incentives, and cultural resistance–and how we overcame them.
+
+Attendees will leave with practical strategies to safely scale AI adoption, boost team productivity, and blend human creativity with machine efficiency–all without breaking the systems or the culture that make great engineering teams thrive.
+
+Whether you’re AI-curious or already experimenting, you’ll leave with a playbook for:
+
+**Speaker bio(s)**
+
+*Yiğit Darçın* — Director of Engineering, Trendyol
+
+Yiğit Darçın is a Director of Engineering at Trendyol, the largest e-commerce company in the region, where he leads data, ml and core technology teams of over 750 engineers. With more than 20 years of experience in scaling products and organizations, he focuses on building high-impact teams, engineering culture, and AI-driven productivity. Yiğit has co-founded and exited two startups and is passionate about combining innovation, automation, and leadership to deliver real business value.
+
+---
+
+### 14:25 – 14:50 — Rebuilding the kitchen: Human connection in distributed engineering teams
+
+**Type:** Talk  ·  **For:** New Manager, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Natalia Nazaruk (Engineering Squad Lead, Kingfisher)
+
+**Abstract**
+
+Distributed teams don’t need more tools – they need shared spaces. This talk shares practical leadership patterns for rebuilding trust, visibility, and human connection through intentional social and collaboration spaces in remote engineering teams.
+
+When teams went remote, we didn’t lose productivity or tools. We lost the shared, informal spaces where trust, learning, and real connection used to form.
+
+Distributed teams rarely fail loudly. They drift quietly. Effort becomes invisible. New joiners miss context. Leaders sense something is wrong, but nothing is obviously broken.
+
+In this talk, I’ll show how engineering leaders can intentionally rebuild those shared spaces in fully remote and cross-country teams. Not by adding more meetings, but by designing social and collaboration spaces that replace informal, in-between moments.
+
+Using a simple metaphor of shared spaces, I’ll share practical leadership approaches for rebuilding trust, visibility, and human connection across time zones and cultures. All examples come from real experience leading distributed engineering teams through growth and structural change.
+
+This is a practical, leadership-focused talk for managers who want their remote teams to feel connected, aligned, and human – not just productive.
+
+Because culture isn’t lost in remote work. It’s just no longer accidental.
+
+**Speaker bio(s)**
+
+*Natalia Nazaruk* — Engineering Squad Lead, Kingfisher
+
+Natalia is an Engineering Squad Lead and mobile engineering leader with experience leading distributed, cross-country teams in large organisations. She focuses on building strong team culture, trust, and effective collaboration in remote-first environments. In her day-to-day work, she combines practical leadership patterns with a human-centred approach to engineering management. Natalia is active in engineering communities and regularly speaks at internal and external events, sharing real-world leadership lessons grounded in hands-on experience.
+
+---
+
+### 15:10 – 15:35 — Beyond timelines: Learning from incidents
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Lyndsay Prewer (Principal Consultant, Equal Experts Ltd)
+
+**Abstract**
+
+Post-incident reviews often focus on timelines and technology, limiting learning. This talk shows how applying the Social Psychology of Risk helps leaders surface hidden psychological and cultural factors, improving understanding, trust, and organisational resilience.
+
+Post-incident reviews often converge on familiar outputs: a timeline, contributing technical factors, insights into system behaviour, and a set of follow-up actions – frequently centred on monitoring, alerts, or process changes. While valuable, these outcomes rarely deliver the deeper learning needed to improve long-term individual and organisational resilience. They focus on what happened in the system, rather than how people experienced the incident while operating in its inception, moment of impact and recovery.
+
+To learn more effectively from incidents, engineering leaders must extend their practice beyond the physical language of systems, events, and actions, and intentionally explore the psychological and cultural dimensions that shape technical and non-technical decision-making and attitudes to risk. This talk demonstrates how the Social Psychology of Risk (SPoR) can be applied to post-incident reviews to achieve deeper, kinder, and more meaningful learning.
+
+Using the lenses of Workspace, Headspace, and Groupspace, the session shows how leaders can build stronger connections with review participants and surface often-hidden contributing factors. Most incident discussions remain in Workspace: tools, constraints, signals, and procedures. By also exploring Headspace (what people noticed, believed, felt, and prioritised) and Groupspace (relationships, hierarchy, norms, and power dynamics), leaders gain insight into how risk was perceived, decisions were made, and why actions made sense at the time.
+
+Through real incident examples, attendees will see how subtle influences – such as confidence, doubt, incident history, and organisational pressure – shape decisions long before any “root cause” appears on a timeline. The talk demonstrates practical techniques for asking better questions, listening more effectively, and creating the psychological safety required for people to articulate these factors without fear or blame.
+
+Attendees will leave with concrete approaches for facilitating post-incident reviews that go beyond technical analysis, strengthen leadership effectiveness, improve decision-making, and build teams and systems that are more resilient because they are better understood.
+
+**Speaker bio(s)**
+
+*Lyndsay Prewer* — Principal Consultant, Equal Experts Ltd
+
+Lyndsay is a qualified rocket scientist and an engineer at heart, with over 30 years experience of helping individuals, teams and organisations improve their software delivery.
+
+For the past 11 years he’s been a consultant with Equal Experts, leading a range of engineering teams in the delivery of large-scale IT services. Problem domains have ranged from public sector organisations (UK’s tax and passport offices) to global, online retailers. He loves helping bridge the gaps between user and business needs, engineering disciplines and service operation.
+
+---
+
+### 16:10 – 16:35 — The shadow culture: Why engineering principles fail under load
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Manogna Machiraju (Head of Engineering, ATG Entertainment)
+
+**Abstract**
+
+When pressure hits, culture breaks. This talk shows how system design drives behaviour and how leaders can redesign environments so principles survive real delivery pressure.
+
+Every engineering organisation has principles: Quality first. Sustainable pace. Radical ownership. Yet when deadlines loom or incidents hit, teams often behave in direct opposition to them.
+
+This is not a failure of belief or competence. It is a system design failure.
+
+Under pressure, organisations do not behave according to what they say they value. They behave according to what the system makes cheap, risky, or impossible. When shortcuts cost less than robustness, engineers are not breaking the culture. They are rationally navigating the environment they have been given.
+
+Drawing from real incident reviews and delivery trade-offs, this talk explores Shadow Culture, the behaviour that emerges when principles collide with reality.For instance, in one incident review, we realised our Quality First principle collapsed not because teams did not care, but because our CI pipeline added over 30 minutes to every change. Fixing the system changed behaviour faster than any retro ever had.
+
+Rather than treating culture as something to communicate or reinforce, this session reframes it as a product that must function under load.
+
+I will introduce a practical framework for pressure-testing engineering principles using four product lenses:
+
+Leaders will learn how to spot where principles collapse under stress and how to redesign the environment so the right decision becomes the default rather than a heroic exception.
+
+**Speaker bio(s)**
+
+*Manogna Machiraju* — Head of Engineering, ATG Entertainment
+
+Manogna is a senior engineering leader with over a decade of experience building and scaling product engineering teams in high-pressure, regulated environments. She has led organisations through rapid growth, platform modernisation, and major reliability improvements, while balancing delivery speed with quality, security, and sustainability.
+
+---
+
+### 17:20 – 17:35 — LDX3 London 2026 wrap-up
+
+**Type:** Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Suhail Patel (Principal Engineer, Monzo), Sarah Wells (Independent Technical Consultant & Author), Meri Williams (CTO, NED & Advisor, ChromeRose)
+
+**Abstract**
+
+Closing remarks from the hosts: Meri Williams , Sarah Wells , and Suhail Patel .
+
+**Speaker bio(s)**
+
+*Suhail Patel* — Principal Engineer, Monzo
+
+Suhail is the Principal Engineer at Monzo focused on building the Core Banking and Infrastructure Platform. His role involves serving as a technical authority on Monzo’s infrastructure which spans over two thousand microservices and leverages key infrastructure components like Kubernetes, Cassandra, Kafka, Etcd and more. He focuses specifically in investigating deviant behaviour and ensuring services continue to work reliably in the face of a constantly shifting environment in the cloud.
+
+*Sarah Wells* — Independent Technical Consultant & Author
+
+Sarah is a technology leader, consultant and conference speaker with a focus on engineering effectiveness, microservices, incident management, platform engineering, optimising for flow and technical strategy. She has over 20 years’ experience as a developer, principal engineer and tech director across product, platform, SRE and DevOps teams.
+
+She spent over a decade working at the Financial Times, as it transformed from 12 releases a year to more than 20,000, embracing autonomous empowered teams and adopting microservices, DevOps, containers and platform engineering.
+
+She is the author of the O’Reilly book Enabling Microservice Success: Managing Technical, Organizational and Cultural Challenges.
+
+*Meri Williams* — CTO, NED & Advisor, ChromeRose
+
+Meri is an experienced CTO and leader of technology organisations. They particularly enjoy helping others to level up as technical leaders and managers of organizations by working as a CTO coach and tech advisor / NED to various companies in this capacity through micro-consultancy ChromeRose.
+
+They have led teams ranging in size from 30 to 300, in a range of organizations from Procter & Gamble, to the Government Digital Service, award-winning online print company MOO, mobile-first challenger bank Monzo and patient-inspired AI-driven rare disease treatment discovery company Healx, amongst others.
+
+Together with their wife, they run the micro-charity One Goes Up, which supports young women and non-binary folks in pursuing STEM education and careers.
+
+---
+
+## DirectorPlus zone
+
+### 10:00 – 11:00 — AI and the software development lifecycle: what will change and what will stay the same?
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** career-development
+
+**Speaker(s):** Hywel Carver (CTO-turned-Founder, Skiller Whale)
+
+**Abstract**
+
+A roundtable on how AI is reshaping and reinventing the software development process, and what it means for individual developers, teams, and leadership.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Hywel Carver* — CTO-turned-Founder, Skiller Whale
+
+Hywel wrote his first program in C aged 9. After graduating with an MEng from Cambridge, he dropped out of his PhD programme to co-found his first start-up. Today, Hywel is Skiller Whale’s Co-Founder and CEO. He runs a dinner club for CTOs, a podcast for tech leaders called ‘Primarily Context-Based’, and is designing and building his own 8-bit computer for playing Pong. In his 12+ year career, he’s been building and scaling start-ups. With Skiller Whale, he is drawing on that experience to solve the biggest problem he faced as a CTO: learning for engineering teams.
+
+---
+
+### 10:00 – 11:00 — Engineer identity as AI reshapes how you work: How to lead teams through uncertainty and change
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** leadership
+
+**Speaker(s):** James Da Costa (VP of Engineering at Cint)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders support the motivation, confidence, and professional identity of engineers navigating rapid and disorienting change.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*James Da Costa* — VP of Engineering at Cint
+
+James Da Costa is VP of Engineering at Cint where he leads teams building services which connect researchers with respondents at scale. He is passionate about coaching managers, building collaborative teams and creating delightful products.
+
+James has over 20 years of experience in tech and has worked in UI design, frontend and backend technologies.
+
+Outside of work, he loves competitive sports, a good mystery novel and listening to his favourite podcast (You Are Not So Smart).
+
+---
+
+### 10:00 – 11:00 — Working with Product: How to align on priorities, trade-offs, and outcomes
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** technical-direction
+
+**Speaker(s):** Oge Opara-Nadi (VP of Engineering)
+
+**Abstract**
+
+A roundtable on how engineering leaders build effective working relationships with Product when priorities shift quickly, and assumptions about what’s possible don’t always align.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Oge Opara-Nadi* — VP of Engineering
+
+Oge Opara-Nadi is an engineering leader focused on building high-performing technology organisations, scaling teams and turning complex technical challenges into practical business outcomes.
+
+She has led engineering across startup and scale-up environments, with experience spanning platform strategy, organisational design, developer experience and AI-enabled product development.
+
+An experienced public speaker, Oge regularly shares insights on engineering leadership, delivery, organisational culture and building inclusive environments where teams can do their best work.
+
+---
+
+### 10:00 – 11:00 — Leading through burnout: How to protect your team’s capacity when the pace doesn’t slow down
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** management
+
+**Speaker(s):** Claire Donald (CPTO Partner, Rational Partners)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders recognize and respond to burnout in teams operating under sustained pressure, without waiting for the business to slow down.
+
+AI is adding cognitive load faster than organizations are acknowledging it. Engineers and leaders are feeling it, but the pressure to keep moving rarely lets up.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Claire Donald* — CPTO Partner, Rational Partners
+
+Claire Donald is a CPTO Partner at Rational Partners.
+
+---
+
+### 10:00 – 11:00 — Managing up in the AI era: Closing the gap between board expectations and engineering reality
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** leadership, velocity
+
+**Speaker(s):** Gary Stevens (VP of Engineering, Trainline)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders align boards and executives with the real capabilities, costs, and risks of AI, without being sidelined as blockers.
+
+As AI creates unrealistic expectations at the top, technology leaders are caught between advocacy and self-preservation. The challenge is building credibility with leadership while staying honest about what’s actually possible.
+
+**Speaker bio(s)**
+
+*Gary Stevens* — VP of Engineering, Trainline
+
+Gary is an Engineering Director at the European Travel business Trainline. He is passionate about developing leaders, empowering high-performing teams, and continuous improvement. His interests include coaching, sports, and spending time with his wife and two children.
+
+---
+
+### 10:00 – 11:00 — Scaling delivery in the AI era: How to stay in control when velocity is no longer the constraint
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** technical-direction
+
+**Speaker(s):** Martin Reynolds (Field CTO, Harness)
+
+**Abstract**
+
+Sponsored by
+
+A roundtable on how senior engineering leaders maintain governance, quality, and accountability as delivery expectations grow faster than the structures designed to manage them.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Martin Reynolds* — Field CTO, Harness
+
+With 30 years working in software, Martin has done a lot of things. Over that time working to deliver software at scale, to multiple platforms, with multiple technologies. He is now working with Harness, the modern software delivery platform to enable organizations and teams to deliver their software faster, more reliably, and more securely.
+
+---
+
+### 11:30 – 13:00 — Defining your engineering strategy
+
+**Type:** DirectorPlus Plenary Session  ·  **For:** Director+  ·  **Topics:** technical-direction
+
+**Speaker(s):** Alice Bartlett (Head of Engineering, Rightmove)
+
+**Abstract**
+
+A good engineering strategy is not just a technology roadmap or a wishlist. It’s an honest account of the challenges your organization faces and a coherent plan for overcoming them. Most strategies fail because they’re vague, disconnected from business goals, or too comfortable to drive real change. This workshop gives you a practical framework – Rumelt’s strategy kernel – and the space to apply it to your own context, with your peers.
+
+This session will provide you with:
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Alice Bartlett* — Head of Engineering, Rightmove
+
+Alice Bartlett is a Head of Engineering at Rightmove. She has led technology strategy and delivery at scale, including content architecture and AI-driven product programmes at the Financial Times, and co-developed the FT’s 10-year sustainability strategy as part of its Next Generation Board.
+
+---
+
+### 11:30 – 12:30 — Developing engineers in the age of AI: How to build skills when the learning pathways are disappearing
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** communication, leadership
+
+**Abstract**
+
+A roundtable on how senior engineering leaders identify and develop the skills their teams need as AI changes not just what engineers do, but how they learn to do it.
+
+The traditional pathways for growing engineers – writing code, debugging, reviewing pull requests – are being compressed or removed. The challenge is developing talent when the old scaffolding no longer exists.
+
+---
+
+### 11:30 – 12:30 — Building inclusive teams under pressure: How to maintain culture when delivery doesn’t slow down
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** technical-direction
+
+**Speaker(s):** Dan Blundell (Engineering Director, Gymshark)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders build and sustain genuinely inclusive team cultures while managing performance, delivery pressure, and constant organizational change.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Dan Blundell* — Engineering Director, Gymshark
+
+Dan is an engineering leader and builder of technical teams. He aims to create environments where each person feels valued, supported and can learn continuously, together. At Gymshark, Dan heads up Core Engineering and is responsible for data pipelines, API and integration development and platform reliability engineering.
+
+Dan will forever be a student of leadership, values feedback above almost anything else and would love to hear how best to help you. His latest side project is taming the tantrums of two toddlers and aims to coach them in the ways of empathy, responsibility and being a good human. Dan will eventually write a book but for now, tweets irregularly at @danblundell and posts sporadically at danblundell.com
+
+---
+
+### 11:30 – 12:30 — Agent trust: Where to draw the line without sacrificing velocity
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** communication
+
+**Speaker(s):** Mark Lechner (CISO, Docker)
+
+**Abstract**
+
+Sponsored by
+
+A roundtable on how senior engineering leaders build the security foundations and trust frameworks needed to run AI agents safely across the SDLC, without sacrificing the velocity they enable.
+
+The trust models built for human contributors don’t carry over to AI agents. The decisions cut across what your teams depend on, where agents execute, and what ships to production. The challenge is knowing where to draw the line and building the foundations that let you hold it as AI capability keeps shifting.
+
+**Speaker bio(s)**
+
+*Mark Lechner* — CISO, Docker
+
+Mark Lechner is CISO at Docker, where he leads security across the platform millions of developers use to build, ship, and run software – including the agentic workloads reshaping modern engineering. Before Docker, he was CISO at DeepOpinion/Otera driving enterprise AI and LLM agentic security, CISO at Bitpanda scaling security through Europe’s largest crypto platform, and Head of Cybersecurity at Solaris Bank. Before that he spent nearly a decade at Morgan Stanley in various security roles including the global leadership of security tooling. His focus today: supply chain integrity, agentic AI security, and secure-by-default developer platforms. Based in Berlin.
+
+---
+
+### 11:30 – 12:30 — Observability: Are you measuring what actually matters?
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** software-quality
+
+**Speaker(s):** Colin Burke (Director of Customer Success – EMEA, Honeycomb)
+
+**Abstract**
+
+Sponsored by
+
+A roundtable on how senior engineering leaders redefine what good observability looks like when traditional metrics no longer reflect the complexity of modern systems or the outcomes the business actually cares about.
+
+Uptime, error rates, MTTR. They prove your systems are running. They do not prove your AI-powered features are behaving, your customers are getting value, or your business is defended against risks you cannot yet see. AI has raised the floor. Competence is being commoditized. The metrics that won budget last year are now table stakes. Observability used to have one buyer. It now has four. CTO, CPO, CISO, CFO. Same data, four readings. The leaders who can hold all four get the budget.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Colin Burke* — Director of Customer Success – EMEA, Honeycomb
+
+Colin Burke is the Director of Customer Success for EMEA at Honeycomb.io, where he helps engineering and technology leaders harness the full potential of observability to drive business outcomes. With more than a decade of experience at industry leaders like VMware and Pivotal, Colin has worked at the intersection of enterprise platforms, developer productivity, and system resilience.
+
+Throughout his career, Colin has partnered closely with product and engineering teams to scale modern platforms and improve velocity – always with a sharp focus on connecting technical excellence to strategic advantage. At Honeycomb, he empowers teams to shift observability from a reactive tool to a proactive driver of innovation and performance.
+
+---
+
+### 13:00 – 14:00 — Leading at a new level: How to operate effectively as a senior engineering leader
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** leadership
+
+**Speaker(s):** Mala Benn (Head of Engineering, Genio)
+
+**Abstract**
+
+A roundtable on how engineering leaders navigate the shift to operating at the Director level and above – where the work changes, the expectations change, and the old playbook stops working.
+
+The transition to senior leadership is among the least supported in engineering. The skills that got you here – technical depth, hands-on delivery, direct problem-solving – are no longer the primary currency. This session focuses on what actually changes, and how to adapt deliberately rather than reactively.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Mala Benn* — Head of Engineering, Genio
+
+Mala has worked in software teams for over two decades, transitioning from developer roles into various leadership positions. Her passion lies in understanding and leveraging the drivers of success: leadership, motivation, personality, culture, progression, and values. Mala’s mission is to continuously learn and empower individuals and teams to achieve their fullest potential.
+
+---
+
+### 13:00 – 14:00 — From engineering leader to business partner: How to influence beyond your function
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** leadership, technical-direction
+
+**Speaker(s):** Claire Knight (Director of Engineering, n8n)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders build the credibility, language, and relationships needed to influence decisions at the executive and board level.
+
+As engineering becomes more central to commercial strategy, leaders are expected to operate well beyond their function, shaping priorities, managing up, and making the case for investment in business terms.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Claire Knight* — Director of Engineering, n8n
+
+Dr Claire Knight is a Director of Engineering at n8n. She served plenty of time in the coal code mine before making the move into wrangling folks rather than just bits. With many years of engineering leadership at companies such as GitHub and Netlify, Claire now leads the Enterprise Engineering function at n8n. Claire lives in Berkshire, UK, with her husband and three cats who from time to time also like to be involved in video calls. When not working, she likes to lift heavy things, only to put them down again and is a 2023, 2024, and 2025 AWPC World Champion Powerlifter.
+
+---
+
+### 13:00 – 14:00 — Managing managers when everything is changing
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** leadership
+
+**Speaker(s):** Suzan Bond (Founder & CEO, Constellary)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders build and sustain a strong management layer as organizations grow, flatten, and face increasing pressure.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Suzan Bond* — Founder & CEO, Constellary
+
+Suzan Bond is the founder and CEO of Constellary . With nearly two decades in tech, Suzan has worked with hundreds of engineering leaders and leadership teams to help them navigate change and meet the challenges of organizational leadership. Her work these days includes preparing new directors for the role, coaching senior engineering leaders and creating cohesive leadership teams.
+
+---
+
+### 13:00 – 14:00 — The technology leader’s dilemma: How to lead AI adoption without losing your judgment
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** technical-direction
+
+**Speaker(s):** Janine Crosbie (VP of Engineering, Mintel)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders navigate situations where business pressure to adopt AI conflicts with their technical confidence – and turn that tension into better decisions rather than just managed risk.
+
+Discussion includes:
+
+---
+
+### 13:00 – 14:00 — Designing organizations that scale: Teams, ownership, and boundaries
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** management
+
+**Speaker(s):** Kevin Stewart
+
+**Abstract**
+
+A roundtable on how senior engineering leaders design team structures and ownership models that hold up as systems grow more complex and delivery expectations increase.
+
+Discussion includes:
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Kevin Stewart*
+
+Kevin Stewart is an engineering executive focused on building teams to build products. He has helped shape the engineering culture at a number of startups, digital agencies and cloud companies. Kevin is particularly experienced in leading remote and distributed teams to consistently deliver quality products. Although he currently resides in Seattle, Kevin is a lifelong New Yorker with dreams of relocating to a sunny island in the Caribbean.
+
+---
+
+### 13:00 – 14:00 — AI in production: How to maintain quality as output scales
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** ai
+
+**Speaker(s):** Hila Fox (AI Product Manager, Qodo)
+
+**Abstract**
+
+Sponsored by
+
+A roundtable on how senior engineering leaders maintain accountability for software quality as AI dramatically increases the volume of code being written, and redefine what “good enough” means at an organizational scale.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Hila Fox* — AI Product Manager, Qodo
+
+Hila Fox is an AI Product Manager at Qodo.
+
+---
+
+### 14:10 – 15:40 — Beyond the hype: Adopting and measuring AI tools safely in regulated, high-velocity engineering teams
+
+**Type:** DirectorPlus Plenary Session  ·  **For:** Director+  ·  **Topics:** ai
+
+**Speaker(s):** Luke Briscoe (Engineering Director – Platform & Data, Monzo Bank)
+
+**Abstract**
+
+This workshop provides senior engineering leaders a practical, honest look at what governing AI adoption actually requires in regulated, high-velocity environments, drawing on real industry data. Most AI adoption advice is vanilla and impractical. This session is designed to equip you with the frameworks to help design guardrails and measure the ROI of AI tools, regardless of your industry.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Luke Briscoe* — Engineering Director – Platform & Data, Monzo Bank
+
+Luke Briscoe is the Engineering Director for Platform, Security and Data at Monzo Bank. He leads the teams that build and operate the platform serving Monzo’s 15 million customers, the bank’s data platform, their secure-by-design engineering culture and the overall developer experience. Luke’s expertise lies in building distributed systems that are resilient to failure, managing incidents (for when things inevitably go wrong), and creating a developer experience that helps product engineers solve customer problems, not wrangle infrastructure.
+
+---
+
+### 14:30 – 15:30 — Balancing speed and risk: How to move fast on AI without exposing the business to irreversible harm
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** ai, technical-direction, velocity
+
+**Speaker(s):** David Kavanagh (Chief Technology Officer, Tillo)
+
+**Abstract**
+
+A roundtable on how senior engineering leaders navigate the tension between competitive pressure to adopt AI quickly and the responsibility to protect customers, teams, and the organization.
+
+Discussion includes:
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*David Kavanagh* — Chief Technology Officer, Tillo
+
+David Kavanagh is CTO at Tillo, a PE-backed global fintech infrastructure company powering branded currencies and rewards at scale. He has spent 25 years in technology, starting as an engineer and spending a decade in France before leading engineering through hypergrowth at Purplebricks, Chip, Salary Finance and Boomin. He specialises in the dangerous middle phase: scaling product and engineering organisations, embedding AI into a builder culture, and translating complex technical decisions for boards and investors. He writes and speaks on engineering leadership, AI adoption, and building teams that last.
+
+---
+
+### 14:30 – 15:30 — Observing AI in production: How to maintain visibility, trust, and control over AI-powered systems
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+, Experienced Manager, Staff+, Tech Lead  ·  **Topics:** ai
+
+**Speaker(s):** Anna Fenske (Engineering Manager, Datadog)
+
+**Abstract**
+
+Sponsored by
+
+A roundtable on how engineering leaders build the monitoring and governance practices needed to operate AI-powered systems reliably – and answer for them when things go wrong.
+
+As LLMs and AI agents move from experiment to core infrastructure, leaders need the same visibility and accountability standards they apply to the rest of their systems.
+
+Discussion includes:
+
+**Speaker bio(s)**
+
+*Anna Fenske* — Engineering Manager, Datadog
+
+Anna Fenske is an Engineering Manager at Datadog.
+
+---
+
+### 14:30 – 15:30 — Leading at a new level: How to operate effectively as a senior engineering leader
+
+**Type:** DirectorPlus Roundtable  ·  **For:** Director+  ·  **Topics:** career-development
+
+**Abstract**
+
+A roundtable on how engineering leaders navigate the shift to operating at the Director level and above – where the work changes, the expectations change, and the old playbook stops working.
+
+The transition to senior leadership is among the least supported in engineering. The skills that got you here – technical depth, hands-on delivery, direct problem-solving – are no longer the primary currency. This session focuses on what actually changes, and how to adapt deliberately rather than reactively.
+
+Discussion includes:
+
+---
+
+## SolutionS ZONE
+
+### 09:55 – 10:25 — Becoming a VP of Engineering
+
+**Type:** Next Steps AMA  ·  **For:** Director+, Experienced Manager  ·  **Topics:** career-development
+
+**Speaker(s):** Lauren Henry (VP Engineering, Tide), Steve Janaway (VP Engineering, Bloom & Wild), Alex Canessa (Fractional Head of Engineering, Self employed), Lisa van Gelder (VP, Engineering)
+
+**Abstract**
+
+Dedicated sessions on how to take the next step in your career for Becoming a VP of Engineering
+
+**Speaker bio(s)**
+
+*Lauren Henry* — VP Engineering, Tide
+
+Lauren Henry is a technology leader with deep experience scaling engineering organizations, driving product led growth, and building high performing teams. She has led complex, cross functional initiatives across platform, data, and product engineering, with a focus on aligning technical execution to business outcomes. Known for her pragmatic and people first leadership style, Lauren specializes in developing managers, navigating organizational change, and creating sustainable operating models. She is particularly interested in how modern engineering organizations evolve in response to AI, shifting customer expectations, and increasing complexity, and is passionate about helping leaders grow into impactful, resilient VP level roles.
+
+*Steve Janaway* — VP Engineering, Bloom & Wild
+
+Steve is the VP of Engineering at Bloom & Wild, Europe’s leading online flower company and home to the Bloom & Wild, bloomon and Bergamotte brands. He is a passionate software engineering leader with a proven track record in building and leading successful teams across diverse industries including social, retail, and telecom. He is a regular speaker and writer on leadership and software, with a keen interest in leveraging technology to drive innovation and create sustainable, happy and high-performing teams.
+
+*Alex Canessa* — Fractional Head of Engineering, Self employed
+
+Alex Canessa works fractionally across multiple organisations as Head of Engineering at Fortivex, Agent Ecosystem Support at the MACH Alliance, and Tech Lead for Unomundi. He started as a developer and still thinks like one, with a strong focus on architecture, clarity, and delivery. His work explores composable systems and emerging agent patterns in real product environments. He is a dad, practises improv theatre, and has a long-standing fascination with etymology.
+
+*Lisa van Gelder* — VP, Engineering
+
+Lisa has been in software for over 25 years, working in a wide range of companies from early stage startups to established companies like the BBC, Meetup & the Guardian newspaper. She used to debug code, now she debugs teams for a living. She is mostly powered by coffee.
+
+---
+
+### 10:25 – 10:55 — Meet the author: Anemari Fiser
+
+**Type:** Meet the author  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Anemari Fiser (Tech Lead Trainer)
+
+**Abstract**
+
+Bring a book and get it signed, or just have a chat with the author.
+
+**Speaker bio(s)**
+
+*Anemari Fiser* — Tech Lead Trainer
+
+Anemari Fiser is a tech leadership coach and trainer who helps engineers grow into confident, people-centered tech leads. She is the author of O’Reilly’s book Leveling Up as a Tech Lead and the creator of the O’Reilly course Soft Skills for Tech Leads.
+
+With over a decade of experience in the tech industry, she has held roles ranging from software engineer to engineering leader. As an independent coach and trainer, Anemari has coached 500+ engineers and trained 400+ tech leads across organisations worldwide. She also shares practical leadership insights with a community of 30,000+ tech professionals on LinkedIn.
+
+---
+
+### 10:30 – 10:40 — Live demo: How to track the real impact of AI coding tools on your team’s delivery with GitKraken
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Jeremy Castile (VP of Developer Research, GitKraken)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+Code volume per developer is up 30%. But most teams aren’t shipping any faster. Review queues are longer. Quality concerns are real. And engineering leaders are stuck between a C-suite that expects AI to replace headcount, teams where adoption is uneven, and bottlenecks they can feel but can’t pinpoint. In this live demo of GitKraken Insights, see how engineering leaders are using a single view of velocity, cycle time, code quality, and agent impact to find what’s slowing their teams down, prove what’s working, and get ahead of the conversation before someone above them decides they already know the answer.
+
+**Speaker bio(s)**
+
+*Jeremy Castile* — VP of Developer Research, GitKraken
+
+As VP of Developer Research at GitKraken, Jeremy works to understand and amplify the voices of the 40+ million developers who rely on their tools daily. With experience at companies like Docker and New Relic, and having been on the engineering side himself, he bridges the gap between what developers need and what products deliver. His research helps shape tools that actually make developers’ lives easier.
+
+When not at his desk, Jeremy can usually be found with his wife and two boys, exploring the outdoors.
+
+---
+
+### 10:30 – 10:40 — Live demo: How to add deployment guardrails for AI-generated code with Octopus Deploy
+
+**Type:** Demo  ·  **For:** Experienced Manager, Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Adam Close (Senior Solutions Engineer, Octopus Deploy)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+AI-generated code is accelerating deployment velocity. This five-minute demo with Adam Close shows how to add the guardrails your platform team needs to keep it safe.
+
+---
+
+### 10:45 – 10:55 — Live demo: How to deploy and scale AI models quickly with Runpod
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Panley Cooze (Forward Deployed Engineer, Runpod)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+See how to get an AI model up and running on RunPod in minutes and discover how our platform scales effortlessly with your needs.
+
+**Speaker bio(s)**
+
+*Panley Cooze* — Forward Deployed Engineer, Runpod
+
+Panley Cooze is a Forward Deployed Engineer at Runpod.
+
+---
+
+### 10:45 – 10:55 — Live demo: AI engineering and governance 2026 trends with Qodo
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Sri Rang (Sales Engineer, Qodo)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+Make the most of your breaks with the demo stage sessions, where leading tech providers will showcase their innovative solutions in informative and concise presentations. Each carefully curated 10 minute demo will show the very best engineering solutions available.
+
+**Speaker bio(s)**
+
+*Sri Rang* — Sales Engineer, Qodo
+
+Sri Rang is a Sales Engineer at Qodo.
+
+---
+
+### 11:00 – 11:30 — Stepping into the role of Staff Engineer
+
+**Type:** Next Steps AMA  ·  **For:** Staff+, Tech Lead  ·  **Topics:** career-development
+
+**Speaker(s):** Haley Roberts (Staff Engineer, NeuroID, a part of Experian), Ian Homer (Staff Engineer, Wise), Alex Canessa (Fractional Head of Engineering, Self employed), Gary Hammett (Head of Software Engineering, PureGym)
+
+**Abstract**
+
+Dedicated sessions on how to take the next step in your career for stepping into the role of a Staff Engineer
+
+**Speaker bio(s)**
+
+*Haley Roberts* — Staff Engineer, NeuroID, a part of Experian
+
+Haley Roberts is a Staff Engineer at NeuroID, a part of Experian.
+
+*Ian Homer* — Staff Engineer, Wise
+
+Ian is a Staff Engineer at Wise, driving the Development Enablement squad to redefine the intersection of CI/CD and Generative AI. He specialises in building the “golden paths” that allow engineers to innovate at scale, focusing specifically on the safe integration of agentic workflows into the SDLC. With over 20 years of experience, spanning co-founder, tech lead, SRE & product engineer roles, Ian now focuses on scaling technical leadership, coaching engineers to transition from high-performing ICs to high-impact organisational leaders.
+
+*Alex Canessa* — Fractional Head of Engineering, Self employed
+
+Alex Canessa works fractionally across multiple organisations as Head of Engineering at Fortivex, Agent Ecosystem Support at the MACH Alliance, and Tech Lead for Unomundi. He started as a developer and still thinks like one, with a strong focus on architecture, clarity, and delivery. His work explores composable systems and emerging agent patterns in real product environments. He is a dad, practises improv theatre, and has a long-standing fascination with etymology.
+
+*Gary Hammett* — Head of Software Engineering, PureGym
+
+Gary is Head of Software Engineering at PureGym with over a decade of experience and an impressive ability to turn technical chaos into something that looks suspiciously like organisation. He proudly plays the “right‑hand” Staff Engineer role, translating business goals, supporting teams, and trying (against all odds) to make DevEx surveys sound exciting. Gary spends far less time pondering the meaning of build pipelines and far more time tackling the real challenge: helping humans talk to each other effectively. He champions strong engineering culture, AI adoption, and continuous improvement.
+
+---
+
+### 11:40 – 12:10 — Building the LeadDev community: A meet-ups AMA
+
+**Type:** Meet-up Panel  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** career-development
+
+**Speaker(s):** Séverin Bruhat (Software Engineering Manager, Trustpilot), Elvira Khamsin (Engineering Manager, Minecraft, Microsoft), Alisa Tikhova (Tech Lead, Rabobank), Ferit Topcu (Senior Manager, Engineering Management, Zenjob SE), Ishaan Singh (Content and Community Manager)
+
+**Abstract**
+
+Curious about how LeadDev meet-ups run around the world, or thinking about starting one where you live?
+
+Join current LeadDev meetup organisers for a live AMA on how the meetup programme works, what it’s really like to run a local community, and how you can get involved.
+
+Whether you’re interested in launching a meet-up, speaking, sponsoring, or supporting local organisers, this session will show you how the LeadDev community comes to life, and how you can be part of it.
+
+**Speaker bio(s)**
+
+*Séverin Bruhat* — Software Engineering Manager, Trustpilot
+
+Sev is a Software Engineering Manager at Trustpilot in Edinburgh, UK. He’s passionate about building effective teams and empowering individuals, leveraging his technical expertise to guide development while fostering a collaborative work environment. When he’s not leading engineering teams, Sev enjoys blogging, playing guitar and spending time with his family and friends.
+
+*Elvira Khamsin* — Engineering Manager, Minecraft, Microsoft
+
+A girl boss, supporter of females, an immigrant also with 15 years experience in the IT business, and with a strong engineering background. After being in the industry for many years, she noticed so few women and  wanted to find out why. It turned out that women are not supported to even enter the industry. So she became a women’s employee resource group leader and self-esteem mentor to encourage women to speak and celebrate their achievements—one of the most respected #IamRemarkable facilitators (top 100 from 3000).
+
+*Alisa Tikhova* — Tech Lead, Rabobank
+
+Alisa Tikhova is a senior technical leader with 15+ years of experience working at the intersection of technology, leadership, and complex systems. Her work focuses on human literacy — how differences in communication, feedback, and decision-making shape outcomes in senior teams, and how leadership choices influence systems as they scale.
+
+*Ferit Topcu* — Senior Manager, Engineering Management, Zenjob SE
+
+Ferit Topcu is a Berlin-based Engineering Manager at Zenjob SE, where he leads the Mobile & Marketing Platform Team. With over a decade of software engineering expertise, he’s passionate about exploring AI’s intersection with current engineering roles, its impact on the future of work and React Native. Known for his humor, often derived from his adventures raising three kids, Ferit brings authenticity and humanity to technical leadership. As an active community contributor, he is co-host of the LeadDev Meetup in Berlin.
+
+*Ishaan Singh* — Content and Community Manager
+
+Ishaan works closely with our audience to curate content for software engineering leaders to address their pain points and help them become more effective in their roles. Ishaan explores new topical themes for future content and exciting new formats for its delivery to drive engagement across our platform.
+
+She’s recently started leading on the global rollout of LeadDev meetups and other community initiatives.
+
+---
+
+### 11:40 – 12:25 — How will we deal with the new drudgery of AI-generated code?
+
+**Type:** The Big Debate  ·  **For:** 
+
+**Speaker(s):** Lawrence Jones (Product Engineer, incident.io), Maude Lemaire (Engineer, Cursor), Randy Shoup (SVP Engineering, Thrive Market), Birgitta Böckeler (Global Lead for AI-assisted Software Delivery, Thoughtworks)
+
+**Abstract**
+
+AI promises faster development cycles and increased productivity, but many teams are discovering new forms of friction in its wake. More generated code means more to review, test, secure, and maintain. The bottlenecks haven’t disappeared; they’ve shifted.
+
+How do you prevent review overload when code volume explodes? What happens when testing and security can’t keep pace? And how do you stop productivity gains from turning into operational drag, where humans are left with the repetitive, high-responsibility work AI can’t do?
+
+Join this discussion as we explore the “new drudgery” emerging in AI-driven engineering environments.
+
+Leaders will share their thoughts on invisible toil, evolving bottlenecks, and how to design systems that scale without burning out teams or reducing engineers to code custodians.
+
+Discussions include:
+
+**Speaker bio(s)**
+
+*Lawrence Jones* — Product Engineer, incident.io
+
+Lawrence Jones is a Founding Engineer at incident.io, where he’s spent the last few years helping take the product from zero to the AI-native incident platform it is today. He now leads engineering on AI SRE — an agent that investigates production incidents autonomously, digging through logs, metrics, traces and code changes to tell teams what’s gone wrong and how to fix it. Before incident.io he was a Principal Engineer at GoCardless, working across the SRE space and product. He’s a regular speaker at engineering conferences including LeadDev, and writes about AI engineering and incident response at blog.lawrencejones.dev.
+
+*Maude Lemaire* — Engineer, Cursor
+
+Maude is an engineer at Cursor, working on the big, thorny problems that come hand-in-hand with rapid growth. Previously, she was a Principal Engineer at GitHub, where she worked on Copilot Code Review, data partitioning, and domain isolation.
+
+Before GitHub, Maude was a Senior Staff Engineer at Slack, where she founded and led the backend performance infrastructure team. Over nearly 8 years, she was responsible for large-scale load test tooling, performance regression monitoring, and successfully onboarding the world’s largest companies to Slack as the product scaled from 60,000 users per team to over 2 million.
+
+When she doesn’t have her nose in a flamegraph, you can find Maude building strong, empathetic engineering cultures. In October 2020, Maude published “Refactoring at Scale” with O’Reilly Media, a blueprint for how technical leaders can successfully navigate large, complex refactors.
+
+*Randy Shoup* — SVP Engineering, Thrive Market
+
+Randy Shoup serves as SVP of Engineering at Thrive Market. With more than 30 years of experience building distributed systems and leading high-performing teams, he has held senior technology leadership roles at eBay, Google, Stitch Fix, and WeWork. He also mentors CTOs, advises organizations, and shares his perspectives widely. A frequent conference speaker on software and engineering leadership, he is particularly interested in how culture, technology, and organizational design intersect.
+
+*Birgitta Böckeler* — Global Lead for AI-assisted Software Delivery, Thoughtworks
+
+Birgitta is the Global Lead for AI-assisted Software Delivery at ThoughtWorks. She has been building software across all layers for more than 15 years, mainly in the space of large custom-developed websites. At ThoughtWorks, she spends most of her time as a Lead Developer, splitting her days between coding, coaching, consulting and keeping things fun.
+
+---
+
+### 12:30 – 12:40 — Live demo: How to ship faster with confidence with CircleCI. From inner loop to production
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Derry Bradley (Senior Solutions Engineer, CircleCI)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+Modern software delivery is under pressure – slow, flaky test suites slow teams down, and the volume of code changes makes it harder than ever to catch issues early. In this demo, we’ll show how smarter test selection cuts through the noise and surfaces what matters, combined with inner loop validation that catches failures locally before they ever reach CI – so your pipeline stays focused on shipping with confidence.
+
+**Speaker bio(s)**
+
+*Derry Bradley* — Senior Solutions Engineer, CircleCI
+
+Derry is a software delivery specialist helping organizations optimize development through CI/CD solutions. He translates complex technical concepts into business value, solving implementation challenges for engineering teams. Previously at Fidelity Investments, he architected automated deployment pipelines and cloud infrastructure. Derry’s expertise spans cloud architecture, DevOps practices, and continuous delivery
+
+---
+
+### 12:40 – 12:50 — Live demo: Resolving incidents faster with PagerDuty AI agents
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Ralph Bird (Principal ML Engineer, PagerDuty), Justyn Roberts (Principal Solutions Consultant – Automation Specialist, Strategic & Channel, PagerDuty)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+Make the most of your breaks with the demo stage sessions, where leading tech providers will showcase their innovative solutions in informative and concise presentations. Each carefully curated 10 minute demo will show the very best engineering solutions available.
+
+**Speaker bio(s)**
+
+*Ralph Bird* — Principal ML Engineer, PagerDuty
+
+Ralph Bird is a Principal ML Engineer at PagerDuty focused on building production-ready, reliable AI agents for real-world, high-stakes workflows like incident response. With over 12 years of experience in machine learning and large-scale analytics, he works at the intersection of AI, distributed systems, and operational tooling. He leads teams to design multi-agent systems and infrastructure for safe, transparent, and scalable LLM adoption.
+
+*Justyn Roberts* — Principal Solutions Consultant – Automation Specialist, Strategic & Channel, PagerDuty
+
+Justyn Roberts is a Principal Solutions Consultant at PagerDuty.
+
+---
+
+### 12:45 – 12:55 — AI agents without guardrails: The governance problem engineering teams need to solve
+
+**Type:** Solution Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Eric Paulsen (Field CTO – EMEA, Coder)
+
+**Abstract**
+
+Sponsored by
+
+AI agents can now run code, trigger workflows, and access systems – so how do engineering teams introduce governance and guardrails without slowing innovation?
+
+**Speaker bio(s)**
+
+*Eric Paulsen* — Field CTO – EMEA, Coder
+
+Eric Paulsen is the EMEA Field CTO at Coder, an open-source, self-hosted cloud development environment platform. A developer at heart, Eric began his career writing code and quickly became known for his ability to support and uplift fellow engineers. That passion for technology and collaboration evolved into guiding enterprise organisations, particularly in highly regulated industries, through their Developer Experience transformations. As Coder’s Founding Sales Engineer, Eric has remained deeply hands-on, continuously expanding his knowledge in emerging areas such as AI agents and automation. Today, he blends technical depth with strategic insight to help customers modernise secure, scalable development environments.
+
+---
+
+### 12:55 – 13:05 — Live demo: How to double your engineering productivity tomorrow with Larridin
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Ameya Kanitkar (Co-founder & CTO, Larridin)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+Make the most of your breaks with the demo stage sessions, where leading tech providers will showcase their innovative solutions in informative and concise presentations. Each carefully curated 10 minute demo will show the very best engineering solutions available.
+
+**Speaker bio(s)**
+
+*Ameya Kanitkar* — Co-founder & CTO, Larridin
+
+Ameya Kanitkar is the Co-founder & CTO at Larridin.
+
+---
+
+### 13:00 – 13:10 — Live demo: How to build failure-resilient workflows with Temporal
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Simon Emms (Staff Solutions Architect, Temporal)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+Watch a workflow survive crashes, retries and restarts in real time, without adding failure-handling code.
+
+**Speaker bio(s)**
+
+*Simon Emms* — Staff Solutions Architect, Temporal
+
+Simon Emms is a Staff Solutions Architect at Temporal.
+
+---
+
+### 13:10 – 13:20 — Live demo: How to measure engineering friction and the real impact of AI investment with DX
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** James Whitfield (Strategic Account Executive, DX)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+Learn how companies like Vercel, Adyen, booking.com use DX to pinpoint engineering friction and measure the real world ROI of AI investments. We’ll demo how to move beyond basic productivity metrics to prioritize platform improvements that actually drive developer velocity.
+
+**Speaker bio(s)**
+
+*James Whitfield* — Strategic Account Executive, DX
+
+James Whitfield is a Strategic Account Executive at DX.
+
+---
+
+### 13:15 – 13:25 — Mastering change as a leader
+
+**Type:** Solution Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Amélie Thery (Senior Engineering Manager, Prima)
+
+**Abstract**
+
+Sponsored by
+
+How to effectively lead change in difficult times, while keeping a high level of engagement and trust in the team.
+
+**Speaker bio(s)**
+
+*Amélie Thery* — Senior Engineering Manager, Prima
+
+Amélie is a passionate and empathetic leader. She aims to build resilient and high-performing teams, led by caring and high-performing individuals. She is French and lives in London, and currently works for Prima, the leading Italian digital insurance company.
+
+---
+
+### 13:25 – 13:35 — Safe autonomy for AI agents
+
+**Type:** Solution Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Jean-Laurent de Morlhon (SVP Engineering, Docker)
+
+**Abstract**
+
+Sponsored by
+
+Learn how Docker micro-VM sandboxes solve the babysitting problem and give AI agents safe isolated execution environments.
+
+**Speaker bio(s)**
+
+*Jean-Laurent de Morlhon* — SVP Engineering, Docker
+
+Jean-Laurent de Morlhon is a SVP Engineering at Docker.
+
+---
+
+### 13:30 – 13:40 — Live demo: How to automatically catch and kill broken deployments with Datadog Feature Flags and Synthetics
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Anthony Rindone (Senior Product Manager, Datadog)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+Discover how to confidently release code at any time by configuring Datadog Synthetics to automatically trigger a feature flag “kill switch” the moment a critical user workflow fails.
+
+**Speaker bio(s)**
+
+*Anthony Rindone* — Senior Product Manager, Datadog
+
+Anthony Rindone is the Senior Product Manager for Feature Flags & Experimentation at Datadog, where he builds the tools that help engineering organizations scale progressive delivery safely. Drawing on a deep background in product leadership for developer platforms, Anthony specializes in bridging the gap between high-velocity deployment and robust system stability. He focuses on equipping engineering leaders with the automated guardrails and structural workflows needed to confidently accelerate feature velocity.
+
+---
+
+### 13:40 – 13:50 — Live demo: How to automate mobile app build, test, and deployment pipelines with Bitrise
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Olivér Falvai (Staff Software Engineer, Bitrise)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+This demo provides an overview of the Bitrise platform, showing how it helps teams automate the process of building, testing, and deploying mobile applications more efficiently and reliably. It covers key features including the Workflow Editor, Pipelines, Stacks & Machines, Insights, and Release Management.
+
+**Speaker bio(s)**
+
+*Olivér Falvai* — Staff Software Engineer, Bitrise
+
+Olivér Falvai is a Staff Software Engineer at Bitrise.
+
+---
+
+### 13:45 – 13:55 — From intent to outcome: AI and the future of internal tooling
+
+**Type:** Solution Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Alexis Ego (Enterprise Solutions Engineer, Retool)
+
+**Abstract**
+
+Sponsored by
+
+Internal tools are the hidden engine of efficiency and revenue—this session shows how to justify investing in them and solve the real challenges of security, governance, and long-term maintenance.
+
+**Speaker bio(s)**
+
+*Alexis Ego* — Enterprise Solutions Engineer, Retool
+
+Alexis Ego is an Enterprise Solutions Engineer at Retool.
+
+---
+
+### 13:55 – 14:05 — Live demo: How to ship frontend code at the speed agents write it with Meticulous
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Gabriel Spencer-Harper (CEO & Co-Founder, Meticulous)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+Join these 10-minute talks to explore how our partners are helping teams tackle real-world engineering challenges. Each session shares practical examples, lessons learned, and insights into the decisions behind the solutions — giving you ideas you can take back to your own teams and systems.
+
+**Speaker bio(s)**
+
+*Gabriel Spencer-Harper* — CEO & Co-Founder, Meticulous
+
+Gabriel is the co-founder and CEO of Meticulous, which exhaustively tests web applications with zero developer effort. He previously worked in engineering at Dropbox.
+
+---
+
+### 14:00 – 14:10 — Live demo: How AI code review works at scale – and how to make it more effective with CodeRabbit
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Adam Spindler (Enterprise Solutions Engineer, CodeRabbit)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+AI plans, AI writes, AI reviews. What is the influences the AI behavior for these actions and how to make AI effective in its actions? We will share CodeRabbit learnings based on doing the code review over millions of PRs and using real life review examples.
+
+**Speaker bio(s)**
+
+*Adam Spindler* — Enterprise Solutions Engineer, CodeRabbit
+
+Adam Spindler is an Enterprise Solutions Engineer at CodeRabbit.
+
+---
+
+### 14:10 – 14:20 — Live demo: How to debug faster with AI, without guesswork with Honeycomb
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Martin Thwaites (Principal Developer Advocate, Honeycomb)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+As AI accelerates development it also increases the speed of failure. Investigations need to run at agent speed, without ignoring your team’s hard-won experience. Martin Thwaite of Honeycomb shows new ways for humans and agents investigate together, working from shared context and building on each other’s insights, to solve the hard problems fast.
+
+**Speaker bio(s)**
+
+*Martin Thwaites* — Principal Developer Advocate, Honeycomb
+
+Martin is a Developer Advocate at Honeycomb, o11y enthusiast, and a delivery-focused Developer from the UK. With over 20 years experience in development in the .NET ecosystem, he’s worked with many companies on scaling up engineering teams and products. The past few years have been spent working on solving complex problems with some of the UK’s big names, including e-commerce retailers and credit lenders.
+
+---
+
+### 14:15 – 14:25 — Live demo: MetalBear
+
+**Type:** Demo  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Ari Sprung (Solutions Engineer, MetalBear)
+
+**Abstract**
+
+Sponsored by
+
+Explore solutions for your technical issues.
+
+Make the most of your breaks with the demo stage sessions, where leading tech providers will showcase their innovative solutions in informative and concise presentations. Each carefully curated 10 minute demo will show the very best engineering solutions available.
+
+---
+
+### 14:25 – 15:10 — What makes an effective EM in the AI era?
+
+**Type:** The Big Debate  ·  **For:** Experienced Manager, New Manager, Tech Lead
+
+**Speaker(s):** Vernon Richards (Senior Engineering Manager, Phrase), Priscilla Nagashima (Founder), Alicia Collymore (Engineering Manager, incident.io), Scott Carey (Editor in Chief, LeadDev)
+
+**Abstract**
+
+As AI tools take on more of the hands-on execution, the role of the Engineering Manager is evolving. But in which direction? Should EMs become more technical to guide AI-enabled work or double down on coaching and organisational leadership?
+
+Balancing delivery, mentoring, stakeholder alignment, and technical credibility has always been complex. In AI-augmented teams, the expectations are shifting again.
+
+Join the conversation as experienced leaders unpack how “highly effective” engineering management is changing. They’ll discuss how the EM role is evolving, where desired skillsets are expanding, and how to stay relevant as workflows and team structures transform.
+
+Discussions include:
+
+**Speaker bio(s)**
+
+*Vernon Richards* — Senior Engineering Manager, Phrase
+
+Vernon Richards is a Testing Strategist and Quality Coach who helps tech teams release with confidence and supports testers in becoming trusted partners and technical leaders. He’s been testing since 2002 and coaching since 2017.
+
+By day, he’s a Senior Engineering Manager at a localisation tech company. By night, he consults, teaches, and creates content on leadership, quality engineering, and entrepreneurship. He co-authored The Software Tester’s Journey, co-hosts The Vernon Richard Show, and writes on The Invisible Work blog. A regular speaker and host at conferences worldwide, he’s also Will Smith’s virtual stunt double (allegedly).
+
+*Priscilla Nagashima* — Founder
+
+Pri Nagashima is a founder and Fractional Chief Product & Technology Officer specialising in data and AI. She spent her career leading engineering, data and product teams of all sizes at companies like Pleo, DICE, iTech Media and Siemens, and now helps organisations think and deploy AI strategy with scalable systems through her UK-based consultancy company Hatch.
+
+*Alicia Collymore* — Engineering Manager, incident.io
+
+Alicia has been an engineering managing for over 2 years, with experience working in many different industries, from biotech where she lead a team of molecular biologist to fintech where she helped build out the pay later space. Alicia is currently an EM at incident.io , who build software to help companies manage incidents more easily, helping her teams to get shit done and have fun doing it.
+
+*Scott Carey* — Editor in Chief, LeadDev
+
+Scott Carey is the Editor in Chief at LeadDev. An experienced technology journalist, he has covered software development for Computerworld, CIO, and InfoWorld before joining LeadDev.
+
+---
+
+## Workshop Zone
+
+### 09:30 – 10:50 — How to train your 𝖽̶𝗋̶𝖺̶𝗀̶𝗈̶𝗇̶ boss
+
+**Type:** Workshop  ·  **For:** Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** career-development
+
+**Speaker(s):** Lena Reinhard (Engineering Leader, Organizational Developer, Coach, Facilitator)
+
+**Abstract**
+
+Having a boss isn’t always as fun as it sounds, and many of us struggle to make the most out of our work with the manager we have, leading to misalignment, friction, and frustration for all parties involved. But how effectively you manage up is a crucial skill, even more as you advance in your career. That’s why you’ll learn how to make more out of your work with your boss in this workshop with someone who’s been on all sides of this challenge: I’ve managed hundreds of people, had dozens of bosses all from great to terrible, and coached engineers and managers on working better with theirs. You’ll learn how to reverse engineer the way your boss works and walk away with a practical framework and tools that you can start using immediately and that will improve your work with your manager, including. This workshop is for anyone who has a manager, no matter if you’re an engineer, technical lead, or manager yourself, you will take away practical approaches to transform your relationship with your manager and accelerate your career growthHow to use your technical expertise to identify hidden system issues by analyzing code patterns, PR structures, and team interactions.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Lena Reinhard* — Engineering Leader, Organizational Developer, Coach, Facilitator
+
+Lena Reinhard is a seasoned technology leader, currently helping leaders and their teams succeed through her work as a leadership coach, organizational developer, and facilitator. Having served the majority of her 20-year career in leadership roles, such as VP Engineering with CircleCI, Travis CI, and a SaaS startup co-founder & CEO, she has partnered with a variety of remote, hybrid, and co-located companies at all stages, from startups, to scale-ups, corporations, and NGOs. Lena loves to paint, read, and ride her bike around the forests and lakes of her home, Berlin, in Germany. She hosts O’Reilly’s Tech Leadership Tuesday podcast.
+
+---
+
+### 09:30 – 10:50 — Crisis simulation: Navigating leadership challenges in real-time
+
+**Type:** Workshop  ·  **For:** Experienced Manager, New Manager  ·  **Topics:** leadership
+
+**Speaker(s):** Sally Lait (Fractional technology leader and advisor)
+
+**Abstract**
+
+In this interactive workshop, you’ll engage in a high-pressure crisis simulation tailored for engineering leadership roles. Drawing from real-world scenarios, you’ll collaborate in teams to practice and share response strategies… but you’ll need to stay on your toes for extra doses of chaos throughout.
+
+This workshop addresses the critical need for engineering leaders to be adept at managing crises that extend beyond technical failures. By simulating real-world challenges, participants will be better equipped to lead their teams through uncertainty, maintain operational continuity, and uphold organizational values under pressure. The session aims to give you a safe way to practice decision-making, communication, and team alignment under pressure, learn from others’ experiences, plus hopefully have some fun with it along the way!
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Sally Lait* — Fractional technology leader and advisor
+
+Sally Lait specialises in building strong engineering culture, and aims to create supportive and inclusive environments for managers, developers, and teams to thrive and do fantastic technical work.
+
+Her roles have included helping to change the way the world deals with death as VP of Engineering (plus IT & Data and Insights) at Farewill, prior to which she led Monzo’s web discipline and engineering across Operations through hypergrowth. Other experience involves founding a digital transformation consultancy with clients including the Manor Racing F1 team and RNLI, and working as Head of Technology for a global digital agency. Sally’s a strong advocate for building software and teams alike with empathy, responsibility, and accessibility in mind. She’s spoken at events around the world, is on Mastodon at @ https://mastodon.social/@sally , and you can find out more about her at sally.dev .
+
+---
+
+### 09:30 – 10:50 — Team building at the age of AI
+
+**Type:** Workshop  ·  **For:** Experienced Manager, New Manager, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Suzan Bond (Founder & CEO, Constellary)
+
+**Abstract**
+
+The integration of AI into engineering teams isn’t just changing how work gets done – it’s fundamentally shifting team dynamics, individual roles, and the emotional landscape of leadership. In this interactive workshop, you’ll tackle the real challenges: creating clear agreements about AI use on your team, evolving your leadership approach in the age of AI, and identifying the skills your team needs to succeed in this new reality.. You’ll leave with practical tools including a framework for building your team’s AI charter, strategies for navigating your evolving leadership role, and a clear approach for developing the human skills that become more valuable as AI handles routine work.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Suzan Bond* — Founder & CEO, Constellary
+
+Suzan Bond is the founder and CEO of Constellary . With nearly two decades in tech, Suzan has worked with hundreds of engineering leaders and leadership teams to help them navigate change and meet the challenges of organizational leadership. Her work these days includes preparing new directors for the role, coaching senior engineering leaders and creating cohesive leadership teams.
+
+---
+
+### 09:30 – 10:50 — Product sense for product engineering with AI
+
+**Type:** Workshop  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** leadership
+
+**Speaker(s):** Oana May (FAANG Product Leadership Coach, Founder of MOATCRAFT™, MOATCRAFT™)
+
+**Abstract**
+
+80% of the features built are barely or never used ( Pendo Report ).
+
+Now, AI makes it easier to build even more of the wrong things. While for engineers, the real advantage is no longer just execution, but judgment. Knowing what is worth building: why it matters for customers, for the business, in the market, etc.
+
+In this interactive session, Oana May, ex-Meta and founder of MOATCRAFT, will share the practical product sense system she has used to coach 500+ product leaders in the Bay Area, NY, Seattle, etc.
+
+You will learn:
+
+Through live collaborative exercises, you will practice applying this framework in real time.
+
+You will leave with practical tools to sharpen your own product sense, coach stronger decision-making on your team, and help engineers move from execution-focused thinking to business-aligned problem solving.
+
+How to participate This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Oana May* — FAANG Product Leadership Coach, Founder of MOATCRAFT™, MOATCRAFT™
+
+Oana May is an ex-Meta leader, FAANG product coach, and 3x founder. She recently launched MOATCRAFT™, where she helps software developers learn to choose what problems are worth solving and make better business-aligned decisions. Using the systems she developed coaching 500+ product leaders across the Bay Area, New York, and Seattle, she teaches builders how to navigate ambiguity and sharpen their judgment, the key skill in a world where AI is writing the code. Her background includes Harvard Business School and a track record of seeing around corners as a founder and product leader, and helping builders earn promotions, land dream roles, and think beyond execution into making smarter bets.
+
+Additional bio options: https://docs.google.com/document/d/12Y2qtSv0Rt6NGFvZZHWA7KIiL9WSasoqZL1C4QIkWrE/edit?usp=sharing
+
+---
+
+### 09:30 – 10:45 — How to build feature flags, run experiments, and manage releases with Harness
+
+**Type:** Hands-on Lab  ·  **For:** Experienced Manager, Staff+, Tech Lead  ·  **Topics:** velocity
+
+**Speaker(s):** Iram Khan (Enterprise Sales Engineer, Harness)
+
+**Abstract**
+
+Sponsored by
+
+Feature flags and experimentation are powerful in theory, but hard to implement consistently in practice. In this guided lab, you’ll get hands-on time with the Harness Software Delivery Platform to build and manage feature flags, run experiments, and practice real-time rollouts and rollbacks – using a live environment provided by Harness.
+
+In this session, you will:
+
+How to participate This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Iram Khan* — Enterprise Sales Engineer, Harness
+
+Iram Khan is an Enterprise Sales Engineer at Harness.
+
+---
+
+### 11:30 – 12:50 — Telling the story of technical debt: From case study to business buy-in
+
+**Type:** Workshop  ·  **For:** Staff+, Tech Lead  ·  **Topics:** communication
+
+**Speaker(s):** Blanca Garcia Gil (Principal Engineer, Transformational Coach & Founder, StaffPlusEngineer.com)
+
+**Abstract**
+
+Moving from “complaining about code” to “proposing a business solution” is the most critical shift a technical leader can make.
+
+In this focused session, we will analyse real-world case studies to understand why some technical debt initiatives thrive while others fail. You will learn how to translate technical pain into business risk and opportunity, framing your proposal in a way that aligns with organisational goals. Leave with a toolkit to communicate the impact of debt so that stakeholders don’t just understand the problem, they want to be part of the solution.
+
+How to participate This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Blanca Garcia Gil* — Principal Engineer, Transformational Coach & Founder, StaffPlusEngineer.com
+
+Blanca is the founder of staffplusengineer.com , leadership coach, workshop facilitator and public speaker.
+
+Before taking the leap into coaching, she worked as a principal engineer, building resilient data analytics platforms. She spent nearly two decades working for different corporations in a variety of tech roles before making the transition to working with data. Her most recent roles were at the BBC and the fintech startup topi .
+
+---
+
+### 11:30 – 12:50 — Reclaim your time, reclaim your leadership
+
+**Type:** Workshop  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** leadership
+
+**Speaker(s):** Joel Chippindale (CTO Coach, Monkey's Thumb Ltd)
+
+**Abstract**
+
+Do you feel that you are perpetually overwhelmed by meetings, emails, and the demands of others? Do you feel like you’ve lost control of your most valuable asset—your time? If you do, then you are not alone and this is the workshop for you.
+
+In this transformative workshop, we will challenge the limiting beliefs preventing you from managing your time. You will gain clarity on the power of managing your time, how to increase your impact and identify areas for change. Additionally, you will develop practical strategies to prioritise what truly matters and lead with purpose.
+
+You will leave the workshop with a specific set of actions and experiments for you to take back into your work.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Joel Chippindale* — CTO Coach, Monkey's Thumb Ltd
+
+Joel Chippindale is a CTO Coach who supports talented start-up and scale-up CTOs to successfully navigate the many changes in their roles as their companies evolve.
+
+He also has over 20 years experience building, scaling and leading software development teams, including CTO roles at Econsultancy, FutureLearn and Unmade.
+
+---
+
+### 11:30 – 12:50 — Consensus protocols: The lego brick from hell
+
+**Type:** Workshop  ·  **For:** Director+, Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Marco Primi (Distributed Systems Bug Hunter, Antithesis)
+
+**Abstract**
+
+Sponsored by
+
+Consensus protocols are a fundamental building block to for a wide variety of distributed systems, from databases to message queues, to storage systems to orchestration layers.
+
+As such you’d expect consensus to be widely commoditized, a one-click drop-in that doesn’t require much thinking. Reality is quite the opposite. Integrating consensus always creates challenges and unexpected difficulties.
+
+In this workshop, we’ll go over practical examples of recurring pains and pitfalls of developing, integrating and testing consensus-based systems. For each category, we’ll stop and discuss, trade ideas, lessons, and techniques. As well as share success and failure stories.
+
+The second part of the workshop will expand the scope and broaden the discussion to other mission-critical distributed systems and infrastructure.
+
+You’ll leave with:
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Marco Primi* — Distributed Systems Bug Hunter, Antithesis
+
+Marco Primi is the official Chaos Monkey at Antithesis, where he focuses on software reliability and intelligent testing strategies. He is a prolific researcher and author on distributed systems, whose research is often cited in both academic and professional publications.
+
+---
+
+### 12:45 – 13:45 — How to vibe code internal tools without losing control of security and maintainability with Retool
+
+**Type:** Hands-on Lab  ·  **For:** Experienced Manager, Staff+, Tech Lead  ·  **Topics:** ai
+
+**Speaker(s):** Alexis Ego (Enterprise Solutions Engineer, Retool), Amar Shah (Solutions Engineer, Retool)
+
+**Abstract**
+
+Sponsored by
+
+In this hands-on-lab, we’ll explore how Enterprises can solve the problems now arising due to teams developing their own software with LLMs. Leveraging 8 years of experience in the Enterprise Application Generation space, Retool’s hands on experts will cover: How to use Retool to build front-ends on top of real data sources inside your VPC How to implement guardrails and permissions to enable semi-technical teams The tools and visuals needed to ensure long term maintainability of internal software
+
+How to participate This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Alexis Ego* — Enterprise Solutions Engineer, Retool
+
+Alexis Ego is an Enterprise Solutions Engineer at Retool.
+
+*Amar Shah* — Solutions Engineer, Retool
+
+Amar Shah is a Solutions Engineer at Retool.
+
+---
+
+### 14:10 – 15:30 — Fundamentals of distributed system resilience
+
+**Type:** Workshop  ·  **For:** Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Sam Newman (Independent Tech Consultant & Author, Sam Newman & Associates)
+
+**Abstract**
+
+Distributed systems are all around us. You are probably building one without realizing it!
+
+What is it about distributed systems that makes them painful to deal with? And how can you make sure the systems you create are resilient in the face of the myriad ways in which they can fail?
+
+In this workshop, you will explore the nature of resilience in the context of distributed systems, and come away with some foundational knowledge that will help you no matter what type of system you are building.
+
+Please note, this is not a coding workshop – it is a discussion-based workshop where as a group we explore architectural and technical aspects. Laptops are totally optional!
+
+How to participate This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+---
+
+### 14:10 – 15:30 — Diagnosing performance problems without the guesswork
+
+**Type:** Workshop  ·  **For:** Experienced Manager, Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Elena Tanasoiu (Staff Software Engineer, GitHub)
+
+**Abstract**
+
+Your app is slow. You add caching, tweak a database index, maybe throw more hardware at it. Sometimes it works, but mostly you’re guessing. This workshop changes that.
+
+You’ll learn to use flamegraphs, the single most effective tool for understanding where your application actually spends time. Through live demos and interactive diagnosis of real-world profiles, you’ll build the intuition to spot N+1 queries, GC pressure, serialisation costs, and hidden middleware overhead in seconds.
+
+We’ll profile in Ruby (Vernier) and Go (pprof), proving the mental model transfers across languages. You’ll also get an AI-assisted prompt template that cuts initial triage from 20 minutes to 2.
+
+You’ll leave with a concrete skill, a reference card, and a specific task to try Monday morning. No vendor lock-in, no theory.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Elena Tanasoiu* — Staff Software Engineer, GitHub
+
+Elena Tanasoiu is a Staff Engineer on GitHub’s Performance Engineering team. She spends her time making one of the world’s largest Ruby on Rails applications faster by profiling production traffic, diagnosing bottlenecks, and occasionally convincing teams they don’t need more hardware. She has a fondness for flamegraphs because they never lie.
+
+---
+
+### 14:10 – 15:30 — Leading through change
+
+**Type:** Workshop  ·  **For:** Director+  ·  **Topics:** technical-direction
+
+**Speaker(s):** Hywel Carver (CTO-turned-Founder, Skiller Whale)
+
+**Abstract**
+
+Sponsored by
+
+Change happens to us. Change happens because of us.
+
+The difference between reactive survival and intentional transformation defines great tech leaders. This interactive workshop will explore both how we understand and respond to change, but also how we strategize and make our own changes happening. You will leave with:
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Hywel Carver* — CTO-turned-Founder, Skiller Whale
+
+Hywel wrote his first program in C aged 9. After graduating with an MEng from Cambridge, he dropped out of his PhD programme to co-found his first start-up. Today, Hywel is Skiller Whale’s Co-Founder and CEO. He runs a dinner club for CTOs, a podcast for tech leaders called ‘Primarily Context-Based’, and is designing and building his own 8-bit computer for playing Pong. In his 12+ year career, he’s been building and scaling start-ups. With Skiller Whale, he is drawing on that experience to solve the biggest problem he faced as a CTO: learning for engineering teams.
+
+---
+
+### 14:10 – 15:30 — Translating up: Engineering advocacy for the C-suite
+
+**Type:** Workshop  ·  **For:** Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Rob Zuber (CTO, CircleCI), Shelly Stuart (Director of Engineering, CircleCI)
+
+**Abstract**
+
+Sponsored by
+
+You know what needs to change. You see the technical opportunities clearly. But when you bring initiatives to executives, they hear “risky change” not “controlled experiment.” The result? Great ideas die in planning, technical debt compounds, and your team runs obsolete processes while competitors experiment their way forward.
+
+The gap isn’t your technical competence—it’s translation. Executives operate in a different context with different constraints and accountabilities. They evaluate initiatives using frameworks like opportunity cost, customer impact, and risk management. Most staff+ engineers never learn to speak this language.
+
+In this workshop, CircleCI CTO Rob Zuber pulls back the curtain on how executives actually evaluate technical initiatives. You’ll learn how to better communicate and leverage technical frameworks to shift perception from “this sounds risky” to “this is a smart opportunity.” Discover how to frame experimentation as hypothesis testing, turn one-way doors into two-way doors, and position engineering investments using the same frameworks executives use for any strategic decision.
+
+You’ll leave with practical tools to drive better alignment between your engineering and the board so you can advocate for and focus on outcomes that drive the business forward.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Rob Zuber* — CTO, CircleCI
+
+Rob Zuber is a 20-year veteran of software startups; a three-time founder, and a five-time CTO. Since joining CircleCI, Rob has seen the company through its Series F funding and delivered on product innovation at scale while leading a team of 150+ engineers distributed worldwide.
+
+*Shelly Stuart* — Director of Engineering, CircleCI
+
+Shelly is an experienced engineering leader who is passionate about building a strong and supportive engineering culture that fosters diversity and growth. She is currently the Director of Engineering at CircleCI.
+
+---
+
+### 14:15 – 15:15 — How to run AI agents securely in self-hosted infrastructure with Coder
+
+**Type:** Hands-on Lab  ·  **For:** Director+, Staff+, Tech Lead  ·  **Topics:** ai
+
+**Speaker(s):** Eric Paulsen (Field CTO – EMEA, Coder)
+
+**Abstract**
+
+Sponsored by
+
+AI agents are moving from experiments to production, but running agents that execute code, call APIs, and interact with infrastructure introduces real security and governance challenges. In this guided lab, you’ll set up and run AI agents inside a controlled, self-hosted Coder environment, enforcing execution boundaries, managing access, and observing agent behavior in real time.
+
+In this session, learn how to:
+
+How to participate This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Eric Paulsen* — Field CTO – EMEA, Coder
+
+Eric Paulsen is the EMEA Field CTO at Coder, an open-source, self-hosted cloud development environment platform. A developer at heart, Eric began his career writing code and quickly became known for his ability to support and uplift fellow engineers. That passion for technology and collaboration evolved into guiding enterprise organisations, particularly in highly regulated industries, through their Developer Experience transformations. As Coder’s Founding Sales Engineer, Eric has remained deeply hands-on, continuously expanding his knowledge in emerging areas such as AI agents and automation. Today, he blends technical depth with strategic insight to help customers modernise secure, scalable development environments.
+
+---
+
+## Community Zone
+
+### 09:55 – 10:25 — How do you build a learning culture that keeps pace with rapidly evolving technology and AI trends?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Simone van Buuren (Staff Engineer, Pleo), Alexia Pedersen (SVP International, O'Reilly), Meng Muk (SVP of Software Engineering, Dexory)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Simone van Buuren* — Staff Engineer, Pleo
+
+Simone van Buuren is a Staff Engineer at Pleo.
+
+*Alexia Pedersen* — SVP International, O'Reilly
+
+Lex Pedersen leads the international team at O’Reilly and is responsible for creating and delivering value to the company’s customers. In this role, she provides support and vision to ensure the sales and customer success teams support customers throughout their learning journeys with O’Reilly.
+
+Lex has a passion for learning across the enterprise. She’s spent over 20 years in the technology sector, including time at Microsoft and Xerox, and brings extensive knowledge of working with large organizations to implement learning at scale to deliver successful outcomes.
+
+*Meng Muk* — SVP of Software Engineering, Dexory
+
+Meng is SVP of Software Engineering at Dexory, operating at the intersection of robotics, data and AI. With over 20 years of experience, she has built and scaled engineering organisations in robotics and automation, where hardware and software must ship together, and in cloud data platforms. Meng builds the teams, architectures and practices needed to move from early product to global deployment. A champion of learning cultures and early-career talent, she believes that when technology is shifting this fast, the people who thrive are the ones most willing to unlearn and relearn.
+
+---
+
+### 09:55 – 10:25 — How do you grow engineers when hiring isn’t an option and expectations are increasing?
+
+**Type:** Table Talk  ·  **For:** Director+  ·  **Topics:** management
+
+**Speaker(s):** Rodrigo Elias (Engineering Manager, Skyscanner), Tomasz Dacewicz (Senior Engineering Manager, Klarna), Rui Ramos (Tech Lead, Red Badger)
+
+**Abstract**
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Rodrigo Elias* — Engineering Manager, Skyscanner
+
+Rodrigo is an Engineering Manager at Skyscanner. His work has ranged from mobile development to large-scale flight search and pricing systems, and more recently into ML platform infrastructure. He has spent much of his career on systems where performance and correctness directly affect users. He is currently exploring agent-driven approaches to building and operating software in production environments.
+
+*Tomasz Dacewicz* — Senior Engineering Manager, Klarna
+
+Tomasz Dacewicz is a seasoned engineering leader with deep expertise in building scalable, high-impact software systems. With experience spanning startups and global organizations, he combines technical excellence with a people-first leadership style, fostering collaboration and continuous improvement within his teams. Passionate about clean architecture, mentoring, and delivering customer-focused solutions, Tom drives engineering cultures that balance innovation with reliability — helping teams ship better software, faster.
+
+*Rui Ramos* — Tech Lead, Red Badger
+
+Rui is currently a Tech Lead at Red Badger, helping blue-chip companies with their digital transformation journey. He leads cross-functional teams in the design and delivery of innovative digital products. A software developer and technical leader with over 10 years experience, Rui thrives in the interception of product, business and technology. Having helped early stage startups to big enterprises, he focuses on using technology to add business value and solve real user needs, building for the now, always with a curious learning-oriented approach. Outside of work, he enjoys spending quality time with his wife and three children.
+
+---
+
+### 10:25 – 10:55 — Connecting trans* and gender non-conforming leaders
+
+**Type:** Community Representation Groups  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Dee Kitchen (VP, Engineering, Grafana Labs), Madeline Fletcher (Development Manager, Shopify), Sam Collard (Technical lead, Patients Know Best)
+
+**Abstract**
+
+Connect with folks over shared experiences
+
+Everyone’s journey into leadership is tough, but folks who are underrepresented in tech often face their own unique set of challenges. And that can lead to people feeling isolated in their experiences.
+
+Come to the community representation groups, where you’ll be able to connect with folks who might have similar backgrounds and experiences to yours, and where you’ll be able to build a peer network for support throughout your journey.
+
+**Speaker bio(s)**
+
+*Dee Kitchen* — VP, Engineering, Grafana Labs
+
+An engineer since 1996 and a people and project leader since 2005, Dee is a deeply technical senior leader who stays hands-on with technical direction while maintaining a strong commitment to developing engineers and engineering managers. Dee focuses on ensuring teams have both the right technology and the right support to successfully deliver on their mission.
+
+Over the past decade, Dee’s technical work has centered on observability, distributed databases, and privacy at Grafana Labs, as well as security products at Cloudflare, including firewalls, denial-of-service protection, traffic matching, and end-user protection. Alongside this work, Dee has led with a strong emphasis on mental health and wellbeing, diversity, and the personal growth of direct reports.
+
+*Madeline Fletcher* — Development Manager, Shopify
+
+Madeline works as a Development Manager in the Retail team at Shopify, supporting engineers to do their best work and push themselves in order to achieve their goals. She has previously worked in diverse industry sectors such as a charity, consultancy and media. She is proud to be a visible LGBTQIA+ leader.
+
+*Sam Collard* — Technical lead, Patients Know Best
+
+Sam is a developer at Patients Know Best where they use their 25+ years of programming experience to help ensure patients receive the best care possible. They care deeply about accessibility, sustainability and ethics in computing, and have been known to dabble in music and visual coding on the side.
+
+---
+
+### 10:25 – 10:55 — 
+
+**Type:** Office hours  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Sam Edwards (Senior Solutions Architect, Vercel), Randy Shoup (SVP Engineering, Thrive Market)
+
+**Abstract**
+
+Ask speakers more about their talk.
+
+**Speaker bio(s)**
+
+*Sam Edwards* — Senior Solutions Architect, Vercel
+
+Sam Edwards is a London-based Solutions Architect at Vercel who works with large enterprises on frontend infrastructure and agentic workflows. Before Vercel, he helped lead a full-stack migration for a luxury retail site and held engineering roles across broadcast media and health tech. Sam has a particular interest in monitoring, observability and productionisation, as well as how the emerging craft of orchestrating agentic fleets is touching nearly every role in the technical sphere.
+
+*Randy Shoup* — SVP Engineering, Thrive Market
+
+Randy Shoup serves as SVP of Engineering at Thrive Market. With more than 30 years of experience building distributed systems and leading high-performing teams, he has held senior technology leadership roles at eBay, Google, Stitch Fix, and WeWork. He also mentors CTOs, advises organizations, and shares his perspectives widely. A frequent conference speaker on software and engineering leadership, he is particularly interested in how culture, technology, and organizational design intersect.
+
+---
+
+### 10:55 – 11:25 — How do you build a testing culture where everyone feels responsible for quality?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Jon Greenall (Engineering Lead, Wise), Ole Lensmar (CTO, Testkube), Michela Federico (Web Engineering Lead, Unite Students)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Jon Greenall* — Engineering Lead, Wise
+
+Jon Greenall is a Senior Engineering Lead at Wise, where he leads initiatives across the UK and Europe and shapes the organisation’s Open Banking strategy. He brings over 15 years of experience in software engineering, with deep expertise in UK and international payments infrastructure. He is currently a member of a Bank of England committee designing the next generation of UK retail payments. Previously, Jon held leadership roles at Starling Bank and at Mettle, NatWest’s digital bank.
+
+*Ole Lensmar* — CTO, Testkube
+
+Ole started building with XML APIs in the late 90s and has since then worked with multiple technologies and startups, most notably as creator of SoapUI in 2004 and Chairman of the Swagger / OpenAPI Initiative in 2015.
+
+He joined Testkube at its inception in 2021 and is now entirely focused on ensuring its success at bringing continuous testing to the cloud-native space.
+
+When not at his laptop he can be found playing a guitar or riding a bike, but rarely both at the same time.
+
+*Michela Federico* — Web Engineering Lead, Unite Students
+
+Michela Federico is a Web Engineering Lead and transformation-focused engineering leader passionate about fast flow, developer experience, and organisational design. With over a decade in software and leadership, she helps teams optimise delivery through DevOps practices, platform thinking, and continuous improvement. She is the creator of the “Continuous Mindset,” a holistic approach that aligns technology, people, and processes with natural feedback loops to drive sustainable performance. Michela mentors engineers globally and speaks about building high-performing, learning-oriented teams.
+
+---
+
+### 10:55 – 11:25 — How do you handle underperformance without avoiding the hard conversations?
+
+**Type:** Table Talk  ·  **For:** Experienced Manager, New Manager  ·  **Topics:** culture
+
+**Speaker(s):** Monica Jianu (Director of Engineering, Supercritical), Stu Cavill (Engineering Manager, Cleo AI), Sally Goble (Head of Services Engineering, Accurx)
+
+**Abstract**
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Monica Jianu* — Director of Engineering, Supercritical
+
+Monica has spent most of her career in the messy middle of early-stage startups — building engineering teams, shaping product direction, and designing the lightweight processes that keep small companies moving fast. She’s worked across seed to Series B in healthtech and climatetech, moving between hands-on delivery, engineering management, and product leadership. She is particularly interested in figuring out why teams are stuck, turning debates into decisions, and treating process as experiment.
+
+*Stu Cavill* — Engineering Manager, Cleo AI
+
+Stu is an Engineering Manager at Cleo with over 15 years experience within tech. Having started his career administering payroll for police officers using a SAP system, his desire to solve problems took him down the path of becoming a self-taught coder. In time, he has come to discover his passion for process experimentation, leading tech teams and endeavoring to accelerate the careers of those whom he works with.
+
+*Sally Goble* — Head of Services Engineering, Accurx
+
+Sally has been working in software development for over twelve years. She is currently the Head of Services Engineering at Accurx, a health tech startup in London, helping solve many of the problems that occur when scaling an organisation. Before that she worked at a diverse range of startups, scaleups and corporations – including Deliveroo the Guardian. She is a regular speaker at conferences.
+
+---
+
+### 11:40 – 12:10 — How do you secure your software supply chain without slowing down delivery?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** software-quality
+
+**Speaker(s):** Shana Dacres-Lawrence (Senior Principal Architect, Accenture), Mark Allen (Head of Engineering, Junction), Tom Finch (Sales Engineering Manager, EMEA, Chainguard)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Shana Dacres-Lawrence* — Senior Principal Architect, Accenture
+
+Shana Dacres-Lawrence is a Senior Principal Architect at Accenture.
+
+*Mark Allen* — Head of Engineering, Junction
+
+Mark Allen is a Head of Engineering at Junction.
+
+*Tom Finch* — Sales Engineering Manager, EMEA, Chainguard
+
+Tom Finch is a technical leader at Chainguard specialising in software supply chain security, minimal container images, and secure-by-default cloud-native architectures. He works hands-on with platform and engineering teams to reduce CVE exposure, harden container environments, and modernise build pipelines using distroless and minimal base images.
+
+Previously at Wiz, Tom advised enterprises on cloud security posture management across complex multi-cloud environments. At Puppet, he helped organisations automate infrastructure and implement policy-driven configuration management at scale.
+
+With deep expertise in Kubernetes, containers, CI/CD pipelines, and infrastructure as code, Tom focuses on practical security outcomes — reducing attack surface, improving SBOM transparency, and shifting security left without slowing development velocity.
+
+---
+
+### 11:40 – 12:10 — How do you deal with AI reshaping team structures, roles, and expectations?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager  ·  **Topics:** technical-direction
+
+**Speaker(s):** Christie Davis (Senior Engineering Lead, Wise), Saki Shinoda (Machine Learning Lead, Ash by Slingshot AI), Mark Hemsley (Head of Architecture, Rail Delivery Group)
+
+**Abstract**
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app.
+
+**Speaker bio(s)**
+
+*Christie Davis* — Senior Engineering Lead, Wise
+
+Christie has been leading engineering teams for the past four years at Wise. She has helped to build the Receive domain – allowing people to get paid like a local wherever they are in the world. She has a passion for building quality products, high performing teams and having fun.
+
+*Saki Shinoda* — Machine Learning Lead, Ash by Slingshot AI
+
+Saki Shinoda is a Machine Learning Lead at Ash by Slingshot AI.
+
+*Mark Hemsley* — Head of Architecture, Rail Delivery Group
+
+Mark Hemsley is a Head of Architecture at Rail Delivery Group.
+
+---
+
+### 11:40 – 12:10 — Connecting engineering leaders in media and entertainment
+
+**Type:** Industry Interest Groups  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Gokce Koyun (Lead Engineer, ITV), Nazlı Sahin (Director of Security, Risk and Compliance, Accedo), Tatiana Stantonian (Principal Engineer, Financial Times)
+
+**Abstract**
+
+Connect with folks over shared experiences
+
+Building great software comes with unique challenges in every industry and often, the best insights come from others who are in the same boat. Join our relaxed sessions where you can meet peers working in similar domains to share ideas, collaborate on challenges and exchange solutions.
+
+**Speaker bio(s)**
+
+*Gokce Koyun* — Lead Engineer, ITV
+
+With over 20 years in technology, the majority spent at ITV, she has witnessed and contributed to the evolution of one of today’s major streaming platforms. She has worked across a range of technologies including .NET, Scala, and currently Go, with a strong focus on highly available, high-traffic systems. Passionate about reliability, observability, and continuous learning, she cares deeply about improving the engineering experience and building autonomous teams. Outside of work, she enjoys reading, travelling, and knitting.
+
+*Nazlı Sahin* — Director of Security, Risk and Compliance, Accedo
+
+Nazli leads security strategy, risk management, and compliance for a global organization. Over a decade in leadership, she has shaped security policies, controls, and governance frameworks, from incident response and AI governance to ISO 27001 and GDPR compliance. She has built teams that operate independently while she focuses on strategic direction and organizational security posture. Nazli believes effective leadership means seeing potential in others and creating environments where, with the right balance of challenge, support, and trust, people grow and elevate those around them.
+
+*Tatiana Stantonian* — Principal Engineer, Financial Times
+
+Tatiana Stantonian is a Principal Engineer and engineering manager at the Financial Times, based in London. She works across teams to shape the systems and direction for FT.com’s Customer Lifecycle area, including subscription growth and retention. With a background at the Government Digital Service and over a decade in software engineering, she’s passionate about the intersection of user experience, business impact, and technical systems. She recently led the implementation of two major AI projects at the FT, and loves helping teams find the highest value work they can deliver.
+
+---
+
+### 11:40 – 12:40 — Fundraising for technical founders
+
+**Type:** VC Office Hours  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Dana Oshiro (Investor, Heavybit)
+
+**Abstract**
+
+Have a startup idea? Join SF-based Heavybit investor Dana Oshiro to craft your narrative as a technical founder; discuss what investors actually evaluate at pre-seed and seed; learn how dilution works over time; and build a pragmatic capital strategy.
+
+**Speaker bio(s)**
+
+*Dana Oshiro* — Investor, Heavybit
+
+Dana Oshiro is a Partner at Heavybit where she’s built the venture firm’s brand, accelerator, and team from the ground up. In addition to sourcing and closing deals, she’s led more than 60 startup company launches. Previously as a senior marketer and journalist, she’s built strategy for Heroku and Salesforce, rebranded and sold a blogging network, and covered hundreds of startups.
+
+---
+
+### 12:25 – 12:55 — How do you balance rapid AI-powered application development with long-term maintainability and security?
+
+**Type:** Table Talk  ·  **For:** Director+, Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Alexis Ego (Enterprise Solutions Engineer, Retool), Priyanka Bettadapura (Senior Software Engineer, Microsoft), Tom Butterwith (Senior Director of Engineering, VEED)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Alexis Ego* — Enterprise Solutions Engineer, Retool
+
+Alexis Ego is an Enterprise Solutions Engineer at Retool.
+
+*Priyanka Bettadapura* — Senior Software Engineer, Microsoft
+
+Priyanka Bettadapura is a Senior Software Engineer at Microsoft working on Azure AI/ML infrastructure. With over 12 years of experience across Microsoft, Zoom, Oracle, Capillary Technologies, and Caterpillar, she has built scalable distributed systems, optimized Kubernetes clusters, and driven cloud cost savings exceeding $1M while maintaining 99.99% availability. Priyanka shares technical insights through her blog (priyankabswe.substack.com) and open-source contributions on GitHub (pribetta). She is passionate about AI/ML systems, technical leadership, and building reliable cloud infrastructure. Outside of work, she enjoys hiking, traveling, and advocating for animal welfare.
+
+*Tom Butterwith* — Senior Director of Engineering, VEED
+
+Tom Butterwith is a Senior Director of Engineering at VEED, where he leads the growth engineering and AI research teams. With over a decade of experience in software engineering, he has built and scaled teams across scale-ups and large enterprises. Tom focuses on empowering engineers to do great work, and applying AI where it delivers real value over hype.
+
+---
+
+### 12:25 – 12:55 — How do you manage managers and maintain alignment across multiple layers of leadership?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, New Manager  ·  **Topics:** leadership
+
+**Speaker(s):** Silky Vaidya (Interim CTPO, SiRV), John Ojetunde (Head of Engineering, Moniepoint), Ugo Anomelechi (Director of Engineering, Heycar)
+
+**Abstract**
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*John Ojetunde* — Head of Engineering, Moniepoint
+
+John Ojetunde is Head of Engineering at Moniepoint, one of Africa’s largest fintech companies, where he leads teams building payment infrastructure that millions of Nigerians rely on daily. He believes speed and quality aren’t enemies — they both answer to mastery. That conviction shapes how he builds teams, runs systems, and thinks about scale. John writes about engineering leadership and team culture on his Substack, Commits by John, and has spent years mentoring engineers across Africa through the DreamDev program. When he’s not thinking about systems, he’s thinking about the people who run them.
+
+*Ugo Anomelechi* — Director of Engineering, Heycar
+
+An experienced engineering leader with 18+ years of driving platform scalability, cross-regional collaboration, and technical innovation. As Director of Engineering at heycar, he has led key initiatives like unifying platforms across markets and fostering team growth through knowledge-sharing programmes. His background as a former international sprinter has shaped his leadership style, emphasising discipline, focus, and the ability to make complex ideas simple and actionable. He thrives on connecting technical excellence with business goals and passionate about sharing insights and learning from peers as he engages more deeply with the engineering leadership community.
+
+---
+
+### 12:25 – 12:55 — Connecting queer leaders
+
+**Type:** Community Representation Groups  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Linn Foster (Director of Engineering Management, Exclaimer), Dougie Robertson (Engineering Manager, ITV), Alfie Potter (Solutions Consultant, Iterable)
+
+**Abstract**
+
+Connect with folks over shared experiences
+
+Everyone’s journey into leadership is tough, but folks who are underrepresented in tech often face their own unique set of challenges. And that can lead to people feeling isolated in their experiences.
+
+Come to the community representation groups, where you’ll be able to connect with folks who might have similar backgrounds and experiences to yours, and where you’ll be able to build a peer network for support throughout your journey.
+
+**Speaker bio(s)**
+
+*Linn Foster* — Director of Engineering Management, Exclaimer
+
+As Director of Engineering Management at Exclaimer, Linn leads Exclaimer’s Engineering department with a strong focus on people leadership, continuous improvement, and technical excellence. She is passionate about building highly engaged and collaborative teams by fostering a people-first culture.
+
+*Dougie Robertson* — Engineering Manager, ITV
+
+Dougie is an Engineering Manager at ITVX, and Deputy Chair for ITV Pride. His route to engineering management was quite scenic, with a professional background in TV production and Japanese language. He is passionate about the responsibility of being a visible LGBTQIA+ leader in our industry.
+
+*Alfie Potter* — Solutions Consultant, Iterable
+
+Alfie is a Technical Analyst for the Enterprise Architecture team at ITV. As a Technical Analyst, he has numerous responsibilities. Such as project support on award winning broadcast initiatives, modelling ITVs technology landscape, supporting business architects in developing ITVs strategy and forming the frameworks for technology governance processes. Additionally he works on the IBC Accelerator Media Innovation Programme, fostering mainstream innovation in media.
+
+Outside of his day job, Alfie sits on the committees of ITV Pride, Out in Tech and Intermedia, where he is actively working on events for LGBTQ+ people in the broadcast and tech industry.
+
+---
+
+### 13:10 – 13:40 — Connecting leaders from non-traditional backgrounds
+
+**Type:** Community Representation Groups  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Jessie Auguste (Software Engineer, CybSafe), Eleanor Deal (Senior Engineer II, CrowdStrike), Rahul Verma (Engineering Leader, Meta)
+
+**Abstract**
+
+Connect with folks over shared experiences
+
+Everyone’s journey into leadership is tough, but folks who are underrepresented in tech often face their own unique set of challenges. And that can lead to people feeling isolated in their experiences.
+
+Come to the community representation groups, where you’ll be able to connect with folks who might have similar backgrounds and experiences to you, and where you’ll be able to build a peer network for support throughout your journey.
+
+**Speaker bio(s)**
+
+*Jessie Auguste* — Software Engineer, CybSafe
+
+As an award-winning Software Engineer at CybSafe, Jessie drives secure software development practices while scaling engineering teams in the UK’s fast-paced startup ecosystem. Her technical expertise spans cybersecurity, application security, and building resilient systems that protect organisations from evolving threats.
+
+Beyond her engineering contributions, Jessie is a recognized leader in fostering inclusive tech cultures. She founded and hosts Glowing in Tech , a platform that has become a vital resource for tech leaders seeking to build more diverse and innovative teams. Through this work, she’s helped hundreds of underrepresented professionals advance their careers while providing actionable insights for leadership teams on creating inclusive environments that drive business results.
+
+As a sought-after technical speaker, Jessie has delivered keynotes and workshops at leading industry events including LeadDev, DevConf, React Miami, and BeJS, as well as for organizations like Docker and codebar. Her presentations focus on practical leadership strategies, secure coding practices, and building high-performing diverse teams.
+
+Jessie’s leadership extends to curriculum development, where she’s created and delivered specialised technical training programs, including OWASP secure coding principles courses. Her educational initiatives have equipped both individual contributors and engineering leaders with the skills needed to build secure, scalable systems while advancing DEI objectives.
+
+Through her board position with Girl Dreamer and active involvement with Coding Black Females, Jessie provides strategic guidance to organisations looking to transform their hiring, retention, and promotion practices in tech.
+
+*Eleanor Deal* — Senior Engineer II, CrowdStrike
+
+Eleanor is a Senior Engineer II at CrowdStrike working in Cloud Security, with 10 years software engineering and leadership experience. She is a Women Techmakers Ambassador and has a strong background in building engineering teams and communities. Eleanor is an outspoken advocate for diversity and inclusivity, taking a data-led approach to tackling challenges keeping people from thriving in technology.
+
+*Rahul Verma* — Engineering Leader, Meta
+
+Rahul is an Engineering Leader, currently supporting the Privacy team at Meta (Facebook), in London.
+
+He is driven by the passion to build, grow and retain high performing teams. Rahul also has rich experience in building highly scalable technology solutions in different domains like user data privacy, collaboration platforms (Slack) and travel commerce (Expedia). Rahul loves to drive clarity in vision and goals for the team.
+
+---
+
+### 13:55 – 14:25 — Connecting Asian leaders
+
+**Type:** Community Representation Groups  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Bharathy Seralathan (Engineering Manager, Exclaimer Ltd), Karen Lee Rigg (Director of Engineering, Global Intelligence Platforms, Just Eat Takeaway.com), Andrew Huang (Technical Lead, Softwire)
+
+**Abstract**
+
+Connect with folks over shared experiences
+
+Everyone’s journey into leadership is tough, but folks who are underrepresented in tech often face their own unique set of challenges. And that can lead to people feeling isolated in their experiences.
+
+Come to the community representation groups, where you’ll be able to connect with folks who might have similar backgrounds and experiences to yours, and where you’ll be able to build a peer network for support throughout your journey.
+
+**Speaker bio(s)**
+
+*Bharathy Seralathan* — Engineering Manager, Exclaimer Ltd
+
+Bharathy Seralathan is an Engineering Manager at Exclaimer, where she leads core functional teams in delivering scalable, cloud-based solutions. With over 15 years of experience in software engineering, she brings deep understanding in software development, agile methodologies, and team leadership.
+
+Bharathy is passionate about building high-performing teams and creating environments where people can thrive. Known for her curiosity, authenticity, creativity, and altruism, she is committed to fostering growth in others and enjoys mentoring the next generation of engineers.
+
+Outside of work, Bharathy volunteers at community cultural events and supports a women’s charity group that offers free dance sessions.
+
+*Karen Lee Rigg* — Director of Engineering, Global Intelligence Platforms, Just Eat Takeaway.com
+
+Karen is a Director of Engineering at Just Eat Takeaway.com, a leading global online food delivery marketplace, connecting consumers and partners to empower everyday convenience. Previously, Karen was a Director of Engineering at Permutive, a best in class audience platform for advertisers and publishers, and a Tech Lead at Thoughtworks, a leading global technology consultancy.
+
+Outside of work, she can be found rock climbing in the Peak District, snowboarding in the Alps and occasionally sailing in the Caribbean.
+
+*Andrew Huang* — Technical Lead, Softwire
+
+A mentor and coach to engineers of all levels, Andrew is a Technical Lead at Softwire. They are impactful in accelerating the careers and personal development of all the people they lead, supporting ambitious colleagues with career guidance, role mentorship and job satisfaction.
+
+---
+
+### 14:25 – 14:55 — How do you build AI into day-to-day workflows in a way that consistently improves developer productivity?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** ai
+
+**Speaker(s):** Donald Forbes (Solutions Architect, Temporal), Eshwari Chandrashekhar (Engineering Manager, MONY Group plc), Josh Bryant (Director of Engineering, Zappi)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Donald Forbes* — Solutions Architect, Temporal
+
+Donald Forbes is a Solutions Architect at Temporal.
+
+*Eshwari Chandrashekhar* — Engineering Manager, MONY Group plc
+
+Eshwari Chandrashekhar is an Engineering Manager at MONY Group plc.
+
+*Josh Bryant* — Director of Engineering, Zappi
+
+Josh is Director of Engineering at Zappi, a B2B SaaS market research platform, where he leads teams across SRE, Developer Experience, Data Platform, and Data Science. He’s interested in the interplay between people and technology — how engineering organisations are structured, how senior leaders develop, and how teams adapt as the tools they work with fundamentally change.
+
+---
+
+### 14:25 – 14:55 — How do you solve the problem of technical debt when you’re scaling systems and teams?
+
+**Type:** Table Talk  ·  **For:** Experienced Manager, Staff+, Tech Lead  ·  **Topics:** technical-direction
+
+**Speaker(s):** Julia Nezdemovska (Engineering Manager, InPost), Gokce Koyun (Lead Engineer, ITV)
+
+**Abstract**
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Julia Nezdemovska* — Engineering Manager, InPost
+
+Julia is an engineering leader with over a decade of experience across software development, technical leadership, and team management. In InPost she actively contributes to building scalable distributed solutions, powering one of Europe’s fastest-growing logistics platforms. She enjoys staying close to architecture and code, participating in technical discussions, while supporting her team as an empathetic and transparent leader. Julia’s teams value her ability to bridge complex technical challenges with effective collaboration to deliver tangible results.
+
+*Gokce Koyun* — Lead Engineer, ITV
+
+With over 20 years in technology, the majority spent at ITV, she has witnessed and contributed to the evolution of one of today’s major streaming platforms. She has worked across a range of technologies including .NET, Scala, and currently Go, with a strong focus on highly available, high-traffic systems. Passionate about reliability, observability, and continuous learning, she cares deeply about improving the engineering experience and building autonomous teams. Outside of work, she enjoys reading, travelling, and knitting.
+
+---
+
+### 14:25 – 14:55 — Connecting engineering leaders in healthcare
+
+**Type:** Industry Interest Groups  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Cristina Martins (Manager of Engineering, Sword Health), Liem Pham (Software Engineer, Healthtech 1), Sally Goble (Head of Services Engineering, Accurx)
+
+**Abstract**
+
+Connect with folks over shared experiences
+
+Building great software comes with unique challenges in every industry and often, the best insights come from others who are in the same boat. Join our relaxed sessions where you can meet peers working in similar domains to share ideas, collaborate on challenges and exchange solutions.
+
+**Speaker bio(s)**
+
+*Cristina Martins* — Manager of Engineering, Sword Health
+
+Cristina Martins is a Manager of Engineering at Sword Health, where she leads one of the teams building Bloom, an AI-powered women’s health solution. Her passion for HealthTech is rooted in her Biomedical Engineering background, which fuels her mission to build products that measurably improve quality of life. With 8 years of Android development experience, Cristina now acts as a facilitator, focusing on empowering engineers to reach their full potential. She is also a community organizer for Google Developer Groups Porto. For a mental reset, Cristina loves attending live concerts, baking cookies, and practicing the art of punch needle.
+
+*Liem Pham* — Software Engineer, Healthtech 1
+
+Liem is a France-born, UK-based frontend engineer in early-stage startups. He has spent the last few years in healthcare, building accessible software for NHS patients. His role sees him wearing multiple hats — hopping between teams to develop processes, put out fires, scope new projects, and support others in the engineering community. Since first arranging his lego by colour and size, he’s found his passion in making websites pixel-perfect. When not coding, you’ll find him running, swimming, and hunting for the best bakery in London.
+
+*Sally Goble* — Head of Services Engineering, Accurx
+
+Sally has been working in software development for over twelve years. She is currently the Head of Services Engineering at Accurx, a health tech startup in London, helping solve many of the problems that occur when scaling an organisation. Before that she worked at a diverse range of startups, scaleups and corporations – including Deliveroo the Guardian. She is a regular speaker at conferences.
+
+---
+
+### 15:10 – 15:40 — How do you make sure your teams stay aligned when roadmaps and priorities keep shifting?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, Tech Lead  ·  **Topics:** communication
+
+**Speaker(s):** Mathew Wilson (Director of Product Management, Docker), Nataliya Pasichnyk (Engineering Manager, Netflix), Devyani Vij (Product Security Lead, Tide)
+
+**Abstract**
+
+Sponsored by
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Mathew Wilson* — Director of Product Management, Docker
+
+Mathew Wilson is a Director of Product Management at Docker.
+
+*Nataliya Pasichnyk* — Engineering Manager, Netflix
+
+Nataliya is an Engineering Manager at Netflix, leading a team focused on building and improving an internal product. She’s an active mentor and supports non-profit initiatives that help women advance in tech, including serving as a leader of the Women@Netflix ERG in Warsaw.
+
+*Devyani Vij* — Product Security Lead, Tide
+
+Devyani Vij is a Product Security Lead at Tide.
+
+---
+
+### 15:10 – 15:40 — How do you influence decisions effectively as a staff+ leader?
+
+**Type:** Table Talk  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Asima Khalid (Staff Engineer, Flagstone), Robert Lehmann (Staff Engineer, Google), Simone van Buuren (Staff Engineer, Pleo)
+
+**Abstract**
+
+Join facilitated conversations and dive into key issues facing engineering teams
+
+There’s never a single silver bullet for any problem and often you’ll need to combine the ideas of multiple people to find the perfect solution for your team. We’ll be discussing some core issues in the Table Talk sessions, hosted by a group of engineering leaders who are on hand to provide their perspectives and help guide the conversation. You can dip in and out of discussions depending on what interests you the most.
+
+How to participate
+
+This session requires sign-up, so you can plan your day and secure your spot in advance. Reserve your place via the LeadDev app, available from 18 May 2026.
+
+**Speaker bio(s)**
+
+*Asima Khalid* — Staff Engineer, Flagstone
+
+Asima Khalid is a Staff Engineer and part of Engineering Leadership group at Flagstone. She holds a Bachelor’s in Computer Science and Engineering from the University of Engineering and Technology, Pakistan, earning two Gold Medals and a National Talent Scholarship.
+
+A culture champion and mental health first aider, committed to empowering others and advocating for inclusivity in STEM, she mentors engineers and women in tech through the ElevateHer community. She leads with empathy and example.
+
+Outside work, she volunteers as a swim instructor, giving young children the confidence and safety skills to thrive in the water.
+
+*Robert Lehmann* — Staff Engineer, Google
+
+Robert Lehmann is a Staff Engineer at Google.
+
+*Simone van Buuren* — Staff Engineer, Pleo
+
+Simone van Buuren is a Staff Engineer at Pleo.
+
+---
+
+### 15:40 – 16:10 — Connecting parent leaders
+
+**Type:** Community Representation Groups  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** culture
+
+**Speaker(s):** Chinonso Ani (Back End Developer, NHS Benchmarking Network (The Benchmarking Network)), Yanqing Cheng (Founder, Tollens.ai), Rahul Verma (Engineering Leader, Meta), Sally Lait (Fractional technology leader and advisor)
+
+**Abstract**
+
+Connect with folks over shared experiences
+
+Everyone’s journey into leadership is tough, but folks who are underrepresented in tech often face their own unique set of challenges. And that can lead to people feeling isolated in their experiences.
+
+Come to the community representation groups, where you’ll be able to connect with folks who might have similar backgrounds and experiences to yours, and where you’ll be able to build a peer network for support throughout your journey.
+
+**Speaker bio(s)**
+
+*Chinonso Ani* — Back End Developer, NHS Benchmarking Network (The Benchmarking Network)
+
+Chinonso is a software engineering leader with over a decade of experience building scalable software systems, data pipelines, and cloud-native platforms across healthcare, e‑commerce, and SaaS products. He is a TOGAF certified Solution Architect and has led software engineering teams as an Engineering Manager and founder. He is also the LeadDev Meetup organiser in Manchester and LeadDev Community Organiser in London, he is passionate about AI-assisted development, integration patterns, and mentoring engineers in high-impact technical delivery.
+
+*Yanqing Cheng* — Founder, Tollens.ai
+
+Yanqing Cheng is a software engineering leader with over a decade of experience in distributed systems and software quality. Her career spans networking protocol stacks in C, 5G core platforms, and cloud-scale test infrastructure at Metaswitch and Microsoft Azure. She has led teams across complex technical domains while championing psychological safety, neurodiversity inclusion, and developing her people. Currently on a career break raising her baby daughter, she is still deeply interested in how AI is shaping software development practices, particularly around quality and reliability. Outside engineering, she performs musical theatre and plays chess.
+
+*Rahul Verma* — Engineering Leader, Meta
+
+Rahul is an Engineering Leader, currently supporting the Privacy team at Meta (Facebook), in London.
+
+He is driven by the passion to build, grow and retain high performing teams. Rahul also has rich experience in building highly scalable technology solutions in different domains like user data privacy, collaboration platforms (Slack) and travel commerce (Expedia). Rahul loves to drive clarity in vision and goals for the team.
+
+*Sally Lait* — Fractional technology leader and advisor
+
+Sally Lait specialises in building strong engineering culture, and aims to create supportive and inclusive environments for managers, developers, and teams to thrive and do fantastic technical work.
+
+Her roles have included helping to change the way the world deals with death as VP of Engineering (plus IT & Data and Insights) at Farewill, prior to which she led Monzo’s web discipline and engineering across Operations through hypergrowth. Other experience involves founding a digital transformation consultancy with clients including the Manor Racing F1 team and RNLI, and working as Head of Technology for a global digital agency. Sally’s a strong advocate for building software and teams alike with empathy, responsibility, and accessibility in mind. She’s spoken at events around the world, is on Mastodon at @ https://mastodon.social/@sally , and you can find out more about her at sally.dev .
+
+---
+
+## Connection Zone
+
+### 09:55 – 10:20 — Speed coaching with Mathias Meyer
+
+**Type:** Speed coaching  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Mathias Meyer (Founding Partner & Executive Coach, The Intentional Organization)
+
+**Abstract**
+
+Watch or participate in free 1:1 coaching with Mathias Meyer.
+
+Learning new information is always great, but sometimes solutions can feel too one-size-fits-all for your specific circumstances. How can advice be applied to a team of 10 or a team of 10,000?
+
+On the other hand, coaching is directly tailored to your specific challenges and the specific environment they exist in. Mathias will be hosting one-on-one coaching sessions with attendees to get into the nuts and bolts of the challenges they’re facing. Come and have a conversation, or peek into the challenges other leaders are facing.
+
+**Speaker bio(s)**
+
+*Mathias Meyer* — Founding Partner & Executive Coach, The Intentional Organization
+
+Mathias Meyer is an executive coach, advisor, and co-author of the book The Intentional Organization . As Founding Partner at The Intentional Organization, he works with founders, CTOs, and senior leaders to build purposeful organizations grounded in clarity, inclusion, and learning. Previously, he co-founded two successful developer tools companies and held leadership roles including CEO of Travis CI and CTO of Reaction Commerce, bringing deep experience in scaling distributed teams and organizations.
+
+---
+
+### 10:55 – 11:20 — VP hangout
+
+**Type:** Peer Hangouts  ·  **For:** Director+, Experienced Manager  ·  **Topics:** culture
+
+**Speaker(s):** Lauren Henry (VP Engineering, Tide), Lisa van Gelder (VP, Engineering)
+
+**Abstract**
+
+Comparing notes on shared challenges that come with your role has never been easier. Peer Hangouts are 30-minute, casual networking sessions for folks to talk through their experiences and challenges with peers who understand the context they’re working in. Drop in and join a conversation!
+
+**Speaker bio(s)**
+
+*Lauren Henry* — VP Engineering, Tide
+
+Lauren Henry is a technology leader with deep experience scaling engineering organizations, driving product led growth, and building high performing teams. She has led complex, cross functional initiatives across platform, data, and product engineering, with a focus on aligning technical execution to business outcomes. Known for her pragmatic and people first leadership style, Lauren specializes in developing managers, navigating organizational change, and creating sustainable operating models. She is particularly interested in how modern engineering organizations evolve in response to AI, shifting customer expectations, and increasing complexity, and is passionate about helping leaders grow into impactful, resilient VP level roles.
+
+*Lisa van Gelder* — VP, Engineering
+
+Lisa has been in software for over 25 years, working in a wide range of companies from early stage startups to established companies like the BBC, Meetup & the Guardian newspaper. She used to debug code, now she debugs teams for a living. She is mostly powered by coffee.
+
+---
+
+### 11:40 – 12:05 — CTO hangout
+
+**Type:** Peer Hangouts  ·  **For:** Director+  ·  **Topics:** culture
+
+**Speaker(s):** Thomas Johnson (Co-founder and CTO, Multiplayer), Crystal Hirschorn (CTO, Zoa)
+
+**Abstract**
+
+Comparing notes on shared challenges that come with your role has never been easier. Peer Hangouts are 30-minute, casual networking sessions for folks to talk through their experiences and challenges with peers who understand the context they’re working in. Drop in and join a conversation!
+
+**Speaker bio(s)**
+
+*Thomas Johnson* — Co-founder and CTO, Multiplayer
+
+Thomas Johnson is the Co-founder and CTO at Multiplayer, with 30+ years of experience as an engineering leader and backend developer building large-scale distributed software (and robots!)
+
+*Crystal Hirschorn* — CTO, Zoa
+
+Crystal is an experienced Technology & Data Leader with a career spanning more than 20 years across many sectors. She has held CTO, VP, and Senior Director of Software Engineering, and Principal Engineer roles. She is currently CTO at Zoa who are on a mission to revolutionise the adoption of green energy with intelligent technologies.
+
+---
+
+### 11:40 – 12:05 — My team is split on AI. Half are racing ahead, half are pushing back. How do I hold it together?
+
+**Type:** Solution Swap  ·  **For:** Director+, Experienced Manager, New Manager  ·  **Topics:** leadership
+
+**Speaker(s):** Robbie Clutton (Principal, RobbieClutton.com)
+
+**Abstract**
+
+Your team has been working flat out for the last 4 months delivering a set of projects for your company. The projects are taking longer than originally expected and tensions are beginning to rise, particularly with the Sales and Customer Success teams.
+
+You are spending more and more of your time getting asked about when the projects are going to be delivered.
+
+In your 1-1 with your CEO, they open the conversation by telling you that they need you to get your teams to deliver these projects faster.
+
+How do you respond?
+
+As Engineering Leaders, many of us will recognise this scenario from similar situations that we have encountered in our own careers.
+
+In this session, we explore the different ways that you can respond. We will think about how to turn a conversation like this into an opportunity to build trust, clarity and transparency.
+
+**Speaker bio(s)**
+
+*Robbie Clutton* — Principal, RobbieClutton.com
+
+Robbie is a software engineering leader with over 18 years as an engineer, GM for consultancy Pivotal Labs in New York and London; VP of Engineering for Snyk; and now an independent consultant and fractional CTO.
+
+---
+
+### 12:25 – 12:50 — My leadership thinks AI means my team should deliver faster. How do I shift that conversation instead of pushing back?
+
+**Type:** Solution Swap  ·  **For:** Director+, Experienced Manager, New Manager, Staff+  ·  **Topics:** leadership
+
+**Speaker(s):** Robbie Clutton (Principal, RobbieClutton.com)
+
+**Abstract**
+
+You are approached by a member of your team who says that they think that they deserve to be promoted to be a manager position. You don’t think that they are ready to make this change yet. You are worried that, if you did promote them, that they and the team that they managed would suffer.
+
+What do you do next?
+
+As Engineering Leaders, many of us will recognise this scenario from similar situations that we have encountered in our own careers. In this session we explore how we can turn a conversation like this into an opportunity to build trust, clarity and transparency.
+
+**Speaker bio(s)**
+
+*Robbie Clutton* — Principal, RobbieClutton.com
+
+Robbie is a software engineering leader with over 18 years as an engineer, GM for consultancy Pivotal Labs in New York and London; VP of Engineering for Snyk; and now an independent consultant and fractional CTO.
+
+---
+
+### 13:10 – 13:35 — Meet the author: Mathias Meyer
+
+**Type:** Meet the author  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Mathias Meyer (Founding Partner & Executive Coach, The Intentional Organization)
+
+**Abstract**
+
+The Intentional Organization is a practical guide for leaders and managers navigating the realities of modern management. Drawing from real-world experience by its authors, Sara Hicks and Mathias Meyer , the book shows how to build organizations where people feel valued, heard, and empowered to achieve meaningful results together. Mathias will bring copies of the book to purchase and sign.
+
+**Speaker bio(s)**
+
+*Mathias Meyer* — Founding Partner & Executive Coach, The Intentional Organization
+
+Mathias Meyer is an executive coach, advisor, and co-author of the book The Intentional Organization . As Founding Partner at The Intentional Organization, he works with founders, CTOs, and senior leaders to build purposeful organizations grounded in clarity, inclusion, and learning. Previously, he co-founded two successful developer tools companies and held leadership roles including CEO of Travis CI and CTO of Reaction Commerce, bringing deep experience in scaling distributed teams and organizations.
+
+---
+
+### 13:40 – 14:05 — Staff Engineer hangout
+
+**Type:** Peer Hangouts  ·  **For:** Staff+  ·  **Topics:** culture
+
+**Speaker(s):** Haley Roberts (Staff Engineer, NeuroID, a part of Experian), Ian Homer (Staff Engineer, Wise), Gary Hammett (Head of Software Engineering, PureGym)
+
+**Abstract**
+
+Comparing notes on shared challenges that come with your role has never been easier. Peer Hangouts are 30-minute, casual networking sessions for folks to talk through their experiences and challenges with peers who understand the context they’re working in. Drop in and join a conversation!
+
+**Speaker bio(s)**
+
+*Haley Roberts* — Staff Engineer, NeuroID, a part of Experian
+
+Haley Roberts is a Staff Engineer at NeuroID, a part of Experian.
+
+*Ian Homer* — Staff Engineer, Wise
+
+Ian is a Staff Engineer at Wise, driving the Development Enablement squad to redefine the intersection of CI/CD and Generative AI. He specialises in building the “golden paths” that allow engineers to innovate at scale, focusing specifically on the safe integration of agentic workflows into the SDLC. With over 20 years of experience, spanning co-founder, tech lead, SRE & product engineer roles, Ian now focuses on scaling technical leadership, coaching engineers to transition from high-performing ICs to high-impact organisational leaders.
+
+*Gary Hammett* — Head of Software Engineering, PureGym
+
+Gary is Head of Software Engineering at PureGym with over a decade of experience and an impressive ability to turn technical chaos into something that looks suspiciously like organisation. He proudly plays the “right‑hand” Staff Engineer role, translating business goals, supporting teams, and trying (against all odds) to make DevEx surveys sound exciting. Gary spends far less time pondering the meaning of build pipelines and far more time tackling the real challenge: helping humans talk to each other effectively. He champions strong engineering culture, AI adoption, and continuous improvement.
+
+---
+
+### 14:25 – 14:50 — Director hangout
+
+**Type:** Peer Hangouts  ·  **For:** Director+, Experienced Manager  ·  **Topics:** culture
+
+**Speaker(s):** Daniela Remogna (Director of Engineering, CrowdStrike), Mark Evans (Director of Engineering, Zopa Bank), Mark Harley (Director of Engineering, Wise), Stephanie Dreyer (Senior Director of Engineering, Payoneer), Chiranjiv Singh (Director of Engineering at Checkout.com), Kaushik Chaubal (Senior Engineering Director, BlackRock)
+
+**Abstract**
+
+Comparing notes on shared challenges that come with your role has never been easier. Peer Hangouts are 30-minute, casual networking sessions for folks to talk through their experiences and challenges with peers who understand the context they’re working in. Drop in and join a conversation!
+
+**Speaker bio(s)**
+
+*Daniela Remogna* — Director of Engineering, CrowdStrike
+
+Daniela Remogna is a Director of Engineering at CrowdStrike.
+
+*Mark Evans* — Director of Engineering, Zopa Bank
+
+Mark Evans is a Director of Engineering at Zopa Bank.
+
+*Mark Harley* — Director of Engineering, Wise
+
+Mark Harley is a Director of Engineering at Wise.
+
+*Stephanie Dreyer* — Senior Director of Engineering, Payoneer
+
+Stephanie Dreyer is a Senior Director of Engineering at Payoneer.
+
+*Chiranjiv Singh* — Director of Engineering at Checkout.com
+
+Chiran is a visionary technology leader who excels at building and leading high-performing teams to deliver successful products. He has helped engineering teams navigate through greenfield and brownfield projects, propelled companies to launch innovative products, expand into new markets, and transform struggling initiatives into triumphs.
+
+He thrives on fostering a culture of continuous improvement and growth, steering the engineering ship through the ever-evolving tech seas with expertise, enthusiasm, and a sprinkle of laughter. He enjoys coaching and mentoring managers and staff+ engineers, leveraging every challenge as a learning opportunity.
+
+*Kaushik Chaubal* — Senior Engineering Director, BlackRock
+
+Kaushik Chaubal is a Senior Engineering Director, leading the ETF Systems technology team in EMEA within the Global Markets Technology organization at BlackRock. Additionally, he co-leads the strategic ‘GMT AI Program’ focused on solving customer enablement challenges and improving engineering efficiencies within the organization.
+
+---
+
+### 14:25 – 14:50 — My team is shipping more than ever. I’m not sure any of us understand what we’re building anymore. What do I do?
+
+**Type:** Solution Swap  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead  ·  **Topics:** career-development
+
+**Speaker(s):** Robbie Clutton (Principal, RobbieClutton.com)
+
+**Abstract**
+
+Members of your team have been complaining, for some time, that ‘technical debt’ is making it harder and harder for them to work on your code base. You have spoken to your leadership team about slowing down development so that you can pay off some of this ‘technical debt’ on a number of occasions but are always told that you must prioritise the new features that have been committed to on the product roadmap.
+
+You are worried that the experience for your team is only going to get worse and feel powerless to change this dynamic.
+
+What will you do to improve the situation?
+
+As Engineering Leaders, many of us will recognise this scenario from similar situations that we have encountered in our own careers. In this session we explore the different ways that you can respond to a situation like this and how to turn it into an opportunity to build trust, clarity and transparency.
+
+**Speaker bio(s)**
+
+*Robbie Clutton* — Principal, RobbieClutton.com
+
+Robbie is a software engineering leader with over 18 years as an engineer, GM for consultancy Pivotal Labs in New York and London; VP of Engineering for Snyk; and now an independent consultant and fractional CTO.
+
+---
+
+### 15:40 – 16:10 — 
+
+**Type:** Office hours  ·  **For:** Director+, Experienced Manager, New Manager, Staff+, Tech Lead
+
+**Speaker(s):** Rick Clegg (Developer Experience Lead, Wise), Diane-Lee Pretorius (Director of Engineering, Paymentology), Simone Casciaroli (Head of Engineering, Kraken), Plum Ertz (Senior Director, Engineering, Ro), Dominika Rogala (Founder and Tech Leaders Advisor, Good Job Coffee)
+
+**Abstract**
+
+Ask speakers more about their talk.
+
+**Speaker bio(s)**
+
+*Rick Clegg* — Developer Experience Lead, Wise
+
+Rick is the Developer Experience Lead at Wise, where he owns the internal developer platform built on Backstage. He drives productivity by engineering “paved roads”—golden paths with automated guardrails that balance startup velocity with banking-grade security. With over 20 years of engineering leadership experience, Rick specializes in scaling DevEx and DevOps cultures. He also directs the WiseStart Academy, ensuring early-career engineers are rapidly enabled to contribute meaningfully. Rick is passionate about creating environments where platform engineering allows teams to move fast without breaking things.
+
+*Diane-Lee Pretorius* — Director of Engineering, Paymentology
+
+Diane Lee Pretorius is an engineering leader who thrives at the intersection of people, systems, and delivery. With over a decade of experience across startups and global organisations, she specialises in building empowered, high-performing teams that ship complex technical products in distributed environments. D-Lee is known for her human-first approach to leadership, pairing strong technical judgement with inclusive collaboration and asynchronous ways of working. Passionate about mentoring and growing future leaders, she shares practical lessons from real-world delivery to help engineering teams work better together.
+
+*Simone Casciaroli* — Head of Engineering, Kraken
+
+Simone Casciaroli is a technology leader who helps autonomous teams ship meaningful customer value, continuously and incrementally. Over the past two decades, he has led product and platform teams across startups and scale-ups including NOW TV, Babylon Health, Onto, and Doccla. His work sits at the intersection of product, delivery, and technology. He has also co-founded two startups in health and personal development, and recently joined Kraken Technologies as Head of Engineering.
+
+*Plum Ertz* — Senior Director, Engineering, Ro
+
+Plum Ertz is a Senior Director of Engineering, baker of noms, and casual economist, with a degree in one of those things. Their main areas of expertise are on the front end, with a focus on accessibility and web standards. They have applied those skills as employee number 8 and number 800 in the marketing, media, and fintech spaces, building everything from interactive multimedia experiences at live events to quizzes about sexy fruits. Plum is presently bolstering a strong culture of accessibility in the direct-to-patient healthcare space as a Director of Software Engineering at Ro.
+
+*Dominika Rogala* — Founder and Tech Leaders Advisor, Good Job Coffee
+
+Dominika works with CTOs, engineering managers, and tech leads — as a partner helping them navigate organizational complexity. With a system-first, evidence-based approach, she helps leaders see what’s really going on in their teams and change how things actually work. She served as VP of Engineering at NeuroDevice, and Engineering Manager at Vector Technologies and Intel. As a mother of three, she finds daily parallels between parenting and leadership — and brings that perspective to her work with tech teams. When she wants to celebrate something, you’ll find her with a good cup of coffee – hence the name Good Job Coffee!
+
+---
