@@ -1,5 +1,4 @@
 import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
-import { validateRetiredModels } from '@mediforce/agent-runtime';
 import type {
   RegisterWorkflowInput,
   RegisterWorkflowOutput,
@@ -12,6 +11,7 @@ import {
   ValidationError,
 } from '../../errors';
 import { actorFromCaller } from '../_helpers';
+import { checkRetiredModels } from './retired-model-check';
 
 interface RegisterScopedInput extends RegisterWorkflowInput {
   namespace: string;
@@ -41,21 +41,9 @@ export async function registerWorkflow(
   }
 
   const allModels = await scope.models.list();
-  const retiredMap = new Map(
-    allModels
-      .filter((m) => m.retiredAt !== null)
-      .map((m) => [m.id, m.retiredAt!]),
-  );
-  const retiredRefs = validateRetiredModels(parsed.data, retiredMap);
-  if (retiredRefs.length > 0) {
-    const detail = retiredRefs
-      .map((r) => {
-        const stepNames = r.steps.map((s) => `'${s.stepName}'`).join(', ');
-        const date = r.retiredAt.slice(0, 10);
-        return `model '${r.model}' (retired ${date}) in step(s) ${stepNames}`;
-      })
-      .join('; ');
-    throw new ValidationError(`Cannot save: step(s) use retired model(s): ${detail}`);
+  const retired = checkRetiredModels(parsed.data, allModels);
+  if (retired !== null) {
+    throw new ValidationError(retired.message.replace('Cannot run', 'Cannot save'));
   }
 
   const latestVersion = await scope.workflowDefinitions.getLatestVersion(

@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   InMemoryAuditRepository,
+  InMemoryModelRegistryRepository,
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import type { ModelRegistryEntry, ModelRegistryRepository } from '@mediforce/platform-core';
 import { registerWorkflow } from '../register-workflow';
 import { ValidationError } from '../../../errors';
 import {
@@ -56,7 +56,8 @@ describe('registerWorkflow handler', () => {
   });
 
   it('rejects workflow with retired model in agent step', async () => {
-    const retiredEntry: ModelRegistryEntry = {
+    const retiredModelRepo = new InMemoryModelRegistryRepository();
+    await retiredModelRepo.upsert({
       id: 'openai/gpt-4',
       canonicalSlug: null,
       name: 'GPT-4',
@@ -72,22 +73,8 @@ describe('registerWorkflow handler', () => {
       source: 'openrouter',
       requestCount: null,
       lastSyncedAt: '2026-01-01T00:00:00Z',
-      createdAt: '2025-01-01T00:00:00Z',
-      updatedAt: '2026-01-15T00:00:00Z',
       retiredAt: '2026-01-15T00:00:00Z',
-    };
-    const retiredModelRepo: ModelRegistryRepository = {
-      async getById() { return null; },
-      async list() { return [retiredEntry]; },
-      async upsert(e) { return e as never; },
-      async update(e) { return e as never; },
-      async delete() { /* no-op */ },
-      async bulkUpsert() { return 0; },
-      async updateRankings() { return 0; },
-      async listIds() { return []; },
-      async retireAbsentModels() { return { retired: 0, reinstated: 0 }; },
-      async getMeta() { return {} as never; },
-    };
+    });
     const scope = createTestScope({
       processRepo,
       auditRepo,
@@ -116,7 +103,8 @@ describe('registerWorkflow handler', () => {
   });
 
   it('accepts workflow when models are not retired', async () => {
-    const activeEntry: ModelRegistryEntry = {
+    const activeModelRepo = new InMemoryModelRegistryRepository();
+    await activeModelRepo.upsert({
       id: 'anthropic/claude-sonnet-4',
       canonicalSlug: null,
       name: 'Claude Sonnet 4',
@@ -132,22 +120,8 @@ describe('registerWorkflow handler', () => {
       source: 'openrouter',
       requestCount: null,
       lastSyncedAt: '2026-01-01T00:00:00Z',
-      createdAt: '2025-01-01T00:00:00Z',
-      updatedAt: '2026-01-01T00:00:00Z',
       retiredAt: null,
-    };
-    const activeModelRepo: ModelRegistryRepository = {
-      async getById() { return null; },
-      async list() { return [activeEntry]; },
-      async upsert(e) { return e as never; },
-      async update(e) { return e as never; },
-      async delete() { /* no-op */ },
-      async bulkUpsert() { return 0; },
-      async updateRankings() { return 0; },
-      async listIds() { return []; },
-      async retireAbsentModels() { return { retired: 0, reinstated: 0 }; },
-      async getMeta() { return {} as never; },
-    };
+    });
     const scope = createTestScope({
       processRepo,
       auditRepo,

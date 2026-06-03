@@ -2,7 +2,8 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
-import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validateRetiredModels } from '@mediforce/agent-runtime';
+import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels } from '@mediforce/agent-runtime';
+import { checkRetiredModels } from '@mediforce/platform-api/handlers';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -166,32 +167,19 @@ export async function POST(
         );
       }
 
-      const retiredMap = new Map(
-        allModels
-          .filter((m) => m.retiredAt !== null)
-          .map((m) => [m.id, m.retiredAt!]),
-      );
-      const retiredModels = validateRetiredModels(workflowDefinition, retiredMap);
-      if (retiredModels.length > 0) {
-        const detail = retiredModels
-          .map((r) => {
-            const stepNames = r.steps.map((s) => `'${s.stepName}'`).join(', ');
-            const date = r.retiredAt.slice(0, 10);
-            return `model '${r.model}' (retired ${date}) in step(s) ${stepNames}`;
-          })
-          .join('; ');
-        const message = `Cannot run: step(s) use retired model(s): ${detail}`;
-        console.log(`[auto-runner] ${message}`);
+      const retired = checkRetiredModels(workflowDefinition, allModels);
+      if (retired !== null) {
+        console.log(`[auto-runner] ${retired.message}`);
         await instanceRepo.update(instanceId, {
           status: 'paused',
-          pauseReason: 'missing_env',
-          error: message,
+          pauseReason: 'retired_model',
+          error: retired.message,
           updatedAt: new Date().toISOString(),
         });
         releaseRunLock(instanceId);
         runLockAcquired = false;
         return NextResponse.json(
-          { error: message, retiredModels, instanceId },
+          { error: retired.message, retiredModels: retired.refs, instanceId },
           { status: 422 },
         );
       }

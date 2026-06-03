@@ -1,56 +1,56 @@
 import { describe, expect, it } from 'vitest';
-import type { ModelRegistryEntry, ModelRegistryRepository, CreateModelRegistryEntryInput } from '@mediforce/platform-core';
+import { InMemoryModelRegistryRepository } from '@mediforce/platform-core/testing';
 import { getModel } from '../get-model';
 
-function makeEntry(id: string): ModelRegistryEntry {
-  return {
-    id,
-    name: id,
-    provider: id.split('/')[0],
-    contextLength: 128000,
-    maxCompletionTokens: null,
-    pricing: { input: 0.000003, output: 0.000015 },
-    modality: 'text->text',
-    inputModalities: ['text'],
-    outputModalities: ['text'],
-    supportsTools: true,
-    supportsVision: false,
-    source: 'openrouter' as const,
-    canonicalSlug: null,
-    requestCount: null,
-    lastSyncedAt: '2026-05-04T00:00:00Z',
-    createdAt: '2026-05-04T00:00:00Z',
-    updatedAt: '2026-05-04T00:00:00Z',
-    retiredAt: null,
-  };
-}
-
-function makeRepo(entries: ModelRegistryEntry[]): ModelRegistryRepository {
-  return {
-    list: async () => entries,
-    getById: async (id) => entries.find((e) => e.id === id) ?? null,
-    upsert: async (input: CreateModelRegistryEntryInput) => makeEntry(input.id),
-    update: async () => entries[0],
-    delete: async () => {},
-    bulkUpsert: async (items: CreateModelRegistryEntryInput[]) => items.length,
-    updateRankings: async (rankings) => rankings.length,
-    getMeta: async () => ({ rankingsUpdatedAt: null }),
-    listIds: async () => [],
-    retireAbsentModels: async () => ({ retired: 0, reinstated: 0 }),
-  };
-}
-
 describe('getModel handler', () => {
-  const entries = [makeEntry('anthropic/claude-sonnet-4')];
-
   it('returns model by id', async () => {
-    const result = await getModel({ id: 'anthropic/claude-sonnet-4' }, { modelRegistryRepo: makeRepo(entries) });
+    const repo = new InMemoryModelRegistryRepository();
+    await repo.upsert({
+      id: 'anthropic/claude-sonnet-4',
+      name: 'anthropic/claude-sonnet-4',
+      provider: 'anthropic',
+      contextLength: 128000,
+      maxCompletionTokens: null,
+      pricing: { input: 0.000003, output: 0.000015 },
+      modality: 'text->text',
+      inputModalities: ['text'],
+      outputModalities: ['text'],
+      supportsTools: true,
+      supportsVision: false,
+      source: 'openrouter',
+      canonicalSlug: null,
+      requestCount: null,
+      lastSyncedAt: '2026-05-04T00:00:00Z',
+      retiredAt: null,
+    });
+
+    const result = await getModel({ id: 'anthropic/claude-sonnet-4' }, { modelRegistryRepo: repo });
     expect(result.model.id).toBe('anthropic/claude-sonnet-4');
   });
 
   it('throws when model not found', async () => {
+    const repo = new InMemoryModelRegistryRepository();
+    await repo.upsert({
+      id: 'anthropic/claude-sonnet-4',
+      name: 'anthropic/claude-sonnet-4',
+      provider: 'anthropic',
+      contextLength: 128000,
+      maxCompletionTokens: null,
+      pricing: { input: 0.000003, output: 0.000015 },
+      modality: 'text->text',
+      inputModalities: ['text'],
+      outputModalities: ['text'],
+      supportsTools: true,
+      supportsVision: false,
+      source: 'openrouter',
+      canonicalSlug: null,
+      requestCount: null,
+      lastSyncedAt: '2026-05-04T00:00:00Z',
+      retiredAt: null,
+    });
+
     await expect(
-      getModel({ id: 'nonexistent/model' }, { modelRegistryRepo: makeRepo(entries) }),
+      getModel({ id: 'nonexistent/model' }, { modelRegistryRepo: repo }),
     ).rejects.toThrow("Model 'nonexistent/model' not found");
   });
 });
