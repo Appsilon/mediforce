@@ -17,7 +17,7 @@ import {
 } from '@mediforce/platform-api/handlers';
 
 const server = new McpServer({
-  name: 'platform-mcp',
+  name: 'mediforce-mcp',
   version: '0.1.0',
 });
 

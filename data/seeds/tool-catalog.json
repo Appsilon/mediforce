@@ -6,9 +6,8 @@
       "description": "Tealflow MCP — lists and describes available teal modules for clinical trial data exploration."
     },
     {
-      "id": "platform-mcp",
-      "command": "tsx",
-      "args": ["packages/platform-mcp/src/server.ts"],
+      "id": "mediforce-mcp",
+      "command": "mediforce-mcp",
       "description": "Platform MCP — Mediforce platform utilities (workflow diagram rendering, etc.)."
     }
   ]

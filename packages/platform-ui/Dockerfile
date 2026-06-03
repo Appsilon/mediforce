@@ -17,7 +17,7 @@ COPY packages/agent-runtime/package.json packages/agent-runtime/
 COPY packages/container-worker/package.json packages/container-worker/
 COPY packages/mcp-client/package.json packages/mcp-client/
 COPY packages/core-actions/package.json packages/core-actions/
-COPY packages/platform-mcp/package.json packages/platform-mcp/
+COPY packages/mediforce-mcp/package.json packages/mediforce-mcp/
 COPY packages/platform-ui/package.json packages/platform-ui/
 COPY apps/community-digest/package.json apps/community-digest/
 COPY apps/protocol-to-tfl/package.json apps/protocol-to-tfl/
@@ -79,6 +79,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV MEDIFORCE_ROOT=/app
 
 # Copy standalone output (includes server.js + traced node_modules)
 COPY --from=builder /app/packages/platform-ui/.next/standalone ./
@@ -90,15 +91,15 @@ COPY --from=builder /app/packages/platform-ui/public ./packages/platform-ui/publ
 # Not reliably picked up by Next.js output file tracing in this build, so copy explicitly.
 COPY --from=builder /app/data ./data
 
-# platform-mcp — stdio MCP server spawned by McpClientManager for cowork
-# agents. Needs tsx (TS execution), workspace sources (@mediforce/* use the
-# TS condition ./src/index.ts), and MCP SDK + zod from node_modules.
+# mediforce-mcp — stdio MCP server providing platform tools to cowork agents.
+# Linked globally so `mediforce-mcp` command is on PATH (same pattern as
+# tealflow-mcp). Copies workspace source + node_modules from builder.
 #
-# TODO: migrate to HTTP MCP transport (option B) or a sidecar container
-# (option C) when platform-mcp outgrows a single tool.
-RUN npm install -g tsx@4
+# TODO: migrate to HTTP MCP (option B) or sidecar (option C) when this
+# outgrows a single tool.
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/node_modules ./node_modules
+RUN npm install -g tsx@4 && cd packages/mediforce-mcp && npm link
 
 EXPOSE 3000
 
