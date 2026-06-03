@@ -13,14 +13,17 @@ interface StepOutputBundle {
   readonly stepOutput: Record<string, unknown>;
 }
 
-export type TaskKind = 'verdict' | 'params' | 'upload' | 'assignment' | 'rows';
+export type TaskKind = 'verdict' | 'params' | 'verdict-with-params' | 'upload' | 'assignment' | 'rows';
 
 export function resolveTaskKind(task: HumanTask): TaskKind {
   const component = task.ui?.component;
   if (component === 'file-upload') return 'upload';
   if (component === 'assignment-table') return 'assignment';
   if (component === 'table-editor') return 'rows';
-  if (Array.isArray(task.params) && task.params.length > 0) return 'params';
+  const hasParams = Array.isArray(task.params) && task.params.length > 0;
+  const hasVerdicts = Array.isArray(task.verdicts) && task.verdicts.length > 0;
+  if (hasParams && hasVerdicts) return 'verdict-with-params';
+  if (hasParams) return 'params';
   return 'verdict';
 }
 
@@ -310,6 +313,27 @@ export function shapeCompletion(
     }
     case 'params': {
       return { ...buildParamsStepOutput(payload, actorId, now), isL3Revise: false };
+    }
+    case 'verdict-with-params': {
+      validateVerdictPayload(task, { kind: 'verdict', verdict: payload.verdict, comment: payload.comment });
+      const stepOutput: Record<string, unknown> = {
+        ...payload.paramValues,
+        verdict: payload.verdict,
+      };
+      if (payload.comment && payload.comment.trim().length > 0) {
+        stepOutput.comment = payload.comment.trim();
+      }
+      return {
+        completionData: {
+          verdict: payload.verdict,
+          comment: payload.comment ?? '',
+          paramValues: payload.paramValues,
+          completedBy: actorId,
+          completedAt: now,
+        },
+        stepOutput,
+        isL3Revise: false,
+      };
     }
     case 'upload': {
       validateUploadPayload(task, payload);

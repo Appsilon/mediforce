@@ -169,5 +169,10 @@ function auditFieldsFor(
         description: `${head} with verdict '${payload.verdict}' for step '${stepId}'`,
         inputSnapshot: { taskId, stepId, verdict: payload.verdict },
       };
+    case 'verdict-with-params':
+      return {
+        description: `${head} with verdict '${payload.verdict}' and param values for step '${stepId}'`,
+        inputSnapshot: { taskId, stepId, verdict: payload.verdict, paramKeys: Object.keys(payload.paramValues) },
+      };
   }
 }
