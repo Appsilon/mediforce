@@ -7,6 +7,8 @@
 import { eagerSyncIfStale } from './eager-sync';
 import { createPostgresClient } from '../postgres/client';
 import { PostgresModelRegistryRepository } from '../postgres/repositories/model-registry-repository';
+import { PostgresAuditRepository } from '../postgres/repositories/audit-repository';
+import { PostgresProcessInstanceRepository } from '../postgres/repositories/process-instance-repository';
 
 async function main(): Promise<void> {
   const url = process.env.DATABASE_URL;
@@ -16,7 +18,9 @@ async function main(): Promise<void> {
   }
   const { db } = createPostgresClient({ url });
   const repo = new PostgresModelRegistryRepository(db);
-  await eagerSyncIfStale(repo);
+  const instanceRepo = new PostgresProcessInstanceRepository(db);
+  const auditRepo = new PostgresAuditRepository(db, instanceRepo);
+  await eagerSyncIfStale(repo, { auditRepo });
 }
 
 main().catch((err) => {

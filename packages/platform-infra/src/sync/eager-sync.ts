@@ -37,6 +37,7 @@ export async function eagerSyncIfStale(
           actorId: 'system',
           actorType: 'system',
           actorRole: 'system',
+          namespace: '_system',
           action: 'model_sync.eager_failed',
           description: `Boot-time sync failed: ${message}`,
           timestamp: new Date().toISOString(),

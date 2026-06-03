@@ -81,13 +81,26 @@ Plans:
 - [ ] 21-01-PLAN.md — platform_settings table, PlatformSettingsRepository, audit logging in sync flows
 - [ ] 21-02-PLAN.md — Webhook sender (Slack/Discord), config API routes, CLI commands (config set/get/test-webhook)
 
+### Phase 22: Boot Sync Audit Wiring
+**Goal**: Boot-time eager sync failures are audited in the same trail as cron sync failures, closing the ALERT-01 gap where `migrate-with-sync.ts` calls `eagerSyncIfStale` without supplying an audit repository.
+**Depends on**: Phase 21
+**Requirements**: ALERT-01
+**Gap Closure**: Closes gaps from v1.4 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. When the boot-time eager sync fails, an audit log entry is written with action `model_sync.boot_failed` including the error message.
+  2. The `attemptCount` in the cron route webhook call is derived from the retry configuration, not hardcoded.
+**Plans**: 1 plan
+Plans:
+- [ ] 22-01-PLAN.md — Wire auditRepo into migrate-with-sync.ts, derive attemptCount from maxRetries
+
 ## Progress
 
-**Execution Order:** 18 → 19 → 20 → 21
+**Execution Order:** 18 → 19 → 20 → 21 → 22
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 18. Schema Foundation | 1/1 | Complete    | 2026-06-02 | - |
 | 19. Sync and Retirement | 2/2 | Complete    | 2026-06-02 | - |
 | 20. Editor and Pre-flight Validation | 2/2 | Complete    | 2026-06-02 | - |
-| 21. Alerting | 2/2 | Complete   | 2026-06-02 | - |
+| 21. Alerting | 2/2 | Complete    | 2026-06-02 | - |
+| 22. Boot Sync Audit Wiring | 0/1 | Pending    | - | - |
