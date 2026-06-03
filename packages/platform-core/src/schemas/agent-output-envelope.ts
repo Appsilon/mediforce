@@ -16,6 +16,9 @@ export const GitMetadataSchema = z.object({
 export const TokenUsageSchema = z.object({
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
+  // Cache-read input tokens are billed at the (much cheaper) cacheRead rate,
+  // so they are tracked separately from full-price input tokens.
+  cachedInputTokens: z.number().int().nonnegative().optional(),
 });
 
 /** A reviewer-facing preview rendered by the platform. `markdown` flows
