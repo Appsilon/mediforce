@@ -433,7 +433,7 @@ function validateVerdicts(
  * refinement for you.
  */
 export const TriggerInputFieldSchema = StepParamSchema.extend({
-  type: z.enum(['string', 'number', 'boolean', 'date', 'select', 'multiselect', 'textarea']).default('string'),
+  type: z.enum(['string', 'number', 'boolean', 'date', 'datetime', 'select', 'multiselect', 'textarea']).default('string'),
 });
 
 export type TriggerInputField = z.infer<typeof TriggerInputFieldSchema>;

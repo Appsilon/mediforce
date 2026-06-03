@@ -134,6 +134,18 @@ function renderInput(
     );
   }
 
+  if (type === 'datetime') {
+    return (
+      <input
+        type="datetime-local"
+        value={String(value ?? '').slice(0, 16)}
+        onChange={(event) => onChange(event.target.value.length === 16 ? event.target.value + ':00' : event.target.value)}
+        disabled={disabled}
+        className={classes}
+      />
+    );
+  }
+
   if (type === 'textarea') {
     return (
       <textarea
