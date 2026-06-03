@@ -203,7 +203,7 @@ export async function seedPostgresNamespace(
         INSERT INTO human_tasks (
           id, workspace, process_instance_id, step_id, assigned_role,
           assigned_user_id, status, deadline, completion_data, completed_at,
-          ui, creation_reason, created_at, updated_at
+          ui, params, verdicts, creation_reason, created_at, updated_at
         ) VALUES (
           ${task.id as string},
           ${workspace},
@@ -216,6 +216,8 @@ export async function seedPostgresNamespace(
           ${task.completionData ? sql.json(task.completionData as unknown) : null},
           ${(task.completedAt as string | null) ?? null},
           ${task.ui ? sql.json(task.ui as unknown) : null},
+          ${task.params ? sql.json(task.params as unknown) : null},
+          ${task.verdicts ? sql.json(task.verdicts as unknown) : null},
           ${(task.creationReason as string | undefined) ?? 'human_executor'},
           ${task.createdAt as string},
           ${task.updatedAt as string}
