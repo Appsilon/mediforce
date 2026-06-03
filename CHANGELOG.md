@@ -20,6 +20,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
   - Artifact panel: collapsible JSON tree explorer replaces raw `JSON.stringify`; tabbed Data/Preview view.
   - Built-in tool calls (`update_artifact`, `update_presentation`) now persist as live tool turns visible in the cowork chat UI.
   - Postgres migration 0018: `validation_result` (jsonb) + `presentation` (text) columns on `cowork_sessions`.
+## [2026-05-31]
 
 ### Changed
 - `pnpm dev` / `pnpm dev:queue` now preflight infra via `scripts/dev-infra.py`: it checks Docker is installed, the daemon is running, and the Compose v2 plugin exists, then brings up Postgres (and Redis) with `--wait` so the DB is healthy before migrations run. Missing prerequisites now stop with an actionable message (e.g. `sudo apt install docker-compose-v2`) instead of silently booting the app against a non-existent database and surfacing `ECONNREFUSED 127.0.0.1:5432` mid-request. Prerequisites + troubleshooting documented in GETTING-STARTED.md / dev-quickref.
