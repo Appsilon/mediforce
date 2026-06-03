@@ -29,9 +29,11 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   const { modelRegistryRepo, auditRepo, platformSettingsRepo } = getPlatformServices();
   const systemCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
+  const maxRetries = 3;
 
   try {
     const result = await syncWithRetry(modelRegistryRepo, {
+      maxRetries,
       onAttemptFail: async (attempt, error) => {
         await emitAudit(auditRepo, systemCaller, {
           action: 'model_sync.attempt_failed',
@@ -66,7 +68,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     });
     await sendSyncFailureWebhook(platformSettingsRepo, {
       errorMessage: err instanceof Error ? err.message : 'Sync failed after retries',
-      attemptCount: 4,
+      attemptCount: maxRetries + 1,
       timestamp: new Date().toISOString(),
     });
     return NextResponse.json(
