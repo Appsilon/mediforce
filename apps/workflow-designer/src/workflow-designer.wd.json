@@ -128,8 +128,10 @@
         "mcpServers": [
           {
             "name": "platform",
-            "command": "tsx",
+            "command": "node",
             "args": [
+              "--import",
+              "tsx/esm",
               "packages/platform-mcp/src/server.ts"
             ],
             "description": "Platform MCP \u2014 workflow diagram rendering and other platform utilities"
