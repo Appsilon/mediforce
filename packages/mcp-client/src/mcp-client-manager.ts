@@ -7,6 +7,7 @@ import { resolveValue } from './resolve-env';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const NAMESPACE_SEPARATOR = '__';
+const MCP_DEBUG = process.env.MCP_DEBUG === 'true';
 
 /**
  * Env vars inherited by stdio MCP subprocesses. Deliberately narrow to avoid
@@ -106,14 +107,14 @@ export class McpClientManager {
         ...inheritedEnv(),
         ...resolvedEnv,
       };
-      console.log(`[MCP] Spawning '${serverConfig.name}': command=${serverConfig.command} args=${JSON.stringify(serverConfig.args ?? [])} cwd=${process.cwd()} PATH=${(spawnEnv.PATH ?? '').slice(0, 120)}…`);
+      if (MCP_DEBUG) console.log(`[MCP] Spawning '${serverConfig.name}': command=${serverConfig.command} args=${JSON.stringify(serverConfig.args ?? [])} cwd=${process.cwd()} PATH=${(spawnEnv.PATH ?? '').slice(0, 120)}…`);
       transport = new StdioClientTransport({
         command: serverConfig.command,
         args: serverConfig.args ?? [],
         env: spawnEnv,
       });
       transport.onerror = (err) => {
-        console.error(`[MCP] Transport error for '${serverConfig.name}':`, err);
+        if (MCP_DEBUG) console.error(`[MCP] Transport error for '${serverConfig.name}':`, err);
       };
     } else if (serverConfig.url) {
       transport = new StreamableHTTPClientTransport(
@@ -137,7 +138,7 @@ export class McpClientManager {
         stderr.on('data', (c: Buffer) => chunks.push(c));
         await new Promise((r) => setTimeout(r, 500));
         const stderrText = Buffer.concat(chunks).toString().trim();
-        if (stderrText) console.error(`[MCP] stderr from '${serverConfig.name}':\n${stderrText}`);
+        if (MCP_DEBUG && stderrText) console.error(`[MCP] stderr from '${serverConfig.name}':\n${stderrText}`);
       }
       throw err;
     }

@@ -28,6 +28,7 @@ import { validateOutputSchema, type OutputSchema } from '@mediforce/agent-runtim
 
 const MAX_TOOL_LOOP_ITERATIONS = 10;
 const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
+const COWORK_DEBUG = process.env.COWORK_DEBUG === 'true';
 
 /**
  * Chat turn — orchestrates the MCP tool loop server-side. Intermediate tool
@@ -208,7 +209,7 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
   }
 
   const tools = buildToolsArray(mcp?.tools ?? []);
-  console.log(`[cowork-chat] Tools sent to LLM: ${tools.map(t => t.function.name).join(', ')} (${tools.length} total)`);
+  if (COWORK_DEBUG) console.log(`[cowork-chat] Tools sent to LLM: ${tools.map(t => t.function.name).join(', ')} (${tools.length} total)`);
   const toolCallSummaries: ChatCoworkToolCall[] = [];
   let artifact: Record<string, unknown> | undefined;
   let agentText = '';
@@ -221,7 +222,7 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
       apiKey: ctx.openRouterKey,
     });
     agentText = response.content;
-    console.log(`[cowork-chat] LLM response: text=${agentText.length}chars toolCalls=[${response.toolCalls.map(tc => tc.function.name).join(', ')}]`);
+    if (COWORK_DEBUG) console.log(`[cowork-chat] LLM response: text=${agentText.length}chars toolCalls=[${response.toolCalls.map(tc => tc.function.name).join(', ')}]`);
 
     const artifactCalls = response.toolCalls.filter(
       (tc) => tc.function.name === 'update_artifact',
