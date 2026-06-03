@@ -90,6 +90,7 @@ import { createHttpSelfFetchRunKicker } from '../runtime/run-kicker';
 import { WebhookRouter } from '@mediforce/workflow-engine';
 import { seedBuiltinAgentDefinitions } from './seed-agent-definitions';
 import { seedBuiltinToolCatalog } from './seed-tool-catalog';
+import { eagerSyncIfStale } from '@mediforce/platform-infra';
 
 let services: PlatformServices | null = null;
 let seedingStarted = false;
@@ -424,6 +425,9 @@ export function getPlatformServices(): PlatformServices {
     });
     seedBuiltinToolCatalog(toolCatalogRepo).catch((err) => {
       console.error('[platform-services] Failed to seed built-in tool catalog:', err);
+    });
+    eagerSyncIfStale(modelRegistryRepo, { auditRepo }).catch((err) => {
+      console.error('[platform-services] Model registry eager sync failed:', err);
     });
   }
 

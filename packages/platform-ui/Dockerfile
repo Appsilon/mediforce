@@ -67,7 +67,7 @@ WORKDIR /app
 COPY --from=deps /app ./
 COPY . .
 WORKDIR /app/packages/platform-infra
-CMD ["sh", "-c", "pnpm exec drizzle-kit migrate && pnpm exec tsx src/sync/migrate-with-sync.ts"]
+CMD ["pnpm", "exec", "drizzle-kit", "migrate"]
 
 # --- Runner ---
 FROM node:24-slim AS runner
