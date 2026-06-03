@@ -171,9 +171,3 @@ export function renderWorkflowDiagram(input: RenderWorkflowDiagramInput): string
     </div>
   `.trim();
 }
-
-export function renderWorkflowDiagramHandler(
-  input: RenderWorkflowDiagramInput,
-): { html: string } {
-  return { html: renderWorkflowDiagram(input) };
-}

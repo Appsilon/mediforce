@@ -11,7 +11,6 @@
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { z } from 'zod';
 import {
   renderWorkflowDiagram,
   RenderWorkflowDiagramInputSchema,
@@ -32,8 +31,9 @@ server.registerTool(
       '(with steps, transitions, triggers). Returns HTML that can be used with update_presentation.',
     inputSchema: { definition: defSchema },
   },
-  async ({ definition }) => {
-    const html = renderWorkflowDiagram({ definition: definition as any });
+  async (args) => {
+    const parsed = RenderWorkflowDiagramInputSchema.parse(args);
+    const html = renderWorkflowDiagram(parsed);
     return {
       content: [{ type: 'text', text: html }],
     };

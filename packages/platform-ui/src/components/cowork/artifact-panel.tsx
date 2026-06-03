@@ -139,7 +139,7 @@ export function ArtifactPanel({
     return `<!DOCTYPE html>
 <html>
 <head>
-<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.tailwindcss.com/3.4.1"></script>
 <style>body { margin: 0; padding: 1rem; font-family: system-ui, sans-serif; }</style>
 </head>
 <body>${presentation}</body>
