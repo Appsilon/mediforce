@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Model Registry Reliability
 status: planning
-stopped_at: Completed 21-alerting/21-02-PLAN.md
-last_updated: "2026-06-02T16:59:25.892Z"
-last_activity: 2026-06-02 — Roadmap created (4 phases, 16 requirements mapped)
+stopped_at: Completed 22-boot-sync-audit-wiring/22-01-PLAN.md
+last_updated: "2026-06-03T07:36:28.959Z"
+last_activity: 2026-06-03 — Gap closure phase 22 added from milestone audit
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 8
-  completed_plans: 7
-  percent: 87
+  completed_plans: 8
+  percent: 0
 ---
 
 # Session State
@@ -53,6 +53,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 20-editor-preflight-validation P01 | 4m | 2 tasks | 6 files |
 | Phase 21-alerting P01 | 8min | 2 tasks | 18 files |
 | Phase 21-alerting P02 | 7min | 2 tasks | 20 files |
+| Phase 22-boot-sync-audit-wiring P01 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,8 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 21-alerting]: Renamed private constructor field from config to clientConfig in Mediforce class to expose readonly config namespace
 - [Phase 21-alerting]: Config routes use direct NextResponse pattern (not createRouteAdapter) — system-level ops without CallerScope
 - [Phase 21-alerting]: sendSyncFailureWebhook is fire-and-forget: try/catch wraps fetch, errors logged but never rethrown to cron route
+- [Phase 22-boot-sync-audit-wiring]: Boot-time audit events use namespace '_system' sentinel so PostgresAuditRepository can resolve workspace without processInstanceId
+- [Phase 22-boot-sync-audit-wiring]: maxRetries extracted as named constant in cron route — syncWithRetry call and webhook attemptCount stay in sync
 
 ### Pending Todos
 
@@ -94,6 +97,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-02T16:53:49.767Z
-Stopped at: Completed 21-alerting/21-02-PLAN.md
+Last session: 2026-06-03T07:36:28.957Z
+Stopped at: Completed 22-boot-sync-audit-wiring/22-01-PLAN.md
 Resume file: None
