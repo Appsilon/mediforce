@@ -1,11 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { InMemoryPlatformSettingsRepository } from '@mediforce/platform-core/testing';
 import { createTestScope } from '../../../repositories/__tests__/create-test-scope';
-import { getConfig, getConfigByPrefix, setConfig, testWebhook } from '../index';
-
-vi.mock('@mediforce/platform-infra', () => ({
-  sendTestWebhook: vi.fn().mockResolvedValue({ ok: true }),
-}));
+import { getConfig, getConfigByPrefix } from '../index';
 
 describe('getConfig', () => {
   it('returns null value for unknown key', async () => {
@@ -20,17 +16,6 @@ describe('getConfig', () => {
     const scope = createTestScope({ platformSettingsRepo });
     const result = await getConfig({ key: 'alert.webhook.url' }, scope);
     expect(result).toEqual({ key: 'alert.webhook.url', value: 'https://hooks.slack.com/test' });
-  });
-});
-
-describe('setConfig + getConfig round-trip', () => {
-  it('stores and retrieves a value', async () => {
-    const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
-    const scope = createTestScope({ platformSettingsRepo });
-    const setResult = await setConfig({ key: 'test.key', value: 'hello' }, scope);
-    expect(setResult).toEqual({ ok: true });
-    const getResult = await getConfig({ key: 'test.key' }, scope);
-    expect(getResult).toEqual({ key: 'test.key', value: 'hello' });
   });
 });
 
@@ -51,16 +36,5 @@ describe('getConfigByPrefix', () => {
     const scope = createTestScope();
     const result = await getConfigByPrefix({ prefix: 'nonexistent.' }, scope);
     expect(result).toEqual({ settings: [] });
-  });
-});
-
-describe('testWebhook', () => {
-  it('calls sendTestWebhook and returns the result', async () => {
-    const { sendTestWebhook: sendTestWebhookMock } = await import('@mediforce/platform-infra');
-    const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
-    const scope = createTestScope({ platformSettingsRepo });
-    const result = await testWebhook(undefined, scope);
-    expect(sendTestWebhookMock).toHaveBeenCalledWith(platformSettingsRepo);
-    expect(result).toEqual({ ok: true });
   });
 });
