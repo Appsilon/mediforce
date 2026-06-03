@@ -3,14 +3,13 @@
 import * as React from 'react';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import * as Tabs from '@radix-ui/react-tabs';
-import { useTheme } from 'next-themes';
 import { ChevronDown, Code, FileText, MonitorPlay } from 'lucide-react';
 import type { Presentation } from '@mediforce/platform-core';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { useStepExecutions } from '@/hooks/use-step-executions';
 import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
-import { buildSrcdoc, clampIframeHeight, isIframeResizeMessage } from './iframe-helpers';
+import { SandboxedHtmlIframe } from './sandboxed-html-iframe';
 import { MarkdownPresentation } from './markdown-presentation';
 import { normalizePresentation } from './task-utils';
 
@@ -275,43 +274,6 @@ interface ReportPaneProps {
 }
 
 function ReportPane({ presentation, loading, error, result }: ReportPaneProps) {
-  const iframeRef = React.useRef<HTMLIFrameElement>(null);
-  const [iframeHeight, setIframeHeight] = React.useState(300);
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
-
-  const html = presentation?.kind === 'html' ? presentation.content : null;
-
-  // Listen for resize messages from the iframe
-  React.useEffect(() => {
-    if (html === null) return;
-    const handler = (event: MessageEvent) => {
-      if (
-        isIframeResizeMessage(event.data) &&
-        iframeRef.current &&
-        event.source === iframeRef.current.contentWindow
-      ) {
-        setIframeHeight((prev) => {
-          const next = clampIframeHeight(event.data.height);
-          return next > 0 ? next : prev;
-        });
-      }
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, [html]);
-
-  // Sync theme changes to iframe. Iframe is sandboxed without
-  // `allow-same-origin`, so its origin is null. `postMessage` rejects the
-  // literal string 'null' as targetOrigin and we can't compute the parent
-  // origin from inside the iframe — '*' is the only valid value here. The
-  // payload is benign (theme bool only), and the iframe-side handler does
-  // not act on sensitive data, so wildcard is acceptable.
-  React.useEffect(() => {
-    if (html === null) return;
-    iframeRef.current?.contentWindow?.postMessage({ type: 'theme', dark: isDark }, '*');
-  }, [isDark, html]);
-
   if (loading) {
     return (
       <div className="space-y-3">
@@ -342,11 +304,9 @@ function ReportPane({ presentation, loading, error, result }: ReportPaneProps) {
   }
 
   return (
-    <iframe
-      ref={iframeRef}
-      srcDoc={buildSrcdoc(presentation.content, result, isDark)}
-      sandbox="allow-scripts"
-      style={{ width: '100%', height: iframeHeight, border: 'none' }}
+    <SandboxedHtmlIframe
+      html={presentation.content}
+      result={result}
       title="Previous step report"
     />
   );
