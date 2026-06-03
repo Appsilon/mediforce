@@ -62,6 +62,10 @@ export const coworkSessions = pgTable(
 
     // Working artifact (mutates as the conversation progresses)
     artifact: jsonb('artifact'),
+    // Live validation result from last update_artifact call
+    validationResult: jsonb('validation_result'),
+    // HTML presentation produced via update_presentation tool
+    presentation: text('presentation'),
 
     finalizedAt: timestamp('finalized_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })

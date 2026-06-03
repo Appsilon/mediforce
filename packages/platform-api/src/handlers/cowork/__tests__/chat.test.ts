@@ -120,30 +120,39 @@ describe('chatCoworkSession handler', () => {
       }),
     );
 
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          choices: [
-            {
-              message: {
-                content: 'Updating artifact',
-                tool_calls: [
-                  {
-                    id: 'call-1',
-                    type: 'function',
-                    function: {
-                      name: 'update_artifact',
-                      arguments: JSON.stringify({ artifact: { title: 'v1' } }),
+    fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: 'Updating artifact',
+                  tool_calls: [
+                    {
+                      id: 'call-1',
+                      type: 'function',
+                      function: {
+                        name: 'update_artifact',
+                        arguments: JSON.stringify({ artifact: { title: 'v1' } }),
+                      },
                     },
-                  },
-                ],
+                  ],
+                },
               },
-            },
-          ],
-        }),
-        { status: 200 },
-      ),
-    );
+            ],
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: 'Done', tool_calls: [] } }],
+          }),
+          { status: 200 },
+        ),
+      );
 
     const scope = createTestScope({
       instanceRepo,
@@ -162,8 +171,8 @@ describe('chatCoworkSession handler', () => {
 
     const session = await coworkSessionRepo.getById('sess-1');
     expect(session?.artifact).toEqual({ title: 'v1' });
-    expect(fetchSpy).toHaveBeenCalledOnce();
-    // Additive shape: returned session carries the same artifact.
+    // Two OpenRouter calls: first returns update_artifact, second returns no tools (loop exit).
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(result.session.artifact).toEqual({ title: 'v1' });
   });
 

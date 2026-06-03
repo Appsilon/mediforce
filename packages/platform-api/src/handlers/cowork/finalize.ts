@@ -5,6 +5,8 @@ import type {
   FinalizeCoworkSessionInput,
   FinalizeCoworkSessionOutput,
 } from '../../contract/cowork';
+import { validateOutputSchema } from '@mediforce/agent-runtime';
+import type { OutputSchemaShape } from '@mediforce/platform-core';
 
 /**
  * Finalize a cowork session and resume its parent process instance.
@@ -47,6 +49,19 @@ export async function finalizeCoworkSession(
 
   const actor = actorFromCaller(scope);
   const now = new Date().toISOString();
+
+  if (session.outputSchema) {
+    const error = validateOutputSchema(
+      input.artifact,
+      session.outputSchema as OutputSchemaShape,
+    );
+    if (error !== null) {
+      throw new PreconditionFailedError(
+        `Artifact validation failed: ${error}`,
+        { sessionId: input.sessionId, error },
+      );
+    }
+  }
 
   await scope.coworkSessions.finalize(input.sessionId, input.artifact);
 

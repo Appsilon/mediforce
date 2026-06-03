@@ -112,3 +112,5 @@ export { setConfig } from './config/index';
 export { testWebhook } from './config/index';
 
 export { listAdapter, getByIdAdapter } from './_generic';
+
+export { renderWorkflowDiagram, renderWorkflowDiagramHandler, RenderWorkflowDiagramInputSchema } from './renders/workflow-diagram';

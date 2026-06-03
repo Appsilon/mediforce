@@ -1,6 +1,6 @@
 {
-  "id": "3c24702c-1645-4296-8ead-0a4e04eb8641",
-  "prevId": "ff055a80-eab6-42e3-8e98-3621b2420ad9",
+  "id": "55493495-a7b2-4bf4-9e94-6d8c270dc2e8",
+  "prevId": "0018_add_cowork_validation_presentation",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2963,38 +2963,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.platform_settings": {
-      "name": "platform_settings",
-      "schema": "",
-      "columns": {
-        "key": {
-          "name": "key",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "value": {
-          "name": "value",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
         },
         "updated_at": {
           "name": "updated_at",

@@ -539,6 +539,8 @@ export function VoiceCoworkView({ session, instance, handle, stepDescription }: 
       <ArtifactPanel
         artifact={artifact}
         outputSchema={session.outputSchema}
+        validationResult={session.validationResult ?? null}
+        presentation={session.presentation ?? null}
         finalized={finalized}
         finalizing={finalizing}
         onFinalize={handleFinalize}

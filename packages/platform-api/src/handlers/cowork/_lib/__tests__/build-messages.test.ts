@@ -16,6 +16,8 @@ function makeSession(overrides?: Partial<CoworkSession>): CoworkSession {
     outputSchema: null,
     voiceConfig: null,
     artifact: null,
+    validationResult: null,
+    presentation: null,
     mcpServers: null,
     turns: [],
     createdAt: '2026-01-15T10:00:00Z',

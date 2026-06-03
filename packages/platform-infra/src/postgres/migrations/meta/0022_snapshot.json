@@ -1,6 +1,6 @@
 {
-  "id": "0018_add_cowork_validation_presentation",
-  "prevId": "0017_normalize_model_ids",
+  "id": "9a632129-d1a2-4716-9630-02780a71f709",
+  "prevId": "054af7fb-83b1-4e30-ad7c-47401d1c12ab",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1444,18 +1444,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "validation_result": {
-          "name": "validation_result",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "presentation": {
-          "name": "presentation",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -2770,6 +2758,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "retired_at": {
+          "name": "retired_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -2969,6 +2963,38 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.platform_settings": {
+      "name": "platform_settings",
+      "schema": "",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
         },
         "updated_at": {
           "name": "updated_at",

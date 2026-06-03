@@ -52,10 +52,11 @@ export function StartRunButton({
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   const effectiveVersion = version ?? hookEffectiveVersion;
+  const preflightVersion = pendingVersion ?? effectiveVersion;
   const { definition: effectiveDefinition } = useWorkflowVersion(
     workflowName,
     handle,
-    effectiveVersion,
+    preflightVersion,
   );
 
   const hasContext = secretKeysCtx !== null;

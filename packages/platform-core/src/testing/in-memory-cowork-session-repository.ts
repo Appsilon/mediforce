@@ -139,6 +139,35 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
     return { ...updated, turns: [...updated.turns] };
   }
 
+  async updateValidationResult(
+    sessionId: string,
+    result: { valid: boolean; errors: string[] },
+  ): Promise<CoworkSession> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`CoworkSession not found: ${sessionId}`);
+    const now = new Date().toISOString();
+    const updated: CoworkSession = {
+      ...session,
+      validationResult: result,
+      updatedAt: now,
+    };
+    this.sessions.set(sessionId, updated);
+    return { ...updated, turns: [...updated.turns] };
+  }
+
+  async updatePresentation(sessionId: string, html: string): Promise<CoworkSession> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`CoworkSession not found: ${sessionId}`);
+    const now = new Date().toISOString();
+    const updated: CoworkSession = {
+      ...session,
+      presentation: html,
+      updatedAt: now,
+    };
+    this.sessions.set(sessionId, updated);
+    return { ...updated, turns: [...updated.turns] };
+  }
+
   async finalize(sessionId: string, artifact: Record<string, unknown>): Promise<CoworkSession> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`CoworkSession not found: ${sessionId}`);

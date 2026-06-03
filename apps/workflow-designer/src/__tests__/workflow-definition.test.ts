@@ -10,7 +10,6 @@ describe('workflow-designer', () => {
     const raw = JSON.parse(
       readFileSync(resolve(appDir, 'src/workflow-designer.wd.json'), 'utf8'),
     );
-    // Add version (auto-assigned by server, not in source file)
     return WorkflowDefinitionSchema.safeParse({ ...raw, version: 1 });
   }
 
@@ -22,8 +21,8 @@ describe('workflow-designer', () => {
       if (!result.success) return;
 
       expect(result.data.name).toBe('workflow-designer');
-      expect(result.data.steps).toHaveLength(13);
-      expect(result.data.transitions).toHaveLength(11);
+      expect(result.data.steps).toHaveLength(7);
+      expect(result.data.transitions).toHaveLength(7);
       expect(result.data.triggers).toHaveLength(1);
     });
 
@@ -45,7 +44,7 @@ describe('workflow-designer', () => {
       const nonTerminal = result.data.steps.filter(s => s.type !== 'terminal');
       for (const step of nonTerminal) {
         expect(step.executor).toBeDefined();
-        expect(['human', 'agent', 'script']).toContain(step.executor);
+        expect(['human', 'agent', 'script', 'cowork']).toContain(step.executor);
       }
     });
 
@@ -77,38 +76,44 @@ describe('workflow-designer', () => {
       }
     });
 
-    it('agent steps have plugin and agent config', () => {
+    it('script steps have plugin and agent config', () => {
       const result = loadDefinition();
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const agentSteps = result.data.steps.filter(s => s.executor === 'agent');
-      expect(agentSteps.length).toBeGreaterThan(0);
+      const scriptSteps = result.data.steps.filter(s => s.executor === 'script');
+      expect(scriptSteps.length).toBeGreaterThan(0);
 
-      for (const step of agentSteps) {
-        expect(step.plugin).toBeDefined();
+      for (const step of scriptSteps) {
+        expect(step.plugin).toBe('script-container');
         expect(step.agent).toBeDefined();
+        expect(step.agent?.runtime).toBe('javascript');
       }
     });
 
-    it('runs every claude-code-agent step in the golden Docker image', () => {
+    it('has a cowork design step with outputSchema', () => {
       const result = loadDefinition();
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const claudeSteps = result.data.steps.filter(s => s.plugin === 'claude-code-agent');
-      expect(claudeSteps.length).toBeGreaterThan(0);
-      for (const step of claudeSteps) {
-        expect(step.agent?.image).toBe('mediforce-golden-image');
-      }
+      const coworkSteps = result.data.steps.filter(s => s.executor === 'cowork');
+      expect(coworkSteps).toHaveLength(1);
+      expect(coworkSteps[0].id).toBe('design');
+      expect(coworkSteps[0].cowork).toBeDefined();
+      expect(coworkSteps[0].cowork?.outputSchema).toBeDefined();
+      expect(coworkSteps[0].cowork?.systemPrompt).toBeDefined();
     });
 
-    it('supplies Anthropic credentials to dockerized agents via workflow env', () => {
+    it('choose-mode branches to create-new or edit-existing paths', () => {
       const result = loadDefinition();
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      expect(result.data.env?.ANTHROPIC_AUTH_TOKEN).toBe('{{OPENROUTER_API_KEY}}');
+      const transitions = result.data.transitions.filter(t => t.from === 'choose-mode');
+      expect(transitions).toHaveLength(2);
+
+      const targets = transitions.map(t => t.to).sort();
+      expect(targets).toEqual(['design', 'fetch-workflows']);
     });
   });
 });

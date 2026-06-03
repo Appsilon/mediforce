@@ -89,6 +89,8 @@ function sessionFor(
     outputSchema: { type: 'object' },
     voiceConfig: null,
     artifact: null,
+    validationResult: null,
+    presentation: null,
     mcpServers: null,
     turns: [],
     createdAt: now,

@@ -320,6 +320,8 @@ export function ChatCoworkView({
         <ArtifactPanel
           artifact={artifact}
           outputSchema={session.outputSchema}
+          validationResult={session.validationResult ?? null}
+          presentation={session.presentation ?? null}
           onFinalize={handleFinalize}
           finalizing={finalizing}
           finalized={finalized}
