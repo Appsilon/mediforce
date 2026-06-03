@@ -128,9 +128,9 @@
         "mcpServers": [
           {
             "name": "platform",
-            "command": "../../node_modules/.bin/tsx",
+            "command": "tsx",
             "args": [
-              "../../packages/platform-mcp/src/server.ts"
+              "packages/platform-mcp/src/server.ts"
             ],
             "description": "Platform MCP \u2014 workflow diagram rendering and other platform utilities"
           }

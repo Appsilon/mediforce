@@ -17,6 +17,7 @@ COPY packages/agent-runtime/package.json packages/agent-runtime/
 COPY packages/container-worker/package.json packages/container-worker/
 COPY packages/mcp-client/package.json packages/mcp-client/
 COPY packages/core-actions/package.json packages/core-actions/
+COPY packages/platform-mcp/package.json packages/platform-mcp/
 COPY packages/platform-ui/package.json packages/platform-ui/
 COPY apps/community-digest/package.json apps/community-digest/
 COPY apps/protocol-to-tfl/package.json apps/protocol-to-tfl/
@@ -88,6 +89,16 @@ COPY --from=builder /app/packages/platform-ui/public ./packages/platform-ui/publ
 # Seed JSONs (agent-definitions, tool-catalog) read at platform-services init.
 # Not reliably picked up by Next.js output file tracing in this build, so copy explicitly.
 COPY --from=builder /app/data ./data
+
+# platform-mcp — stdio MCP server spawned by McpClientManager for cowork
+# agents. Needs tsx (TS execution), workspace sources (@mediforce/* use the
+# TS condition ./src/index.ts), and MCP SDK + zod from node_modules.
+#
+# TODO: migrate to HTTP MCP transport (option B) or a sidecar container
+# (option C) when platform-mcp outgrows a single tool.
+RUN npm install -g tsx@4
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/node_modules ./node_modules
 
 EXPOSE 3000
 
