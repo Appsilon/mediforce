@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ModelRegistryRepository, CreateModelRegistryEntryInput, ModelRegistryEntry } from '@mediforce/platform-core';
-import { syncModels } from '../sync-models';
+import { syncWithRetry } from '../openrouter-sync';
 
 function stubEntry(): ModelRegistryEntry {
   return { id: 'test/m', name: 'm', provider: 'test', contextLength: 0, maxCompletionTokens: null, pricing: { input: 0, output: 0 }, modality: 'text->text', inputModalities: ['text'], outputModalities: ['text'], supportsTools: false, supportsVision: false, source: 'openrouter' as const, canonicalSlug: null, requestCount: null, lastSyncedAt: '', createdAt: '', updatedAt: '', retiredAt: null };
@@ -35,43 +35,32 @@ function makeFakeModel(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe('syncModels handler', () => {
-  it('returns synced count and lastSyncedAt from OpenRouter response', async () => {
-    const fakeResponse = {
-      data: [makeFakeModel()],
-    };
-
+describe('syncWithRetry', () => {
+  it('succeeds on first attempt', async () => {
+    const fakeResponse = { data: [makeFakeModel()] };
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify(fakeResponse), { status: 200 }),
     );
-
-    const result = await syncModels({ modelRegistryRepo: makeRepo() });
+    const result = await syncWithRetry(makeRepo(), { maxRetries: 3, intervalMs: 10 });
     expect(result.synced).toBe(1);
-    expect(result.total).toBe(1);
-    expect(result.lastSyncedAt).toBeTruthy();
-
     vi.restoreAllMocks();
   });
 
-  it('returns retired, reinstated, and rankingsUpdated counts', async () => {
-    const fakeResponse = {
-      data: [makeFakeModel({ requests: 500 })],
-    };
+  it('retries after failure and succeeds on third attempt', async () => {
+    const fakeResponse = { data: [makeFakeModel()] };
+    vi.spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('network error 1'))
+      .mockRejectedValueOnce(new Error('network error 2'))
+      .mockResolvedValueOnce(new Response(JSON.stringify(fakeResponse), { status: 200 }));
 
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify(fakeResponse), { status: 200 }),
-    );
+    const result = await syncWithRetry(makeRepo(), { maxRetries: 3, intervalMs: 10 });
+    expect(result.synced).toBe(1);
+    vi.restoreAllMocks();
+  });
 
-    const result = await syncModels({
-      modelRegistryRepo: makeRepo({
-        retireAbsentModels: async () => ({ retired: 2, reinstated: 1 }),
-        updateRankings: async () => 1,
-      }),
-    });
-    expect(result.retired).toBe(2);
-    expect(result.reinstated).toBe(1);
-    expect(result.rankingsUpdated).toBe(1);
-
+  it('throws after exhausting all retries', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('always fails'));
+    await expect(syncWithRetry(makeRepo(), { maxRetries: 2, intervalMs: 10 })).rejects.toThrow('always fails');
     vi.restoreAllMocks();
   });
 });

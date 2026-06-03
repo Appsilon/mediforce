@@ -29,10 +29,10 @@ export class PostgresPlatformSettingsRepository implements PlatformSettingsRepos
   }
 
   async getByPrefix(prefix: string): Promise<Array<{ key: string; value: string }>> {
-    const rows = await this.db
+    const escaped = prefix.replace(/[%_]/g, '\\$&');
+    return this.db
       .select({ key: platformSettings.key, value: platformSettings.value })
       .from(platformSettings)
-      .where(like(platformSettings.key, `${prefix}%`));
-    return rows.map((row) => ({ key: row.key, value: row.value }));
+      .where(like(platformSettings.key, `${escaped}%`));
   }
 }

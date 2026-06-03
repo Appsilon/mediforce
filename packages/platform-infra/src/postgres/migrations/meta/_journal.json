@@ -148,6 +148,13 @@
       "when": 1780502400000,
       "tag": "0020_system_workspace",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1780588800000,
+      "tag": "0021_platform_settings_trigger",
+      "breakpoints": true
     }
   ]
 }
