@@ -4,7 +4,7 @@ import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation } from '@mediforce/platform-core';
+import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, OutputSchemaShape } from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls, formatExitInfo, type ContainerPluginInit } from './container-plugin';
@@ -203,15 +203,11 @@ function buildHttpHeaders(
   return { [bundle.headerName]: headerValue };
 }
 
-export interface OutputSchema {
-  type?: string;
-  required?: string[];
-  properties?: Record<string, { type?: string }>;
-}
+export type OutputSchema = OutputSchemaShape;
 
 export function validateOutputSchema(
   output: Record<string, unknown>,
-  schema: OutputSchema,
+  schema: OutputSchemaShape,
 ): string | null {
   let data = output;
 

@@ -108,4 +108,4 @@ export { getMonitoringSummary } from './monitoring/get-monitoring-summary';
 
 export { listAdapter, getByIdAdapter } from './_generic';
 
-export { renderWorkflowDiagram, RenderWorkflowDiagramInputSchema } from './renders/workflow-diagram';
+export { renderWorkflowDiagram, renderWorkflowDiagramHandler, RenderWorkflowDiagramInputSchema } from './renders/workflow-diagram';

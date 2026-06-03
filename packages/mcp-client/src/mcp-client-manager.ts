@@ -132,7 +132,7 @@ export class McpClientManager {
     try {
       await client.connect(transport);
     } catch (err) {
-      const stderr = (transport as any)._process?.stderr;
+      const stderr = (transport as { _process?: { stderr?: NodeJS.ReadableStream } })._process?.stderr;
       if (stderr) {
         const chunks: Buffer[] = [];
         stderr.on('data', (c: Buffer) => chunks.push(c));

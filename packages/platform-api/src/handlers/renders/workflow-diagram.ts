@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { CallerScope } from '../../repositories/index';
 
 export const RenderWorkflowDiagramInputSchema = z.object({
   definition: z.object({
@@ -170,4 +171,11 @@ export function renderWorkflowDiagram(input: RenderWorkflowDiagramInput): string
       ${triggerInputHtml}
     </div>
   `.trim();
+}
+
+export async function renderWorkflowDiagramHandler(
+  input: RenderWorkflowDiagramInput,
+  _scope: CallerScope,
+): Promise<{ html: string }> {
+  return { html: renderWorkflowDiagram(input) };
 }

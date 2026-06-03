@@ -1,6 +1,18 @@
 import { z } from 'zod';
 import { McpServerConfigSchema } from './mcp-server-config';
 
+/**
+ * Shape expected by `validateOutputSchema` — the structural subset of JSON
+ * Schema used for cowork artifact validation. Defined here (next to the
+ * `outputSchema` field on CoworkSession) so both platform-api handlers and
+ * agent-runtime can import it without circular deps.
+ */
+export interface OutputSchemaShape {
+  type?: string;
+  required?: string[];
+  properties?: Record<string, { type?: string }>;
+}
+
 // ---------------------------------------------------------------------------
 // ConversationTurn — a single message in a cowork conversation
 // ---------------------------------------------------------------------------
