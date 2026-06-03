@@ -133,7 +133,9 @@ async function connectMcp(session: CoworkSession): Promise<McpHandle | null> {
     return { manager, tools };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    throw new HandlerError('internal', `Failed to connect to MCP servers: ${message}`);
+    console.warn(`[cowork-chat] MCP connection failed (continuing without MCP tools): ${message}`);
+    await manager.disconnect().catch(() => {});
+    return null;
   }
 }
 

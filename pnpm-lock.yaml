@@ -228,6 +228,22 @@ importers:
         specifier: ^4.0.0
         version: 4.1.7(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.7)(jsdom@29.1.1)(vite@8.0.14(@types/node@24.12.4)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
+  packages/mediforce-mcp:
+    dependencies:
+      '@mediforce/platform-api':
+        specifier: workspace:*
+        version: link:../platform-api
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.12.1
+        version: 1.29.0(zod@4.4.3)
+      zod:
+        specifier: ^4.0.0
+        version: 4.4.3
+    devDependencies:
+      tsx:
+        specifier: ^4.21.0
+        version: 4.22.3
+
   packages/platform-api:
     dependencies:
       '@mediforce/agent-runtime':
@@ -299,22 +315,6 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
-
-  packages/platform-mcp:
-    dependencies:
-      '@mediforce/platform-api':
-        specifier: workspace:*
-        version: link:../platform-api
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.12.1
-        version: 1.29.0(zod@4.4.3)
-      zod:
-        specifier: ^4.0.0
-        version: 4.4.3
-    devDependencies:
-      tsx:
-        specifier: ^4.21.0
-        version: 4.22.3
 
   packages/platform-ui:
     dependencies:
@@ -3394,10 +3394,6 @@ packages:
 
   has-tostringtag@1.0.2:
     resolution: {integrity: sha512-NqADB8VjPFLM2V0VvHUewwwsw0ZWBaIdgo+ieHtK3hasLz4qeCRjYcqfB6AQrBggRKppKF8L52/VqdVsO47Dlw==}
-    engines: {node: '>= 0.4'}
-
-  hasown@2.0.2:
-    resolution: {integrity: sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==}
     engines: {node: '>= 0.4'}
 
   hasown@2.0.3:
@@ -7411,7 +7407,7 @@ snapshots:
       get-proto: 1.0.1
       gopd: 1.2.0
       has-symbols: 1.1.0
-      hasown: 2.0.2
+      hasown: 2.0.3
       math-intrinsics: 1.1.0
 
   get-nonce@1.0.1: {}
@@ -7495,14 +7491,9 @@ snapshots:
       has-symbols: 1.1.0
     optional: true
 
-  hasown@2.0.2:
-    dependencies:
-      function-bind: 1.1.2
-
   hasown@2.0.3:
     dependencies:
       function-bind: 1.1.2
-    optional: true
 
   hast-util-sanitize@5.0.2:
     dependencies:

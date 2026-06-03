@@ -18,6 +18,7 @@ const MCP_DEBUG = process.env.MCP_DEBUG === 'true';
 const INHERITED_ENV_KEYS = [
   'PATH',
   'HOME',
+  'MEDIFORCE_ROOT',
   'USER',
   'LOGNAME',
   'SHELL',
@@ -108,10 +109,12 @@ export class McpClientManager {
         ...resolvedEnv,
       };
       if (MCP_DEBUG) console.log(`[MCP] Spawning '${serverConfig.name}': command=${serverConfig.command} args=${JSON.stringify(serverConfig.args ?? [])} cwd=${process.cwd()} PATH=${(spawnEnv.PATH ?? '').slice(0, 120)}…`);
+      const cwd = spawnEnv.MEDIFORCE_ROOT || undefined;
       transport = new StdioClientTransport({
         command: serverConfig.command,
         args: serverConfig.args ?? [],
         env: spawnEnv,
+        ...(cwd ? { cwd } : {}),
       });
       transport.onerror = (err) => {
         if (MCP_DEBUG) console.error(`[MCP] Transport error for '${serverConfig.name}':`, err);
