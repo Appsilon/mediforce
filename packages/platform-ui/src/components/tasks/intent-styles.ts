@@ -1,4 +1,4 @@
-import { CheckCircle, XCircle, AlertCircle, MinusCircle } from 'lucide-react';
+import { CheckCircle, XCircle, MessageSquare, Circle } from 'lucide-react';
 
 export type Intent = 'success' | 'warning' | 'danger' | 'neutral';
 
@@ -23,7 +23,7 @@ export const INTENT_STYLES: Record<Intent, IntentStyles> = {
     timestamp: 'text-green-600/70 dark:text-green-400/70',
   },
   warning: {
-    Icon: AlertCircle,
+    Icon: MessageSquare,
     submit: 'bg-amber-600 text-white hover:bg-amber-700',
     card: 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800',
     iconColor: 'text-amber-600 dark:text-amber-400',
@@ -41,8 +41,8 @@ export const INTENT_STYLES: Record<Intent, IntentStyles> = {
     timestamp: 'text-red-600/70 dark:text-red-400/70',
   },
   neutral: {
-    Icon: MinusCircle,
-    submit: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+    Icon: Circle,
+    submit: 'bg-slate-600 text-white hover:bg-slate-700',
     card: 'bg-slate-50 border-slate-200 dark:bg-slate-900/20 dark:border-slate-800',
     iconColor: 'text-slate-600 dark:text-slate-400',
     text: 'text-slate-800 dark:text-slate-300',

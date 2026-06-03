@@ -148,14 +148,10 @@ export function VerdictForm({
   );
 }
 
-// --- Intent helpers ------------------------------------------------------
-
 function IntentIcon({ intent, className }: { intent: Intent; className?: string }) {
   const { Icon } = INTENT_STYLES[intent];
   return <Icon className={className} />;
 }
-
-// --- Post-submission inline confirmation ---------------------------------
 
 function VerdictConfirmation({
   data,

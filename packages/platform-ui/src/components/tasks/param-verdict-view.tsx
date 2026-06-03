@@ -87,13 +87,18 @@ function ParamVerdictForm({
     setError(null);
 
     try {
+      const coercedValues: Record<string, unknown> = {};
+      for (const param of params) {
+        const raw = values[param.name];
+        coercedValues[param.name] = param.type === 'number' ? Number(raw) : raw;
+      }
       await mediforce.tasks.complete({
         taskId,
         payload: {
           kind: 'verdict-with-params',
           verdict: cfg.key,
           comment: trimmedComment || undefined,
-          paramValues: values,
+          paramValues: coercedValues,
         },
       });
       setSubmitted(true);
@@ -192,13 +197,13 @@ function CompletionReadOnly({
   verdicts,
   remainingTaskCount,
 }: {
-  completionData: unknown;
+  completionData: Record<string, unknown>;
   params: StepParam[];
   verdicts?: TaskVerdict[];
   remainingTaskCount?: number;
 }) {
   const handle = useHandleFromPath();
-  const data = completionData as Record<string, unknown>;
+  const data = completionData;
   const verdictKey = data.verdict as string | undefined;
   const comment = data.comment as string | undefined;
   const timestamp = data.completedAt as string | undefined;
