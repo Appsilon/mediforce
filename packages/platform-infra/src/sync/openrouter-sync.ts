@@ -72,7 +72,9 @@ function transformModel(model: OpenRouterModel): CreateModelRegistryEntryInput {
 export async function syncFromOpenRouter(
   repo: ModelRegistryRepository,
 ): Promise<SyncResult> {
-  const response = await fetch(OPENROUTER_MODELS_URL);
+  const response = await fetch(OPENROUTER_MODELS_URL, {
+    signal: AbortSignal.timeout(15_000),
+  });
   if (!response.ok) {
     throw new Error(`OpenRouter API returned ${response.status}: ${response.statusText}`);
   }
