@@ -1,6 +1,18 @@
 import { z } from 'zod';
 import { McpServerConfigSchema } from './mcp-server-config';
 
+/**
+ * Shape expected by `validateOutputSchema` — the structural subset of JSON
+ * Schema used for cowork artifact validation. Defined here (next to the
+ * `outputSchema` field on CoworkSession) so both platform-api handlers and
+ * agent-runtime can import it without circular deps.
+ */
+export interface OutputSchemaShape {
+  type?: string;
+  required?: string[];
+  properties?: Record<string, { type?: string }>;
+}
+
 // ---------------------------------------------------------------------------
 // ConversationTurn — a single message in a cowork conversation
 // ---------------------------------------------------------------------------
@@ -85,6 +97,13 @@ export const CoworkSessionSchema = z.object({
   // Default null keeps full-scan reads tolerant of those docs.
   voiceConfig: CoworkVoiceConfigSchema.nullable().default(null),
   artifact: z.record(z.string(), z.unknown()).nullable(),
+  /** Validation result from the last update_artifact call */
+  validationResult: z.object({
+    valid: z.boolean(),
+    errors: z.array(z.string()),
+  }).nullable().default(null),
+  /** HTML presentation produced by the agent via update_presentation */
+  presentation: z.string().nullable().default(null),
   /** MCP servers available during this cowork session */
   mcpServers: z.array(McpServerConfigSchema).nullable().default(null),
   turns: z.array(ConversationTurnSchema),

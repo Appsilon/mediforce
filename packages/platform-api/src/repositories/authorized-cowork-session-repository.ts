@@ -73,6 +73,22 @@ export class AuthorizedCoworkSessionRepository extends AuthorizedScope {
     return this.raw.updateArtifact(sessionId, artifact);
   };
 
+  updateValidationResult = async (
+    sessionId: string,
+    result: { valid: boolean; errors: string[] },
+  ): Promise<CoworkSession> => {
+    await this.requireAccess(sessionId);
+    return this.raw.updateValidationResult(sessionId, result);
+  };
+
+  updatePresentation = async (
+    sessionId: string,
+    html: string,
+  ): Promise<CoworkSession> => {
+    await this.requireAccess(sessionId);
+    return this.raw.updatePresentation(sessionId, html);
+  };
+
   finalize = async (
     sessionId: string,
     artifact: Record<string, unknown>,

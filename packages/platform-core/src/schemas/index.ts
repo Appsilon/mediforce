@@ -208,6 +208,7 @@ export {
   type ToolTurn,
   type CoworkSessionStatus,
   type CoworkSession,
+  type OutputSchemaShape,
 } from './cowork-session';
 
 export {

@@ -116,12 +116,6 @@ importers:
         specifier: workspace:*
         version: link:../../packages/platform-core
 
-  apps/workflow-designer-2:
-    dependencies:
-      '@mediforce/platform-core':
-        specifier: workspace:*
-        version: link:../../packages/platform-core
-
   packages/agent-runtime:
     dependencies:
       '@mediforce/platform-core':
@@ -305,6 +299,22 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
+
+  packages/platform-mcp:
+    dependencies:
+      '@mediforce/platform-api':
+        specifier: workspace:*
+        version: link:../platform-api
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.12.1
+        version: 1.29.0(zod@4.4.3)
+      zod:
+        specifier: ^4.0.0
+        version: 4.4.3
+    devDependencies:
+      tsx:
+        specifier: ^4.21.0
+        version: 4.22.3
 
   packages/platform-ui:
     dependencies:

@@ -178,6 +178,7 @@ export type {
   ToolTurn,
   CoworkSessionStatus,
   CoworkSession,
+  OutputSchemaShape,
   NamespaceType,
   Namespace,
   NamespaceMember,

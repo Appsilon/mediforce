@@ -32,6 +32,27 @@ export const ARTIFACT_TOOL = {
   },
 };
 
+export const PRESENTATION_TOOL = {
+  type: 'function' as const,
+  function: {
+    name: 'update_presentation',
+    description:
+      'Update the visual presentation shown alongside the artifact. ' +
+      'Pass complete HTML content — it will be rendered in a sandboxed iframe with Tailwind CSS available. ' +
+      'Use this to show flow diagrams, comparison cards, or other visual representations of the artifact.',
+    parameters: {
+      type: 'object',
+      properties: {
+        html: {
+          type: 'string',
+          description: 'Complete HTML fragment to render. Tailwind CSS 4 classes are available.',
+        },
+      },
+      required: ['html'],
+    },
+  },
+};
+
 /**
  * Build the system prompt for a cowork session.
  * Combines the step-level system prompt with artifact context.
@@ -58,6 +79,7 @@ function buildSystemPrompt(session: CoworkSession): string {
     '\n## Instructions\n' +
     '- Ask clarifying questions when the human\'s intent is ambiguous.\n' +
     '- Call the `update_artifact` tool whenever you have enough information to create or improve the artifact.\n' +
+    '- Call `update_presentation` with an HTML fragment to show a visual representation of the artifact (e.g., a flow diagram).\n' +
     '- Always pass the COMPLETE artifact to `update_artifact`, not a partial delta.\n' +
     '- Explain what you changed and why after each artifact update.\n' +
     '- When you believe the artifact is complete, say so and ask the human to review and finalize.',
@@ -110,9 +132,10 @@ export function buildMessages(
 /**
  * Build the tools array for OpenRouter, combining the artifact tool with MCP tools.
  */
-export function buildToolsArray(mcpTools?: McpToolDefinition[]): Array<typeof ARTIFACT_TOOL | McpToolDefinition> {
-  if (!mcpTools || mcpTools.length === 0) return [ARTIFACT_TOOL];
-  return [ARTIFACT_TOOL, ...mcpTools];
+export function buildToolsArray(mcpTools?: McpToolDefinition[]): Array<typeof ARTIFACT_TOOL | typeof PRESENTATION_TOOL | McpToolDefinition> {
+  const builtins = [ARTIFACT_TOOL, PRESENTATION_TOOL];
+  if (!mcpTools || mcpTools.length === 0) return builtins;
+  return [...builtins, ...mcpTools];
 }
 
 /**

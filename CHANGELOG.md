@@ -11,6 +11,16 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Added
+- **Merged workflow designer** — consolidated `workflow-designer` (v21), `workflow-designer-2` (v3), and `cowork-workflow-designer` (v5) into a single cowork-based `workflow-designer` with create/edit mode support, live validation, HTML diagram previews, and a rich system prompt covering the full WorkflowDefinition schema.
+  - Cowork sessions now validate artifacts live on every `update_artifact` call (wires up the previously unused `validateOutputSchema`), with results shown in the artifact panel and enforced as a gate on finalize.
+  - New `update_presentation` built-in tool lets cowork agents push HTML previews rendered in a sandboxed iframe tab alongside the JSON tree explorer.
+  - `platform-mcp` stdio server exposes `render_workflow_diagram` — a deterministic HTML renderer matching the platform's visual language (step type colors, executor badges, verdict pills).
+  - `POST /api/render/workflow-diagram` REST endpoint (same renderer).
+  - Artifact panel: collapsible JSON tree explorer replaces raw `JSON.stringify`; tabbed Data/Preview view.
+  - Built-in tool calls (`update_artifact`, `update_presentation`) now persist as live tool turns visible in the cowork chat UI.
+  - Postgres migration 0018: `validation_result` (jsonb) + `presentation` (text) columns on `cowork_sessions`.
+
 ## [2026-05-31]
 
 ### Changed

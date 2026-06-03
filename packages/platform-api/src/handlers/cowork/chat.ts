@@ -2,7 +2,7 @@ import {
   McpClientManager,
   type McpToolDefinition,
 } from '@mediforce/mcp-client';
-import type { ConversationTurn, CoworkSession } from '@mediforce/platform-core';
+import type { ConversationTurn, CoworkSession, OutputSchemaShape } from '@mediforce/platform-core';
 import {
   HandlerError,
   PreconditionFailedError,
@@ -24,9 +24,11 @@ import {
   callOpenRouter,
   type OpenRouterToolCall,
 } from '../../services/openrouter-client';
+import { validateOutputSchema } from '@mediforce/agent-runtime';
 
 const MAX_TOOL_LOOP_ITERATIONS = 10;
 const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
+const COWORK_DEBUG = process.env.COWORK_DEBUG === 'true';
 
 /**
  * Chat turn — orchestrates the MCP tool loop server-side. Intermediate tool
@@ -207,6 +209,7 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
   }
 
   const tools = buildToolsArray(mcp?.tools ?? []);
+  if (COWORK_DEBUG) console.log(`[cowork-chat] Tools sent to LLM: ${tools.map(t => t.function.name).join(', ')} (${tools.length} total)`);
   const toolCallSummaries: ChatCoworkToolCall[] = [];
   let artifact: Record<string, unknown> | undefined;
   let agentText = '';
@@ -219,31 +222,97 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
       apiKey: ctx.openRouterKey,
     });
     agentText = response.content;
+    if (COWORK_DEBUG) console.log(`[cowork-chat] LLM response: text=${agentText.length}chars toolCalls=[${response.toolCalls.map(tc => tc.function.name).join(', ')}]`);
 
     const artifactCalls = response.toolCalls.filter(
       (tc) => tc.function.name === 'update_artifact',
     );
+    const presentationCalls = response.toolCalls.filter(
+      (tc) => tc.function.name === 'update_presentation',
+    );
     const mcpCalls = response.toolCalls.filter(
-      (tc) => tc.function.name !== 'update_artifact',
+      (tc) => tc.function.name !== 'update_artifact' && tc.function.name !== 'update_presentation',
     );
 
     for (const call of artifactCalls) {
+      const turn = toolRunningTurn('update_artifact', '_builtin', {});
+      await addTurn(scope, ctx.session.id, turn);
+
       const parsed = applyArtifactUpdate(call);
       if (parsed !== null) {
         artifact = parsed;
         await scope.coworkSessions.updateArtifact(ctx.session.id, parsed);
+
+        let resultMsg = 'Artifact updated.';
+        if (ctx.session.outputSchema) {
+          const error = validateOutputSchema(
+            parsed,
+            ctx.session.outputSchema as OutputSchemaShape,
+          );
+          const validationResult = error === null
+            ? { valid: true, errors: [] as string[] }
+            : { valid: false, errors: [error] };
+          await scope.coworkSessions.updateValidationResult(ctx.session.id, validationResult);
+          resultMsg = error === null
+            ? 'Artifact updated and validated.'
+            : `Artifact updated. Validation: ${error}`;
+        }
+        await scope.coworkSessions.updateTurn(ctx.session.id, turn.id, {
+          toolResult: resultMsg,
+          toolStatus: 'success',
+        });
+      } else {
+        await scope.coworkSessions.updateTurn(ctx.session.id, turn.id, {
+          toolResult: 'Artifact update skipped (parse error).',
+          toolStatus: 'error',
+        });
       }
     }
 
-    if (mcpCalls.length === 0) break;
-    // mcpCalls non-empty implies the LLM picked at least one MCP tool, which
-    // can only happen when `tools` included MCP entries (`mcp !== null`).
-    if (mcp === null) break;
+    for (const call of presentationCalls) {
+      const turn = toolRunningTurn('update_presentation', '_builtin', {});
+      await addTurn(scope, ctx.session.id, turn);
 
+      const html = applyPresentationUpdate(call);
+      if (html !== null) {
+        await scope.coworkSessions.updatePresentation(ctx.session.id, html);
+        await scope.coworkSessions.updateTurn(ctx.session.id, turn.id, {
+          toolResult: 'Presentation updated.',
+          toolStatus: 'success',
+        });
+      } else {
+        await scope.coworkSessions.updateTurn(ctx.session.id, turn.id, {
+          toolResult: 'Presentation update skipped (parse error).',
+          toolStatus: 'error',
+        });
+      }
+    }
+
+    // No tool calls at all → LLM is done, break.
+    if (response.toolCalls.length === 0) break;
+
+    // Built-in tools (artifact, presentation) are handled above and don't
+    // produce tool_result messages. If the LLM called ONLY built-in tools,
+    // we still need to feed back tool results so it can continue. Push
+    // synthetic "ok" results for built-in calls.
     messages.push(assistantMessage(agentText, response.toolCalls));
-    for (const call of mcpCalls) {
-      const summary = await executeMcpTool(scope, ctx.session.id, mcp, call, messages);
-      toolCallSummaries.push(summary);
+
+    for (const call of artifactCalls) {
+      const validationMsg = ctx.session.outputSchema
+        ? (artifact ? 'Artifact updated and validated.' : 'Artifact update skipped (parse error).')
+        : 'Artifact updated.';
+      messages.push({ role: 'tool', content: validationMsg, tool_call_id: call.id });
+    }
+    for (const call of presentationCalls) {
+      messages.push({ role: 'tool', content: 'Presentation updated.', tool_call_id: call.id });
+    }
+
+    if (mcpCalls.length > 0) {
+      if (mcp === null) break;
+      for (const call of mcpCalls) {
+        const summary = await executeMcpTool(scope, ctx.session.id, mcp, call, messages);
+        toolCallSummaries.push(summary);
+      }
     }
   }
 
@@ -315,6 +384,17 @@ function applyArtifactUpdate(
       artifact: Record<string, unknown>;
     };
     return parsed.artifact;
+  } catch {
+    return null;
+  }
+}
+
+function applyPresentationUpdate(
+  call: OpenRouterToolCall,
+): string | null {
+  try {
+    const parsed = JSON.parse(call.function.arguments) as { html: string };
+    return typeof parsed.html === 'string' ? parsed.html : null;
   } catch {
     return null;
   }
