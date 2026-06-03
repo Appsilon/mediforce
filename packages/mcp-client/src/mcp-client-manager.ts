@@ -102,14 +102,19 @@ export class McpClientManager {
     let transport: StdioClientTransport | StreamableHTTPClientTransport;
 
     if (serverConfig.command) {
+      const spawnEnv = {
+        ...inheritedEnv(),
+        ...resolvedEnv,
+      };
+      console.log(`[MCP] Spawning '${serverConfig.name}': command=${serverConfig.command} args=${JSON.stringify(serverConfig.args ?? [])} cwd=${process.cwd()} PATH=${(spawnEnv.PATH ?? '').slice(0, 120)}…`);
       transport = new StdioClientTransport({
         command: serverConfig.command,
         args: serverConfig.args ?? [],
-        env: {
-          ...inheritedEnv(),
-          ...resolvedEnv,
-        },
+        env: spawnEnv,
       });
+      transport.onerror = (err) => {
+        console.error(`[MCP] Transport error for '${serverConfig.name}':`, err);
+      };
     } else if (serverConfig.url) {
       transport = new StreamableHTTPClientTransport(
         new URL(serverConfig.url),
@@ -123,7 +128,19 @@ export class McpClientManager {
       version: '1.0.0',
     });
 
-    await client.connect(transport);
+    try {
+      await client.connect(transport);
+    } catch (err) {
+      const stderr = (transport as any)._process?.stderr;
+      if (stderr) {
+        const chunks: Buffer[] = [];
+        stderr.on('data', (c: Buffer) => chunks.push(c));
+        await new Promise((r) => setTimeout(r, 500));
+        const stderrText = Buffer.concat(chunks).toString().trim();
+        if (stderrText) console.error(`[MCP] stderr from '${serverConfig.name}':\n${stderrText}`);
+      }
+      throw err;
+    }
 
     const toolsResponse = await client.listTools();
     const toolMap = new Map<string, { originalName: string }>();
