@@ -3,62 +3,14 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Loader2, CheckCircle, XCircle, AlertCircle, MinusCircle } from 'lucide-react';
+import { Loader2, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { ParamField } from '@/components/ui/param-field';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import type { TaskVerdict, StepParam } from '@mediforce/platform-core';
 import type { TaskBodyProps } from './task-body-registry';
-
-type Intent = 'success' | 'warning' | 'danger' | 'neutral';
-
-const INTENT_STYLES: Record<Intent, {
-  submit: string;
-  Icon: typeof CheckCircle;
-  card: string;
-  iconColor: string;
-  text: string;
-  blockquote: string;
-  timestamp: string;
-}> = {
-  success: {
-    submit: 'bg-green-600 text-white hover:bg-green-700',
-    Icon: CheckCircle,
-    card: 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800',
-    iconColor: 'text-green-600 dark:text-green-400',
-    text: 'text-green-800 dark:text-green-300',
-    blockquote: 'border-green-300 text-green-700 dark:border-green-700 dark:text-green-300',
-    timestamp: 'text-green-600/70 dark:text-green-400/70',
-  },
-  warning: {
-    submit: 'bg-yellow-600 text-white hover:bg-yellow-700',
-    Icon: AlertCircle,
-    card: 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800',
-    iconColor: 'text-amber-600 dark:text-amber-400',
-    text: 'text-amber-800 dark:text-amber-300',
-    blockquote: 'border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300',
-    timestamp: 'text-amber-600/70 dark:text-amber-400/70',
-  },
-  danger: {
-    submit: 'bg-red-600 text-white hover:bg-red-700',
-    Icon: XCircle,
-    card: 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800',
-    iconColor: 'text-red-600 dark:text-red-400',
-    text: 'text-red-800 dark:text-red-300',
-    blockquote: 'border-red-300 text-red-700 dark:border-red-700 dark:text-red-300',
-    timestamp: 'text-red-600/70 dark:text-red-400/70',
-  },
-  neutral: {
-    submit: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-    Icon: MinusCircle,
-    card: 'bg-slate-50 border-slate-200 dark:bg-slate-900/20 dark:border-slate-800',
-    iconColor: 'text-slate-600 dark:text-slate-400',
-    text: 'text-slate-800 dark:text-slate-300',
-    blockquote: 'border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-300',
-    timestamp: 'text-slate-600/70 dark:text-slate-400/70',
-  },
-};
+import { INTENT_STYLES, type Intent } from './intent-styles';
 
 export function ParamVerdictView({ task, remainingTaskCount }: TaskBodyProps) {
   const isActionable = task.status === 'claimed' || task.status === 'pending';
@@ -98,7 +50,19 @@ function ParamVerdictForm({
   verdicts: TaskVerdict[];
   remainingTaskCount?: number;
 }) {
-  const [values, setValues] = React.useState<Record<string, unknown>>({});
+  const [values, setValues] = React.useState<Record<string, unknown>>(() => {
+    const initial: Record<string, unknown> = {};
+    for (const param of params) {
+      if (param.default !== undefined) {
+        initial[param.name] = param.default;
+      } else if (param.type === 'boolean') {
+        initial[param.name] = false;
+      } else {
+        initial[param.name] = '';
+      }
+    }
+    return initial;
+  });
   const [comment, setComment] = React.useState('');
   const [submitting, setSubmitting] = React.useState<string | null>(null);
   const [submitted, setSubmitted] = React.useState(false);
