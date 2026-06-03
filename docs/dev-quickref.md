@@ -62,6 +62,17 @@ pnpm db:migrate     # 3. apply locally (pnpm dev also auto-runs this)
 
 Branch-collision rename rule: [postgres-local-dev.md](postgres-local-dev.md).
 
+### Pull staging data locally
+
+Clone the staging DB into your local dev Postgres so you can work against real data without touching staging:
+
+```bash
+python3 scripts/db-pull-staging.py <staging-ip>          # e.g. 204.168.165.57
+python3 scripts/db-pull-staging.py <staging-ip> --keep-dump  # keep the .dump file for reuse
+```
+
+Requires SSH access to the staging host (uses `deploy` user by default, override with `--user`).
+
 ## Port map
 
 | Port | Service                          |
