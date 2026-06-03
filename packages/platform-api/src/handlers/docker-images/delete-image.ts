@@ -1,4 +1,5 @@
 import { assertCallerCanAdminDockerImages } from '../../auth';
+import { emitAudit } from '../../audit-helpers';
 import { PreconditionFailedError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type {
@@ -21,11 +22,16 @@ export async function deleteDockerImage(
 
   const result = await deleter.delete(input.imageId);
 
-  // TODO(#592): re-enable audit emission once `_system` sentinel workspace
-  // lands. PostgresAuditRepository.append throws here because this
-  // platform-global handler has no workspace context (no processInstanceId,
-  // no namespace), and InMemoryAuditRepository accepts it silently —
-  // ADR-0001 Pattern #2 divergence tracked in #592.
+  await emitAudit(scope.system.audit, scope.caller, {
+    action: 'docker_image.deleted',
+    namespace: '_system',
+    description: `Deleted docker image ${input.imageId}`,
+    entityType: 'docker_image',
+    entityId: input.imageId,
+    basis: 'api-call',
+    inputSnapshot: { imageId: input.imageId },
+    outputSnapshot: { ...result },
+  });
 
   return result;
 }

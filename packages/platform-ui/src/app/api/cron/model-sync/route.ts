@@ -37,6 +37,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       onAttemptFail: async (attempt, error) => {
         await emitAudit(auditRepo, systemCaller, {
           action: 'model_sync.attempt_failed',
+          namespace: '_system',
           description: `Sync attempt ${attempt} failed: ${error.message}`,
           entityType: 'model_registry',
           entityId: 'openrouter',
@@ -48,6 +49,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     });
     await emitAudit(auditRepo, systemCaller, {
       action: 'model_sync.completed',
+      namespace: '_system',
       description: `Sync completed: ${result.synced} synced, ${result.retired} retired, ${result.reinstated} reinstated`,
       entityType: 'model_registry',
       entityId: 'openrouter',
@@ -59,6 +61,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   } catch (err) {
     await emitAudit(auditRepo, systemCaller, {
       action: 'model_sync.failed',
+      namespace: '_system',
       description: `Sync failed after all retries: ${err instanceof Error ? err.message : 'Sync failed after retries'}`,
       entityType: 'model_registry',
       entityId: 'openrouter',
