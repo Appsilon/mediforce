@@ -13,6 +13,7 @@ import {
   InMemoryHandoffRepository,
   InMemoryHumanTaskRepository,
   InMemoryOAuthProviderRepository,
+  InMemoryPlatformSettingsRepository,
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
   InMemoryToolCatalogRepository,
@@ -24,6 +25,7 @@ import type {
   ModelRegistryRepository,
   NamespaceRepository,
   NamespaceSecretsRepository,
+  PlatformSettingsRepository,
   ProcessInstanceRepository,
   UserDirectoryService,
   UserProfileRepository,
@@ -180,6 +182,7 @@ export interface TestScopeOverrides {
   readonly namespaceRepo?: NamespaceRepository;
   readonly userProfileRepo?: UserProfileRepository;
   readonly userDirectory?: UserDirectoryService | null;
+  readonly platformSettingsRepo?: PlatformSettingsRepository;
 }
 
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
@@ -221,6 +224,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     modelRegistryRepo: overrides.modelRegistryRepo ?? stubModelRegistry,
     secretsRepo: overrides.secretsRepo ?? stubWorkflowSecrets,
     namespaceSecretsRepo: overrides.namespaceSecretsRepo ?? stubNamespaceSecrets,
+    platformSettingsRepo: overrides.platformSettingsRepo ?? new InMemoryPlatformSettingsRepository(),
     pluginRegistry: (overrides.pluginRegistry ?? stubPluginRegistry) as CallerScopeServices['pluginRegistry'],
     engine: null as unknown as CallerScopeServices['engine'],
     manualTrigger: null as unknown as CallerScopeServices['manualTrigger'],

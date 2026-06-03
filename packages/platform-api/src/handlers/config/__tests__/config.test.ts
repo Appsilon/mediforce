@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InMemoryPlatformSettingsRepository } from '@mediforce/platform-core/testing';
+import { createTestScope } from '../../../repositories/__tests__/create-test-scope';
 import { getConfig, getConfigByPrefix, setConfig, testWebhook } from '../index';
 
 vi.mock('@mediforce/platform-infra', () => ({
@@ -8,15 +9,16 @@ vi.mock('@mediforce/platform-infra', () => ({
 
 describe('getConfig', () => {
   it('returns null value for unknown key', async () => {
-    const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
-    const result = await getConfig({ platformSettingsRepo }, { key: 'unknown.key' });
+    const scope = createTestScope();
+    const result = await getConfig({ key: 'unknown.key' }, scope);
     expect(result).toEqual({ key: 'unknown.key', value: null });
   });
 
   it('returns the stored value for a known key', async () => {
     const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
     await platformSettingsRepo.set('alert.webhook.url', 'https://hooks.slack.com/test');
-    const result = await getConfig({ platformSettingsRepo }, { key: 'alert.webhook.url' });
+    const scope = createTestScope({ platformSettingsRepo });
+    const result = await getConfig({ key: 'alert.webhook.url' }, scope);
     expect(result).toEqual({ key: 'alert.webhook.url', value: 'https://hooks.slack.com/test' });
   });
 });
@@ -24,9 +26,10 @@ describe('getConfig', () => {
 describe('setConfig + getConfig round-trip', () => {
   it('stores and retrieves a value', async () => {
     const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
-    const setResult = await setConfig({ platformSettingsRepo }, { key: 'test.key', value: 'hello' });
+    const scope = createTestScope({ platformSettingsRepo });
+    const setResult = await setConfig({ key: 'test.key', value: 'hello' }, scope);
     expect(setResult).toEqual({ ok: true });
-    const getResult = await getConfig({ platformSettingsRepo }, { key: 'test.key' });
+    const getResult = await getConfig({ key: 'test.key' }, scope);
     expect(getResult).toEqual({ key: 'test.key', value: 'hello' });
   });
 });
@@ -37,25 +40,27 @@ describe('getConfigByPrefix', () => {
     await platformSettingsRepo.set('alert.webhook.url', 'https://hooks.slack.com/test');
     await platformSettingsRepo.set('alert.webhook.type', 'slack');
     await platformSettingsRepo.set('other.key', 'value');
-    const result = await getConfigByPrefix({ platformSettingsRepo }, { prefix: 'alert.webhook.' });
+    const scope = createTestScope({ platformSettingsRepo });
+    const result = await getConfigByPrefix({ prefix: 'alert.webhook.' }, scope);
     expect(result.settings).toHaveLength(2);
     expect(result.settings).toContainEqual({ key: 'alert.webhook.url', value: 'https://hooks.slack.com/test' });
     expect(result.settings).toContainEqual({ key: 'alert.webhook.type', value: 'slack' });
   });
 
   it('returns empty array for unknown prefix', async () => {
-    const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
-    const result = await getConfigByPrefix({ platformSettingsRepo }, { prefix: 'nonexistent.' });
+    const scope = createTestScope();
+    const result = await getConfigByPrefix({ prefix: 'nonexistent.' }, scope);
     expect(result).toEqual({ settings: [] });
   });
 });
 
 describe('testWebhook', () => {
   it('calls sendTestWebhook and returns the result', async () => {
-    const { sendTestWebhook } = await import('@mediforce/platform-infra');
+    const { sendTestWebhook: sendTestWebhookMock } = await import('@mediforce/platform-infra');
     const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
-    const result = await testWebhook({ platformSettingsRepo });
-    expect(sendTestWebhook).toHaveBeenCalledWith(platformSettingsRepo);
+    const scope = createTestScope({ platformSettingsRepo });
+    const result = await testWebhook(undefined, scope);
+    expect(sendTestWebhookMock).toHaveBeenCalledWith(platformSettingsRepo);
     expect(result).toEqual({ ok: true });
   });
 });

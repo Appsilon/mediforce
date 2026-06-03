@@ -1,69 +1,33 @@
-import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getPlatformServices } from '@/lib/platform-services';
+import { createRouteAdapter } from '@/lib/route-adapter';
 import { getConfig, getConfigByPrefix, setConfig } from '@mediforce/platform-api/handlers';
 import {
   GetConfigInputSchema,
   GetConfigByPrefixInputSchema,
   SetConfigInputSchema,
 } from '@mediforce/platform-api/contract';
+import type { NextRequest } from 'next/server';
 
-/**
- * GET /api/config?key=<key>          — get a single config value
- * GET /api/config?prefix=<prefix>   — get all config values matching a prefix
- * PUT /api/config                   — set a config value
- *
- * System-actor only (API key required). Used by `mediforce config get/set`.
- */
-export async function GET(request: Request): Promise<NextResponse> {
-  const { searchParams } = new URL(request.url);
-  const { platformSettingsRepo } = getPlatformServices();
+const GetConfigQuerySchema = z.union([
+  GetConfigByPrefixInputSchema,
+  GetConfigInputSchema,
+]);
 
-  const prefix = searchParams.get('prefix');
-  if (prefix !== null) {
-    try {
-      const input = GetConfigByPrefixInputSchema.parse({ prefix });
-      const result = await getConfigByPrefix({ platformSettingsRepo }, input);
-      return NextResponse.json(result);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return NextResponse.json({ error: err.issues[0]?.message ?? 'Invalid input' }, { status: 400 });
-      }
-      return NextResponse.json({ error: 'Failed to get config' }, { status: 500 });
-    }
-  }
+export const GET = createRouteAdapter(
+  GetConfigQuerySchema,
+  (req: NextRequest) => {
+    const prefix = req.nextUrl.searchParams.get('prefix');
+    if (prefix !== null) return { prefix };
+    return { key: req.nextUrl.searchParams.get('key') ?? '' };
+  },
+  async (input, scope) => {
+    if ('prefix' in input) return getConfigByPrefix(input, scope);
+    return getConfig(input, scope);
+  },
+);
 
-  const key = searchParams.get('key');
-  if (key !== null) {
-    try {
-      const input = GetConfigInputSchema.parse({ key });
-      const result = await getConfig({ platformSettingsRepo }, input);
-      return NextResponse.json(result);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return NextResponse.json({ error: err.issues[0]?.message ?? 'Invalid input' }, { status: 400 });
-      }
-      return NextResponse.json({ error: 'Failed to get config' }, { status: 500 });
-    }
-  }
-
-  return NextResponse.json(
-    { error: 'Provide either ?key=<key> or ?prefix=<prefix>' },
-    { status: 400 },
-  );
-}
-
-export async function PUT(request: Request): Promise<NextResponse> {
-  const { platformSettingsRepo } = getPlatformServices();
-  try {
-    const body = (await request.json().catch(() => ({}))) as unknown;
-    const input = SetConfigInputSchema.parse(body);
-    const result = await setConfig({ platformSettingsRepo }, input);
-    return NextResponse.json(result);
-  } catch (err) {
-    if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: err.issues[0]?.message ?? 'Invalid input' }, { status: 400 });
-    }
-    return NextResponse.json({ error: 'Failed to set config' }, { status: 500 });
-  }
-}
+export const PUT = createRouteAdapter(
+  SetConfigInputSchema,
+  async (req: NextRequest) => req.json(),
+  setConfig,
+);

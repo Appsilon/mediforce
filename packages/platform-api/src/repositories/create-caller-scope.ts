@@ -13,6 +13,7 @@ import type {
   NamespaceRepository,
   NamespaceSecretsRepository,
   OAuthProviderRepository,
+  PlatformSettingsRepository,
   ProcessInstanceRepository,
   ProcessRepository,
   ToolCatalogRepository,
@@ -81,6 +82,7 @@ export interface CallerScopeServices {
   readonly inviteNotificationService: InviteNotificationService | null;
   readonly dockerImages: DockerImagesService | null;
   readonly userDirectory: UserDirectoryService | null;
+  readonly platformSettingsRepo: PlatformSettingsRepository;
 }
 
 /**
@@ -147,6 +149,7 @@ export function createCallerScope(
       inviteNotificationService: services.inviteNotificationService,
       dockerImages: services.dockerImages,
       userDirectory: services.userDirectory,
+      platformSettings: services.platformSettingsRepo,
     },
   };
 }

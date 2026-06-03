@@ -1,24 +1,12 @@
-import type { PlatformSettingsRepository } from '@mediforce/platform-core';
-import type {
-  GetConfigInput,
-  GetConfigOutput,
-  GetConfigByPrefixInput,
-  GetConfigByPrefixOutput,
-} from '../../contract/config';
+import type { CallerScope } from '../../repositories/index';
+import type { GetConfigInput, GetConfigOutput, GetConfigByPrefixInput, GetConfigByPrefixOutput } from '../../contract/config';
 
-export interface GetConfigDeps {
-  platformSettingsRepo: PlatformSettingsRepository;
-}
-
-export async function getConfig(deps: GetConfigDeps, input: GetConfigInput): Promise<GetConfigOutput> {
-  const value = await deps.platformSettingsRepo.get(input.key);
+export async function getConfig(input: GetConfigInput, scope: CallerScope): Promise<GetConfigOutput> {
+  const value = await scope.system.platformSettings.get(input.key);
   return { key: input.key, value };
 }
 
-export async function getConfigByPrefix(
-  deps: GetConfigDeps,
-  input: GetConfigByPrefixInput,
-): Promise<GetConfigByPrefixOutput> {
-  const settings = await deps.platformSettingsRepo.getByPrefix(input.prefix);
+export async function getConfigByPrefix(input: GetConfigByPrefixInput, scope: CallerScope): Promise<GetConfigByPrefixOutput> {
+  const settings = await scope.system.platformSettings.getByPrefix(input.prefix);
   return { settings };
 }

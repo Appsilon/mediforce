@@ -18,13 +18,15 @@ import type { CallerIdentity } from '@mediforce/platform-api';
  *   https://domain/api/cron/model-sync
  */
 export async function GET(request: Request): Promise<NextResponse> {
-  // Verify CRON_SECRET if set (Vercel Cron sends this automatically)
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get('authorization');
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const platformApiKey = process.env.PLATFORM_API_KEY;
+  const auth = request.headers.get('authorization');
+
+  const isValidCronSecret = cronSecret && auth === `Bearer ${cronSecret}`;
+  const isValidApiKey = platformApiKey && auth === `Bearer ${platformApiKey}`;
+
+  if (!isValidCronSecret && !isValidApiKey) {
+    return NextResponse.json({ error: { code: 'unauthorized', message: 'Unauthorized' } }, { status: 401 });
   }
 
   const { modelRegistryRepo, auditRepo, platformSettingsRepo } = getPlatformServices();

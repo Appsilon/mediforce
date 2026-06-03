@@ -1,3 +1,3 @@
-export { getConfig, getConfigByPrefix, type GetConfigDeps } from './get-config';
-export { setConfig, type SetConfigDeps } from './set-config';
-export { testWebhook, type TestWebhookDeps } from './test-webhook';
+export { getConfig, getConfigByPrefix } from './get-config';
+export { setConfig } from './set-config';
+export { testWebhook } from './test-webhook';

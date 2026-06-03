@@ -45,6 +45,7 @@ export { setDefaultWorkflowVersion } from './workflows/set-default-version';
 export { deleteWorkflow } from './workflows/delete-workflow';
 export { transferWorkflowNamespace } from './workflows/transfer-workflow';
 export { getWorkflowRunCount } from './workflows/get-run-count';
+export { checkRetiredModels } from './workflows/retired-model-check';
 
 export { chatCoworkSession } from './cowork/chat';
 export { createVoiceEphemeralKey } from './cowork/voice-ephemeral-key';
@@ -106,8 +107,8 @@ export { deleteToolCatalogEntry } from './tool-catalog/delete-entry';
 export { listAgentRuns } from './agent-runs/list-agent-runs';
 export { getMonitoringSummary } from './monitoring/get-monitoring-summary';
 
-export { getConfig, getConfigByPrefix } from './config/get-config';
-export { setConfig } from './config/set-config';
-export { testWebhook } from './config/test-webhook';
+export { getConfig, getConfigByPrefix } from './config/index';
+export { setConfig } from './config/index';
+export { testWebhook } from './config/index';
 
 export { listAdapter, getByIdAdapter } from './_generic';
