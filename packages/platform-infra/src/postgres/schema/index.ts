@@ -15,3 +15,4 @@ export * from './model-registry';
 export * from './namespace-secret';
 export * from './workflow-secret';
 export * from './user-profile';
+export * from './platform-settings';

@@ -22,6 +22,7 @@ export const ModelRegistryEntrySchema = z.object({
   lastSyncedAt: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  retiredAt: z.string().nullable(),
 });
 
 export const ModelRegistryMetaSchema = z.object({

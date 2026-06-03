@@ -18,6 +18,7 @@ import {
   PostgresProcessInstanceRepository,
   PostgresProcessRepository,
   PostgresAgentEventLog,
+  PostgresPlatformSettingsRepository,
   getSharedPostgresClient,
   FirebaseInviteService,
   validateSecretsKey,
@@ -40,6 +41,7 @@ import type {
   NamespaceRepository,
   NamespaceSecretsRepository,
   OAuthProviderRepository,
+  PlatformSettingsRepository,
   ProcessInstanceRepository,
   ProcessRepository,
   SendEmailFn,
@@ -117,6 +119,7 @@ export interface PlatformServices {
   oauthProviderRepo: OAuthProviderRepository;
   agentOAuthTokenRepo: AgentOAuthTokenRepository;
   modelRegistryRepo: ModelRegistryRepository;
+  platformSettingsRepo: PlatformSettingsRepository;
   secretsRepo: WorkflowSecretsRepository;
   namespaceSecretsRepo: NamespaceSecretsRepository;
   inviteService: InviteService;
@@ -257,6 +260,7 @@ export function getPlatformServices(): PlatformServices {
   const agentOAuthTokenRepo: AgentOAuthTokenRepository =
     new PostgresAgentOAuthTokenRepository(pg);
   const modelRegistryRepo: ModelRegistryRepository = new PostgresModelRegistryRepository(pg);
+  const platformSettingsRepo: PlatformSettingsRepository = new PostgresPlatformSettingsRepository(pg);
   const secretsRepo: WorkflowSecretsRepository = new PostgresWorkflowSecretsRepository(pg);
   const namespaceSecretsRepo: NamespaceSecretsRepository =
     new PostgresNamespaceSecretsRepository(pg);
@@ -404,6 +408,7 @@ export function getPlatformServices(): PlatformServices {
     oauthProviderRepo,
     agentOAuthTokenRepo,
     modelRegistryRepo,
+    platformSettingsRepo,
     secretsRepo,
     namespaceSecretsRepo,
     inviteService,

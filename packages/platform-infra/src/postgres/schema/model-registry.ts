@@ -30,6 +30,7 @@ export const modelRegistryEntries = pgTable('model_registry_entries', {
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  retiredAt: timestamp('retired_at', { withTimezone: true }),
 });
 
 /**

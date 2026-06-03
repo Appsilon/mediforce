@@ -22,6 +22,16 @@ interface OpenRouterModel {
     max_completion_tokens: number | null;
   };
   supported_parameters: string[];
+  requests?: number;
+}
+
+export interface SyncResult {
+  synced: number;
+  total: number;
+  retired: number;
+  reinstated: number;
+  rankingsUpdated: number;
+  lastSyncedAt: string;
 }
 
 function parsePrice(raw: string | undefined | null): number {
@@ -55,12 +65,13 @@ function transformModel(model: OpenRouterModel): CreateModelRegistryEntryInput {
     source: 'openrouter' as const,
     requestCount: null,
     lastSyncedAt: new Date().toISOString(),
+    retiredAt: null,
   };
 }
 
 export async function syncFromOpenRouter(
   repo: ModelRegistryRepository,
-): Promise<{ synced: number; total: number }> {
+): Promise<SyncResult> {
   const response = await fetch(OPENROUTER_MODELS_URL);
   if (!response.ok) {
     throw new Error(`OpenRouter API returned ${response.status}: ${response.statusText}`);
@@ -70,7 +81,45 @@ export async function syncFromOpenRouter(
   if (!Array.isArray(models)) {
     throw new Error('Unexpected OpenRouter response shape: expected array of models');
   }
+
   const entries = models.map(transformModel);
   const synced = await repo.bulkUpsert(entries);
-  return { synced, total: models.length };
+
+  // Retire absent models and reinstate returned ones
+  const syncedIds = entries.map((e) => e.id);
+  const { retired, reinstated } = await repo.retireAbsentModels(syncedIds);
+
+  // Update rankings from request counts in the OpenRouter response
+  const rankings = models
+    .filter((m) => typeof m.requests === 'number' && m.requests > 0)
+    .map((m) => ({ id: m.id, requestCount: m.requests as number }));
+  const rankingsUpdated = rankings.length > 0 ? await repo.updateRankings(rankings) : 0;
+
+  const lastSyncedAt = new Date().toISOString();
+  return { synced, total: models.length, retired, reinstated, rankingsUpdated, lastSyncedAt };
+}
+
+export async function syncWithRetry(
+  repo: ModelRegistryRepository,
+  opts: {
+    maxRetries?: number;
+    intervalMs?: number;
+    onAttemptFail?: (attempt: number, error: Error) => void | Promise<void>;
+  } = {},
+): Promise<SyncResult> {
+  const { maxRetries = 3, intervalMs = 3_600_000, onAttemptFail } = opts;
+  let lastError: Error | undefined;
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      return await syncFromOpenRouter(repo);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt <= maxRetries) {
+        console.log(`[model-sync] Attempt ${attempt} failed: ${lastError.message}. Retrying in ${intervalMs / 1000}s...`);
+        await onAttemptFail?.(attempt, lastError);
+        await new Promise((r) => setTimeout(r, intervalMs));
+      }
+    }
+  }
+  throw lastError;
 }

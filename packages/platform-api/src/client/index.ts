@@ -347,6 +347,17 @@ import {
   GetMonitoringSummaryOutputSchema,
   type MonitoringSummaryInput,
   type GetMonitoringSummaryOutput,
+  GetConfigInputSchema,
+  GetConfigOutputSchema,
+  GetConfigByPrefixInputSchema,
+  GetConfigByPrefixOutputSchema,
+  SetConfigInputSchema,
+  SetConfigOutputSchema,
+  TestWebhookOutputSchema,
+  type GetConfigOutput,
+  type GetConfigByPrefixOutput,
+  type SetConfigOutput,
+  type TestWebhookOutput,
 } from '../contract/index';
 // SDK consumers reach for one path:
 //   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
@@ -589,12 +600,19 @@ export class Mediforce {
     summary: (input: MonitoringSummaryInput) => Promise<GetMonitoringSummaryOutput>;
   };
 
-  constructor(private readonly config: ClientConfig) {
+  readonly config: {
+    get: (input: { key: string }) => Promise<GetConfigOutput>;
+    getByPrefix: (input: { prefix: string }) => Promise<GetConfigByPrefixOutput>;
+    set: (input: { key: string; value: string }) => Promise<SetConfigOutput>;
+    testWebhook: () => Promise<TestWebhookOutput>;
+  };
+
+  constructor(private readonly clientConfig: ClientConfig) {
     // Defense-in-depth against JS callers / bad casts that bypass the
     // discriminated union (e.g. `new Mediforce()` with no argument, which the
     // type system already rejects). Treat a missing config like one with no
     // auth sources, triggering the same "exactly one" error below.
-    const safeConfig = (config ?? {}) as Partial<{
+    const safeConfig = (clientConfig ?? {}) as Partial<{
       apiKey: string;
       bearerToken: () => Promise<string | null>;
       fetch: typeof fetch;
@@ -615,7 +633,7 @@ export class Mediforce {
     // Node ("Invalid URL" from `fetch('/api/...')` is not obviously a config
     // mistake at the call site).
     if (safeConfig.apiKey !== undefined) {
-      const baseUrl = (config as BaseClientConfig).baseUrl;
+      const baseUrl = (clientConfig as BaseClientConfig).baseUrl;
       if (typeof baseUrl !== 'string' || baseUrl.length === 0) {
         throw new Error(
           'Mediforce: `apiKey` requires a non-empty `baseUrl` (server-to-server calls need an absolute target). ' +
@@ -1553,6 +1571,42 @@ export class Mediforce {
         );
       },
     };
+
+    this.config = {
+      get: async (input) => {
+        const validated = GetConfigInputSchema.parse(input);
+        const qs = `?key=${encodeURIComponent(validated.key)}`;
+        const res = await this.request(`/api/config${qs}`);
+        const responseBody = await parseJsonOrThrow(res, 'mediforce.config.get');
+        return GetConfigOutputSchema.parse(responseBody);
+      },
+      getByPrefix: async (input) => {
+        const validated = GetConfigByPrefixInputSchema.parse(input);
+        const qs = `?prefix=${encodeURIComponent(validated.prefix)}`;
+        const res = await this.request(`/api/config${qs}`);
+        const responseBody = await parseJsonOrThrow(res, 'mediforce.config.getByPrefix');
+        return GetConfigByPrefixOutputSchema.parse(responseBody);
+      },
+      set: async (input) => {
+        const validated = SetConfigInputSchema.parse(input);
+        return this.sendJson(
+          'PUT',
+          '/api/config',
+          { key: validated.key, value: validated.value },
+          SetConfigOutputSchema,
+          'mediforce.config.set',
+        );
+      },
+      testWebhook: async () => {
+        return this.sendJson(
+          'POST',
+          '/api/config/test-webhook',
+          undefined,
+          TestWebhookOutputSchema,
+          'mediforce.config.testWebhook',
+        );
+      },
+    };
   }
 
   private async request(path: string, init?: RequestInit): Promise<Response> {
@@ -1561,8 +1615,8 @@ export class Mediforce {
     for (const [key, value] of Object.entries(authHeaders)) {
       if (!headers.has(key)) headers.set(key, value);
     }
-    const base = this.config.baseUrl ?? '';
-    const fetchImpl = this.config.fetch ?? globalThis.fetch;
+    const base = this.clientConfig.baseUrl ?? '';
+    const fetchImpl = this.clientConfig.fetch ?? globalThis.fetch;
     return fetchImpl(`${base}${path}`, { ...init, headers });
   }
 
@@ -1593,11 +1647,11 @@ export class Mediforce {
   }
 
   private async buildAuthHeaders(): Promise<Record<string, string>> {
-    if (this.config.apiKey !== undefined) {
-      return { 'X-Api-Key': this.config.apiKey };
+    if (this.clientConfig.apiKey !== undefined) {
+      return { 'X-Api-Key': this.clientConfig.apiKey };
     }
-    if (this.config.bearerToken !== undefined) {
-      const token = await this.config.bearerToken();
+    if (this.clientConfig.bearerToken !== undefined) {
+      const token = await this.clientConfig.bearerToken();
       return token === null ? {} : { Authorization: `Bearer ${token}` };
     }
     return {};

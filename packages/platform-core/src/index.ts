@@ -278,6 +278,7 @@ export type {
   UpdateRankingsInput,
 } from './schemas/model-registry';
 export type { ModelRegistryRepository } from './repositories/model-registry-repository';
+export type { PlatformSettingsRepository } from './repositories/platform-settings-repository';
 
 // OAuth — Step 5
 export {
@@ -326,6 +327,7 @@ export {
   InMemoryOAuthProviderRepository,
   InMemoryAgentOAuthTokenRepository,
   InMemoryAgentRunRepository,
+  InMemoryPlatformSettingsRepository,
   // Test factories
   buildProcessDefinition,
   buildProcessInstance,

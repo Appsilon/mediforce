@@ -21,6 +21,10 @@ export class InMemoryModelRegistryRepository implements ModelRegistryRepository 
     return Array.from(this.entries.values());
   }
 
+  async listIds(): Promise<string[]> {
+    return Array.from(this.entries.keys());
+  }
+
   async upsert(entry: CreateModelRegistryEntryInput): Promise<ModelRegistryEntry> {
     const parsed = CreateModelRegistryEntryInputSchema.parse(entry);
     const now = new Date().toISOString();
@@ -77,6 +81,23 @@ export class InMemoryModelRegistryRepository implements ModelRegistryRepository 
     }
     this.rankingsUpdatedAt = new Date().toISOString();
     return updated;
+  }
+
+  async retireAbsentModels(presentIds: string[]): Promise<{ retired: number; reinstated: number }> {
+    const presentSet = new Set(presentIds);
+    let retired = 0;
+    let reinstated = 0;
+    const now = new Date().toISOString();
+    for (const [id, entry] of this.entries) {
+      if (!presentSet.has(id) && entry.retiredAt === null) {
+        this.entries.set(id, { ...entry, retiredAt: now });
+        retired += 1;
+      } else if (presentSet.has(id) && entry.retiredAt !== null) {
+        this.entries.set(id, { ...entry, retiredAt: null });
+        reinstated += 1;
+      }
+    }
+    return { retired, reinstated };
   }
 
   async getMeta(): Promise<ModelRegistryMeta> {

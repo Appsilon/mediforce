@@ -11,6 +11,7 @@ import {
   ValidationError,
 } from '../../errors';
 import { actorFromCaller } from '../_helpers';
+import { checkRetiredModels } from './retired-model-check';
 
 interface RegisterScopedInput extends RegisterWorkflowInput {
   namespace: string;
@@ -37,6 +38,12 @@ export async function registerWorkflow(
       parsed.error.issues.map((i) => i.message).join(', '),
       parsed.error.issues,
     );
+  }
+
+  const allModels = await scope.models.list();
+  const retired = checkRetiredModels(parsed.data, allModels);
+  if (retired !== null) {
+    throw new ValidationError(retired.message.replace('Cannot run', 'Cannot save'));
   }
 
   const latestVersion = await scope.workflowDefinitions.getLatestVersion(

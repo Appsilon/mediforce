@@ -3,10 +3,10 @@ import type { ModelRegistryRepository, CreateModelRegistryEntryInput, ModelRegis
 import { syncModels } from '../sync-models';
 
 function stubEntry(): ModelRegistryEntry {
-  return { id: 'test/m', name: 'm', provider: 'test', contextLength: 0, maxCompletionTokens: null, pricing: { input: 0, output: 0 }, modality: 'text->text', inputModalities: ['text'], outputModalities: ['text'], supportsTools: false, supportsVision: false, source: 'openrouter' as const, canonicalSlug: null, requestCount: null, lastSyncedAt: '', createdAt: '', updatedAt: '' };
+  return { id: 'test/m', name: 'm', provider: 'test', contextLength: 0, maxCompletionTokens: null, pricing: { input: 0, output: 0 }, modality: 'text->text', inputModalities: ['text'], outputModalities: ['text'], supportsTools: false, supportsVision: false, source: 'openrouter' as const, canonicalSlug: null, requestCount: null, lastSyncedAt: '', createdAt: '', updatedAt: '', retiredAt: null };
 }
 
-function makeRepo(): ModelRegistryRepository {
+function makeRepo(overrides: Partial<ModelRegistryRepository> = {}): ModelRegistryRepository {
   return {
     list: async () => [],
     getById: async () => null,
@@ -16,23 +16,29 @@ function makeRepo(): ModelRegistryRepository {
     bulkUpsert: async (items: CreateModelRegistryEntryInput[]) => items.length,
     updateRankings: async (rankings) => rankings.length,
     getMeta: async () => ({ rankingsUpdatedAt: null }),
+    listIds: async () => [],
+    retireAbsentModels: async () => ({ retired: 0, reinstated: 0 }),
+    ...overrides,
+  };
+}
+
+function makeFakeModel(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'test/model-1',
+    name: 'Test Model 1',
+    context_length: 8192,
+    architecture: { modality: 'text->text', input_modalities: ['text'], output_modalities: ['text'] },
+    pricing: { prompt: '0.000001', completion: '0.000002' },
+    top_provider: { context_length: 8192, max_completion_tokens: null },
+    supported_parameters: ['tools'],
+    ...overrides,
   };
 }
 
 describe('syncModels handler', () => {
   it('returns synced count and lastSyncedAt from OpenRouter response', async () => {
     const fakeResponse = {
-      data: [
-        {
-          id: 'test/model-1',
-          name: 'Test Model 1',
-          context_length: 8192,
-          architecture: { modality: 'text->text', input_modalities: ['text'], output_modalities: ['text'] },
-          pricing: { prompt: '0.000001', completion: '0.000002' },
-          top_provider: { context_length: 8192, max_completion_tokens: null },
-          supported_parameters: ['tools'],
-        },
-      ],
+      data: [makeFakeModel()],
     };
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
@@ -43,6 +49,28 @@ describe('syncModels handler', () => {
     expect(result.synced).toBe(1);
     expect(result.total).toBe(1);
     expect(result.lastSyncedAt).toBeTruthy();
+
+    vi.restoreAllMocks();
+  });
+
+  it('returns retired, reinstated, and rankingsUpdated counts', async () => {
+    const fakeResponse = {
+      data: [makeFakeModel({ requests: 500 })],
+    };
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(fakeResponse), { status: 200 }),
+    );
+
+    const result = await syncModels({
+      modelRegistryRepo: makeRepo({
+        retireAbsentModels: async () => ({ retired: 2, reinstated: 1 }),
+        updateRankings: async () => 1,
+      }),
+    });
+    expect(result.retired).toBe(2);
+    expect(result.reinstated).toBe(1);
+    expect(result.rankingsUpdated).toBe(1);
 
     vi.restoreAllMocks();
   });

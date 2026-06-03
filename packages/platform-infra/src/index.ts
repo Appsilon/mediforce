@@ -35,10 +35,18 @@ export { PostgresModelRegistryRepository } from './postgres/repositories/model-r
 export { PostgresNamespaceSecretsRepository } from './postgres/repositories/namespace-secrets-repository';
 export { PostgresWorkflowSecretsRepository } from './postgres/repositories/workflow-secrets-repository';
 export { PostgresUserProfileRepository } from './postgres/repositories/user-profile-repository';
+export { PostgresPlatformSettingsRepository } from './postgres/repositories/platform-settings-repository';
 export { createPostgresClient, getSharedPostgresClient } from './postgres/client';
 export type { Database } from './postgres/client';
 export { PostgresAgentEventLog } from './postgres/agent-event-log';
 
 // Crypto + sync
 export { validateSecretsKey } from './crypto/secrets-cipher';
-export { syncFromOpenRouter } from './sync/openrouter-sync';
+export { syncFromOpenRouter, syncWithRetry } from './sync/openrouter-sync';
+export type { SyncResult } from './sync/openrouter-sync';
+export { eagerSyncIfStale } from './sync/eager-sync';
+export { isRegistryStale, MODEL_SYNC_CRON } from './sync/model-sync-scheduler';
+
+// Sync alert webhook
+export { sendSyncFailureWebhook, sendTestWebhook } from './notifications/sync-alert-webhook';
+export type { SyncFailureContext, TestWebhookResult } from './notifications/sync-alert-webhook';

@@ -134,6 +134,34 @@
       "when": 1780588800000,
       "tag": "0018_add_cowork_validation_presentation",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1780401748745,
+      "tag": "0019_add_retired_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1780418027000,
+      "tag": "0020_platform_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1780502400000,
+      "tag": "0021_system_workspace",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1780588800000,
+      "tag": "0022_platform_settings_trigger",
+      "breakpoints": true
     }
   ]
 }

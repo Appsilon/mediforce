@@ -4,6 +4,7 @@ import type {
   CronTriggerStateRepository,
   ModelRegistryRepository,
   NamespaceRepository,
+  PlatformSettingsRepository,
   UserDirectoryService,
   UserProfileRepository,
 } from '@mediforce/platform-core';
@@ -136,4 +137,5 @@ export interface SystemServices {
    * member rather than failing the whole response.
    */
   readonly userDirectory: UserDirectoryService | null;
+  readonly platformSettings: PlatformSettingsRepository;
 }

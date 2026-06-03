@@ -154,6 +154,55 @@ export function validateWorkflowModels(
   return Array.from(unknownMap.values());
 }
 
+// ---------------------------------------------------------------------------
+// Pre-flight validation — known-but-retired models
+// ---------------------------------------------------------------------------
+
+export interface RetiredModelRef {
+  model: string;
+  retiredAt: string;
+  steps: Array<{ stepId: string; stepName: string }>;
+}
+
+/**
+ * Validate that no agent step references a retired model.
+ * `retiredMap` maps normalised model ID to its ISO retirement timestamp.
+ * The function normalises step model IDs (same as `validateWorkflowModels`)
+ * before lookup so both `__` and `/` formats match.
+ * Returns the list of retired model refs (empty = all good).
+ */
+export function validateRetiredModels(
+  definition: {
+    steps: Array<{
+      id: string;
+      name: string;
+      executor: string;
+      agent?: { model?: string };
+    }>;
+  },
+  retiredMap: Map<string, string>,
+): RetiredModelRef[] {
+  const retiredRefMap = new Map<string, RetiredModelRef>();
+
+  for (const step of definition.steps) {
+    if (step.executor !== 'agent') continue;
+    const raw = step.agent?.model;
+    if (!raw) continue;
+
+    const normalised = normaliseModelId(raw);
+    const retiredAt = retiredMap.get(normalised) ?? retiredMap.get(raw);
+    if (!retiredAt) continue;
+
+    const key = normalised;
+    if (!retiredRefMap.has(key)) {
+      retiredRefMap.set(key, { model: normalised, retiredAt, steps: [] });
+    }
+    retiredRefMap.get(key)!.steps.push({ stepId: step.id, stepName: step.name });
+  }
+
+  return Array.from(retiredRefMap.values());
+}
+
 export function resolveStepEnv(
   configEnv: Record<string, string> | undefined,
   stepEnv: Record<string, string> | undefined,

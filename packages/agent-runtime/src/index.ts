@@ -34,8 +34,8 @@ export type { AgentRunResult } from './runner/agent-runner';
 export { FallbackHandler } from './runner/fallback-handler';
 
 // Env validation
-export { validateWorkflowEnv, validateWorkflowModels } from './plugins/resolve-env';
-export type { MissingEnvVar } from './plugins/resolve-env';
+export { validateWorkflowEnv, validateWorkflowModels, validateRetiredModels } from './plugins/resolve-env';
+export type { MissingEnvVar, UnknownModel, RetiredModelRef } from './plugins/resolve-env';
 
 // MCP resolution helpers
 export { resolveMcpForStep, AgentDefinitionNotFoundError } from './mcp/resolve-mcp-for-step';

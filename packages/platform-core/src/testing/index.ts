@@ -15,6 +15,7 @@ export { InMemoryAgentDefinitionRepository } from './in-memory-agent-definition-
 export { InMemoryNamespaceRepository } from './in-memory-namespace-repository';
 export { InMemoryAgentRunRepository } from './in-memory-agent-run-repository';
 export { InMemoryModelRegistryRepository } from './in-memory-model-registry-repository';
+export { InMemoryPlatformSettingsRepository } from './in-memory-platform-settings-repository';
 export { InMemoryNamespaceSecretsRepository } from './in-memory-namespace-secrets-repository';
 export { InMemoryWorkflowSecretsRepository } from './in-memory-workflow-secrets-repository';
 export {

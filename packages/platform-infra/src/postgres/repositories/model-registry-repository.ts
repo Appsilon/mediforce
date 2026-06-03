@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 import {
   ModelRegistryEntrySchema,
   type ModelRegistryEntry,
@@ -41,6 +41,45 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
     return rows.map((r) => ModelRegistryEntrySchema.parse(toEntry(r)));
   }
 
+  async listIds(): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: modelRegistryEntries.id })
+      .from(modelRegistryEntries);
+    return rows.map((r) => r.id);
+  }
+
+  async retireAbsentModels(presentIds: string[]): Promise<{ retired: number; reinstated: number }> {
+    if (presentIds.length === 0) {
+      // Retire all active models
+      const retired = await this.db
+        .update(modelRegistryEntries)
+        .set({ retiredAt: sql`NOW()` })
+        .where(isNull(modelRegistryEntries.retiredAt))
+        .returning({ id: modelRegistryEntries.id });
+      return { retired: retired.length, reinstated: 0 };
+    }
+
+    // Retire models absent from presentIds
+    const retiredRows = await this.db
+      .update(modelRegistryEntries)
+      .set({ retiredAt: sql`NOW()` })
+      .where(
+        sql`${notInArray(modelRegistryEntries.id, presentIds)} AND ${isNull(modelRegistryEntries.retiredAt)}`,
+      )
+      .returning({ id: modelRegistryEntries.id });
+
+    // Reinstate models that reappear
+    const reinstatedRows = await this.db
+      .update(modelRegistryEntries)
+      .set({ retiredAt: null })
+      .where(
+        sql`${inArray(modelRegistryEntries.id, presentIds)} AND ${isNotNull(modelRegistryEntries.retiredAt)}`,
+      )
+      .returning({ id: modelRegistryEntries.id });
+
+    return { retired: retiredRows.length, reinstated: reinstatedRows.length };
+  }
+
   async upsert(entry: CreateModelRegistryEntryInput): Promise<ModelRegistryEntry> {
     const values = toRowValues(entry);
     await this.db
@@ -63,6 +102,7 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
           source: values.source,
           requestCount: values.requestCount,
           lastSyncedAt: values.lastSyncedAt,
+          retiredAt: values.retiredAt,
           // updated_at advanced by the set_updated_at() trigger on UPDATE.
         },
       });
@@ -88,6 +128,7 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
     if (rest.source !== undefined) set.source = rest.source;
     if (rest.requestCount !== undefined) set.requestCount = rest.requestCount;
     if (rest.lastSyncedAt !== undefined) set.lastSyncedAt = new Date(rest.lastSyncedAt);
+    if (rest.retiredAt !== undefined) set.retiredAt = rest.retiredAt ? new Date(rest.retiredAt) : null;
 
     if (Object.keys(set).length > 0) {
       await this.db.update(modelRegistryEntries).set(set).where(eq(modelRegistryEntries.id, id));
@@ -128,6 +169,7 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
             source: sql`excluded.source`,
             requestCount: sql`excluded.request_count`,
             lastSyncedAt: sql`excluded.last_synced_at`,
+            retiredAt: sql`excluded.retired_at`,
           },
         });
       synced += chunk.length;
@@ -223,6 +265,7 @@ function toRowValues(entry: CreateModelRegistryEntryInput) {
     source: entry.source,
     requestCount: entry.requestCount,
     lastSyncedAt: new Date(entry.lastSyncedAt),
+    retiredAt: entry.retiredAt ? new Date(entry.retiredAt) : null,
   };
 }
 
@@ -245,5 +288,6 @@ function toEntry(row: typeof modelRegistryEntries.$inferSelect): ModelRegistryEn
     lastSyncedAt: row.lastSyncedAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    retiredAt: row.retiredAt ? row.retiredAt.toISOString() : null,
   };
 }
