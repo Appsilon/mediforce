@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Loader2, Send, CheckCircle, XCircle, AlertCircle, MinusCircle } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, AlertCircle, MinusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { ParamField } from '@/components/ui/param-field';
@@ -107,7 +107,6 @@ function ParamVerdictForm({
 
   return (
     <div className="space-y-4">
-      {/* Param fields */}
       <div className="rounded-lg border p-4 space-y-4">
         {params.map((param) => (
           <ParamField
@@ -120,7 +119,6 @@ function ParamVerdictForm({
         ))}
       </div>
 
-      {/* Optional comment */}
       <textarea
         value={comment}
         onChange={(e) => setComment(e.target.value)}
@@ -137,7 +135,6 @@ function ParamVerdictForm({
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {/* Verdict buttons */}
       <div className="flex flex-wrap items-start gap-3">
         {verdicts.map((cfg) => {
           const intent = (cfg.intent ?? 'neutral') as Intent;

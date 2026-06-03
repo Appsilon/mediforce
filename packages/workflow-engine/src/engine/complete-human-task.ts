@@ -326,7 +326,7 @@ export function shapeCompletion(
       return {
         completionData: {
           verdict: payload.verdict,
-          comment: payload.comment ?? '',
+          comment: payload.comment?.trim() || undefined,
           paramValues: payload.paramValues,
           completedBy: actorId,
           completedAt: now,
