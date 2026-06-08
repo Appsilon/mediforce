@@ -2,7 +2,7 @@ import { CheckCircle, XCircle, MessageSquare, Circle } from 'lucide-react';
 
 export type Intent = 'success' | 'warning' | 'danger' | 'neutral';
 
-export type IntentStyles = {
+type IntentStyles = {
   Icon: typeof CheckCircle;
   submit: string;
   card: string;

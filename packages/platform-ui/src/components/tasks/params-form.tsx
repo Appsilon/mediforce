@@ -1,14 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { format } from 'date-fns';
 import { CheckCircle, Loader2, Send } from 'lucide-react';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
-import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { ParamField } from '@/components/ui/param-field';
 import type { StepParam } from '@mediforce/platform-core';
+import { RemainingTasksFooter } from './verdict-form';
 
 interface ParamsFormProps {
   taskId: string;
@@ -22,13 +21,7 @@ interface SubmittedValues {
   timestamp: string;
 }
 
-export function ParamsForm({
-  taskId,
-  params,
-  remainingTaskCount,
-  onCompleted,
-}: ParamsFormProps) {
-  const handle = useHandleFromPath();
+export function useParamValues(params: StepParam[]) {
   const [values, setValues] = React.useState<Record<string, unknown>>(() => {
     const initial: Record<string, unknown> = {};
     for (const param of params) {
@@ -42,17 +35,37 @@ export function ParamsForm({
     }
     return initial;
   });
-  const [submitting, setSubmitting] = React.useState(false);
-  const [submitted, setSubmitted] = React.useState<SubmittedValues | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
 
   const requiredMissing = params.some(
-    (param) => param.required && (values[param.name] === '' || values[param.name] === undefined),
+    (p) => p.required && (values[p.name] === undefined || values[p.name] === ''),
   );
 
   function setValue(name: string, value: unknown) {
     setValues((prev) => ({ ...prev, [name]: value }));
   }
+
+  function coerce(): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const param of params) {
+      const raw = values[param.name];
+      result[param.name] = param.type === 'number' ? (raw === '' ? undefined : Number(raw)) : raw;
+    }
+    return result;
+  }
+
+  return { values, setValue, requiredMissing, coerce };
+}
+
+export function ParamsForm({
+  taskId,
+  params,
+  remainingTaskCount,
+  onCompleted,
+}: ParamsFormProps) {
+  const { values, setValue, requiredMissing, coerce } = useParamValues(params);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [submitted, setSubmitted] = React.useState<SubmittedValues | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -61,16 +74,7 @@ export function ParamsForm({
     setSubmitting(true);
     setError(null);
 
-    // Coerce types before sending
-    const coerced: Record<string, unknown> = {};
-    for (const param of params) {
-      const raw = values[param.name];
-      if (param.type === 'number') {
-        coerced[param.name] = raw === '' ? undefined : Number(raw);
-      } else {
-        coerced[param.name] = raw;
-      }
-    }
+    const coerced = coerce();
 
     try {
       await mediforce.tasks.complete({
@@ -135,7 +139,6 @@ function ParamsConfirmation({
   params: StepParam[];
   remainingTaskCount?: number;
 }) {
-  const handle = useHandleFromPath();
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:bg-green-900/20 dark:border-green-800">
@@ -168,20 +171,7 @@ function ParamsConfirmation({
         </p>
       </div>
 
-      <div className="text-sm text-muted-foreground">
-        {remainingTaskCount !== undefined && remainingTaskCount > 0 ? (
-          <span>
-            You have {remainingTaskCount} more {remainingTaskCount === 1 ? 'task' : 'tasks'} &mdash;{' '}
-            <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
-              View next task
-            </Link>
-          </span>
-        ) : (
-          <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
-            Back to tasks
-          </Link>
-        )}
-      </div>
+      <RemainingTasksFooter remainingTaskCount={remainingTaskCount} />
     </div>
   );
 }
