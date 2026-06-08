@@ -95,6 +95,12 @@ importers:
         specifier: workspace:*
         version: link:../../packages/platform-core
 
+  apps/sap-generator:
+    dependencies:
+      '@mediforce/platform-core':
+        specifier: workspace:*
+        version: link:../../packages/platform-core
+
   apps/team-pulse:
     dependencies:
       '@mediforce/platform-api':

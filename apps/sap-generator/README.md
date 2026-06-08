@@ -13,6 +13,7 @@ making traceability a first-class, machine-checkable artifact.
 
 - [**CDISC Use Case 2 — problem & solution brief**](docs/cdisc-use-case-2-sap-generation.md) — the problem, the solution, and why it answers the challenge's accuracy/consistency/traceability criteria.
 - [**Running locally**](docs/running-locally.md) — bring up Mediforce and exercise this workflow end-to-end.
+- [**Protocol → SAP playbook**](docs/protocol-to-sap-playbook.md) — research findings on the CDISC standards (ARS/ADaM/USDM/E9(R1)) and how a SAP is actually derived from a protocol, from real protocol↔SAP pairs across phases 1–3 + the CDISC pilot.
 
 ## Where it fits
 
