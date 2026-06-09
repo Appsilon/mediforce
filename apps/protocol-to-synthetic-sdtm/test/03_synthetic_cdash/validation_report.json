@@ -1,0 +1,120 @@
+{
+  "datasets": 10,
+  "totalIssues": 0,
+  "allPass": true,
+  "perDataset": {
+    "AE": {
+      "rows": 32,
+      "issues": [],
+      "keyUnique": true,
+      "ctMembership": {
+        "AESEV": {
+          "codelist": "C66769",
+          "inCT": true,
+          "violations": []
+        },
+        "AESER": {
+          "codelist": "C66742",
+          "inCT": true,
+          "violations": []
+        },
+        "AEREL": {
+          "codelist": "C66742",
+          "inCT": true,
+          "violations": []
+        }
+      },
+      "provenanceComplete": true,
+      "pass": true
+    },
+    "CM": {
+      "rows": 54,
+      "issues": [],
+      "keyUnique": true,
+      "ctMembership": {
+        "CMONGO": {
+          "codelist": "C66742",
+          "inCT": true,
+          "violations": []
+        }
+      },
+      "provenanceComplete": true,
+      "pass": true
+    },
+    "DM": {
+      "rows": 40,
+      "issues": [],
+      "ctMembership": {
+        "SEX": {
+          "codelist": "C66731",
+          "inCT": true,
+          "violations": []
+        }
+      },
+      "provenanceComplete": true,
+      "pass": true
+    },
+    "DS": {
+      "rows": 40,
+      "issues": [],
+      "keyUnique": true,
+      "provenanceComplete": true,
+      "pass": true
+    },
+    "EG": {
+      "rows": 640,
+      "issues": [],
+      "keyUnique": true,
+      "provenanceComplete": true,
+      "pass": true
+    },
+    "EX": {
+      "rows": 80,
+      "issues": [],
+      "keyUnique": true,
+      "provenanceComplete": true,
+      "pass": true
+    },
+    "IE": {
+      "rows": 2,
+      "issues": [],
+      "provenanceComplete": true,
+      "pass": true
+    },
+    "LB": {
+      "rows": 2080,
+      "issues": [],
+      "keyUnique": true,
+      "provenanceComplete": true,
+      "pass": true
+    },
+    "MH": {
+      "rows": 83,
+      "issues": [],
+      "keyUnique": true,
+      "ctMembership": {
+        "MHONGO": {
+          "codelist": "C66742",
+          "inCT": true,
+          "violations": []
+        }
+      },
+      "provenanceComplete": true,
+      "pass": true
+    },
+    "VS": {
+      "rows": 720,
+      "issues": [],
+      "keyUnique": true,
+      "ctMembership": {
+        "VSPOS": {
+          "codelist": "C71148",
+          "inCT": true,
+          "violations": []
+        }
+      },
+      "provenanceComplete": true,
+      "pass": true
+    }
+  }
+}

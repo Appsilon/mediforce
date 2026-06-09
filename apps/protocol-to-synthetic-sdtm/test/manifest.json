@@ -1,0 +1,207 @@
+{
+  "pipeline": "protocol-to-synthetic-CDASH (MVP test run)",
+  "input": {
+    "nctId": "NCT04556760",
+    "sponsorStudyId": "D6470C00005",
+    "title": "Study to Assess the Effect on Glucose Homeostasis of Two Dose Levels of AZD9567, Compared to Prednisolone, in Adults With Type 2 Diabetes"
+  },
+  "provenance": {
+    "ctgovApiVersion": "2.0.5",
+    "ctgovDataTimestamp": "2026-06-05T09:00:05",
+    "protocolDocument": "Prot_000.pdf (Clinical Study Protocol v3.0, dated 2021-03-03)",
+    "protocolSoAPages": "20-24"
+  },
+  "standards": {
+    "usdmVersion": "3.0.0",
+    "cdashigVersion": "2.3",
+    "ctPackage": "sdtmct-2026-03-27",
+    "cdashMappedToSdtmig": "3.4 (via field sdtmigDatasetMappingTargets)"
+  },
+  "parameters": {
+    "subjectCount": 40,
+    "randomSeed": 1234,
+    "cohorts": {
+      "Cohort 1": 24,
+      "Cohort 2": 8,
+      "Cohort 3": 8
+    },
+    "crossover": "two-way (AB/BA sequences)"
+  },
+  "tools": {
+    "ctgov": "ctgov MCP (ClinicalTrials.gov API v2)",
+    "cdisclib": "cdisclib client/MCP (CDISC Library API)"
+  },
+  "stages": {
+    "1_fetch": "00_raw/NCT04556760.json (+ protocol/Prot_000.pdf)",
+    "2_usdm": "01_usdm/usdm.json (+ soa.json)",
+    "3_4_cdash_spec": "02_cdash_spec/cdash_spec.json (+ ct_cache.json, coverage.json)",
+    "5_populate": "03_synthetic_cdash/*.csv (+ lineage.json, datasets_summary.json)",
+    "6_validate": "03_synthetic_cdash/validation_report.json"
+  },
+  "artifacts": {
+    "00_raw/NCT04556760.json": {
+      "sha256_16": "8f1f9c028cfb0034",
+      "bytes": 130988
+    },
+    "00_raw/ctgov_version.json": {
+      "sha256_16": "342e3a37345ba618",
+      "bytes": 71
+    },
+    "01_build_usdm.py": {
+      "sha256_16": "a58c83a9e5ae3cf0",
+      "bytes": 13770
+    },
+    "01_usdm/soa.json": {
+      "sha256_16": "9dd42981266648ba",
+      "bytes": 9357
+    },
+    "01_usdm/usdm.json": {
+      "sha256_16": "3f7a512135206270",
+      "bytes": 40467
+    },
+    "02_build_cdash_spec.py": {
+      "sha256_16": "ba66b2e91e5e7b8b",
+      "bytes": 5728
+    },
+    "02_cdash_spec/cdash_spec.json": {
+      "sha256_16": "d0fd2f8e1573db7a",
+      "bytes": 136080
+    },
+    "02_cdash_spec/coverage.json": {
+      "sha256_16": "368052105176ab2f",
+      "bytes": 587
+    },
+    "02_cdash_spec/ct_cache.json": {
+      "sha256_16": "79d37098c41ef8cd",
+      "bytes": 480192
+    },
+    "03_generate_synthetic_cdash.py": {
+      "sha256_16": "480e8cca956cba29",
+      "bytes": 17152
+    },
+    "03_synthetic_cdash/AE.csv": {
+      "sha256_16": "dde2a5e3485c9025",
+      "bytes": 3767
+    },
+    "03_synthetic_cdash/CM.csv": {
+      "sha256_16": "31af6dac21238eb5",
+      "bytes": 5222
+    },
+    "03_synthetic_cdash/DM.csv": {
+      "sha256_16": "0cc093aeb3d4fc52",
+      "bytes": 3798
+    },
+    "03_synthetic_cdash/DS.csv": {
+      "sha256_16": "01fc6381b3704d2b",
+      "bytes": 3529
+    },
+    "03_synthetic_cdash/EG.csv": {
+      "sha256_16": "ccfc83f498ffb176",
+      "bytes": 57212
+    },
+    "03_synthetic_cdash/EX.csv": {
+      "sha256_16": "08762d82535176e8",
+      "bytes": 7518
+    },
+    "03_synthetic_cdash/IE.csv": {
+      "sha256_16": "68a8e902707ff539",
+      "bytes": 254
+    },
+    "03_synthetic_cdash/LB.csv": {
+      "sha256_16": "c5ebc905e4d20c6e",
+      "bytes": 213142
+    },
+    "03_synthetic_cdash/MH.csv": {
+      "sha256_16": "1fceb22e46bf039f",
+      "bytes": 6584
+    },
+    "03_synthetic_cdash/VS.csv": {
+      "sha256_16": "74182fd1b5debc67",
+      "bytes": 72101
+    },
+    "03_synthetic_cdash/datasets_summary.json": {
+      "sha256_16": "1558e324ac4c239a",
+      "bytes": 347
+    },
+    "03_synthetic_cdash/lineage.json": {
+      "sha256_16": "b43fe193c19ec0c4",
+      "bytes": 85450
+    },
+    "03_synthetic_cdash/validation_report.json": {
+      "sha256_16": "e545e5cd536e1656",
+      "bytes": 2335
+    },
+    "04_validate.py": {
+      "sha256_16": "52840f25af9e707f",
+      "bytes": 3726
+    },
+    "05_write_manifest.py": {
+      "sha256_16": "58fad02b5b81aafd",
+      "bytes": 2395
+    },
+    "06_cdash_to_sdtm.py": {
+      "sha256_16": "57a1953428edd1a6",
+      "bytes": 16212
+    },
+    "06_sdtm/datasets/_datasets.csv": {
+      "sha256_16": "df9aa059fdb1b312",
+      "bytes": 179
+    },
+    "06_sdtm/datasets/_variables.csv": {
+      "sha256_16": "e2580286083c8db6",
+      "bytes": 4959
+    },
+    "06_sdtm/datasets/ae.csv": {
+      "sha256_16": "14117d24badce5da",
+      "bytes": 4242
+    },
+    "06_sdtm/datasets/cm.csv": {
+      "sha256_16": "63e3c1f89d97a121",
+      "bytes": 5911
+    },
+    "06_sdtm/datasets/dm.csv": {
+      "sha256_16": "a7b120c829156491",
+      "bytes": 7546
+    },
+    "06_sdtm/datasets/ds.csv": {
+      "sha256_16": "6a5d1aec1f07fe2e",
+      "bytes": 3967
+    },
+    "06_sdtm/datasets/ex.csv": {
+      "sha256_16": "6808fae67d36bfe5",
+      "bytes": 8733
+    },
+    "06_sdtm/datasets/lb.csv": {
+      "sha256_16": "66437b58f4d907e0",
+      "bytes": 295653
+    },
+    "06_sdtm/datasets/mh.csv": {
+      "sha256_16": "fa14ebbf4919ad33",
+      "bytes": 7717
+    },
+    "06_sdtm/datasets/vs.csv": {
+      "sha256_16": "83dc971a45a5536b",
+      "bytes": 90075
+    },
+    "07_core_report/core_sdtmig34.json": {
+      "sha256_16": "bd1182cd3e0f4438",
+      "bytes": 152240
+    },
+    "07_core_report/summary.json": {
+      "sha256_16": "ce7fe083f333303b",
+      "bytes": 7287
+    },
+    "07_core_summary.py": {
+      "sha256_16": "9bb722855006b930",
+      "bytes": 4046
+    },
+    "manifest.json": {
+      "sha256_16": "34da44e0d2cc171a",
+      "bytes": 4164
+    },
+    "protocol/Prot_000.pdf": {
+      "sha256_16": "060e0914d04058a8",
+      "bytes": 3693117
+    }
+  }
+}

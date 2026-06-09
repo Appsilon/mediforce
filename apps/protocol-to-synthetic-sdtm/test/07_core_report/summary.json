@@ -1,0 +1,253 @@
+{
+  "standard": "SDTMIG V3.4",
+  "ctVersion": "sdtmct-2026-03-27",
+  "engineVersion": "0.16.0",
+  "datasetsValidated": [
+    "AE",
+    "VS",
+    "CM",
+    "LB",
+    "DM",
+    "EX",
+    "DS",
+    "MH"
+  ],
+  "rulesExecuted": 430,
+  "ruleStatusCounts": {
+    "SKIPPED": 251,
+    "SUCCESS": 170,
+    "ISSUE REPORTED": 7,
+    "EXECUTION ERROR": 2
+  },
+  "rulesWithIssues": 31,
+  "totalIssueRecords": 154,
+  "findingsByCategory": {
+    "tabulation_gap": 14,
+    "harness": 16,
+    "other": 1
+  },
+  "interpretation": {
+    "data_bug": "Genuine inconsistency in the synthetic generator — fix in Stage 5.",
+    "tabulation_gap": "SDTM derivation not implemented in the CDASH->SDTM pass (EPOCH, --DY study days, variable ordering, expected/required vars).",
+    "harness": "Artifact of validating raw CSV without a Define-XML / unsupplied reference variables; not a data-quality issue."
+  },
+  "findings": [
+    {
+      "dataset": "MH",
+      "coreId": "CORE-000365",
+      "issues": 83,
+      "category": "tabulation_gap",
+      "message": "MHCAT is grouping all records into one generic group. If no smaller categorization can be applied, then it is not necessary to include or populate this variable."
+    },
+    {
+      "dataset": "DS",
+      "coreId": "CORE-000767",
+      "issues": 40,
+      "category": "tabulation_gap",
+      "message": "Parent record exists and DSDECOD is not null, but FAOBJ is not equal to DSDECOD."
+    },
+    {
+      "dataset": "LB",
+      "coreId": "CORE-001082",
+      "issues": 3,
+      "category": "tabulation_gap",
+      "message": "Variable data type specified in the dataset does not match the variable data type in the IG or the Model."
+    },
+    {
+      "dataset": "AE",
+      "coreId": "CORE-000334",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "At least one expected variable is missing from dataset"
+    },
+    {
+      "dataset": "AE",
+      "coreId": "CORE-000355",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "At least one required variable is missing from dataset"
+    },
+    {
+      "dataset": "AE",
+      "coreId": "CORE-000852",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "Variables are not in the correct order as shown in SDTM for the observation class."
+    },
+    {
+      "dataset": "AE",
+      "coreId": "CORE-000929",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "AE",
+      "coreId": "CORE-001081",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "CM",
+      "coreId": "CORE-000852",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "Variables are not in the correct order as shown in SDTM for the observation class."
+    },
+    {
+      "dataset": "CM",
+      "coreId": "CORE-000929",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "CM",
+      "coreId": "CORE-001081",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "DM",
+      "coreId": "CORE-000334",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "At least one expected variable is missing from dataset"
+    },
+    {
+      "dataset": "DM",
+      "coreId": "CORE-000929",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "DM",
+      "coreId": "CORE-001081",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "DS",
+      "coreId": "CORE-000852",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "Variables are not in the correct order as shown in SDTM for the observation class."
+    },
+    {
+      "dataset": "DS",
+      "coreId": "CORE-000929",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "DS",
+      "coreId": "CORE-001081",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "EX",
+      "coreId": "CORE-000334",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "At least one expected variable is missing from dataset"
+    },
+    {
+      "dataset": "EX",
+      "coreId": "CORE-000929",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "EX",
+      "coreId": "CORE-001081",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "LB",
+      "coreId": "CORE-000334",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "At least one expected variable is missing from dataset"
+    },
+    {
+      "dataset": "LB",
+      "coreId": "CORE-000852",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "Variables are not in the correct order as shown in SDTM for the observation class."
+    },
+    {
+      "dataset": "LB",
+      "coreId": "CORE-000929",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "LB",
+      "coreId": "CORE-001081",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "MH",
+      "coreId": "CORE-000019",
+      "issues": 1,
+      "category": "other",
+      "message": "Variable label length should be less than or equal to 40 characters"
+    },
+    {
+      "dataset": "MH",
+      "coreId": "CORE-000929",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "MH",
+      "coreId": "CORE-001081",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "VS",
+      "coreId": "CORE-000334",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "At least one expected variable is missing from dataset"
+    },
+    {
+      "dataset": "VS",
+      "coreId": "CORE-000929",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "VS",
+      "coreId": "CORE-001081",
+      "issues": 1,
+      "category": "harness",
+      "message": "rule evaluation error - evaluation dataset failed to build"
+    },
+    {
+      "dataset": "VS",
+      "coreId": "CORE-001082",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "Variable data type specified in the dataset does not match the variable data type in the IG or the Model."
+    }
+  ]
+}
