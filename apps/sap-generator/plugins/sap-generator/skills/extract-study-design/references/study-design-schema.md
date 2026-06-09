@@ -15,6 +15,9 @@ The SAP-specific addition is the `analysis_requirements` block and the
 - Fields marked **(required)** must always be present (use `null` if unknown).
 - Fields marked **(optional)** may be omitted entirely.
 - Any field can carry sibling annotations:
+  - `"source"` — `"protocol"` when the value is **lifted** from the protocol, or
+    a free-text origin. This is the lift-vs-decide marker: lifted values are
+    copy-set, `_sap_decision` values are author-set.
   - `"_notes"` — human-readable commentary.
   - `"_source"` — which protocol section the value came from.
   - `"_reviewer_attention"` — flags an interpretation needing human verification.
@@ -51,6 +54,7 @@ The SAP-specific addition is the `analysis_requirements` block and the
 
   "study_design": {
     "type": "string (required) — e.g., 'randomized, double-blind, placebo-controlled, parallel-group'",
+    "design_family": "string (required) — detect, do not assume. e.g. 'randomized:survival', 'single-arm:two-stage:Simon', 'single-arm:two-stage:H1-minimax', 'dose-escalation:mTPI', 'dose-escalation:3+3', 'parallel:continuous'. Drives the default estimator family in draft-sap.",
     "randomized": "boolean",
     "blinding": "open-label | single-blind | double-blind | triple-blind",
     "control_type": "placebo | active | dose-comparison | historical | none | null",

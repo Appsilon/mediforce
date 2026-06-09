@@ -13,6 +13,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ### Added
 - `apps/sap-generator` — workflow for the CDISC AI Challenge Use Case 2 (AI-driven SAP generation). Protocol PDF → study-design extraction → SAP draft → CDISC ARS-aligned traceability matrix → biostatistician review (revise loops back) → finalize. Produces the SAP that the existing `protocol-to-tfl` pipeline consumes, so the two apps chain.
+  - Research-informed skill upgrade: distilled protocol→SAP playbook added to each skill's `references/`; `extract-study-design` gains a lift-vs-decide split + `design_family`; `draft-sap`'s template gains estimand, data-handling-conventions (windows/baseline/imputation/censoring), default-estimator, and deviations-ledger sections; `build-traceability`'s ARS guide aligned to the real object model (Operation/whereClause/OutputDisplay) + ADaM target mapping. Grounded in the CDISC KB and four real protocol↔SAP pairs (`docs/protocol-to-sap-playbook.md`).
 
 ### Changed
 - Removed redundant `dev:postgres` script (use `pnpm dev`); `dev:no-docker` now sets `DATABASE_URL` so it boots post-#534; doc cleanup (ADR-0001 Accepted, `STORAGE_BACKEND` refs scrubbed, headless-migration docs marked Completed).

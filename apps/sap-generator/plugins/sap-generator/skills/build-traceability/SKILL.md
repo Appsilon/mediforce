@@ -50,7 +50,8 @@ produced.
   least one SAP analysis traces to it. Record any endpoint with no analysis as a
   `missing_analysis` gap.
 - For each `_sap_decision` in `study-design.json`, confirm it appears in the
-  SAP's §14 (Changes from protocol). Record misses as `undocumented_decision`.
+  SAP's §15 deviations ledger (Changes from protocol). Record misses as
+  `undocumented_decision`.
 
 ### Step 3: Emit the traceability matrix
 
@@ -66,7 +67,7 @@ Write `outputs/traceability-matrix.json`:
       "endpoint_id": "string",
       "analysis_requirement_id": "string",
       "population_id": "string",
-      "sap_section": "string — e.g., '6.1'",
+      "sap_section": "string — e.g., '8.1'",
       "method": "string — as specified in the SAP",
       "is_sap_decision": "boolean — true if the method was introduced by the SAP, not the protocol",
       "planned_display": "string — TLG title/number from SAP §15, or null"
@@ -90,11 +91,15 @@ Write `outputs/traceability-matrix.json`:
 
 Following `references/ars-object-guide.md`, write `outputs/analysis-metadata.json`
 expressing each planned analysis as an ARS `Analysis` referencing an
-`AnalysisMethod`, an `AnalysisSet` (population), optional `DataSubset`s and
-`GroupingFactor`s (e.g. treatment arm), the `Output`/`Display` it produces, and
-wrapping them in a single `ReportingEvent`. Keep ids consistent with the
-traceability matrix and `study-design.json` so the three files cross-reference
-cleanly.
+`AnalysisMethod` (which bundles ordered `Operation`s), an `AnalysisSet`
+(population, via a `whereClause`), optional `DataSubset`s and ordered
+`GroupingFactor`s (e.g. treatment arm), the `Output → OutputDisplay` it produces,
+all wrapped in a single `ReportingEvent`. For each analysis also record the
+**ADaM target dataset** it implies (`adamTarget`: ADSL / ADTTE for OS/PFS/DOR /
+ADRS for response / ADAE for AEs) so the metadata bridges to the downstream
+`protocol-to-tfl` pipeline and to define.xml / ARM lineage. Keep ids consistent
+with the traceability matrix and `study-design.json` so the three files
+cross-reference cleanly.
 
 ### Step 5: Report
 
@@ -117,6 +122,8 @@ Present a concise summary:
 
 ## Reference files
 
-- `references/ars-object-guide.md` — the ARS object subset, relationships, and
-  the exact JSON shape for `analysis-metadata.json`. **Always read before
-  emitting ARS metadata.**
+- `references/ars-object-guide.md` — the ARS object subset, relationships, ADaM
+  target mapping, and the exact JSON shape for `analysis-metadata.json`. **Always
+  read before emitting ARS metadata.**
+- `references/protocol-to-sap-playbook.md` — context on why ARS/ADaM traceability
+  is the differentiator and how analyses map to ADaM datasets.

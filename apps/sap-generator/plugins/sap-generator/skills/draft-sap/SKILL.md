@@ -66,23 +66,34 @@ Follow `references/sap-section-template.md`. At minimum:
 3. Study design
 4. Analysis populations
 5. Statistical methods — general principles
-6. Statistical methods — primary efficacy analysis
-7. Statistical methods — secondary analyses
-8. Statistical methods — safety analyses
-9. Subgroup and sensitivity analyses
-10. Missing data handling (and estimand framing if applicable)
-11. Multiplicity / Type I error control
-12. Interim analyses (if any)
-13. Sample size determination
-14. Changes from the protocol-planned analyses (lists every SAP DECISION)
-15. Appendix: List of planned Tables, Figures, and Listings (TLGs)
+6. **Estimands** (per confirmatory endpoint: the five ICH E9(R1) attributes +
+   the named intercurrent-event strategy — synthesize even if the protocol is
+   silent, and flag as a SAP DECISION)
+7. **Data handling conventions** (assessment/derivation windows, baseline
+   definitions, imputation/missing-data, time-to-event censoring rules)
+8. Statistical methods — primary efficacy analysis
+9. Statistical methods — secondary analyses
+10. Statistical methods — safety analyses
+11. Subgroup and sensitivity analyses
+12. Multiplicity / Type I error control
+13. Interim analyses (if any)
+14. Sample size determination
+15. Changes from the protocol-planned analyses — the **deviations ledger**
+    (every SAP DECISION *and* every scope reduction)
+16. Appendix: List of planned Tables, Figures, and Listings (TLGs)
+
+Pick the default statistical methods from the **design family** and endpoint type
+(see the section template and `references/protocol-to-sap-playbook.md`): ANCOVA/
+MMRM (continuous), Clopper-Pearson (proportion), (stratified) log-rank + Cox /
+complementary-log-log KM (time-to-event), with NPH max-combo as a pre-specified
+sensitivity for IO oncology. **Detect the design; do not assume** Simon/MMRM.
 
 ### Step 4: Self-check before writing out
 
 - Every primary and secondary endpoint has a named analysis in §6–§7.
 - Every analysis names its population (defined in §4) and its comparison.
 - Every `_sap_decision` from `study-design.json` appears as a SAP DECISION flag
-  and is collected in §14.
+  and is collected in the §15 deviations ledger (with include/deviate/drop).
 - Every analysis specification carries a `[trace: …]` tag with ids that exist in
   `study-design.json`.
 - No method, threshold, or population was introduced without either a protocol
@@ -113,10 +124,14 @@ When invoked with reviewer feedback:
 3. If a reviewer instruction conflicts with the protocol (e.g. asks for a method
    the design cannot support), make the change but add a SAP DECISION flag noting
    the deviation, rather than silently overriding the protocol trace.
-4. Keep `[trace: …]` tags intact and update §14 if the set of SAP DECISIONs
-   changed.
+4. Keep `[trace: …]` tags intact and update the §15 deviations ledger if the set
+   of SAP DECISIONs changed.
 
 ## Reference files
 
 - `references/sap-section-template.md` — section-by-section template with the
-  source-field map and prose conventions. **Always read before drafting.**
+  source-field map, default-estimator table, and prose conventions. **Always read
+  before drafting.**
+- `references/protocol-to-sap-playbook.md` — the lift-vs-delta model and the full
+  set of authoring deltas (windows, imputation, censoring, estimands, the TLG
+  base×AESI×modifier pattern) the SAP must add beyond the protocol.

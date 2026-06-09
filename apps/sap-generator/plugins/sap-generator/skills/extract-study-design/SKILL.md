@@ -68,6 +68,23 @@ Work through each section of the schema. For each field:
    to `null` and add a `"_sap_decision"` note describing the decision the
    `draft-sap` skill must make and flag for the reviewer.
 
+**Lift vs decide (the central split).** Read `references/protocol-to-sap-playbook.md`
+first. Every field is either **lifted** from the protocol (copy-set: identity,
+design, objective/endpoint text, populations, sample-size assumptions, named
+methods) or a **SAP decision** (author-set: windows, operational population
+criteria, imputation, exact estimators, censoring rules, the TLG inventory). On
+each field set `"source": "protocol"` when lifted, or `"_sap_decision": "<the
+decision draft-sap must make>"` when it must be authored downstream. The protocol
+is **not** a complete spec — it is reliably silent on derivation windows,
+operational population definitions, and the entire display layer.
+
+**Capture the design family and the protocol version.** Record `study_design.design_family`
+(e.g. `dose-escalation:mTPI`, `single-arm:two-stage:H1-minimax`,
+`randomized:survival`) — **detect it, do not assume** (a "two-stage" design may be
+Simon *or* H1-minimax; the choice changes the estimator). Record the protocol
+version/amendment the extraction is based on (`source_documents[].version`) —
+SAPs key to a specific amendment and version skew is a real defect.
+
 **Critical principles**
 
 - **Fidelity over completeness.** A `null` field with a note is better than wrong
@@ -139,3 +156,7 @@ should be resolved or will be flagged by the drafting step, and that the
 - `references/study-design-schema.md` — the complete JSON schema with field
   descriptions. **Always read this before extraction.** Compatible with the
   `protocol-to-tfl` trial-metadata contract.
+- `references/protocol-to-sap-playbook.md` — how protocols become SAPs: the
+  lift-vs-delta model, what's reliably in a protocol vs what the SAP must author,
+  by-phase patterns, and the version-skew / don't-assume-defaults pitfalls.
+  **Read this to know what to capture as lifted vs as a `_sap_decision`.**

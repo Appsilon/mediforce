@@ -18,15 +18,20 @@ method, population, and the SAP/protocol element that motivated it.
 
 ## Object model (subset)
 
-| ARS object | What it captures | Maps from study-design.json |
+Object names and relationships follow the real ARS logical model (CDISC, LinkML;
+[docs](https://cdisc-org.github.io/analysis-results-standard/)). This is a
+pragmatic *subset* — enough for traceability and downstream composition.
+
+| ARS object | What it captures | Maps from study-design.json / SAP |
 |---|---|---|
-| `ReportingEvent` | The container for one reporting effort (this SAP). | The study itself (`study_identification.study_id`). |
-| `AnalysisSet` | A population the analysis runs on. | `populations[]`. |
-| `DataSubset` | A filter within a set (e.g. responders, a visit). | derived from endpoint `timing` / analysis filters. |
-| `GroupingFactor` | A categorical split (e.g. treatment arm, subgroup). | `study_design.treatment_arms[]`, subgroup analyses. |
-| `AnalysisMethod` | A reusable statistical method definition. | `analysis_requirements[].method` (or SAP DECISION default). |
-| `Analysis` | One planned analysis: references a method, a set, optional subsets and grouping factors, and the endpoint it serves. | `analysis_requirements[]`. |
-| `Output` / `Display` | The table/figure/listing the analysis populates. | SAP §15 planned-TLG list. |
+| `ReportingEvent` | Root container for one reporting effort (this SAP) — holds analyses, outputs, reference documents, terminology extensions. | `study_identification.study_id` + SAP title. |
+| `AnalysisSet` | A population, defined by a **`whereClause`** condition. | `populations[]` (definition → whereClause). |
+| `DataSubset` | A further filter within a set (same where-clause machinery). | endpoint `timing` / analysis filters. |
+| `GroupingFactor` → `Group` | A categorical split (e.g. treatment arm, subgroup); analyses reference **ordered** grouping factors. | `study_design.treatment_arms[]`, subgroup analyses. |
+| `AnalysisMethod` → `Operation` | A reusable method = an **ordered set of `Operation`s**, each producing one result value. | `analysis_requirements[].method` (or SAP DECISION default). |
+| `Analysis` | One planned analysis: references a `method` + `analysisSet` + ordered `groupingFactor`s + optional `dataSubset`; carries `purpose` and `reason`; serves an endpoint. | `analysis_requirements[]`. |
+| `Output` → `OutputDisplay` → `DisplaySection` | The TFL the analysis populates, down to section text. | SAP §16 planned-TLG list. |
+| `ReferenceDocument` | Link to the SAP / source code / external doc. | the SAP itself + section number. |
 
 ## JSON shape to emit
 
@@ -43,7 +48,7 @@ method, population, and the SAP/protocol element that motivated it.
     {
       "id": "AS-<population_id>",
       "label": "string — population name",
-      "condition": "string — verbatim population definition",
+      "whereClause": "string — the population condition (verbatim definition, or a simple predicate)",
       "_population_id": "string — link to study-design populations[].population_id"
     }
   ],
@@ -51,7 +56,7 @@ method, population, and the SAP/protocol element that motivated it.
     {
       "id": "DS-<short>",
       "label": "string",
-      "condition": "string — the filter expressed in words or a simple predicate"
+      "whereClause": "string — the filter as a condition"
     }
   ],
   "groupingFactors": [
@@ -67,7 +72,13 @@ method, population, and the SAP/protocol element that motivated it.
     {
       "id": "AM-<short>",
       "label": "string — e.g., 'Stratified log-rank test'",
-      "description": "string — operation summary (model, covariates, estimate, CI)",
+      "operations": [
+        {
+          "id": "Op-<short>",
+          "name": "string — e.g., 'p-value', 'hazard ratio', '95% CI lower'",
+          "resultPattern": "string — what this operation outputs"
+        }
+      ],
       "_is_sap_decision": "boolean — true if introduced by the SAP, not the protocol"
     }
   ],
@@ -76,14 +87,15 @@ method, population, and the SAP/protocol element that motivated it.
       "id": "AN-<requirement_id>",
       "label": "string — e.g., 'Primary analysis of Overall Survival'",
       "purpose": "primary | secondary | sensitivity | subgroup | safety | exploratory",
-      "reason": "string — e.g., 'SPECIFIED IN SAP' or 'SPECIFIED IN PROTOCOL'",
+      "reason": "string — 'SPECIFIED IN SAP' or 'SPECIFIED IN PROTOCOL'",
       "methodId": "AM-<short>",
       "analysisSetId": "AS-<population_id>",
       "dataSubsetIds": ["DS-<short>"],
-      "groupingFactorIds": ["GF-TRT"],
+      "orderedGroupingFactorIds": ["GF-TRT"],
+      "adamTarget": "string — ADaM dataset this analysis reads (ADSL | ADTTE | ADRS | ADAE | ADLB | ...)",
       "_endpoint_id": "string — study-design endpoints.<tier>[].endpoint_id (tier = primary|secondary|exploratory|safety)",
       "_analysis_requirement_id": "string — study-design analysis_requirements[].requirement_id",
-      "_sap_section": "string — e.g., '6.1'",
+      "_sap_section": "string — e.g., '8.1'",
       "outputId": "OUT-<short>"
     }
   ],
@@ -92,19 +104,47 @@ method, population, and the SAP/protocol element that motivated it.
       "id": "OUT-<short>",
       "label": "string — TLG title",
       "displayType": "table | figure | listing",
-      "number": "string or null — CSR-aligned number if known"
+      "number": "string or null — CSR-aligned number if known",
+      "outputDisplay": {
+        "sections": ["string — display section labels, e.g. 'Title', 'Body', 'Footnotes'"]
+      }
+    }
+  ],
+  "referenceDocuments": [
+    {
+      "id": "RD-SAP",
+      "label": "Statistical Analysis Plan",
+      "location": "outputs/sap-final.md"
     }
   ]
 }
 ```
 
+## ADaM target mapping (bridge to protocol-to-tfl / define.xml)
+
+Each `Analysis` reads an ADaM analysis dataset. Record it in `adamTarget` so the
+metadata links to the downstream `protocol-to-tfl` pipeline and to define.xml /
+Analysis Results Metadata (ARM) lineage:
+
+| Endpoint / analysis | ADaM target |
+|---|---|
+| Subject-level, disposition, demographics, populations | **ADSL** (always present) |
+| Time-to-event (OS, PFS, DOR, TTE safety) | **ADTTE** |
+| Tumour response (ORR, BOR, DCR, RECIST) | **ADRS** |
+| Adverse events / AESI | **ADAE** |
+| Labs / vitals / ECG | **ADLB / ADVS / ADEG** |
+| Continuous BDS endpoints (rating scales, change from baseline) | **BDS (e.g. ADQS)** |
+
+Real SAPs rarely name ADaM/ARS — supplying this mapping is the traceability edge.
+
 ## Consistency rules
 
 - Every `analyses[].analysisSetId` resolves to an `analysisSets[].id`; every
   `methodId` to an `analysisMethods[].id`; every `outputId` to an `outputs[].id`;
-  every `groupingFactorIds`/`dataSubsetIds` entry to its respective array.
+  every `orderedGroupingFactorIds`/`dataSubsetIds` entry to its respective array.
 - Every primary and secondary endpoint in `study-design.json` is referenced by at
   least one `analyses[]._endpoint_id`.
+- Every `analyses[].adamTarget` is a recognized ADaM dataset (see the table).
 - `analyses[].reason` and `analysisMethods[]._is_sap_decision` must agree: an
   analysis whose method was introduced by the SAP carries
   `reason: "SPECIFIED IN SAP"` and `_is_sap_decision: true`.
