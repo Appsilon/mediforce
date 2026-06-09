@@ -1,0 +1,7 @@
+{
+  "name": "protocol-to-synthetic-sdtm",
+  "description": "Bounded-AI skills for the protocol-to-synthetic-SDTM pipeline: extract a USDM v3.0 representation from a ClinicalTrials.gov record + protocol SoA, and match USDM activities to CDISC Biomedical Concepts. Both return constrained JSON and emit a *.review.json HITL checkpoint.",
+  "author": {
+    "name": "vedha"
+  }
+}

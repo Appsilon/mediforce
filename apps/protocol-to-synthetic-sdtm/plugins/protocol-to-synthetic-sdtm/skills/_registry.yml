@@ -1,0 +1,18 @@
+version: "1.0"
+standard: "agentskills.io/specification"
+total_skills: 2
+
+domains:
+  synthetic-sdtm:
+    description: Bounded-AI stages of the protocol-to-synthetic-SDTM pipeline
+    skills:
+      - id: extract-usdm
+        path: extract-usdm/SKILL.md
+        complexity: advanced
+        language: multi
+        description: Extract a USDM v3.0 study representation from a CT.gov record + protocol SoA
+      - id: match-bc
+        path: match-bc/SKILL.md
+        complexity: advanced
+        language: multi
+        description: Match USDM activities to CDISC Biomedical Concepts (constrained selection)

@@ -1,0 +1,5075 @@
+{
+  "info": {
+    "name": "CDISC Library API (full)",
+    "description": "Every GET endpoint across CDISC's published OpenAPI specs.\n\n`baseUrl` includes /api (default https://library.cdisc.org/api).\n1. CDISC Library API (core)  - {{baseUrl}}/mdr/... (official 1.1.0 + flagged mirror extras), sub-foldered by tag.\n2. COSMoS v1                 - {{baseUrl}}/cosmos/v1/mdr/...\n3. COSMoS v2 Biomedical Concept     - {{baseUrl}}/cosmos/v2/mdr/...\n4. COSMoS v2 Dataset Specialization - {{baseUrl}}/cosmos/v2/mdr/...\n\nENVIRONMENTS: import an environment and pick it (top-right in Postman).\n  - Production: baseUrl=https://library.cdisc.org/api + your cdisc_api_key.\n  - SwaggerHub mock: baseUrl=https://virtserver.swaggerhub.com/CDISC1/share-2.0/1.1.0 (returns example payloads, no key needed; covers the core folder only - the COSMoS folders are not mocked).\n\nAUTH: set the `cdisc_api_key` variable (from the environment); sent as the `api-key` header on every request.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "api-key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{cdisc_api_key}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://library.cdisc.org/api",
+      "type": "string"
+    },
+    {
+      "key": "cdisc_api_key",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. CDISC Library API (core)",
+      "item": [
+        {
+          "name": "Analysis Data Model and Implementation Guide (ADaM and ADaMIG)",
+          "item": [
+            {
+              "name": "/mdr/adam/{product}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/adam/:product",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "adam",
+                    ":product"
+                  ],
+                  "variable": [
+                    {
+                      "key": "product",
+                      "value": "",
+                      "description": "CDISC Library Product"
+                    }
+                  ]
+                },
+                "description": "Get ADaM Product"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/adam/{product}/datastructures",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/adam/:product/datastructures",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "adam",
+                    ":product",
+                    "datastructures"
+                  ],
+                  "variable": [
+                    {
+                      "key": "product",
+                      "value": "",
+                      "description": "CDISC Library Product"
+                    }
+                  ]
+                },
+                "description": "Get ADaM Data Structure List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/adam/{product}/datastructures/{structure}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/adam/:product/datastructures/:structure",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "adam",
+                    ":product",
+                    "datastructures",
+                    ":structure"
+                  ],
+                  "variable": [
+                    {
+                      "key": "product",
+                      "value": "",
+                      "description": "CDISC Library Product"
+                    },
+                    {
+                      "key": "structure",
+                      "value": "",
+                      "description": "Data structure Identifier"
+                    }
+                  ]
+                },
+                "description": "Get ADaM Data Structure"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/adam/{product}/datastructures/{structure}/variables",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/adam/:product/datastructures/:structure/variables",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "adam",
+                    ":product",
+                    "datastructures",
+                    ":structure",
+                    "variables"
+                  ],
+                  "variable": [
+                    {
+                      "key": "product",
+                      "value": "",
+                      "description": "CDISC Library Product"
+                    },
+                    {
+                      "key": "structure",
+                      "value": "",
+                      "description": "ADaM Data Structure Identifier"
+                    }
+                  ]
+                },
+                "description": "Get ADaM Variable List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/adam/{product}/datastructures/{structure}/variables/{var}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/adam/:product/datastructures/:structure/variables/:var",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "adam",
+                    ":product",
+                    "datastructures",
+                    ":structure",
+                    "variables",
+                    ":var"
+                  ],
+                  "variable": [
+                    {
+                      "key": "product",
+                      "value": "",
+                      "description": "CDISC Library Product"
+                    },
+                    {
+                      "key": "structure",
+                      "value": "",
+                      "description": "ADaM Data Structure Identifier"
+                    },
+                    {
+                      "key": "var",
+                      "value": "",
+                      "description": "ADaM Variable Identifier"
+                    }
+                  ]
+                },
+                "description": "Get ADaM Variable"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/adam/{product}/datastructures/{structure}/varsets",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/adam/:product/datastructures/:structure/varsets",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "adam",
+                    ":product",
+                    "datastructures",
+                    ":structure",
+                    "varsets"
+                  ],
+                  "variable": [
+                    {
+                      "key": "product",
+                      "value": "",
+                      "description": "CDISC Library Product"
+                    },
+                    {
+                      "key": "structure",
+                      "value": "",
+                      "description": "ADaM Data Structure Identifier"
+                    }
+                  ]
+                },
+                "description": "Get ADaM Variable Set List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/adam/{product}/datastructures/{structure}/varsets/{varset}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/adam/:product/datastructures/:structure/varsets/:varset",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "adam",
+                    ":product",
+                    "datastructures",
+                    ":structure",
+                    "varsets",
+                    ":varset"
+                  ],
+                  "variable": [
+                    {
+                      "key": "product",
+                      "value": "",
+                      "description": "CDISC Library Product"
+                    },
+                    {
+                      "key": "structure",
+                      "value": "",
+                      "description": "ADaM Data Structure Identifier"
+                    },
+                    {
+                      "key": "varset",
+                      "value": "",
+                      "description": "ADaM Variable Set Identifier"
+                    }
+                  ]
+                },
+                "description": "Get ADaM Variable Set"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "CDASH Implementation Guide (CDASHIG)",
+          "item": [
+            {
+              "name": "/mdr/cdashig/{version}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdashig/:version",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdashig",
+                    ":version"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get CDASHIG Product"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdashig/{version}/classes",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdashig/:version/classes",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdashig",
+                    ":version",
+                    "classes"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get CDASHIG Class List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdashig/{version}/classes/{class}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdashig/:version/classes/:class",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdashig",
+                    ":version",
+                    "classes",
+                    ":class"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "CDASHIG Class Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDASHIG Class"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdashig/{version}/classes/{class}/domains",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdashig/:version/classes/:class/domains",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdashig",
+                    ":version",
+                    "classes",
+                    ":class",
+                    "domains"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "CDASHIG Class Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDASHIG Class Domain List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdashig/{version}/classes/{class}/scenarios",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdashig/:version/classes/:class/scenarios",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdashig",
+                    ":version",
+                    "classes",
+                    ":class",
+                    "scenarios"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "CDASHIG Class Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDASHIG Class Scenario List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdashig/{version}/domains",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdashig/:version/domains",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdashig",
+                    ":version",
+                    "domains"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get CDASHIG Domain List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdashig/{version}/domains/{domain}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdashig/:version/domains/:domain",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdashig",
+                    ":version",
+                    "domains",
+                    ":domain"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "domain",
+                      "value": "",
+                      "description": "CDASHIG Domain Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDASHIG Domain"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdashig/{version}/domains/{domain}/fields",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdashig/:version/domains/:domain/fields",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdashig",
+                    ":version",
+                    "domains",
+                    ":domain",
+                    "fields"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "domain",
+                      "value": "",
+                      "description": "CDASHIG Domain Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDASHIG Domain Field List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdashig/{version}/domains/{domain}/fields/{field}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdashig/:version/domains/:domain/fields/:field",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdashig",
+                    ":version",
+                    "domains",
+                    ":domain",
+                    "fields",
+                    ":field"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "domain",
+                      "value": "",
+                      "description": "CDASHIG Domain Identifier"
+                    },
+                    {
+                      "key": "field",
+                      "value": "",
+                      "description": "CDASHIG Field Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDASHIG Domain Field"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdashig/{version}/scenarios",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdashig/:version/scenarios",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdashig",
+                    ":version",
+                    "scenarios"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get CDASHIG Scenario List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdashig/{version}/scenarios/{domain}.{scenario}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdashig/:version/scenarios/:domain}.{scenario",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdashig",
+                    ":version",
+                    "scenarios",
+                    ":domain}.{scenario"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "domain",
+                      "value": "",
+                      "description": "CDASHIG Domain Identifier"
+                    },
+                    {
+                      "key": "scenario",
+                      "value": "",
+                      "description": "CDASHIG Scenario Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDASHIG Scenario"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdashig/{version}/scenarios/{domain}.{scenario}/fields",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdashig/:version/scenarios/:domain}.{scenario/fields",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdashig",
+                    ":version",
+                    "scenarios",
+                    ":domain}.{scenario",
+                    "fields"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "domain",
+                      "value": "",
+                      "description": "CDASHIG Domain Identifier"
+                    },
+                    {
+                      "key": "scenario",
+                      "value": "",
+                      "description": "CDASHIG Scenario Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDASHIG Scenario Field List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdashig/{version}/scenarios/{domain}.{scenario}/fields/{field}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdashig/:version/scenarios/:domain}.{scenario/fields/:field",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdashig",
+                    ":version",
+                    "scenarios",
+                    ":domain}.{scenario",
+                    "fields",
+                    ":field"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "domain",
+                      "value": "",
+                      "description": "CDASHIG Domain Identifier"
+                    },
+                    {
+                      "key": "scenario",
+                      "value": "",
+                      "description": "CDASHIG Scenario Identifier"
+                    },
+                    {
+                      "key": "field",
+                      "value": "",
+                      "description": "CDASHIG Field Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDASHIG Scenario Field"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/root/cdashig/domains/{domain}/fields/{field}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/root/cdashig/domains/:domain/fields/:field",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "root",
+                    "cdashig",
+                    "domains",
+                    ":domain",
+                    "fields",
+                    ":field"
+                  ],
+                  "variable": [
+                    {
+                      "key": "domain",
+                      "value": "",
+                      "description": "CDASHIG Domain Identifier"
+                    },
+                    {
+                      "key": "field",
+                      "value": "",
+                      "description": "CDASHIG Field Identifier"
+                    }
+                  ]
+                },
+                "description": "Get Root CDASHIG Domain Field"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/root/cdashig/scenarios/{domain}.{scenario}/fields/{field}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/root/cdashig/scenarios/:domain}.{scenario/fields/:field",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "root",
+                    "cdashig",
+                    "scenarios",
+                    ":domain}.{scenario",
+                    "fields",
+                    ":field"
+                  ],
+                  "variable": [
+                    {
+                      "key": "domain",
+                      "value": "",
+                      "description": "CDASHIG Domain Identifier"
+                    },
+                    {
+                      "key": "scenario",
+                      "value": "",
+                      "description": "CDASHIG Scenario Identifier"
+                    },
+                    {
+                      "key": "field",
+                      "value": "",
+                      "description": "CDASHIG Field Identifier"
+                    }
+                  ]
+                },
+                "description": "Get Root CDASHIG Scenario Field"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Clinical Data Acquisition Standards Harmonization (CDASH)",
+          "item": [
+            {
+              "name": "/mdr/cdash/{version}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdash/:version",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdash",
+                    ":version"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get CDASH Product"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdash/{version}/classes",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdash/:version/classes",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdash",
+                    ":version",
+                    "classes"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get CDASH Class List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdash/{version}/classes/{class}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdash/:version/classes/:class",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdash",
+                    ":version",
+                    "classes",
+                    ":class"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "CDASH Class Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDASH Class"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdash/{version}/classes/{class}/domains",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdash/:version/classes/:class/domains",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdash",
+                    ":version",
+                    "classes",
+                    ":class",
+                    "domains"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "CDASH Class Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDASH Class Domain List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdash/{version}/classes/{class}/fields/{field}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdash/:version/classes/:class/fields/:field",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdash",
+                    ":version",
+                    "classes",
+                    ":class",
+                    "fields",
+                    ":field"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "CDASH Class Identifier"
+                    },
+                    {
+                      "key": "field",
+                      "value": "",
+                      "description": "CDASH Field Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDASH Class Field"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdash/{version}/domains",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdash/:version/domains",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdash",
+                    ":version",
+                    "domains"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get CDASH Domain List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdash/{version}/domains/{domain}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdash/:version/domains/:domain",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdash",
+                    ":version",
+                    "domains",
+                    ":domain"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "domain",
+                      "value": "",
+                      "description": "CDASH Domain Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDASH Domain"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdash/{version}/domains/{domain}/fields",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdash/:version/domains/:domain/fields",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdash",
+                    ":version",
+                    "domains",
+                    ":domain",
+                    "fields"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "domain",
+                      "value": "",
+                      "description": "CDASH Domain Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDASH Domain Field List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/cdash/{version}/domains/{domain}/fields/{field}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/cdash/:version/domains/:domain/fields/:field",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "cdash",
+                    ":version",
+                    "domains",
+                    ":domain",
+                    "fields",
+                    ":field"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "domain",
+                      "value": "",
+                      "description": "CDASH Domain Identifier"
+                    },
+                    {
+                      "key": "field",
+                      "value": "",
+                      "description": "CDASH Field Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDASH Domain Field"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/root/cdash/classes/{class}/fields/{field}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/root/cdash/classes/:class/fields/:field",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "root",
+                    "cdash",
+                    "classes",
+                    ":class",
+                    "fields",
+                    ":field"
+                  ],
+                  "variable": [
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "CDASH Class Identifier"
+                    },
+                    {
+                      "key": "field",
+                      "value": "",
+                      "description": "CDASH Field Identifier"
+                    }
+                  ]
+                },
+                "description": "Get Root CDASH Class Field"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/root/cdash/domains/{domain}/fields/{field}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/root/cdash/domains/:domain/fields/:field",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "root",
+                    "cdash",
+                    "domains",
+                    ":domain",
+                    "fields",
+                    ":field"
+                  ],
+                  "variable": [
+                    {
+                      "key": "domain",
+                      "value": "",
+                      "description": "CDASH Domain Identifier"
+                    },
+                    {
+                      "key": "field",
+                      "value": "",
+                      "description": "CDASH Field Identifier"
+                    }
+                  ]
+                },
+                "description": "Get Root CDASH Domain Field"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Controlled Terminology (CT)",
+          "item": [
+            {
+              "name": "/mdr/ct/packages",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/ct/packages",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "ct",
+                    "packages"
+                  ]
+                },
+                "description": "Get CDISC Library CT Package List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/ct/packages/{package}/codelists",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/ct/packages/:package/codelists",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "ct",
+                    "packages",
+                    ":package",
+                    "codelists"
+                  ],
+                  "variable": [
+                    {
+                      "key": "package",
+                      "value": "",
+                      "description": "CT Package Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDISC Library CT Package Codelist List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/ct/packages/{package}/codelists/{codelist}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/ct/packages/:package/codelists/:codelist",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "ct",
+                    "packages",
+                    ":package",
+                    "codelists",
+                    ":codelist"
+                  ],
+                  "variable": [
+                    {
+                      "key": "package",
+                      "value": "",
+                      "description": "CT Package Identifier"
+                    },
+                    {
+                      "key": "codelist",
+                      "value": "",
+                      "description": "CT Codelist Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDISC Library CT Package Codelist"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/ct/packages/{package}/codelists/{codelist}/terms",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/ct/packages/:package/codelists/:codelist/terms",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "ct",
+                    "packages",
+                    ":package",
+                    "codelists",
+                    ":codelist",
+                    "terms"
+                  ],
+                  "variable": [
+                    {
+                      "key": "package",
+                      "value": "",
+                      "description": "CT Package Identifier"
+                    },
+                    {
+                      "key": "codelist",
+                      "value": "",
+                      "description": "CT Codelist Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDISC Library CT Package Codelist Term List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/ct/packages/{package}/codelists/{codelist}/terms/{term}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/ct/packages/:package/codelists/:codelist/terms/:term",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "ct",
+                    "packages",
+                    ":package",
+                    "codelists",
+                    ":codelist",
+                    "terms",
+                    ":term"
+                  ],
+                  "variable": [
+                    {
+                      "key": "package",
+                      "value": "",
+                      "description": "CT Package Product Identifier"
+                    },
+                    {
+                      "key": "codelist",
+                      "value": "",
+                      "description": "CT Codelist Identifier"
+                    },
+                    {
+                      "key": "term",
+                      "value": "",
+                      "description": "CT Codelist Term Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDISC Library CT Package Codelist Term"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/ct/packages/{product}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/ct/packages/:product",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "ct",
+                    "packages",
+                    ":product"
+                  ],
+                  "variable": [
+                    {
+                      "key": "product",
+                      "value": "",
+                      "description": "CT Package Product Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDISC Library CT Package"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/root/ct/{productGroup}/codelists/{codelist}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/root/ct/:productGroup/codelists/:codelist",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "root",
+                    "ct",
+                    ":productGroup",
+                    "codelists",
+                    ":codelist"
+                  ],
+                  "variable": [
+                    {
+                      "key": "productGroup",
+                      "value": "",
+                      "description": "CT Product Group Identifier"
+                    },
+                    {
+                      "key": "codelist",
+                      "value": "",
+                      "description": "CT Codelist Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDISC Library Root CT Codelist"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/root/ct/{productGroup}/codelists/{codelist}/terms/{term}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/root/ct/:productGroup/codelists/:codelist/terms/:term",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "root",
+                    "ct",
+                    ":productGroup",
+                    "codelists",
+                    ":codelist",
+                    "terms",
+                    ":term"
+                  ],
+                  "variable": [
+                    {
+                      "key": "productGroup",
+                      "value": "",
+                      "description": "CT Product Group Identifier"
+                    },
+                    {
+                      "key": "codelist",
+                      "value": "",
+                      "description": "CT Codelist Identifier"
+                    },
+                    {
+                      "key": "term",
+                      "value": "",
+                      "description": "CT Codelist Term Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDISC Library Root CT Term"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/ct/packages/{package}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/ct/packages/:package?expand=False",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "ct",
+                    "packages",
+                    ":package"
+                  ],
+                  "query": [
+                    {
+                      "key": "expand",
+                      "value": "False",
+                      "description": "If true, entity links will be hydrated and returned within the response (e.g. Fields, Domains, Classes)",
+                      "disabled": true
+                    }
+                  ],
+                  "variable": [
+                    {
+                      "key": "package",
+                      "value": "",
+                      "description": "CT Package Product Identifier"
+                    }
+                  ]
+                },
+                "description": "Get CDISC Library CT Package\n\n[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Diff",
+          "item": [
+            {
+              "name": "Compare a product with its immediately preceding version",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/diff/:product/:version",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "diff",
+                    ":product",
+                    ":version"
+                  ],
+                  "variable": [
+                    {
+                      "key": "product",
+                      "value": "",
+                      "description": "CDISC Library Product"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            },
+            {
+              "name": "Compare a product with another version",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/diff/:product/:version/:previous",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "diff",
+                    ":product",
+                    ":version",
+                    ":previous"
+                  ],
+                  "variable": [
+                    {
+                      "key": "product",
+                      "value": "",
+                      "description": "CDISC Library Product"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "previous",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "General",
+          "item": [
+            {
+              "name": "/mdr/about",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/about",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "about"
+                  ]
+                },
+                "description": "Get Information About CDISC Library"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/lastupdated",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/lastupdated",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "lastupdated"
+                  ]
+                },
+                "description": "Get CDISC Library Last Updated"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/products",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/products",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "products"
+                  ]
+                },
+                "description": "Get CDISC Library Products"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/products/DataAnalysis",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/products/DataAnalysis",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "products",
+                    "DataAnalysis"
+                  ]
+                },
+                "description": "Get CDISC Library Product Group Data Analysis"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/products/DataCollection",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/products/DataCollection",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "products",
+                    "DataCollection"
+                  ]
+                },
+                "description": "Get CDISC Library Product Group Data Collection"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/products/DataTabulation",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/products/DataTabulation",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "products",
+                    "DataTabulation"
+                  ]
+                },
+                "description": "Get CDISC Library Product Group Data Tabulation"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/products/Measures",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/products/Measures",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "products",
+                    "Measures"
+                  ]
+                },
+                "description": "Get CDISC Library Product Group QRS"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/products/Terminology",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/products/Terminology",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "products",
+                    "Terminology"
+                  ]
+                },
+                "description": "Get CDISC Library Product Group Terminology"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/products/DraftContent",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/products/DraftContent?expand=False",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "products",
+                    "DraftContent"
+                  ],
+                  "query": [
+                    {
+                      "key": "expand",
+                      "value": "False",
+                      "description": "If true, entity links will be hydrated and returned within the response (e.g. Fields, Domains, Classes)",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Get CDISC Library Product Group Draft Content\n\n[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/products/QrsInstrument",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/products/QrsInstrument?expand=False",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "products",
+                    "QrsInstrument"
+                  ],
+                  "query": [
+                    {
+                      "key": "expand",
+                      "value": "False",
+                      "description": "If true, entity links will be hydrated and returned within the response (e.g. Fields, Domains, Classes)",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Get CDISC Library Product Group QRS Instrument\n\n[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "IG Documents",
+          "item": [
+            {
+              "name": "Get a document given a document id",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/documents/:document_id",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "documents",
+                    ":document_id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "document_id",
+                      "value": "",
+                      "description": "Documents id"
+                    }
+                  ]
+                },
+                "description": "[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            },
+            {
+              "name": "Get all documents sections for a given IG document",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/documents/:standard/:version/sections",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "documents",
+                    ":standard",
+                    ":version",
+                    "sections"
+                  ],
+                  "variable": [
+                    {
+                      "key": "standard",
+                      "value": "",
+                      "description": "Standard"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            },
+            {
+              "name": "Get all documents associated with a given section and structure",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/documents/:standard/:version/:structure/:section",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "documents",
+                    ":standard",
+                    ":version",
+                    ":structure",
+                    ":section"
+                  ],
+                  "variable": [
+                    {
+                      "key": "standard",
+                      "value": "",
+                      "description": "Standard"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "structure",
+                      "value": "",
+                      "description": "High level structure of the standard (i.e domain, dataset, datastructure)"
+                    },
+                    {
+                      "key": "section",
+                      "value": "",
+                      "description": "Section of the document to get"
+                    }
+                  ]
+                },
+                "description": "[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Measures",
+          "item": [
+            {
+              "name": "/mdr/qrs/{measure}/{version}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/qrs/:measure/:version",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "qrs",
+                    ":measure",
+                    ":version"
+                  ],
+                  "variable": [
+                    {
+                      "key": "measure",
+                      "value": "",
+                      "description": "QRS Measure Identifier"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get QRS Product"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/qrs/{measure}/{version}/items",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/qrs/:measure/:version/items",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "qrs",
+                    ":measure",
+                    ":version",
+                    "items"
+                  ],
+                  "variable": [
+                    {
+                      "key": "measure",
+                      "value": "",
+                      "description": "QRS Measure Identifier"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get QRS Item List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/qrs/{measure}/{version}/items/{item}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/qrs/:measure/:version/items/:item",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "qrs",
+                    ":measure",
+                    ":version",
+                    "items",
+                    ":item"
+                  ],
+                  "variable": [
+                    {
+                      "key": "measure",
+                      "value": "",
+                      "description": "QRS Measure Identifier"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "item",
+                      "value": "",
+                      "description": "QRS Measure Item Identifier"
+                    }
+                  ]
+                },
+                "description": "Get QRS Item"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/qrs/{measure}/{version}/responsegroups",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/qrs/:measure/:version/responsegroups",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "qrs",
+                    ":measure",
+                    ":version",
+                    "responsegroups"
+                  ],
+                  "variable": [
+                    {
+                      "key": "measure",
+                      "value": "",
+                      "description": "QRS Measure Identifier"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get QRS Response Group List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/qrs/{measure}/{version}/responsegroups/{responsegroup}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/qrs/:measure/:version/responsegroups/:responsegroup",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "qrs",
+                    ":measure",
+                    ":version",
+                    "responsegroups",
+                    ":responsegroup"
+                  ],
+                  "variable": [
+                    {
+                      "key": "measure",
+                      "value": "",
+                      "description": "QRS Measure Identifier"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "responsegroup",
+                      "value": "",
+                      "description": "QRS Measure's Response Group Identifier"
+                    }
+                  ]
+                },
+                "description": "Get QRS Response Group"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Questionnaires, Ratings & Scales (QRS)",
+          "item": [
+            {
+              "name": "/mdr/qrs/instruments/{instrument}/versions/{version}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/qrs/instruments/:instrument/versions/:version",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "qrs",
+                    "instruments",
+                    ":instrument",
+                    "versions",
+                    ":version"
+                  ],
+                  "variable": [
+                    {
+                      "key": "instrument",
+                      "value": "",
+                      "description": "CDISC QRS Instrument Identifier"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get QRS Instrument Product\n\n[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/qrs/instruments/{instrument}/versions/{version}/items",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/qrs/instruments/:instrument/versions/:version/items",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "qrs",
+                    "instruments",
+                    ":instrument",
+                    "versions",
+                    ":version",
+                    "items"
+                  ],
+                  "variable": [
+                    {
+                      "key": "instrument",
+                      "value": "",
+                      "description": "CDISC QRS Instrument Identifier"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get QRS Instrument Items\n\n[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/qrs/instruments/{instrument}/versions/{version}/items/{item}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/qrs/instruments/:instrument/versions/:version/items/:item",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "qrs",
+                    "instruments",
+                    ":instrument",
+                    "versions",
+                    ":version",
+                    "items",
+                    ":item"
+                  ],
+                  "variable": [
+                    {
+                      "key": "instrument",
+                      "value": "",
+                      "description": "CDISC QRS Instrument Identifier"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "item",
+                      "value": "",
+                      "description": "CDISC QRS Instrument Item"
+                    }
+                  ]
+                },
+                "description": "Get QRS Instrument Item\n\n[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/qrs/instruments/{instrument}/versions/{version}/responseGroups",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/qrs/instruments/:instrument/versions/:version/responseGroups",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "qrs",
+                    "instruments",
+                    ":instrument",
+                    "versions",
+                    ":version",
+                    "responseGroups"
+                  ],
+                  "variable": [
+                    {
+                      "key": "instrument",
+                      "value": "",
+                      "description": "CDISC QRS Instrument Identifier"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get QRS Instrument Response Groups\n\n[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/qrs/instruments/{instrument}/versions/{version}/responseGroups/{responseGroup}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/qrs/instruments/:instrument/versions/:version/responseGroups/:responseGroup",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "qrs",
+                    "instruments",
+                    ":instrument",
+                    "versions",
+                    ":version",
+                    "responseGroups",
+                    ":responseGroup"
+                  ],
+                  "variable": [
+                    {
+                      "key": "instrument",
+                      "value": "",
+                      "description": "CDISC QRS Instrument Identifier"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "responseGroup",
+                      "value": "",
+                      "description": "CDISC QRS Instrument Response Group"
+                    }
+                  ]
+                },
+                "description": "Get QRS Instrument Response Group\n\n[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/root/qrs/instruments/{instrument}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/root/qrs/instruments/:instrument",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "root",
+                    "qrs",
+                    "instruments",
+                    ":instrument"
+                  ],
+                  "variable": [
+                    {
+                      "key": "instrument",
+                      "value": "",
+                      "description": "CDISC QRS Instrument Identifier"
+                    }
+                  ]
+                },
+                "description": "Get Root QRS Instrument Product\n\n[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Rule",
+          "item": [
+            {
+              "name": "Get all rule packages and standards they apply to",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/rules?expand=False",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "rules"
+                  ],
+                  "query": [
+                    {
+                      "key": "expand",
+                      "value": "False",
+                      "description": "If true, entity links will be hydrated and returned within the response (e.g. Fields, Domains, Classes)",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            },
+            {
+              "name": "Get all rules from a rule type release",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/rules/:standard/:version",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "rules",
+                    ":standard",
+                    ":version"
+                  ],
+                  "variable": [
+                    {
+                      "key": "standard",
+                      "value": "",
+                      "description": "standard"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            },
+            {
+              "name": "Get all rules from a rule type release",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/rules/:standard/:version/rule/:rule_id",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "rules",
+                    ":standard",
+                    ":version",
+                    "rule",
+                    ":rule_id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "standard",
+                      "value": "",
+                      "description": "Standard"
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "rule_id",
+                      "value": "",
+                      "description": "Rule Id"
+                    }
+                  ]
+                },
+                "description": "[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "SDTM Implementation Guide (SDTMIG)",
+          "item": [
+            {
+              "name": "/mdr/root/sdtmig/datasets/{dataset}/variables/{var}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/root/sdtmig/datasets/:dataset/variables/:var",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "root",
+                    "sdtmig",
+                    "datasets",
+                    ":dataset",
+                    "variables",
+                    ":var"
+                  ],
+                  "variable": [
+                    {
+                      "key": "dataset",
+                      "value": "",
+                      "description": "SDTMIG Dataset Identifier"
+                    },
+                    {
+                      "key": "var",
+                      "value": "",
+                      "description": "SDTMIG Variable Identifier"
+                    }
+                  ]
+                },
+                "description": "Get Root SDTMIG Dataset Variable"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtmig/{version}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtmig/:version",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtmig",
+                    ":version"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get SDTMIG product"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtmig/{version}/classes",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtmig/:version/classes",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtmig",
+                    ":version",
+                    "classes"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get SDTMIG Class List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtmig/{version}/classes/{class}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtmig/:version/classes/:class",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtmig",
+                    ":version",
+                    "classes",
+                    ":class"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "SDTMIG Class Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SDTMIG Class"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtmig/{version}/classes/{class}/datasets",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtmig/:version/classes/:class/datasets",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtmig",
+                    ":version",
+                    "classes",
+                    ":class",
+                    "datasets"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "SDTMIG Class Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SDTMIG Class Dataset List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtmig/{version}/datasets",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtmig/:version/datasets",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtmig",
+                    ":version",
+                    "datasets"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get SDTMIG Dataset List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtmig/{version}/datasets/{dataset}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtmig/:version/datasets/:dataset",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtmig",
+                    ":version",
+                    "datasets",
+                    ":dataset"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "dataset",
+                      "value": "",
+                      "description": "SDTMIG Dataset Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SDTMIG Dataset"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtmig/{version}/datasets/{dataset}/variables",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtmig/:version/datasets/:dataset/variables",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtmig",
+                    ":version",
+                    "datasets",
+                    ":dataset",
+                    "variables"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "dataset",
+                      "value": "",
+                      "description": "SDTMIG Dataset Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SDTMIG Dataset Variable List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtmig/{version}/datasets/{dataset}/variables/{var}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtmig/:version/datasets/:dataset/variables/:var",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtmig",
+                    ":version",
+                    "datasets",
+                    ":dataset",
+                    "variables",
+                    ":var"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "dataset",
+                      "value": "",
+                      "description": "SDTMIG Dataset Identifier"
+                    },
+                    {
+                      "key": "var",
+                      "value": "",
+                      "description": "SDTMIG Variable Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SDTMIG Dataset Variable"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "SEND Implementation Guide (SENDIG)",
+          "item": [
+            {
+              "name": "/mdr/root/sendig/datasets/{dataset}/variables/{var}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/root/sendig/datasets/:dataset/variables/:var",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "root",
+                    "sendig",
+                    "datasets",
+                    ":dataset",
+                    "variables",
+                    ":var"
+                  ],
+                  "variable": [
+                    {
+                      "key": "dataset",
+                      "value": "",
+                      "description": "SENDIG Dataset Identifier"
+                    },
+                    {
+                      "key": "var",
+                      "value": "",
+                      "description": "SENDIG Variable Identifier"
+                    }
+                  ]
+                },
+                "description": "Get Root SENDIG Dataset Variable"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sendig/{version}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sendig/:version",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sendig",
+                    ":version"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get SENDIG product"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sendig/{version}/classes",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sendig/:version/classes",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sendig",
+                    ":version",
+                    "classes"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get SENDIG Class List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sendig/{version}/classes/{class}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sendig/:version/classes/:class",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sendig",
+                    ":version",
+                    "classes",
+                    ":class"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "SENDIG Class Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SENDIG Class"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sendig/{version}/classes/{class}/datasets",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sendig/:version/classes/:class/datasets",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sendig",
+                    ":version",
+                    "classes",
+                    ":class",
+                    "datasets"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "SENDIG Class Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SENDIG Class Dataset List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sendig/{version}/datasets",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sendig/:version/datasets",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sendig",
+                    ":version",
+                    "datasets"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get SENDIG Dataset List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sendig/{version}/datasets/{dataset}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sendig/:version/datasets/:dataset",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sendig",
+                    ":version",
+                    "datasets",
+                    ":dataset"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "dataset",
+                      "value": "",
+                      "description": "SENDIG Class Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SENDIG Dataset"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sendig/{version}/datasets/{dataset}/variables",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sendig/:version/datasets/:dataset/variables",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sendig",
+                    ":version",
+                    "datasets",
+                    ":dataset",
+                    "variables"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "dataset",
+                      "value": "",
+                      "description": "SENDIG Class Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SENDIG Dataset Variable List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sendig/{version}/datasets/{dataset}/variables/{var}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sendig/:version/datasets/:dataset/variables/:var",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sendig",
+                    ":version",
+                    "datasets",
+                    ":dataset",
+                    "variables",
+                    ":var"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "dataset",
+                      "value": "",
+                      "description": "SENDIG Class Identifier"
+                    },
+                    {
+                      "key": "var",
+                      "value": "",
+                      "description": "SENDIG Variable Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SENDIG Dataset Variable"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Searches",
+          "item": [
+            {
+              "name": "/mdr/search",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/search?q=&highlight=&start=0&pageSize=100&class=&codelist=&conceptId=&core=&dataStructure=&datasetStructure=&definition=&description=&domain=&effectiveDate=&extensible=&href=&label=&measureType=&name=&preferredTerm=&product=&productGroup=&registrationStatus=&roleDescription=&sdtmTarget=&simpleDatatype=&submissionValue=&synonyms=&type=&uiHref=&valueDomain=&variableSet=&version=",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "search"
+                  ],
+                  "query": [
+                    {
+                      "key": "q",
+                      "value": "",
+                      "description": "(required) Search Term Expression",
+                      "disabled": false
+                    },
+                    {
+                      "key": "highlight",
+                      "value": "",
+                      "description": "Search Highlight Expression",
+                      "disabled": true
+                    },
+                    {
+                      "key": "start",
+                      "value": "0",
+                      "description": "Initial Search Result Index",
+                      "disabled": true
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "100",
+                      "description": "Number of Search Results to Return",
+                      "disabled": true
+                    },
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Class",
+                      "disabled": true
+                    },
+                    {
+                      "key": "codelist",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Codelist",
+                      "disabled": true
+                    },
+                    {
+                      "key": "conceptId",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Concept ID",
+                      "disabled": true
+                    },
+                    {
+                      "key": "core",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Core",
+                      "disabled": true
+                    },
+                    {
+                      "key": "dataStructure",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Data Structure",
+                      "disabled": true
+                    },
+                    {
+                      "key": "datasetStructure",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Dataset Structure",
+                      "disabled": true
+                    },
+                    {
+                      "key": "definition",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Definition",
+                      "disabled": true
+                    },
+                    {
+                      "key": "description",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Description",
+                      "disabled": true
+                    },
+                    {
+                      "key": "domain",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Domain",
+                      "disabled": true
+                    },
+                    {
+                      "key": "effectiveDate",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Effective Date",
+                      "disabled": true
+                    },
+                    {
+                      "key": "extensible",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Extensible",
+                      "disabled": true
+                    },
+                    {
+                      "key": "href",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Href",
+                      "disabled": true
+                    },
+                    {
+                      "key": "label",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Label",
+                      "disabled": true
+                    },
+                    {
+                      "key": "measureType",
+                      "value": "",
+                      "description": "SLimit Search by Setting Scope to Measure Type",
+                      "disabled": true
+                    },
+                    {
+                      "key": "name",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Name",
+                      "disabled": true
+                    },
+                    {
+                      "key": "preferredTerm",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Preferred Term",
+                      "disabled": true
+                    },
+                    {
+                      "key": "product",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Product",
+                      "disabled": true
+                    },
+                    {
+                      "key": "productGroup",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Product Group",
+                      "disabled": true
+                    },
+                    {
+                      "key": "registrationStatus",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Registration Status",
+                      "disabled": true
+                    },
+                    {
+                      "key": "roleDescription",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Role Description",
+                      "disabled": true
+                    },
+                    {
+                      "key": "sdtmTarget",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to SDTM Target",
+                      "disabled": true
+                    },
+                    {
+                      "key": "simpleDatatype",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Simple Datatype",
+                      "disabled": true
+                    },
+                    {
+                      "key": "submissionValue",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Submission Value",
+                      "disabled": true
+                    },
+                    {
+                      "key": "synonyms",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Synonyms",
+                      "disabled": true
+                    },
+                    {
+                      "key": "type",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Type",
+                      "disabled": true
+                    },
+                    {
+                      "key": "uiHref",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to UI Href",
+                      "disabled": true
+                    },
+                    {
+                      "key": "valueDomain",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Value Domain",
+                      "disabled": true
+                    },
+                    {
+                      "key": "variableSet",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Variable Set",
+                      "disabled": true
+                    },
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "Limit Search by Setting Scope to Version",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Get Search Results Across CDISC Library"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/search/scopes",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/search/scopes",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "search",
+                    "scopes"
+                  ]
+                },
+                "description": "Get Search Results Across CDISC Library"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/search/scopes/{scope}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/search/scopes/:scope",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "search",
+                    "scopes",
+                    ":scope"
+                  ],
+                  "variable": [
+                    {
+                      "key": "scope",
+                      "value": "",
+                      "description": "Search Scope"
+                    }
+                  ]
+                },
+                "description": "Get Search Results Limited to Scope"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/search/implementedBy",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/search/implementedBy?href=&start=0&pageSize=100",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "search",
+                    "implementedBy"
+                  ],
+                  "query": [
+                    {
+                      "key": "href",
+                      "value": "",
+                      "description": "(required) Identify Products Who Implment targetHref",
+                      "disabled": false
+                    },
+                    {
+                      "key": "start",
+                      "value": "0",
+                      "description": "Initial Search Result Index",
+                      "disabled": true
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "100",
+                      "description": "Number of Search Results to Return",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Get Products That Implment href\n\n[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/suggest",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/suggest?q=&top=&select=",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "suggest"
+                  ],
+                  "query": [
+                    {
+                      "key": "q",
+                      "value": "",
+                      "description": "(required) Suggestion Query",
+                      "disabled": false
+                    },
+                    {
+                      "key": "top",
+                      "value": "",
+                      "description": "Suggestion Term Expression",
+                      "disabled": true
+                    },
+                    {
+                      "key": "select",
+                      "value": "",
+                      "description": "Select Fields to Return with Result",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Get Search Query Suggestion Results Across CDISC Library\n\n[Source: SwaggerHub mirror lexjansen/cdisc-library_api 1.8 - NOT in the official share-2.0/1.1.0 spec. Some mirror-only paths are live (e.g. /mdr/rules, /mdr/products/QrsInstrument); others 404. Verify before relying on it.]"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Statuses",
+          "item": [
+            {
+              "name": "/health",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/health",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "health"
+                  ]
+                },
+                "description": "Check health of system components"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/maintenance",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/maintenance",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "maintenance"
+                  ]
+                },
+                "description": "Set maintenance mode and message"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Study Data Tabulation Model (SDTM)",
+          "item": [
+            {
+              "name": "/mdr/root/sdtm/classes/{class}/variables/{var}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/root/sdtm/classes/:class/variables/:var",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "root",
+                    "sdtm",
+                    "classes",
+                    ":class",
+                    "variables",
+                    ":var"
+                  ],
+                  "variable": [
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "SDTM Class Identifier"
+                    },
+                    {
+                      "key": "var",
+                      "value": "",
+                      "description": "SDTM Variable Identifier"
+                    }
+                  ]
+                },
+                "description": "Get Root of SDTM Class Variable"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/root/sdtm/datasets/{dataset}/variables/{var}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/root/sdtm/datasets/:dataset/variables/:var",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "root",
+                    "sdtm",
+                    "datasets",
+                    ":dataset",
+                    "variables",
+                    ":var"
+                  ],
+                  "variable": [
+                    {
+                      "key": "dataset",
+                      "value": "",
+                      "description": "SDTM Dataset Identifier"
+                    },
+                    {
+                      "key": "var",
+                      "value": "",
+                      "description": "SDTM Variable Identifier"
+                    }
+                  ]
+                },
+                "description": "Get Root SDTM Dataset Variable"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtm/{version}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtm/:version",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtm",
+                    ":version"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get SDTM product"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtm/{version}/classes",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtm/:version/classes",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtm",
+                    ":version",
+                    "classes"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get SDTM Class List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtm/{version}/classes/{class}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtm/:version/classes/:class",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtm",
+                    ":version",
+                    "classes",
+                    ":class"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "SDTM Class Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SDTM Class"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtm/{version}/classes/{class}/datasets",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtm/:version/classes/:class/datasets",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtm",
+                    ":version",
+                    "classes",
+                    ":class",
+                    "datasets"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "SDTM Class Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SDTM Class Dataset List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtm/{version}/classes/{class}/variables",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtm/:version/classes/:class/variables",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtm",
+                    ":version",
+                    "classes",
+                    ":class",
+                    "variables"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "SDTM Class Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SDTM Class Variable List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtm/{version}/classes/{class}/variables/{var}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtm/:version/classes/:class/variables/:var",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtm",
+                    ":version",
+                    "classes",
+                    ":class",
+                    "variables",
+                    ":var"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "class",
+                      "value": "",
+                      "description": "SDTM Class Identifier"
+                    },
+                    {
+                      "key": "var",
+                      "value": "",
+                      "description": "SDTM Variable Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SDTM Class Variable"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtm/{version}/datasets",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtm/:version/datasets",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtm",
+                    ":version",
+                    "datasets"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    }
+                  ]
+                },
+                "description": "Get SDTM Dataset List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtm/{version}/datasets/{dataset}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtm/:version/datasets/:dataset",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtm",
+                    ":version",
+                    "datasets",
+                    ":dataset"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "dataset",
+                      "value": "",
+                      "description": "SDTM Dataset Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SDTM Dataset"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtm/{version}/datasets/{dataset}/variables",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtm/:version/datasets/:dataset/variables",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtm",
+                    ":version",
+                    "datasets",
+                    ":dataset",
+                    "variables"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "dataset",
+                      "value": "",
+                      "description": "SDTM Dataset Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SDTM Dataset Variable List"
+              },
+              "response": []
+            },
+            {
+              "name": "/mdr/sdtm/{version}/datasets/{dataset}/variables/{var}",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/mdr/sdtm/:version/datasets/:dataset/variables/:var",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "mdr",
+                    "sdtm",
+                    ":version",
+                    "datasets",
+                    ":dataset",
+                    "variables",
+                    ":var"
+                  ],
+                  "variable": [
+                    {
+                      "key": "version",
+                      "value": "",
+                      "description": "CDISC Library Product Version"
+                    },
+                    {
+                      "key": "dataset",
+                      "value": "",
+                      "description": "SDTM Dataset Identifier"
+                    },
+                    {
+                      "key": "var",
+                      "value": "",
+                      "description": "SDTM Variable Identifier"
+                    }
+                  ]
+                },
+                "description": "Get SDTM Dataset Variable"
+              },
+              "response": []
+            }
+          ]
+        }
+      ],
+      "description": "Core CDISC Library API. URLs: {{baseUrl}}/mdr/..."
+    },
+    {
+      "name": "2. COSMoS v1 (BC + SDTM Dataset Specialization)",
+      "item": [
+        {
+          "name": "Biomedical Concept (v1)",
+          "item": [
+            {
+              "name": "Get Biomedical Concept Package List",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/cosmos/v1/mdr/bc/packages",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "cosmos",
+                    "v1",
+                    "mdr",
+                    "bc",
+                    "packages"
+                  ]
+                },
+                "description": ""
+              },
+              "response": []
+            },
+            {
+              "name": "Get Biomedical Concept List for Package",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/cosmos/v1/mdr/bc/packages/:package/biomedicalconcepts",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "cosmos",
+                    "v1",
+                    "mdr",
+                    "bc",
+                    "packages",
+                    ":package",
+                    "biomedicalconcepts"
+                  ],
+                  "variable": [
+                    {
+                      "key": "package",
+                      "value": "",
+                      "description": ""
+                    }
+                  ]
+                },
+                "description": ""
+              },
+              "response": []
+            },
+            {
+              "name": "Get Biomedical Concept for Package",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/cosmos/v1/mdr/bc/packages/:package/biomedicalconcepts/:biomedicalconcept",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "cosmos",
+                    "v1",
+                    "mdr",
+                    "bc",
+                    "packages",
+                    ":package",
+                    "biomedicalconcepts",
+                    ":biomedicalconcept"
+                  ],
+                  "variable": [
+                    {
+                      "key": "package",
+                      "value": "",
+                      "description": ""
+                    },
+                    {
+                      "key": "biomedicalconcept",
+                      "value": "",
+                      "description": ""
+                    }
+                  ]
+                },
+                "description": ""
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "SDTM Dataset Specialization (v1)",
+          "item": [
+            {
+              "name": "Get SDTM Dataset Specialization Package List",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/cosmos/v1/mdr/specializations/sdtm/packages",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "cosmos",
+                    "v1",
+                    "mdr",
+                    "specializations",
+                    "sdtm",
+                    "packages"
+                  ]
+                },
+                "description": ""
+              },
+              "response": []
+            },
+            {
+              "name": "Get SDTM Dataset Specializations List for Package",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/cosmos/v1/mdr/specializations/sdtm/packages/:package/datasetspecializations",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "cosmos",
+                    "v1",
+                    "mdr",
+                    "specializations",
+                    "sdtm",
+                    "packages",
+                    ":package",
+                    "datasetspecializations"
+                  ],
+                  "variable": [
+                    {
+                      "key": "package",
+                      "value": "",
+                      "description": ""
+                    }
+                  ]
+                },
+                "description": ""
+              },
+              "response": []
+            },
+            {
+              "name": "Get SDTM Dataset Specialization for Package",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/cosmos/v1/mdr/specializations/sdtm/packages/:package/datasetspecializations/:datasetspecialization",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "cosmos",
+                    "v1",
+                    "mdr",
+                    "specializations",
+                    "sdtm",
+                    "packages",
+                    ":package",
+                    "datasetspecializations",
+                    ":datasetspecialization"
+                  ],
+                  "variable": [
+                    {
+                      "key": "package",
+                      "value": "",
+                      "description": ""
+                    },
+                    {
+                      "key": "datasetspecialization",
+                      "value": "",
+                      "description": ""
+                    }
+                  ]
+                },
+                "description": ""
+              },
+              "response": []
+            }
+          ]
+        }
+      ],
+      "description": "URLs: {{baseUrl}}/cosmos/v1/mdr/..."
+    },
+    {
+      "name": "3. COSMoS v2 - Biomedical Concept",
+      "item": [
+        {
+          "name": "Get Biomedical Concepts List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cosmos/v2/mdr/bc/biomedicalconcepts?category=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cosmos",
+                "v2",
+                "mdr",
+                "bc",
+                "biomedicalconcepts"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get latest Biomedical Concept",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cosmos/v2/mdr/bc/biomedicalconcepts/:biomedicalconcept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cosmos",
+                "v2",
+                "mdr",
+                "bc",
+                "biomedicalconcepts",
+                ":biomedicalconcept"
+              ],
+              "variable": [
+                {
+                  "key": "biomedicalconcept",
+                  "value": "",
+                  "description": ""
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Latest Biomedical Concept Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cosmos/v2/mdr/bc/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cosmos",
+                "v2",
+                "mdr",
+                "bc",
+                "categories"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Biomedical Concept Package List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cosmos/v2/mdr/bc/packages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cosmos",
+                "v2",
+                "mdr",
+                "bc",
+                "packages"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Biomedical Concept List for Package",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cosmos/v2/mdr/bc/packages/:package/biomedicalconcepts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cosmos",
+                "v2",
+                "mdr",
+                "bc",
+                "packages",
+                ":package",
+                "biomedicalconcepts"
+              ],
+              "variable": [
+                {
+                  "key": "package",
+                  "value": "",
+                  "description": ""
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Biomedical Concept for Package",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cosmos/v2/mdr/bc/packages/:package/biomedicalconcepts/:biomedicalconcept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cosmos",
+                "v2",
+                "mdr",
+                "bc",
+                "packages",
+                ":package",
+                "biomedicalconcepts",
+                ":biomedicalconcept"
+              ],
+              "variable": [
+                {
+                  "key": "package",
+                  "value": "",
+                  "description": ""
+                },
+                {
+                  "key": "biomedicalconcept",
+                  "value": "",
+                  "description": ""
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ],
+      "description": "URLs: {{baseUrl}}/cosmos/v2/mdr/..."
+    },
+    {
+      "name": "4. COSMoS v2 - Dataset Specialization",
+      "item": [
+        {
+          "name": "Get latest Biomedical Concept Dataset Specializations List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cosmos/v2/mdr/specializations/datasetspecializations?biomedicalconcept=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cosmos",
+                "v2",
+                "mdr",
+                "specializations",
+                "datasetspecializations"
+              ],
+              "query": [
+                {
+                  "key": "biomedicalconcept",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Latest SDTM Dataset Specializations List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cosmos/v2/mdr/specializations/sdtm/datasetspecializations?domain=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cosmos",
+                "v2",
+                "mdr",
+                "specializations",
+                "sdtm",
+                "datasetspecializations"
+              ],
+              "query": [
+                {
+                  "key": "domain",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Latest SDTM Specialization",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cosmos/v2/mdr/specializations/sdtm/datasetspecializations/:dataset_specialization_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cosmos",
+                "v2",
+                "mdr",
+                "specializations",
+                "sdtm",
+                "datasetspecializations",
+                ":dataset_specialization_id"
+              ],
+              "variable": [
+                {
+                  "key": "dataset_specialization_id",
+                  "value": "",
+                  "description": ""
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get SDTM Dataset Specialization Domain List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cosmos/v2/mdr/specializations/sdtm/domains",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cosmos",
+                "v2",
+                "mdr",
+                "specializations",
+                "sdtm",
+                "domains"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get SDTM Dataset Specialization Package List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cosmos/v2/mdr/specializations/sdtm/packages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cosmos",
+                "v2",
+                "mdr",
+                "specializations",
+                "sdtm",
+                "packages"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get SDTM Dataset Specializations List for Package",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cosmos/v2/mdr/specializations/sdtm/packages/:package/datasetspecializations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cosmos",
+                "v2",
+                "mdr",
+                "specializations",
+                "sdtm",
+                "packages",
+                ":package",
+                "datasetspecializations"
+              ],
+              "variable": [
+                {
+                  "key": "package",
+                  "value": "",
+                  "description": ""
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get SDTM Dataset Specialization for Package",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cosmos/v2/mdr/specializations/sdtm/packages/:package/datasetspecializations/:datasetspecialization",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cosmos",
+                "v2",
+                "mdr",
+                "specializations",
+                "sdtm",
+                "packages",
+                ":package",
+                "datasetspecializations",
+                ":datasetspecialization"
+              ],
+              "variable": [
+                {
+                  "key": "package",
+                  "value": "",
+                  "description": ""
+                },
+                {
+                  "key": "datasetspecialization",
+                  "value": "",
+                  "description": ""
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ],
+      "description": "URLs: {{baseUrl}}/cosmos/v2/mdr/..."
+    }
+  ]
+}
