@@ -1,9 +1,9 @@
 {
-  "datasets": 10,
+  "datasets": 8,
   "totalIssues": 0,
   "allPass": true,
   "perDataset": {
-    "AE": {
+    "ae": {
       "rows": 32,
       "issues": [],
       "keyUnique": true,
@@ -27,21 +27,14 @@
       "provenanceComplete": true,
       "pass": true
     },
-    "CM": {
+    "cm": {
       "rows": 54,
       "issues": [],
       "keyUnique": true,
-      "ctMembership": {
-        "CMONGO": {
-          "codelist": "C66742",
-          "inCT": true,
-          "violations": []
-        }
-      },
       "provenanceComplete": true,
       "pass": true
     },
-    "DM": {
+    "dm": {
       "rows": 40,
       "issues": [],
       "ctMembership": {
@@ -54,55 +47,34 @@
       "provenanceComplete": true,
       "pass": true
     },
-    "DS": {
+    "ds": {
       "rows": 40,
       "issues": [],
       "keyUnique": true,
-      "provenanceComplete": true,
       "pass": true
     },
-    "EG": {
-      "rows": 640,
-      "issues": [],
-      "keyUnique": true,
-      "provenanceComplete": true,
-      "pass": true
-    },
-    "EX": {
+    "ex": {
       "rows": 80,
       "issues": [],
       "keyUnique": true,
       "provenanceComplete": true,
       "pass": true
     },
-    "IE": {
-      "rows": 2,
-      "issues": [],
-      "provenanceComplete": true,
-      "pass": true
-    },
-    "LB": {
+    "lb": {
       "rows": 2080,
       "issues": [],
       "keyUnique": true,
       "provenanceComplete": true,
       "pass": true
     },
-    "MH": {
+    "mh": {
       "rows": 83,
       "issues": [],
       "keyUnique": true,
-      "ctMembership": {
-        "MHONGO": {
-          "codelist": "C66742",
-          "inCT": true,
-          "violations": []
-        }
-      },
       "provenanceComplete": true,
       "pass": true
     },
-    "VS": {
+    "vs": {
       "rows": 720,
       "issues": [],
       "keyUnique": true,

@@ -14,7 +14,7 @@ synthetic population). Retrieval is deterministic; only the final *selection* is
 ## Inputs
 
 - `01_usdm/usdm.json` (+ `01_usdm/soa.json`) — activities/assessments with `ncit_hint` and
-  `cdash_domain` from Stage 2.
+  `sdtm_domain` from Stage 2.
 - The `cdisclib` MCP server (`search`, `list_biomedical_concepts`, `get_biomedical_concept`,
   `list_bc_categories`) — needs `CDISC_API_KEY` (wired in the workflow step).
 
@@ -29,7 +29,7 @@ For each activity, build a candidate BC set from the CDISC Library:
 2. Call `search(q=<activity name + key terms>, type="biomedicalconcept")` and take the top
    results.
 3. Optionally narrow with `list_biomedical_concepts` filtered by the activity's
-   `cdash_domain` category.
+   `sdtm_domain` category.
 
 Collect candidates as `{bc_id, bc_label, ncit_code, category}`. Deduplicate by `bc_id`.
 

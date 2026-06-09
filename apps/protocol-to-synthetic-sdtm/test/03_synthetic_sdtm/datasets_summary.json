@@ -3,19 +3,17 @@
   "sponsorStudyId": "D6470C00005",
   "subjects": 40,
   "seed": 1234,
-  "cdashigVersion": "2-3",
+  "sdtmigVersion": "3.4",
   "ctPackage": "sdtmct-2026-03-27",
   "rowCounts": {
     "DM": 40,
-    "IE": 2,
-    "MH": 83,
     "VS": 720,
-    "EG": 640,
     "LB": 2080,
     "EX": 80,
     "CM": 54,
     "AE": 32,
-    "DS": 40
+    "DS": 40,
+    "MH": 83
   },
-  "totalRows": 3771
+  "totalRows": 3129
 }

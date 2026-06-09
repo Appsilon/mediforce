@@ -9,7 +9,7 @@ Outputs: 01_usdm/soa.json  — the extracted Schedule of Activities (visits x ac
 Design principle (per spec): the structured/enumerated fields are mapped deterministically
 from the CT.gov record; the SoA activity list + visit grid is the bounded extraction from the
 protocol PDF (done by reading pp.20-24). Every activity carries a provenance pointer
-(protocol page + the source it came from) so Stage 3/4 can trace CDASH fields back to source.
+(protocol page + the source it came from) so Stage 3/4 can trace SDTM variables back to source.
 """
 from __future__ import annotations
 
@@ -52,35 +52,35 @@ EPOCHS = [
     {"id": "EP_FU", "name": "Follow-up", "type": "FOLLOW_UP"},
 ]
 
-# Activities from the SoA. Each: id, name, encounters where performed, the CDASH domain it
+# Activities from the SoA. Each: id, name, encounters where performed, the SDTM domain it
 # feeds (Stage 3 target), and an NCIt biomedical-concept hint where one cleanly applies.
 # 'source' = SoA row; page = protocol page the row appears on.
 A = lambda **k: k  # noqa: E731  (compact literal helper)
 ACTIVITIES = [
-    A(id="ACT_IC",   name="Informed consent",            enc=["ENC_V1"], cdash="IE",  bc=None,       page=20),
-    A(id="ACT_ELIG", name="Verify eligibility criteria", enc=["ENC_V1","ENC_V4"], cdash="IE", bc=None, page=20),
-    A(id="ACT_DM",   name="Demography",                  enc=["ENC_V1"], cdash="DM",  bc=None,       page=20),
-    A(id="ACT_HTWT", name="Height and weight",           enc=["ENC_V1","ENC_V3","ENC_V5","ENC_V6"], cdash="VS", bc="C25347/C25208", page=20),
-    A(id="ACT_MH",   name="Medical History",             enc=["ENC_V1"], cdash="MH",  bc=None,       page=20),
-    A(id="ACT_PE",   name="Physical examination",        enc=["ENC_V1","ENC_V3","ENC_V5","ENC_V6"], cdash="PE", bc=None, page=20),
-    A(id="ACT_TOB",  name="Tobacco use",                 enc=["ENC_V1","ENC_V2","ENC_V5"], cdash="SU", bc=None, page=20),
-    A(id="ACT_ECG",  name="Safety ECG (12-lead)",        enc=["ENC_V1","ENC_V3","ENC_V5","ENC_V6"], cdash="EG", bc="C71355", page=20),
-    A(id="ACT_VS",   name="Vital signs (SBP, DBP, pulse, temperature)", enc=["ENC_V1","ENC_V3","ENC_V5","ENC_V6"], cdash="VS", bc="C54706", page=20),
-    A(id="ACT_RAND", name="Randomisation (IVRS/IWRS)",   enc=["ENC_V3"], cdash="DS",  bc=None,       page=21),
-    A(id="ACT_AE",   name="Adverse events",              enc=["ENC_V1","ENC_V2","ENC_V3","ENC_V4","ENC_V5","ENC_V6"], cdash="AE", bc=None, page=21),
-    A(id="ACT_CM",   name="Concomitant medication",      enc=["ENC_V1","ENC_V2","ENC_V3","ENC_V4","ENC_V5","ENC_V6"], cdash="CM", bc=None, page=21),
-    A(id="ACT_HEM",  name="Haematology",                 enc=["ENC_V1","ENC_V3","ENC_V5","ENC_V6"], cdash="LB", bc="C28133", page=21),
-    A(id="ACT_CHEM", name="Clinical chemistry (incl. triglycerides, HDL-C)", enc=["ENC_V1","ENC_V3","ENC_V5","ENC_V6"], cdash="LB", bc="C49237", page=21),
-    A(id="ACT_COAG", name="Coagulation (INR, PT, aPTT)", enc=["ENC_V1"], cdash="LB", bc="C61367", page=21),
-    A(id="ACT_HBA1C",name="HbA1c",                       enc=["ENC_V1"], cdash="LB", bc="C64849", page=21),
-    A(id="ACT_MMTT", name="MMTT (glucose, insulin, C-peptide, GLP-1, GIP, glucagon, FFAs)", enc=["ENC_V3","ENC_V5"], cdash="LB", bc="C105585", page=23),
-    A(id="ACT_CORT", name="Serum cortisol",              enc=["ENC_V3","ENC_V5","ENC_V6"], cdash="LB", bc="C105443", page=23),
-    A(id="ACT_UNAK", name="24-h urinary sodium & potassium (U-Na, U-K)", enc=["ENC_V3","ENC_V5"], cdash="LB", bc="C147062", page=24),
-    A(id="ACT_UA",   name="Urinalysis",                  enc=["ENC_V1","ENC_V3","ENC_V5","ENC_V6"], cdash="LB", bc="C17241", page=24),
-    A(id="ACT_PREG", name="Pregnancy test (hCG)",        enc=["ENC_V1","ENC_V6"], cdash="LB", bc="C25640", page=21),
-    A(id="ACT_PK",   name="PK sampling (AZD9567, prednisolone)", enc=["ENC_V3","ENC_V5"], cdash="PC", bc=None, page=22),
-    A(id="ACT_DOSE", name="IMP administration (AZD9567 / prednisolone / placebo)", enc=["ENC_V3","ENC_V5"], cdash="EX", bc=None, page=22),
-    A(id="ACT_DISP", name="Study completion / disposition", enc=["ENC_V6"], cdash="DS", bc=None, page=24),
+    A(id="ACT_IC",   name="Informed consent",            enc=["ENC_V1"], sdtm="IE",  bc=None,       page=20),
+    A(id="ACT_ELIG", name="Verify eligibility criteria", enc=["ENC_V1","ENC_V4"], sdtm="IE", bc=None, page=20),
+    A(id="ACT_DM",   name="Demography",                  enc=["ENC_V1"], sdtm="DM",  bc=None,       page=20),
+    A(id="ACT_HTWT", name="Height and weight",           enc=["ENC_V1","ENC_V3","ENC_V5","ENC_V6"], sdtm="VS", bc="C25347/C25208", page=20),
+    A(id="ACT_MH",   name="Medical History",             enc=["ENC_V1"], sdtm="MH",  bc=None,       page=20),
+    A(id="ACT_PE",   name="Physical examination",        enc=["ENC_V1","ENC_V3","ENC_V5","ENC_V6"], sdtm="PE", bc=None, page=20),
+    A(id="ACT_TOB",  name="Tobacco use",                 enc=["ENC_V1","ENC_V2","ENC_V5"], sdtm="SU", bc=None, page=20),
+    A(id="ACT_ECG",  name="Safety ECG (12-lead)",        enc=["ENC_V1","ENC_V3","ENC_V5","ENC_V6"], sdtm="EG", bc="C71355", page=20),
+    A(id="ACT_VS",   name="Vital signs (SBP, DBP, pulse, temperature)", enc=["ENC_V1","ENC_V3","ENC_V5","ENC_V6"], sdtm="VS", bc="C54706", page=20),
+    A(id="ACT_RAND", name="Randomisation (IVRS/IWRS)",   enc=["ENC_V3"], sdtm="DS",  bc=None,       page=21),
+    A(id="ACT_AE",   name="Adverse events",              enc=["ENC_V1","ENC_V2","ENC_V3","ENC_V4","ENC_V5","ENC_V6"], sdtm="AE", bc=None, page=21),
+    A(id="ACT_CM",   name="Concomitant medication",      enc=["ENC_V1","ENC_V2","ENC_V3","ENC_V4","ENC_V5","ENC_V6"], sdtm="CM", bc=None, page=21),
+    A(id="ACT_HEM",  name="Haematology",                 enc=["ENC_V1","ENC_V3","ENC_V5","ENC_V6"], sdtm="LB", bc="C28133", page=21),
+    A(id="ACT_CHEM", name="Clinical chemistry (incl. triglycerides, HDL-C)", enc=["ENC_V1","ENC_V3","ENC_V5","ENC_V6"], sdtm="LB", bc="C49237", page=21),
+    A(id="ACT_COAG", name="Coagulation (INR, PT, aPTT)", enc=["ENC_V1"], sdtm="LB", bc="C61367", page=21),
+    A(id="ACT_HBA1C",name="HbA1c",                       enc=["ENC_V1"], sdtm="LB", bc="C64849", page=21),
+    A(id="ACT_MMTT", name="MMTT (glucose, insulin, C-peptide, GLP-1, GIP, glucagon, FFAs)", enc=["ENC_V3","ENC_V5"], sdtm="LB", bc="C105585", page=23),
+    A(id="ACT_CORT", name="Serum cortisol",              enc=["ENC_V3","ENC_V5","ENC_V6"], sdtm="LB", bc="C105443", page=23),
+    A(id="ACT_UNAK", name="24-h urinary sodium & potassium (U-Na, U-K)", enc=["ENC_V3","ENC_V5"], sdtm="LB", bc="C147062", page=24),
+    A(id="ACT_UA",   name="Urinalysis",                  enc=["ENC_V1","ENC_V3","ENC_V5","ENC_V6"], sdtm="LB", bc="C17241", page=24),
+    A(id="ACT_PREG", name="Pregnancy test (hCG)",        enc=["ENC_V1","ENC_V6"], sdtm="LB", bc="C25640", page=21),
+    A(id="ACT_PK",   name="PK sampling (AZD9567, prednisolone)", enc=["ENC_V3","ENC_V5"], sdtm="PC", bc=None, page=22),
+    A(id="ACT_DOSE", name="IMP administration (AZD9567 / prednisolone / placebo)", enc=["ENC_V3","ENC_V5"], sdtm="EX", bc=None, page=22),
+    A(id="ACT_DISP", name="Study completion / disposition", enc=["ENC_V6"], sdtm="DS", bc=None, page=24),
 ]
 
 # ---------------------------------------------------------------------------------------------
@@ -104,7 +104,7 @@ soa = {
     "encounters": ENCOUNTERS,
     "activities": [
         {"id": a["id"], "name": a["name"], "performedAt": a["enc"],
-         "targetCdashDomain": a["cdash"], "biomedicalConceptNcit": a["bc"],
+         "targetSdtmDomain": a["sdtm"], "biomedicalConceptNcit": a["bc"],
          "provenance": {"protocolPage": a["page"], "source": "SoA"}}
         for a in ACTIVITIES
     ],
@@ -224,4 +224,4 @@ n_inst = len(usdm["study"]["versions"][0]["studyDesigns"][0]["scheduleTimeline"]
 print(f"USDM built: {len(ACTIVITIES)} activities, {len(ENCOUNTERS)} encounters, "
       f"{len(EPOCHS)} epochs, {n_inst} scheduled instances, "
       f"{len(usdm['eligibilityCriteria'])} eligibility criteria.")
-print("CDASH domains implied:", sorted({a['cdash'] for a in ACTIVITIES}))
+print("SDTM domains implied:", sorted({a['sdtm'] for a in ACTIVITIES}))

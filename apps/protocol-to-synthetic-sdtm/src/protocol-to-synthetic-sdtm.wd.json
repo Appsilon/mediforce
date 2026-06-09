@@ -2,7 +2,7 @@
   "name": "protocol-to-synthetic-sdtm",
   "namespace": "appsilon",
   "title": "Protocol to Synthetic SDTM pipeline",
-  "description": "Given one ClinicalTrials.gov NCT id, produce populated synthetic CDASH/SDTM datasets plus an end-to-end traceability graph linking every generated cell back to its source (NCT field -> USDM element -> Biomedical Concept -> SDTM Dataset Specialization -> variable -> value). CDISC AI Innovation Challenge 2026, Use Case 1.",
+  "description": "Given one ClinicalTrials.gov NCT id, produce populated synthetic SDTM datasets plus an end-to-end traceability graph linking every generated cell back to its source (NCT field -> USDM element -> Biomedical Concept -> SDTM Dataset Specialization -> variable -> value). CDISC AI Innovation Challenge 2026, Use Case 1.",
   "workspace": {
     "remote": "Appsilon/ct-to-synthetic-data"
   },
@@ -46,18 +46,11 @@
           "description": "Seed for deterministic sampling (reproducibility)"
         },
         {
-          "name": "cdashigVersion",
-          "type": "string",
-          "required": false,
-          "default": "2.3",
-          "description": "CDASHIG version (data-collection path)"
-        },
-        {
           "name": "sdtmigVersion",
           "type": "string",
           "required": false,
           "default": "3.4",
-          "description": "SDTMIG version (tabulation target + CORE standard)"
+          "description": "SDTMIG version (generation target + CORE standard)"
         },
         {
           "name": "ctPackageDate",
@@ -185,34 +178,34 @@
     },
     {
       "id": "resolve-specs",
-      "name": "Resolve CDASH/SDTM Specs",
+      "name": "Resolve SDTM Specs",
       "type": "creation",
       "executor": "script",
       "autonomyLevel": "L4",
       "plugin": "script-container",
-      "description": "Stage 4 (deterministic). For each matched BC, fetch its SDTM Dataset Specialization(s) from the CDISC Library (cdisclib client, same API the cdisclib MCP wraps); union implied domains with the MVP domain set [DM, IE, MH, VS, EG, LB, EX, CM, AE, DS]; generate trial-design domains from USDM. Assemble per-domain variable specs (name, role, dataType, length, codelist, valueList, assignedTerm, mandatoryVariable/Value, originType, vlmTarget) and cache the pinned Controlled Terminology. Each CDASH field records its SDTM mapping target for later tabulation. Library miss -> SDTMIG template fallback (logged). Output: 02_cdash_spec/ (spec, CT cache, coverage).",
+      "description": "Stage 4 (deterministic). For each matched BC, fetch its SDTM Dataset Specialization(s) from the CDISC Library (cdisclib client, same API the cdisclib MCP wraps); union implied domains with the MVP domain set [DM, IE, MH, VS, EG, LB, EX, CM, AE, DS]; generate trial-design domains from USDM. Assemble per-domain SDTM variable specs (name, role, dataType, length, codelist/subsetCodelist, valueList, assignedTerm, mandatoryVariable/Value, originType, vlmTarget) and cache the pinned Controlled Terminology -- this is both the 'datasets needed' answer and the constraint set for population. Library miss -> SDTMIG template fallback (logged). Output: 02_sdtm_spec/ (spec, CT cache, coverage).",
       "stepParams": {
-        "outputDir": "02_cdash_spec"
+        "outputDir": "02_sdtm_spec"
       },
       "agent": {
         "image": "mediforce-agent:protocol-to-synthetic-sdtm",
-        "command": "python /app/test/02_build_cdash_spec.py"
+        "command": "python /app/test/02_build_sdtm_spec.py"
       }
     },
     {
       "id": "populate-datasets",
-      "name": "Populate Synthetic Datasets",
+      "name": "Populate Synthetic SDTM Datasets",
       "type": "creation",
       "executor": "script",
       "autonomyLevel": "L4",
       "plugin": "script-container",
-      "description": "Stage 5 (deterministic). Generate subjectCount subjects in DM; populate each domain by sampling within VLM constraints (CT variables from codelist; numeric variables in plausible seeded ranges; mandatory variables/values always populated; STUDYID/USUBJID/DOMAIN/--SEQ/identifiers assigned deterministically; dates against the USDM epoch/visit grid). Every populated cell records a provenance pointer (domain, variable, source BC, source USDM element). Output: 03_synthetic_cdash/*.csv + lineage.",
+      "description": "Stage 5 (deterministic). Generate subjectCount subjects in DM; populate each SDTM domain by sampling within VLM constraints (CT variables from codelist; numeric variables in plausible seeded ranges; mandatory variables/values always populated; STUDYID/USUBJID/DOMAIN/--SEQ/identifiers assigned deterministically; dates against the USDM epoch/visit grid). Every populated cell records a provenance pointer (domain, variable, source BC, source USDM element). Output: 03_synthetic_sdtm/*.csv + lineage.",
       "stepParams": {
-        "outputDir": "03_synthetic_cdash"
+        "outputDir": "03_synthetic_sdtm"
       },
       "agent": {
         "image": "mediforce-agent:protocol-to-synthetic-sdtm",
-        "command": "python /app/test/03_generate_synthetic_cdash.py"
+        "command": "python /app/test/03_generate_synthetic_sdtm.py"
       }
     },
     {
@@ -222,29 +215,13 @@
       "executor": "script",
       "autonomyLevel": "L4",
       "plugin": "script-container",
-      "description": "Stage 6a (deterministic). Fast pre-CORE checks on the CDASH CSVs: Controlled-Terminology membership, mandatory identifiers present, key uniqueness (USUBJID + --SEQ), and provenance completeness. Codelist fetch failure fails the domain, not the run (logged). Output: 03_synthetic_cdash/validation_report.json.",
+      "description": "Stage 6a (deterministic). Fast pre-CORE checks on the SDTM CSVs: Controlled-Terminology membership, mandatory identifiers present, key uniqueness (USUBJID + --SEQ), and provenance completeness. Codelist fetch failure fails the domain, not the run (logged). Output: 03_synthetic_sdtm/validation_report.json.",
       "stepParams": {
-        "outputDir": "03_synthetic_cdash"
+        "outputDir": "03_synthetic_sdtm"
       },
       "agent": {
         "image": "mediforce-agent:protocol-to-synthetic-sdtm",
         "command": "python /app/test/04_validate.py"
-      }
-    },
-    {
-      "id": "tabulate-to-sdtm",
-      "name": "Tabulate CDASH to SDTM",
-      "type": "creation",
-      "executor": "script",
-      "autonomyLevel": "L4",
-      "plugin": "script-container",
-      "description": "Deterministic. Tabulate the populated CDASH datasets to SDTMIG 3.4 using each field's recorded SDTM mapping target, and emit the CORE input metadata. This is the bridge to conformance validation: CORE has no CDASH rule packages, so CDASH output is validated by tabulating to SDTM and running CORE on the SDTM. Output: 06_sdtm/datasets/.",
-      "stepParams": {
-        "outputDir": "06_sdtm"
-      },
-      "agent": {
-        "image": "mediforce-agent:protocol-to-synthetic-sdtm",
-        "command": "python /app/test/06_cdash_to_sdtm.py"
       }
     },
     {
@@ -254,7 +231,7 @@
       "executor": "script",
       "autonomyLevel": "L4",
       "plugin": "script-container",
-      "description": "Stage 6b (deterministic). Run the CDISC Rules Engine (CORE) offline against its bundled cache: core.py -s sdtmig -v 3-4 -ct sdtmct-2026-03-27 over the tabulated SDTM, then summarize. Conformance failures are reported, not fatal: the report IS a deliverable. Produce raw JSON, an XLSX, and a categorized digest. Output: 07_core_report/.",
+      "description": "Stage 6b (deterministic). Run the CDISC Rules Engine (CORE) offline against its bundled cache: core.py -s sdtmig -v 3-4 -ct sdtmct-2026-03-27 directly over the populated SDTM datasets (03_synthetic_sdtm), then summarize. Conformance failures are reported, not fatal: the report IS a deliverable. Produce raw JSON, an XLSX, and a categorized digest. Output: 07_core_report/.",
       "stepParams": {
         "outputDir": "07_core_report",
         "ruleSet": "sdtmig",
@@ -273,7 +250,7 @@
       "executor": "script",
       "autonomyLevel": "L4",
       "plugin": "script-container",
-      "description": "Deterministic. Write manifest.json pinning all standard versions (USDM, CDASHIG, SDTMIG, CT package), the LLM model id, the input NCT id, and a content hash of every artifact — this is the reproducibility record for judges. The traceability graph (the scoring linchpin) is assembled from the per-cell provenance pointers embedded during population (Study -> USDMElement -> BiomedicalConcept -> DatasetSpecialization -> SDTMVariable -> SyntheticCell; AI-inferred edges carry confidence). Output: manifest.json (+ lineage graph).",
+      "description": "Deterministic. Write manifest.json pinning all standard versions (USDM, SDTMIG, CT package), the LLM model id, the input NCT id, and a content hash of every artifact — this is the reproducibility record for judges. The traceability graph (the scoring linchpin) is assembled from the per-cell provenance pointers embedded during population (Study -> USDMElement -> BiomedicalConcept -> DatasetSpecialization -> SDTMVariable -> SyntheticCell; AI-inferred edges carry confidence). Output: manifest.json (+ lineage graph).",
       "stepParams": {
         "outputDir": "."
       },
@@ -342,10 +319,6 @@
     },
     {
       "from": "light-validate",
-      "to": "tabulate-to-sdtm"
-    },
-    {
-      "from": "tabulate-to-sdtm",
       "to": "core-validate"
     },
     {

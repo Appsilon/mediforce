@@ -16,21 +16,20 @@
   ],
   "populated": [
     "DM",
-    "IE",
-    "MH",
     "VS",
-    "EG",
     "LB",
     "EX",
     "CM",
     "AE",
-    "DS"
+    "DS",
+    "MH"
   ],
   "deferred": {
-    "PC": "spec resolvable from CDASHIG; not populated in this MVP run",
-    "PE": "spec resolvable from CDASHIG; not populated in this MVP run",
-    "SU": "spec resolvable from CDASHIG; not populated in this MVP run"
+    "EG": "resolvable; not populated this run",
+    "PC": "resolvable; not populated this run",
+    "PE": "resolvable; not populated this run",
+    "SU": "resolvable; not populated this run"
   },
   "ctPackagePinned": "sdtmct-2026-03-27",
-  "cdashigVersion": "2-3"
+  "sdtmigVersion": "3.4"
 }

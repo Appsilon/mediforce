@@ -52,10 +52,10 @@ If a protocol PDF is present, read its Schedule of Activities table and produce,
 
 - `encounters[]` — visit grid: `{id, name, label, epoch, timing}`.
 - `epochs[]` — `{id, name, type}` (SCREENING / TREATMENT / WASHOUT / FOLLOW_UP / ...).
-- `activities[]` — `{id, name, encounters[], cdash_domain, ncit_hint, source_page}`.
+- `activities[]` — `{id, name, encounters[], sdtm_domain, ncit_hint, source_page}`.
 
-Every activity MUST carry provenance: the protocol page it came from. `cdash_domain` is the
-data-collection target the activity feeds (e.g. VS, LB, AE) — this is the handle Stage 3
+Every activity MUST carry provenance: the protocol page it came from. `sdtm_domain` is the
+SDTM domain the activity feeds (e.g. VS, LB, AE) — this is the handle Stage 3
 (match-bc) keys on. Use `ncit_hint` only when an NCIt concept applies cleanly; never guess.
 
 If no protocol PDF is present, infer a minimal activity list from the outcome measures

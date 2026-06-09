@@ -1,5 +1,5 @@
 {
-  "note": "Representative cell-level lineage: synthetic value -> USDM activity -> biomedical concept (NCIt) -> protocol SoA page. Full provenance is in each dataset's SRCACT/SRCPAGE columns.",
+  "note": "Representative cell-level lineage: synthetic value -> USDM activity -> biomedical concept (NCIt) -> protocol SoA page. The SDTM CSVs are kept clean for CORE (no SRCACT/SRCPAGE columns); this sidecar carries the provenance.",
   "studyId": "NCT04556760",
   "subjects": 40,
   "seed": 1234,
@@ -13,7 +13,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -24,7 +24,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -35,7 +35,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -46,7 +46,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -57,7 +57,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -68,7 +68,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -79,7 +79,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -90,7 +90,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -101,7 +101,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -112,7 +112,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -123,7 +123,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -134,7 +134,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -145,7 +145,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -156,7 +156,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -167,7 +167,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -178,7 +178,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -189,7 +189,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -200,7 +200,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -211,7 +211,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -222,7 +222,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -233,7 +233,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -244,7 +244,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -255,7 +255,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -266,7 +266,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -277,7 +277,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -288,7 +288,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -299,7 +299,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -310,7 +310,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -321,7 +321,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -332,7 +332,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -343,7 +343,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -354,7 +354,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -365,7 +365,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -376,7 +376,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -387,7 +387,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -398,7 +398,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -409,7 +409,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -420,7 +420,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -431,7 +431,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "DM",
@@ -442,7 +442,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -453,7 +453,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -464,7 +464,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -475,7 +475,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -486,7 +486,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -497,7 +497,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -508,7 +508,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -519,7 +519,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -530,7 +530,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -541,7 +541,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -552,7 +552,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -563,7 +563,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -574,7 +574,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -585,7 +585,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -596,7 +596,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -607,7 +607,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -618,7 +618,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -629,7 +629,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -640,7 +640,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -651,7 +651,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -662,7 +662,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -673,7 +673,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -684,7 +684,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -695,7 +695,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -706,7 +706,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -717,7 +717,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -728,7 +728,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -739,7 +739,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -750,7 +750,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -761,7 +761,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -772,7 +772,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -783,7 +783,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -794,7 +794,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -805,7 +805,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -816,7 +816,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -827,7 +827,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -838,7 +838,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -849,7 +849,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -860,7 +860,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -871,7 +871,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "MH",
@@ -882,7 +882,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -893,7 +893,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -904,7 +904,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -915,7 +915,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -926,7 +926,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -937,7 +937,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -948,7 +948,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -959,7 +959,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -970,7 +970,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -981,7 +981,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -992,7 +992,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1003,7 +1003,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1014,7 +1014,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1025,7 +1025,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1036,7 +1036,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1047,7 +1047,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1058,7 +1058,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1069,7 +1069,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1080,7 +1080,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1091,7 +1091,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1102,7 +1102,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1113,7 +1113,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1124,7 +1124,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1135,7 +1135,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1146,7 +1146,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1157,7 +1157,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1168,7 +1168,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1179,7 +1179,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1190,7 +1190,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1201,7 +1201,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1212,7 +1212,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1223,7 +1223,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1234,7 +1234,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1245,7 +1245,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1256,7 +1256,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1267,7 +1267,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1278,7 +1278,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1289,7 +1289,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1300,7 +1300,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1311,7 +1311,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "VS",
@@ -1322,7 +1322,7 @@
       "biomedicalConceptNcit": "C25347/C25208",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1333,7 +1333,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1344,7 +1344,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1355,7 +1355,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1366,7 +1366,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1377,7 +1377,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1388,7 +1388,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1399,7 +1399,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1410,7 +1410,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1421,7 +1421,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1432,7 +1432,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1443,7 +1443,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1454,7 +1454,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1465,7 +1465,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1476,7 +1476,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1487,7 +1487,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1498,7 +1498,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1509,7 +1509,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1520,7 +1520,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1531,7 +1531,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1542,7 +1542,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1553,7 +1553,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1564,7 +1564,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1575,7 +1575,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1586,7 +1586,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1597,7 +1597,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1608,7 +1608,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1619,7 +1619,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1630,7 +1630,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1641,7 +1641,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1652,7 +1652,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1663,7 +1663,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1674,7 +1674,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1685,7 +1685,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1696,7 +1696,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1707,7 +1707,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1718,7 +1718,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1729,7 +1729,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1740,7 +1740,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1751,7 +1751,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EG",
@@ -1762,7 +1762,7 @@
       "biomedicalConceptNcit": "C71355",
       "protocolPage": 20,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1773,7 +1773,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1784,7 +1784,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1795,7 +1795,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1806,7 +1806,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1817,7 +1817,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1828,7 +1828,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1839,7 +1839,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1850,7 +1850,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1861,7 +1861,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1872,7 +1872,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1883,7 +1883,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1894,7 +1894,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1905,7 +1905,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1916,7 +1916,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1927,7 +1927,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1938,7 +1938,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1949,7 +1949,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1960,7 +1960,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1971,7 +1971,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1982,7 +1982,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -1993,7 +1993,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2004,7 +2004,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2015,7 +2015,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2026,7 +2026,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2037,7 +2037,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2048,7 +2048,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2059,7 +2059,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2070,7 +2070,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2081,7 +2081,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2092,7 +2092,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2103,7 +2103,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2114,7 +2114,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2125,7 +2125,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2136,7 +2136,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2147,7 +2147,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2158,7 +2158,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2169,7 +2169,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2180,7 +2180,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2191,7 +2191,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "LB",
@@ -2202,7 +2202,7 @@
       "biomedicalConceptNcit": "C28133",
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2213,7 +2213,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2224,7 +2224,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2235,7 +2235,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2246,7 +2246,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2257,7 +2257,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2268,7 +2268,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2279,7 +2279,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2290,7 +2290,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2301,7 +2301,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2312,7 +2312,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2323,7 +2323,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2334,7 +2334,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2345,7 +2345,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2356,7 +2356,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2367,7 +2367,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2378,7 +2378,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2389,7 +2389,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2400,7 +2400,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2411,7 +2411,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2422,7 +2422,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2433,7 +2433,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2444,7 +2444,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2455,7 +2455,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2466,7 +2466,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2477,7 +2477,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2488,7 +2488,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2499,7 +2499,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2510,7 +2510,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2521,7 +2521,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2532,7 +2532,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2543,7 +2543,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2554,7 +2554,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2565,7 +2565,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2576,7 +2576,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2587,7 +2587,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2598,7 +2598,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2609,7 +2609,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2620,7 +2620,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2631,7 +2631,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "EX",
@@ -2642,7 +2642,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 22,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2653,7 +2653,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2664,7 +2664,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2675,7 +2675,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2686,7 +2686,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2697,7 +2697,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2708,7 +2708,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2719,7 +2719,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2730,7 +2730,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2741,7 +2741,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2752,7 +2752,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2763,7 +2763,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2774,7 +2774,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2785,7 +2785,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2796,7 +2796,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2807,7 +2807,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2818,7 +2818,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2829,7 +2829,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2840,7 +2840,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2851,7 +2851,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2862,7 +2862,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2873,7 +2873,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2884,7 +2884,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2895,7 +2895,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2906,7 +2906,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2917,7 +2917,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2928,7 +2928,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2939,7 +2939,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2950,7 +2950,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2961,7 +2961,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2972,7 +2972,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2983,7 +2983,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -2994,7 +2994,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -3005,7 +3005,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -3016,7 +3016,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -3027,7 +3027,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -3038,7 +3038,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -3049,7 +3049,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -3060,7 +3060,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -3071,7 +3071,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "CM",
@@ -3082,7 +3082,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3093,7 +3093,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3104,7 +3104,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3115,7 +3115,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3126,7 +3126,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3137,7 +3137,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3148,7 +3148,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3159,7 +3159,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3170,7 +3170,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3181,7 +3181,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3192,7 +3192,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3203,7 +3203,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3214,7 +3214,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3225,7 +3225,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3236,7 +3236,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3247,7 +3247,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3258,7 +3258,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3269,7 +3269,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     },
     {
       "domain": "AE",
@@ -3280,7 +3280,7 @@
       "biomedicalConceptNcit": null,
       "protocolPage": 21,
       "ctPackage": "sdtmct-2026-03-27",
-      "cdashigVersion": "2-3"
+      "sdtmigVersion": "3.4"
     }
   ]
 }

@@ -21,7 +21,7 @@ for p in sorted(HERE.rglob("*")):
         artifacts[str(p.relative_to(HERE))] = {"sha256_16": sha(p), "bytes": p.stat().st_size}
 
 manifest = {
-    "pipeline": "protocol-to-synthetic-CDASH (MVP test run)",
+    "pipeline": "protocol-to-synthetic-SDTM (MVP test run)",
     "input": {"nctId": "NCT04556760",
               "sponsorStudyId": RAW["protocolSection"]["identificationModule"]["orgStudyIdInfo"]["id"],
               "title": RAW["protocolSection"]["identificationModule"]["briefTitle"]},
@@ -33,9 +33,8 @@ manifest = {
     },
     "standards": {
         "usdmVersion": "3.0.0",
-        "cdashigVersion": "2.3",
         "ctPackage": "sdtmct-2026-03-27",
-        "cdashMappedToSdtmig": "3.4 (via field sdtmigDatasetMappingTargets)",
+        "sdtmigVersion": "3.4",
     },
     "parameters": {"subjectCount": 40, "randomSeed": 1234,
                    "cohorts": {"Cohort 1": 24, "Cohort 2": 8, "Cohort 3": 8},
@@ -45,9 +44,10 @@ manifest = {
     "stages": {
         "1_fetch": "00_raw/NCT04556760.json (+ protocol/Prot_000.pdf)",
         "2_usdm": "01_usdm/usdm.json (+ soa.json)",
-        "3_4_cdash_spec": "02_cdash_spec/cdash_spec.json (+ ct_cache.json, coverage.json)",
-        "5_populate": "03_synthetic_cdash/*.csv (+ lineage.json, datasets_summary.json)",
-        "6_validate": "03_synthetic_cdash/validation_report.json",
+        "3_4_sdtm_spec": "02_sdtm_spec/sdtm_spec.json (+ ct_cache.json, coverage.json)",
+        "5_populate": "03_synthetic_sdtm/*.csv (+ lineage.json, datasets_summary.json)",
+        "6a_validate": "03_synthetic_sdtm/validation_report.json",
+        "6b_export_core": "06_sdtm_xpt/*.xpt + 07_core_report/{core_sdtmig34.json, summary.json}",
     },
     "artifacts": artifacts,
 }

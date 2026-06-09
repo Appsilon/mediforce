@@ -17,7 +17,7 @@
 FROM mediforce-golden-image
 
 # --- MCP servers: console scripts ctgov-mcp / cdisclib-mcp, and the cdisclib_mcp
-#     package importable by the stage scripts (02_build_cdash_spec.py) ---
+#     package importable by the stage scripts (02_build_sdtm_spec.py) ---
 COPY mcp /app/mcp
 RUN pip3 install --no-cache-dir --break-system-packages /app/mcp/ctgov /app/mcp/cdisclib
 

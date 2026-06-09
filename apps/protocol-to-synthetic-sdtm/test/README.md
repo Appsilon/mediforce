@@ -1,9 +1,14 @@
-# Test run — Protocol → USDM → CDASH → Synthetic CDASH
+# Test run — Protocol → USDM → SDTM → Synthetic SDTM
 
-End-to-end MVP demonstration of the pipeline on one real trial, using the **ctgov** and
-**cdisclib** MCPs/clients. Pick a registered trial that has a protocol PDF, represent it in
-**USDM v3.0**, resolve the **CDASH** datasets it implies, and generate **populated synthetic
-CDASH datasets** — with traceability from every synthetic cell back to the source protocol.
+End-to-end MVP demonstration of the **SDTM-first** pipeline on one real trial, using the **ctgov**
+and **cdisclib** MCPs/clients. Pick a registered trial that has a protocol PDF, represent it in
+**USDM v3.0**, resolve the **SDTM** datasets it implies, generate **populated synthetic SDTM
+datasets** under the resolved constraints, and validate them with **CORE** — with traceability from
+every synthetic cell back to the source protocol.
+
+> SDTM-first: the pipeline resolves SDTM Dataset Specializations and generates SDTM directly, then
+> runs CORE on it. There is no CDASH collection layer and no CDASH→SDTM tabulation hop (the earlier
+> CDASH-first path was reverted — see `protocol-to-synthetic-sdtm-spec.md` §0.2.0).
 
 ## Chosen trial
 
@@ -20,96 +25,84 @@ hormone sampling, CGM, PK, safety labs, vitals, ECG, urine electrolytes), and (c
 
 ```bash
 # Stage 1 (fetch) was done via the ctgov MCP + curl into 00_raw/ and protocol/.
-python3 01_build_usdm.py            # Stage 2: CT.gov record + protocol SoA -> USDM v3.0
-CDISC_API_KEY=<key> ../mcp/cdisclib/.venv/bin/python 02_build_cdash_spec.py   # Stage 3/4: CDASH spec from CDISC Library
-python3 03_generate_synthetic_cdash.py   # Stage 5: populate synthetic CDASH (seed 1234)
-python3 04_validate.py              # Stage 6: validate (CT membership, keys, provenance)
-python3 05_write_manifest.py        # manifest with versions + content hashes
+python 01_build_usdm.py            # Stage 2: CT.gov record + protocol SoA -> USDM v3.0
+python 02_build_sdtm_spec.py       # Stage 4: SDTM spec from SDTMIG 3.4 structure + pinned CT
+python 03_generate_synthetic_sdtm.py   # Stage 5: populate synthetic SDTM (seed 1234)
+python 04_validate.py              # Stage 6a: light checks (CT membership, keys, provenance)
+python 05_write_manifest.py        # manifest with versions + content hashes
+./07_core_report/run_core_validation.sh   # Stage 6b: export XPT + CORE (-s sdtmig -v 3-4)
+python 07_core_summary.py          # categorized digest -> 07_core_report/summary.json
 ```
+
+With `CDISC_API_KEY` set, `02_build_sdtm_spec.py` can resolve SDTM Dataset Specializations live via
+`cdisclib`; the default run is fully offline, reusing the pinned CT snapshot (`ct_snapshot/`).
 
 ## Steps & artifacts
 
 | Stage | What happened | Tool | Output |
 |-------|---------------|------|--------|
-| **1. Fetch** | Pulled the verbatim CT.gov v2 record and downloaded the protocol PDF (CT.gov CDN). Captured API `dataTimestamp` for provenance. | **ctgov MCP** (`get_study`, `search_studies`, `get_api_version`) + CDN | `00_raw/NCT04556760.json`, `protocol/Prot_000.pdf` |
-| **2. USDM** | Mapped enumerated registry fields (phase, design, arms, interventions, eligibility, objectives/endpoints) deterministically; **read the protocol Schedule of Activities (pp.20–24)** to extract the visit grid + activity list. Assembled a USDM v3.0-structured study (DDF class names: StudyVersion, StudyDesign, Epoch, Encounter, Activity, ScheduleTimeline/ScheduledActivityInstance, StudyIntervention, EligibilityCriterion, Objective/Endpoint). | reading + deterministic build | `01_usdm/usdm.json`, `01_usdm/soa.json` |
-| **3+4. CDASH spec** | For each CDASH domain the USDM activities imply, pulled **CDASHIG 2.3** field lists from the CDISC Library, plus each coded field's **Controlled Terminology** (pinned `sdtmct-2026-03-27`) and its **SDTM mapping target** (CDASH→SDTM traceability). Attached USDM-activity + protocol-page provenance to each domain. | **cdisclib client** (CDISC Library API) | `02_cdash_spec/cdash_spec.json`, `ct_cache.json`, `coverage.json` |
-| **5. Populate** | Generated **40 subjects** across the 3 cohorts (24/8/8) with AB/BA crossover sequences. Coded values sampled from the fetched CT; numeric results sampled within plausible clinical ranges; identifiers + `--SEQ` assigned deterministically (seed 1234). Every findings/intervention row carries `SRCACT` (USDM activity) + `SRCPAGE` (protocol page). | deterministic, seeded | `03_synthetic_cdash/*.csv`, `lineage.json`, `datasets_summary.json` |
-| **6. Validate** | Checked mandatory identifiers, key uniqueness (`STUDYID+SUBJID+--SEQ`), CT membership of coded fields, and provenance completeness. | deterministic | `03_synthetic_cdash/validation_report.json` |
+| **1. Fetch** | Pulled the verbatim CT.gov v2 record and downloaded the protocol PDF (CT.gov CDN). Captured API `dataTimestamp` for provenance. | **ctgov MCP** + CDN | `00_raw/NCT04556760.json`, `protocol/Prot_000.pdf` |
+| **2. USDM** | Mapped enumerated registry fields deterministically; **read the protocol Schedule of Activities (pp.20–24)** to extract the visit grid + activity list. Assembled a USDM v3.0-structured study. | reading + deterministic build | `01_usdm/usdm.json`, `01_usdm/soa.json` |
+| **4. SDTM spec** | For each SDTM domain the USDM activities imply, assembled the per-domain SDTM variable spec (name, label, role, dataType, codelist, mandatory) from the SDTMIG 3.4 structure, plus each coded variable's **Controlled Terminology** (pinned `sdtmct-2026-03-27`). Attached USDM-activity + protocol-page provenance. | **cdisclib** (CT) / SDTMIG template | `02_sdtm_spec/sdtm_spec.json`, `ct_cache.json`, `coverage.json` |
+| **5. Populate** | Generated **40 subjects** across the 3 cohorts (24/8/8) with AB/BA crossover sequences. Coded values sampled from the pinned CT; numeric results within plausible clinical ranges; SDTM identifiers, `--SEQ`, `--DTC`, `EPOCH`, study-day `--DY`, and `RFSTDTC/RFXSTDTC` derived deterministically (seed 1234). Provenance kept in the `lineage.json` sidecar. | deterministic, seeded | `03_synthetic_sdtm/*.csv` (+ `_datasets.csv`, `_variables.csv`, `lineage.json`, `datasets_summary.json`) |
+| **6a. Validate** | Checked mandatory identifiers, key uniqueness (`USUBJID + --SEQ`), CT membership of coded variables, and provenance completeness. | deterministic | `03_synthetic_sdtm/validation_report.json` |
+| **6b. CORE** | Exported the SDTM to XPT v5 and ran the CDISC Rules Engine against SDTMIG 3.4. | XPT export + **CORE** | `06_sdtm_xpt/*.xpt`, `07_core_report/{core_sdtmig34.json, .xlsx, summary.json}` |
 
-## CDASH datasets produced (CDASHIG 2.3)
+## SDTM datasets produced (SDTMIG 3.4)
 
 Implied by the USDM activities: `DM, IE, MH, VS, EG, LB, EX, CM, AE, DS, PC, PE, SU`.
-**Populated** (10): `DM, IE, MH, VS, EG, LB, EX, CM, AE, DS` — **3,793 rows total**.
-**Deferred** (spec resolvable, not populated this run): `PC` (PK concentrations), `PE` (physical
-exam), `SU` (substance use) — see `02_cdash_spec/coverage.json`.
+**Populated** (8): `DM, VS, LB, EX, CM, AE, DS, MH` — **3,129 rows total**.
+**Deferred** (resolvable, not populated this run): `EG` (ECG), `PC` (PK concentrations), `PE`
+(physical exam), `SU` (substance use) — see `02_sdtm_spec/coverage.json`.
 
 | Domain | Rows | Notes |
 |--------|------|-------|
-| DM | 40 | one per subject |
-| IE | 2 | inclusion/exclusion exceptions (criteria-not-met model) |
-| MH | 83 | T2DM (all) + comorbidities |
+| DM | 40 | one per subject; `ARM/ACTARM`, `RFSTDTC/RFXSTDTC` from first/last dose |
 | VS | 720 | SBP/DBP/Pulse/Temp + screening Height/Weight × 4 visits |
-| EG | 640 | QTcF/HR/PR/QRS × 4 visits |
-| LB | 2080 | chem/hematology/urinalysis panel incl. MMTT glucose/insulin/C-peptide, HbA1c, cortisol, U-Na/U-K |
-| EX | 80 | two crossover treatment periods per subject |
+| LB | 2080 | chem/hematology/urinalysis incl. MMTT glucose/insulin/C-peptide, HbA1c, cortisol, U-Na/U-K |
+| EX | 80 | two crossover treatment periods per subject (placebo `EXDOSE=0`) |
 | CM | 54 | metformin (all) + add-ons |
-| AE | 54 | ~55% of subjects, CT-coded severity/outcome |
+| AE | 32 | CT-coded severity/outcome; no end date for unresolved AEs |
 | DS | 40 | disposition (completed / discontinued) |
+| MH | 83 | T2DM (all) + comorbidities |
 
 ## Traceability
 
-`NCT04556760 → protocol SoA activity → USDM Activity → (NCIt biomedical concept) → CDASH domain
-field (+ SDTM target) → synthetic value`.
+`NCT04556760 → protocol SoA activity → USDM Activity → (NCIt biomedical concept) → SDTM Dataset
+Specialization → SDTM variable → synthetic value`.
 
-- Per-row: `SRCACT` + `SRCPAGE` columns in every findings/intervention CSV.
-- Per-cell sample: `03_synthetic_cdash/lineage.json`.
+- Per-cell sample: `03_synthetic_sdtm/lineage.json` (kept out of the CSVs so the SDTM stays clean
+  for CORE).
+- Per-domain provenance (source activities + protocol page): `02_sdtm_spec/sdtm_spec.json`.
 - Standards/versions + content hashes of every artifact: `manifest.json`.
 
 ## Stage 6b — CORE conformance validation (CDISC Rules Engine)
 
-The cloned **CDISC Rules Engine** (`../cdisc-rules-engine`) validates our model output against
-published conformance rules. Key fact established here: **CORE has no CDASH rule catalog** — the
-CDISC Library publishes conformance rules only for `sdtmig`, `sendig`, `adamig`, `tig`, and
-`usdm` (verified against `/mdr/rules` and `core.py list-rule-sets`). CDASH is a *collection*
-standard with no CORE rules. So we **tabulate the synthetic CDASH → SDTMIG 3.4** (using the
-`sdtmTarget` mappings captured in Stage 4) and validate that, which is CORE's core competency and
-runs fully offline against the engine's bundled cache.
+The cloned **CDISC Rules Engine** validates the generated SDTM against published SDTMIG 3.4 rules,
+**offline** against its bundled cache. The engine consumes SAS V5 XPT / Dataset-JSON / XLSX (CSV
+input was dropped after engine 0.16.0), so `06_export_sdtm.py` writes XPT v5 first.
 
-```bash
-python3 06_cdash_to_sdtm.py            # CDASH -> SDTMIG 3.4 (06_sdtm/datasets/*.csv + _datasets/_variables.csv)
-./07_core_report/run_core_validation.sh   # CORE validate -s sdtmig -v 3-4 -ct sdtmct-2026-03-27
-python3 07_core_summary.py             # categorized digest -> 07_core_report/summary.json
-```
+Latest run (engine **0.14.2**, SDTMIG V3.4, CT `sdtmct-2026-03-27`):
 
-**The validate → fix loop (this is the point):** CORE found two genuine bugs in the synthetic
-generator, which we fixed at the source and re-validated:
+| Rules SUCCESS / SKIPPED | Rule-findings | Records flagged | Genuine data bugs |
+|--|--|--|--|
+| **177 / 257** | 12 | 133 | **0** |
 
-| | First run | After fixes |
-|--|-----------|-------------|
-| Rules SUCCESS / ISSUE / SKIPPED / ERROR | 153 / 13 / 260 / 4 | **170 / 7 / 251 / 2** |
-| Rule-findings | 54 | **31** |
-| Records flagged | 3,227 | **154** |
-| Genuine data bugs | **2** | **0** |
+All 12 findings are `tabulation_gap` (e.g. MedDRA-coded `AEDECOD` absent, `MHCAT` granularity,
+strict IG variable order) — **no data-quality issues**; categorized in `summary.json`. The two
+genuine synthetic-data bugs CORE caught earlier (placebo `EXDOSE≠0`; `AEENDTC` on unresolved AEs)
+remain fixed at the source.
 
-Bugs CORE caught and we fixed:
-- `CORE-000005` — EX `EXTRT=PLACEBO` but `EXDOSE≠0` (placebo dose now collected as 0).
-- `CORE-000657` — `AEENDTC` populated when `AEOUT=NOT RECOVERED/NOT RESOLVED` (ongoing AEs now have no end date).
-
-We also added SDTM derivations the first run flagged (`EPOCH`, study-day `--DY`, `RFXSTDTC/RFXENDTC`,
-variable ordering), which removed ~3,000 flagged records. The remaining 154 are categorized in
-`summary.json` as `tabulation_gap` (e.g. MedDRA-coded `AEDECOD` not present, MHCAT granularity,
-strict IG variable order) or `harness` (two rules error without a Define-XML) — **no remaining
-data-quality issues**.
-
-Outputs: `07_core_report/core_sdtmig34.json` (raw), `core_sdtmig34.xlsx` (human-readable),
-`summary.json` (categorized digest), `run_core_validation.sh` (reproducible command).
+> The synthetic SDTM here is **byte-identical** to the previously CORE-validated output the earlier
+> CDASH→SDTM path produced — proving the SDTM-first refactor introduced zero data regression. The
+> absolute rule counts differ slightly from the older 0.16.0 baseline (170 SUCCESS) only because a
+> different engine version is installed locally.
 
 ## Caveats (honest scope)
 
-- The CDASH field specs are **real** (CDISC Library CDASHIG 2.3) and CT is **real & pinned**; the
+- The SDTM variable specs follow the SDTMIG 3.4 structure and the CT is **real & pinned**; the
   patient *values* are synthetic and **not** statistically modelled on real data.
-- USDM is a **v3.0-structured representation** (faithful class names/relationships), not validated
-  through the `usdm` package / CORE engine — that is the documented next step.
-- CDASH is the **collection** standard; SDTM tabulation/CORE conformance is out of scope for this
-  CDASH-focused run (each field records its `sdtmTarget` so the SDTM step is a clean follow-on).
+- USDM is a **v3.0-structured representation** (faithful class names/relationships), not yet
+  validated through the `usdm` package / CORE USDM rules — that is the documented next step.
+- The offline SDTM spec uses the SDTMIG 3.4 template; live SDTM Dataset Specialization resolution
+  via `cdisclib` is wired but requires `CDISC_API_KEY`.
