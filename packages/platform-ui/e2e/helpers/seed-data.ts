@@ -104,6 +104,56 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       completedAt: null,
       completionData: null,
     },
+    // Dedicated tasks for verdict-with-params.journey.ts — isolated from all
+    // other tests so submitting the pending task never pollutes shared state.
+    'task-param-verdict-target': {
+      id: 'task-param-verdict-target',
+      processInstanceId: 'proc-param-verdict-target',
+      stepId: 'supply-chain-assessment',
+      assignedRole: 'reviewer',
+      assignedUserId: null,
+      status: 'pending',
+      deadline: nextWeek,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      completionData: null,
+      params: [
+        { name: 'findings', type: 'string', required: true, description: 'Summary of assessment findings' },
+        { name: 'riskScore', type: 'number', required: false, description: 'Risk score 1–10' },
+      ],
+      verdicts: [
+        { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+        { key: 'reject', label: 'Reject', intent: 'danger', requiresComment: true },
+      ],
+    },
+    // Already-completed variant — used by the read-only CompletionReadOnly test
+    'task-param-verdict-completed': {
+      id: 'task-param-verdict-completed',
+      processInstanceId: 'proc-completed-1',
+      stepId: 'supply-chain-assessment',
+      assignedRole: 'reviewer',
+      assignedUserId: testUserId,
+      status: 'completed',
+      deadline: null,
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      completedAt: now,
+      completionData: {
+        verdict: 'approve',
+        paramValues: { findings: 'All vendor checks passed', riskScore: 2 },
+        completedBy: testUserId,
+        completedAt: now,
+      },
+      params: [
+        { name: 'findings', type: 'string', required: true, description: 'Summary of assessment findings' },
+        { name: 'riskScore', type: 'number', required: false, description: 'Risk score 1–10' },
+      ],
+      verdicts: [
+        { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+        { key: 'reject', label: 'Reject', intent: 'danger', requiresComment: true },
+      ],
+    },
     'task-upload-docs': {
       id: 'task-upload-docs',
       processInstanceId: 'proc-upload-waiting',
@@ -315,6 +365,28 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       status: 'paused',
       currentStepId: 'human-review',
       variables: { studyId: 'study-review-target' },
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: 'auto-runner',
+      pauseReason: 'waiting_for_human',
+      error: null,
+      assignedRoles: ['reviewer'],
+    },
+    // Dedicated instance for verdict-with-params.journey.ts — isolated so
+    // submitting task-param-verdict-target does not pollute other tests.
+    // Uses 'Param Verdict Test:1' which contains the supply-chain-assessment
+    // step so advanceStep succeeds after task completion (Supply Chain Review
+    // v1 does not have this step and would throw a 500).
+    'proc-param-verdict-target': {
+      id: 'proc-param-verdict-target',
+      namespace: 'test',
+      definitionName: 'Param Verdict Test',
+      definitionVersion: '1',
+      status: 'paused',
+      currentStepId: 'supply-chain-assessment',
+      variables: { studyId: 'study-pv-target' },
       triggerType: 'manual',
       triggerPayload: {},
       createdAt: oneHourAgo,
@@ -1432,6 +1504,23 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       { name: 'priority', type: 'select', required: false, options: ['low', 'normal', 'high'], default: 'normal', description: 'Run priority' },
       { name: 'dryRun', type: 'boolean', required: false, default: false, description: 'Dry run mode' },
     ],
+    createdAt: twoDaysAgo,
+  };
+
+  // Minimal workflow for verdict-with-params.journey.ts. Contains the
+  // supply-chain-assessment step so advanceStep succeeds when the test submits
+  // the task — Supply Chain Review v1 lacks this step and would 500.
+  workflowDefinitions['test:Param Verdict Test:1'] = {
+    name: 'Param Verdict Test',
+    namespace: 'test',
+    version: 1,
+    description: 'Fixture workflow for verdict-with-params journey',
+    steps: [
+      { id: 'supply-chain-assessment', name: 'Supply Chain Assessment', type: 'creation', executor: 'human' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'supply-chain-assessment', to: 'done' }],
+    triggers: [{ type: 'manual', name: 'start' }],
     createdAt: twoDaysAgo,
   };
 

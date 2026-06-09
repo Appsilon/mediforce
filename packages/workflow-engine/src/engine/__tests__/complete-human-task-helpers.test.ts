@@ -39,12 +39,22 @@ describe('resolveTaskKind', () => {
   it('rows for table-editor', () => {
     expect(resolveTaskKind(baseTask({ ui: { component: 'table-editor' } as never }))).toBe('rows');
   });
-  it('params when task.params has entries', () => {
+  it('params when task has params but no verdicts', () => {
     expect(
       resolveTaskKind(
         baseTask({ params: [{ key: 'k', label: 'k', type: 'string' }] as never }),
       ),
     ).toBe('params');
+  });
+  it('verdict-with-params when task has both params and verdicts', () => {
+    expect(
+      resolveTaskKind(
+        baseTask({
+          params: [{ key: 'k', label: 'k', type: 'string' }] as never,
+          verdicts: [{ key: 'approve', label: 'Approve', intent: 'positive' as never }] as never,
+        }),
+      ),
+    ).toBe('verdict-with-params');
   });
   it('verdict by default', () => {
     expect(resolveTaskKind(baseTask())).toBe('verdict');
@@ -67,6 +77,19 @@ describe('validatePayloadKindMatchesTask', () => {
       validatePayloadKindMatchesTask(task, {
         kind: 'verdict',
         verdict: 'approve',
+      }),
+    ).not.toThrow();
+  });
+  it('passes for verdict-with-params when task has both params and verdicts', () => {
+    const task = baseTask({
+      params: [{ key: 'dose', label: 'Dose', type: 'string' }] as never,
+      verdicts: [{ key: 'approve', label: 'Approve', intent: 'positive' as never }] as never,
+    });
+    expect(() =>
+      validatePayloadKindMatchesTask(task, {
+        kind: 'verdict-with-params',
+        verdict: 'approve',
+        paramValues: { dose: '10mg' },
       }),
     ).not.toThrow();
   });
@@ -128,6 +151,65 @@ describe('validateUploadPayload', () => {
       attachments: [{ name: 'a.pdf', size: 1, type: 'application/pdf' }],
     };
     expect(() => validateUploadPayload(task, oneFile as never)).toThrow(/Expected 2-3 file/);
+  });
+});
+
+describe('shapeCompletion — verdict-with-params variant', () => {
+  function verdictWithParamsTask() {
+    return baseTask({
+      params: [{ key: 'dose', label: 'Dose', type: 'string' }] as never,
+      verdicts: [
+        { key: 'approve', label: 'Approve', intent: 'positive' as never },
+        { key: 'reject', label: 'Reject', intent: 'negative' as never, requiresComment: true },
+      ] as never,
+    });
+  }
+
+  it('merges paramValues + verdict into flat stepOutput', () => {
+    const result = shapeCompletion(
+      verdictWithParamsTask(),
+      { kind: 'verdict-with-params', verdict: 'approve', paramValues: { dose: '10mg' }, comment: 'looks good' },
+      'user-1',
+      '2026-06-03T00:00:00.000Z',
+    );
+    expect(result.stepOutput.dose).toBe('10mg');
+    expect(result.stepOutput.verdict).toBe('approve');
+    expect(result.stepOutput.comment).toBe('looks good');
+    expect(result.isL3Revise).toBe(false);
+  });
+
+  it('stores trimmed comment and omits empty comment from stepOutput', () => {
+    const result = shapeCompletion(
+      verdictWithParamsTask(),
+      { kind: 'verdict-with-params', verdict: 'approve', paramValues: {}, comment: '  ' },
+      'user-1',
+      '2026-06-03T00:00:00.000Z',
+    );
+    expect(result.stepOutput.comment).toBeUndefined();
+    expect(result.completionData.comment).toBeUndefined();
+  });
+
+  it('omits comment from completionData when not provided', () => {
+    const result = shapeCompletion(
+      verdictWithParamsTask(),
+      { kind: 'verdict-with-params', verdict: 'approve', paramValues: { dose: '5mg' } },
+      'user-1',
+      '2026-06-03T00:00:00.000Z',
+    );
+    expect(result.completionData.comment).toBeUndefined();
+    expect(result.completionData.verdict).toBe('approve');
+    expect(result.completionData.paramValues).toEqual({ dose: '5mg' });
+  });
+
+  it('rejects a verdict not in the task allowlist', () => {
+    expect(() =>
+      shapeCompletion(
+        verdictWithParamsTask(),
+        { kind: 'verdict-with-params', verdict: 'maybe', paramValues: {} },
+        'user-1',
+        '2026-06-03T00:00:00.000Z',
+      ),
+    ).toThrow(/verdict 'maybe' not allowed/);
   });
 });
 

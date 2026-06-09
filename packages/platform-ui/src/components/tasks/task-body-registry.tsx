@@ -4,6 +4,7 @@ import { FileUploadView } from './file-upload-view';
 import { SelectionView } from './selection-view';
 import { ParamsView } from './params-view';
 import { VerdictView } from './verdict-view';
+import { ParamVerdictView } from './param-verdict-view';
 import { AssignmentTableView } from './assignment-table-view';
 import { TableEditorView } from './table-editor-view';
 
@@ -31,8 +32,9 @@ export function resolveTaskBody(task: HumanTask): TaskBodyEntry {
   if (Array.isArray(task.options) && task.options.length > 0) {
     return { Component: SelectionView };
   }
-  if (Array.isArray(task.params) && task.params.length > 0) {
-    return { Component: ParamsView };
-  }
+  const hasParams = Array.isArray(task.params) && task.params.length > 0;
+  const hasVerdicts = Array.isArray(task.verdicts) && task.verdicts.length > 0;
+  if (hasParams && hasVerdicts) return { Component: ParamVerdictView };
+  if (hasParams) return { Component: ParamsView };
   return { Component: VerdictView };
 }

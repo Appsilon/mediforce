@@ -143,6 +143,41 @@ describe('completeTask handler', () => {
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
+  it('accepts verdict-with-params payload and passes it through to the engine', async () => {
+    const task = buildHumanTask({
+      id: 'task-2',
+      processInstanceId: 'inst-a',
+      stepId: 'collect-and-decide',
+      status: 'claimed',
+      assignedUserId: 'u-1',
+    });
+    await humanTaskRepo.create(task);
+
+    const taskAfter = { ...task, status: 'completed' as const };
+    const instanceAfter = (await instanceRepo.getById('inst-a'))!;
+    const engineStub = makeEngineStub({ task: taskAfter, instance: instanceAfter });
+
+    const scope = createTestScope({
+      humanTaskRepo,
+      instanceRepo,
+      auditRepo,
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+    Object.assign(scope.system, { engine: engineStub });
+
+    const payload: CompleteHumanTaskPayload = {
+      kind: 'verdict-with-params',
+      verdict: 'approve',
+      paramValues: { dose: '10mg', route: 'oral' },
+      comment: 'within range',
+    };
+
+    const result = await completeTask({ taskId: 'task-2', payload }, scope);
+
+    expect(result.task.status).toBe('completed');
+    expect(engineStub.calls[0].payload).toEqual(payload);
+  });
+
   it('maps engine InvalidTransitionError to PreconditionFailedError (409)', async () => {
     const task = buildHumanTask({ id: 'task-1', processInstanceId: 'inst-a', status: 'claimed' });
     await humanTaskRepo.create(task);

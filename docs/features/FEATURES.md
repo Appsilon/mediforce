@@ -12,6 +12,8 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 **Tasks** — human review queue for workflow steps requiring human input
 - [Task Browsing & Grouping](#task-browsing--grouping) — reviewers find their tasks across workflows
 - [Task Approve Flow](#task-approve-flow) — reviewer sees context, submits verdict
+- [Param Verdict Submit](#param-verdict-submit) — reviewer fills required params then submits a verdict
+- [Param Verdict Read-only](#param-verdict-readonly) — completed task shows captured param values in verdict card
 
 **Workflows** — defining and managing automated processes
 - [Workflow Home](#workflow-home) — overview of all workflows and their active runs

@@ -134,6 +134,25 @@ function renderInput(
     );
   }
 
+  if (type === 'datetime') {
+    // datetime-local inputs produce YYYY-MM-DDTHH:MM (16 chars); we append :00
+    // to normalise to YYYY-MM-DDTHH:MM:SS before storing
+    const DATETIME_LOCAL_LEN = 16;
+    return (
+      <input
+        type="datetime-local"
+        value={String(value ?? '').slice(0, DATETIME_LOCAL_LEN)}
+        onChange={(event) => onChange(
+          event.target.value.length === DATETIME_LOCAL_LEN
+            ? event.target.value + ':00'
+            : event.target.value,
+        )}
+        disabled={disabled}
+        className={classes}
+      />
+    );
+  }
+
   if (type === 'textarea') {
     return (
       <textarea

@@ -38,6 +38,12 @@ export const CompleteHumanTaskPayloadSchema = z.discriminatedUnion('kind', [
     paramValues: z.record(z.string(), z.unknown()),
   }).strict(),
   z.object({
+    kind: z.literal('verdict-with-params'),
+    verdict: z.string().min(1),
+    comment: z.string().optional(),
+    paramValues: z.record(z.string(), z.unknown()),
+  }).strict(),
+  z.object({
     kind: z.literal('upload'),
     attachments: z.array(AttachmentSchema).min(1),
   }).strict(),
