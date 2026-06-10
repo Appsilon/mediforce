@@ -235,15 +235,17 @@ pnpm exec mediforce <command> --help                                     # per-c
 
 ### Building Docker images for script steps
 
-Workflows with `script` executor steps need Docker images built locally:
+Workflows with `script` executor steps need Docker images built locally — none
+are pulled from a registry. Build everything in one go:
 
 ```bash
-# Community Digest workflow
-docker build -t mediforce-agent:community-digest -f apps/community-digest/container/Dockerfile .
-
-# Protocol to TFL workflow
-docker build -t mediforce-agent:protocol-to-tfl -f apps/protocol-to-tfl/container/Dockerfile .
+./scripts/rebuild-docker-images.sh
 ```
+
+This builds `mediforce-golden-image` and `mediforce-node` (used by most inline
+`runtime: javascript` script steps, and as the fallback when a step omits
+`agent.image`), plus the per-app images (`community-digest`, `protocol-to-tfl`,
+`tealflow`, `landing-zone`).
 
 Skip this if you only use `human` or `agent` executor steps, or run with `MOCK_AGENT=true`.
 

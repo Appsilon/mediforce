@@ -22,6 +22,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
   - Built-in tool calls (`update_artifact`, `update_presentation`) now persist as live tool turns visible in the cowork chat UI.
   - Postgres migration 0018: `validation_result` (jsonb) + `presentation` (text) columns on `cowork_sessions`.
 
+### Changed
+- GETTING-STARTED now covers two first-run blockers that were previously only discoverable by hitting the error: setting `MEDIFORCE_API_KEY` for the CLI (must match `PLATFORM_API_KEY`), and building local `script`-executor images (`mediforce-golden-image`, `mediforce-node`) via `scripts/rebuild-docker-images.sh` before running workflows with `script` steps [#670](https://github.com/Appsilon/mediforce/pull/670).
+
 ## [2026-05-31]
 
 ### Changed
