@@ -37,7 +37,7 @@
     ],
     "overrides": {
       "axios": ">=1.15.0",
-      "protobufjs": "8.4.2",
+      "protobufjs": "8.5.0",
       "hono": "4.12.23",
       "@hono/node-server": "2.0.4",
       "fast-xml-parser": "5.8.0",
