@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-06-07]
+
 ### Added
 - `databricks-job` plugin — workflow steps can trigger an existing Databricks job (`jobs/run-now` + polling) and route transitions on the JSON the notebook exits with; secrets `DATABRICKS_HOST`/`DATABRICKS_TOKEN`, `${steps.*}` param interpolation, single-task jobs in v1. Includes `scripts/databricks-spike.py` for manual verification against a real workspace.
 - Agent-produced files are no longer lost — everything an agent step leaves in `/output` is preserved as **Output Files** on the run branch (`.mediforce/output/<stepId>/`, ADR-0007) and is reviewable and downloadable:
