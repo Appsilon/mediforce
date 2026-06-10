@@ -1,5 +1,7 @@
 import type { StepExecution } from '@mediforce/platform-core';
 
+export { formatBytes } from '@mediforce/platform-core';
+
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   const seconds = Math.round(ms / 1000);

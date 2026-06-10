@@ -41,7 +41,9 @@ log "Building images"
 docker compose -f "$COMPOSE_FILE" build
 
 log "Starting services"
-docker compose -f "$COMPOSE_FILE" up -d
+# --remove-orphans kills containers left over from services that no longer
+# exist in the compose file (prevents stale workers consuming shared queues).
+docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
 
 # Clean up old images and build cache
 docker image prune -f >> "$LOG_FILE" 2>&1

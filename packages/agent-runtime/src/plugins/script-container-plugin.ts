@@ -13,7 +13,7 @@ const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 /** Runtime → Docker image, file extension, and run command (as array for spawn). */
 const RUNTIME_CONFIG: Record<string, { image: string; ext: string; cmd: (path: string) => string[] }> = {
   javascript: { image: 'mediforce-node:latest', ext: '.mjs', cmd: (p) => ['node', p] },
-  python: { image: 'python:3.12-slim', ext: '.py', cmd: (p) => ['python', p] },
+  python: { image: 'python:3.12-slim', ext: '.py', cmd: (p) => ['python3', p] },
   r: { image: 'rocker/r-ver:4', ext: '.R', cmd: (p) => ['Rscript', p] },
   bash: { image: 'alpine:3.19', ext: '.sh', cmd: (p) => ['sh', p] },
 };

@@ -66,6 +66,9 @@ export const queryKeys = {
   /** Aggregate step-entry view for a process instance (processes.getSteps). */
   processSteps: (instanceId: string) => ['process-steps', instanceId] as const,
 
+  /** Output Files listing for a run (runs.listOutputFiles). */
+  runOutputFiles: (runId: string) => ['run-output-files', runId] as const,
+
   /** Agent event log slice. `stepId` undefined fetches every step's events
    *  on the instance. */
   agentEvents: (instanceId: string, stepId: string | null | undefined) =>

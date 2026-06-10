@@ -86,6 +86,14 @@ Structured deliverable that a human and an agent build collaboratively across
 the turns of a Cowork Session. **Not** the same as Output or Variables —
 finalized artifact is promoted to Output only when the cowork step completes.
 
+**Output Files** (per Step Execution):
+Files a Step Execution leaves behind alongside its Output (reports, exports,
+generated documents) — preserved per Workflow Run on success and failure
+alike, listable and downloadable by Run members (UI + CLI).
+_Avoid_: Artifact (= Cowork Session deliverable), "deliverable"/`deliverableFile`
+(legacy single-file mechanism), conflating with Output (= the structured result;
+Output Files are its file siblings).
+
 ### Agent + human work
 
 **Agent Run**:
@@ -232,7 +240,7 @@ the user-facing immutable log.
   (`name`+`version` identifies which version of which Workflow).
 - A **Workflow Run** has many **Step Executions**.
 - A **Step Execution** has 0..1 **Agent Run**, 0..1 **Cowork Session**,
-  0..N **Human Tasks** attached.
+  0..N **Human Tasks** attached, and produces 0..N **Output Files**.
 - An **Agent Run** may produce 0..N **Handoffs**.
 - An **Agent** has many **Agent MCP Bindings** (per server) and
   many **Agent OAuth Tokens** (per server).
@@ -262,11 +270,13 @@ the user-facing immutable log.
   drop the suffix is pending in a follow-up PR. If we ever introduce
   agent versioning, the suffix will earn its keep — see the **Agent**
   glossary entry.
-- **Output vs Variables vs Artifact**: three distinct concepts, often
-  confused. Output = one step's immediate result. Variables = accumulated
-  outputs forwarded across steps. Artifact = collaboratively built
-  deliverable inside a cowork session (promoted to Output only on cowork
-  finalize). Keep the distinction in storage too.
+- **Output vs Variables vs Artifact vs Output Files**: four distinct
+  concepts, often confused. Output = one step's immediate result.
+  Variables = accumulated outputs forwarded across steps. Artifact =
+  collaboratively built deliverable inside a cowork session (promoted to
+  Output only on cowork finalize). Output Files = files a step leaves
+  behind alongside its Output (resolved 2026-06-10, ADR-0007). Keep the
+  distinction in storage too.
 - **Workflow visibility (`public` vs `private`)**: Defined in PR #346 — a
   `public` Workflow Definition is **read-discoverable from other
   Namespaces**; `private` is members-only. **Workflow Runs (runs) are

@@ -5,12 +5,13 @@
  */
 import { Worker } from 'bullmq';
 import { spawn } from 'node:child_process';
-import { appendFile, mkdir, mkdtemp, writeFile, readdir, readFile } from 'node:fs/promises';
+import { appendFile, mkdir, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { getRedisConnection } from './connection';
 import { QUEUE_NAME, DockerJobDataSchema } from './schemas';
 import type { DockerJobResult } from './schemas';
+import { encodeFilePayload, decodeFilePayload } from './file-payload';
 import { ensureImage } from './docker-image-builder';
 import { startHttpServer } from './http-server';
 import { createLineStreamReader } from '@mediforce/platform-core';
@@ -27,12 +28,9 @@ async function prepareLocalOutputDir(data: { inputFiles?: Record<string, string>
   }
 
   const localOutputDir = await mkdtemp(join(tmpdir(), 'mediforce-worker-'));
-  const fileCount = Object.keys(data.inputFiles).length;
-  console.log(`[worker] Remote caller — recreating ${fileCount} input file(s) in ${localOutputDir}`);
-  for (const [name, content] of Object.entries(data.inputFiles)) {
-    await writeFile(join(localOutputDir, name), content, 'utf-8');
-    console.log(`[worker]   wrote ${name} (${content.length} bytes)`);
-  }
+  const fileNames = Object.keys(data.inputFiles);
+  console.log(`[worker] Remote caller — recreating ${fileNames.length} input file(s) in ${localOutputDir}: ${fileNames.join(', ')}`);
+  await decodeFilePayload(data.inputFiles, localOutputDir);
 
   // Replace the remote outputDir path in dockerArgs with local path
   const remoteDir = data.outputDir;
@@ -42,25 +40,6 @@ async function prepareLocalOutputDir(data: { inputFiles?: Record<string, string>
   console.log(`[worker] Patched outputDir: ${remoteDir} → ${localOutputDir}`);
 
   return { localOutputDir, patchedArgs };
-}
-
-/** Collect all files from outputDir after docker run completes. */
-async function collectOutputFiles(outputDir: string): Promise<Record<string, string>> {
-  const files: Record<string, string> = {};
-  try {
-    const entries = await readdir(outputDir);
-    for (const entry of entries) {
-      try {
-        const content = await readFile(join(outputDir, entry), 'utf-8');
-        files[entry] = content;
-      } catch (err) {
-        console.warn(`[worker] Skipping unreadable output file '${entry}': ${err instanceof Error ? err.message : err}`);
-      }
-    }
-  } catch (err) {
-    console.warn(`[worker] Could not read outputDir '${outputDir}': ${err instanceof Error ? err.message : err}`);
-  }
-  return files;
 }
 
 async function processDockerJob(rawData: unknown): Promise<DockerJobResult> {
@@ -143,7 +122,7 @@ async function processDockerJob(rawData: unknown): Promise<DockerJobResult> {
 
       // If remote caller sent inputFiles, collect output files to return through Redis
       if (hasInputFiles) {
-        collectOutputFiles(localOutputDir).then((outputFiles) => {
+        encodeFilePayload(localOutputDir).then((outputFiles) => {
           resolve({ stdout, stderr, exitCode: code, signal: signal ?? null, outputFiles });
         }).catch((err) => {
           console.warn(`[worker] Failed to collect output files: ${err instanceof Error ? err.message : err}`);

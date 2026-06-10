@@ -3,10 +3,12 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText, FileCode } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText, FileCode, Paperclip } from 'lucide-react';
 import type { ProcessInstance, StepExecution, Step } from '@mediforce/platform-core';
+import type { RunOutputFileEntry } from '@mediforce/platform-api/contract';
 import { AutonomyBadge } from '../agents/autonomy-badge';
 import { RetryStepButton } from './retry-step-button';
+import { OutputFileRow } from './run-output-files-panel';
 import { cn } from '@/lib/utils';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 import { formatDuration, formatCostUsd } from '@/lib/format';
@@ -48,6 +50,8 @@ interface StepStatusPanelProps {
   stepExecutions: StepExecution[];
   agentEvents?: AgentEventItem[];
   stepConfigMap?: Map<string, StepConfigInfo>;
+  /** The run's Output Files — steps with files get a paperclip chip that expands to download links. */
+  outputFiles?: RunOutputFileEntry[];
   onAgentLogClick?: (stepId: string) => void;
   /** Base href for step detail links, e.g. "/workflows/foo/runs/abc". Steps link to `{base}/steps/{stepId}`. */
   stepDetailBaseHref?: string;
@@ -363,11 +367,26 @@ export function StepStatusPanel({
   stepExecutions,
   agentEvents = [],
   stepConfigMap,
+  outputFiles = [],
   onAgentLogClick,
   stepDetailBaseHref,
 }: StepStatusPanelProps) {
   const [expandedStepId, setExpandedStepId] = React.useState<string | null>(null);
+  const [filesExpandedStepId, setFilesExpandedStepId] = React.useState<string | null>(null);
   const wfStatus = getWorkflowStatus(instance);
+
+  const outputFilesByStep = React.useMemo(() => {
+    const byStepId = new Map<string, RunOutputFileEntry[]>();
+    for (const file of outputFiles) {
+      const existing = byStepId.get(file.stepId);
+      if (existing) {
+        existing.push(file);
+      } else {
+        byStepId.set(file.stepId, [file]);
+      }
+    }
+    return byStepId;
+  }, [outputFiles]);
 
   // Filter out terminal steps — they aren't meaningful to display
   const visibleSteps = definitionSteps.filter((s) => s.type !== 'terminal');
@@ -409,6 +428,8 @@ export function StepStatusPanel({
             (e) => e.stepId === step.id && e.type === 'prompt',
           );
           const assembledPrompt = promptEvent ? String(promptEvent.payload) : undefined;
+          const stepOutputFiles = outputFilesByStep.get(step.id) ?? [];
+          const isFilesExpanded = filesExpandedStepId === step.id;
 
           return (
             <li
@@ -458,6 +479,19 @@ export function StepStatusPanel({
                     <AutonomyBadge level={stepConfigMap.get(step.id)!.autonomyLevel!} />
                   )}
                   <StatusLabel status={status} />
+                  {stepOutputFiles.length > 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilesExpandedStepId(isFilesExpanded ? null : step.id);
+                      }}
+                      title={`${stepOutputFiles.length} output file${stepOutputFiles.length === 1 ? '' : 's'}`}
+                      className="inline-flex items-center gap-0.5 text-xs bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 hover:text-foreground transition-colors"
+                    >
+                      <Paperclip className="h-3 w-3" />
+                      {stepOutputFiles.length}
+                    </button>
+                  )}
                   {hasConfig && (
                     isExpanded
                       ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -531,6 +565,20 @@ export function StepStatusPanel({
                         </div>
                       );
                     })}
+                  </div>
+                )}
+
+                {/* Expandable Output Files list (paperclip chip) */}
+                {isFilesExpanded && stepOutputFiles.length > 0 && (
+                  <div
+                    className="mt-2 rounded-md bg-muted/50 border px-3 py-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ul className="space-y-1">
+                      {stepOutputFiles.map((file) => (
+                        <OutputFileRow key={file.path} runId={instance.id} file={file} />
+                      ))}
+                    </ul>
                   </div>
                 )}
 

@@ -8,6 +8,7 @@ import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, Mc
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls, formatExitInfo, type ContainerPluginInit } from './container-plugin';
+import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
 import { createLineStreamReader } from '@mediforce/platform-core';
 
@@ -531,11 +532,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     instanceId: string,
     stepId: string,
   ): Promise<string | null> {
-    const INTERNAL_NAMES = new Set([
-      'opencode.json', 'auth.json', 'prompt.txt', 'result.json',
-      'git-result.json', 'mock-result.json',
-      'presentation.html', 'presentation.md',
-    ]);
+    const INTERNAL_NAMES = new Set([...INTERNAL_OUTPUT_FILE_NAMES, ...PRESENTATION_FILE_NAMES]);
     const DELIVERABLE_EXTS = new Set(['.html', '.htm', '.pdf', '.csv', '.xlsx', '.md']);
 
     let entries: string[];
@@ -566,7 +563,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     // Also handle presentation.{md,html} — already read into
     // spawnResult.presentation but a persisted path is needed for the
     // Download Report button. Markdown wins on tie.
-    for (const filename of ['presentation.md', 'presentation.html']) {
+    for (const filename of PRESENTATION_FILE_NAMES) {
       const presentationPath = join(outputDir, filename);
       try {
         const destDir = join(tmpdir(), 'mediforce-deliverables', instanceId);

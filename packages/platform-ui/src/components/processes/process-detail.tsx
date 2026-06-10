@@ -10,9 +10,11 @@ import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
 import { AgentLogViewer } from './agent-log-viewer';
 import { RunResultsPanel } from './run-results-panel';
+import { RunOutputFilesPanel } from './run-output-files-panel';
 import { ApiError } from '@mediforce/platform-api/client';
 import { useActiveCoworkSession } from '@/hooks/use-tasks';
 import { useProcessInstance } from '@/hooks/use-process-instances';
+import { useRunOutputFiles } from '@/hooks/use-run-output-files';
 import { useArchiveRun, useCancelRun } from '@/hooks/use-run-mutations';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
@@ -188,6 +190,8 @@ export function ProcessDetail({
 
   const isTerminal = instance.status === 'completed' || instance.status === 'failed';
 
+  const { data: outputFiles } = useRunOutputFiles(instance.id, instance.status);
+
   // Scroll audit log to bottom when events change
   const auditScrollRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
@@ -361,6 +365,13 @@ export function ProcessDetail({
           <RunResultsPanel stepExecutions={stepExecutions} />
         )}
 
+        {/* Output Files — hidden until the run has at least one */}
+        <RunOutputFilesPanel
+          runId={instance.id}
+          files={outputFiles}
+          definitionSteps={definitionSteps}
+        />
+
         {/* Step Status Panel */}
         {definitionSteps.length > 0 && (
           <StepStatusPanel
@@ -369,6 +380,7 @@ export function ProcessDetail({
             stepExecutions={stepExecutions}
             agentEvents={agentEvents}
             stepConfigMap={stepConfigMap}
+            outputFiles={outputFiles}
             stepDetailBaseHref={runDetailHref}
             onAgentLogClick={(stepId: string) => {
               setAgentLogStepId(stepId);

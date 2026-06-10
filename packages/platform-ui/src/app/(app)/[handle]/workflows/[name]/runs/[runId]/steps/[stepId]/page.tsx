@@ -19,7 +19,7 @@ import { HumanStepView } from '@/components/tasks/human-step-view';
 import { AgentOutputDisplay } from '@/components/agents/agent-output-display';
 import { agentOutputFromEnvelope } from './agent-output-from-envelope';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
-import { formatDuration, formatStepName, formatCostUsd } from '@/lib/format';
+import { formatBytes, formatDuration, formatStepName, formatCostUsd } from '@/lib/format';
 
 function StatusIcon({ status }: { status: string }) {
   switch (status) {
@@ -590,14 +590,6 @@ function isFileArray(arr: unknown[]): boolean {
       'size' in item &&
       'type' in item,
   );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  const exp = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const size = bytes / Math.pow(1024, exp);
-  return `${size.toFixed(exp > 0 ? 1 : 0)} ${units[exp]}`;
 }
 
 function FileList({ files }: { files: FileItem[] }) {
