@@ -321,7 +321,7 @@ function CollapsiblePrompt({ prompt }: { prompt: unknown }) {
         )}
       </button>
       {expanded && (
-        <pre className="rounded-md bg-muted p-3 text-xs overflow-auto max-h-[500px] whitespace-pre-wrap break-words">
+        <pre className="rounded-md bg-muted p-3 text-xs whitespace-pre-wrap break-words">
           {promptText}
         </pre>
       )}
@@ -554,7 +554,7 @@ function DataValue({ value }: { value: unknown }) {
       );
     }
     return (
-      <pre className="rounded-md bg-muted p-3 text-xs overflow-auto max-h-[400px] whitespace-pre-wrap break-words">
+      <pre className="rounded-md bg-muted p-3 text-xs whitespace-pre-wrap break-words">
         {JSON.stringify(value, null, 2)}
       </pre>
     );
@@ -562,7 +562,7 @@ function DataValue({ value }: { value: unknown }) {
 
   if (typeof value === 'object') {
     return (
-      <pre className="rounded-md bg-muted p-3 text-xs overflow-auto max-h-[400px] whitespace-pre-wrap break-words">
+      <pre className="rounded-md bg-muted p-3 text-xs whitespace-pre-wrap break-words">
         {JSON.stringify(value, null, 2)}
       </pre>
     );
