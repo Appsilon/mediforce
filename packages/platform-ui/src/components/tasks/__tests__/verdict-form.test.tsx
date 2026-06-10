@@ -35,7 +35,7 @@ describe('VerdictForm (single-click GitHub flow)', () => {
     expect(screen.queryByRole('button', { name: /Reject/ })).not.toBeInTheDocument();
   });
 
-  it('renders one button per descriptor in array order', () => {
+  it('renders one button per descriptor with success intent sorted last', () => {
     const verdicts: TaskVerdict[] = [
       { key: 'accept', label: 'Accept delivery', intent: 'success', requiresComment: false },
       { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger', requiresComment: false },
@@ -46,9 +46,9 @@ describe('VerdictForm (single-click GitHub flow)', () => {
 
     const buttons = screen.getAllByRole('button').map((b) => b.textContent?.trim());
     expect(buttons).toEqual([
-      'Accept delivery',
       'Reject — notify CRO',
       'Ask agent to make changes',
+      'Accept delivery', // success intent always sorted last
     ]);
   });
 
