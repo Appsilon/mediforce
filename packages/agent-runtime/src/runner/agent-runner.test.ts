@@ -1,21 +1,36 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AgentRunner } from './agent-runner';
 import {
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
+  type WorkflowStep,
 } from '@mediforce/platform-core';
+import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { InMemoryAgentEventLog } from '../testing/index';
 import { NoopLlmClient } from '../testing/index';
 import type {
   AgentPlugin,
   AgentContext,
   EmitFn,
+  WorkflowAgentContext,
 } from '../interfaces/agent-plugin';
 import type {
   StepConfig,
   ProcessConfig,
   AgentOutputEnvelope,
 } from '@mediforce/platform-core';
+import type {
+  Attributes,
+  Context,
+  Link,
+  Span,
+  SpanOptions,
+  SpanStatus,
+  TimeInput,
+  Tracer,
+  TracerProvider,
+} from '@opentelemetry/api';
+import { trace } from '@opentelemetry/api';
 
 // --- Test helpers ---
 
@@ -52,6 +67,39 @@ function makeStepConfig(overrides: Partial<StepConfig> = {}): StepConfig {
   };
 }
 
+function makeWorkflowContext(overrides: Partial<WorkflowAgentContext> = {}): WorkflowAgentContext {
+  const step: WorkflowStep = {
+    id: 'step-1',
+    name: 'Review output',
+    type: 'review',
+    executor: 'agent',
+    plugin: 'test-plugin',
+    agent: {
+      model: 'anthropic/claude-sonnet-4',
+    },
+  };
+
+  return {
+    stepId: 'step-1',
+    processInstanceId: 'instance-1',
+    runNamespace: 'acme-trials',
+    definitionVersion: '7',
+    stepInput: { patientId: 'P001' },
+    autonomyLevel: 'L4',
+    workflowDefinition: buildWorkflowDefinition({
+      name: 'Protocol Review',
+      version: 7,
+      namespace: 'acme-trials',
+      steps: [step],
+      transitions: [],
+    }),
+    step,
+    llm: new NoopLlmClient(),
+    getPreviousStepOutputs: async () => ({}),
+    ...overrides,
+  };
+}
+
 function makeValidEnvelope(overrides: Partial<AgentOutputEnvelope> = {}): AgentOutputEnvelope {
   return {
     confidence: 0.9,
@@ -63,6 +111,137 @@ function makeValidEnvelope(overrides: Partial<AgentOutputEnvelope> = {}): AgentO
     result: { recommendation: 'continue_monitoring' },
     ...overrides,
   };
+}
+
+type SpanCallback<T> = (span: Span) => T;
+
+class RecordingSpan {
+  public readonly attributes: Record<string, string | number | boolean> = {};
+  public ended = false;
+  public status: SpanStatus | null = null;
+
+  constructor(
+    public readonly name: string,
+    attributes?: Attributes,
+  ) {
+    Object.assign(this.attributes, attributes);
+  }
+
+  spanContext() {
+    return {
+      traceId: '1'.repeat(32),
+      spanId: '2'.repeat(16),
+      traceFlags: 1,
+    };
+  }
+
+  setAttribute(key: string, value: string | number | boolean) {
+    this.attributes[key] = value;
+    return this as unknown as Span;
+  }
+
+  setAttributes(attributes: Attributes) {
+    for (const [key, value] of Object.entries(attributes)) {
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        this.attributes[key] = value;
+      }
+    }
+    return this as unknown as Span;
+  }
+
+  addEvent(): this {
+    return this;
+  }
+
+  addLink(_link: Link): this {
+    return this;
+  }
+
+  addLinks(_links: Link[]): this {
+    return this;
+  }
+
+  setStatus(status: SpanStatus): this {
+    this.status = status;
+    return this;
+  }
+
+  updateName(): this {
+    return this;
+  }
+
+  end(_endTime?: TimeInput): void {
+    this.ended = true;
+  }
+
+  isRecording(): boolean {
+    return true;
+  }
+
+  recordException(): void {}
+}
+
+class RecordingTracer implements Tracer {
+  constructor(private readonly spans: RecordingSpan[]) {}
+
+  startSpan(name: string, options?: SpanOptions): Span {
+    const span = new RecordingSpan(name, options?.attributes);
+    this.spans.push(span);
+    return span as unknown as Span;
+  }
+
+  startActiveSpan<F extends (span: Span) => ReturnType<F>>(name: string, fn: F): ReturnType<F>;
+  startActiveSpan<F extends (span: Span) => ReturnType<F>>(name: string, options: SpanOptions, fn: F): ReturnType<F>;
+  startActiveSpan<F extends (span: Span) => ReturnType<F>>(
+    name: string,
+    _options: SpanOptions,
+    _context: Context,
+    fn: F,
+  ): ReturnType<F>;
+  startActiveSpan<T>(
+    name: string,
+    optionsOrFn: SpanOptions | SpanCallback<T>,
+    contextOrFn?: Context | SpanCallback<T>,
+    fnMaybe?: SpanCallback<T>,
+  ): T {
+    const callback =
+      typeof optionsOrFn === 'function'
+        ? optionsOrFn
+        : typeof contextOrFn === 'function'
+          ? contextOrFn
+          : fnMaybe;
+
+    if (callback === undefined) {
+      throw new Error('Missing span callback');
+    }
+
+    const options = typeof optionsOrFn === 'function' ? undefined : optionsOrFn;
+    const span = new RecordingSpan(name, options?.attributes);
+    this.spans.push(span);
+
+    try {
+      const result = callback(span as unknown as Span);
+      if (result instanceof Promise) {
+        return result.finally(() => {
+          span.end();
+        }) as T;
+      }
+
+      span.end();
+      return result;
+    } catch (error) {
+      span.end();
+      throw error;
+    }
+  }
+}
+
+class RecordingTracerProvider implements TracerProvider {
+  public readonly spans: RecordingSpan[] = [];
+
+  getTracer(): Tracer {
+    return new RecordingTracer(this.spans);
+  }
 }
 
 /** Simple plugin that emits events synchronously then resolves */
@@ -180,6 +359,10 @@ describe('AgentRunner', () => {
     await createTestInstance(instanceRepository);
   });
 
+  afterEach(() => {
+    trace.disable();
+  });
+
   // --- Test 1: Successful L4 (Autopilot) run ---
   it('L4 Autopilot: completes run, applies to workflow, appends audit event', async () => {
     const envelope = makeValidEnvelope();
@@ -198,6 +381,30 @@ describe('AgentRunner', () => {
     const audits = auditRepository.getAll();
     expect(audits).toHaveLength(1);
     expect(audits[0].actorType).toBe('agent');
+  });
+
+  it('runWithWorkflowStep emits an OpenTelemetry root span with workflow correlation attributes', async () => {
+    const tracerProvider = new RecordingTracerProvider();
+    trace.setGlobalTracerProvider(tracerProvider);
+
+    const envelope = makeValidEnvelope();
+    const plugin = makeSuccessPlugin(envelope);
+    const context = makeWorkflowContext();
+
+    const result = await runner.runWithWorkflowStep(plugin, context);
+
+    expect(result.status).toBe('completed');
+
+    const span = tracerProvider.spans[0];
+    expect(span.name).toBe('mediforce.agent.run');
+    expect(span.attributes['mediforce.agent_run.id']).toEqual(expect.any(String));
+    expect(span.attributes['mediforce.process_instance.id']).toBe('instance-1');
+    expect(span.attributes['mediforce.namespace']).toBe('acme-trials');
+    expect(span.attributes['mediforce.workflow.name']).toBe('Protocol Review');
+    expect(span.attributes['mediforce.workflow.version']).toBe(7);
+    expect(span.attributes['mediforce.workflow.step_id']).toBe('step-1');
+    expect(span.attributes['gen_ai.request.model']).toBe('anthropic/claude-sonnet-4');
+    expect(span.ended).toBe(true);
   });
 
   // --- Test 2: L0 (Silent Observer) — output not surfaced ---

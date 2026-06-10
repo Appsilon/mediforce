@@ -1,4 +1,9 @@
 import type { LlmMessage, LlmResponse } from '../interfaces/agent-plugin';
+import {
+  annotateOpenRouterLlmSpan,
+  type OpenTelemetryTracingOptions,
+  withOpenRouterLlmSpan,
+} from './tracing';
 
 // Re-export the interface defined in interfaces/ for barrel convenience
 export type { LlmClient, LlmMessage, LlmResponse } from '../interfaces/agent-plugin';
@@ -9,43 +14,64 @@ export class OpenRouterLlmClient {
   constructor(
     private readonly apiKey: string,
     private readonly defaultModel: string = 'anthropic/claude-sonnet-4',
+    private readonly tracingOptions: OpenTelemetryTracingOptions = {},
   ) {}
 
   async complete(messages: LlmMessage[], model?: string): Promise<LlmResponse> {
     const selectedModel = model ?? this.defaultModel;
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: selectedModel,
+    return withOpenRouterLlmSpan(
+      {
         messages,
-        temperature: 0.7,
-        max_tokens: 2000,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenRouter API error ${response.status}: ${errorText}`);
-    }
-
-    const data = await response.json() as {
-      model: string;
-      choices: Array<{ message: { content: string } }>;
-      usage: { prompt_tokens: number; completion_tokens: number };
-    };
-
-    return {
-      content: data.choices[0].message.content,
-      model: data.model,
-      usage: {
-        promptTokens: data.usage.prompt_tokens,
-        completionTokens: data.usage.completion_tokens,
+        selectedModel,
+        captureContent: this.tracingOptions.captureContent === true,
       },
-    };
+      async (span) => {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: selectedModel,
+            messages,
+            temperature: 0.7,
+            max_tokens: 2000,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`OpenRouter API error ${response.status}: ${errorText}`);
+        }
+
+        const data = await response.json() as {
+          model: string;
+          choices: Array<{ message: { content: string } }>;
+          usage: { prompt_tokens: number; completion_tokens: number };
+        };
+
+        annotateOpenRouterLlmSpan(
+          span,
+          {
+            model: data.model,
+            promptTokens: data.usage.prompt_tokens,
+            completionTokens: data.usage.completion_tokens,
+            content: data.choices[0].message.content,
+          },
+          this.tracingOptions,
+        );
+
+        return {
+          content: data.choices[0].message.content,
+          model: data.model,
+          usage: {
+            promptTokens: data.usage.prompt_tokens,
+            completionTokens: data.usage.completion_tokens,
+          },
+        };
+      },
+    );
   }
 }

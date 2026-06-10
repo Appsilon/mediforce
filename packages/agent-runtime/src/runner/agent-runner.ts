@@ -12,6 +12,7 @@ import { randomUUID } from 'crypto';
 import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitPayload } from '../interfaces/agent-plugin';
 import type { AgentEventLog } from './agent-event-log';
 import { FallbackHandler } from './fallback-handler';
+import { annotateAgentRunSpan, withAgentRunSpan } from './tracing';
 
 export interface AgentRunResult {
   status: AgentRunStatus;
@@ -54,65 +55,98 @@ export class AgentRunner {
     const runId = randomUUID();
     const pluginId = context.step.plugin ?? context.stepId;
 
-    if (this.agentRunRepository) {
-      await this.agentRunRepository.create({
-        id: runId,
-        processInstanceId,
-        stepId,
-        pluginId,
-        autonomyLevel: autonomyLevel as 'L0' | 'L1' | 'L2' | 'L3' | 'L4',
-        status: 'running',
-        envelope: null,
-        fallbackReason: null,
-        startedAt: new Date(startedAt).toISOString(),
-        completedAt: null,
+    return withAgentRunSpan(runId, context, async (span) => {
+      if (this.agentRunRepository) {
+        await this.agentRunRepository.create({
+          id: runId,
+          processInstanceId,
+          stepId,
+          pluginId,
+          autonomyLevel: autonomyLevel as 'L0' | 'L1' | 'L2' | 'L3' | 'L4',
+          status: 'running',
+          envelope: null,
+          fallbackReason: null,
+          startedAt: new Date(startedAt).toISOString(),
+          completedAt: null,
+        });
+      }
+
+      const emit = async (event: EmitPayload): Promise<void> => {
+        await this.eventLog.write(processInstanceId, stepId, event);
+      };
+
+      await plugin.initialize(context);
+
+      const timeoutMs = (context.step.agent?.timeoutMinutes ?? 30) * 60_000;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new AgentTimeoutError()), timeoutMs);
       });
-    }
 
-    const emit = async (event: EmitPayload): Promise<void> => {
-      await this.eventLog.write(processInstanceId, stepId, event);
-    };
+      let fallbackReason: 'timeout' | 'low_confidence' | 'error' | null = null;
+      let caughtErrorMessage: string | null = null;
 
-    await plugin.initialize(context);
+      try {
+        await Promise.race([plugin.run(emit), timeoutPromise]);
 
-    const timeoutMs = (context.step.agent?.timeoutMinutes ?? 30) * 60_000;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new AgentTimeoutError()), timeoutMs);
-    });
+        const events = this.eventLog.getEvents(processInstanceId, stepId);
+        const resultEvent = [...events].reverse().find((e) => e.type === 'result');
 
-    let fallbackReason: 'timeout' | 'low_confidence' | 'error' | null = null;
-    let caughtErrorMessage: string | null = null;
-
-    try {
-      await Promise.race([plugin.run(emit), timeoutPromise]);
-
-      const events = this.eventLog.getEvents(processInstanceId, stepId);
-      const resultEvent = [...events].reverse().find((e) => e.type === 'result');
-
-      if (!resultEvent) {
-        fallbackReason = 'error';
-      } else {
-        const parseResult = AgentOutputEnvelopeSchema.safeParse(resultEvent.payload);
-        if (!parseResult.success) {
+        if (!resultEvent) {
           fallbackReason = 'error';
         } else {
-          const envelope = parseResult.data;
+          const parseResult = AgentOutputEnvelopeSchema.safeParse(resultEvent.payload);
+          if (!parseResult.success) {
+            fallbackReason = 'error';
+          } else {
+            const envelope = parseResult.data;
 
-          const threshold = context.step.agent?.confidenceThreshold ?? 0;
-          if (envelope.confidence < threshold) {
-            fallbackReason = 'low_confidence';
-          }
+            const threshold = context.step.agent?.confidenceThreshold ?? 0;
+            if (envelope.confidence < threshold) {
+              fallbackReason = 'low_confidence';
+            }
 
-          if (fallbackReason) {
-            const partialWork = this.eventLog.getPartialWork(processInstanceId, stepId);
-            const fallbackResult = await this.fallbackHandler.handleWithWorkflowStep(
-              fallbackReason,
-              context,
-              partialWork,
-              envelope,
-            );
+            if (fallbackReason) {
+              const partialWork = this.eventLog.getPartialWork(processInstanceId, stepId);
+              const fallbackResult = await this.fallbackHandler.handleWithWorkflowStep(
+                fallbackReason,
+                context,
+                partialWork,
+                envelope,
+              );
+              const duration_ms = Date.now() - startedAt;
+              await this.appendAuditEventFromWorkflowStep(context, envelope, fallbackResult.status, duration_ms);
+              annotateAgentRunSpan(span, {
+                status: fallbackResult.status,
+                appliedToWorkflow: fallbackResult.appliedToWorkflow,
+                fallbackReason: fallbackResult.fallbackReason,
+                envelopeModel: fallbackResult.envelope?.model ?? envelope.model,
+              });
+              if (this.agentRunRepository) {
+                await this.agentRunRepository.create({
+                  id: runId,
+                  processInstanceId,
+                  stepId,
+                  pluginId,
+                  autonomyLevel: autonomyLevel as 'L0' | 'L1' | 'L2' | 'L3' | 'L4',
+                  status: fallbackResult.status,
+                  envelope: fallbackResult.envelope,
+                  fallbackReason: fallbackResult.fallbackReason,
+                  startedAt: new Date(startedAt).toISOString(),
+                  completedAt: new Date().toISOString(),
+                });
+              }
+              return fallbackResult;
+            }
+
+            const result = await this.applyAutonomyBehaviorForWorkflowStep(autonomyLevel, envelope, context);
             const duration_ms = Date.now() - startedAt;
-            await this.appendAuditEventFromWorkflowStep(context, envelope, fallbackResult.status, duration_ms);
+            await this.appendAuditEventFromWorkflowStep(context, envelope, result.status, duration_ms);
+            annotateAgentRunSpan(span, {
+              status: result.status,
+              appliedToWorkflow: result.appliedToWorkflow,
+              fallbackReason: result.fallbackReason,
+              envelopeModel: result.envelope?.model ?? envelope.model,
+            });
             if (this.agentRunRepository) {
               await this.agentRunRepository.create({
                 id: runId,
@@ -120,68 +154,55 @@ export class AgentRunner {
                 stepId,
                 pluginId,
                 autonomyLevel: autonomyLevel as 'L0' | 'L1' | 'L2' | 'L3' | 'L4',
-                status: fallbackResult.status,
-                envelope: fallbackResult.envelope,
-                fallbackReason: fallbackResult.fallbackReason,
+                status: result.status,
+                envelope: result.envelope,
+                fallbackReason: result.fallbackReason,
                 startedAt: new Date(startedAt).toISOString(),
                 completedAt: new Date().toISOString(),
               });
             }
-            return fallbackResult;
+            return result;
           }
-
-          const result = await this.applyAutonomyBehaviorForWorkflowStep(autonomyLevel, envelope, context);
-          const duration_ms = Date.now() - startedAt;
-          await this.appendAuditEventFromWorkflowStep(context, envelope, result.status, duration_ms);
-          if (this.agentRunRepository) {
-            await this.agentRunRepository.create({
-              id: runId,
-              processInstanceId,
-              stepId,
-              pluginId,
-              autonomyLevel: autonomyLevel as 'L0' | 'L1' | 'L2' | 'L3' | 'L4',
-              status: result.status,
-              envelope: result.envelope,
-              fallbackReason: result.fallbackReason,
-              startedAt: new Date(startedAt).toISOString(),
-              completedAt: new Date().toISOString(),
-            });
-          }
-          return result;
+        }
+      } catch (err) {
+        if (err instanceof AgentTimeoutError) {
+          fallbackReason = 'timeout';
+        } else {
+          fallbackReason = 'error';
+          caughtErrorMessage = err instanceof Error ? err.message : String(err);
         }
       }
-    } catch (err) {
-      if (err instanceof AgentTimeoutError) {
-        fallbackReason = 'timeout';
-      } else {
-        fallbackReason = 'error';
-        caughtErrorMessage = err instanceof Error ? err.message : String(err);
-      }
-    }
 
-    const partialWork = this.eventLog.getPartialWork(processInstanceId, stepId);
-    const fallbackResult = await this.fallbackHandler.handleWithWorkflowStep(
-      fallbackReason!,
-      context,
-      partialWork,
-    );
-    const duration_ms = Date.now() - startedAt;
-    await this.appendAuditEventFromWorkflowStep(context, null, fallbackResult.status, duration_ms, caughtErrorMessage);
-    if (this.agentRunRepository) {
-      await this.agentRunRepository.create({
-        id: runId,
-        processInstanceId,
-        stepId,
-        pluginId,
-        autonomyLevel: autonomyLevel as 'L0' | 'L1' | 'L2' | 'L3' | 'L4',
+      const partialWork = this.eventLog.getPartialWork(processInstanceId, stepId);
+      const fallbackResult = await this.fallbackHandler.handleWithWorkflowStep(
+        fallbackReason!,
+        context,
+        partialWork,
+      );
+      const duration_ms = Date.now() - startedAt;
+      await this.appendAuditEventFromWorkflowStep(context, null, fallbackResult.status, duration_ms, caughtErrorMessage);
+      annotateAgentRunSpan(span, {
         status: fallbackResult.status,
-        envelope: fallbackResult.envelope,
+        appliedToWorkflow: fallbackResult.appliedToWorkflow,
         fallbackReason: fallbackResult.fallbackReason,
-        startedAt: new Date(startedAt).toISOString(),
-        completedAt: new Date().toISOString(),
+        envelopeModel: fallbackResult.envelope?.model ?? null,
       });
-    }
-    return { ...fallbackResult, errorMessage: caughtErrorMessage };
+      if (this.agentRunRepository) {
+        await this.agentRunRepository.create({
+          id: runId,
+          processInstanceId,
+          stepId,
+          pluginId,
+          autonomyLevel: autonomyLevel as 'L0' | 'L1' | 'L2' | 'L3' | 'L4',
+          status: fallbackResult.status,
+          envelope: fallbackResult.envelope,
+          fallbackReason: fallbackResult.fallbackReason,
+          startedAt: new Date(startedAt).toISOString(),
+          completedAt: new Date().toISOString(),
+        });
+      }
+      return { ...fallbackResult, errorMessage: caughtErrorMessage };
+    });
   }
 
   /**

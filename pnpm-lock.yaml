@@ -121,6 +121,9 @@ importers:
       '@mediforce/platform-core':
         specifier: workspace:*
         version: link:../platform-core
+      '@opentelemetry/api':
+        specifier: ^1.9.1
+        version: 1.9.1
       firebase-admin:
         specifier: ^13.6.1
         version: 13.10.0
@@ -5786,8 +5789,7 @@ snapshots:
   '@nodable/entities@2.1.0':
     optional: true
 
-  '@opentelemetry/api@1.9.1':
-    optional: true
+  '@opentelemetry/api@1.9.1': {}
 
   '@oxc-project/types@0.132.0': {}
 

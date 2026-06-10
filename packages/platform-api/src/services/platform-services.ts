@@ -284,6 +284,9 @@ export function getPlatformServices(): PlatformServices {
   const llmClient = new OpenRouterLlmClient(
     process.env.OPENROUTER_API_KEY ?? '',
     'anthropic/claude-sonnet-4',
+    {
+      captureContent: process.env.MEDIFORCE_OTEL_CAPTURE_CONTENT === 'true',
+    },
   );
 
   const emailDisabled = process.env.MEDIFORCE_DISABLE_EMAIL === 'true';
