@@ -243,7 +243,7 @@ function PreviousStepOutputTabs({
       </Tabs.Content>
 
       <Tabs.Content value="full" className="p-4">
-        <pre className="rounded-md bg-muted p-4 text-xs overflow-auto max-h-96 whitespace-pre-wrap break-words">
+        <pre className="rounded-md bg-muted p-4 text-xs whitespace-pre-wrap break-words">
           {output !== null ? JSON.stringify(output, null, 2) : String(rawOutput)}
         </pre>
       </Tabs.Content>
