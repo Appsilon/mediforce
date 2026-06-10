@@ -4,7 +4,7 @@
  * against temp dirs — no network, no Docker.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, rm, writeFile, mkdir, readFile, stat } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, mkdir, readFile, stat, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -105,6 +105,27 @@ describe('copyOutputFilesIntoWorkspace', () => {
     expect(warned).toContain('huge.bin');
     expect(warned).toContain('32');
     expect(warned).toContain('8');
+  });
+
+  it('never follows symlinks — an agent-written link to a host path must not be copied', async () => {
+    const hostDir = await mkdtemp(join(tmpdir(), 'outfiles-host-'));
+    try {
+      await writeFile(join(hostDir, 'secret.txt'), 'host-sentinel-do-not-leak');
+      await mkdir(join(hostDir, 'secrets-dir'));
+      await writeFile(join(hostDir, 'secrets-dir', 'inner.txt'), 'host-sentinel-dir');
+      await symlink(join(hostDir, 'secret.txt'), join(outputDir, 'leak'));
+      await symlink(join(hostDir, 'secrets-dir'), join(outputDir, 'leak-dir'));
+      await writeFile(join(outputDir, 'legit.txt'), 'fine');
+
+      await copyOutputFilesIntoWorkspace(outputDir, worktreeDir, 'step-1');
+
+      const destDir = join(worktreeDir, '.mediforce', 'output', 'step-1');
+      await expect(readFile(join(destDir, 'legit.txt'), 'utf-8')).resolves.toBe('fine');
+      await expect(stat(join(destDir, 'leak'))).rejects.toThrow();
+      await expect(stat(join(destDir, 'leak-dir'))).rejects.toThrow();
+    } finally {
+      await rm(hostDir, { recursive: true, force: true }).catch(() => {});
+    }
   });
 
   it('does nothing when outputDir does not exist', async () => {

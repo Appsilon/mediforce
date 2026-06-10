@@ -11,11 +11,16 @@ step (success or failure) on a never-pushed run branch.
 
 **Decision:** after each agent step, copy the contents of `/output` —
 minus internal runtime files (`auth.json`, `prompt.txt`, `result.json`,
-`git-result.json`, `mock-result.json`, `opencode.json`) and minus files
-over a per-file size cap (platform config, default 100 MB) — into
+`git-result.json`, `mock-result.json`, `opencode.json`, `input.json`,
+`previous_run.json`, `mcp-config.json`, `script.{mjs,py,R,sh}`; source of
+truth: `INTERNAL_OUTPUT_FILE_NAMES` in
+`packages/agent-runtime/src/workspace/output-files.ts`) and minus files
+over a per-file size cap (`MEDIFORCE_OUTPUT_FILE_MAX_BYTES`, default
+100 MiB) — into
 `.mediforce/output/<stepId>/` inside the workspace, so the existing
 per-step commit captures them on the run branch. Listing reads
-`git ls-tree` and downloads read `git show` against the bare repo; no new
+`git ls-tree` and downloads read `git cat-file blob` against the bare
+repo; no new
 storage system is introduced. `.mediforce/` is a reserved namespace, so
 repos that legitimately contain an `output/` directory never conflict.
 
@@ -40,3 +45,7 @@ repos that legitimately contain an `output/` directory never conflict.
 - The platform API host must share a filesystem with
   `~/.mediforce/bare-repos` (already an existing assumption — the
   deliverable-file route reads host tmpdir today).
+- `MEDIFORCE_OUTPUT_FILE_MAX_BYTES` must be configured identically on the
+  runtime and API hosts — the reader sizes its git buffer from the same
+  env, so a smaller value on the API side would truncate downloads of
+  files the runtime legitimately committed.

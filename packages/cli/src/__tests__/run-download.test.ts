@@ -12,7 +12,7 @@ const PDF_BYTES = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x00, 0xff, 0x80, 0xfe
 const CSV_BYTES = new Uint8Array([0x67, 0x72, 0x61, 0x64, 0x65, 0x2c, 0x35, 0x0a]);
 
 function binaryResponse(bytes: Uint8Array, fileName: string): Response {
-  return new Response(bytes, {
+  return new Response(bytes.slice(), {
     status: 200,
     headers: {
       'Content-Type': 'application/octet-stream',

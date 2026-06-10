@@ -1,5 +1,7 @@
 import type { StepExecution } from '@mediforce/platform-core';
 
+export { formatBytes } from '@mediforce/platform-core';
+
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   const seconds = Math.round(ms / 1000);
@@ -14,14 +16,6 @@ export function formatCostUsd(cost: number): string {
   if (cost < 0.01) return `$${cost.toFixed(4)}`;
   if (cost < 1) return `$${cost.toFixed(3)}`;
   return `$${cost.toFixed(2)}`;
-}
-
-export function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const size = bytes / Math.pow(1024, exponent);
-  return `${size.toFixed(exponent > 0 ? 1 : 0)} ${units[exponent]}`;
 }
 
 export function formatStepName(stepId: string): string {

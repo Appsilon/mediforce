@@ -28,10 +28,11 @@ export const runDownloadCommand = defineCommand({
     const outDir = resolve(
       typeof args.output === 'string' && args.output.length > 0 ? args.output : '.',
     );
-    const downloadAll = typeof args.path !== 'string' || args.path.length === 0;
+    const requestedPath = typeof args.path === 'string' && args.path.length > 0 ? args.path : null;
+    const downloadAll = requestedPath === null;
     const written: string[] = [];
 
-    if (downloadAll) {
+    if (requestedPath === null) {
       const listed = await mediforce.runs.listOutputFiles({ runId: args.runId });
       if (listed.files.length === 0) {
         if (jsonMode) {
@@ -56,7 +57,7 @@ export const runDownloadCommand = defineCommand({
     } else {
       const downloaded = await mediforce.runs.downloadOutputFile({
         runId: args.runId,
-        path: args.path,
+        path: requestedPath,
       });
       const destination = join(outDir, downloaded.fileName);
       await mkdir(dirname(destination), { recursive: true });

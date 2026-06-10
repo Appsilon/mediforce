@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WorkspaceReader, OUTPUT_FILES_REPO_ROOT } from '@mediforce/agent-runtime';
-import { NotFoundError, ValidationError, type HandlerError } from '@mediforce/platform-api/errors';
+import { HandlerError, NotFoundError, ValidationError } from '@mediforce/platform-api/errors';
 import { defaultBuildScope, defaultResolveCaller } from '@/lib/route-adapter';
 import { attachmentContentDisposition, contentTypeForFilePath } from '@/lib/file-content-type';
 
@@ -33,43 +33,52 @@ export async function GET(req: NextRequest, ctx: RouteContext): Promise<NextResp
   if (callerOrResponse instanceof NextResponse) return callerOrResponse;
   const scope = defaultBuildScope(callerOrResponse);
 
-  const { runId, path: pathSegments } = await ctx.params;
-  const repoRelativePath = pathSegments.join('/');
+  // Same error tail as createRouteAdapter (src/lib/route-adapter.ts): a
+  // HandlerError maps to the ADR-0005 envelope, anything else is logged and
+  // becomes a 500 'internal' envelope — never Next's default 500 page.
+  try {
+    const { runId, path: pathSegments } = await ctx.params;
+    const repoRelativePath = pathSegments.join('/');
 
-  const hasTraversalSegment = repoRelativePath.split('/').includes('..');
-  const isUnderOutputRoot =
-    repoRelativePath.startsWith(OUTPUT_FILES_PATH_PREFIX) &&
-    repoRelativePath.length > OUTPUT_FILES_PATH_PREFIX.length;
-  if (hasTraversalSegment === true || isUnderOutputRoot === false) {
-    return errorResponse(
-      new ValidationError(
-        `Output File paths must live under ${OUTPUT_FILES_PATH_PREFIX} and contain no ".." segments`,
-      ),
+    const hasTraversalSegment = repoRelativePath.split('/').includes('..');
+    const isUnderOutputRoot =
+      repoRelativePath.startsWith(OUTPUT_FILES_PATH_PREFIX) &&
+      repoRelativePath.length > OUTPUT_FILES_PATH_PREFIX.length;
+    if (hasTraversalSegment === true || isUnderOutputRoot === false) {
+      return errorResponse(
+        new ValidationError(
+          `Output File paths must live under ${OUTPUT_FILES_PATH_PREFIX} and contain no ".." segments`,
+        ),
+      );
+    }
+
+    const run = await scope.runs.getById(runId);
+    if (run === null) {
+      return errorResponse(new NotFoundError(`Run ${runId} not found`));
+    }
+
+    const fileBytes = await new WorkspaceReader().readOutputFile(
+      { name: run.definitionName, namespace: run.namespace },
+      runId,
+      repoRelativePath,
     );
-  }
+    if (fileBytes === null) {
+      return errorResponse(new NotFoundError(`Output File ${repoRelativePath} not found for run ${runId}`));
+    }
 
-  const run = await scope.runs.getById(runId);
-  if (run === null) {
-    return errorResponse(new NotFoundError(`Run ${runId} not found`));
+    const fileName = repoRelativePath.split('/').pop() ?? 'download';
+    return new NextResponse(new Uint8Array(fileBytes), {
+      headers: {
+        'Content-Type': contentTypeForFilePath(fileName),
+        'Content-Disposition': attachmentContentDisposition(fileName),
+        'Content-Length': String(fileBytes.byteLength),
+      },
+    });
+  } catch (err) {
+    if (err instanceof HandlerError) return errorResponse(err);
+    console.error('[run-output-file-route] handler error:', err);
+    return errorResponse(new HandlerError('internal', 'Internal error'));
   }
-
-  const fileBytes = await new WorkspaceReader().readOutputFile(
-    { name: run.definitionName, namespace: run.namespace },
-    runId,
-    repoRelativePath,
-  );
-  if (fileBytes === null) {
-    return errorResponse(new NotFoundError(`Output File ${repoRelativePath} not found for run ${runId}`));
-  }
-
-  const fileName = repoRelativePath.split('/').pop() ?? 'download';
-  return new NextResponse(new Uint8Array(fileBytes), {
-    headers: {
-      'Content-Type': contentTypeForFilePath(fileName),
-      'Content-Disposition': attachmentContentDisposition(fileName),
-      'Content-Length': String(fileBytes.byteLength),
-    },
-  });
 }
 
 function errorResponse(err: HandlerError): NextResponse {

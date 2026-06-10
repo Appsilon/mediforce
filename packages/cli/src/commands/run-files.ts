@@ -1,18 +1,6 @@
+import { formatBytes } from '@mediforce/platform-core';
 import { defineCommand } from '../define-command';
 import { printJson } from '../output';
-
-const SIZE_UNITS = ['KB', 'MB', 'GB', 'TB'] as const;
-
-export function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${String(bytes)} B`;
-  let value = bytes;
-  let unitIndex = -1;
-  while (value >= 1024 && unitIndex < SIZE_UNITS.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  return `${value.toFixed(1)} ${SIZE_UNITS[unitIndex]}`;
-}
 
 export const runFilesCommand = defineCommand({
   name: 'mediforce run files',
@@ -47,7 +35,7 @@ export const runFilesCommand = defineCommand({
     for (const [stepId, files] of filesByStep) {
       output.stdout(`${stepId}:`);
       for (const file of files) {
-        output.stdout(`  ${file.name}  ${formatSize(file.size)}  ${file.path}`);
+        output.stdout(`  ${file.name}  ${formatBytes(file.size)}  ${file.path}`);
       }
     }
     return 0;

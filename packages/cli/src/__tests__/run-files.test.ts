@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { runFilesCommand, formatSize } from '../commands/run-files';
+import { runFilesCommand } from '../commands/run-files';
 import { captureOutput, jsonResponse } from './test-helpers';
 
 beforeEach(() => {
@@ -31,19 +31,8 @@ const TWO_STEP_LISTING = {
   ],
 };
 
-describe('formatSize', () => {
-  it('renders byte counts below 1024 as-is', () => {
-    expect(formatSize(0)).toBe('0 B');
-    expect(formatSize(1023)).toBe('1023 B');
-  });
-
-  it('scales to KB / MB / GB with one decimal', () => {
-    expect(formatSize(1024)).toBe('1.0 KB');
-    expect(formatSize(1536)).toBe('1.5 KB');
-    expect(formatSize(5 * 1024 * 1024)).toBe('5.0 MB');
-    expect(formatSize(3 * 1024 * 1024 * 1024)).toBe('3.0 GB');
-  });
-});
+// Size formatting is the shared @mediforce/platform-core formatBytes,
+// tested in platform-core (src/utils/__tests__/format.test.ts).
 
 describe('run files command', () => {
   it('exits 2 when no runId positional is given', async () => {

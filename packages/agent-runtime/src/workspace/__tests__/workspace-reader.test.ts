@@ -121,6 +121,17 @@ describe('WorkspaceReader', () => {
       expect(result!.equals(binary)).toBe(true);
     });
 
+    it('returns null for a directory path instead of serving a tree listing', async () => {
+      const workflow = { name: 'wd-dir-path' };
+      await commitOutputFiles(workflow, 'run-dir', 'step-x', { 'sub/file.txt': 'nested content' });
+
+      expect(await reader.readOutputFile(workflow, 'run-dir', '.mediforce/output/step-x')).toBeNull();
+      expect(await reader.readOutputFile(workflow, 'run-dir', '.mediforce/output/step-x/sub')).toBeNull();
+      // The blob itself stays readable.
+      const blob = await reader.readOutputFile(workflow, 'run-dir', '.mediforce/output/step-x/sub/file.txt');
+      expect(blob!.toString('utf-8')).toBe('nested content');
+    });
+
     it('returns null for a missing file', async () => {
       const workflow = { name: 'wd-missing-file' };
       await commitOutputFiles(workflow, 'run-1', 'step-1', { 'real.txt': 'x' });

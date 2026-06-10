@@ -13,7 +13,7 @@ const execFileAsync = promisify(execFile);
 const OUTPUT_FILES_PATH_PREFIX = `${OUTPUT_FILES_REPO_ROOT}/`;
 
 // Generous stdout cap for git: at least 256 MiB, and never below the
-// configured per-file Output File size cap (binary `git show` payloads).
+// configured per-file Output File size cap (binary `git cat-file` payloads).
 function gitMaxBuffer(): number {
   return Math.max(256 * 1024 * 1024, resolveOutputFileMaxBytes());
 }
@@ -93,10 +93,11 @@ export class WorkspaceReader {
   }
 
   /**
-   * One file's bytes via `git show run/<runId>:<path>` — binary-safe (stdout
-   * captured as a Buffer). Returns null when the repo, branch, or file is
-   * missing. Throws on paths outside `.mediforce/output/` or containing
-   * `..` segments.
+   * One file's bytes via `git cat-file blob run/<runId>:<path>` — binary-safe
+   * (stdout captured as a Buffer). Returns null when the repo, branch, or
+   * file is missing, or when the path names a tree (`git show` would render
+   * a textual directory listing instead; `cat-file blob` refuses non-blobs).
+   * Throws on paths outside `.mediforce/output/` or containing `..` segments.
    */
   async readOutputFile(workflow: WorkflowIdentity, runId: string, path: string): Promise<Buffer | null> {
     assertOutputFilePath(path);
@@ -104,7 +105,7 @@ export class WorkspaceReader {
     try {
       const { stdout } = await execFileAsync(
         'git',
-        ['show', `${runBranchName(runId)}:${path}`],
+        ['cat-file', 'blob', `${runBranchName(runId)}:${path}`],
         { cwd: bareRepoPath, encoding: 'buffer', maxBuffer: gitMaxBuffer() },
       );
       return stdout;
