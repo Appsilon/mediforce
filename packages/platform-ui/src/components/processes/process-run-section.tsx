@@ -164,6 +164,9 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
   const timeAgo = shortTimeAgo(new Date(instance.createdAt));
   const fullTimeAgo = formatDistanceToNow(new Date(instance.createdAt), { addSuffix: true });
   const detailHref = routes.workflowRun(handle, instance.definitionName, instance.id);
+  const currentStepHref = instance.currentStepId
+    ? routes.workflowRunStep(handle, instance.definitionName, instance.id, instance.currentStepId)
+    : null;
 
   return (
     <Link
@@ -205,7 +208,7 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      window.location.href = routes.task(handle, activeTaskId);
+                      if (currentStepHref) window.location.href = currentStepHref;
                     }}
                     className="inline-flex items-center gap-1 bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
                   >

@@ -295,7 +295,7 @@ export function ProcessDetail({
                 </span>
               </div>
               <Link
-                href={routes.task(handle, blockingTask.id)}
+                href={routes.workflowRunStep(handle, instance.definitionName, instance.id, blockingTask.stepId)}
                 className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
               >
                 Open task

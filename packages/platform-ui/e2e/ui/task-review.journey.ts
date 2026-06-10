@@ -6,7 +6,7 @@ test.describe('Task Review Journey', () => {
   test('browse tasks, interact with grouping, and navigate to task detail', async ({ page }, testInfo) => {
     await setupRecording(page, 'task-browse-and-grouping', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/tasks`);
-    await expect(page.getByRole('heading', { name: 'New actions' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Human actions' })).toBeVisible({ timeout: 30_000 });
 
     await expect(page.getByText('Review Intake Data')).toBeVisible();
     await expect(page.getByText('Supply Chain Review').first()).toBeVisible();
@@ -21,7 +21,7 @@ test.describe('Task Review Journey', () => {
     await expect(page.getByText('Action needed').first()).toBeVisible();
     await showCaption(page, 'Grouped by action type', 3500);
 
-    await click(page, page.getByRole('link', { name: /new actions/i }));
+    await click(page, page.getByRole('link', { name: /human actions/i }));
     const taskLink = page.getByText('Review Intake Data').first();
     await expect(taskLink).toBeVisible({ timeout: 10_000 });
     await click(page, taskLink);

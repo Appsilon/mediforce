@@ -29,9 +29,9 @@ test.describe('Tasks page cowork sections', () => {
     // Tasks page mounts both `useMyCoworkSessions` (active) and
     // `useFinalizedCoworkSessions` (finalized) on the same render — there
     // are no tabs to switch between them; both lists are passed straight
-    // through to `TaskGroupedView`. So once "New actions" appears the
+    // through to `TaskGroupedView`. So once "Human actions" appears the
     // active + finalized cowork.list round trips have both succeeded.
-    await expect(page.getByRole('heading', { name: 'New actions' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Human actions' })).toBeVisible({ timeout: 30_000 });
     await showResult(page);
 
     await endRecording(page);

@@ -317,7 +317,7 @@ export function RunsTable({
                   {run.currentStepId ? (
                     activeTaskByInstance?.get(run.id) ? (
                       <Link
-                        href={routes.task(handle, activeTaskByInstance.get(run.id)!)}
+                        href={routes.workflowRunStep(handle, run.definitionName, run.id, run.currentStepId)}
                         className="inline-flex items-center gap-1 bg-muted/50 rounded px-1.5 py-0.5 font-medium cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
                       >
                         {run.currentStepId}

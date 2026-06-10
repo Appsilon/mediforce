@@ -27,6 +27,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Completed param-only tasks (e.g. data-entry steps with no verdicts) no longer show a "Waiting for step output... Verdict buttons will be enabled..." box — that message only made sense for review steps, and the panel now renders nothing when the previous step produced no output to show [#672](https://github.com/Appsilon/mediforce/pull/672).
 
 ### Changed
+- Human steps in the run view are now first-class: a waiting step shows the full task UI (verdict buttons, params, claim/access banner); a completed human step shows the read-only task body alongside execution input/output — the separate task detail page is gone. Task inbox renamed "New actions" → "Human actions"; all inbox links point directly to the step view. `/tasks/{id}` deep-links (emails, bookmarks) redirect transparently to the owning step.
 - GETTING-STARTED now covers two first-run blockers that were previously only discoverable by hitting the error: setting `MEDIFORCE_API_KEY` for the CLI (must match `PLATFORM_API_KEY`), and building local `script`-executor images (`mediforce-golden-image`, `mediforce-node`) via `scripts/rebuild-docker-images.sh` before running workflows with `script` steps [#670](https://github.com/Appsilon/mediforce/pull/670).
 
 ## [2026-05-31]

@@ -4,6 +4,7 @@ import * as React from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { SlidersHorizontal, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { useViewerIdentity } from '@/hooks/use-viewer-identity';
 import {
   useMyActionableTasks,
   useMyActionableTasksByRole,
@@ -91,18 +92,7 @@ export default function TasksPage() {
     });
   }, []);
 
-  const [role, setRole] = React.useState<string | null>(null);
-  React.useEffect(() => {
-    if (!firebaseUser) return;
-    firebaseUser.getIdTokenResult().then((result) => {
-      const roles = result.claims['roles'];
-      if (Array.isArray(roles) && roles.length > 0) {
-        setRole(roles[0] as string);
-      }
-    });
-  }, [firebaseUser]);
-
-  const uid = firebaseUser?.uid ?? null;
+  const { uid, role } = useViewerIdentity();
   const roleActive = useMyActionableTasksByRole(role ?? undefined, uid);
   const callerActive = useMyActionableTasks(uid);
   const roleCompleted = useCompletedTasksByRole(role ?? undefined);
@@ -146,7 +136,7 @@ export default function TasksPage() {
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-headline font-semibold">New actions</h1>
+          <h1 className="text-xl font-headline font-semibold">Human actions</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {role ? (
               <>

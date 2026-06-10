@@ -10,9 +10,12 @@ import { useProcessInstance } from '@/hooks/use-process-instances';
 import { useStepExecutions } from '@/hooks/use-step-executions';
 import { useAgentEvents } from '@/hooks/use-agent-events';
 import { useWorkflowVersion } from '@/hooks/use-workflow-versions';
-import { useInstanceTasks } from '@/hooks/use-instance-tasks';
+import { useStepTasks } from '@/hooks/use-tasks';
+import { useViewerIdentity } from '@/hooks/use-viewer-identity';
 import { useAgentRunsForStep } from '@/hooks/use-agent-runs';
 import { getAgentOutput, type AgentOutputData } from '@/components/tasks/task-utils';
+import { resolveStepView } from '@/components/tasks/resolve-step-view';
+import { HumanStepView } from '@/components/tasks/human-step-view';
 import { AgentOutputDisplay } from '@/components/agents/agent-output-display';
 import { agentOutputFromEnvelope } from './agent-output-from-envelope';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
@@ -92,7 +95,11 @@ export default function StepDetailPage() {
   //   2. HumanTask.completionData.agentOutput (only for L3 review steps) —
   //      fallback for older runs where envelope wasn't queryable.
   const { data: agentRuns } = useAgentRunsForStep(runId ?? null, decodedStepId || null);
-  const { tasks: instanceTasks } = useInstanceTasks(runId ?? undefined);
+  const { tasks: stepTasks, loading: tasksLoading } = useStepTasks(
+    runId ?? null,
+    decodedStepId || null,
+    instance?.status,
+  );
   const agentOutput = useMemo((): AgentOutputData | null => {
     const latestRun = agentRuns
       .slice()
@@ -100,20 +107,24 @@ export default function StepDetailPage() {
     if (latestRun?.envelope) {
       return agentOutputFromEnvelope(latestRun.envelope);
     }
-    const candidates = instanceTasks
-      .filter((task: HumanTask) => task.stepId === decodedStepId)
-      .sort(
-        (a: HumanTask, b: HumanTask) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+    const candidates = [...stepTasks].sort(
+      (a: HumanTask, b: HumanTask) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
     for (const task of candidates) {
       const output = getAgentOutput(task);
       if (output) return output;
     }
     return null;
-  }, [agentRuns, instanceTasks, decodedStepId]);
+  }, [agentRuns, stepTasks]);
 
-  const loading = instanceLoading || stepsLoading || eventsLoading;
+  const viewer = useViewerIdentity();
+  const stepView = useMemo(
+    () => resolveStepView({ tasks: stepTasks, execution, viewer }),
+    [stepTasks, execution, viewer],
+  );
+
+  const loading = instanceLoading || stepsLoading || eventsLoading || tasksLoading;
 
   if (loading) {
     return (
@@ -135,6 +146,31 @@ export default function StepDetailPage() {
 
   const stepName = definitionStep?.name ?? formatStepName(decodedStepId);
   const hasAgentBadge = agentOutput !== null || execution?.agentOutput !== undefined;
+
+  if (stepView.kind === 'human-step') {
+    const executionPanel = execution !== null && stepView.access.kind === 'completed' ? (
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <InputColumn
+          execution={execution}
+          previousStepName={previousStepName}
+          promptEvent={promptEvent}
+        />
+        <OutputColumn execution={execution} />
+      </div>
+    ) : undefined;
+
+    return (
+      <div className="p-6">
+        <HumanStepView
+          task={stepView.task}
+          access={stepView.access}
+          processInstance={instance}
+          agentOutput={agentOutput}
+          executionPanel={executionPanel}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-6xl">

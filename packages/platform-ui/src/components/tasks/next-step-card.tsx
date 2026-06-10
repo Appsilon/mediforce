@@ -105,6 +105,9 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
   const runHref = instance
     ? routes.workflowRun(handle, instance.definitionName, processInstanceId)
     : null;
+  const nextStepHref = instance && nextStepId
+    ? routes.workflowRunStep(handle, instance.definitionName, processInstanceId, nextStepId)
+    : null;
 
   return (
     <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
@@ -148,7 +151,7 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
           executorType={executorType}
           nextHumanTask={nextHumanTask}
           runHref={runHref}
-          handle={handle}
+          nextStepHref={nextStepHref}
         />
       </div>
     </div>
@@ -224,19 +227,19 @@ function StepLink({
   executorType,
   nextHumanTask,
   runHref,
-  handle,
+  nextStepHref,
 }: {
   isTerminal: boolean;
   processCompleted: boolean;
   executorType: string | null;
   nextHumanTask: HumanTask | null;
   runHref: string | null;
-  handle: string;
+  nextStepHref: string | null;
 }) {
-  if (!isTerminal && !processCompleted && executorType === 'human' && nextHumanTask) {
+  if (!isTerminal && !processCompleted && executorType === 'human' && nextHumanTask && nextStepHref) {
     return (
       <Link
-        href={routes.task(handle, nextHumanTask.id)}
+        href={nextStepHref}
         className={cn(
           'shrink-0 inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium',
           'bg-primary/10 text-primary hover:bg-primary/20 transition-colors',
