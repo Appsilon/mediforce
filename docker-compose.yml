@@ -64,10 +64,13 @@ services:
         condition: service_healthy
 
   # OTel trace viewer (ADR-0007). Receives OTLP HTTP on :6006 (/v1/traces)
-  # and serves the UI on the same port. Enable export by setting
-  # OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:6006 before `pnpm dev`.
+  # and serves the UI on the same port. Opt-in via the `tracing` profile:
+  #   docker compose up -d phoenix
+  #   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:6006 pnpm dev
+  # See docs/dev-quickref.md § Tracing.
   phoenix:
-    image: arizephoenix/phoenix:latest
+    image: arizephoenix/phoenix:version-17
+    profiles: [tracing]
     ports:
       - "6006:6006"
     environment:

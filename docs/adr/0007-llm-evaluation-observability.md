@@ -1,6 +1,7 @@
 # 0007 — LLM evaluation & observability: layered model, hybrid system of record
 
-- **Status:** Proposed
+- **Status:** Accepted (layer 1 implemented in the same PR; layers 2–4
+  deliberately deferred — see Deferred section)
 - **Date:** 2026-06-10
 - **Authors:** Filip Stachura (@filipstachura)
 - **Relates to:**
