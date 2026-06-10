@@ -180,7 +180,8 @@ describe('workflow register command', () => {
   it('warns about missing Docker images after successful registration', async () => {
     const wd = buildWorkflowDefinition({ name: 'img-wf' });
     wd.steps[0].executor = 'script';
-    wd.steps[0].agent = { image: 'mediforce/nonexistent-image:v99' };
+    wd.steps[0].plugin = 'script-container';
+    wd.steps[0].script = { command: 'run-report', image: 'mediforce/nonexistent-image:v99' };
     const { version: _v, namespace: _n, createdAt: _c, ...body } = wd;
     const imgFile = path.join(tempDir, 'img-workflow.json');
     await writeFile(imgFile, JSON.stringify(body), 'utf-8');

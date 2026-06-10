@@ -79,9 +79,9 @@ describe('backlog-triage', () => {
       const step = result.data.steps.find((s) => s.id === stepId);
       expect(step?.executor).toBe('script');
       expect(step?.plugin).toBe('script-container');
-      expect(step?.agent?.image).toBe('mediforce-golden-image:latest');
-      expect(step?.agent?.runtime).toBe('javascript');
-      expect(step?.agent?.inlineScript).toBeDefined();
+      expect(step?.script?.image).toBe('mediforce-golden-image:latest');
+      expect(step?.script?.runtime).toBe('javascript');
+      expect(step?.script?.inlineScript).toBeDefined();
     }
   });
 
@@ -90,9 +90,9 @@ describe('backlog-triage', () => {
     expect(result.success).toBe(true);
     if (!result.success) return;
     const step = result.data.steps.find((s) => s.id === 'check-tags');
-    expect(step?.agent?.inlineScript).toMatch(/options: untagged/);
-    expect(step?.agent?.inlineScript).not.toMatch(/presentation\./);
-    expect(step?.agent?.inlineScript).toMatch(/needsTagging/);
+    expect(step?.script?.inlineScript).toMatch(/options: untagged/);
+    expect(step?.script?.inlineScript).not.toMatch(/presentation\./);
+    expect(step?.script?.inlineScript).toMatch(/needsTagging/);
   });
 
   it('tag-issues is a human table-editor step (category + priority) with no verdict', () => {
@@ -120,7 +120,7 @@ describe('backlog-triage', () => {
     expect(t('apply-tags', 'fetch-backlog')).toBe(true);
     const applyTags = result.data.steps.find((s) => s.id === 'apply-tags');
     expect(applyTags?.executor).toBe('script');
-    expect(applyTags?.agent?.inlineScript).toMatch(/issues\/\$\{itemId\}\/labels/);
+    expect(applyTags?.script?.inlineScript).toMatch(/issues\/\$\{itemId\}\/labels/);
   });
 
   it('propose-assignments is an L4 agent step that mentions sprintDays + AI-bottleneck guidance', () => {

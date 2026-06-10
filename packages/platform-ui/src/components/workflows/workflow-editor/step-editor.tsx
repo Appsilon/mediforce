@@ -33,36 +33,37 @@ function friendlyFieldError(message: string): string {
 }
 
 export function buildExecutorChangePatch(step: WorkflowStep, targetExecutor: WorkflowStep['executor']): Partial<WorkflowStep> {
-  const AGENT_ONLY = ['model', 'skill', 'prompt', 'skillsDir', 'timeoutMs', 'timeoutMinutes', 'confidenceThreshold', 'fallbackBehavior'] as const;
-  const SCRIPT_ONLY = ['command', 'inlineScript', 'runtime', 'image', 'dockerfile', 'repo', 'commit', 'repoAuth'] as const;
+  const SHARED_CONTAINER_KEYS = ['image', 'dockerfile', 'repo', 'commit', 'repoAuth'] as const;
   const base: Partial<WorkflowStep> = { executor: targetExecutor };
 
   if (targetExecutor === 'human') {
-    return { ...base, plugin: undefined, agent: undefined, cowork: undefined };
+    return { ...base, plugin: undefined, agent: undefined, script: undefined, databricks: undefined, cowork: undefined };
   }
   if (targetExecutor === 'agent') {
-    const cleanedAgent = step.agent
-      ? Object.fromEntries(Object.entries(step.agent).filter(([k]) => !SCRIPT_ONLY.includes(k as typeof SCRIPT_ONLY[number])))
+    const carriedFromScript = step.script
+      ? Object.fromEntries(Object.entries(step.script).filter(([k]) => SHARED_CONTAINER_KEYS.includes(k as typeof SHARED_CONTAINER_KEYS[number])))
       : undefined;
+    const agent = step.agent ?? (Object.keys(carriedFromScript ?? {}).length > 0 ? carriedFromScript as WorkflowStep['agent'] : undefined);
     return {
-      ...base, allowedRoles: undefined, cowork: undefined,
-      plugin: step.plugin ?? 'opencode-agent',
-      agent: Object.keys(cleanedAgent ?? {}).length > 0 ? cleanedAgent as WorkflowStep['agent'] : undefined,
+      ...base, allowedRoles: undefined, cowork: undefined, script: undefined, databricks: undefined,
+      plugin: step.plugin === 'script-container' || step.plugin === 'databricks-job' ? 'opencode-agent' : step.plugin ?? 'opencode-agent',
+      agent,
     };
   }
   if (targetExecutor === 'script') {
-    const cleanedAgent = step.agent
-      ? Object.fromEntries(Object.entries(step.agent).filter(([k]) => !AGENT_ONLY.includes(k as typeof AGENT_ONLY[number])))
+    const carriedFromAgent = step.agent
+      ? Object.fromEntries(Object.entries(step.agent).filter(([k]) => SHARED_CONTAINER_KEYS.includes(k as typeof SHARED_CONTAINER_KEYS[number])))
       : undefined;
+    const script = step.script ?? (Object.keys(carriedFromAgent ?? {}).length > 0 ? carriedFromAgent as WorkflowStep['script'] : undefined);
     return {
-      ...base, allowedRoles: undefined, autonomyLevel: undefined, cowork: undefined,
+      ...base, allowedRoles: undefined, autonomyLevel: undefined, cowork: undefined, agent: undefined,
       plugin: step.plugin ?? 'script-container',
-      agent: Object.keys(cleanedAgent ?? {}).length > 0 ? cleanedAgent as WorkflowStep['agent'] : undefined,
+      script,
     };
   }
   return {
     ...base, plugin: undefined, autonomyLevel: undefined, allowedRoles: undefined,
-    agent: undefined, cowork: step.cowork ?? { agent: 'chat' },
+    agent: undefined, script: undefined, databricks: undefined, cowork: step.cowork ?? { agent: 'chat' },
   };
 }
 
@@ -114,14 +115,14 @@ const TIP = {
   agentAllowedTools:       'Tools the agent may call, comma-separated. Leave empty to allow all available tools.',
   agentPrompt:             'Additional instructions appended to the agent\'s system prompt for this step only.',
 
-  agentRuntime:            'Language runtime for the inline script: javascript, python, r, or bash.',
-  agentCommand:            'Shell command to run in the container, typically to invoke a file from agent.repo.',
-  agentImage:              'Docker base image for the container (e.g. python:3.11-slim).',
-  agentDockerfile:         'Path to a Dockerfile in agent.repo. When set, the container is built from this file instead of agent.image.',
-  agentRepo:               'Git repository URL to clone into the container before running the command.',
-  agentCommit:             'Commit SHA or branch to check out from agent.repo. Defaults to the repo\'s default branch.',
-  agentRepoAuth:           'Name of a workflow secret holding the auth token for cloning a private repository.',
-  agentInlineScript:       'Script source code to run directly in the container. Set the language via agent.runtime.',
+  scriptRuntime:           'Language runtime for the inline script: javascript, python, r, or bash.',
+  scriptCommand:           'Shell command to run in the container, typically to invoke a file from script.repo.',
+  scriptImage:             'Docker base image for the container (e.g. python:3.11-slim).',
+  scriptDockerfile:        'Path to a Dockerfile in script.repo. When set, the container is built from this file instead of script.image.',
+  scriptRepo:              'Git repository URL to clone into the container before running the command.',
+  scriptCommit:            'Commit SHA or branch to check out from script.repo. Defaults to the repo\'s default branch.',
+  scriptRepoAuth:          'Name of a workflow secret holding the auth token for cloning a private repository.',
+  scriptInlineScript:      'Script source code to run directly in the container. Set the language via script.runtime.',
 
   allowedRoles:            'Roles that can claim this task, comma-separated. Leave empty to allow any signed-in user.',
 
@@ -239,6 +240,9 @@ export function StepEditor({
 
   function updateAgent(patch: Partial<NonNullable<WorkflowStep['agent']>>) {
     onChange({ agent: { ...step.agent, ...patch } });
+  }
+  function updateScript(patch: Partial<NonNullable<WorkflowStep['script']>>) {
+    onChange({ script: { ...step.script, ...patch } });
   }
   function updateReview(patch: Partial<NonNullable<WorkflowStep['review']>>) {
     onChange({ review: { ...step.review, ...patch } });
@@ -455,28 +459,28 @@ export function StepEditor({
             />
           </FieldRow>
 
-          <FieldRow label="agent.runtime" tooltip={TIP.agentRuntime}>
+          <FieldRow label="script.runtime" tooltip={TIP.scriptRuntime}>
             <select
-              value={step.agent?.runtime ?? ''}
-              onChange={(e) => updateAgent({ runtime: (e.target.value || undefined) as 'javascript' | 'python' | 'r' | 'bash' | undefined })}
+              value={step.script?.runtime ?? ''}
+              onChange={(e) => updateScript({ runtime: (e.target.value || undefined) as 'javascript' | 'python' | 'r' | 'bash' | undefined })}
               className={rs}
             >
               {RUNTIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </FieldRow>
 
-          <FieldRow label="agent.command" tooltip={TIP.agentCommand}>
+          <FieldRow label="script.command" tooltip={TIP.scriptCommand}>
             <input
-              value={step.agent?.command ?? ''}
-              onChange={(e) => updateAgent({ command: e.target.value || undefined })}
+              value={step.script?.command ?? ''}
+              onChange={(e) => updateScript({ command: e.target.value || undefined })}
               className={riMono}
             />
           </FieldRow>
 
-          <FieldRow label="agent.image" tooltip={TIP.agentImage}>
+          <FieldRow label="script.image" tooltip={TIP.scriptImage}>
             <input
-              value={step.agent?.image ?? ''}
-              onChange={(e) => updateAgent({ image: e.target.value || undefined })}
+              value={step.script?.image ?? ''}
+              onChange={(e) => updateScript({ image: e.target.value || undefined })}
               className={riMono}
             />
           </FieldRow>
@@ -487,42 +491,42 @@ export function StepEditor({
             </div>
           )}
 
-          <FieldRow label="agent.dockerfile" tooltip={TIP.agentDockerfile}>
+          <FieldRow label="script.dockerfile" tooltip={TIP.scriptDockerfile}>
             <input
-              value={step.agent?.dockerfile ?? ''}
-              onChange={(e) => updateAgent({ dockerfile: e.target.value || undefined })}
+              value={step.script?.dockerfile ?? ''}
+              onChange={(e) => updateScript({ dockerfile: e.target.value || undefined })}
               className={riMono}
             />
           </FieldRow>
 
-          <FieldRow label="agent.repo" tooltip={TIP.agentRepo}>
+          <FieldRow label="script.repo" tooltip={TIP.scriptRepo}>
             <input
-              value={step.agent?.repo ?? ''}
-              onChange={(e) => updateAgent({ repo: e.target.value || undefined })}
+              value={step.script?.repo ?? ''}
+              onChange={(e) => updateScript({ repo: e.target.value || undefined })}
               className={riMono}
             />
           </FieldRow>
 
-          <FieldRow label="agent.commit" tooltip={TIP.agentCommit}>
+          <FieldRow label="script.commit" tooltip={TIP.scriptCommit}>
             <input
-              value={step.agent?.commit ?? ''}
-              onChange={(e) => updateAgent({ commit: e.target.value || undefined })}
+              value={step.script?.commit ?? ''}
+              onChange={(e) => updateScript({ commit: e.target.value || undefined })}
               className={riMono}
             />
           </FieldRow>
 
-          <FieldRow label="agent.repoAuth" tooltip={TIP.agentRepoAuth}>
+          <FieldRow label="script.repoAuth" tooltip={TIP.scriptRepoAuth}>
             <input
-              value={step.agent?.repoAuth ?? ''}
-              onChange={(e) => updateAgent({ repoAuth: e.target.value || undefined })}
+              value={step.script?.repoAuth ?? ''}
+              onChange={(e) => updateScript({ repoAuth: e.target.value || undefined })}
               className={riMono}
             />
           </FieldRow>
 
-          <FieldRow label="agent.inlineScript" tooltip={TIP.agentInlineScript} alignStart>
+          <FieldRow label="script.inlineScript" tooltip={TIP.scriptInlineScript} alignStart>
             <textarea
-              value={step.agent?.inlineScript ?? ''}
-              onChange={(e) => updateAgent({ inlineScript: e.target.value || undefined })}
+              value={step.script?.inlineScript ?? ''}
+              onChange={(e) => updateScript({ inlineScript: e.target.value || undefined })}
               rows={3}
               placeholder="Script code…"
               className={cn(rt, 'font-mono text-[11px] placeholder:italic placeholder:text-muted-foreground/40')}

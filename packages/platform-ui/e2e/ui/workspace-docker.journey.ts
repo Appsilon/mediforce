@@ -96,8 +96,7 @@ test.describe('Docker-backed workspace E2E', () => {
           type: 'creation',
           executor: 'script',
           plugin: 'script-container',
-          autonomyLevel: 'L4',
-          agent: {
+          script: {
             image: TEST_IMAGE,
             command: 'bash -c "echo step 1 content > /workspace/step-1.md && echo \'{\\"ok\\":true}\' > /output/result.json"',
           },
@@ -108,8 +107,7 @@ test.describe('Docker-backed workspace E2E', () => {
           type: 'creation',
           executor: 'script',
           plugin: 'script-container',
-          autonomyLevel: 'L4',
-          agent: {
+          script: {
             image: TEST_IMAGE,
             // Fails hard if /workspace/step-1.md isn't there — proves inter-step file visibility.
             command: 'bash -c "test -f /workspace/step-1.md && cp /workspace/step-1.md /workspace/step-2.md && echo \'{\\"ok\\":true}\' > /output/result.json"',

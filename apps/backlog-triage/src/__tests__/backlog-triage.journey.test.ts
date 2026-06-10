@@ -276,7 +276,7 @@ describe('backlog-triage journey', () => {
 
     it('check-tags carries the untagged issues forward as options (no presentation file)', async () => {
       const step = wd.steps.find((s) => s.id === 'check-tags')!;
-      const script = step.agent!.inlineScript!;
+      const script = step.script!.inlineScript!;
       const result = await runInlineScript(
         script,
         {
@@ -298,7 +298,7 @@ describe('backlog-triage journey', () => {
 
     it('fetch-backlog GETs the repo issues endpoint with the auth header', async () => {
       const step = wd.steps.find((s) => s.id === 'fetch-backlog')!;
-      const script = step.agent!.inlineScript!;
+      const script = step.script!.inlineScript!;
       mockFetch.mockResolvedValue(new Response(JSON.stringify([
         { number: 101, title: 'A', body: 'b', labels: [{ name: 'bug' }], html_url: 'https://github.com/owner/repo/issues/101', assignee: null },
       ]), { status: 200, headers: { 'content-type': 'application/json' } }));
@@ -324,7 +324,7 @@ describe('backlog-triage journey', () => {
 
     it('fetch-backlog paginates past PRs to collect up to `limit` real issues', async () => {
       const step = wd.steps.find((s) => s.id === 'fetch-backlog')!;
-      const script = step.agent!.inlineScript!;
+      const script = step.script!.inlineScript!;
       // Page 1: 100 items — 60 issues + 40 PRs (PRs eat the per_page budget). Page 2: 1 more issue.
       const page1 = Array.from({ length: 100 }, (_, k) =>
         k < 60
@@ -350,7 +350,7 @@ describe('backlog-triage journey', () => {
 
     it('dispatch PATCHes GitHub for human assignments and POSTs Mediforce for agent assignments', async () => {
       const step = wd.steps.find((s) => s.id === 'dispatch')!;
-      const script = step.agent!.inlineScript!;
+      const script = step.script!.inlineScript!;
       mockFetch
         .mockResolvedValueOnce(new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } })) // GitHub POST /labels
         .mockResolvedValueOnce(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })) // GitHub POST /assignees
@@ -403,7 +403,7 @@ describe('backlog-triage journey', () => {
 
     it('dispatch rejects an invalid repo format early', async () => {
       const step = wd.steps.find((s) => s.id === 'dispatch')!;
-      const script = step.agent!.inlineScript!;
+      const script = step.script!.inlineScript!;
 
       await expect(
         runInlineScript(
@@ -417,7 +417,7 @@ describe('backlog-triage journey', () => {
 
     it('dispatch records per-assignment errors but continues', async () => {
       const step = wd.steps.find((s) => s.id === 'dispatch')!;
-      const script = step.agent!.inlineScript!;
+      const script = step.script!.inlineScript!;
       mockFetch
         .mockResolvedValueOnce(new Response('not found', { status: 404, headers: { 'content-type': 'text/plain' } })) // GitHub POST /labels fails — script skips /assignees for this row
         .mockResolvedValueOnce(new Response(JSON.stringify({ instanceId: 'run-zzz', status: 'running' }), { status: 200, headers: { 'content-type': 'application/json' } }));
@@ -448,7 +448,7 @@ describe('backlog-triage journey', () => {
 
     it('apply-tags create-if-missing then POSTs the category + priority labels to the issue', async () => {
       const step = wd.steps.find((s) => s.id === 'apply-tags')!;
-      const script = step.agent!.inlineScript!;
+      const script = step.script!.inlineScript!;
       mockFetch
         .mockResolvedValueOnce(new Response('{}', { status: 201, headers: { 'content-type': 'application/json' } })) // create 'ux'
         .mockResolvedValueOnce(new Response('{}', { status: 201, headers: { 'content-type': 'application/json' } })) // create 'priority/P1'
@@ -477,7 +477,7 @@ describe('backlog-triage journey', () => {
 
     it('apply-tags treats a 422 on label creation as already-exists and still applies', async () => {
       const step = wd.steps.find((s) => s.id === 'apply-tags')!;
-      const script = step.agent!.inlineScript!;
+      const script = step.script!.inlineScript!;
       mockFetch
         .mockResolvedValueOnce(new Response('{"message":"already_exists"}', { status: 422, headers: { 'content-type': 'application/json' } })) // create 'security' → exists
         .mockResolvedValueOnce(new Response('{}', { status: 201, headers: { 'content-type': 'application/json' } })) // create 'priority/P0'
@@ -495,7 +495,7 @@ describe('backlog-triage journey', () => {
 
     it('apply-tags records a per-row error on apply failure but continues (partial = non-fatal, still surfaced)', async () => {
       const step = wd.steps.find((s) => s.id === 'apply-tags')!;
-      const script = step.agent!.inlineScript!;
+      const script = step.script!.inlineScript!;
       mockFetch
         .mockResolvedValueOnce(new Response('{}', { status: 201 })) // create 'ux' (row 101)
         .mockResolvedValueOnce(new Response('{}', { status: 201 })) // create 'priority/P1' (row 101)
@@ -527,7 +527,7 @@ describe('backlog-triage journey', () => {
 
     it('apply-tags fails the step (exit 1) and writes a presentation when every row fails', async () => {
       const step = wd.steps.find((s) => s.id === 'apply-tags')!;
-      const script = step.agent!.inlineScript!;
+      const script = step.script!.inlineScript!;
       // The create POST fails 403 → add-labels never attempted → the only row errors → total failure.
       mockFetch.mockResolvedValueOnce(new Response('forbidden', { status: 403, headers: { 'content-type': 'text/plain' } }));
 

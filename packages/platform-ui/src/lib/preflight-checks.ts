@@ -40,10 +40,12 @@ export function runPreflightChecks(
   for (const step of steps) {
     if (step.executor !== 'agent' && step.executor !== 'script') continue;
 
+    const containerConfig = step.executor === 'script' ? step.script : step.agent;
+
     if (options.dockerAvailable && options.dockerImages) {
-      const image = step.agent?.image;
-      const hasBuildSource = typeof step.agent?.repo === 'string' && step.agent.repo.length > 0
-        && typeof step.agent?.commit === 'string' && step.agent.commit.length > 0;
+      const image = containerConfig?.image;
+      const hasBuildSource = typeof containerConfig?.repo === 'string' && containerConfig.repo.length > 0
+        && typeof containerConfig?.commit === 'string' && containerConfig.commit.length > 0;
       if (typeof image === 'string' && image.length > 0 && !hasBuildSource) {
         const [repo, tag = 'latest'] = image.split(':');
         const found = options.dockerImages.some((img) => img.repository === repo && img.tag === tag);

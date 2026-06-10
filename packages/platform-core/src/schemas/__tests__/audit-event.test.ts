@@ -146,6 +146,18 @@ describe('AuditEventSchema', () => {
     }
   });
 
+  it('[DATA] should accept executorType "script" (deterministic script steps)', () => {
+    const result = AuditEventSchema.safeParse({
+      ...validAuditEvent,
+      executorType: 'script',
+      reviewerType: 'none',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.executorType).toBe('script');
+    }
+  });
+
   it('[DATA] should accept reviewerType "agent"', () => {
     const result = AuditEventSchema.safeParse({
       ...validAuditEvent,

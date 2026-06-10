@@ -27,12 +27,14 @@ async function warnMissingImages(
 ): Promise<void> {
   const images = new Set<string>();
   for (const step of body.steps) {
-    const agent = (step as { agent?: { image?: string; repo?: string; commit?: string } }).agent;
-    const image = agent?.image;
-    const hasBuildSource =
-      typeof agent?.repo === 'string' && agent.repo.length > 0
-      && typeof agent?.commit === 'string' && agent.commit.length > 0;
-    if (typeof image === 'string' && image.length > 0 && !hasBuildSource) images.add(image);
+    // Agent steps configure their container under `agent`; script steps under `script`.
+    for (const containerConfig of [step.agent, step.script]) {
+      const image = containerConfig?.image;
+      const hasBuildSource =
+        typeof containerConfig?.repo === 'string' && containerConfig.repo.length > 0
+        && typeof containerConfig?.commit === 'string' && containerConfig.commit.length > 0;
+      if (typeof image === 'string' && image.length > 0 && !hasBuildSource) images.add(image);
+    }
   }
   if (images.size === 0) return;
 

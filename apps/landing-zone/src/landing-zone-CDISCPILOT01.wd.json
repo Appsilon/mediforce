@@ -28,10 +28,17 @@
     "DATA_MANAGER_EMAIL": "{{DATA_MANAGER_EMAIL_CDISCPILOT01}}"
   },
   "triggers": [
-    { "name": "manual", "type": "manual" }
+    {
+      "name": "manual",
+      "type": "manual"
+    }
   ],
   "inputForNextRun": [
-    { "stepId": "sftp-poll", "output": "listing", "as": "previousListing" }
+    {
+      "stepId": "sftp-poll",
+      "output": "listing",
+      "as": "previousListing"
+    }
   ],
   "steps": [
     {
@@ -40,11 +47,10 @@
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "autonomyLevel": "L4",
       "description": "Connect to CRO SFTP, list remote path, diff against previousRun.previousListing. Output: listing, newFiles, missingFiles.",
-      "agent": {
-        "image": "mediforce-landing-zone:latest",
-        "command": "python3 /scripts/sftp_poll.py"
+      "script": {
+        "command": "python3 /scripts/sftp_poll.py",
+        "image": "mediforce-landing-zone:latest"
       }
     },
     {
@@ -60,12 +66,11 @@
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "autonomyLevel": "L4",
       "description": "Download newFiles from SFTP and run CDISC CORE rules engine. Catches errors internally — sets scriptStatus to ok or failed. Always exits 0 so the next step (agent interpretation) always runs.",
-      "agent": {
-        "timeoutMinutes": 30,
+      "script": {
+        "command": "python3 -u /scripts/validate.py",
         "image": "mediforce-landing-zone:latest",
-        "command": "python3 -u /scripts/validate.py"
+        "timeoutMinutes": 30
       }
     },
     {
@@ -74,11 +79,10 @@
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "autonomyLevel": "L4",
       "description": "Run study-specific validation rules (layer 2) using R + pointblank against the delivered .xpt files. Rules defined in validation-rules.yaml owned by data managers. Outputs custom-findings.json with per-rule pass/fail results.",
-      "agent": {
-        "image": "mediforce-landing-zone:latest",
-        "command": "sh /scripts/validate_custom.sh"
+      "script": {
+        "command": "sh /scripts/validate_custom.sh",
+        "image": "mediforce-landing-zone:latest"
       }
     },
     {
@@ -130,11 +134,10 @@
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "autonomyLevel": "L4",
       "description": "Copy newFiles to data/lake/{studyId}/{deliveryId}/, compute SHA-256 manifest, write status=accepted.",
-      "agent": {
-        "image": "mediforce-landing-zone:latest",
-        "command": "python3 /scripts/accept_delivery.py"
+      "script": {
+        "command": "python3 /scripts/accept_delivery.py",
+        "image": "mediforce-landing-zone:latest"
       }
     },
     {
@@ -189,8 +192,12 @@
       "autonomyLevel": "L3",
       "description": "Read findings.json + the existing validation-rules.yaml, propose new study-specific rules to close the gaps the rejected delivery exposed. Pauses for human approval — verdicts: approve (open PR), revise (loop with reviewer comment, e.g. \"no rules needed\").",
       "verdicts": {
-        "approve": { "target": "new-rules-branch" },
-        "revise": { "target": "propose-rules" }
+        "approve": {
+          "target": "new-rules-branch"
+        },
+        "revise": {
+          "target": "propose-rules"
+        }
       },
       "agent": {
         "skill": "propose-rules",
@@ -208,9 +215,8 @@
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "autonomyLevel": "L4",
       "description": "Push a branch with the proposed validation-rules.yaml and open a PR against main. Idempotent: skips cleanly when the file is unchanged vs main; force-pushes on retry.",
-      "agent": {
+      "script": {
         "command": "python3 /scripts/open_rules_pr.py",
         "image": "mediforce-landing-zone:latest"
       }
@@ -224,14 +230,43 @@
     }
   ],
   "transitions": [
-    { "from": "sftp-poll", "to": "no-deliveries", "when": "output.newFiles.length == 0" },
-    { "from": "sftp-poll", "to": "validate-script", "when": "output.newFiles.length > 0" },
-    { "from": "validate-script", "to": "validate-custom" },
-    { "from": "validate-custom", "to": "interpret-validation" },
-    { "from": "interpret-validation", "to": "human-review" },
-    { "from": "accept-delivery", "to": "accepted" },
-    { "from": "draft-rejection-note", "to": "send-rejection-email" },
-    { "from": "send-rejection-email", "to": "propose-rules" },
-    { "from": "new-rules-branch", "to": "rejected-with-note" }
+    {
+      "from": "sftp-poll",
+      "to": "no-deliveries",
+      "when": "output.newFiles.length == 0"
+    },
+    {
+      "from": "sftp-poll",
+      "to": "validate-script",
+      "when": "output.newFiles.length > 0"
+    },
+    {
+      "from": "validate-script",
+      "to": "validate-custom"
+    },
+    {
+      "from": "validate-custom",
+      "to": "interpret-validation"
+    },
+    {
+      "from": "interpret-validation",
+      "to": "human-review"
+    },
+    {
+      "from": "accept-delivery",
+      "to": "accepted"
+    },
+    {
+      "from": "draft-rejection-note",
+      "to": "send-rejection-email"
+    },
+    {
+      "from": "send-rejection-email",
+      "to": "propose-rules"
+    },
+    {
+      "from": "new-rules-branch",
+      "to": "rejected-with-note"
+    }
   ]
 }

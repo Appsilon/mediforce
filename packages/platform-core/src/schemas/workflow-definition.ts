@@ -104,9 +104,6 @@ export const WorkflowAgentConfigSchema = z.object({
   skillsDir: z.string().optional(),
   timeoutMs: z.number().positive().optional(),
   timeoutMinutes: z.number().optional(),
-  command: z.string().optional(),
-  inlineScript: z.string().optional(),
-  runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),
   image: z.string().optional(),
   dockerfile: z.string().optional(),
   repo: z.string().optional(),
@@ -125,6 +122,49 @@ export const WorkflowAgentConfigSchema = z.object({
    *  (Bash, Read, Write, Edit, Glob, Grep). Use this to grant internet
    *  access (WebSearch, WebFetch) or any other built-in tool. */
   allowedTools: z.array(z.string()).optional(),
+});
+
+/**
+ * Config for deterministic script steps (executor='script', plugin='script-container').
+ * Exactly one of `command` (run in `image`) or `inlineScript` (run via `runtime`)
+ * must be set. `image`/`dockerfile`/`repo`/`commit`/`repoAuth` mirror the agent
+ * config fields — container plugins resolve image builds identically for both.
+ */
+export const ScriptStepConfigSchema = z.object({
+  command: z.string().min(1).optional(),
+  inlineScript: z.string().min(1).optional(),
+  runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),
+  image: z.string().optional(),
+  dockerfile: z.string().optional(),
+  repo: z.string().optional(),
+  commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
+  /** Name of a workflow secret containing a token for repo access. */
+  repoAuth: z.string().optional(),
+  timeoutMinutes: z.number().positive().optional(),
+}).superRefine((config, ctx) => {
+  if ((config.command !== undefined) === (config.inlineScript !== undefined)) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'exactly one of command or inlineScript must be set',
+    });
+  }
+  if (config.inlineScript !== undefined && config.runtime === undefined) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['runtime'],
+      message: 'runtime is required when inlineScript is set',
+    });
+  }
+});
+
+/** Config for Databricks job steps (executor='script', plugin='databricks-job'). */
+export const DatabricksJobConfigSchema = z.object({
+  /** Numeric Databricks job id, or a string to allow `${...}` interpolation. */
+  jobId: z.union([z.number().int().positive(), z.string().min(1)]),
+  notebookParams: z.record(z.string(), z.string()).optional(),
+  jobParameters: z.record(z.string(), z.string()).optional(),
+  pollIntervalMs: z.number().int().positive().default(10_000),
+  timeoutMinutes: z.number().positive().optional(),
 });
 
 export const CoworkChatConfigSchema = z.object({
@@ -212,6 +252,10 @@ export const WorkflowStepSchema = z.object({
    *  marks the task 'claimed'. Validation rejects it on non-human steps. */
   assignedTo: z.string().optional(),
   agent: WorkflowAgentConfigSchema.optional(),
+  /** Required when executor='script' and plugin='script-container'. */
+  script: ScriptStepConfigSchema.optional(),
+  /** Required when executor='script' and plugin='databricks-job'. */
+  databricks: DatabricksJobConfigSchema.optional(),
   review: WorkflowReviewConfigSchema.optional(),
   cowork: WorkflowCoworkConfigSchema.optional(),
   stepParams: z.record(z.string(), z.unknown()).optional(),
@@ -242,19 +286,107 @@ export const InputForNextRunEntrySchema = z.object({
  * callers using `.omit()` or `.partial()` on the base object can re-apply it).
  */
 /**
+ * Script-executor plugins and the step config key they read. A plugin listed
+ * here REQUIRES its config key on the step (and executor='script'); the
+ * config keys are rejected everywhere else.
+ */
+const SCRIPT_PLUGIN_CONFIG_KEY: Record<string, 'script' | 'databricks'> = {
+  'script-container': 'script',
+  'databricks-job': 'databricks',
+};
+
+const SCRIPT_CONFIG_KEY_PLUGIN: Record<'script' | 'databricks', string> = {
+  script: 'script-container',
+  databricks: 'databricks-job',
+};
+
+/**
  * executor='action' steps must carry an `action` config; conversely, `action`
- * makes no sense on other executors. Webhook triggers must declare a typed
- * config (method+path) — TriggerSchema accepts `config: z.record(...).optional()`
- * for back-compat with cron/manual, so we narrow webhook here.
+ * makes no sense on other executors. executor='script' steps carry their config
+ * under `script` / `databricks` (matching the plugin) — the old shape with
+ * script settings under `agent` (and `autonomyLevel`/`cowork` on script steps)
+ * is rejected. Webhook triggers must declare a typed config (method+path) —
+ * TriggerSchema accepts `config: z.record(...).optional()` for back-compat
+ * with cron/manual, so we narrow webhook here.
  */
 function validateExecutorAndTriggers(
   wd: {
-    steps: Array<{ id: string; executor: string; action?: unknown; assignedTo?: string }>;
+    steps: Array<{
+      id: string;
+      executor: string;
+      plugin?: string;
+      action?: unknown;
+      assignedTo?: string;
+      agent?: unknown;
+      autonomyLevel?: string;
+      cowork?: unknown;
+      script?: unknown;
+      databricks?: unknown;
+    }>;
     triggers: Array<{ type: string; config?: unknown }>;
   },
   ctx: z.RefinementCtx,
 ): void {
   wd.steps.forEach((step, i) => {
+    const pluginConfigKey = step.plugin !== undefined ? SCRIPT_PLUGIN_CONFIG_KEY[step.plugin] : undefined;
+
+    for (const configKey of ['script', 'databricks'] as const) {
+      if (step[configKey] === undefined) continue;
+      if (step.executor !== 'script') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, configKey],
+          message: `step '${step.id}' has ${configKey} config but executor is '${step.executor}' (must be 'script')`,
+        });
+      }
+      if (pluginConfigKey !== configKey) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, configKey],
+          message: `step '${step.id}' has ${configKey} config but plugin is '${step.plugin ?? 'unset'}' (expected '${SCRIPT_CONFIG_KEY_PLUGIN[configKey]}')`,
+        });
+      }
+    }
+
+    if (pluginConfigKey !== undefined && step.executor !== 'script') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['steps', i, 'plugin'],
+        message: `step '${step.id}': plugin '${step.plugin}' requires executor='script' (got '${step.executor}')`,
+      });
+    }
+
+    if (step.executor === 'script') {
+      if (pluginConfigKey !== undefined && step[pluginConfigKey] === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, pluginConfigKey],
+          message: `step '${step.id}' has plugin '${step.plugin}' but no ${pluginConfigKey} config`,
+        });
+      }
+      if (step.agent !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, 'agent'],
+          message: `step '${step.id}': agent config is not allowed on script steps — script settings moved to step.script`,
+        });
+      }
+      if (step.autonomyLevel !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, 'autonomyLevel'],
+          message: `step '${step.id}': autonomyLevel is not allowed on script steps (scripts are deterministic — remove the field)`,
+        });
+      }
+      if (step.cowork !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, 'cowork'],
+          message: `step '${step.id}': cowork config is not allowed on script steps`,
+        });
+      }
+    }
+
     if (step.assignedTo !== undefined && step.executor !== 'human') {
       ctx.addIssue({
         code: 'custom',
@@ -553,9 +685,24 @@ export function parseWorkflowTemplate(input: unknown) {
 }
 
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
+export type ScriptStepConfig = z.infer<typeof ScriptStepConfigSchema>;
+export type DatabricksJobConfig = z.infer<typeof DatabricksJobConfigSchema>;
 export type WorkflowCoworkConfig = z.infer<typeof WorkflowCoworkConfigSchema>;
 export type WorkflowReviewConfig = z.infer<typeof WorkflowReviewConfigSchema>;
 export type WorkflowWorkspace = z.infer<typeof WorkflowWorkspaceSchema>;
 export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
 export type InputForNextRunEntry = z.infer<typeof InputForNextRunEntrySchema>;
+
+/**
+ * Effective step timeout in minutes, regardless of executor flavour.
+ * Mirrors the runtime's historical default of 30 minutes (agent-runner).
+ */
+export function resolveStepTimeoutMinutes(
+  step: Pick<WorkflowStep, 'agent' | 'script' | 'databricks'>,
+): number {
+  return step.agent?.timeoutMinutes
+    ?? step.script?.timeoutMinutes
+    ?? step.databricks?.timeoutMinutes
+    ?? 30;
+}

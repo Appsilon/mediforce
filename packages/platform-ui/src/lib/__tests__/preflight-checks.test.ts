@@ -11,7 +11,7 @@ const IMAGES: DockerImageInfo[] = [
 function makeDefinition(overrides?: { image?: string; env?: Record<string, string> }) {
   const wd = buildWorkflowDefinition({ name: 'test-wf' });
   wd.steps[0].executor = 'script';
-  wd.steps[0].agent = { image: overrides?.image ?? 'python:3.11-slim' };
+  wd.steps[0].script = { command: 'python run.py', image: overrides?.image ?? 'python:3.11-slim' };
   if (overrides?.env) wd.steps[0].env = overrides.env;
   return wd;
 }
@@ -37,7 +37,7 @@ describe('runPreflightChecks', () => {
 
   it('skips image warning when repo + commit configured (engine auto-builds)', () => {
     const wd = makeDefinition({ image: 'mediforce/nonexistent:v1' });
-    wd.steps[0].agent = { ...wd.steps[0].agent, repo: 'git@github.com:org/repo.git', commit: 'abc1234' };
+    wd.steps[0].script = { ...wd.steps[0].script, repo: 'git@github.com:org/repo.git', commit: 'abc1234' };
     const result = runPreflightChecks(wd, { dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
     expect(result.filter((w) => w.category === 'missing-image')).toEqual([]);
   });
@@ -69,7 +69,7 @@ describe('runPreflightChecks', () => {
   it('groups same resource across multiple steps', () => {
     const wd = buildWorkflowDefinition({ name: 'test-wf' });
     wd.steps[0].executor = 'script';
-    wd.steps[0].agent = { image: 'bad:v1' };
+    wd.steps[0].script = { command: 'python run.py', image: 'bad:v1' };
     wd.steps[0].env = { KEY: '{{SHARED_SECRET}}' };
     const reviewStep = wd.steps.find((s) => s.type === 'review');
     if (reviewStep) {

@@ -76,7 +76,7 @@ describe('workflow-designer', () => {
       }
     });
 
-    it('script steps have plugin and agent config', () => {
+    it('script steps have plugin and script config', () => {
       const result = loadDefinition();
       expect(result.success).toBe(true);
       if (!result.success) return;
@@ -86,8 +86,8 @@ describe('workflow-designer', () => {
 
       for (const step of scriptSteps) {
         expect(step.plugin).toBe('script-container');
-        expect(step.agent).toBeDefined();
-        expect(step.agent?.runtime).toBe('javascript');
+        expect(step.script).toBeDefined();
+        expect(step.script?.runtime).toBe('javascript');
       }
     });
 

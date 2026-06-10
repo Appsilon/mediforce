@@ -1058,8 +1058,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
           type: 'creation',
           executor: 'script',
           plugin: 'script-container',
-          autonomyLevel: 'L4',
-          agent: {
+          script: {
             runtime: 'bash',
             inlineScript: [
               '#!/bin/sh',
@@ -1077,8 +1076,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
           type: 'creation',
           executor: 'script',
           plugin: 'script-container',
-          autonomyLevel: 'L4',
-          agent: {
+          script: {
             runtime: 'bash',
             inlineScript: [
               '#!/bin/sh',
@@ -1309,7 +1307,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         type: 'creation',
         executor: 'agent',
         autonomyLevel: 'L2',
-        plugin: 'script-container',
+        plugin: 'claude-code-agent',
         agentId: 'mcp-test-agent',
       },
       { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
