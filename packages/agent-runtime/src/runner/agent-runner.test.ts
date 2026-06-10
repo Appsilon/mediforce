@@ -264,7 +264,42 @@ describe('AgentRunner', () => {
     expect(span.attributes['mediforce.workflow.version']).toBe(7);
     expect(span.attributes['mediforce.workflow.step_id']).toBe('step-1');
     expect(span.attributes['gen_ai.request.model']).toBe('anthropic/claude-sonnet-4');
+    expect(span.attributes['openinference.span.kind']).toBe('AGENT');
     expect(span.ended).toBe(true);
+  });
+
+  it('does not record run input/output on the span by default (content capture off)', async () => {
+    const tracerProvider = new RecordingTracerProvider();
+    trace.setGlobalTracerProvider(tracerProvider);
+
+    const plugin = makeSuccessPlugin(makeValidEnvelope());
+    await runner.runWithWorkflowStep(plugin, makeWorkflowContext());
+
+    const span = tracerProvider.spans[0];
+    expect(span.attributes['input.value']).toBeUndefined();
+    expect(span.attributes['output.value']).toBeUndefined();
+  });
+
+  it('records run input/output on the span when content capture is enabled', async () => {
+    const tracerProvider = new RecordingTracerProvider();
+    trace.setGlobalTracerProvider(tracerProvider);
+
+    const capturingRunner = new AgentRunner(
+      instanceRepository,
+      auditRepository,
+      eventLog,
+      undefined,
+      { captureContent: true },
+    );
+    const plugin = makeSuccessPlugin(makeValidEnvelope());
+    await capturingRunner.runWithWorkflowStep(plugin, makeWorkflowContext());
+
+    const span = tracerProvider.spans[0];
+    expect(span.attributes['input.value']).toBe(JSON.stringify({ patientId: 'P001' }));
+    expect(span.attributes['output.value']).toBe(
+      JSON.stringify({ recommendation: 'continue_monitoring' }),
+    );
+    expect(span.attributes['output.mime_type']).toBe('application/json');
   });
 
   // --- Test 2: L0 (Silent Observer) — output not surfaced ---

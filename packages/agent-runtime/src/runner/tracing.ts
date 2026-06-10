@@ -12,6 +12,9 @@ interface AgentRunSpanResult {
   appliedToWorkflow: boolean;
   fallbackReason: 'timeout' | 'low_confidence' | 'error' | null;
   envelopeModel?: string | null;
+  /** Envelope result to record as output.value — only pass when content
+   *  capture is enabled (ADR-0007 D5: may contain patient data). */
+  capturedResult?: unknown;
 }
 
 interface LlmSpanInput {
@@ -35,9 +38,13 @@ function recordError(span: Span, error: unknown): void {
 export async function withAgentRunSpan<T>(
   agentRunId: string,
   context: WorkflowAgentContext,
+  options: OpenTelemetryTracingOptions,
   callback: (span: Span) => Promise<T>,
 ): Promise<T> {
   const attributes: Attributes = {
+    // OpenInference span kind — trace viewers (Phoenix) use it to type and
+    // render the span (icons, input/output panels).
+    'openinference.span.kind': 'AGENT',
     'mediforce.agent_run.id': agentRunId,
     'mediforce.process_instance.id': context.processInstanceId,
     'mediforce.namespace': context.runNamespace,
@@ -49,6 +56,11 @@ export async function withAgentRunSpan<T>(
 
   if (context.step.agent?.model !== undefined) {
     attributes['gen_ai.request.model'] = context.step.agent.model;
+  }
+
+  if (options.captureContent === true) {
+    attributes['input.value'] = JSON.stringify(context.stepInput);
+    attributes['input.mime_type'] = 'application/json';
   }
 
   // Final span status is set by annotateAgentRunSpan (every terminal path
@@ -85,6 +97,13 @@ export function annotateAgentRunSpan(
     span.setAttribute('gen_ai.response.model', result.envelopeModel);
   }
 
+  if (result.capturedResult !== undefined) {
+    span.setAttributes({
+      'output.value': JSON.stringify(result.capturedResult),
+      'output.mime_type': 'application/json',
+    });
+  }
+
   if (result.fallbackReason === 'timeout' || result.fallbackReason === 'error') {
     span.setStatus({
       code: SpanStatusCode.ERROR,
@@ -100,6 +119,7 @@ export async function withOpenRouterLlmSpan<T>(
   callback: (span: Span) => Promise<T>,
 ): Promise<T> {
   const attributes: Attributes = {
+    'openinference.span.kind': 'LLM',
     'gen_ai.request.model': input.selectedModel,
     'mediforce.llm.provider': 'openrouter',
     'mediforce.llm.message_count': input.messages.length,

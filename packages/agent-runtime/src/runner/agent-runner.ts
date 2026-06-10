@@ -15,7 +15,11 @@ import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext } from '../
 import type { AgentEventLog } from './agent-event-log';
 import { FallbackHandler } from './fallback-handler';
 import { PluginRunner } from './plugin-runner';
-import { annotateAgentRunSpan, withAgentRunSpan } from './tracing';
+import {
+  annotateAgentRunSpan,
+  withAgentRunSpan,
+  type OpenTelemetryTracingOptions,
+} from './tracing';
 
 export interface AgentRunResult {
   status: AgentRunStatus;
@@ -34,6 +38,7 @@ export class AgentRunner {
     private readonly auditRepository: AuditRepository,
     private readonly eventLog: AgentEventLog,
     private readonly agentRunRepository?: AgentRunRepository,
+    private readonly tracingOptions: OpenTelemetryTracingOptions = {},
   ) {
     this.fallbackHandler = new FallbackHandler(instanceRepository);
     this.pluginRunner = new PluginRunner(eventLog);
@@ -53,6 +58,8 @@ export class AgentRunner {
       appliedToWorkflow: result.appliedToWorkflow,
       fallbackReason: result.fallbackReason,
       envelopeModel,
+      capturedResult:
+        this.tracingOptions.captureContent === true ? result.envelope?.result : undefined,
     });
     if (this.agentRunRepository) {
       await this.agentRunRepository.create({
@@ -85,7 +92,7 @@ export class AgentRunner {
     const runId = randomUUID();
     const pluginId = context.step.plugin ?? context.stepId;
 
-    return withAgentRunSpan(runId, context, async (span) => {
+    return withAgentRunSpan(runId, context, this.tracingOptions, async (span) => {
       if (this.agentRunRepository) {
         await this.agentRunRepository.create({
           id: runId,

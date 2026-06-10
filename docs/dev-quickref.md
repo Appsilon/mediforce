@@ -63,9 +63,16 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:6006 pnpm dev
 Run any workflow with an agent step, then open http://localhost:6006 —
 spans `mediforce.agent.run` (workflow correlation attributes) and
 `openrouter.chat.completion` (model + token usage) land in the `default`
-project. Add `MEDIFORCE_OTEL_CAPTURE_CONTENT=true` to also record
-prompt/completion text (dev/demo only — prompts may contain patient data).
-Any OTLP-HTTP backend works in place of Phoenix.
+project. Add `MEDIFORCE_OTEL_CAPTURE_CONTENT=true` to also record content
+(dev/demo only — may contain patient data): step input / envelope result on
+the agent-run span (Phoenix Input/Output panels), prompt/completion text on
+LLM spans. Any OTLP-HTTP backend works in place of Phoenix.
+
+Container agents (claude-code, opencode, script) call their LLM **inside**
+the Docker container, so their runs have no `openrouter.chat.completion`
+child span — only the platform-side `OpenRouterLlmClient` is traced.
+In-container LLM tracing needs context propagation into the container
+(not implemented).
 
 Only `@mediforce/*` spans are exported. Registering the tracer provider also
 activates Next.js's built-in HTTP instrumentation; those spans are filtered
