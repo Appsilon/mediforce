@@ -63,5 +63,18 @@ services:
       redis:
         condition: service_healthy
 
+  # OTel trace viewer (ADR-0007). Receives OTLP HTTP on :6006 (/v1/traces)
+  # and serves the UI on the same port. Enable export by setting
+  # OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:6006 before `pnpm dev`.
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports:
+      - "6006:6006"
+    environment:
+      - PHOENIX_WORKING_DIR=/mnt/data
+    volumes:
+      - phoenix-data:/mnt/data
+
 volumes:
   postgres-data:
+  phoenix-data:
