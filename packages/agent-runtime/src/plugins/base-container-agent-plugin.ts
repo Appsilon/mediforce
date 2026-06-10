@@ -894,24 +894,33 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         ? parsedResult.confidence_rationale
         : undefined;
 
-      let tokenUsage: { inputTokens: number; outputTokens: number } | undefined;
+      let tokenUsage: { inputTokens: number; outputTokens: number; cachedInputTokens?: number } | undefined;
 
       // First: check if agent reported tokenUsage in its result
       if (parsedResult.tokenUsage !== null
         && typeof parsedResult.tokenUsage === 'object'
         && typeof (parsedResult.tokenUsage as Record<string, unknown>).inputTokens === 'number'
         && typeof (parsedResult.tokenUsage as Record<string, unknown>).outputTokens === 'number') {
-        tokenUsage = parsedResult.tokenUsage as { inputTokens: number; outputTokens: number };
+        tokenUsage = parsedResult.tokenUsage as { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
       }
 
       // Second: check stream event for CLI-reported usage (e.g. Claude Code stream-json result event)
       // parseAgentOutput() returns a single JSON object for the final result event.
+      // Cache-creation tokens are billed at (roughly) the input rate, so they fold into
+      // inputTokens; cache-read tokens are billed at the cheaper cacheRead rate, so they are
+      // tracked separately. Dropping either — as the previous version did — under-reports cost.
       if (!tokenUsage) {
         try {
           const rawEvent = JSON.parse(spawnResult.cliOutput) as Record<string, unknown>;
           const usage = rawEvent.usage as Record<string, number> | undefined;
           if (usage && typeof usage.input_tokens === 'number' && typeof usage.output_tokens === 'number') {
-            tokenUsage = { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens };
+            const cacheCreationTokens = typeof usage.cache_creation_input_tokens === 'number' ? usage.cache_creation_input_tokens : 0;
+            const cacheReadTokens = typeof usage.cache_read_input_tokens === 'number' ? usage.cache_read_input_tokens : 0;
+            tokenUsage = {
+              inputTokens: usage.input_tokens + cacheCreationTokens,
+              outputTokens: usage.output_tokens,
+              ...(cacheReadTokens > 0 ? { cachedInputTokens: cacheReadTokens } : {}),
+            };
           }
         } catch {
           agentLog('cost.tokenExtraction', 'could not extract token usage from CLI output', {
