@@ -16,7 +16,6 @@ import { normalizePresentation } from './task-utils';
 interface TaskContextPanelProps {
   processInstanceId: string;
   stepId: string; // The human task's stepId — we need the PREVIOUS step's output
-  onContentLoaded?: (hasContent: boolean) => void;
 }
 
 /**
@@ -26,13 +25,11 @@ interface TaskContextPanelProps {
  * iframe under a "Report" tab and selects that tab by default. The
  * Summary and Full Output tabs remain available for the structured JSON.
  *
- * Reports content availability via onContentLoaded callback so the parent
- * can disable verdict buttons when no content exists to review.
+ * Renders nothing if the previous step produced no output to show.
  */
 export function TaskContextPanel({
   processInstanceId,
   stepId,
-  onContentLoaded,
 }: TaskContextPanelProps) {
   const { data: instance } = useProcessInstance(processInstanceId);
   const { data: executions, loading } = useStepExecutions(
@@ -76,11 +73,6 @@ export function TaskContextPanel({
       normalizePresentation(previousStepOutput.agentOutput?.presentation) !== null
     );
 
-  // Notify parent about content availability
-  React.useEffect(() => {
-    onContentLoaded?.(hasContent);
-  }, [hasContent, onContentLoaded]);
-
   if (loading) {
     return (
       <div className="rounded-lg border p-6">
@@ -93,16 +85,7 @@ export function TaskContextPanel({
   }
 
   if (!hasContent) {
-    return (
-      <div className="rounded-lg border border-dashed p-6 text-center">
-        <p className="text-sm text-muted-foreground">
-          Waiting for step output...
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Verdict buttons will be enabled once there is content to review.
-        </p>
-      </div>
-    );
+    return null;
   }
 
   const previousStep = previousStepOutput!;

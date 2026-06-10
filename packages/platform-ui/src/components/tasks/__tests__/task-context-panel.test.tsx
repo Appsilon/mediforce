@@ -207,6 +207,20 @@ describe('TaskContextPanel', () => {
     expect(document.querySelector('iframe')).toBeNull();
   });
 
+  it('renders nothing when there is no previous step output to show', async () => {
+    setStepExecutions([]);
+
+    const { container } = render(
+      <TaskContextPanel
+        processInstanceId="inst-1"
+        stepId="human-review"
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /previous step output/i })).toBeNull();
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('shows an inline error notice when the report fetch returns 404 — Summary tab is still selectable', async () => {
     const execution = buildExecution({
       output: {

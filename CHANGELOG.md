@@ -24,6 +24,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ### Fixed
 - **Run cost under-reported for cached agent runs** — the container-agent token extractor read only `input_tokens`/`output_tokens` from the CLI result event and dropped `cache_read_input_tokens` and `cache_creation_input_tokens`, so prompt-cached runs (where cache reads dominate input) showed costs many times lower than OpenRouter actually charged. Cache-creation tokens now fold into `inputTokens` and cache-read tokens are tracked as `cachedInputTokens`, priced at the registry `cacheRead` rate (falling back to the input rate). (#654)
+- Completed param-only tasks (e.g. data-entry steps with no verdicts) no longer show a "Waiting for step output... Verdict buttons will be enabled..." box — that message only made sense for review steps, and the panel now renders nothing when the previous step produced no output to show [#672](https://github.com/Appsilon/mediforce/pull/672).
+
 ### Changed
 - GETTING-STARTED now covers two first-run blockers that were previously only discoverable by hitting the error: setting `MEDIFORCE_API_KEY` for the CLI (must match `PLATFORM_API_KEY`), and building local `script`-executor images (`mediforce-golden-image`, `mediforce-node`) via `scripts/rebuild-docker-images.sh` before running workflows with `script` steps [#670](https://github.com/Appsilon/mediforce/pull/670).
 
