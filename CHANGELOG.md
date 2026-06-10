@@ -22,6 +22,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
   - Built-in tool calls (`update_artifact`, `update_presentation`) now persist as live tool turns visible in the cowork chat UI.
   - Postgres migration 0018: `validation_result` (jsonb) + `presentation` (text) columns on `cowork_sessions`.
 
+### Fixed
+- **Run cost under-reported for cached agent runs** — the container-agent token extractor read only `input_tokens`/`output_tokens` from the CLI result event and dropped `cache_read_input_tokens` and `cache_creation_input_tokens`, so prompt-cached runs (where cache reads dominate input) showed costs many times lower than OpenRouter actually charged. Cache-creation tokens now fold into `inputTokens` and cache-read tokens are tracked as `cachedInputTokens`, priced at the registry `cacheRead` rate (falling back to the input rate). (#654)
+
 ## [2026-05-31]
 
 ### Changed
