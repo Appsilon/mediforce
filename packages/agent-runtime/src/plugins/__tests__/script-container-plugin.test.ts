@@ -290,6 +290,57 @@ describe('ScriptContainerPlugin', () => {
       expect(dockerArgs.slice(imageIdx + 1)).toEqual(['sh', '/output/script.sh']);
     });
 
+    it('[DATA] base64-encoded inlineScript is decoded before writing script.mjs', async () => {
+      const sourceScript = [
+        "import { writeFileSync } from 'fs';",
+        "writeFileSync('/output/result.json', JSON.stringify({ ok: true }));",
+      ].join('\n');
+      const context: AgentContext = {
+        ...buildMockContext(),
+        config: {
+          processName: 'test',
+          configName: 'default',
+          configVersion: 'v1',
+          stepConfigs: [
+            {
+              stepId: 'run-script',
+              executorType: 'script',
+              plugin: 'script-container',
+              agentConfig: {
+                runtime: 'javascript',
+                inlineScript: Buffer.from(sourceScript, 'utf-8').toString('base64'),
+              },
+            },
+          ],
+        } satisfies ProcessConfig,
+      };
+      await plugin.initialize(context);
+
+      const { emit } = buildEmitSpy();
+      const mockChild = createMockChild();
+      let writtenScript = '';
+
+      spawnMock.mockImplementation((_cmd, args) => {
+        const argsArr = args as string[];
+        const volumeIdx = argsArr.indexOf('-v');
+        const outputDir = volumeIdx >= 0 ? argsArr[volumeIdx + 1].split(':')[0] : null;
+        setTimeout(async () => {
+          if (outputDir) {
+            writtenScript = await readFile(join(outputDir, 'script.mjs'), 'utf-8');
+            await writeFile(join(outputDir, 'result.json'), JSON.stringify({ ok: true }), 'utf-8');
+          }
+          (mockChild.stdout as Readable).push(null);
+          (mockChild.stderr as Readable).push(null);
+          mockChild.emit('close', 0, null);
+        }, 10);
+        return mockChild;
+      });
+
+      await plugin.run(emit);
+
+      expect(writtenScript).toBe(sourceScript);
+    });
+
     it('[DATA] command field is whitespace-split argv — complex shell belongs in inlineScript', async () => {
       // This documents the convention: `command` is token-split on whitespace,
       // so it cannot carry shell operators like quotes, pipes, or `&&`.

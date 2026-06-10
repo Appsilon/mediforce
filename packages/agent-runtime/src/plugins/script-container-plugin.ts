@@ -9,6 +9,7 @@ import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitI
 import { isLocalExecutionAllowed } from './base-container-agent-plugin';
 
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
+const BASE64_TEXT_RE = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
 /** Runtime → Docker image, file extension, and run command (as array for spawn). */
 const RUNTIME_CONFIG: Record<string, { image: string; ext: string; cmd: (path: string) => string[] }> = {
@@ -17,6 +18,49 @@ const RUNTIME_CONFIG: Record<string, { image: string; ext: string; cmd: (path: s
   r: { image: 'rocker/r-ver:4', ext: '.R', cmd: (p) => ['Rscript', p] },
   bash: { image: 'alpine:3.19', ext: '.sh', cmd: (p) => ['sh', p] },
 };
+
+function looksLikeScriptSource(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return false;
+  if (trimmed.startsWith('#!')) return true;
+  return [
+    'import ',
+    'export ',
+    'const ',
+    'let ',
+    'var ',
+    'function ',
+    'await ',
+    'process.',
+    'console.',
+    'readFileSync(',
+    'writeFileSync(',
+    'JSON.parse(',
+    'if (',
+    'for (',
+    'while (',
+    'echo ',
+  ].some((marker) => trimmed.includes(marker));
+}
+
+function maybeDecodeInlineScript(rawScript: string): string {
+  const trimmed = rawScript.trim();
+  if (trimmed.length < 24 || trimmed.length % 4 !== 0 || !BASE64_TEXT_RE.test(trimmed)) {
+    return rawScript;
+  }
+
+  const decodedBuffer = Buffer.from(trimmed, 'base64');
+  if (decodedBuffer.length === 0 || decodedBuffer.toString('base64') !== trimmed) {
+    return rawScript;
+  }
+
+  const decodedScript = decodedBuffer.toString('utf-8');
+  if (decodedScript.includes('\uFFFD') || !looksLikeScriptSource(decodedScript) || looksLikeScriptSource(rawScript)) {
+    return rawScript;
+  }
+
+  return decodedScript;
+}
 
 /**
  * Best-effort extraction of a human-readable failure reason from a step's
@@ -126,7 +170,13 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         );
       }
 
-      this.inlineScript = agentConfig.inlineScript;
+      const normalizedInlineScript = maybeDecodeInlineScript(agentConfig.inlineScript);
+      if (normalizedInlineScript !== agentConfig.inlineScript) {
+        console.warn(
+          `[ScriptContainer] Decoded base64 inlineScript for step '${context.stepId}' before writing the runtime file`,
+        );
+      }
+      this.inlineScript = normalizedInlineScript;
       this.runtime = runtime;
 
       if (!agentConfig.image && isLocalExecutionAllowed()) {
