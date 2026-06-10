@@ -61,7 +61,7 @@ export default function StepDetailPage() {
   );
 
   const definitionStep = useMemo((): Step | null => {
-    return definition?.steps.find((s) => s.id === decodedStepId) ?? null;
+    return definition?.steps?.find((s) => s.id === decodedStepId) ?? null;
   }, [definition, decodedStepId]);
 
   // Find previous step name for the "From:" label
@@ -69,7 +69,7 @@ export default function StepDetailPage() {
     const transitions = definition?.transitions ?? [];
     const incoming = transitions.find((t) => t.to === decodedStepId);
     if (!incoming) return null;
-    const prevStep = definition?.steps.find((s) => s.id === incoming.from);
+    const prevStep = definition?.steps?.find((s) => s.id === incoming.from);
     return prevStep?.name ?? formatStepName(incoming.from);
   }, [definition, decodedStepId]);
 
