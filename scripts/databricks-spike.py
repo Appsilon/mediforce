@@ -73,7 +73,13 @@ def api(host: str, token: str, method: str, path: str, payload: dict | None = No
     )
     try:
         with urllib.request.urlopen(request) as response:
-            return json.loads(response.read() or b"{}")
+            raw = response.read() or b"{}"
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                print(f"\nError: {method} {path} returned non-JSON (first 200 chars):")
+                print(raw[:200].decode(errors="replace"))
+                sys.exit(1)
     except urllib.error.HTTPError as error:
         print(f"\nError: {method} {path} -> HTTP {error.code}")
         print(error.read().decode())
@@ -104,12 +110,16 @@ def main() -> None:
     parser.add_argument("--keep", action="store_true", help="skip cleanup of notebook + job")
     args = parser.parse_args()
 
-    host = env_value("DATABRICKS_HOST").rstrip("/")
+    host_raw = env_value("DATABRICKS_HOST")
     token = env_value("DATABRICKS_TOKEN")
-    if host == "" or token == "":
+    if host_raw == "" or token == "":
         print("Error: DATABRICKS_HOST and DATABRICKS_TOKEN not found.")
         print("Export them or add them to .env.local (repo root or packages/platform-ui).")
         sys.exit(1)
+    host_parts = urllib.parse.urlsplit(host_raw)
+    host = f"{host_parts.scheme}://{host_parts.netloc}"
+    if host != host_raw.rstrip("/"):
+        print(f"Note: DATABRICKS_HOST trimmed to workspace origin: {host}")
 
     started = timed(f"1. Jobs API sanity check against {host}")
     api(host, token, "GET", "/api/2.2/jobs/list?limit=1")
