@@ -9,8 +9,39 @@ beforeEach(() => {
 const BASE_ENV = { MEDIFORCE_API_KEY: 'k' };
 
 const COMPLETE_RESPONSE = {
-  task: { id: 'task-1', status: 'completed' },
-  run: { id: 'run-1', status: 'running' },
+  task: {
+    id: 'task-1',
+    processInstanceId: 'run-1',
+    stepId: 'step-review',
+    assignedRole: 'reviewer',
+    assignedUserId: null,
+    status: 'completed',
+    deadline: null,
+    createdAt: '2026-06-01T00:00:00.000Z',
+    updatedAt: '2026-06-01T00:00:00.000Z',
+    completedAt: '2026-06-01T00:01:00.000Z',
+    completionData: { kind: 'verdict', verdict: 'approve' },
+  },
+  run: {
+    id: 'run-1',
+    definitionName: 'wf-a',
+    definitionVersion: '1',
+    status: 'running',
+    currentStepId: null,
+    variables: {},
+    triggerType: 'manual',
+    triggerPayload: {},
+    createdAt: '2026-06-01T00:00:00.000Z',
+    updatedAt: '2026-06-01T00:00:00.000Z',
+    createdBy: 'test',
+    pauseReason: null,
+    error: null,
+    assignedRoles: [],
+    deleted: false,
+    archived: false,
+    dryRun: false,
+    namespace: 'test',
+  },
 };
 
 describe('task complete command', () => {
@@ -60,14 +91,14 @@ describe('task complete command', () => {
     );
     const output = captureOutput();
     const code = await taskCompleteCommand({
-      argv: ['task-1', '--payload', '{"verdict":"approve"}', '--base-url', 'http://test:9000'],
+      argv: ['task-1', '--payload', '{"kind":"verdict","verdict":"approve"}', '--base-url', 'http://test:9000'],
       env: BASE_ENV,
       output,
     });
     expect(code).toBe(0);
     expect(output.stdoutLines.join('\n')).toMatch(/task-1.*completed/i);
     const body = JSON.parse(fetchSpy.mock.calls[0]![1]?.body as string);
-    expect(body.payload).toEqual({ verdict: 'approve' });
+    expect(body).toEqual({ kind: 'verdict', verdict: 'approve' });
   });
 
   it('reads payload from stdin via --payload-file -', async () => {
@@ -79,11 +110,11 @@ describe('task complete command', () => {
       argv: ['task-1', '--payload-file', '-', '--base-url', 'http://test:9000'],
       env: BASE_ENV,
       output,
-      stdin: async () => '{"fromStdin":true}',
+      stdin: async () => '{"kind":"verdict","verdict":"ok"}',
     });
     expect(code).toBe(0);
     const body = JSON.parse(fetchSpy.mock.calls[0]![1]?.body as string);
-    expect(body.payload).toEqual({ fromStdin: true });
+    expect(body).toEqual({ kind: 'verdict', verdict: 'ok' });
   });
 
   it('outputs JSON on --json', async () => {
@@ -92,7 +123,7 @@ describe('task complete command', () => {
     );
     const output = captureOutput();
     const code = await taskCompleteCommand({
-      argv: ['task-1', '--payload', '{}', '--json', '--base-url', 'http://test:9000'],
+      argv: ['task-1', '--payload', '{"kind":"verdict","verdict":"done"}', '--json', '--base-url', 'http://test:9000'],
       env: BASE_ENV,
       output,
     });
