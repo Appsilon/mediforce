@@ -36,9 +36,9 @@ test.describe('Task Review Journey', () => {
     await expect(page.getByText(/pending/i)).toBeVisible();
     await showCaption(page, 'Human review task — status: pending');
 
-    // Previous Step Output panel is open by default; Summary tab is the
-    // default selection. Just confirm the user can see review context.
-    await expect(page.getByRole('tab', { name: /summary/i })).toBeVisible();
+    // Previous Step Output panel is open by default; Report tab is the
+    // default selection when an HTML report is present.
+    await expect(page.getByRole('tab', { name: /extracted data/i })).toBeVisible();
     await showCaption(page, 'Reviewing previous step output');
 
     // Lock the single-click invariant before clicking: no Submit button

@@ -34,7 +34,10 @@ test.describe('Run Detail Journey', () => {
     await expect(page.getByText('Archived').first()).toBeVisible();
     await showStep(page);
 
-    // Right panel: Audit Log tab visible; no Step History tab (removed in two-panel redesign)
+    // Right panel: "Show Detailed Log" always visible in header; clicking it
+    // expands the panel revealing the Audit Log tab. No Step History tab.
+    await expect(page.getByRole('button', { name: /show detailed log/i })).toBeVisible();
+    await click(page, page.getByRole('button', { name: /show detailed log/i }));
     await expect(page.getByRole('button', { name: /audit log/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /step history/i })).not.toBeVisible();
     await showResult(page);
@@ -58,7 +61,8 @@ test.describe('Run Detail Journey', () => {
     // Duration is visible for a completed run
     await expect(page.getByText(/duration/i)).toBeVisible();
 
-    // Right panel: Audit Log tab in the two-panel layout
+    // Right panel: expand via "Show Detailed Log", then Audit Log tab is visible
+    await click(page, page.getByRole('button', { name: /show detailed log/i }));
     await expect(page.getByRole('button', { name: /audit log/i })).toBeVisible();
     await showResult(page);
   });
