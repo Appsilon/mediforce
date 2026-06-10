@@ -8,6 +8,9 @@ Usage:
     python3 scripts/databricks-spike.py
     python3 scripts/databricks-spike.py --keep   # leave notebook + job behind
 
+Instead of exporting, the two variables can also live in `.env.local` at the
+repo root or in `packages/platform-ui/.env.local`.
+
 Exercises the full plugin cycle against a real workspace (Free Edition works):
     1. Jobs API sanity check (token + `jobs` scope)
     2. Upload a notebook via workspace import (`workspace` scope)
@@ -30,6 +33,10 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+ENV_LOCAL_PATHS = [REPO_ROOT / ".env.local", REPO_ROOT / "packages/platform-ui/.env.local"]
 
 NOTEBOOK_PATH = "/Shared/mediforce-databricks-spike"
 NOTEBOOK_SOURCE = """# Databricks notebook source
@@ -40,6 +47,19 @@ dbutils.notebook.exit(json.dumps({"validationStatus": "passed", "rowsChecked": 4
 JOB_NAME = "mediforce-databricks-spike"
 RUN_POLL_INTERVAL_SECONDS = 10
 RUN_TIMEOUT_SECONDS = 15 * 60
+
+
+def env_value(name: str) -> str:
+    if name in os.environ:
+        return os.environ[name]
+    for env_file in ENV_LOCAL_PATHS:
+        if not env_file.exists():
+            continue
+        for line in env_file.read_text().splitlines():
+            line = line.strip().removeprefix("export ")
+            if line.startswith(f"{name}="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return ""
 
 
 def api(host: str, token: str, method: str, path: str, payload: dict | None = None) -> dict:
@@ -84,10 +104,11 @@ def main() -> None:
     parser.add_argument("--keep", action="store_true", help="skip cleanup of notebook + job")
     args = parser.parse_args()
 
-    host = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
-    token = os.environ.get("DATABRICKS_TOKEN", "")
+    host = env_value("DATABRICKS_HOST").rstrip("/")
+    token = env_value("DATABRICKS_TOKEN")
     if host == "" or token == "":
-        print("Error: set DATABRICKS_HOST and DATABRICKS_TOKEN first.")
+        print("Error: DATABRICKS_HOST and DATABRICKS_TOKEN not found.")
+        print("Export them or add them to .env.local (repo root or packages/platform-ui).")
         sys.exit(1)
 
     started = timed(f"1. Jobs API sanity check against {host}")
