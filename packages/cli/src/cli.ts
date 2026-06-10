@@ -18,6 +18,8 @@ import { workflowListVersionsCommand } from './commands/workflow-list-versions';
 import { workflowGetCommand } from './commands/workflow-get';
 import { runGetCommand } from './commands/run-get';
 import { runListCommand } from './commands/run-list';
+import { runFilesCommand } from './commands/run-files';
+import { runDownloadCommand } from './commands/run-download';
 import { runStartCommand } from './commands/run-start';
 import { runCancelCommand } from './commands/run-cancel';
 import { runArchiveCommand } from './commands/run-archive';
@@ -103,11 +105,13 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   run: {
-    description: 'Workflow runs (list, start, get, cancel, archive, bulk)',
+    description: 'Workflow runs (list, start, get, files, download, cancel, archive, bulk)',
     leaves: {
       list: { description: 'List recent runs', fn: runListCommand },
       start: { description: 'Start a new run (manual trigger)', fn: runStartCommand },
       get: { description: "Fetch a single run's status", fn: runGetCommand },
+      files: { description: "List a run's Output Files", fn: runFilesCommand },
+      download: { description: "Download a run's Output Files (one or all)", fn: runDownloadCommand },
       cancel: { description: 'Cancel a running or paused run', fn: runCancelCommand },
       archive: { description: 'Soft-archive (or restore) a run', fn: runArchiveCommand },
       'bulk-cancel': { description: 'Cancel multiple runs in one call', fn: runBulkCancelCommand },
