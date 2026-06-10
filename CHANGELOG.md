@@ -29,6 +29,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ### Fixed
 - Queued (BullMQ) Docker execution no longer corrupts binary files (PDF, XLSX, ZIP) and now preserves nested output directories — file payloads cross Redis as base64 keyed by POSIX relative path, matching local-mode behaviour.
 - **Run cost under-reported for cached agent runs** — the container-agent token extractor read only `input_tokens`/`output_tokens` from the CLI result event and dropped `cache_read_input_tokens` and `cache_creation_input_tokens`, so prompt-cached runs (where cache reads dominate input) showed costs many times lower than OpenRouter actually charged. Cache-creation tokens now fold into `inputTokens` and cache-read tokens are tracked as `cachedInputTokens`, priced at the registry `cacheRead` rate (falling back to the input rate). (#654)
+- Deploys can no longer leave orphaned containers behind — `deploy.sh` and `deploy-staging.sh` pass `--remove-orphans` to `docker compose up`, so containers from since-removed compose services die on deploy instead of silently consuming shared queues with weeks-old code (root cause of the staging incident where a stale agent worker wrote base64 `script.mjs` payloads).
 
 ## [2026-05-31]
 
