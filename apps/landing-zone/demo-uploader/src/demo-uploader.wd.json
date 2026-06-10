@@ -8,7 +8,10 @@
     "DEMO_CONSOLE_API_KEY": "{{DEMO_CONSOLE_API_KEY}}"
   },
   "triggers": [
-    { "name": "manual", "type": "manual" }
+    {
+      "name": "manual",
+      "type": "manual"
+    }
   ],
   "steps": [
     {
@@ -18,15 +21,51 @@
       "executor": "human",
       "description": "Pick one of the 8 demo scenarios. The seed step calls the demo-console to drop the chosen variant onto the demo SFTP.",
       "verdicts": {
-        "smoke-clean":       { "target": "seed", "label": "Clean delivery — DM only",     "intent": "success" },
-        "full-clean":        { "target": "seed", "label": "Clean weekly delivery — full", "intent": "success" },
-        "smoke-broken":      { "target": "seed", "label": "Codifiable defects — DM only", "intent": "warning" },
-        "full-broken":       { "target": "seed", "label": "Full injection delivery",      "intent": "warning" },
-        "demo-3findings":    { "target": "seed", "label": "3 codifiable findings",        "intent": "warning" },
-        "chaos-encoding":    { "target": "seed", "label": "Encoding chaos",               "intent": "warning" },
-        "mess-inconsistent": { "target": "seed", "label": "Inconsistent SITEID values",   "intent": "warning" },
-        "missing-domain":    { "target": "seed", "label": "Missing AE.xpt",               "intent": "warning" },
-        "late-delivery":     { "target": "seed", "label": "Late delivery (14d)",          "intent": "warning" }
+        "smoke-clean": {
+          "target": "seed",
+          "label": "Clean delivery — DM only",
+          "intent": "success"
+        },
+        "full-clean": {
+          "target": "seed",
+          "label": "Clean weekly delivery — full",
+          "intent": "success"
+        },
+        "smoke-broken": {
+          "target": "seed",
+          "label": "Codifiable defects — DM only",
+          "intent": "warning"
+        },
+        "full-broken": {
+          "target": "seed",
+          "label": "Full injection delivery",
+          "intent": "warning"
+        },
+        "demo-3findings": {
+          "target": "seed",
+          "label": "3 codifiable findings",
+          "intent": "warning"
+        },
+        "chaos-encoding": {
+          "target": "seed",
+          "label": "Encoding chaos",
+          "intent": "warning"
+        },
+        "mess-inconsistent": {
+          "target": "seed",
+          "label": "Inconsistent SITEID values",
+          "intent": "warning"
+        },
+        "missing-domain": {
+          "target": "seed",
+          "label": "Missing AE.xpt",
+          "intent": "warning"
+        },
+        "late-delivery": {
+          "target": "seed",
+          "label": "Late delivery (14d)",
+          "intent": "warning"
+        }
       }
     },
     {
@@ -35,11 +74,10 @@
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "autonomyLevel": "L4",
       "description": "POST { scenario } to the demo-console's /seed endpoint. The console (running on the SFTP host) handles the actual file moves.",
-      "agent": {
-        "image": "mediforce-landing-zone:latest",
-        "command": "sh -c 'scenario=$(jq -r .verdict /output/input.json) && curl -fsS -X POST \"$DEMO_CONSOLE_URL/seed\" -H \"Content-Type: application/json\" -H \"X-Api-Key: $DEMO_CONSOLE_API_KEY\" -d \"{\\\"scenario\\\":\\\"$scenario\\\"}\"'"
+      "script": {
+        "command": "sh -c 'scenario=$(jq -r .verdict /output/input.json) && curl -fsS -X POST \"$DEMO_CONSOLE_URL/seed\" -H \"Content-Type: application/json\" -H \"X-Api-Key: $DEMO_CONSOLE_API_KEY\" -d \"{\\\"scenario\\\":\\\"$scenario\\\"}\"'",
+        "image": "mediforce-landing-zone:latest"
       }
     },
     {
@@ -51,7 +89,13 @@
     }
   ],
   "transitions": [
-    { "from": "review-and-pick", "to": "seed" },
-    { "from": "seed", "to": "done" }
+    {
+      "from": "review-and-pick",
+      "to": "seed"
+    },
+    {
+      "from": "seed",
+      "to": "done"
+    }
   ]
 }

@@ -105,6 +105,8 @@ export async function executeAgentStep(
     ? 'L4'
     : (workflowStep.autonomyLevel ?? 'L2');
 
+  const executorType = workflowStep.executor === 'script' ? ('script' as const) : ('agent' as const);
+
   // Merge step params into context — stepParams take lower priority than appContext
   const mergedInput: Record<string, unknown> = {
     ...(workflowStep.stepParams ?? {}),
@@ -126,7 +128,7 @@ export async function executeAgentStep(
     processInstanceId: instanceId,
     stepId,
     processDefinitionVersion: instance.definitionVersion,
-    executorType: 'agent',
+    executorType,
     reviewerType: 'none',
   });
 
@@ -335,7 +337,7 @@ export async function executeAgentStep(
       processInstanceId: instanceId,
       stepId,
       processDefinitionVersion: instance.definitionVersion,
-      executorType: 'agent',
+      executorType,
       reviewerType: 'human',
     });
 
@@ -452,7 +454,7 @@ export async function executeAgentStep(
       processInstanceId: instanceId,
       stepId,
       processDefinitionVersion: instance.definitionVersion,
-      executorType: 'agent',
+      executorType,
       reviewerType: 'none',
     });
     const currentInstance = await instanceRepo.getById(instanceId);

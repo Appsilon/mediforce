@@ -124,7 +124,7 @@ describe('ScriptContainerPlugin', () => {
       await expect(plugin.initialize(context)).rejects.toThrow(/step config not found/i);
     });
 
-    it('[ERROR] throws if no agentConfig', async () => {
+    it('[ERROR] throws if no script config', async () => {
       const context = buildMockContext({
         config: {
           processName: 'protocol-to-tfl',
@@ -135,7 +135,7 @@ describe('ScriptContainerPlugin', () => {
           ],
         } satisfies ProcessConfig,
       });
-      await expect(plugin.initialize(context)).rejects.toThrow(/no agent config/i);
+      await expect(plugin.initialize(context)).rejects.toThrow(/no script config/i);
     });
 
     it('[ERROR] throws if no command configured', async () => {
@@ -510,7 +510,7 @@ describe('ScriptContainerPlugin', () => {
           name: 'Register',
           type: 'creation',
           executor: 'script',
-          agent: { runtime: 'bash', inlineScript: '#!/bin/sh\necho ok\n' },
+          script: { runtime: 'bash', inlineScript: '#!/bin/sh\necho ok\n' },
         },
         llm: { complete: vi.fn() },
         getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
@@ -548,7 +548,7 @@ describe('ScriptContainerPlugin', () => {
           name: 'Register',
           type: 'creation',
           executor: 'script',
-          agent: { runtime: 'bash', inlineScript: '#!/bin/sh\necho ok\n' },
+          script: { runtime: 'bash', inlineScript: '#!/bin/sh\necho ok\n' },
         },
         llm: { complete: vi.fn() },
         getPreviousStepOutputs: vi.fn().mockResolvedValue({}),

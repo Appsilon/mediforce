@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Added
+- `databricks-job` plugin — workflow steps can trigger an existing Databricks job (`jobs/run-now` + polling) and route transitions on the JSON the notebook exits with; secrets `DATABRICKS_HOST`/`DATABRICKS_TOKEN`, `${steps.*}` param interpolation, single-task jobs in v1. Includes `scripts/databricks-spike.py` for manual verification against a real workspace.
 - Agent-produced files are no longer lost — everything an agent step leaves in `/output` is preserved as **Output Files** on the run branch (`.mediforce/output/<stepId>/`, ADR-0007) and is reviewable and downloadable:
   - API: `GET /api/runs/<runId>/files` lists a run's files; `GET /api/runs/<runId>/files/<path>` serves the bytes (binary-safe, RFC 6266 attachment); `mediforce.runs.listOutputFiles` / `downloadOutputFile` client methods.
   - UI: "Files" card on the run detail page (grouped by step, hidden when empty) + per-step paperclip chips expanding to that step's files.
@@ -29,6 +30,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
   - Built-in tool calls (`update_artifact`, `update_presentation`) now persist as live tool turns visible in the cowork chat UI.
   - Postgres migration 0018: `validation_result` (jsonb) + `presentation` (text) columns on `cowork_sessions`.
 
+### Changed
+- **Breaking (schema + data migration 0023):** deterministic script-step config moved from `step.agent` to a typed `step.script` key; `agent`/`autonomyLevel`/`cowork` are now rejected on `executor: 'script'` steps and audit events record `executorType: 'script'` (forward-only). Stored workflow definitions are rewritten in-place by Postgres migration `0023_script_step_config` — it must ship in the same release, because definitions are re-parsed on read.
 ### Fixed
 - Script container `runtime: "python"` now invokes `python3` — previously failed on golden image (and any image without a `python` symlink) with `exec: "python": not found` [#675](https://github.com/Appsilon/mediforce/pull/675).
 - Queued (BullMQ) Docker execution no longer corrupts binary files (PDF, XLSX, ZIP) and now preserves nested output directories — file payloads cross Redis as base64 keyed by POSIX relative path, matching local-mode behaviour.

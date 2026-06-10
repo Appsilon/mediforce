@@ -129,13 +129,24 @@ export function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext)
  * Resolve the repo auth token from the step or workflow-level config.
  * `repoAuth` is the name of a key in resolvedEnv (sourced from workflow secrets).
  */
+/**
+ * Image-build fields shared by agent config (step.agent) and script config
+ * (step.script) — both flavours resolve container images identically.
+ */
+export interface ImageBuildConfig {
+  dockerfile?: string;
+  repo?: string;
+  commit?: string;
+  repoAuth?: string;
+}
+
 export function resolveRepoToken(
-  agentConfig: AgentConfig,
+  buildConfig: ImageBuildConfig,
   context: AgentContext | WorkflowAgentContext,
   resolvedEnv?: Record<string, string>,
 ): string | undefined {
   // Step-level repoAuth takes priority
-  const authKey = agentConfig.repoAuth
+  const authKey = buildConfig.repoAuth
     ?? (isWorkflowAgentContext(context) ? context.workflowDefinition.repo?.auth : undefined);
   if (!authKey || !resolvedEnv) return undefined;
   return resolvedEnv[authKey];
@@ -143,11 +154,11 @@ export function resolveRepoToken(
 
 export function resolveImageBuild(
   image: string,
-  agentConfig: AgentConfig,
+  buildConfig: ImageBuildConfig,
   context: AgentContext | WorkflowAgentContext,
   resolvedEnv?: Record<string, string>,
 ): ImageBuildMeta | undefined {
-  const { dockerfile, repo, commit } = agentConfig;
+  const { dockerfile, repo, commit } = buildConfig;
 
   if (repo && commit) {
     return {
@@ -155,7 +166,7 @@ export function resolveImageBuild(
       repoUrl: normalizeRepoUrls(repo).gitUrl,
       commit,
       dockerfile,
-      repoToken: resolveRepoToken(agentConfig, context, resolvedEnv),
+      repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
     };
   }
 
@@ -167,7 +178,7 @@ export function resolveImageBuild(
         repoUrl: repo ? normalizeRepoUrls(repo).gitUrl : normalizeRepoUrls(wfRepo.url).gitUrl,
         commit: commit ?? wfRepo.commit,
         dockerfile,
-        repoToken: resolveRepoToken(agentConfig, context, resolvedEnv),
+        repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
       };
     }
   }

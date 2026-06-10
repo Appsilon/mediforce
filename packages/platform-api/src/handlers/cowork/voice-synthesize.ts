@@ -216,12 +216,12 @@ const SYNTHESIS_SYSTEM_PROMPT = `You are an expert Mediforce workflow synthesize
 3. Executor types:
    - "human" — manual work (forms, uploads, approvals)
    - "agent" — AI-powered (add plugin + autonomyLevel)
-   - "script" — deterministic code (validation, API calls, notifications)
+   - "script" — deterministic code (validation, API calls, notifications); add plugin "script-container" and a "script" config object ({ "command" or "inlineScript" + "runtime" }); NEVER set autonomyLevel or agent config on script steps
    - "cowork" — collaborative human+AI artifact construction
-4. Autonomy levels (required for agent steps):
+4. Autonomy levels (required for agent steps, forbidden on script steps):
    - L0: human only, L1: agent suggests, L2: agent acts + human approves,
    - L3: agent acts + periodic review, L4: fully autonomous
-5. Plugins for agent/script steps: claude-code-agent, opencode-agent, script-container
+5. Plugins: claude-code-agent, opencode-agent (agent steps); script-container (script steps)
 6. Use kebab-case for all IDs and the workflow name
 7. Review steps use "verdicts" map, non-review steps use "transitions" array
 8. If a step has multiple outgoing transitions, each MUST have a "when" expression
@@ -230,7 +230,7 @@ const SYNTHESIS_SYSTEM_PROMPT = `You are an expert Mediforce workflow synthesize
 
 ## What to infer when the conversation is vague
 
-- If the user mentions "checking" or "validating" → likely a script step with L4
+- If the user mentions "checking" or "validating" → likely a script step
 - If "review" or "approval" → human step or agent with L2/L3
 - If "AI does X" or "automatically" → agent step with appropriate autonomy
 - If "send notification" or "webhook" → script step

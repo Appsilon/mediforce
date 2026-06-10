@@ -148,6 +148,8 @@ export {
 
 export {
   WorkflowAgentConfigSchema,
+  ScriptStepConfigSchema,
+  DatabricksJobConfigSchema,
   WorkflowCoworkConfigSchema,
   WorkflowReviewConfigSchema,
   WorkflowWorkspaceSchema,
@@ -172,7 +174,10 @@ export {
   validateTriggerInput,
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,
+  resolveStepTimeoutMinutes,
   type WorkflowAgentConfig,
+  type ScriptStepConfig,
+  type DatabricksJobConfig,
   type WorkflowCoworkConfig,
   type WorkflowReviewConfig,
   type WorkflowWorkspace,

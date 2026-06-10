@@ -170,7 +170,7 @@ export function WorkflowEditorCanvas({
     if (!dockerAvailable) return undefined;
     const map = new Map<string, string>();
     for (const step of editedSteps) {
-      const image = step.agent?.image;
+      const image = step.agent?.image ?? step.script?.image;
       if (typeof image === 'string' && image.length > 0 && !isImageAvailable(dockerImages, image)) {
         map.set(step.id, `Image '${image}' not available on platform`);
       }

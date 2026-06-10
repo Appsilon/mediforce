@@ -57,6 +57,8 @@ export type {
 
 export type {
   WorkflowAgentConfig,
+  ScriptStepConfig,
+  DatabricksJobConfig,
   WorkflowCoworkConfig,
   WorkflowReviewConfig,
   WorkflowStep,

@@ -1,5 +1,6 @@
 import {
   AgentOutputEnvelopeSchema,
+  resolveStepTimeoutMinutes,
   type AgentOutputEnvelope,
   type AgentRunStatus,
   type ProcessInstanceRepository,
@@ -42,8 +43,9 @@ export class AgentRunner {
 
   /**
    * Run an agent plugin using the unified WorkflowDefinition model.
-   * Config is read from step.agent (model, timeoutMinutes, confidenceThreshold,
-   * fallbackBehavior) and step.autonomyLevel / step.plugin.
+   * Config is read from step.agent (model, confidenceThreshold, fallbackBehavior)
+   * or step.script / step.databricks (deterministic plugins), plus
+   * step.autonomyLevel / step.plugin; timeout via resolveStepTimeoutMinutes.
    */
   async runWithWorkflowStep(
     plugin: AgentPlugin,
@@ -75,7 +77,7 @@ export class AgentRunner {
 
     await plugin.initialize(context);
 
-    const timeoutMs = (context.step.agent?.timeoutMinutes ?? 30) * 60_000;
+    const timeoutMs = resolveStepTimeoutMinutes(context.step) * 60_000;
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new AgentTimeoutError()), timeoutMs);
     });
@@ -430,7 +432,7 @@ export class AgentRunner {
       processInstanceId: context.processInstanceId,
       stepId: context.stepId,
       processDefinitionVersion: context.definitionVersion,
-      executorType: 'agent',
+      executorType: context.step.executor === 'script' ? 'script' : 'agent',
       reviewerType,
     });
   }

@@ -72,8 +72,8 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
 
     for (const step of scriptSteps) {
       expect(step.plugin).toBe('script-container');
-      expect(step.agent?.image).toBeDefined();
-      expect(step.agent?.command).toBeDefined();
+      expect(step.script?.image).toBeDefined();
+      expect(step.script?.command).toBeDefined();
     }
   });
 

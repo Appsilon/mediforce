@@ -48,3 +48,4 @@ packages/platform-ui/.emulator-data
 .claude/scheduled_tasks.lock
 .planning/wave-*-status.log
 staging-dump.dump
+__pycache__/
