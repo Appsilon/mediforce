@@ -45,7 +45,7 @@
       "follow-redirects": "1.16.0",
       "brace-expansion": "5.0.6",
       "@tootallnate/once": "3.0.1",
-      "next": "16.2.6",
+      "next": "16.2.7",
       "vite": "8.0.14"
     },
     "minimumReleaseAgeExclude": [
