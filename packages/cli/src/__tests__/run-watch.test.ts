@@ -16,15 +16,44 @@ function mkRun(status: string, opts: { currentStepId?: string; dryRun?: boolean;
     currentStepId: opts.currentStepId ?? null,
     dryRun: opts.dryRun ?? false,
     error: opts.error ?? null,
+    finalOutput: null,
+  };
+}
+
+function mkExecution(stepId: string, status: string, opts: { error?: string; startedAt?: string; completedAt?: string } = {}) {
+  return {
+    id: `exec-${stepId}`,
+    instanceId: 'run-1',
+    stepId,
+    status,
+    input: {},
+    output: null,
+    verdict: null,
+    executedBy: 'system',
+    startedAt: opts.startedAt ?? '2026-06-01T10:00:00.000Z',
+    completedAt: opts.completedAt ?? null,
+    iterationNumber: 0,
+    gateResult: null,
+    error: opts.error ?? null,
   };
 }
 
 function mkSteps(steps: Array<{ stepId: string; status: string; error?: string }>) {
   return {
+    instanceId: 'run-1',
+    definitionName: 'wf-a',
+    definitionVersion: '1',
+    instanceStatus: 'completed',
+    currentStepId: null,
     steps: steps.map((s) => ({
       stepId: s.stepId,
+      name: s.stepId,
+      type: 'review' as const,
+      executorType: 'human' as const,
       status: s.status,
-      execution: { status: s.status, startedAt: null, completedAt: null, error: s.error ?? null },
+      input: null,
+      output: null,
+      execution: mkExecution(s.stepId, s.status, { error: s.error }),
     })),
   };
 }
@@ -87,7 +116,7 @@ describe('run watch command', () => {
       .mockResolvedValueOnce(jsonResponse(mkRun('completed')))
       .mockResolvedValueOnce(jsonResponse(mkSteps([
         { stepId: 'step-a', status: 'completed' },
-        { stepId: 'step-b', status: 'failed', error: 'timeout' },
+        { stepId: 'step-b', status: 'completed', error: 'timeout' },
       ])));
 
     const output = captureOutput();

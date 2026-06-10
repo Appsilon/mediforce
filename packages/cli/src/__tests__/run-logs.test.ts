@@ -8,37 +8,82 @@ beforeEach(() => {
 
 const BASE_ENV = { MEDIFORCE_API_KEY: 'k' };
 
+function mkAuditEvent(action: string, description: string, timestamp: string) {
+  return {
+    actorId: 'system',
+    actorType: 'system',
+    actorRole: '',
+    action,
+    description,
+    timestamp,
+    inputSnapshot: {},
+    outputSnapshot: {},
+    basis: 'workflow',
+    entityType: 'run',
+    entityId: 'run-1',
+  };
+}
+
+function mkExecution(stepId: string, status: string, opts: { error?: string; verdict?: string; startedAt?: string; completedAt?: string } = {}) {
+  return {
+    id: `exec-${stepId}`,
+    instanceId: 'run-1',
+    stepId,
+    status,
+    input: {},
+    output: null,
+    verdict: opts.verdict ?? null,
+    executedBy: 'system',
+    startedAt: opts.startedAt ?? '2026-06-01T10:00:00.000Z',
+    completedAt: opts.completedAt ?? null,
+    iterationNumber: 0,
+    gateResult: null,
+    error: opts.error ?? null,
+  };
+}
+
 const SAMPLE_STEPS = {
+  instanceId: 'run-1',
+  definitionName: 'wf-a',
+  definitionVersion: '1',
+  instanceStatus: 'completed' as const,
+  currentStepId: null,
   steps: [
     {
       stepId: 'step-review',
-      status: 'completed',
-      execution: {
-        status: 'completed',
+      name: 'step-review',
+      type: 'review' as const,
+      executorType: 'human' as const,
+      status: 'completed' as const,
+      input: null,
+      output: null,
+      execution: mkExecution('step-review', 'completed', {
         startedAt: '2026-06-01T10:00:00.000Z',
         completedAt: '2026-06-01T10:00:05.000Z',
-        error: null,
-        verdict: null,
-      },
+      }),
     },
     {
       stepId: 'step-approve',
-      status: 'failed',
-      execution: {
-        status: 'failed',
+      name: 'step-approve',
+      type: 'review' as const,
+      executorType: 'human' as const,
+      status: 'completed' as const,
+      input: null,
+      output: null,
+      execution: mkExecution('step-approve', 'failed', {
         startedAt: '2026-06-01T10:00:06.000Z',
         completedAt: '2026-06-01T10:00:08.000Z',
         error: 'rejected by reviewer',
         verdict: 'reject',
-      },
+      }),
     },
   ],
 };
 
 const SAMPLE_EVENTS = {
   events: [
-    { timestamp: '2026-06-01T10:00:00.000Z', action: 'run.started', description: 'Run started' },
-    { timestamp: '2026-06-01T10:00:05.000Z', action: 'step.completed', description: 'step-review completed' },
+    mkAuditEvent('run.started', 'Run started', '2026-06-01T10:00:00.000Z'),
+    mkAuditEvent('step.completed', 'step-review completed', '2026-06-01T10:00:05.000Z'),
   ],
 };
 
