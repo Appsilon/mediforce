@@ -131,14 +131,17 @@ const prodRunKicker: RunKicker = createHttpSelfFetchRunKicker({
   apiKey: () => process.env.PLATFORM_API_KEY ?? '',
 });
 
-function defaultBuildScope(caller: CallerIdentity): CallerScope {
+// Exported for the rare non-JSON route (binary file download) that can't
+// compose through `createRouteAdapter` but MUST run the identical auth +
+// scope pipeline. Everything JSON goes through the adapter — see module doc.
+export function defaultBuildScope(caller: CallerIdentity): CallerScope {
   return createCallerScope(
     { ...getPlatformServices(), runKicker: prodRunKicker },
     caller,
   );
 }
 
-async function defaultResolveCaller(req: NextRequest): Promise<CallerIdentity | NextResponse> {
+export async function defaultResolveCaller(req: NextRequest): Promise<CallerIdentity | NextResponse> {
   const { namespaceRepo } = getPlatformServices();
   return resolveCallerIdentity(req, namespaceRepo);
 }

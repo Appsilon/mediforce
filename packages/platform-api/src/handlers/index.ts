@@ -62,6 +62,7 @@ export { listRuns } from './runs/list-runs';
 export { listRunNames } from './runs/list-run-names';
 export { getRun } from './runs/get-run';
 export { startRun } from './runs/start-run';
+export { listRunOutputFiles } from './runs/list-output-files';
 
 export { listSecretKeys } from './secrets/list-secret-keys';
 export { setSecret } from './secrets/set-secret';

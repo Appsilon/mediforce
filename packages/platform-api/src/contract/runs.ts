@@ -112,3 +112,48 @@ export const ListRunNamesOutputSchema = z.object({
 
 export type ListRunNamesInput = z.infer<typeof ListRunNamesInputSchema>;
 export type ListRunNamesOutput = z.infer<typeof ListRunNamesOutputSchema>;
+
+/**
+ * Contract for `GET /api/runs/<runId>/files`.
+ *
+ * Output Files: artifacts the runtime committed under
+ * `.mediforce/output/<stepId>/` on the run branch of the workflow's bare
+ * repo. `path` is the repo-relative download key for
+ * `GET /api/runs/<runId>/files/<path>` (binary route, not part of this
+ * JSON contract).
+ */
+export const ListRunOutputFilesInputSchema = z.object({
+  runId: z.string().min(1),
+});
+
+export const RunOutputFileEntrySchema = z.object({
+  stepId: z.string().min(1),
+  /** Path relative to `.mediforce/output/<stepId>/` (may contain slashes). */
+  name: z.string().min(1),
+  /** Repo-relative path `.mediforce/output/<stepId>/<name>` — the download key. */
+  path: z.string().min(1),
+  /** Blob size in bytes. */
+  size: z.number().int().nonnegative(),
+});
+
+export const ListRunOutputFilesOutputSchema = z.object({
+  files: z.array(RunOutputFileEntrySchema),
+});
+
+export type ListRunOutputFilesInput = z.infer<typeof ListRunOutputFilesInputSchema>;
+export type RunOutputFileEntry = z.infer<typeof RunOutputFileEntrySchema>;
+export type ListRunOutputFilesOutput = z.infer<typeof ListRunOutputFilesOutputSchema>;
+
+/**
+ * Client-side input for `GET /api/runs/<runId>/files/<path>` (binary
+ * download). The response is raw bytes, so there is no output schema —
+ * `mediforce.runs.downloadOutputFile` returns `{ fileName, contentType,
+ * bytes }` assembled from headers + body.
+ */
+export const DownloadRunOutputFileInputSchema = z.object({
+  runId: z.string().min(1),
+  /** Repo-relative path from `RunOutputFileEntry.path` (incl. `.mediforce/output/` prefix). */
+  path: z.string().min(1),
+});
+
+export type DownloadRunOutputFileInput = z.infer<typeof DownloadRunOutputFileInputSchema>;

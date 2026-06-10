@@ -12,6 +12,10 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Added
+- Agent-produced files are no longer lost — everything an agent step leaves in `/output` is preserved as **Output Files** on the run branch (`.mediforce/output/<stepId>/`, ADR-0007) and is reviewable and downloadable:
+  - API: `GET /api/runs/<runId>/files` lists a run's files; `GET /api/runs/<runId>/files/<path>` serves the bytes (binary-safe, RFC 6266 attachment); `mediforce.runs.listOutputFiles` / `downloadOutputFile` client methods.
+  - UI: "Files" card on the run detail page (grouped by step, hidden when empty) + per-step paperclip chips expanding to that step's files.
+  - CLI: `mediforce run files <runId>` and `mediforce run download <runId> [path] [-o dir]`.
 - `verdict-with-params` task kind lets a single human step collect structured param values and a verdict together — previously required two separate steps [#658](https://github.com/Appsilon/mediforce/pull/658). Includes `ParamVerdictView` component and `datetime` param type support.
 - **Merged workflow designer** — consolidated `workflow-designer` (v21), `workflow-designer-2` (v3), and `cowork-workflow-designer` (v5) into a single cowork-based `workflow-designer` with create/edit mode support, live validation, HTML diagram previews, and a rich system prompt covering the full WorkflowDefinition schema.
   - Cowork sessions now validate artifacts live on every `update_artifact` call (wires up the previously unused `validateOutputSchema`), with results shown in the artifact panel and enforced as a gate on finalize.
@@ -23,6 +27,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
   - Postgres migration 0018: `validation_result` (jsonb) + `presentation` (text) columns on `cowork_sessions`.
 
 ### Fixed
+- Queued (BullMQ) Docker execution no longer corrupts binary files (PDF, XLSX, ZIP) and now preserves nested output directories — file payloads cross Redis as base64 keyed by POSIX relative path, matching local-mode behaviour.
 - **Run cost under-reported for cached agent runs** — the container-agent token extractor read only `input_tokens`/`output_tokens` from the CLI result event and dropped `cache_read_input_tokens` and `cache_creation_input_tokens`, so prompt-cached runs (where cache reads dominate input) showed costs many times lower than OpenRouter actually charged. Cache-creation tokens now fold into `inputTokens` and cache-read tokens are tracked as `cachedInputTokens`, priced at the registry `cacheRead` rate (falling back to the input rate). (#654)
 
 ## [2026-05-31]

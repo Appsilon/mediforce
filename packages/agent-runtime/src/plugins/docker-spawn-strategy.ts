@@ -8,8 +8,8 @@
  * The queued strategy is activated when REDIS_URL is set.
  */
 import { spawn } from 'node:child_process';
-import { appendFile, readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { appendFile, mkdir } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { ensureImage } from './docker-image-builder';
 import { createLineStreamReader } from '@mediforce/platform-core';
 
@@ -210,7 +210,9 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
  * Files from outputDir are sent through Redis as inputFiles so the worker can
  * recreate them locally (caller and worker may not share a filesystem).
  * Output files produced by the container are returned through Redis and
- * written back to the caller's outputDir.
+ * written back to the caller's outputDir. File contents cross the queue as
+ * base64 keyed by POSIX relative path (see container-worker's file-payload.ts),
+ * so binary files and nested directories survive intact.
  *
  * Function callbacks (`onStdoutLine`, `onStderrLine`) cannot cross the Redis
  * boundary, so live streaming is unavailable. The strategy compensates by replaying
@@ -223,16 +225,12 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
   readonly supportsLiveStreaming = false;
 
   async spawn(request: DockerSpawnRequest): Promise<DockerSpawnResult> {
-    const { enqueueDockerJob } = await import('@mediforce/container-worker');
+    const { enqueueDockerJob, encodeFilePayload, decodeFilePayload } = await import('@mediforce/container-worker');
 
-    // Collect all files from outputDir to send through Redis
-    const inputFiles: Record<string, string> = {};
+    // Collect all files from outputDir (base64, nested paths included) to send through Redis
+    let inputFiles: Record<string, string> = {};
     try {
-      const entries = await readdir(request.outputDir);
-      for (const entry of entries) {
-        const content = await readFile(join(request.outputDir, entry), 'utf-8');
-        inputFiles[entry] = content;
-      }
+      inputFiles = await encodeFilePayload(request.outputDir);
       console.log(`[queued-strategy] Collected ${Object.keys(inputFiles).length} input file(s) from ${request.outputDir}: ${Object.keys(inputFiles).join(', ')}`);
     } catch (err) {
       console.warn(`[queued-strategy] Could not read outputDir '${request.outputDir}': ${err instanceof Error ? err.message : err}`);
@@ -284,10 +282,7 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
 
     // Write output files from worker back to caller's outputDir
     if (result.outputFiles) {
-      await mkdir(request.outputDir, { recursive: true });
-      for (const [name, content] of Object.entries(result.outputFiles)) {
-        await writeFile(join(request.outputDir, name), content, 'utf-8');
-      }
+      await decodeFilePayload(result.outputFiles, request.outputDir);
     }
 
     return result;

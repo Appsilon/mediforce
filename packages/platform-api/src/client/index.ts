@@ -19,6 +19,9 @@ import {
   ListRunsOutputSchema,
   ListRunNamesInputSchema,
   ListRunNamesOutputSchema,
+  ListRunOutputFilesInputSchema,
+  ListRunOutputFilesOutputSchema,
+  DownloadRunOutputFileInputSchema,
   ArchiveVersionInputSchema,
   ArchiveVersionOutputSchema,
   ArchiveAllInputSchema,
@@ -250,6 +253,9 @@ import {
   type ListRunsOutput,
   type ListRunNamesInput,
   type ListRunNamesOutput,
+  type ListRunOutputFilesInput,
+  type ListRunOutputFilesOutput,
+  type DownloadRunOutputFileInput,
   type DockerInfoResponse,
   type OpenRouterCreditsInput,
   type OpenRouterCreditsOutput,
@@ -427,6 +433,17 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * One downloaded Output File. `bytes` is the raw body (binary-safe);
+ * `fileName` comes from the RFC 6266 `Content-Disposition` header with the
+ * last path segment as fallback.
+ */
+export interface DownloadedRunOutputFile {
+  fileName: string;
+  contentType: string;
+  bytes: Uint8Array;
+}
+
 export class Mediforce {
   readonly tasks: {
     list: (input: ListTasksInput) => Promise<ListTasksOutput>;
@@ -486,6 +503,8 @@ export class Mediforce {
     list: (input?: ListRunsInput) => Promise<ListRunsOutput>;
     listNames: (input: ListRunNamesInput) => Promise<ListRunNamesOutput>;
     get: (input: GetRunInput) => Promise<GetRunOutput>;
+    listOutputFiles: (input: ListRunOutputFilesInput) => Promise<ListRunOutputFilesOutput>;
+    downloadOutputFile: (input: DownloadRunOutputFileInput) => Promise<DownloadedRunOutputFile>;
     start: (input: StartRunInput) => Promise<StartRunOutput>;
     cancel: (input: CancelRunInput) => Promise<CancelRunOutput>;
     resume: (input: ResumeRunInput) => Promise<ResumeRunOutput>;
@@ -1115,6 +1134,40 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.runs.get');
         return GetRunOutputSchema.parse(body);
       },
+      listOutputFiles: async (input) => {
+        const validated = ListRunOutputFilesInputSchema.parse(input);
+        const res = await this.request(
+          `/api/runs/${encodeURIComponent(validated.runId)}/files`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.runs.listOutputFiles');
+        return ListRunOutputFilesOutputSchema.parse(body);
+      },
+      downloadOutputFile: async (input) => {
+        const validated = DownloadRunOutputFileInputSchema.parse(input);
+        // `path` is repo-relative with meaningful slashes (`.mediforce/output/<stepId>/<name>`)
+        // — encode each segment, keep the separators.
+        const encodedPath = validated.path
+          .split('/')
+          .map(encodeURIComponent)
+          .join('/');
+        const res = await this.request(
+          `/api/runs/${encodeURIComponent(validated.runId)}/files/${encodedPath}`,
+        );
+        if (res.ok === false) {
+          // Error responses are the JSON envelope — parseJsonOrThrow always
+          // throws ApiError on non-OK.
+          await parseJsonOrThrow(res, 'mediforce.runs.downloadOutputFile');
+        }
+        const fileName =
+          fileNameFromContentDisposition(res.headers.get('Content-Disposition')) ??
+          validated.path.split('/').pop() ??
+          'download';
+        return {
+          fileName,
+          contentType: res.headers.get('Content-Type') ?? 'application/octet-stream',
+          bytes: new Uint8Array(await res.arrayBuffer()),
+        };
+      },
       start: async (input) => {
         const validated = StartRunInputSchema.parse(input);
         const res = await this.request('/api/processes', {
@@ -1672,6 +1725,28 @@ function toSearchParams(
   }
   const qs = params.toString();
   return qs.length > 0 ? `?${qs}` : '';
+}
+
+/**
+ * Extract the file name from an RFC 6266 `Content-Disposition` header.
+ * Prefers the percent-encoded `filename*` parameter (full Unicode), falls
+ * back to the quoted `filename`, returns null when neither parses.
+ */
+function fileNameFromContentDisposition(header: string | null): string | null {
+  if (header === null) return null;
+  const extendedMatch = header.match(/filename\*=UTF-8''([^;]+)/i);
+  if (extendedMatch !== null) {
+    try {
+      return decodeURIComponent(extendedMatch[1]);
+    } catch {
+      return null;
+    }
+  }
+  const quotedMatch = header.match(/filename="((?:[^"\\]|\\.)*)"/);
+  if (quotedMatch !== null) {
+    return quotedMatch[1].replace(/\\(.)/g, '$1');
+  }
+  return null;
 }
 
 async function parseJsonOrThrow(res: Response, context: string): Promise<unknown> {
