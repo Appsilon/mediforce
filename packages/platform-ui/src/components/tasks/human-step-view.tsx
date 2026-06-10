@@ -93,7 +93,7 @@ export function HumanStepView({
 
         <TaskMetadataCard task={task} processInstance={processInstance} handle={handle} userNames={userNames} />
 
-        {!bodyIsWide && access.kind !== 'completed' && body}
+        {!bodyIsWide && body}
 
         {access.kind === 'completed' && (
           <NextStepCard processInstanceId={task.processInstanceId} stepId={task.stepId} />
