@@ -201,6 +201,19 @@ Key-value secrets visible to all workflows in a Namespace. Resolved via
 Secrets scoped to one Workflow Definition. Wins over Namespace Secret if
 same key exists (precedence).
 
+### Evaluation domain
+
+**Score**:
+An external quality judgment attached to one Agent Run or one Workflow Run
+(polymorphic subject). Three sources: deterministic check, LLM-as-judge,
+human review. The unit of evaluation is the **Agent Run**; Workflow-Run-level
+Scores arise only from production monitoring (e.g. a final human verdict) —
+offline replay of whole workflows is explicitly out of scope.
+_Avoid_: confusing with `AgentOutputEnvelope.confidence` — confidence is the
+agent's **self-assessment**, a Score is an **external judgment**. Also avoid
+"evaluation" for a single judgment (an evaluation is a process; a Score is
+one data point).
+
 ### Audit / observability
 
 **Audit Event**:
