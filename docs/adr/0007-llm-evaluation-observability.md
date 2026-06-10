@@ -92,12 +92,19 @@ OTLP exporter endpoint), not architecture:
 - Default battery included for dev/demo: **Arize Phoenix** (OTel-native,
   single container + Postgres, strong drift visualization). ELv2 license
   needs a one-time legal check before bundling in customer deployments.
+  **Testing starts here** — lightest self-host footprint, OTel-native
+  ingestion, no additional infrastructure.
 - A customer with an existing OTLP-capable observability stack (SigNoz,
   Grafana Tempo, Datadog, …) points the exporter at it instead — zero new
   systems to qualify.
 - Langfuse remains a valid target (it ingests OTLP) for customers who want
   it; we do not adopt its SDK or its dataset/eval features (those are
   platform-owned per D2).
+
+The topology supports fan-out: application → **OTel Collector** → N
+backends in parallel (one pipeline, multiple exporters in Collector YAML).
+Langfuse evaluation happens later via this fan-out — add an exporter,
+compare both UIs on the same live traffic, drop whichever loses.
 
 ### D4. Correlation contract
 
