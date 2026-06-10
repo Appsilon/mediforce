@@ -115,7 +115,7 @@ export function HumanStepView({
           />
         )}
 
-        {bodyIsWide && access.kind !== 'completed' && body}
+        {bodyIsWide && body}
 
         {executionPanel}
       </div>
@@ -206,7 +206,7 @@ function TaskMetadataCard({
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             Assigned To
           </div>
-          <div>{userNames.get(task.assignedUserId ?? '') ?? task.assignedUserId}</div>
+          <div>{userNames.get(task.assignedUserId) ?? task.assignedUserId}</div>
         </div>
       )}
       {task.completedAt && (

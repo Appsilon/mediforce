@@ -198,7 +198,6 @@ export function ProcessDetail({
 
   return (
     <div className="flex items-start gap-0 p-6">
-      {/* Left column — main content */}
       <div className="flex-1 min-w-0 space-y-6 pr-6">
         {/* Header */}
         <div className="space-y-2">
@@ -253,7 +252,7 @@ export function ProcessDetail({
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shrink-0"
             >
               <ScrollText className="h-3.5 w-3.5" />
-              Show Detailed Log
+              {logsOpen ? 'Hide Detailed Log' : 'Show Detailed Log'}
             </button>
           </div>
 
@@ -373,7 +372,7 @@ export function ProcessDetail({
             stepDetailBaseHref={runDetailHref}
             onAgentLogClick={(stepId: string) => {
               setAgentLogStepId(stepId);
-              setRightTab('agent-log');
+              if (agentLogFiles.length > 0) setRightTab('agent-log');
               setLogsOpen(true);
             }}
           />
@@ -428,12 +427,10 @@ export function ProcessDetail({
             ))}
           </div>
 
-          {/* Agent Log */}
           <div className={cn('flex-1 min-h-0 p-4 flex flex-col overflow-hidden', rightTab !== 'agent-log' && 'hidden')}>
             <AgentLogViewer logFiles={agentLogFiles} initialStepId={agentLogStepId} runningStepIds={runningStepIds} />
           </div>
 
-          {/* Audit Log */}
           <div
             ref={auditScrollRef}
             className={cn('flex-1 min-h-0 overflow-y-auto p-4', rightTab !== 'audit' && 'hidden')}

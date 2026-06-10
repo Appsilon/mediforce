@@ -121,7 +121,7 @@ function ActionItemRow({
 
   // Human tasks open as run steps (the merged human step view). The
   // definition name comes from the run-name map; while it loads, fall back
-  // to the /tasks/{id} redirect which resolves the same URL server-side.
+  // to the /tasks/{id} redirect which resolves to the step URL client-side.
   const definitionName = item.kind === 'task'
     ? processNameMap.get(item.data.processInstanceId)
     : undefined;

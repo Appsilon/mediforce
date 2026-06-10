@@ -17,7 +17,7 @@ export function useViewerIdentity(): { uid: string | null; role: string | null }
     firebaseUser.getIdTokenResult().then((result) => {
       const roles = result.claims['roles'];
       if (Array.isArray(roles) && roles.length > 0) {
-        setRole(roles[0] as string);
+        setRole(String(roles[0]));
       }
     });
   }, [firebaseUser]);

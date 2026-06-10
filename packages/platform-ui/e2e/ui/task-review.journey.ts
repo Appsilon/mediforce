@@ -36,8 +36,8 @@ test.describe('Task Review Journey', () => {
     await expect(page.getByText(/pending/i)).toBeVisible();
     await showCaption(page, 'Human review task — status: pending');
 
-    // Previous Step Output panel is open by default; Report tab is the
-    // default selection when an HTML report is present.
+    // Previous Step Output panel is open by default; both Report and Extracted
+    // Data tabs are visible. Assert the always-present Extracted Data tab.
     await expect(page.getByRole('tab', { name: /extracted data/i })).toBeVisible();
     await showCaption(page, 'Reviewing previous step output');
 

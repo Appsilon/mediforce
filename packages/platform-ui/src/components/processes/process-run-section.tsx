@@ -208,7 +208,7 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      if (currentStepHref) window.location.href = currentStepHref;
+                      window.location.href = currentStepHref ?? routes.task(handle, activeTaskId);
                     }}
                     className="inline-flex items-center gap-1 bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
                   >

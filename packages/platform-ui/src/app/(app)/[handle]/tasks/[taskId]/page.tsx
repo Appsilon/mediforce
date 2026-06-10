@@ -18,7 +18,12 @@ export default function TaskRedirectPage() {
   const router = useRouter();
   const handle = useHandleFromPath();
   const { task, loading, error, notFound } = useTask(taskId);
-  const { data: instance } = useProcessInstance(task?.processInstanceId ?? null);
+  const {
+    data: instance,
+    loading: instanceLoading,
+    notFound: instanceNotFound,
+    error: instanceError,
+  } = useProcessInstance(task?.processInstanceId ?? null);
 
   React.useEffect(() => {
     if (task && instance) {
@@ -41,6 +46,14 @@ export default function TaskRedirectPage() {
       <div className="p-6 space-y-2">
         <p className="text-sm font-medium text-destructive">Failed to load task.</p>
         <p className="text-xs text-muted-foreground font-mono break-all">{error.message}</p>
+      </div>
+    );
+  }
+
+  if (!loading && task && !instanceLoading && (instanceNotFound || instanceError)) {
+    return (
+      <div className="p-6 text-center text-sm text-muted-foreground">
+        Unable to locate this task&apos;s run.
       </div>
     );
   }
