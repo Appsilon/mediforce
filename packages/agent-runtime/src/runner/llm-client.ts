@@ -60,7 +60,7 @@ export class OpenRouterLlmClient {
             completionTokens: data.usage.completion_tokens,
             content: data.choices[0].message.content,
           },
-          this.tracingOptions,
+          this.tracingOptions.captureContent === true,
         );
 
         return {

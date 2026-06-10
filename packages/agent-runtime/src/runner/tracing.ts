@@ -51,11 +51,12 @@ export async function withAgentRunSpan<T>(
     attributes['gen_ai.request.model'] = context.step.agent.model;
   }
 
+  // Final span status is set by annotateAgentRunSpan (every terminal path
+  // calls it): the runner resolves normally on timeout/error fallbacks, so
+  // a blanket OK here would mask failed runs in trace viewers.
   return getTracer().startActiveSpan('mediforce.agent.run', { attributes }, async (span) => {
     try {
-      const result = await callback(span);
-      span.setStatus({ code: SpanStatusCode.OK });
-      return result;
+      return await callback(span);
     } catch (error) {
       recordError(span, error);
       throw error;
@@ -80,6 +81,15 @@ export function annotateAgentRunSpan(
 
   if (result.envelopeModel !== undefined && result.envelopeModel !== null) {
     span.setAttribute('gen_ai.response.model', result.envelopeModel);
+  }
+
+  if (result.fallbackReason === 'timeout' || result.fallbackReason === 'error') {
+    span.setStatus({
+      code: SpanStatusCode.ERROR,
+      message: `agent run fell back: ${result.fallbackReason}`,
+    });
+  } else {
+    span.setStatus({ code: SpanStatusCode.OK });
   }
 }
 
@@ -122,7 +132,7 @@ export function annotateOpenRouterLlmSpan(
     completionTokens: number;
     content?: string;
   },
-  options: OpenTelemetryTracingOptions,
+  captureContent: boolean,
 ): void {
   span.setAttributes({
     'gen_ai.response.model': response.model,
@@ -130,7 +140,7 @@ export function annotateOpenRouterLlmSpan(
     'gen_ai.usage.output_tokens': response.completionTokens,
   });
 
-  if (options.captureContent === true) {
+  if (captureContent === true) {
     span.setAttributes({
       'gen_ai.completion.0.role': 'assistant',
       'gen_ai.completion.0.content': response.content ?? '',

@@ -9,6 +9,7 @@ import {
   type WorkflowStep,
 } from '@mediforce/platform-core';
 import { randomUUID } from 'crypto';
+import type { Span } from '@opentelemetry/api';
 import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitPayload } from '../interfaces/agent-plugin';
 import type { AgentEventLog } from './agent-event-log';
 import { FallbackHandler } from './fallback-handler';
@@ -39,6 +40,37 @@ export class AgentRunner {
     private readonly agentRunRepository?: AgentRunRepository,
   ) {
     this.fallbackHandler = new FallbackHandler(instanceRepository);
+  }
+
+  /** Annotate the span and persist the terminal Agent Run record (upsert on runId). */
+  private async recordTerminalRun(
+    span: Span,
+    runId: string,
+    context: WorkflowAgentContext,
+    startedAt: number,
+    result: AgentRunResult,
+    envelopeModel: string | null,
+  ): Promise<void> {
+    annotateAgentRunSpan(span, {
+      status: result.status,
+      appliedToWorkflow: result.appliedToWorkflow,
+      fallbackReason: result.fallbackReason,
+      envelopeModel,
+    });
+    if (this.agentRunRepository) {
+      await this.agentRunRepository.create({
+        id: runId,
+        processInstanceId: context.processInstanceId,
+        stepId: context.stepId,
+        pluginId: context.step.plugin ?? context.stepId,
+        autonomyLevel: context.autonomyLevel as 'L0' | 'L1' | 'L2' | 'L3' | 'L4',
+        status: result.status,
+        envelope: result.envelope,
+        fallbackReason: result.fallbackReason,
+        startedAt: new Date(startedAt).toISOString(),
+        completedAt: new Date().toISOString(),
+      });
+    }
   }
 
   /**
@@ -115,52 +147,20 @@ export class AgentRunner {
               );
               const duration_ms = Date.now() - startedAt;
               await this.appendAuditEventFromWorkflowStep(context, envelope, fallbackResult.status, duration_ms);
-              annotateAgentRunSpan(span, {
-                status: fallbackResult.status,
-                appliedToWorkflow: fallbackResult.appliedToWorkflow,
-                fallbackReason: fallbackResult.fallbackReason,
-                envelopeModel: fallbackResult.envelope?.model ?? envelope.model,
-              });
-              if (this.agentRunRepository) {
-                await this.agentRunRepository.create({
-                  id: runId,
-                  processInstanceId,
-                  stepId,
-                  pluginId,
-                  autonomyLevel: autonomyLevel as 'L0' | 'L1' | 'L2' | 'L3' | 'L4',
-                  status: fallbackResult.status,
-                  envelope: fallbackResult.envelope,
-                  fallbackReason: fallbackResult.fallbackReason,
-                  startedAt: new Date(startedAt).toISOString(),
-                  completedAt: new Date().toISOString(),
-                });
-              }
+              await this.recordTerminalRun(
+                span, runId, context, startedAt, fallbackResult,
+                fallbackResult.envelope?.model ?? envelope.model,
+              );
               return fallbackResult;
             }
 
             const result = await this.applyAutonomyBehaviorForWorkflowStep(autonomyLevel, envelope, context);
             const duration_ms = Date.now() - startedAt;
             await this.appendAuditEventFromWorkflowStep(context, envelope, result.status, duration_ms);
-            annotateAgentRunSpan(span, {
-              status: result.status,
-              appliedToWorkflow: result.appliedToWorkflow,
-              fallbackReason: result.fallbackReason,
-              envelopeModel: result.envelope?.model ?? envelope.model,
-            });
-            if (this.agentRunRepository) {
-              await this.agentRunRepository.create({
-                id: runId,
-                processInstanceId,
-                stepId,
-                pluginId,
-                autonomyLevel: autonomyLevel as 'L0' | 'L1' | 'L2' | 'L3' | 'L4',
-                status: result.status,
-                envelope: result.envelope,
-                fallbackReason: result.fallbackReason,
-                startedAt: new Date(startedAt).toISOString(),
-                completedAt: new Date().toISOString(),
-              });
-            }
+            await this.recordTerminalRun(
+              span, runId, context, startedAt, result,
+              result.envelope?.model ?? envelope.model,
+            );
             return result;
           }
         }
@@ -181,26 +181,10 @@ export class AgentRunner {
       );
       const duration_ms = Date.now() - startedAt;
       await this.appendAuditEventFromWorkflowStep(context, null, fallbackResult.status, duration_ms, caughtErrorMessage);
-      annotateAgentRunSpan(span, {
-        status: fallbackResult.status,
-        appliedToWorkflow: fallbackResult.appliedToWorkflow,
-        fallbackReason: fallbackResult.fallbackReason,
-        envelopeModel: fallbackResult.envelope?.model ?? null,
-      });
-      if (this.agentRunRepository) {
-        await this.agentRunRepository.create({
-          id: runId,
-          processInstanceId,
-          stepId,
-          pluginId,
-          autonomyLevel: autonomyLevel as 'L0' | 'L1' | 'L2' | 'L3' | 'L4',
-          status: fallbackResult.status,
-          envelope: fallbackResult.envelope,
-          fallbackReason: fallbackResult.fallbackReason,
-          startedAt: new Date(startedAt).toISOString(),
-          completedAt: new Date().toISOString(),
-        });
-      }
+      await this.recordTerminalRun(
+        span, runId, context, startedAt, fallbackResult,
+        fallbackResult.envelope?.model ?? null,
+      );
       return { ...fallbackResult, errorMessage: caughtErrorMessage };
     });
   }
