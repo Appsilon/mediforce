@@ -91,7 +91,7 @@ export function HumanStepView({
 
         {readOnly && <AccessBanner access={access} userNames={userNames} />}
 
-        <TaskMetadataCard task={task} processInstance={processInstance} handle={handle} />
+        <TaskMetadataCard task={task} processInstance={processInstance} handle={handle} userNames={userNames} />
 
         {!bodyIsWide && body}
 
@@ -161,10 +161,12 @@ function TaskMetadataCard({
   task,
   processInstance,
   handle,
+  userNames,
 }: {
   task: HumanTask;
   processInstance: ProcessInstance | null;
   handle: string;
+  userNames: Map<string, string>;
 }) {
   return (
     <div className="rounded-lg border p-4 grid grid-cols-2 gap-4 text-sm">
@@ -204,7 +206,7 @@ function TaskMetadataCard({
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             Assigned To
           </div>
-          <div className="font-mono text-xs">{task.assignedUserId}</div>
+          <div>{userNames.get(task.assignedUserId ?? '') ?? task.assignedUserId}</div>
         </div>
       )}
       {task.completedAt && (
