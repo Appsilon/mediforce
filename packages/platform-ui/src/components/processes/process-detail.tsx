@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { ArrowLeft, FileBarChart, Archive, ArchiveRestore } from 'lucide-react';
+import { ChevronDown, FileBarChart, Archive, ArchiveRestore, ScrollText } from 'lucide-react';
 import type { ProcessInstance, StepExecution, AuditEvent, Step, WorkflowStep } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
 import { AuditLogTab } from './audit-log-tab';
@@ -17,7 +17,7 @@ import { useArchiveRun, useCancelRun } from '@/hooks/use-run-mutations';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
-import { useBackNavigation } from '@/hooks/use-back-navigation';
+import { cn } from '@/lib/utils';
 import { formatStepName } from '@/components/tasks/task-utils';
 import { MissingEnvBanner } from './missing-env-banner';
 import { AgentEscalatedBanner } from './agent-escalated-banner';
@@ -63,7 +63,6 @@ export function ProcessDetail({
   runDetailHref?: string;
 }) {
   const handle = useHandleFromPath();
-  const { goBack } = useBackNavigation(backHref);
   const wfStatus = getWorkflowStatus(instance);
   const needsHumanTaskAction = wfStatus.rawReason === 'waiting_for_human' || wfStatus.rawReason === 'awaiting_agent_approval';
   const { task: blockingTask } = useActiveTaskForInstance(
@@ -126,6 +125,8 @@ export function ProcessDetail({
   }, [agentLogFiles.length]);
 
   const [agentLogStepId, setAgentLogStepId] = React.useState<string | null>(null);
+
+  const [logsOpen, setLogsOpen] = React.useState(false);
 
   // Cancel double-confirm: 0 = idle, 1 = first confirm shown, 2 = cancelling in progress
   const [cancelStep, setCancelStep] = React.useState<0 | 1 | 2>(0);
@@ -196,39 +197,31 @@ export function ProcessDetail({
   }, [auditEvents, rightTab]);
 
   return (
-    <div className="flex gap-6 p-6 items-start">
-      {/* Left panel */}
-      <div className="flex-1 min-w-0 space-y-6">
-        {/* Back */}
-        <button onClick={goBack} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </button>
-
-        {/* Header */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-headline font-semibold flex-1">{formatStepName(instance.definitionName)}</h1>
-            {canArchive && (
-              <button
-                onClick={handleArchiveToggle}
-                disabled={archiving}
-                title={instance.archived === true ? 'Unarchive run' : 'Archive run'}
-                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shrink-0 disabled:opacity-50"
-              >
-                {instance.archived === true
-                  ? <><ArchiveRestore className="h-3.5 w-3.5" />Unarchive</>
-                  : <><Archive className="h-3.5 w-3.5" />Archive</>}
-              </button>
-            )}
-            {canCancel && cancelStep === 0 && (
-              <button
-                onClick={() => setCancelStep(1)}
-                className="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors shrink-0"
-              >
-                Cancel
-              </button>
-            )}
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-headline font-semibold flex-1">{formatStepName(instance.definitionName)}</h1>
+          {canArchive && (
+            <button
+              onClick={handleArchiveToggle}
+              disabled={archiving}
+              title={instance.archived === true ? 'Unarchive run' : 'Archive run'}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shrink-0 disabled:opacity-50"
+            >
+              {instance.archived === true
+                ? <><ArchiveRestore className="h-3.5 w-3.5" />Unarchive</>
+                : <><Archive className="h-3.5 w-3.5" />Archive</>}
+            </button>
+          )}
+          {canCancel && cancelStep === 0 && (
+            <button
+              onClick={() => setCancelStep(1)}
+              className="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors shrink-0"
+            >
+              Cancel Run
+            </button>
+          )}
             {canCancel && cancelStep === 1 && (
               <div className="flex items-center gap-1.5 shrink-0">
                 <span className="text-xs text-destructive">This cannot be undone.</span>
@@ -354,62 +347,78 @@ export function ProcessDetail({
           )}
         </div>
 
-        {/* Results — at top of left panel when available */}
-        {instance.status === 'completed' && (
-          <RunResultsPanel stepExecutions={stepExecutions} />
-        )}
+      {/* Results */}
+      {instance.status === 'completed' && (
+        <RunResultsPanel stepExecutions={stepExecutions} />
+      )}
 
-        {/* Step Status Panel */}
-        {definitionSteps.length > 0 && (
-          <StepStatusPanel
-            instance={instance}
-            definitionSteps={definitionSteps}
-            stepExecutions={stepExecutions}
-            agentEvents={agentEvents}
-            stepConfigMap={stepConfigMap}
-            stepDetailBaseHref={runDetailHref}
-            onAgentLogClick={agentLogFiles.length > 0 ? (stepId: string) => {
-              setAgentLogStepId(stepId);
-              setRightTab('agent-log');
-            } : undefined}
-          />
-        )}
-      </div>
+      {/* Step Status Panel */}
+      {definitionSteps.length > 0 && (
+        <StepStatusPanel
+          instance={instance}
+          definitionSteps={definitionSteps}
+          stepExecutions={stepExecutions}
+          agentEvents={agentEvents}
+          stepConfigMap={stepConfigMap}
+          stepDetailBaseHref={runDetailHref}
+          onAgentLogClick={(stepId: string) => {
+            setAgentLogStepId(stepId);
+            setRightTab('agent-log');
+            setLogsOpen(true);
+          }}
+        />
+      )}
 
-      {/* Right panel — Agent Log + Audit Log, sticky full-height */}
-      <div className="flex-1 min-w-0 sticky top-4 flex flex-col h-[calc(100vh-2rem)]">
-        {/* Tab bar */}
-        <div className="flex gap-1 border-b shrink-0">
-          {[
-            ...(agentLogFiles.length > 0 ? [{ value: 'agent-log', label: 'Step Log' }] : []),
-            { value: 'audit', label: 'Audit Log' },
-          ].map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => setRightTab(value)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                rightTab === value
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Agent Log — flex-fills remaining height, internal scroll handles auto-scroll-to-bottom */}
-        <div className={`flex-1 min-h-0 pt-4 ${rightTab === 'agent-log' ? 'flex flex-col overflow-hidden' : 'hidden'}`}>
-          <AgentLogViewer logFiles={agentLogFiles} initialStepId={agentLogStepId} runningStepIds={runningStepIds} />
-        </div>
-
-        {/* Audit Log — outer div scrolls, effect scrolls to bottom on updates */}
-        <div
-          ref={auditScrollRef}
-          className={`flex-1 min-h-0 overflow-y-auto pt-4 ${rightTab === 'audit' ? '' : 'hidden'}`}
+      {/* Collapsible log panel */}
+      <div className="rounded-lg border">
+        <button
+          onClick={() => setLogsOpen((prev) => !prev)}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors rounded-lg"
         >
-          <AuditLogTab events={auditEvents} loading={auditEventsLoading} error={auditEventsError} />
-        </div>
+          <div className="flex items-center gap-2">
+            <ScrollText className="h-4 w-4" />
+            Logs
+          </div>
+          <ChevronDown className={cn('h-4 w-4 transition-transform duration-200', logsOpen && 'rotate-180')} />
+        </button>
+
+        {logsOpen && (
+          <div className="border-t">
+            {/* Tab bar */}
+            <div className="flex gap-1 border-b px-2 pt-1">
+              {[
+                ...(agentLogFiles.length > 0 ? [{ value: 'agent-log', label: 'Step Log' }] : []),
+                { value: 'audit', label: 'Audit Log' },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setRightTab(value)}
+                  className={cn(
+                    'px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+                    rightTab === value
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Agent Log */}
+            <div className={cn('p-4 h-[480px] flex flex-col', rightTab !== 'agent-log' && 'hidden')}>
+              <AgentLogViewer logFiles={agentLogFiles} initialStepId={agentLogStepId} runningStepIds={runningStepIds} />
+            </div>
+
+            {/* Audit Log */}
+            <div
+              ref={auditScrollRef}
+              className={cn('p-4 max-h-[480px] overflow-y-auto', rightTab !== 'audit' && 'hidden')}
+            >
+              <AuditLogTab events={auditEvents} loading={auditEventsLoading} error={auditEventsError} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
