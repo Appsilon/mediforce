@@ -31,6 +31,7 @@ export const GetRunOutputSchema = z.object({
    *  servers that don't include the field. */
   definitionNamespace: z.string().min(1).nullable().optional(),
   totalCostUsd: z.number().optional(),
+  dryRun: z.boolean().optional(),
 });
 
 export type GetRunInput = z.infer<typeof GetRunInputSchema>;
@@ -44,6 +45,7 @@ export const StartRunInputSchema = z.object({
   triggerName: z.string().min(1).default('manual'),
   triggeredBy: z.string().min(1),
   payload: z.record(z.string(), z.unknown()).optional(),
+  dryRun: z.boolean().optional(),
 });
 
 export const StartRunOutputSchema = z.object({
@@ -74,6 +76,7 @@ export const ListRunsInputSchema = z.object({
   // more runs. Tracked in #588 alongside PR2's identical workaround — the
   // cap drops back to a sane page size once cursor pagination lands.
   limit: z.coerce.number().int().positive().max(10000).default(20),
+  dryRun: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
 });
 
 /**

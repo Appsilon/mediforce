@@ -3,7 +3,7 @@
 import * as React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useRouter } from 'next/navigation';
-import { Play, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRound, FileInput } from 'lucide-react';
+import { Play, FlaskConical, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRound, FileInput } from 'lucide-react';
 import { useWorkflowVersions, useWorkflowVersion } from '@/hooks/use-workflow-versions';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useAuth } from '@/contexts/auth-context';
@@ -144,7 +144,7 @@ export function StartRunButton({
     return () => document.removeEventListener('mousedown', handleClick);
   }, [dropdownOpen]);
 
-  async function executeStart(v?: number) {
+  async function executeStart(v?: number, dryRun?: boolean) {
     const targetVersion = v ?? effectiveVersion;
     if (!firebaseUser || targetVersion === null || targetVersion === 0) return;
 
@@ -163,6 +163,7 @@ export function StartRunButton({
         triggerName: 'manual',
         triggeredBy: firebaseUser.uid,
         payload,
+        ...(dryRun ? { dryRun: true } : {}),
       });
       router.push(`/${handle}/workflows/${encodeURIComponent(workflowName)}/runs/${result.run.id}`);
     } catch (err) {
@@ -328,6 +329,17 @@ export function StartRunButton({
             <Dialog.Close className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors">
               Cancel
             </Dialog.Close>
+            <button
+              onClick={() => executeStart(pendingVersion, true)}
+              disabled={hasTriggerInput && requiredInputMissing}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 hover:bg-violet-100 dark:border-violet-700 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 px-3 py-1.5 text-sm font-medium text-violet-700 dark:text-violet-300 transition-colors',
+                hasTriggerInput && requiredInputMissing && 'opacity-50 cursor-not-allowed',
+              )}
+            >
+              <FlaskConical className="h-3.5 w-3.5" />
+              Dry Run
+            </button>
             <button
               onClick={() => executeStart(pendingVersion)}
               disabled={hasTriggerInput && requiredInputMissing}

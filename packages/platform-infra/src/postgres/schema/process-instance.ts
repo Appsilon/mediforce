@@ -3,6 +3,7 @@ import {
   text,
   integer,
   bigint,
+  boolean,
   jsonb,
   timestamp,
   numeric,
@@ -76,6 +77,8 @@ export const processInstances = pgTable(
 
     totalCostUsd: numeric('total_cost_usd', { precision: 12, scale: 6 }),
     createdBy: text('created_by'),
+
+    dryRun: boolean('dry_run').notNull().default(false),
 
     // Tombstones — null when not set.
     archivedAt: timestamp('archived_at', { withTimezone: true }),
