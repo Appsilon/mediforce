@@ -23,6 +23,10 @@ export { ClaudeCodeAgentPlugin } from './plugins/claude-code-agent-plugin';
 export { MockClaudeCodeAgentPlugin } from './plugins/mock-claude-code-agent-plugin';
 export { OpenCodeAgentPlugin } from './plugins/opencode-agent-plugin';
 export { ScriptContainerPlugin } from './plugins/script-container-plugin';
+export { DatabricksJobPlugin } from './plugins/databricks/databricks-job-plugin';
+export type { DatabricksJobPluginInit } from './plugins/databricks/databricks-job-plugin';
+export { DatabricksClient } from './plugins/databricks/databricks-client';
+export type { DatabricksClientInit, DatabricksRunStatus } from './plugins/databricks/databricks-client';
 export type { DockerSpawnStrategy, DockerSpawnRequest, DockerSpawnResult } from './plugins/docker-spawn-strategy';
 
 // Runner
