@@ -83,7 +83,10 @@ export default defineConfig({
   webServer: {
     // `MOCK_AGENT=true` wires the runtime through MockClaudeCodeAgentPlugin — real
     // Docker still spawns, but the container runs a mock bash command instead of
-    // calling Claude. `MEDIFORCE_DATA_DIR` isolates workspace state to a test dir.
+    // calling Claude. `ALLOW_LOCAL_AGENTS=true` lets inline script-container steps
+    // run as local child processes so L3 plugin-dispatch journeys don't need a
+    // Docker daemon (the Docker spawn path is covered by agent-runtime L5).
+    // `MEDIFORCE_DATA_DIR` isolates workspace state to a test dir.
     // `NEXT_PUBLIC_APP_URL` is explicit so `getAppBaseUrl` doesn't fall back to the
     // :3000 default before Next sets PORT — the auto-runner fire-and-forget to
     // `/api/processes/:id/run` needs the right host:port.
@@ -97,7 +100,7 @@ export default defineConfig({
     // step already started.
     command: useEmulators
       ? process.env.E2E_DEV_SERVER === 'true'
-        ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce MOCK_AGENT=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${testPort} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npx next dev -p ${testPort}`
+        ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce MOCK_AGENT=true ALLOW_LOCAL_AGENTS=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${testPort} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npx next dev -p ${testPort}`
         : `pnpm start:e2e`
       : 'pnpm dev',
     port: testPort,
