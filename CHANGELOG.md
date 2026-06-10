@@ -24,6 +24,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ### Fixed
 - **Run cost under-reported for cached agent runs** — the container-agent token extractor read only `input_tokens`/`output_tokens` from the CLI result event and dropped `cache_read_input_tokens` and `cache_creation_input_tokens`, so prompt-cached runs (where cache reads dominate input) showed costs many times lower than OpenRouter actually charged. Cache-creation tokens now fold into `inputTokens` and cache-read tokens are tracked as `cachedInputTokens`, priced at the registry `cacheRead` rate (falling back to the input rate). (#654)
+### Changed
+- GETTING-STARTED now covers two first-run blockers that were previously only discoverable by hitting the error: setting `MEDIFORCE_API_KEY` for the CLI (must match `PLATFORM_API_KEY`), and building local `script`-executor images (`mediforce-golden-image`, `mediforce-node`) via `scripts/rebuild-docker-images.sh` before running workflows with `script` steps [#670](https://github.com/Appsilon/mediforce/pull/670).
 
 ## [2026-05-31]
 
