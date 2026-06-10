@@ -349,7 +349,7 @@ describe('WorkflowDefinitionSchema — script step config', () => {
     expect(messages.some((m) => /runtime is required when inlineScript is set/.test(m))).toBe(true);
   });
 
-  it('accepts a databricks-job step with numeric jobId and defaults pollIntervalMs', () => {
+  it('accepts a databricks-job step without pollIntervalMs (plugin defaults to 10s)', () => {
     const wd = wdWithScanStep({
       executor: 'script',
       plugin: 'databricks-job',
@@ -358,7 +358,7 @@ describe('WorkflowDefinitionSchema — script step config', () => {
     const result = WorkflowDefinitionSchema.safeParse(wd);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.steps[0].databricks?.pollIntervalMs).toBe(10_000);
+      expect(result.data.steps[0].databricks?.pollIntervalMs).toBeUndefined();
     }
   });
 
