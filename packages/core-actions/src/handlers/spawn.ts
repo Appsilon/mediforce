@@ -17,6 +17,7 @@ interface WorkflowTrigger {
     payload?: Record<string, unknown>;
     parentInstanceId?: string;
     parentDefinitionName?: string;
+    dryRun?: boolean;
   }): Promise<TriggerResult>;
 }
 
@@ -94,6 +95,7 @@ export function createSpawnActionHandler(
           payload: interpolatedPayload,
           parentInstanceId: ctx.processInstanceId,
           parentDefinitionName: ctx.definitionName,
+          ...(ctx.dryRun ? { dryRun: true } : {}),
         });
 
         spawned.push({

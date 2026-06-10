@@ -301,7 +301,7 @@ export function RunsTable({
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <ProcessStatusBadge status={run.status} pauseReason={run.pauseReason} error={run.error} />
+                  <ProcessStatusBadge status={run.status} pauseReason={run.pauseReason} error={run.error} dryRun={run.dryRun} />
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {run.parentInstanceId && run.parentDefinitionName ? (

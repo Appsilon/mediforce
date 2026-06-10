@@ -55,6 +55,7 @@ export const ProcessInstanceSchema = z.object({
   totalCostUsd: z.number().optional(),
   parentInstanceId: z.string().min(1).optional(),
   parentDefinitionName: z.string().min(1).optional(),
+  dryRun: z.boolean().default(false),
 });
 
 export type InstanceStatus = z.infer<typeof InstanceStatusSchema>;

@@ -23,6 +23,10 @@ export const runStartCommand = defineCommand({
       type: 'string',
       description: 'Read trigger input JSON from a file (use - for stdin)',
     },
+    'dry-run': {
+      type: 'boolean',
+      description: 'Tag the run as a dry run (real execution, labelled for testing)',
+    },
   },
   async run({ args, output, stdin, mediforce, jsonMode }) {
     let definitionVersion: number | undefined;
@@ -99,15 +103,17 @@ export const runStartCommand = defineCommand({
       triggerName: args.trigger ?? 'manual',
       triggeredBy: args['triggered-by'] ?? 'mediforce-cli',
       payload,
+      ...(args['dry-run'] ? { dryRun: true } : {}),
     });
     if (jsonMode) {
       printJson(output, result);
       return 0;
     }
-    output.stdout(`Run started`);
+    output.stdout(result.run.dryRun ? `Dry run started` : `Run started`);
     printKv(output, [
       ['instanceId', result.run.id],
       ['status', result.run.status],
+      ...(result.run.dryRun ? [['dryRun', 'true'] as const] : []),
     ]);
     output.stdout('');
     output.stdout(`Follow with: mediforce run get ${result.run.id}`);

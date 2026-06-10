@@ -18,6 +18,7 @@ export interface ListInstancesOptions {
    */
   namespace?: string;
   limit?: number;
+  dryRun?: boolean;
 }
 
 /**
