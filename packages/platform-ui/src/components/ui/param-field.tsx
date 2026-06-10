@@ -21,7 +21,7 @@ interface ParamFieldProps {
 
 const inputClasses = (disabled?: boolean) =>
   cn(
-    'w-full rounded-md border bg-background px-3 py-2 text-sm',
+    'w-full rounded-md border bg-white dark:bg-white/[0.05] px-3 py-2 text-sm',
     'placeholder:text-muted-foreground',
     'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary',
     disabled && 'opacity-50 cursor-not-allowed',

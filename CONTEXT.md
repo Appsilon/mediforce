@@ -118,6 +118,13 @@ Work item assigned to a human role inside a Workflow Run. Created when
 `executor=human` or as L3 agent-review. Has soft claim (`assignedUserId: null`
 visible to all role-matching users until claimed).
 
+**Human actions** *(UI label)*:
+The task inbox page listing all pending Human Tasks for the current user. Navigating
+to a task item deep-links directly to the owning Workflow Run Step view (not a
+separate task detail page). Previously labelled "New actions".
+_Avoid_: using "task inbox" or "task detail" for the unified step view — the step
+view is the canonical surface for human work, not a standalone task page.
+
 **Handoff**:
 Structured escalation from an Agent Run to a human (low confidence, error,
 explicit escalation). Distinct from Human Task — Handoff has agent context,

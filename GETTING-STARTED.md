@@ -16,6 +16,11 @@ Agents / quick lookups: see [docs/dev-quickref.md](docs/dev-quickref.md).
   `sudo apt install docker.io docker-compose-v2`. Verify with `docker compose version`.
 - **Firebase service account** — only for cloud Auth/Storage (the optional path below).
   **Not** needed for data: all server data lives in Postgres (ADR-0001).
+- **`MEDIFORCE_API_KEY`** — only for the CLI (section 3) or calling the API
+  directly. Not needed for `pnpm dev:mock` UI-only exploration.
+- **Local agent images** — only if you'll run a workflow with `script`
+  executor steps (most workflows under `apps/`). See [Build images for
+  script-executor steps](#build-images-for-script-executor-steps).
 
 ---
 
@@ -68,6 +73,31 @@ below), use:
 
 A real Firebase project uses your own accounts.
 
+### Build images for script-executor steps
+
+Workflow steps with `"executor": "script"` (`plugin: script-container`) run
+inside Docker images that are **built locally, not pulled from a registry**.
+Most workflows under `apps/` use one or both of:
+
+- `mediforce-golden-image:latest` — Node + common tooling, the base for most
+  inline `runtime: javascript` script steps
+- `mediforce-node:latest` — plain Node runtime, the fallback image when a
+  script step omits `agent.image`
+
+Build everything in one go:
+
+```bash
+./scripts/rebuild-docker-images.sh
+```
+
+This also builds the per-app agent images (`protocol-to-tfl`, `tealflow`,
+`community-digest`, `landing-zone`). Re-run it after pulling changes to
+`packages/agent-runtime/container/` or any `apps/*/container/Dockerfile`.
+
+Skip this if you're only on `pnpm dev:mock` or running workflows with
+`human`/`agent` executor steps only — without it, starting a `script` step
+fails with `Unable to find image '...' locally`.
+
 ---
 
 ## Which dev command?
@@ -93,13 +123,26 @@ Full decision table + ports + migration steps: [docs/dev-quickref.md](docs/dev-q
 The `mediforce` CLI is the supported way to drive the platform from a terminal
 (dogfood rule: CLI > REST).
 
+### Authenticate (one-time)
+
+The CLI sends `MEDIFORCE_API_KEY` as the `X-Api-Key` header — it must match
+`PLATFORM_API_KEY` in `packages/platform-ui/.env.local` (the `.env.example`
+default is `test-api-key`). Add to your shell profile (`~/.zshrc` /
+`~/.bashrc`), then reload your shell:
+
+```bash
+export MEDIFORCE_API_KEY="test-api-key"   # match PLATFORM_API_KEY in .env.local
+export MEDIFORCE_BASE_URL="http://127.0.0.1:9003"
+# Use 127.0.0.1, not localhost — Node prefers IPv6 and the dev server binds
+# IPv4, which surfaces as a misleading "fetch failed".
+```
+
 ```bash
 pnpm exec mediforce --help
 pnpm exec mediforce workflow list
 ```
 
-Auth via `MEDIFORCE_API_KEY`; base URL defaults to `http://localhost:9003`. See
-the [use-mediforce skill](.claude/skills/use-mediforce/SKILL.md) for the full
+See the [use-mediforce skill](.claude/skills/use-mediforce/SKILL.md) for the full
 command list and the REST fallback ladder.
 
 ---
@@ -395,6 +438,17 @@ if Java is missing, `brew install openjdk@21` (macOS) or
 Check: `namespace` query param present, valid step `type`
 (`creation`/`review`/`decision`/`terminal`), required fields (`name`,
 `triggers`, `steps`, `transitions`).
+
+### `mediforce: missing API key`
+
+`MEDIFORCE_API_KEY` isn't set, or doesn't match `PLATFORM_API_KEY` in
+`packages/platform-ui/.env.local`. See [Authenticate](#3-run-the-cli) above.
+
+### Workflow run fails with `Unable to find image '...' locally`
+
+A `script` executor step needs a Docker image that's built locally, not
+pulled from a registry. Run `./scripts/rebuild-docker-images.sh` (see [Build
+images for script-executor steps](#build-images-for-script-executor-steps)).
 
 ---
 

@@ -204,10 +204,15 @@ function ExecutedBy({ executedBy, executorType, plugin, autonomyLevel, runtime }
       </span>
     );
   }
-  const resolvedName = SYSTEM_ACTOR_IDS.has(executedBy)
-    ? null
-    : (userNames.get(executedBy) ?? executedBy);
-  const displayName = resolvedName ?? 'User unknown';
+  if (SYSTEM_ACTOR_IDS.has(executedBy)) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <Cog className="h-3 w-3 shrink-0" />
+        System
+      </span>
+    );
+  }
+  const displayName = userNames.get(executedBy) ?? executedBy ?? 'Unknown user';
   return (
     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
       <User className="h-3 w-3 shrink-0" />

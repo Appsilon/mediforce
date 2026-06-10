@@ -38,11 +38,6 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-// Mock hooks
-vi.mock('@/hooks/use-collection', () => ({
-  useCollection: () => ({ data: [], loading: false }),
-}));
-
 vi.mock('@/contexts/auth-context', () => ({
   useAuth: () => ({ firebaseUser: { getIdToken: vi.fn().mockResolvedValue('mock-id-token') } }),
 }));
@@ -53,11 +48,6 @@ vi.mock('@/lib/mediforce', () => ({
     tasks: {
       complete: vi.fn(async () => ({ task: {}, run: {} })),
       list: vi.fn(async () => ({ tasks: [] })),
-      get: vi.fn(async (input: { taskId: string }) => ({ id: input.taskId })),
-    },
-    processes: {
-      get: vi.fn(async (input: { instanceId: string }) => ({ id: input.instanceId, status: 'running' })),
-      listAuditEvents: vi.fn(async () => ({ events: [] })),
     },
   },
   ApiError: class ApiError extends Error {
@@ -68,7 +58,8 @@ vi.mock('@/lib/mediforce', () => ({
 }));
 
 import { mediforce } from '@/lib/mediforce';
-import { TaskDetail } from '../task-detail';
+import { FileUploadView } from '../file-upload-view';
+import { SelectionView } from '../selection-view';
 
 const completeMock = vi.mocked(mediforce.tasks.complete);
 
@@ -103,14 +94,14 @@ function createSelectionTask(overrides?: Partial<HumanTask>): HumanTask {
   });
 }
 
-describe('TaskDetail — selection task rendering', () => {
+describe('SelectionView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('[RENDER] shows option cards when task has options', () => {
     const task = createSelectionTask();
-    render(<TaskDetail task={task} />);
+    render(<SelectionView task={task} />);
 
     expect(screen.getByText('All-human')).toBeInTheDocument();
     expect(screen.getByText('Hybrid')).toBeInTheDocument();
@@ -119,19 +110,17 @@ describe('TaskDetail — selection task rendering', () => {
 
   it('[RENDER] shows approve and revise buttons for selection tasks', () => {
     const task = createSelectionTask();
-    render(<TaskDetail task={task} />);
+    render(<SelectionView task={task} />);
 
     expect(screen.getByRole('button', { name: /approve selected/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /request changes/i })).toBeInTheDocument();
   });
 
-  it('[RENDER] does not show verdict form when selection task is active', () => {
+  it('[RENDER] does not show regular verdict form for selection tasks', () => {
     const task = createSelectionTask();
-    render(<TaskDetail task={task} />);
+    render(<SelectionView task={task} />);
 
-    // Should show selection form, not the regular verdict form
-    expect(screen.getByText('All-human')).toBeInTheDocument();
-    // Verdict form has a standalone "Approve" button (not "Approve selected")
+    // SelectionView shows "Approve selected", not a bare "Approve" button
     const approveButtons = screen.getAllByRole('button').filter(
       (btn) => btn.textContent?.trim() === 'Approve',
     );
@@ -140,7 +129,7 @@ describe('TaskDetail — selection task rendering', () => {
 
   it('[RENDER] shows selection form even when task is pending (auto-assign)', () => {
     const task = createSelectionTask({ status: 'pending', assignedUserId: null });
-    render(<TaskDetail task={task} />);
+    render(<SelectionView task={task} />);
 
     expect(screen.getByText('All-human')).toBeInTheDocument();
   });
@@ -157,7 +146,7 @@ describe('TaskDetail — selection task rendering', () => {
         completedAt: '2026-03-14T12:00:00.000Z',
       },
     });
-    render(<TaskDetail task={task} />);
+    render(<SelectionView task={task} />);
 
     expect(screen.getByText(/you approved: all-human/i)).toBeInTheDocument();
   });
@@ -165,7 +154,7 @@ describe('TaskDetail — selection task rendering', () => {
 
 // ---- File upload rendering ----
 
-describe('TaskDetail — file upload integration', () => {
+describe('FileUploadView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -173,40 +162,26 @@ describe('TaskDetail — file upload integration', () => {
   it('[RENDER] shows FileUploadZone when task has ui.component file-upload', () => {
     const task = createUploadTask();
 
-    render(<TaskDetail task={task} />);
+    render(<FileUploadView task={task} />);
 
     expect(screen.getByText(/drop files here/i)).toBeInTheDocument();
     expect(screen.getByText(/pdf/i)).toBeInTheDocument();
   });
 
-  it('[RENDER] does not show FileUploadZone for regular review tasks', () => {
-    const task = buildHumanTask({
-      status: 'claimed',
-      assignedUserId: 'user-1',
-    });
-
-    render(<TaskDetail task={task} />);
-
-    expect(screen.queryByText(/drop files here/i)).not.toBeInTheDocument();
-    // Should show verdict form instead
-    expect(screen.getByText(/approve/i)).toBeInTheDocument();
-  });
-
   it('[RENDER] shows FileUploadZone even when task is pending (auto-assign)', () => {
     const task = createUploadTask({ status: 'pending', assignedUserId: null });
 
-    render(<TaskDetail task={task} />);
+    render(<FileUploadView task={task} />);
 
     // Forms are shown for pending tasks (claiming removed, auto-assign enabled)
     expect(screen.getByText(/drop files here/i)).toBeInTheDocument();
   });
 
-  it('[RENDER] does not show verdict form when upload UI is active', () => {
+  it('[RENDER] does not show verdict buttons when upload UI is active', () => {
     const task = createUploadTask();
 
-    render(<TaskDetail task={task} />);
+    render(<FileUploadView task={task} />);
 
-    // Should show upload zone, not verdict buttons
     expect(screen.getByText(/drop files here/i)).toBeInTheDocument();
     expect(screen.queryByText(/revise/i)).not.toBeInTheDocument();
   });
@@ -215,14 +190,12 @@ describe('TaskDetail — file upload integration', () => {
     const user = userEvent.setup();
     const task = createUploadTask();
 
-    render(<TaskDetail task={task} />);
+    render(<FileUploadView task={task} />);
 
-    // Add a file
     const input = screen.getByTestId('file-input');
     const file = new File(['content'], 'protocol.pdf', { type: 'application/pdf' });
     fireEvent.change(input, { target: { files: [file] } });
 
-    // Submit
     const uploadButton = screen.getByRole('button', { name: /upload/i });
     await user.click(uploadButton);
 
@@ -240,7 +213,7 @@ describe('TaskDetail — file upload integration', () => {
     const user = userEvent.setup();
     const task = createUploadTask();
 
-    render(<TaskDetail task={task} />);
+    render(<FileUploadView task={task} />);
 
     const input = screen.getByTestId('file-input');
     const file = new File(['content'], 'protocol.pdf', { type: 'application/pdf' });
@@ -265,14 +238,13 @@ describe('TaskDetail — file upload integration', () => {
       },
     });
 
-    render(<TaskDetail task={task} />);
+    render(<FileUploadView task={task} />);
 
     expect(screen.getByText(/2 files uploaded/i)).toBeInTheDocument();
     expect(screen.getByText('protocol.pdf')).toBeInTheDocument();
     expect(screen.getByText('appendix.pdf')).toBeInTheDocument();
     expect(screen.getByText(/100(.0)?\s*KB/i)).toBeInTheDocument();
 
-    // Download links present
     const downloadLinks = screen.getAllByRole('link', { name: /download/i });
     expect(downloadLinks).toHaveLength(2);
     expect(downloadLinks[0]).toHaveAttribute('href', 'https://storage.example.com/protocol.pdf');
@@ -283,7 +255,7 @@ describe('TaskDetail — file upload integration', () => {
     const user = userEvent.setup();
     const task = createUploadTask();
 
-    render(<TaskDetail task={task} />);
+    render(<FileUploadView task={task} />);
 
     const input = screen.getByTestId('file-input');
     const file = new File(['content'], 'protocol.pdf', { type: 'application/pdf' });

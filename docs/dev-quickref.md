@@ -95,3 +95,5 @@ Requires SSH access to the staging host (uses `deploy` user by default, override
 | `pnpm dev`: "Docker Compose v2 is not installed" | Engine-only `docker.io` lacks Compose — `sudo apt install docker-compose-v2` (Ubuntu); Docker Desktop bundles it. |
 | `relation "..." does not exist`          | `pnpm db:migrate`.                                               |
 | Stale / corrupt local data               | `docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v && pnpm dev` (wipes the pg volume). |
+| `mediforce: missing API key`             | Set `MEDIFORCE_API_KEY` (see [GETTING-STARTED §3](../GETTING-STARTED.md#3-run-the-cli)). |
+| `Unable to find image '...' locally` (script step) | Build local agent images: `./scripts/rebuild-docker-images.sh` ([GETTING-STARTED](../GETTING-STARTED.md#build-images-for-script-executor-steps)). |

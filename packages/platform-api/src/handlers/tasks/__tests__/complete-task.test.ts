@@ -9,7 +9,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import type { HumanTask, ProcessInstance, CompleteHumanTaskPayload } from '@mediforce/platform-core';
 import { completeTask } from '../complete-task';
-import { NotFoundError, PreconditionFailedError } from '../../../errors';
+import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
@@ -176,6 +176,68 @@ describe('completeTask handler', () => {
 
     expect(result.task.status).toBe('completed');
     expect(engineStub.calls[0].payload).toEqual(payload);
+  });
+
+  it('rejects a user completing a task claimed by another user', async () => {
+    const task = buildHumanTask({
+      id: 'task-1',
+      processInstanceId: 'inst-a',
+      stepId: 'review',
+      status: 'claimed',
+      assignedUserId: 'u-owner',
+    });
+    await humanTaskRepo.create(task);
+
+    const engineStub = makeEngineStub({
+      task,
+      instance: (await instanceRepo.getById('inst-a'))!,
+    });
+    const scope = createTestScope({
+      humanTaskRepo,
+      instanceRepo,
+      auditRepo,
+      caller: userCaller('u-intruder', ['team-alpha']),
+    });
+    Object.assign(scope.system, { engine: engineStub });
+
+    await expect(
+      completeTask(
+        { taskId: 'task-1', payload: { kind: 'verdict', verdict: 'approve' } },
+        scope,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(engineStub.calls).toHaveLength(0);
+  });
+
+  it('lets an apiKey caller complete a claimed task (CLI / agent acting on behalf)', async () => {
+    const task = buildHumanTask({
+      id: 'task-1',
+      processInstanceId: 'inst-a',
+      stepId: 'review',
+      status: 'claimed',
+      assignedUserId: 'u-owner',
+    });
+    await humanTaskRepo.create(task);
+
+    const taskAfter = { ...task, status: 'completed' as const };
+    const engineStub = makeEngineStub({
+      task: taskAfter,
+      instance: (await instanceRepo.getById('inst-a'))!,
+    });
+    const scope = createTestScope({
+      humanTaskRepo,
+      instanceRepo,
+      auditRepo,
+    });
+    Object.assign(scope.system, { engine: engineStub });
+
+    const result = await completeTask(
+      { taskId: 'task-1', payload: { kind: 'verdict', verdict: 'approve' } },
+      scope,
+    );
+    expect(result.task.status).toBe('completed');
+    // apiKey actor attribution falls back to the claimant for the audit trail.
+    expect(engineStub.calls[0].actorId).toBe('u-owner');
   });
 
   it('maps engine InvalidTransitionError to PreconditionFailedError (409)', async () => {

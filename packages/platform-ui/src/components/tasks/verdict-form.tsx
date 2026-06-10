@@ -69,9 +69,13 @@ export function VerdictButtons({
   outerBlockedHint?: string;
   onVerdict: (cfg: TaskVerdict) => void;
 }) {
+  const sorted = [...verdicts].sort((a, b) =>
+    a.intent === 'success' ? 1 : b.intent === 'success' ? -1 : 0,
+  );
+
   return (
-    <div className="flex flex-wrap items-start gap-3">
-      {verdicts.map((cfg) => {
+    <div className="flex flex-col gap-2">
+      {sorted.map((cfg) => {
         const commentBlocked = cfg.requiresComment && !trimmedComment;
         const isSubmittingThis = submitting === cfg.key;
         const isDisabled = submitting !== null || !!outerBlocked || commentBlocked;
@@ -82,7 +86,7 @@ export function VerdictButtons({
               onClick={() => onVerdict(cfg)}
               disabled={isDisabled}
               className={cn(
-                'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
+                'inline-flex items-center justify-center gap-2 rounded-none px-4 py-2 text-sm font-medium transition-colors w-full whitespace-nowrap',
                 INTENT_STYLES[cfg.intent].submit,
                 isDisabled && 'opacity-50 cursor-not-allowed',
               )}
