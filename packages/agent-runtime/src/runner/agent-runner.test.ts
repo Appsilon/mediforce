@@ -19,18 +19,8 @@ import type {
   ProcessConfig,
   AgentOutputEnvelope,
 } from '@mediforce/platform-core';
-import type {
-  Attributes,
-  Context,
-  Link,
-  Span,
-  SpanOptions,
-  SpanStatus,
-  TimeInput,
-  Tracer,
-  TracerProvider,
-} from '@opentelemetry/api';
 import { trace } from '@opentelemetry/api';
+import { RecordingTracerProvider } from '../testing/index';
 
 // --- Test helpers ---
 
@@ -111,137 +101,6 @@ function makeValidEnvelope(overrides: Partial<AgentOutputEnvelope> = {}): AgentO
     result: { recommendation: 'continue_monitoring' },
     ...overrides,
   };
-}
-
-type SpanCallback<T> = (span: Span) => T;
-
-class RecordingSpan {
-  public readonly attributes: Record<string, string | number | boolean> = {};
-  public ended = false;
-  public status: SpanStatus | null = null;
-
-  constructor(
-    public readonly name: string,
-    attributes?: Attributes,
-  ) {
-    Object.assign(this.attributes, attributes);
-  }
-
-  spanContext() {
-    return {
-      traceId: '1'.repeat(32),
-      spanId: '2'.repeat(16),
-      traceFlags: 1,
-    };
-  }
-
-  setAttribute(key: string, value: string | number | boolean) {
-    this.attributes[key] = value;
-    return this as unknown as Span;
-  }
-
-  setAttributes(attributes: Attributes) {
-    for (const [key, value] of Object.entries(attributes)) {
-      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-        this.attributes[key] = value;
-      }
-    }
-    return this as unknown as Span;
-  }
-
-  addEvent(): this {
-    return this;
-  }
-
-  addLink(_link: Link): this {
-    return this;
-  }
-
-  addLinks(_links: Link[]): this {
-    return this;
-  }
-
-  setStatus(status: SpanStatus): this {
-    this.status = status;
-    return this;
-  }
-
-  updateName(): this {
-    return this;
-  }
-
-  end(_endTime?: TimeInput): void {
-    this.ended = true;
-  }
-
-  isRecording(): boolean {
-    return true;
-  }
-
-  recordException(): void {}
-}
-
-class RecordingTracer implements Tracer {
-  constructor(private readonly spans: RecordingSpan[]) {}
-
-  startSpan(name: string, options?: SpanOptions): Span {
-    const span = new RecordingSpan(name, options?.attributes);
-    this.spans.push(span);
-    return span as unknown as Span;
-  }
-
-  startActiveSpan<F extends (span: Span) => ReturnType<F>>(name: string, fn: F): ReturnType<F>;
-  startActiveSpan<F extends (span: Span) => ReturnType<F>>(name: string, options: SpanOptions, fn: F): ReturnType<F>;
-  startActiveSpan<F extends (span: Span) => ReturnType<F>>(
-    name: string,
-    _options: SpanOptions,
-    _context: Context,
-    fn: F,
-  ): ReturnType<F>;
-  startActiveSpan<T>(
-    name: string,
-    optionsOrFn: SpanOptions | SpanCallback<T>,
-    contextOrFn?: Context | SpanCallback<T>,
-    fnMaybe?: SpanCallback<T>,
-  ): T {
-    const callback =
-      typeof optionsOrFn === 'function'
-        ? optionsOrFn
-        : typeof contextOrFn === 'function'
-          ? contextOrFn
-          : fnMaybe;
-
-    if (callback === undefined) {
-      throw new Error('Missing span callback');
-    }
-
-    const options = typeof optionsOrFn === 'function' ? undefined : optionsOrFn;
-    const span = new RecordingSpan(name, options?.attributes);
-    this.spans.push(span);
-
-    try {
-      const result = callback(span as unknown as Span);
-      if (result instanceof Promise) {
-        return result.finally(() => {
-          span.end();
-        }) as T;
-      }
-
-      span.end();
-      return result;
-    } catch (error) {
-      span.end();
-      throw error;
-    }
-  }
-}
-
-class RecordingTracerProvider implements TracerProvider {
-  public readonly spans: RecordingSpan[] = [];
-
-  getTracer(): Tracer {
-    return new RecordingTracer(this.spans);
-  }
 }
 
 /** Simple plugin that emits events synchronously then resolves */
