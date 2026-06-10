@@ -28,9 +28,12 @@ What exists today:
   `annotation` events are discarded once the envelope is built.
 - No OpenTelemetry / tracing SDK anywhere in the repo. No eval datasets, no
   eval runs, no external quality scores.
-- `ProcessInstance.totalCostUsd` exists but nothing computes it;
-  `ModelRegistryEntry` has per-model pricing that is never multiplied by
-  token counts.
+- `ProcessInstance.totalCostUsd` is computed
+  (envelope.tokenUsage × `ModelRegistryEntry.pricing` via
+  `estimateCostField`) and accumulated per run, but the logic lives in
+  `platform-ui/execute-agent-step.ts` (a Server Action), so it is
+  unavailable to CLI / agents / tests until migrated to the headless
+  handler layer (ADR-0005).
 - `ReviewPlugin.review()` returns `{verdict, reasoning, confidence}` — a
   ready-made LLM-as-judge interface, not yet wired into the engine.
 - Model is already swappable per step (`step.agent.model`) and per agent
@@ -155,10 +158,10 @@ that customer's deployment config, not in the architecture.
   experimental upstream; attribute names may shift. Accepted — they are the
   only emerging standard, renames are mechanical, and the alternative
   (vendor wire format) is strictly worse lock-in.
-- Token usage should become required (not optional) in the envelope, and
-  cost computation (tokens × `ModelRegistryEntry.pricing` →
-  `totalCostUsd`) becomes meaningful and should be implemented alongside
-  layer 1.
+- Token usage should become required (not optional) in the envelope.
+  Cost computation already exists (`estimateCostField`) but lives in
+  `platform-ui`; migrating it to the headless handler layer alongside
+  layer 1 makes it available to CLI, agents, and eval runs.
 - `ReviewPlugin`'s `{verdict, reasoning, confidence}` shape is the intended
   basis for LLM-as-judge scoring in layer 2 — do not invent a parallel
   abstraction when that layer lands.
