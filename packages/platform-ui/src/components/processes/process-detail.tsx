@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, FileBarChart, Archive, ArchiveRestore, ScrollText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileBarChart, Archive, ArchiveRestore, ScrollText, X } from 'lucide-react';
 import type { ProcessInstance, StepExecution, AuditEvent, Step, WorkflowStep } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
 import { AuditLogTab } from './audit-log-tab';
@@ -219,8 +219,9 @@ export function ProcessDetail({
             {canCancel && cancelStep === 0 && (
               <button
                 onClick={() => setCancelStep(1)}
-                className="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors shrink-0"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors shrink-0"
               >
+                <X className="h-3.5 w-3.5" />
                 Cancel Run
               </button>
             )}
@@ -247,6 +248,13 @@ export function ProcessDetail({
             {cancelError && (
               <span className="text-xs text-destructive shrink-0">{cancelError}</span>
             )}
+            <button
+              onClick={() => setLogsOpen((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shrink-0"
+            >
+              <ScrollText className="h-3.5 w-3.5" />
+              Show Detailed Log
+            </button>
           </div>
 
           {/* Metadata row */}
@@ -376,7 +384,7 @@ export function ProcessDetail({
       <div
         className={cn(
           'sticky top-4 h-[calc(100vh-2rem)] shrink-0 flex border-l transition-[width] duration-300 ease-in-out',
-          logsOpen ? 'w-[500px]' : 'w-10',
+          logsOpen ? 'w-1/2' : 'w-10',
         )}
       >
         {/* Toggle strip — always visible */}

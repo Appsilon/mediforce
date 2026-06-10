@@ -418,7 +418,7 @@ function isSectionTerminal(section: AgentLogSection): boolean {
   return false;
 }
 
-const THINKING_TEXT = 'Thinking...';
+const THINKING_TEXT = 'Running...';
 
 function ThinkingIndicator() {
   const [charCount, setCharCount] = React.useState(0);
@@ -432,10 +432,10 @@ function ThinkingIndicator() {
 
   return (
     <div className="flex items-center gap-2 py-2 mt-1">
-      <Clock className="h-3.5 w-3.5 text-primary animate-spin shrink-0" />
+      <Clock className="h-3.5 w-3.5 text-blue-500 animate-spin shrink-0" />
       {/* Use visibility:hidden (not display:none) at char 0 so layout height stays constant — prevents scrollbar jump. */}
       <span
-        className={cn('text-xs font-bold text-primary', charCount === 0 && 'invisible')}
+        className={cn('text-xs font-bold text-blue-500', charCount === 0 && 'invisible')}
         style={{ minWidth: '5.5rem' }}
       >
         {THINKING_TEXT.slice(0, Math.max(charCount, 1))}
