@@ -124,6 +124,12 @@ const TIP = {
   scriptRepoAuth:          'Name of a workflow secret holding the auth token for cloning a private repository.',
   scriptInlineScript:      'Script source code to run directly in the container. Set the language via script.runtime.',
 
+  databricksJobId:         'ID of an existing Databricks job to trigger. Supports ${steps.*} interpolation when given as a string.',
+  databricksNotebookParams:'notebook_params for run-now as JSON object of string values. Values support ${steps.*} interpolation.',
+  databricksJobParameters: 'job_parameters for run-now (jobs with job-level parameters) as JSON object of string values.',
+  databricksPollIntervalMs:'How often to poll the run state, in milliseconds. Default 10000.',
+  databricksTimeoutMinutes:'Step timeout in minutes — the run is cancelled when exceeded. Default 30.',
+
   allowedRoles:            'Roles that can claim this task, comma-separated. Leave empty to allow any signed-in user.',
 
   reviewType:              'Who performs the review: human (creates a task), agent (auto-evaluates), or none (skips review).',
@@ -243,6 +249,16 @@ export function StepEditor({
   }
   function updateScript(patch: Partial<NonNullable<WorkflowStep['script']>>) {
     onChange({ script: { ...step.script, ...patch } });
+  }
+  function updateDatabricks(patch: Partial<NonNullable<WorkflowStep['databricks']>>) {
+    onChange({ databricks: { ...(step.databricks ?? { jobId: 0 }), ...patch } });
+  }
+  function updateDatabricksParams(
+    field: 'notebookParams' | 'jobParameters',
+    mutate: (params: Record<string, string>) => Record<string, string>,
+  ) {
+    const next = mutate({ ...(step.databricks?.[field] ?? {}) });
+    updateDatabricks({ [field]: Object.keys(next).length > 0 ? next : undefined });
   }
   function updateReview(patch: Partial<NonNullable<WorkflowStep['review']>>) {
     onChange({ review: { ...step.review, ...patch } });
@@ -459,6 +475,7 @@ export function StepEditor({
             />
           </FieldRow>
 
+          {step.plugin !== 'databricks-job' && (<>
           <FieldRow label="script.runtime" tooltip={TIP.scriptRuntime}>
             <select
               value={step.script?.runtime ?? ''}
@@ -532,6 +549,70 @@ export function StepEditor({
               className={cn(rt, 'font-mono text-[11px] placeholder:italic placeholder:text-muted-foreground/40')}
             />
           </FieldRow>
+          </>)}
+
+          {step.plugin === 'databricks-job' && (<>
+          <FieldRow label="databricks.jobId" tooltip={TIP.databricksJobId}>
+            <input
+              value={step.databricks?.jobId !== undefined ? String(step.databricks.jobId) : ''}
+              onChange={(e) => updateDatabricks({ jobId: /^\d+$/.test(e.target.value) ? Number(e.target.value) : e.target.value })}
+              className={riMono}
+            />
+          </FieldRow>
+          <FieldRow label="databricks.pollIntervalMs" tooltip={TIP.databricksPollIntervalMs}>
+            <input
+              type="number"
+              value={step.databricks?.pollIntervalMs ?? ''}
+              onChange={(e) => updateDatabricks({ pollIntervalMs: e.target.value ? Number(e.target.value) : undefined })}
+              className={riMono}
+            />
+          </FieldRow>
+          <FieldRow label="databricks.timeoutMinutes" tooltip={TIP.databricksTimeoutMinutes}>
+            <input
+              type="number"
+              value={step.databricks?.timeoutMinutes ?? ''}
+              onChange={(e) => updateDatabricks({ timeoutMinutes: e.target.value ? Number(e.target.value) : undefined })}
+              className={riMono}
+            />
+          </FieldRow>
+          {(['notebookParams', 'jobParameters'] as const).map((field) => (
+            <div key={field} className="px-3 py-1.5 border-b border-border/30 last:border-0">
+              <div
+                className="text-[11px] text-muted-foreground mb-1"
+                title={field === 'notebookParams' ? TIP.databricksNotebookParams : TIP.databricksJobParameters}
+              >databricks.{field}</div>
+              {Object.entries(step.databricks?.[field] ?? {}).map(([key, val], idx) => (
+                <div key={idx} className="grid grid-cols-[184px_1fr_auto] gap-x-3 py-1 items-center">
+                  <input
+                    value={key}
+                    onChange={(e) => updateDatabricksParams(field, (params) => {
+                      const renamed: Record<string, string> = {};
+                      for (const [k, v] of Object.entries(params)) renamed[k === key ? e.target.value : k] = v;
+                      return renamed;
+                    })}
+                    className={cn(riMono, 'text-muted-foreground/70')}
+                  />
+                  <input
+                    value={val}
+                    onChange={(e) => updateDatabricksParams(field, (params) => ({ ...params, [key]: e.target.value }))}
+                    className={riMono}
+                  />
+                  <button
+                    onClick={() => updateDatabricksParams(field, (params) => {
+                      delete params[key];
+                      return params;
+                    })}
+                    className="text-[10px] text-muted-foreground/30 hover:text-red-500 transition-colors"
+                  >×</button>
+                </div>
+              ))}
+              <button
+                onClick={() => updateDatabricksParams(field, (params) => ({ ...params, param: '' }))}
+                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              >+ Add parameter</button>
+            </div>
+          ))}
+          </>)}
         </FieldGroup>
       )}
 

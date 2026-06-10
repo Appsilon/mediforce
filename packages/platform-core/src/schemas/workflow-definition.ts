@@ -163,7 +163,8 @@ export const DatabricksJobConfigSchema = z.object({
   jobId: z.union([z.number().int().positive(), z.string().min(1)]),
   notebookParams: z.record(z.string(), z.string()).optional(),
   jobParameters: z.record(z.string(), z.string()).optional(),
-  pollIntervalMs: z.number().int().positive().default(10_000),
+  /** Run-state poll cadence; the plugin defaults to 10s when unset. */
+  pollIntervalMs: z.number().int().positive().optional(),
   timeoutMinutes: z.number().positive().optional(),
 });
 

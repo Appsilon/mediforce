@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Added
+- `databricks-job` plugin — workflow steps can trigger an existing Databricks job (`jobs/run-now` + polling) and route transitions on the JSON the notebook exits with; secrets `DATABRICKS_HOST`/`DATABRICKS_TOKEN`, `${steps.*}` param interpolation, single-task jobs in v1. Includes `scripts/databricks-spike.py` for manual verification against a real workspace.
 - `verdict-with-params` task kind lets a single human step collect structured param values and a verdict together — previously required two separate steps [#658](https://github.com/Appsilon/mediforce/pull/658). Includes `ParamVerdictView` component and `datetime` param type support.
 - **Merged workflow designer** — consolidated `workflow-designer` (v21), `workflow-designer-2` (v3), and `cowork-workflow-designer` (v5) into a single cowork-based `workflow-designer` with create/edit mode support, live validation, HTML diagram previews, and a rich system prompt covering the full WorkflowDefinition schema.
   - Cowork sessions now validate artifacts live on every `update_artifact` call (wires up the previously unused `validateOutputSchema`), with results shown in the artifact panel and enforced as a gate on finalize.
@@ -21,6 +22,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
   - Artifact panel: collapsible JSON tree explorer replaces raw `JSON.stringify`; tabbed Data/Preview view.
   - Built-in tool calls (`update_artifact`, `update_presentation`) now persist as live tool turns visible in the cowork chat UI.
   - Postgres migration 0018: `validation_result` (jsonb) + `presentation` (text) columns on `cowork_sessions`.
+
+### Changed
+- **Breaking (schema + data migration 0023):** deterministic script-step config moved from `step.agent` to a typed `step.script` key; `agent`/`autonomyLevel`/`cowork` are now rejected on `executor: 'script'` steps and audit events record `executorType: 'script'` (forward-only). Stored workflow definitions are rewritten in-place by Postgres migration `0023_script_step_config` — it must ship in the same release, because definitions are re-parsed on read.
 
 ## [2026-05-31]
 

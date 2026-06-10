@@ -11,6 +11,7 @@ import { isWorkflowAgentContext } from '../container-plugin';
 import { DatabricksClient, isTerminalLifecycle } from './databricks-client';
 
 const MAX_CONSECUTIVE_POLL_FAILURES = 3;
+const DEFAULT_POLL_INTERVAL_MS = 10_000;
 /** Cancel margin before the AgentRunner timeout race kills the step. */
 const DEADLINE_BUFFER_MS = 5_000;
 
@@ -202,7 +203,7 @@ export class DatabricksJobPlugin implements AgentPlugin {
         if (consecutiveFailures >= MAX_CONSECUTIVE_POLL_FAILURES) throw error;
       }
 
-      await this.sleep(this.config.pollIntervalMs);
+      await this.sleep(this.config.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
     }
   }
 

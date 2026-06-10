@@ -17,6 +17,7 @@ Some steps need reproducible LLM-free code (data transforms, packaging, API call
 - Subclass of `BaseContainerAgentPlugin` in [`agent-runtime`](../packages/agent-runtime.md). See [plugin-dispatch](../../concepts/plugin-dispatch.md).
 - Registered by `getPlatformServices()` in [`platform-ui`](../packages/platform-ui.md).
 - Output conforms to `AgentOutputEnvelopeSchema`; `confidence` typically pinned to `1.0` (deterministic).
+- Step config lives under `step.script` (command/inlineScript + container image fields) — `executor: 'script'`, never `step.agent`.
 
 ## Relationships
 
