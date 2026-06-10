@@ -251,7 +251,7 @@ function ReportHeader({
             Generated: {format(new Date(), 'MMMM d, yyyy')}
           </p>
         </div>
-        <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} error={instance.error} />
+        <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} error={instance.error} dryRun={instance.dryRun} />
       </div>
 
       <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">

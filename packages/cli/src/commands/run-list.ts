@@ -52,8 +52,9 @@ export const runListCommand = defineCommand({
       const costLabel = run.totalCostUsd != null
         ? `  $${run.totalCostUsd.toFixed(4)}${isTerminal ? '' : '+'}`
         : '';
+      const dryLabel = run.dryRun ? ' [DRY RUN]' : '';
       output.stdout(
-        `${icon} ${run.status.padEnd(10)} ${run.id}  ${run.definitionName} v${run.definitionVersion}${costLabel}  ${age}`,
+        `${icon} ${run.status.padEnd(10)} ${run.id}  ${run.definitionName} v${run.definitionVersion}${costLabel}${dryLabel}  ${age}`,
       );
       if (run.currentStepId !== null) output.stdout(`  step: ${run.currentStepId}`);
       if (run.error !== null) output.stdout(`  error: ${run.error}`);

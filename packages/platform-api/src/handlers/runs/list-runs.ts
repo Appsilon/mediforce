@@ -18,5 +18,6 @@ export const listRuns = listAdapter<ListRunsInput, ProcessInstance, 'runs'>(
       status: input.status,
       namespace: input.namespace,
       limit: input.limit,
+      dryRun: input.dryRun,
     }),
 );

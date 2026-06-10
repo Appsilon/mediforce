@@ -44,6 +44,7 @@ function instanceFor(
     assignedRoles: [],
     deleted: false,
     archived: false,
+    dryRun: false,
     namespace,
     ...overrides,
   };

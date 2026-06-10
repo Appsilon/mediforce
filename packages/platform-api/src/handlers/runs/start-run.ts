@@ -57,6 +57,7 @@ export async function startRun(
     triggerName: input.triggerName,
     triggeredBy: input.triggeredBy,
     payload,
+    ...(input.dryRun ? { dryRun: true } : {}),
   });
 
   await scope.system.runKicker.kick(result.instanceId, {

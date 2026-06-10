@@ -90,6 +90,7 @@ export class PostgresProcessInstanceRepository
         totalCostUsd:
           parsed.totalCostUsd !== undefined ? String(parsed.totalCostUsd) : null,
         createdBy: parsed.createdBy,
+        dryRun: parsed.dryRun === true,
         archivedAt: parsed.archived === true ? new Date() : null,
         deletedAt: parsed.deleted === true ? new Date() : null,
         createdAt: new Date(parsed.createdAt),
@@ -148,6 +149,9 @@ export class PostgresProcessInstanceRepository
     if (options.namespace !== undefined) {
       conditions.push(eq(processInstances.workspace, options.namespace));
     }
+    if (options.dryRun !== undefined) {
+      conditions.push(eq(processInstances.dryRun, options.dryRun));
+    }
     const rows = await this.db
       .select()
       .from(processInstances)
@@ -174,6 +178,9 @@ export class PostgresProcessInstanceRepository
     }
     if (options.namespace !== undefined) {
       conditions.push(eq(processInstances.workspace, options.namespace));
+    }
+    if (options.dryRun !== undefined) {
+      conditions.push(eq(processInstances.dryRun, options.dryRun));
     }
     const rows = await this.db
       .select()
@@ -518,6 +525,7 @@ function toInstance(row: typeof processInstances.$inferSelect): ProcessInstance 
         : undefined,
     previousRunSourceId: row.previousRunSourceId ?? undefined,
     totalCostUsd: row.totalCostUsd !== null ? Number(row.totalCostUsd) : undefined,
+    dryRun: row.dryRun === true,
   });
 }
 

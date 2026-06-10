@@ -36,6 +36,7 @@ export async function getRun(
     definitionName: run.definitionName,
     definitionNamespace,
     ...(run.totalCostUsd != null ? { totalCostUsd: run.totalCostUsd } : {}),
+    ...(run.dryRun ? { dryRun: true } : {}),
   };
 }
 
