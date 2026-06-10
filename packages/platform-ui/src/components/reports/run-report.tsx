@@ -35,6 +35,7 @@ import {
   computeActiveProcessingTime,
 } from '@/lib/format';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
+import { saveBlobToDevice } from '@/lib/save-blob';
 
 type DetailLevel = 'brief' | 'full';
 
@@ -446,13 +447,10 @@ function DeliverablesSection({
       { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} },
     );
     if (!response.ok) return;
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = effectiveDeliverableFile.split('/').pop() ?? 'download';
-    a.click();
-    URL.revokeObjectURL(url);
+    saveBlobToDevice(
+      await response.blob(),
+      effectiveDeliverableFile.split('/').pop() ?? 'download',
+    );
   }
 
   return (
