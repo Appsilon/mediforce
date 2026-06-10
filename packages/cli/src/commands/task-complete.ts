@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import type { CompleteTaskInput } from '@mediforce/platform-api';
 import { defineCommand } from '../define-command';
 import { printJson, printError, printKv } from '../output';
 
@@ -51,7 +52,7 @@ export const taskCompleteCommand = defineCommand({
 
     const result = await mediforce.tasks.complete({
       taskId: args.taskId,
-      payload: payload as Record<string, unknown>,
+      payload: payload as CompleteTaskInput['payload'],
     });
 
     if (jsonMode) {

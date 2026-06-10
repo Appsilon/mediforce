@@ -32,7 +32,7 @@ export const runWatchCommand = defineCommand({
 
       const steps = await mediforce.processes.getSteps({ instanceId: args.runId });
       for (const step of steps.steps) {
-        const exec = step.latestExecution;
+        const exec = step.execution;
         const key = `${step.stepId}:${exec?.status ?? step.status}`;
         if (seenSteps.has(key)) continue;
         seenSteps.add(key);

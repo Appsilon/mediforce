@@ -28,7 +28,7 @@ export const runLogsCommand = defineCommand({
     if (stepsResult.steps.length > 0) {
       output.stdout('Steps:');
       for (const step of stepsResult.steps) {
-        const exec = step.latestExecution;
+        const exec = step.execution;
         const status = exec?.status ?? step.status;
         const duration = exec?.startedAt && exec?.completedAt
           ? `${Math.round((new Date(exec.completedAt).getTime() - new Date(exec.startedAt).getTime()) / 1000)}s`
