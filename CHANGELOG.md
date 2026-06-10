@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Added
+- ADR-0007: LLM evaluation & observability — four-layer model (traces → scores → eval datasets → eval runs), hybrid system of record (traces external via OpenTelemetry GenAI conventions, scores/datasets/eval runs as platform entities), Agent Run as the unit of evaluation, per-deployment content-capture switch. Glossary gains Trace / Score / Eval Dataset / Eval Run.
 - `verdict-with-params` task kind lets a single human step collect structured param values and a verdict together — previously required two separate steps [#658](https://github.com/Appsilon/mediforce/pull/658). Includes `ParamVerdictView` component and `datetime` param type support.
 - **Merged workflow designer** — consolidated `workflow-designer` (v21), `workflow-designer-2` (v3), and `cowork-workflow-designer` (v5) into a single cowork-based `workflow-designer` with create/edit mode support, live validation, HTML diagram previews, and a rich system prompt covering the full WorkflowDefinition schema.
   - Cowork sessions now validate artifacts live on every `update_artifact` call (wires up the previously unused `validateOutputSchema`), with results shown in the artifact panel and enforced as a gate on finalize.
