@@ -162,6 +162,10 @@ export {
   ListRunsOutputSchema,
   ListRunNamesInputSchema,
   ListRunNamesOutputSchema,
+  ListRunOutputFilesInputSchema,
+  RunOutputFileEntrySchema,
+  ListRunOutputFilesOutputSchema,
+  DownloadRunOutputFileInputSchema,
   type GetRunInput,
   type GetRunOutput,
   type StartRunInput,
@@ -170,6 +174,10 @@ export {
   type ListRunsOutput,
   type ListRunNamesInput,
   type ListRunNamesOutput,
+  type ListRunOutputFilesInput,
+  type RunOutputFileEntry,
+  type ListRunOutputFilesOutput,
+  type DownloadRunOutputFileInput,
 } from './runs';
 
 export {

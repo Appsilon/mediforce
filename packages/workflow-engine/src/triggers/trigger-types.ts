@@ -11,6 +11,7 @@ export interface WorkflowTriggerContext {
   payload?: Record<string, unknown>;
   parentInstanceId?: string;
   parentDefinitionName?: string;
+  dryRun?: boolean;
 }
 
 export interface TriggerResult {

@@ -527,6 +527,7 @@ export async function POST(
                 processInstanceId: instanceId,
                 namespace: instance.namespace ?? '',
                 definitionName: instance.definitionName,
+                ...(instance.dryRun ? { dryRun: true } : {}),
                 sources: {
                   triggerPayload: (instance.triggerPayload as Record<string, unknown>) ?? {},
                   steps: instance.variables,

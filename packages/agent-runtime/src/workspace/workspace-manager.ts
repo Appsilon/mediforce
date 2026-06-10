@@ -27,6 +27,9 @@ import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import type { WorkflowWorkspace } from '@mediforce/platform-core';
 import { normalizeRepoUrls, toHttpsWithToken } from '../plugins/container-plugin';
+import { bareRepoPathFor, defaultDataDir, runBranchName, worktreePathFor, type WorkflowIdentity } from './workspace-paths';
+
+export type { WorkflowIdentity } from './workspace-paths';
 
 /**
  * Baseline gitignore-style patterns applied to every workspace via `.git/info/exclude`.
@@ -75,11 +78,6 @@ export class SecretDetectedError extends Error {
     );
     this.name = 'SecretDetectedError';
   }
-}
-
-export interface WorkflowIdentity {
-  name: string;
-  namespace?: string;
 }
 
 export interface WorkspaceManagerInit {
@@ -249,15 +247,6 @@ export function formatStepCommitMessage(
   return sections.join('\n\n');
 }
 
-function sanitizeSegment(segment: string): string {
-  // Allow alphanumerics, dashes, underscores, dots. Replace anything else with an underscore.
-  return segment.replace(/[^a-zA-Z0-9._-]/g, '_');
-}
-
-function defaultDataDir(): string {
-  return process.env.MEDIFORCE_DATA_DIR ?? join(homedir(), '.mediforce');
-}
-
 function resolveDeployKeyPath(override?: string): string {
   return override ?? process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
 }
@@ -343,11 +332,11 @@ export class WorkspaceManager {
   }
 
   private bareRepoPath(workflow: WorkflowIdentity): string {
-    return join(this.dataDir, 'bare-repos', sanitizeSegment(workflow.namespace ?? '_default'), `${sanitizeSegment(workflow.name)}.git`);
+    return bareRepoPathFor(this.dataDir, workflow);
   }
 
   private worktreePath(workflow: WorkflowIdentity, runId: string): string {
-    return join(this.dataDir, 'worktrees', sanitizeSegment(workflow.namespace ?? '_default'), sanitizeSegment(workflow.name), sanitizeSegment(runId));
+    return worktreePathFor(this.dataDir, workflow, runId);
   }
 
   private fetchLockPath(bareRepoPath: string): string {
@@ -608,7 +597,7 @@ export class WorkspaceManager {
   ): Promise<RunWorkspaceHandle> {
     const bare = await this.ensureBareRepo(workflow, opts);
     const wtPath = this.worktreePath(workflow, runId);
-    const branch = `run/${runId}`;
+    const branch = runBranchName(runId);
 
     if (await pathExists(join(wtPath, '.git'))) {
       // Worktree already set up — step N>1 of an already-started run
@@ -775,7 +764,7 @@ export class WorkspaceManager {
       const nsDir = join(worktreesRoot, namespace);
       for (const name of await readdir(nsDir).catch(() => [])) {
         const wdDir = join(nsDir, name);
-        const bareRepoPath = join(this.dataDir, 'bare-repos', namespace, `${name}.git`);
+        const bareRepoPath = bareRepoPathFor(this.dataDir, { name, namespace });
         for (const runId of await readdir(wdDir).catch(() => [])) {
           const wtPath = join(wdDir, runId);
           const info = await stat(wtPath).catch(() => null);

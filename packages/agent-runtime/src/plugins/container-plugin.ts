@@ -65,6 +65,7 @@ import type { GitMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env';
 import type { ImageBuildMeta } from './docker-spawn-strategy';
 import { WorkspaceManager, type RunWorkspaceHandle } from '../workspace/workspace-manager';
+import { copyOutputFilesIntoWorkspace } from '../workspace/output-files';
 
 let preparedDeployKeyPath: string | null = null;
 
@@ -308,6 +309,10 @@ export abstract class ContainerPlugin implements AgentPlugin {
    *   ✓ last agent step of the run (no more agents will touch the workspace)
    *   ✗ failed — commits whatever the step produced before the error
    *
+   * Before committing, copies the step's `/output` deliverables into
+   * `.mediforce/output/<stepId>/` in the worktree (best-effort) so the same
+   * commit captures them — see `copyOutputFilesIntoWorkspace`.
+   *
    * Writes `git-result.json` into `outputDir` for downstream consumers.
    * Never pushes — run branches stay local for now.
    */
@@ -316,6 +321,8 @@ export abstract class ContainerPlugin implements AgentPlugin {
     opts: CommitRunWorkspaceOptions = {},
   ): Promise<GitMetadata | null> {
     if (!this.runWorkspaceHandle || !this.workspaceManager) return null;
+
+    await copyOutputFilesIntoWorkspace(outputDir, this.runWorkspaceHandle.path, this.context.stepId);
 
     const commit = await this.workspaceManager.commitStep(this.runWorkspaceHandle, {
       stepId: this.context.stepId,

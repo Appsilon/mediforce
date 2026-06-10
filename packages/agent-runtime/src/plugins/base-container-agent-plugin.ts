@@ -8,6 +8,7 @@ import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, Mc
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls, formatExitInfo, type ContainerPluginInit } from './container-plugin';
+import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
 import { createLineStreamReader } from '@mediforce/platform-core';
 
@@ -531,11 +532,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     instanceId: string,
     stepId: string,
   ): Promise<string | null> {
-    const INTERNAL_NAMES = new Set([
-      'opencode.json', 'auth.json', 'prompt.txt', 'result.json',
-      'git-result.json', 'mock-result.json',
-      'presentation.html', 'presentation.md',
-    ]);
+    const INTERNAL_NAMES = new Set([...INTERNAL_OUTPUT_FILE_NAMES, ...PRESENTATION_FILE_NAMES]);
     const DELIVERABLE_EXTS = new Set(['.html', '.htm', '.pdf', '.csv', '.xlsx', '.md']);
 
     let entries: string[];
@@ -566,7 +563,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     // Also handle presentation.{md,html} — already read into
     // spawnResult.presentation but a persisted path is needed for the
     // Download Report button. Markdown wins on tie.
-    for (const filename of ['presentation.md', 'presentation.html']) {
+    for (const filename of PRESENTATION_FILE_NAMES) {
       const presentationPath = join(outputDir, filename);
       try {
         const destDir = join(tmpdir(), 'mediforce-deliverables', instanceId);
@@ -894,24 +891,33 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         ? parsedResult.confidence_rationale
         : undefined;
 
-      let tokenUsage: { inputTokens: number; outputTokens: number } | undefined;
+      let tokenUsage: { inputTokens: number; outputTokens: number; cachedInputTokens?: number } | undefined;
 
       // First: check if agent reported tokenUsage in its result
       if (parsedResult.tokenUsage !== null
         && typeof parsedResult.tokenUsage === 'object'
         && typeof (parsedResult.tokenUsage as Record<string, unknown>).inputTokens === 'number'
         && typeof (parsedResult.tokenUsage as Record<string, unknown>).outputTokens === 'number') {
-        tokenUsage = parsedResult.tokenUsage as { inputTokens: number; outputTokens: number };
+        tokenUsage = parsedResult.tokenUsage as { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
       }
 
       // Second: check stream event for CLI-reported usage (e.g. Claude Code stream-json result event)
       // parseAgentOutput() returns a single JSON object for the final result event.
+      // Cache-creation tokens are billed at (roughly) the input rate, so they fold into
+      // inputTokens; cache-read tokens are billed at the cheaper cacheRead rate, so they are
+      // tracked separately. Dropping either — as the previous version did — under-reports cost.
       if (!tokenUsage) {
         try {
           const rawEvent = JSON.parse(spawnResult.cliOutput) as Record<string, unknown>;
           const usage = rawEvent.usage as Record<string, number> | undefined;
           if (usage && typeof usage.input_tokens === 'number' && typeof usage.output_tokens === 'number') {
-            tokenUsage = { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens };
+            const cacheCreationTokens = typeof usage.cache_creation_input_tokens === 'number' ? usage.cache_creation_input_tokens : 0;
+            const cacheReadTokens = typeof usage.cache_read_input_tokens === 'number' ? usage.cache_read_input_tokens : 0;
+            tokenUsage = {
+              inputTokens: usage.input_tokens + cacheCreationTokens,
+              outputTokens: usage.output_tokens,
+              ...(cacheReadTokens > 0 ? { cachedInputTokens: cacheReadTokens } : {}),
+            };
           }
         } catch {
           agentLog('cost.tokenExtraction', 'could not extract token usage from CLI output', {

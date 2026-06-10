@@ -72,6 +72,7 @@ function makeRunningInstance(
     assignedRoles: [],
     deleted: false,
     archived: false,
+    dryRun: false,
     ...overrides,
   };
 }

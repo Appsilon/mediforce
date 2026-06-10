@@ -18,10 +18,14 @@ import { workflowListVersionsCommand } from './commands/workflow-list-versions';
 import { workflowGetCommand } from './commands/workflow-get';
 import { runGetCommand } from './commands/run-get';
 import { runListCommand } from './commands/run-list';
+import { runFilesCommand } from './commands/run-files';
+import { runDownloadCommand } from './commands/run-download';
 import { runStartCommand } from './commands/run-start';
 import { runCancelCommand } from './commands/run-cancel';
 import { runArchiveCommand } from './commands/run-archive';
 import { runBulkCancelCommand, runBulkArchiveCommand } from './commands/run-bulk';
+import { runLogsCommand } from './commands/run-logs';
+import { runWatchCommand } from './commands/run-watch';
 import { workflowArchiveCommand } from './commands/workflow-archive';
 import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility';
 import { workflowCopyCommand } from './commands/workflow-copy';
@@ -47,6 +51,7 @@ import { secretDeleteCommand } from './commands/secret-delete';
 import { taskListCommand } from './commands/task-list';
 import { taskGetCommand } from './commands/task-get';
 import { taskClaimCommand } from './commands/task-claim';
+import { taskCompleteCommand } from './commands/task-complete';
 import { coworkGetCommand } from './commands/cowork-get';
 import { coworkGetByInstanceCommand } from './commands/cowork-get-by-instance';
 import { coworkListCommand } from './commands/cowork-list';
@@ -103,11 +108,15 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   run: {
-    description: 'Workflow runs (list, start, get, cancel, archive, bulk)',
+    description: 'Workflow runs (list, start, get, watch, logs, files, download, cancel, archive, bulk)',
     leaves: {
       list: { description: 'List recent runs', fn: runListCommand },
       start: { description: 'Start a new run (manual trigger)', fn: runStartCommand },
       get: { description: "Fetch a single run's status", fn: runGetCommand },
+      watch: { description: 'Watch a run until terminal, streaming step events', fn: runWatchCommand },
+      logs: { description: 'Show audit events and step executions for a run', fn: runLogsCommand },
+      files: { description: "List a run's Output Files", fn: runFilesCommand },
+      download: { description: "Download a run's Output Files (one or all)", fn: runDownloadCommand },
       cancel: { description: 'Cancel a running or paused run', fn: runCancelCommand },
       archive: { description: 'Soft-archive (or restore) a run', fn: runArchiveCommand },
       'bulk-cancel': { description: 'Cancel multiple runs in one call', fn: runBulkCancelCommand },
@@ -115,11 +124,12 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   task: {
-    description: 'Human tasks (list, get, claim)',
+    description: 'Human tasks (list, get, claim, complete)',
     leaves: {
       list: { description: 'List tasks by role or instance', fn: taskListCommand },
       get: { description: 'Fetch a single task', fn: taskGetCommand },
       claim: { description: 'Claim a pending task', fn: taskClaimCommand },
+      complete: { description: 'Complete a human task with a payload', fn: taskCompleteCommand },
     },
   },
   cowork: {

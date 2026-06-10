@@ -26,8 +26,9 @@ export const DockerJobDataSchema = z.object({
   outputDir: z.string(),
   /** Host-side log file path for realtime activity streaming (null = no logging). */
   logFile: z.string().nullable(),
-  /** Files from outputDir, keyed by filename. Sent through Redis when caller
-   *  and worker don't share a filesystem (e.g. Vercel → VPS). */
+  /** Files from outputDir, keyed by POSIX relative path with base64-encoded
+   *  content (see file-payload.ts). Sent through Redis when caller and worker
+   *  don't share a filesystem (e.g. Vercel → VPS). */
   inputFiles: z.record(z.string(), z.string()).optional(),
   /** Image build metadata — when present, worker ensures image exists before docker run. */
   imageBuild: z.object({
@@ -46,7 +47,8 @@ export const DockerJobResultSchema = z.object({
   stderr: z.string(),
   exitCode: z.number().nullable(),
   signal: z.string().nullable(),
-  /** Files from the worker's outputDir after docker run completes.
+  /** Files from the worker's outputDir after docker run completes, keyed by
+   *  POSIX relative path with base64-encoded content (see file-payload.ts).
    *  Returned through Redis so the caller can recreate them locally. */
   outputFiles: z.record(z.string(), z.string()).optional(),
 });

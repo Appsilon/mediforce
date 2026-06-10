@@ -107,6 +107,9 @@ export class InMemoryProcessInstanceRepository
     if (options.namespace !== undefined) {
       results = results.filter((i) => i.namespace === options.namespace);
     }
+    if (options.dryRun !== undefined) {
+      results = results.filter((i) => (i.dryRun === true) === options.dryRun);
+    }
     results.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
     return results.slice(0, options.limit ?? 20);
   }
