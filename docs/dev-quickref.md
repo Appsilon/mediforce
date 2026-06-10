@@ -67,6 +67,11 @@ project. Add `MEDIFORCE_OTEL_CAPTURE_CONTENT=true` to also record
 prompt/completion text (dev/demo only — prompts may contain patient data).
 Any OTLP-HTTP backend works in place of Phoenix.
 
+Only `@mediforce/*` spans are exported. Registering the tracer provider also
+activates Next.js's built-in HTTP instrumentation; those spans are filtered
+out so trace views stay agent-only. `MEDIFORCE_OTEL_EXPORT_ALL_SPANS=true`
+exports everything (e.g. to debug HTTP latency).
+
 ## Add a migration
 
 ```bash

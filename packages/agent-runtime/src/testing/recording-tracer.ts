@@ -95,9 +95,16 @@ class RecordingTracer implements Tracer {
   ) {}
 
   startSpan(name: string, options?: SpanOptions): Span {
-    const span = new RecordingSpan(name, this.spanStack.at(-1)?.name ?? null, options?.attributes);
+    const span = new RecordingSpan(name, this.parentNameFor(options), options?.attributes);
     this.spans.push(span);
     return span as unknown as Span;
+  }
+
+  private parentNameFor(options?: SpanOptions): string | null {
+    if (options?.root === true) {
+      return null;
+    }
+    return this.spanStack.at(-1)?.name ?? null;
   }
 
   startActiveSpan<F extends (span: Span) => ReturnType<F>>(name: string, fn: F): ReturnType<F>;
@@ -126,7 +133,7 @@ class RecordingTracer implements Tracer {
     }
 
     const options = typeof optionsOrFn === 'function' ? undefined : optionsOrFn;
-    const span = new RecordingSpan(name, this.spanStack.at(-1)?.name ?? null, options?.attributes);
+    const span = new RecordingSpan(name, this.parentNameFor(options), options?.attributes);
     this.spans.push(span);
     this.spanStack.push(span);
 

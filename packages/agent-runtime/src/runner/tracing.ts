@@ -54,7 +54,9 @@ export async function withAgentRunSpan<T>(
   // Final span status is set by annotateAgentRunSpan (every terminal path
   // calls it): the runner resolves normally on timeout/error fallbacks, so
   // a blanket OK here would mask failed runs in trace viewers.
-  return getTracer().startActiveSpan('mediforce.agent.run', { attributes }, async (span) => {
+  // root: true — host-framework spans (e.g. Next.js HTTP auto-instrumentation)
+  // are filtered out of export, so parenting under them would orphan the trace.
+  return getTracer().startActiveSpan('mediforce.agent.run', { attributes, root: true }, async (span) => {
     try {
       return await callback(span);
     } catch (error) {
