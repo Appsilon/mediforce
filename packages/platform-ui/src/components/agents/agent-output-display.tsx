@@ -129,11 +129,11 @@ export function AgentOutputDisplay({
         <GeneratedFiles git={agentOutput.gitMetadata} />
       )}
 
-      <Tabs.Root defaultValue={defaultTab}>
+      <Tabs.Root key={defaultTab} defaultValue={defaultTab}>
         <Tabs.List className="flex gap-1 border-b px-4">
           {[
-            ...(hasPresentation ? [{ value: 'presentation', label: 'Presentation', icon: MonitorPlay }] : []),
-            ...(hasFileTab ? [{ value: 'content', label: 'Content', icon: FileText }] : []),
+            ...(hasPresentation ? [{ value: 'presentation', label: 'Report', icon: MonitorPlay }] : []),
+            ...(hasFileTab ? [{ value: 'content', label: 'Output File', icon: FileText }] : []),
             { value: 'summary', label: 'Extracted Data', icon: FileText },
             { value: 'full', label: 'Raw JSON', icon: Code },
           ].map(({ value, label, icon: Icon }) => (

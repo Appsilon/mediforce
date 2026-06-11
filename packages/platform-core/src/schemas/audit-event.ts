@@ -38,7 +38,7 @@ export const AuditEventSchema = z.object({
   processDefinitionVersion: z.string().optional(),
 
   // --- Executor/Reviewer role tracking ---
-  executorType: z.enum(['human', 'agent']).optional(), // who executed the step
+  executorType: z.enum(['human', 'agent', 'script']).optional(), // who executed the step
   reviewerType: z.enum(['human', 'agent', 'none']).optional(), // who reviewed; 'none' for L4
 });
 

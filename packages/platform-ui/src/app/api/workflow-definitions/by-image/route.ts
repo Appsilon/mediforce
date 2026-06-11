@@ -43,7 +43,10 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
 
     const matchingSteps = latest.steps
-      .filter((step) => step.agent?.image && normalizeImage(step.agent.image) === needle)
+      .filter((step) => {
+        const image = step.agent?.image ?? step.script?.image;
+        return typeof image === 'string' && normalizeImage(image) === needle;
+      })
       .map((step) => step.id);
 
     if (matchingSteps.length > 0) {

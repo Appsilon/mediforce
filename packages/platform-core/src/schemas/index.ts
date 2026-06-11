@@ -81,11 +81,13 @@ export {
 export {
   AnnotationSchema,
   GitMetadataSchema,
+  StepOutputEnvelopeSchema,
   AgentOutputEnvelopeSchema,
   TokenUsageSchema,
   type Annotation,
   type GitMetadata,
   type TokenUsage,
+  type StepOutputEnvelope,
   type AgentOutputEnvelope,
 } from './agent-output-envelope';
 
@@ -148,6 +150,8 @@ export {
 
 export {
   WorkflowAgentConfigSchema,
+  ScriptStepConfigSchema,
+  DatabricksJobConfigSchema,
   WorkflowCoworkConfigSchema,
   WorkflowReviewConfigSchema,
   WorkflowWorkspaceSchema,
@@ -172,7 +176,10 @@ export {
   validateTriggerInput,
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,
+  resolveStepTimeoutMinutes,
   type WorkflowAgentConfig,
+  type ScriptStepConfig,
+  type DatabricksJobConfig,
   type WorkflowCoworkConfig,
   type WorkflowReviewConfig,
   type WorkflowWorkspace,

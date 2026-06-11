@@ -77,6 +77,7 @@ import {
   MockClaudeCodeAgentPlugin,
   OpenCodeAgentPlugin,
   ScriptContainerPlugin,
+  DatabricksJobPlugin,
 } from '@mediforce/agent-runtime';
 import {
   ActionRegistry,
@@ -280,6 +281,7 @@ export function getPlatformServices(): PlatformServices {
 
   pluginRegistry.register('opencode-agent', new OpenCodeAgentPlugin());
   pluginRegistry.register('script-container', new ScriptContainerPlugin());
+  pluginRegistry.register('databricks-job', new DatabricksJobPlugin());
 
   const llmClient = new OpenRouterLlmClient(
     process.env.OPENROUTER_API_KEY ?? '',

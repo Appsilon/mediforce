@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata, Presentation } from '@mediforce/platform-core';
+import type { AgentConfig, ScriptStepConfig, StepConfig, PluginCapabilityMetadata, Presentation } from '@mediforce/platform-core';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, type ContainerPluginInit } from './container-plugin';
 import { isLocalExecutionAllowed } from './base-container-agent-plugin';
@@ -45,14 +45,15 @@ async function readResultError(outputDir: string): Promise<string | null> {
  * Script container plugin — runs a deterministic command inside a Docker container.
  *
  * Unlike BaseContainerAgentPlugin, this does NOT involve an LLM, prompt assembly,
- * skill files, or any AI agent. Two modes:
+ * skill files, or any AI agent. Config comes from step.script (workflow
+ * definitions) or the legacy StepConfig.agentConfig. Two modes:
  *
- * **Command mode** (existing): agentConfig.command + agentConfig.image
+ * **Command mode**: script.command + script.image
  *   1. Writes step input as /output/input.json
  *   2. Runs `docker run --rm IMAGE COMMAND`
  *   3. Reads /output/result.json from the container
  *
- * **Inline script mode** (new): agentConfig.inlineScript + agentConfig.runtime
+ * **Inline script mode**: script.inlineScript + script.runtime
  *   1. Writes step input as /output/input.json
  *   2. Writes inlineScript to /output/script.{ext}
  *   3. Runs the script using the runtime's command in an auto-resolved Docker image
@@ -81,12 +82,12 @@ export class ScriptContainerPlugin extends ContainerPlugin {
   async initialize(context: AgentContext | WorkflowAgentContext): Promise<void> {
     this.context = context;
 
-    let agentConfig: AgentConfig | undefined;
+    let scriptConfig: ScriptStepConfig | AgentConfig | undefined;
     let stepEnv: Record<string, string> | undefined;
     let definitionEnv: Record<string, string> | undefined;
 
     if (isWorkflowAgentContext(context)) {
-      agentConfig = context.step.agent as AgentConfig | undefined;
+      scriptConfig = context.step.script;
       stepEnv = context.step.env;
       definitionEnv = context.workflowDefinition.env;
     } else {
@@ -96,24 +97,24 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       if (!stepConfig) {
         throw new Error(`Step config not found for stepId '${context.stepId}'`);
       }
-      agentConfig = stepConfig.agentConfig;
+      scriptConfig = stepConfig.agentConfig;
       stepEnv = stepConfig.env;
       definitionEnv = context.config.env;
     }
 
-    if (!agentConfig) {
+    if (!scriptConfig) {
       throw new Error(
-        `No agent config found for step '${context.stepId}'. ` +
-        `ScriptContainerPlugin requires agent config with command or inlineScript.`,
+        `No script config found for step '${context.stepId}'. ` +
+        `ScriptContainerPlugin requires step.script with command or inlineScript.`,
       );
     }
 
-    if (agentConfig.inlineScript) {
+    if (scriptConfig.inlineScript) {
       // Inline script mode — resolve runtime, image, and command automatically
-      const runtime = agentConfig.runtime;
+      const runtime = scriptConfig.runtime;
       if (!runtime) {
         throw new Error(
-          `agent.runtime is required when using inlineScript for step '${context.stepId}'. ` +
+          `script.runtime is required when using inlineScript for step '${context.stepId}'. ` +
           `Supported runtimes: ${Object.keys(RUNTIME_CONFIG).join(', ')}`,
         );
       }
@@ -126,10 +127,10 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         );
       }
 
-      this.inlineScript = agentConfig.inlineScript;
+      this.inlineScript = scriptConfig.inlineScript;
       this.runtime = runtime;
 
-      if (!agentConfig.image && isLocalExecutionAllowed()) {
+      if (!scriptConfig.image && isLocalExecutionAllowed()) {
         // Local mode: run the script as a child process on the host. Gated by
         // ALLOW_LOCAL_AGENTS=true. No container isolation — dev only. Mirrors
         // the same gate used in BaseContainerAgentPlugin for AI agents.
@@ -138,33 +139,33 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         this.commandArgs = [];
         this.commandDisplay = `${runtimeCfg.cmd('script' + runtimeCfg.ext).join(' ')} (local)`;
       } else {
-        this.image = agentConfig.image ?? runtimeCfg.image;
+        this.image = scriptConfig.image ?? runtimeCfg.image;
         const scriptPath = `/output/script${runtimeCfg.ext}`;
         this.commandArgs = runtimeCfg.cmd(scriptPath);
         this.commandDisplay = this.commandArgs.join(' ');
       }
-    } else if (agentConfig.command) {
+    } else if (scriptConfig.command) {
       // Command mode — existing behavior
-      if (!agentConfig.image) {
+      if (!scriptConfig.image) {
         throw new Error(
-          `No Docker image configured in agent config for step '${context.stepId}'. ` +
-          'ScriptContainerPlugin requires agent.image when using command mode.',
+          `No Docker image configured in script config for step '${context.stepId}'. ` +
+          'ScriptContainerPlugin requires script.image when using command mode.',
         );
       }
-      this.image = agentConfig.image;
-      this.commandArgs = agentConfig.command.split(' ');
-      this.commandDisplay = agentConfig.command;
+      this.image = scriptConfig.image;
+      this.commandArgs = scriptConfig.command.split(' ');
+      this.commandDisplay = scriptConfig.command;
     } else {
       throw new Error(
         `No command or inlineScript configured for step '${context.stepId}'. ` +
-        'ScriptContainerPlugin requires either agent.command or agent.inlineScript.',
+        'ScriptContainerPlugin requires either script.command or script.inlineScript.',
       );
     }
 
     // Resolve env vars from definition-level + step-level env + workflow secrets
     const workflowSecrets = isWorkflowAgentContext(context) ? context.workflowSecrets : undefined;
     this.resolveEnvironment(definitionEnv, stepEnv, workflowSecrets);
-    this.imageBuild = resolveImageBuild(this.image, agentConfig, context, this.resolvedEnv.vars);
+    this.imageBuild = resolveImageBuild(this.image, scriptConfig, context, this.resolvedEnv.vars);
   }
 
   async run(emit: EmitFn): Promise<void> {
@@ -210,7 +211,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       }
 
       const timeoutMinutes = isWorkflowAgentContext(this.context)
-        ? (this.context.step.agent as AgentConfig | undefined)?.timeoutMinutes
+        ? this.context.step.script?.timeoutMinutes
         : this.context.config.stepConfigs.find(
             (sc: StepConfig) => sc.stepId === this.context.stepId,
           )?.agentConfig?.timeoutMinutes;

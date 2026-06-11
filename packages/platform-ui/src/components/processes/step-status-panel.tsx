@@ -204,10 +204,15 @@ function ExecutedBy({ executedBy, executorType, plugin, autonomyLevel, runtime }
       </span>
     );
   }
-  const resolvedName = SYSTEM_ACTOR_IDS.has(executedBy)
-    ? null
-    : (userNames.get(executedBy) ?? executedBy);
-  const displayName = resolvedName ?? 'User unknown';
+  if (SYSTEM_ACTOR_IDS.has(executedBy)) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <Cog className="h-3 w-3 shrink-0" />
+        System
+      </span>
+    );
+  }
+  const displayName = userNames.get(executedBy) ?? executedBy ?? 'Unknown user';
   return (
     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
       <User className="h-3 w-3 shrink-0" />
@@ -280,10 +285,12 @@ function StepConfigDetail({
   const entries: Array<{ label: string; value: string }> = [];
 
   if (config.plugin) entries.push({ label: 'Plugin', value: config.plugin });
-  const model = config.agentConfig?.model ?? config.model;
-  if (model) entries.push({ label: 'Model', value: model });
+  if (config.executorType !== 'script') {
+    const model = config.agentConfig?.model ?? config.model;
+    if (model) entries.push({ label: 'Model', value: model });
+  }
   if (config.agentConfig?.skill) entries.push({ label: 'Skill', value: config.agentConfig.skill });
-  if (config.confidenceThreshold !== undefined) entries.push({ label: 'Confidence threshold', value: `${config.confidenceThreshold}` });
+  if (config.executorType !== 'script' && config.confidenceThreshold !== undefined) entries.push({ label: 'Confidence threshold', value: `${config.confidenceThreshold}` });
   if (config.fallbackBehavior) entries.push({ label: 'Fallback', value: config.fallbackBehavior.replace(/_/g, ' ') });
   if (config.timeoutMinutes) entries.push({ label: 'Timeout', value: `${config.timeoutMinutes} min` });
   if (config.reviewerType && config.reviewerType !== 'none') entries.push({ label: 'Reviewer', value: config.reviewerType });

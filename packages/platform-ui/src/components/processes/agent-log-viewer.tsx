@@ -379,7 +379,7 @@ function serializeSectionToText(section: AgentLogSection): string {
   return lines.join('\n');
 }
 
-function AgentTabContent({ section }: { section: AgentLogSection }) {
+function AgentTabContent({ section, isRunning }: { section: AgentLogSection; isRunning: boolean }) {
   const groups = buildGroups(section.entries);
   const isEmpty = groups.length === 0 && !section.rawContent;
 
@@ -393,7 +393,7 @@ function AgentTabContent({ section }: { section: AgentLogSection }) {
 
       {isEmpty && !section.error && (
         <p className="text-xs text-muted-foreground py-2">
-          Initializing log...
+          {isRunning ? 'Initializing log...' : 'No log for this step.'}
         </p>
       )}
 
@@ -418,7 +418,7 @@ function isSectionTerminal(section: AgentLogSection): boolean {
   return false;
 }
 
-const THINKING_TEXT = 'Thinking...';
+const THINKING_TEXT = 'Running...';
 
 function ThinkingIndicator() {
   const [charCount, setCharCount] = React.useState(0);
@@ -432,10 +432,10 @@ function ThinkingIndicator() {
 
   return (
     <div className="flex items-center gap-2 py-2 mt-1">
-      <Clock className="h-3.5 w-3.5 text-primary animate-spin shrink-0" />
+      <Clock className="h-3.5 w-3.5 text-blue-500 animate-spin shrink-0" />
       {/* Use visibility:hidden (not display:none) at char 0 so layout height stays constant — prevents scrollbar jump. */}
       <span
-        className={cn('text-xs font-bold text-primary', charCount === 0 && 'invisible')}
+        className={cn('text-xs font-bold text-blue-500', charCount === 0 && 'invisible')}
         style={{ minWidth: '5.5rem' }}
       >
         {THINKING_TEXT.slice(0, Math.max(charCount, 1))}
@@ -517,6 +517,7 @@ export function AgentLogViewer({ logFiles, initialStepId, runningStepIds = new S
   }, [sections, activeTab]);
 
   const activeSection = sections[activeTab] ?? null;
+  const initialStepHasLog = !initialStepId || sections.some((s) => s.stepId === initialStepId);
 
   const handleCopy = React.useCallback(async () => {
     if (!activeSection) return;
@@ -600,20 +601,26 @@ export function AgentLogViewer({ logFiles, initialStepId, runningStepIds = new S
           ref={scrollRef}
           className="p-3 overflow-auto flex-1 min-h-0 space-y-0.5"
         >
-          {sections.length === 0 && (
+          {!initialStepHasLog && (
+            <p className="text-xs text-muted-foreground text-center py-4">
+              No log for this step.
+            </p>
+          )}
+
+          {sections.length === 0 && initialStepHasLog && (
             <p className="text-xs text-muted-foreground text-center py-4">
               {loading ? 'Loading...' : 'Waiting for agent activity...'}
             </p>
           )}
 
           {/* Single agent — show directly */}
-          {sections.length === 1 && activeSection && (
-            <AgentTabContent section={activeSection} />
+          {sections.length === 1 && activeSection && initialStepHasLog && (
+            <AgentTabContent section={activeSection} isRunning={runningStepIds.has(activeSection.stepId)} />
           )}
 
           {/* Multiple agents — show active tab */}
-          {hasTabs && activeSection && (
-            <AgentTabContent section={activeSection} />
+          {hasTabs && activeSection && initialStepHasLog && (
+            <AgentTabContent section={activeSection} isRunning={runningStepIds.has(activeSection.stepId)} />
           )}
 
           {/* Thinking indicator — only while the step is actively running */}

@@ -2,13 +2,13 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { HumanTask, CoworkSession } from '@mediforce/platform-core';
+import type { HumanTask, CoworkSession, InstanceStatus } from '@mediforce/platform-core';
 import { ACTIONABLE_STATUSES } from '@mediforce/platform-api/contract';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 
-import { CRITICAL_LIVE_INTERVAL_MS, STANDARD_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
+import { CRITICAL_LIVE_INTERVAL_MS, STANDARD_LIVE_INTERVAL_MS, TERMINAL_STATUSES } from '@/lib/polling-cadence';
 
 /**
  * Role-scoped actionable task queue, react-query backed (STANDARD LIVE per
@@ -175,6 +175,50 @@ export function useActiveTaskForInstance(
   );
 
   return { task: activeTask, loading: enabled && query.isPending };
+}
+
+/**
+ * Every human task (any status) raised against one step of a process
+ * instance — powers the merged run-step page, which shows the actionable
+ * task UI for waiting human steps. CRITICAL LIVE while the run is active so
+ * claims by other users and L3 revise loops surface without a reload;
+ * stops once the run is terminal. `instanceStatus === undefined` (not yet
+ * known) is treated as active, mirroring `useStepExecutions`.
+ */
+export function useStepTasks(
+  instanceId: string | null,
+  stepId: string | null,
+  instanceStatus: InstanceStatus | undefined,
+): { tasks: HumanTask[]; loading: boolean } {
+  const enabled =
+    instanceId !== null && instanceId.length > 0 && stepId !== null && stepId.length > 0;
+  const isTerminal = instanceStatus !== undefined && TERMINAL_STATUSES.has(instanceStatus);
+
+  const query = useQuery({
+    queryKey: enabled
+      ? queryKeys.tasks.byInstance(instanceId, { stepId })
+      : (['tasks', '__noop__'] as const),
+    queryFn: async () => {
+      if (instanceId === null || stepId === null) {
+        throw new Error('unreachable: enabled gates this');
+      }
+      const result = await mediforce.tasks.list({ instanceId, stepId });
+      return result.tasks;
+    },
+    enabled,
+    refetchInterval: (q) => {
+      if (q.state.error !== null) return false;
+      return isTerminal ? false : CRITICAL_LIVE_INTERVAL_MS;
+    },
+    retry: stopRetryOn4xx,
+  });
+
+  const tasks = useMemo(
+    () => (query.data ?? []).filter((task) => !task.deleted),
+    [query.data],
+  );
+
+  return { tasks, loading: enabled && query.isPending };
 }
 
 /**

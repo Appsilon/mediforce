@@ -20,7 +20,7 @@ const NAV_ITEMS = [
   { href: '/runs', label: 'All runs', icon: Play, badge: null, exact: false },
   { href: '/agents', label: 'Agents', icon: Bot, badge: null, exact: false },
   { href: '/tools', label: 'Tools', icon: Wrench, badge: null, exact: false },
-  { href: '/tasks', label: 'New actions', icon: User, badge: null, exact: false },
+  { href: '/tasks', label: 'Human actions', icon: User, badge: null, exact: false },
 ] as const;
 
 const ACTION_ITEMS = [

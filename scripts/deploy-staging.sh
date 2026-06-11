@@ -47,7 +47,10 @@ echo "==> Building agent runtime images (golden-image, app containers)"
 bash scripts/rebuild-docker-images.sh
 
 echo "==> Restarting services"
-$COMPOSE up -d --force-recreate
+# --remove-orphans kills containers left over from services that no longer
+# exist in the compose files — an orphaned worker once kept consuming the
+# BullMQ queue with weeks-old code.
+$COMPOSE up -d --force-recreate --remove-orphans
 
 echo "==> Pruning dangling images from previous builds"
 docker image prune -f 2>/dev/null || true

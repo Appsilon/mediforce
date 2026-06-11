@@ -24,7 +24,7 @@ export const INTENT_STYLES: Record<Intent, IntentStyles> = {
   },
   warning: {
     Icon: MessageSquare,
-    submit: 'bg-amber-600 text-white hover:bg-amber-700',
+    submit: 'bg-blue-900 text-white hover:bg-blue-800 dark:bg-blue-800 dark:hover:bg-blue-700',
     card: 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800',
     iconColor: 'text-amber-600 dark:text-amber-400',
     text: 'text-amber-800 dark:text-amber-300',
@@ -33,7 +33,7 @@ export const INTENT_STYLES: Record<Intent, IntentStyles> = {
   },
   danger: {
     Icon: XCircle,
-    submit: 'bg-red-600 text-white hover:bg-red-700',
+    submit: 'bg-blue-900 text-white hover:bg-blue-800 dark:bg-blue-800 dark:hover:bg-blue-700',
     card: 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800',
     iconColor: 'text-red-600 dark:text-red-400',
     text: 'text-red-800 dark:text-red-300',
@@ -42,7 +42,7 @@ export const INTENT_STYLES: Record<Intent, IntentStyles> = {
   },
   neutral: {
     Icon: Circle,
-    submit: 'bg-slate-600 text-white hover:bg-slate-700',
+    submit: 'bg-blue-900 text-white hover:bg-blue-800 dark:bg-blue-800 dark:hover:bg-blue-700',
     card: 'bg-slate-50 border-slate-200 dark:bg-slate-900/20 dark:border-slate-800',
     iconColor: 'text-slate-600 dark:text-slate-400',
     text: 'text-slate-800 dark:text-slate-300',

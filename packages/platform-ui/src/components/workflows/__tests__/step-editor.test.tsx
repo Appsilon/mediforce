@@ -223,9 +223,9 @@ describe('StepEditor', () => {
       />,
     );
 
-    expect(screen.getByText('agent.runtime')).toBeInTheDocument();
-    expect(screen.getByText('agent.command')).toBeInTheDocument();
-    expect(screen.getByText('agent.inlineScript')).toBeInTheDocument();
+    expect(screen.getByText('script.runtime')).toBeInTheDocument();
+    expect(screen.getByText('script.command')).toBeInTheDocument();
+    expect(screen.getByText('script.inlineScript')).toBeInTheDocument();
   });
 
   it('[RENDER] human config shows allowedRoles field', () => {

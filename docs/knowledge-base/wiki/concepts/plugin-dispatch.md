@@ -19,7 +19,7 @@ tags: [concept, plugin-dispatch, agent-runtime, registry]
 
 ## Registration points
 
-- **Built-in** — `getPlatformServices()` in [platform-ui](../entities/packages/platform-ui.md) registers `claude-code-agent`, `opencode-agent`, `script-container`. `MOCK_AGENT=true` → mocks.
+- **Built-in** — `getPlatformServices()` in [platform-ui](../entities/packages/platform-ui.md) registers `claude-code-agent`, `opencode-agent`, `script-container`, [`databricks-job`](../entities/plugins/databricks-job.md). `MOCK_AGENT=true` → mocks.
 - **Domain** — `registerSupplyIntelligencePlugins(registry)` called from `getPlatformServices()`.
 - **Ad-hoc / tests** — `registry.register(name, plugin)` directly.
 

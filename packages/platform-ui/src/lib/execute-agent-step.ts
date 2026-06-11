@@ -105,20 +105,25 @@ export async function executeAgentStep(
     ? 'L4'
     : (workflowStep.autonomyLevel ?? 'L2');
 
+  const executorType = workflowStep.executor === 'script' ? ('script' as const) : ('agent' as const);
+
   // Merge step params into context — stepParams take lower priority than appContext
   const mergedInput: Record<string, unknown> = {
     ...(workflowStep.stepParams ?? {}),
     ...appContext,
   };
 
+  const isScript = executorType === 'script';
   await auditRepo.append({
-    actorId: `agent:${pluginId}`,
-    actorType: 'agent',
+    actorId: `${isScript ? 'script' : 'agent'}:${pluginId}`,
+    actorType: isScript ? 'system' : 'agent',
     actorRole: autonomyLevel,
-    action: 'agent.step.started',
-    description: `Workflow agent step '${stepId}' started (plugin: ${pluginId}, autonomy: ${autonomyLevel})`,
+    action: isScript ? 'script.step.started' : 'agent.step.started',
+    description: isScript
+      ? `Script step '${stepId}' started (plugin: ${pluginId})`
+      : `Workflow agent step '${stepId}' started (plugin: ${pluginId}, autonomy: ${autonomyLevel})`,
     timestamp: new Date().toISOString(),
-    inputSnapshot: { stepId, pluginId, autonomyLevel, ...appContext },
+    inputSnapshot: { stepId, pluginId, ...(isScript ? {} : { autonomyLevel }), ...appContext },
     outputSnapshot: {},
     basis: `Triggered by ${triggeredBy}`,
     entityType: 'processInstance',
@@ -126,7 +131,7 @@ export async function executeAgentStep(
     processInstanceId: instanceId,
     stepId,
     processDefinitionVersion: instance.definitionVersion,
-    executorType: 'agent',
+    executorType,
     reviewerType: 'none',
   });
 
@@ -235,16 +240,17 @@ export async function executeAgentStep(
     });
   }
 
-  // When the agent crashes (fallbackReason='error'), surface the error on the
+  // When the agent/script crashes (fallbackReason='error'), surface the error on the
   // run overview by writing it to processInstance.error. Without this the error
   // is only visible on the step detail page.
   const isFailed = runResult.fallbackReason === 'error' || runResult.fallbackReason === 'timeout';
   if (isFailed) {
     const failLabel = runResult.fallbackReason === 'timeout' ? 'timed out' : 'failed';
-    const errorDetail = runResult.errorMessage ?? (runResult.fallbackReason === 'timeout' ? 'agent execution timed out' : null);
+    const stepKind = isScript ? 'Script' : 'Agent';
+    const errorDetail = runResult.errorMessage ?? (runResult.fallbackReason === 'timeout' ? `${stepKind.toLowerCase()} execution timed out` : null);
     if (errorDetail !== null) {
       await instanceRepo.update(instanceId, {
-        error: `Agent step '${stepId}' ${failLabel}: ${errorDetail}`,
+        error: `${stepKind} step '${stepId}' ${failLabel}: ${errorDetail}`,
         updatedAt: new Date().toISOString(),
       });
     }
@@ -335,7 +341,7 @@ export async function executeAgentStep(
       processInstanceId: instanceId,
       stepId,
       processDefinitionVersion: instance.definitionVersion,
-      executorType: 'agent',
+      executorType,
       reviewerType: 'human',
     });
 
@@ -438,21 +444,25 @@ export async function executeAgentStep(
   // ---- Escalation/Pause (non-L3) ----
   if (runResult.status === 'escalated' || runResult.status === 'paused') {
     await auditRepo.append({
-      actorId: `agent:${pluginId}`,
-      actorType: 'agent',
+      actorId: `${isScript ? 'script' : 'agent'}:${pluginId}`,
+      actorType: isScript ? 'system' : 'agent',
       actorRole: autonomyLevel,
-      action: 'agent.escalated',
-      description: `Workflow step '${stepId}' escalated — reason: ${runResult.fallbackReason ?? 'unknown'}`,
+      action: isScript ? 'script.escalated' : 'agent.escalated',
+      description: isScript
+        ? `Script step '${stepId}' failed — reason: ${runResult.fallbackReason ?? 'unknown'}`
+        : `Workflow step '${stepId}' escalated — reason: ${runResult.fallbackReason ?? 'unknown'}`,
       timestamp: new Date().toISOString(),
       inputSnapshot: { stepId, fallbackReason: runResult.fallbackReason ?? null },
       outputSnapshot: { status: runResult.status },
-      basis: 'FallbackHandler: agent could not complete step autonomously',
+      basis: isScript
+        ? 'Script step could not complete'
+        : 'FallbackHandler: agent could not complete step autonomously',
       entityType: 'processInstance',
       entityId: instanceId,
       processInstanceId: instanceId,
       stepId,
       processDefinitionVersion: instance.definitionVersion,
-      executorType: 'agent',
+      executorType,
       reviewerType: 'none',
     });
     const currentInstance = await instanceRepo.getById(instanceId);

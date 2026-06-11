@@ -11,6 +11,7 @@ import type {
 import type { CompleteTaskInput, CompleteTaskOutput } from '../../contract/tasks';
 import type { CallerScope } from '../../repositories/index';
 import {
+  ForbiddenError,
   HandlerError,
   NotFoundError,
   PreconditionFailedError,
@@ -41,6 +42,13 @@ async function loadTaskContext(
   taskId: string,
 ): Promise<TaskContext> {
   const task = await loadOr404(scope.tasks.getById(taskId), 'Task not found');
+  if (
+    scope.caller.kind === 'user' &&
+    task.assignedUserId !== null &&
+    task.assignedUserId !== scope.caller.uid
+  ) {
+    throw new ForbiddenError('Task is claimed by another user');
+  }
   const actor = actorFromCaller(scope);
   // Fall back to the task's prior assignee for apiKey callers so the audit
   // trail reflects the human who claimed the task, not 'api-user'.

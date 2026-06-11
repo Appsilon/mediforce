@@ -98,6 +98,7 @@ function ActionItemRow({
   currentUserId,
   currentUserName,
   userNames,
+  processNameMap,
   showProcess,
   processName,
   muted = false,
@@ -106,6 +107,7 @@ function ActionItemRow({
   currentUserId: string;
   currentUserName?: string | null;
   userNames: Map<string, string>;
+  processNameMap: Map<string, string>;
   showProcess: boolean;
   processName?: string;
   muted?: boolean;
@@ -117,9 +119,17 @@ function ActionItemRow({
   const isOverdue = deadline?.includes('overdue') ?? false;
   const assignedUserId = getItemAssignedUserId(item);
 
+  // Human tasks open as run steps (the merged human step view). The
+  // definition name comes from the run-name map; while it loads, fall back
+  // to the /tasks/{id} redirect which resolves to the step URL client-side.
+  const definitionName = item.kind === 'task'
+    ? processNameMap.get(item.data.processInstanceId)
+    : undefined;
   const href = item.kind === 'cowork'
     ? routes.cowork(handle, item.data.id)
-    : routes.task(handle, item.data.id);
+    : definitionName !== undefined
+      ? routes.workflowRunStep(handle, definitionName, item.data.processInstanceId, item.data.stepId)
+      : routes.task(handle, item.data.id);
 
   return (
     <div className={cn('group flex items-center border-b border-border/30 last:border-b-0', muted && 'opacity-60')}>
@@ -181,10 +191,11 @@ interface ProcessCardProps {
   currentUserId: string;
   currentUserName?: string | null;
   userNames: Map<string, string>;
+  processNameMap: Map<string, string>;
   subGroupByAction: boolean;
 }
 
-function ProcessCard({ processName, activeItems, completedItems, currentUserId, currentUserName, userNames, subGroupByAction }: ProcessCardProps) {
+function ProcessCard({ processName, activeItems, completedItems, currentUserId, currentUserName, userNames, processNameMap, subGroupByAction }: ProcessCardProps) {
   const [expanded, setExpanded] = React.useState(false);
 
   const allItems = React.useMemo(() => {
@@ -211,6 +222,7 @@ function ProcessCard({ processName, activeItems, completedItems, currentUserId, 
           currentUserId={currentUserId}
           currentUserName={currentUserName}
           userNames={userNames}
+          processNameMap={processNameMap}
           showProcess={false}
           muted={isItemCompleted(item)}
         />
@@ -242,6 +254,7 @@ function ProcessCard({ processName, activeItems, completedItems, currentUserId, 
               currentUserId={currentUserId}
               currentUserName={currentUserName}
               userNames={userNames}
+              processNameMap={processNameMap}
               showProcess={false}
               muted={isItemCompleted(item)}
             />
@@ -335,6 +348,7 @@ function ActionGroup({
             currentUserId={currentUserId}
             currentUserName={currentUserName}
             userNames={userNames}
+            processNameMap={processNameMap}
             showProcess
             processName={processNameMap.get(getItemProcessInstanceId(item))}
             muted={isItemCompleted(item)}
@@ -392,6 +406,7 @@ function FlatList({
           currentUserId={currentUserId}
           currentUserName={currentUserName}
           userNames={userNames}
+          processNameMap={processNameMap}
           showProcess
           processName={processNameMap.get(getItemProcessInstanceId(item))}
         />
@@ -503,6 +518,7 @@ export function TaskGroupedView({
             currentUserId={currentUserId}
             currentUserName={currentUserName}
             userNames={userNames}
+            processNameMap={processNameMap}
             subGroupByAction={groupByAction}
           />
         ))}

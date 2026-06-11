@@ -11,7 +11,10 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-06-07]
+
 ### Added
+- `databricks-job` plugin — workflow steps can trigger an existing Databricks job (`jobs/run-now` + polling) and route transitions on the JSON the notebook exits with; secrets `DATABRICKS_HOST`/`DATABRICKS_TOKEN`, `${steps.*}` param interpolation, single-task jobs in v1. Includes `scripts/databricks-spike.py` for manual verification against a real workspace.
 - Agent-produced files are no longer lost — everything an agent step leaves in `/output` is preserved as **Output Files** on the run branch (`.mediforce/output/<stepId>/`, ADR-0007) and is reviewable and downloadable:
   - API: `GET /api/runs/<runId>/files` lists a run's files; `GET /api/runs/<runId>/files/<path>` serves the bytes (binary-safe, RFC 6266 attachment); `mediforce.runs.listOutputFiles` / `downloadOutputFile` client methods.
   - UI: "Files" card on the run detail page (grouped by step, hidden when empty) + per-step paperclip chips expanding to that step's files.
@@ -30,9 +33,18 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
   - Built-in tool calls (`update_artifact`, `update_presentation`) now persist as live tool turns visible in the cowork chat UI.
   - Postgres migration 0018: `validation_result` (jsonb) + `presentation` (text) columns on `cowork_sessions`.
 
+### Changed
+- **Breaking (schema + data migration 0023):** deterministic script-step config moved from `step.agent` to a typed `step.script` key; `agent`/`autonomyLevel`/`cowork` are now rejected on `executor: 'script'` steps and audit events record `executorType: 'script'` (forward-only). Stored workflow definitions are rewritten in-place by Postgres migration `0023_script_step_config` — it must ship in the same release, because definitions are re-parsed on read.
 ### Fixed
+- Script container `runtime: "python"` now invokes `python3` — previously failed on golden image (and any image without a `python` symlink) with `exec: "python": not found` [#675](https://github.com/Appsilon/mediforce/pull/675).
 - Queued (BullMQ) Docker execution no longer corrupts binary files (PDF, XLSX, ZIP) and now preserves nested output directories — file payloads cross Redis as base64 keyed by POSIX relative path, matching local-mode behaviour.
 - **Run cost under-reported for cached agent runs** — the container-agent token extractor read only `input_tokens`/`output_tokens` from the CLI result event and dropped `cache_read_input_tokens` and `cache_creation_input_tokens`, so prompt-cached runs (where cache reads dominate input) showed costs many times lower than OpenRouter actually charged. Cache-creation tokens now fold into `inputTokens` and cache-read tokens are tracked as `cachedInputTokens`, priced at the registry `cacheRead` rate (falling back to the input rate). (#654)
+- Completed param-only tasks (e.g. data-entry steps with no verdicts) no longer show a "Waiting for step output... Verdict buttons will be enabled..." box — that message only made sense for review steps, and the panel now renders nothing when the previous step produced no output to show [#672](https://github.com/Appsilon/mediforce/pull/672).
+
+### Changed
+- Human steps in the run view are now first-class: a waiting step shows the full task UI (verdict buttons, params, claim/access banner); a completed human step shows the read-only task body alongside execution input/output — the separate task detail page is gone. Task inbox renamed "New actions" → "Human actions"; all inbox links point directly to the step view. `/tasks/{id}` deep-links (emails, bookmarks) redirect transparently to the owning step.
+- GETTING-STARTED now covers two first-run blockers that were previously only discoverable by hitting the error: setting `MEDIFORCE_API_KEY` for the CLI (must match `PLATFORM_API_KEY`), and building local `script`-executor images (`mediforce-golden-image`, `mediforce-node`) via `scripts/rebuild-docker-images.sh` before running workflows with `script` steps [#670](https://github.com/Appsilon/mediforce/pull/670).
+- Deploys can no longer leave orphaned containers behind — `deploy.sh` and `deploy-staging.sh` pass `--remove-orphans` to `docker compose up`, so containers from since-removed compose services die on deploy instead of silently consuming shared queues with weeks-old code (root cause of the staging incident where a stale agent worker wrote base64 `script.mjs` payloads) [#682](https://github.com/Appsilon/mediforce/pull/682).
 
 ## [2026-05-31]
 

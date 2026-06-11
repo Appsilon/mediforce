@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useMemo } from 'react';
-import type { WorkflowStep } from '@mediforce/platform-core';
+import { resolveStepTimeoutMinutes, type WorkflowStep } from '@mediforce/platform-core';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { useStepExecutions } from '@/hooks/use-step-executions';
 import { useAgentEvents } from '@/hooks/use-agent-events';
@@ -50,9 +50,11 @@ export default function RunDetailPage() {
               model: ws.agent?.model,
               confidenceThreshold: ws.agent?.confidenceThreshold,
               fallbackBehavior: ws.agent?.fallbackBehavior,
-              timeoutMinutes: ws.agent?.timeoutMinutes ?? (ws.agent?.timeoutMs !== undefined ? ws.agent.timeoutMs / 60000 : undefined),
+              timeoutMinutes: resolveStepTimeoutMinutes(ws),
               reviewerType: ws.review?.type,
               agentConfig: ws.agent,
+              scriptConfig: ws.script,
+              databricksConfig: ws.databricks,
             },
           ] as const;
         })

@@ -87,8 +87,8 @@ describe('AgentOutputReviewPanel', () => {
 
     render(<AgentOutputReviewPanel agentOutput={agentOutput} />);
 
-    // Presentation tab should exist
-    expect(screen.getByText('Presentation')).toBeInTheDocument();
+    // Report tab should exist
+    expect(screen.getByText('Report')).toBeInTheDocument();
 
     // Data tabs should also be in the tab list
     expect(screen.getByText('Extracted Data')).toBeInTheDocument();

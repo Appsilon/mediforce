@@ -45,6 +45,7 @@ export type {
   GitMetadata,
   TokenUsage,
   Presentation,
+  StepOutputEnvelope,
   AgentOutputEnvelope,
 } from '../schemas/agent-output-envelope';
 
@@ -57,6 +58,8 @@ export type {
 
 export type {
   WorkflowAgentConfig,
+  ScriptStepConfig,
+  DatabricksJobConfig,
   WorkflowCoworkConfig,
   WorkflowReviewConfig,
   WorkflowStep,

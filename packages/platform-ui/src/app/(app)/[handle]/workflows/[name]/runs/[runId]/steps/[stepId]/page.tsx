@@ -5,14 +5,17 @@ import { useMemo, useState } from 'react';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { format } from 'date-fns';
 import { CheckCircle2, Clock, XCircle, Circle, Pause, Bot, User, ExternalLink, FileText, GitBranch, Gauge, ChevronDown, ChevronRight, MessageSquare, DollarSign } from 'lucide-react';
-import type { StepExecution, Step, AgentEvent, HumanTask } from '@mediforce/platform-core';
+import type { StepExecution, Step, AgentEvent, HumanTask, WorkflowStep } from '@mediforce/platform-core';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { useStepExecutions } from '@/hooks/use-step-executions';
 import { useAgentEvents } from '@/hooks/use-agent-events';
 import { useWorkflowVersion } from '@/hooks/use-workflow-versions';
-import { useInstanceTasks } from '@/hooks/use-instance-tasks';
+import { useStepTasks } from '@/hooks/use-tasks';
+import { useViewerIdentity } from '@/hooks/use-viewer-identity';
 import { useAgentRunsForStep } from '@/hooks/use-agent-runs';
 import { getAgentOutput, type AgentOutputData } from '@/components/tasks/task-utils';
+import { resolveStepView } from '@/components/tasks/resolve-step-view';
+import { HumanStepView } from '@/components/tasks/human-step-view';
 import { AgentOutputDisplay } from '@/components/agents/agent-output-display';
 import { agentOutputFromEnvelope } from './agent-output-from-envelope';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
@@ -58,15 +61,20 @@ export default function StepDetailPage() {
   );
 
   const definitionStep = useMemo((): Step | null => {
-    return definition?.steps.find((s) => s.id === decodedStepId) ?? null;
+    return definition?.steps?.find((s) => s.id === decodedStepId) ?? null;
   }, [definition, decodedStepId]);
+
+  const executorType = useMemo(() => {
+    if (!definitionStep) return undefined;
+    return (definitionStep as unknown as WorkflowStep).executor;
+  }, [definitionStep]);
 
   // Find previous step name for the "From:" label
   const previousStepName = useMemo(() => {
     const transitions = definition?.transitions ?? [];
     const incoming = transitions.find((t) => t.to === decodedStepId);
     if (!incoming) return null;
-    const prevStep = definition?.steps.find((s) => s.id === incoming.from);
+    const prevStep = definition?.steps?.find((s) => s.id === incoming.from);
     return prevStep?.name ?? formatStepName(incoming.from);
   }, [definition, decodedStepId]);
 
@@ -92,7 +100,11 @@ export default function StepDetailPage() {
   //   2. HumanTask.completionData.agentOutput (only for L3 review steps) —
   //      fallback for older runs where envelope wasn't queryable.
   const { data: agentRuns } = useAgentRunsForStep(runId ?? null, decodedStepId || null);
-  const { tasks: instanceTasks } = useInstanceTasks(runId ?? undefined);
+  const { tasks: stepTasks, loading: tasksLoading } = useStepTasks(
+    runId ?? null,
+    decodedStepId || null,
+    instance?.status,
+  );
   const agentOutput = useMemo((): AgentOutputData | null => {
     const latestRun = agentRuns
       .slice()
@@ -100,20 +112,24 @@ export default function StepDetailPage() {
     if (latestRun?.envelope) {
       return agentOutputFromEnvelope(latestRun.envelope);
     }
-    const candidates = instanceTasks
-      .filter((task: HumanTask) => task.stepId === decodedStepId)
-      .sort(
-        (a: HumanTask, b: HumanTask) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+    const candidates = [...stepTasks].sort(
+      (a: HumanTask, b: HumanTask) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
     for (const task of candidates) {
       const output = getAgentOutput(task);
       if (output) return output;
     }
     return null;
-  }, [agentRuns, instanceTasks, decodedStepId]);
+  }, [agentRuns, stepTasks]);
 
-  const loading = instanceLoading || stepsLoading || eventsLoading;
+  const viewer = useViewerIdentity();
+  const stepView = useMemo(
+    () => resolveStepView({ tasks: stepTasks, execution, viewer }),
+    [stepTasks, execution, viewer],
+  );
+
+  const loading = instanceLoading || stepsLoading || eventsLoading || tasksLoading;
 
   if (loading) {
     return (
@@ -136,8 +152,33 @@ export default function StepDetailPage() {
   const stepName = definitionStep?.name ?? formatStepName(decodedStepId);
   const hasAgentBadge = agentOutput !== null || execution?.agentOutput !== undefined;
 
+  if (stepView.kind === 'human-step') {
+    const executionPanel = execution !== null && stepView.access.kind === 'completed' ? (
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <InputColumn
+          execution={execution}
+          previousStepName={previousStepName}
+          promptEvent={promptEvent}
+        />
+        <OutputColumn execution={execution} />
+      </div>
+    ) : undefined;
+
+    return (
+      <div className="p-6">
+        <HumanStepView
+          task={stepView.task}
+          access={stepView.access}
+          processInstance={instance}
+          agentOutput={agentOutput}
+          executionPanel={executionPanel}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 space-y-6 max-w-6xl">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-3">
@@ -191,24 +232,24 @@ export default function StepDetailPage() {
               Step IO (debug)
             </Collapsible.Trigger>
             <Collapsible.Content className="mt-3">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <InputColumn
                   execution={execution}
                   previousStepName={previousStepName}
                   promptEvent={promptEvent}
                 />
-                <OutputColumn execution={execution} />
+                <OutputColumn execution={execution} executorType={executorType} />
               </div>
             </Collapsible.Content>
           </Collapsible.Root>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <InputColumn
               execution={execution}
               previousStepName={previousStepName}
               promptEvent={promptEvent}
             />
-            <OutputColumn execution={execution} />
+            <OutputColumn execution={execution} executorType={executorType} />
           </div>
         )
       ) : (
@@ -285,7 +326,7 @@ function CollapsiblePrompt({ prompt }: { prompt: unknown }) {
         )}
       </button>
       {expanded && (
-        <pre className="rounded-md bg-muted p-3 text-xs overflow-auto max-h-[500px] whitespace-pre-wrap break-words">
+        <pre className="rounded-md bg-muted p-3 text-xs whitespace-pre-wrap break-words">
           {promptText}
         </pre>
       )}
@@ -295,7 +336,7 @@ function CollapsiblePrompt({ prompt }: { prompt: unknown }) {
 
 // ── Output Column ───────────────────────────────────────────────────────────
 
-function OutputColumn({ execution }: { execution: StepExecution }) {
+function OutputColumn({ execution, executorType }: { execution: StepExecution; executorType?: string }) {
   const agentOutput = execution.agentOutput;
   const hasAgent = agentOutput !== undefined;
   const output = execution.output;
@@ -312,7 +353,7 @@ function OutputColumn({ execution }: { execution: StepExecution }) {
         ) : (
           <div className="divide-y">
             {hasAgent && agentOutput && (
-              <AgentMetadataSection agentOutput={agentOutput} />
+              <AgentMetadataSection agentOutput={agentOutput} executorType={executorType} />
             )}
 
             {hasAgent && agentOutput?.gitMetadata && (
@@ -331,8 +372,9 @@ function OutputColumn({ execution }: { execution: StepExecution }) {
 
 // ── Agent Metadata ──────────────────────────────────────────────────────────
 
-function AgentMetadataSection({ agentOutput }: { agentOutput: NonNullable<StepExecution['agentOutput']> }) {
-  const confidencePct = agentOutput.confidence !== null
+function AgentMetadataSection({ agentOutput, executorType }: { agentOutput: NonNullable<StepExecution['agentOutput']>; executorType?: string }) {
+  const isScript = executorType === 'script';
+  const confidencePct = !isScript && agentOutput.confidence !== null
     ? Math.round(agentOutput.confidence * 100)
     : null;
 
@@ -355,7 +397,7 @@ function AgentMetadataSection({ agentOutput }: { agentOutput: NonNullable<StepEx
             )}>{confidencePct}%</span>
           </div>
         )}
-        {agentOutput.model && (
+        {!isScript && agentOutput.model && (
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground">Model:</span>
             <span className="font-mono text-xs">{agentOutput.model}</span>
@@ -382,7 +424,7 @@ function AgentMetadataSection({ agentOutput }: { agentOutput: NonNullable<StepEx
           </div>
         )}
       </div>
-      {agentOutput.confidence_rationale && (
+      {!isScript && agentOutput.confidence_rationale && (
         <p className="text-xs text-muted-foreground italic">{agentOutput.confidence_rationale}</p>
       )}
       {agentOutput.reasoning && (
@@ -518,7 +560,7 @@ function DataValue({ value }: { value: unknown }) {
       );
     }
     return (
-      <pre className="rounded-md bg-muted p-3 text-xs overflow-auto max-h-[400px] whitespace-pre-wrap break-words">
+      <pre className="rounded-md bg-muted p-3 text-xs whitespace-pre-wrap break-words">
         {JSON.stringify(value, null, 2)}
       </pre>
     );
@@ -526,7 +568,7 @@ function DataValue({ value }: { value: unknown }) {
 
   if (typeof value === 'object') {
     return (
-      <pre className="rounded-md bg-muted p-3 text-xs overflow-auto max-h-[400px] whitespace-pre-wrap break-words">
+      <pre className="rounded-md bg-muted p-3 text-xs whitespace-pre-wrap break-words">
         {JSON.stringify(value, null, 2)}
       </pre>
     );

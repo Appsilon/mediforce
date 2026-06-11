@@ -65,8 +65,8 @@ async function expandPanel(): Promise<void> {
   }
 }
 
-// Summary is the default selected tab. Iframe-related tests need the Report
-// tab active; this helper switches to it.
+// Extracted Data is the default tab when there is no report. Iframe-related
+// tests need the Report tab active; this helper switches to it.
 async function activateReportTab(): Promise<void> {
   const reportTrigger = screen.getByRole('tab', { name: /report/i });
   await userEvent.setup().click(reportTrigger);
@@ -81,7 +81,7 @@ describe('TaskContextPanel', () => {
     mockUseTheme.mockReturnValue({ resolvedTheme: 'light', setTheme: vi.fn() });
   });
 
-  it('renders Summary tab as default with Report tab available when inline presentation is present', async () => {
+  it('defaults to Report tab with Extracted Data tab available when inline presentation is present', async () => {
     const execution = buildExecution({
       output: {
         summary: 'OK',
@@ -98,11 +98,11 @@ describe('TaskContextPanel', () => {
     );
     await expandPanel();
 
-    // Summary selected by default; Report tab present but inactive.
-    const summaryTrigger = screen.getByRole('tab', { name: /summary/i });
+    // Report selected by default when presentation is available; Extracted Data tab present but inactive.
     const reportTrigger = screen.getByRole('tab', { name: /report/i });
-    expect(summaryTrigger.getAttribute('data-state')).toBe('active');
-    expect(reportTrigger.getAttribute('data-state')).toBe('inactive');
+    const extractedDataTrigger = screen.getByRole('tab', { name: /extracted data/i });
+    expect(reportTrigger.getAttribute('data-state')).toBe('active');
+    expect(extractedDataTrigger.getAttribute('data-state')).toBe('inactive');
 
     // Switching to Report tab reveals the inline iframe.
     await activateReportTab();
@@ -187,7 +187,7 @@ describe('TaskContextPanel', () => {
     expect(reportTrigger.getAttribute('data-state')).toBe('active');
   });
 
-  it('falls back to Summary tab when neither presentation nor htmlReportPath is present', async () => {
+  it('defaults to Extracted Data tab when neither presentation nor htmlReportPath is present', async () => {
     const execution = buildExecution({ output: { summary: 'Plain output' } });
     setStepExecutions([execution]);
 
@@ -201,13 +201,27 @@ describe('TaskContextPanel', () => {
 
     expect(screen.queryByRole('tab', { name: /report/i })).toBeNull();
 
-    const summaryTrigger = screen.getByRole('tab', { name: /summary/i });
-    expect(summaryTrigger.getAttribute('data-state')).toBe('active');
+    const extractedDataTrigger = screen.getByRole('tab', { name: /extracted data/i });
+    expect(extractedDataTrigger.getAttribute('data-state')).toBe('active');
 
     expect(document.querySelector('iframe')).toBeNull();
   });
 
-  it('shows an inline error notice when the report fetch returns 404 — Summary tab is still selectable', async () => {
+  it('renders nothing when there is no previous step output to show', async () => {
+    setStepExecutions([]);
+
+    const { container } = render(
+      <TaskContextPanel
+        processInstanceId="inst-1"
+        stepId="human-review"
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /previous step output/i })).toBeNull();
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('shows an inline error notice when the report fetch returns 404 — Extracted Data tab is still selectable', async () => {
     const execution = buildExecution({
       output: {
         htmlReportPath: '/output/presentation.html',
@@ -236,18 +250,18 @@ describe('TaskContextPanel', () => {
     // Inline notice shows in Report tab
     await waitFor(() => {
       expect(
-        screen.getByText(/report file not available — see summary tab/i),
+        screen.getByText(/report file not available — see extracted data tab/i),
       ).toBeInTheDocument();
     });
 
     // No iframe on failure
     expect(document.querySelector('iframe')).toBeNull();
 
-    // Summary tab still works
+    // Extracted Data tab still works
     const user = userEvent.setup();
-    const summaryTrigger = screen.getByRole('tab', { name: /summary/i });
-    await user.click(summaryTrigger);
-    expect(summaryTrigger.getAttribute('data-state')).toBe('active');
+    const extractedDataTrigger = screen.getByRole('tab', { name: /extracted data/i });
+    await user.click(extractedDataTrigger);
+    expect(extractedDataTrigger.getAttribute('data-state')).toBe('active');
     expect(screen.getByText('Has summary text')).toBeInTheDocument();
   });
 
