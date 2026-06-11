@@ -199,14 +199,23 @@ export async function POST(
       let lastActiveStepId: string | null = null;
       try {
         const agentStepCount = workflowDefinition.steps.filter(
-          (s) => s.executor === 'agent' || s.executor === 'script',
+          (s) => s.executor === 'agent',
         ).length;
+        const scriptStepCount = workflowDefinition.steps.filter(
+          (s) => s.executor === 'script',
+        ).length;
+        const stepCountParts: string[] = [];
+        if (agentStepCount > 0) stepCountParts.push(`${agentStepCount} agent step(s)`);
+        if (scriptStepCount > 0) stepCountParts.push(`${scriptStepCount} script step(s)`);
+        const stepCountDescription = stepCountParts.length > 0
+          ? stepCountParts.join(', ')
+          : '0 step(s)';
         await auditRepo.append({
           actorId: 'auto-runner',
           actorType: 'system',
           actorRole: 'orchestrator',
           action: 'process.run.started',
-          description: `Auto-runner started for '${initialInstance.definitionName}' (workflow) — ${agentStepCount} agent step(s) to execute`,
+          description: `Auto-runner started for '${initialInstance.definitionName}' (workflow) — ${stepCountDescription} to execute`,
           timestamp: new Date().toISOString(),
           inputSnapshot: { definitionName: initialInstance.definitionName, definitionVersion: initialInstance.definitionVersion, appContext, triggeredBy: triggeredBy ?? 'auto-runner' },
           outputSnapshot: {},
