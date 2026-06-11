@@ -1,5 +1,4 @@
 import type { HumanTask, ProcessInstance, Presentation } from '@mediforce/platform-core';
-export { formatStepName } from '@/lib/format';
 import { formatStepName } from '@/lib/format';
 
 /** Check if a task is an agent output review (L3 approval).
