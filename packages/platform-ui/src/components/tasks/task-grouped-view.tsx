@@ -23,8 +23,7 @@ import {
   getItemDeadline,
   isItemCompleted,
 } from './action-type';
-import { formatStepName } from './task-utils';
-import { deriveInitials } from './table-editor-view';
+import { formatStepName, deriveInitials } from '@/lib/format';
 
 export type GroupByField = 'process' | 'action';
 

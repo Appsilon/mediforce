@@ -21,22 +21,16 @@ import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 import { cn } from '@/lib/utils';
-import { formatStepName } from '@/components/tasks/task-utils';
 import { MissingEnvBanner } from './missing-env-banner';
 import { AgentEscalatedBanner } from './agent-escalated-banner';
 import { PreviousRunBanner } from './previous-run-banner';
-import { formatDuration, formatCostUsd } from '@/lib/format';
+import { formatDuration, formatCostUsd, formatStepName } from '@/lib/format';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 
 const WorkflowDiagram = dynamic(
   () => import('@/components/workflows/workflow-diagram').then((m) => ({ default: m.WorkflowDiagram })),
   { ssr: false, loading: () => <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Loading diagram…</div> },
 );
-
-function resolveStepLabel(stepId: string, steps: Step[]): string {
-  const found = steps.find((s) => s.id === stepId);
-  return found?.name ?? stepId.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 export interface AgentEventItem {
   id: string;
@@ -334,7 +328,7 @@ export function ProcessDetail({
               <div className="text-sm">
                 <span className="font-medium">Waiting for your input</span>
                 <span className="text-muted-foreground ml-1.5">
-                  — {resolveStepLabel(blockingTask.stepId, definitionSteps)}
+                  — {definitionSteps.find((s) => s.id === blockingTask.stepId)?.name ?? formatStepName(blockingTask.stepId)}
                 </span>
               </div>
               <Link
@@ -350,7 +344,7 @@ export function ProcessDetail({
               <div className="text-sm">
                 <span className="font-medium">Ready to collaborate</span>
                 <span className="text-muted-foreground ml-1.5">
-                  — {resolveStepLabel(coworkSession.stepId, definitionSteps)}
+                  — {definitionSteps.find((s) => s.id === coworkSession.stepId)?.name ?? formatStepName(coworkSession.stepId)}
                 </span>
               </div>
               <Link

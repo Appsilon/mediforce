@@ -9,14 +9,9 @@ import type { ProcessInstance } from '@mediforce/platform-core';
 import { getWorkflowStatus, type WorkflowDisplayStatus } from '@/lib/workflow-status';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
-import { formatCostUsd } from '@/lib/format';
+import { formatCostUsd, formatStepName } from '@/lib/format';
 import { STATUS_LABELS } from './process-status-badge';
 
-function toHumanLabel(identifier: string): string {
-  return identifier
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
 
 function StepDots({
   steps,
@@ -58,7 +53,7 @@ function StepDots({
           <span
             key={stepId}
             className={`${isCurrent ? 'w-2.5 h-2.5' : 'w-1.5 h-1.5'} rounded-full ${dotClass}`}
-            title={toHumanLabel(stepId)}
+            title={formatStepName(stepId)}
           />
         );
       })}
@@ -86,7 +81,7 @@ function StepProgressBar({
   }
 
   if (instanceStatus === 'failed') {
-    const failedAt = currentStepId ? toHumanLabel(currentStepId) : null;
+    const failedAt = currentStepId ? formatStepName(currentStepId) : null;
     return (
       <span className="text-xs text-red-600/70 dark:text-red-400/70 truncate flex-1">
         {failedAt ? `✗ Failed at ${failedAt}` : '✗ Failed'}
@@ -99,7 +94,7 @@ function StepProgressBar({
   return (
     <div className="flex items-center gap-px flex-1 min-w-0 h-5">
       {steps.map((stepId, index) => {
-        const label = toHumanLabel(stepId);
+        const label = formatStepName(stepId);
         const isCompleted = index < currentIndex;
         const isCurrent = index === currentIndex;
 
@@ -179,7 +174,7 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
     >
       {showProcess && (
         <span className="text-xs text-muted-foreground truncate max-w-[120px] shrink-0">
-          {toHumanLabel(instance.definitionName)}
+          {formatStepName(instance.definitionName)}
         </span>
       )}
       {stepStyle === 'bar' ? (
@@ -199,7 +194,7 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
             <span className="text-xs text-muted-foreground truncate flex-1">Completed</span>
           ) : wfStatus.displayStatus === 'error' || wfStatus.displayStatus === 'cancelled' ? (
             <span className="text-xs text-red-600/70 dark:text-red-400/70 truncate flex-1">
-              {STATUS_LABELS[wfStatus.displayStatus]}{instance.currentStepId ? ` · ${toHumanLabel(instance.currentStepId)}` : ''}
+              {STATUS_LABELS[wfStatus.displayStatus]}{instance.currentStepId ? ` · ${formatStepName(instance.currentStepId)}` : ''}
             </span>
           ) : instance.currentStepId ? (
             <span className="text-xs flex-1 inline-flex items-center gap-1.5 min-w-0 overflow-hidden">
@@ -215,12 +210,12 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
                   }}
                   className="inline-flex items-center gap-1 bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors truncate"
                 >
-                  {toHumanLabel(instance.currentStepId)}
+                  {formatStepName(instance.currentStepId)}
                   <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
                 </button>
               ) : (
                 <span className="inline-flex bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium truncate">
-                  {toHumanLabel(instance.currentStepId)}
+                  {formatStepName(instance.currentStepId)}
                 </span>
               )}
             </span>

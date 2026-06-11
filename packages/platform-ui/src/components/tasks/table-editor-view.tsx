@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { AlertTriangle, Bot, CheckCircle, Loader2, User } from 'lucide-react';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
+import { deriveInitials } from '@/lib/format';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import type { TaskBodyProps } from './task-body-registry';
 
@@ -455,12 +456,7 @@ function StaticCell({ field, href, link }: { field: unknown; href: string | unde
   return <span className="font-medium">{text}</span>;
 }
 
-export function deriveInitials(name: string): string {
-  const words = name.trim().split(/\s+/);
-  const first = words[0]?.[0] ?? '';
-  const last = words.length > 1 ? words[words.length - 1]![0] ?? '' : '';
-  return (first + last).toUpperCase();
-}
+export { deriveInitials };
 
 function InitialsCircle({ fallback, size }: { fallback?: string; size: number }) {
   const initials = fallback !== undefined ? deriveInitials(fallback) : '?';
