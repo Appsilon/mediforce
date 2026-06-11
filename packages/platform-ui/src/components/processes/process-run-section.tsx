@@ -12,7 +12,6 @@ import { routes } from '@/lib/routes';
 import { formatCostUsd, formatStepName } from '@/lib/format';
 import { STATUS_LABELS } from './process-status-badge';
 
-
 function StepDots({
   steps,
   currentStepId,
