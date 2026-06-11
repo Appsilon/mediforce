@@ -153,9 +153,10 @@ server.registerTool(
       const client = getClient();
       const runId = args.runId as string;
 
-      const [run, stepsResult] = await Promise.all([
+      const [run, stepsResult, tasksResult] = await Promise.all([
         client.runs.get({ runId }),
         client.processes.getSteps({ instanceId: runId }),
+        client.tasks.list({ instanceId: runId }),
       ]);
 
       const steps = stepsResult.steps.map((s) => ({
@@ -176,6 +177,17 @@ server.registerTool(
           : {}),
       }));
 
+      const pendingTasks = tasksResult.tasks
+        .filter((t) => t.status === 'pending' || t.status === 'claimed')
+        .map((t) => ({
+          taskId: t.id,
+          stepId: t.stepId,
+          role: t.assignedRole,
+          status: t.status,
+          params: t.params,
+          verdicts: t.verdicts,
+        }));
+
       return mcpJson({
         runId: run.runId,
         status: run.status,
@@ -183,6 +195,7 @@ server.registerTool(
         dryRun: run.dryRun,
         error: run.error,
         steps,
+        pendingTasks,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
