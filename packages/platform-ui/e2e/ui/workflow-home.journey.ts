@@ -17,8 +17,9 @@ test.describe('Workflow Home Journey', () => {
     await expect(page.getByText(/\d+ runs/).first()).toBeVisible();
     await expect(page.getByText(/\d+ active/).first()).toBeVisible();
 
-    // Instance row data — at least one run hash visible in the preview
-    await expect(page.getByText('#proc-r')).toBeVisible();
+    // Instance row data — at least one active run preview visible (run hash display was
+    // removed in favour of step-status rows; check for the running step label instead)
+    await expect(page.getByText('In Progress').first()).toBeVisible();
 
     // Display popover
     await click(page, page.getByRole('button', { name: /display/i }));
@@ -27,9 +28,9 @@ test.describe('Workflow Home Journey', () => {
     // Close popover
     await page.locator('body').click({ position: { x: 0, y: 0 } });
 
-    // Navigate to run detail
-    const hash = page.getByText('#proc-r').first();
-    await click(page, hash);
+    // Navigate to run detail by clicking the first active run row
+    // (all running seed instances are Supply Chain Review, so any row works)
+    await click(page, page.getByText('In Progress').first());
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 30_000 });
     await showResult(page);
     await endRecording(page);
