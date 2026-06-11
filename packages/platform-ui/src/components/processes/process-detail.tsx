@@ -2,9 +2,15 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, FileBarChart, Archive, ArchiveRestore, ScrollText, X } from 'lucide-react';
-import type { ProcessInstance, StepExecution, AuditEvent, Step, WorkflowStep } from '@mediforce/platform-core';
+import { ChevronLeft, ChevronRight, FileBarChart, Archive, ArchiveRestore, ScrollText, X, GitBranch } from 'lucide-react';
+import type { ProcessInstance, StepExecution, AuditEvent, Step, WorkflowStep, WorkflowDefinition } from '@mediforce/platform-core';
+
+const WorkflowDiagram = dynamic(
+  () => import('@/components/workflows/workflow-diagram').then((m) => ({ default: m.WorkflowDiagram })),
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Loading diagram…</div> },
+);
 import { ProcessStatusBadge } from './process-status-badge';
 import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
@@ -51,6 +57,7 @@ export function ProcessDetail({
   backHref = '/processes',
   stepConfigMap,
   runDetailHref,
+  definition,
 }: {
   instance: ProcessInstance;
   stepExecutions: StepExecution[];
@@ -63,6 +70,8 @@ export function ProcessDetail({
   stepConfigMap?: Map<string, Record<string, unknown>>;
   /** Href for this run's detail page, used to build step detail links. */
   runDetailHref?: string;
+  /** Full workflow definition for the version this run used — powers the diagram tab. */
+  definition?: WorkflowDefinition;
 }) {
   const handle = useHandleFromPath();
   const wfStatus = getWorkflowStatus(instance);
@@ -110,7 +119,7 @@ export function ProcessDetail({
     [stepExecutions],
   );
 
-  const [rightTab, setRightTab] = React.useState<string>(() =>
+  const [rightTab, setRightTab] = React.useState<'agent-log' | 'audit' | 'diagram'>(() =>
     agentLogFiles.length > 0 ? 'agent-log' : 'audit',
   );
 
@@ -256,8 +265,22 @@ export function ProcessDetail({
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shrink-0"
             >
               <ScrollText className="h-3.5 w-3.5" />
-              {logsOpen ? 'Hide Detailed Log' : 'Show Detailed Log'}
+              {logsOpen && rightTab !== 'diagram' ? 'Hide Detailed Log' : 'Show Detailed Log'}
             </button>
+            {definition && (
+              <button
+                onClick={() => { setRightTab('diagram'); setLogsOpen(true); }}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors shrink-0',
+                  logsOpen && rightTab === 'diagram'
+                    ? 'border-primary/40 text-primary bg-primary/5'
+                    : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
+                )}
+              >
+                <GitBranch className="h-3.5 w-3.5" />
+                Workflow Diagram
+              </button>
+            )}
           </div>
 
           {/* Metadata row */}
@@ -421,8 +444,9 @@ export function ProcessDetail({
           {/* Tab bar */}
           <div className="flex gap-1 border-b shrink-0">
             {[
-              ...(agentLogFiles.length > 0 ? [{ value: 'agent-log', label: 'Step Log' }] : []),
-              { value: 'audit', label: 'Audit Log' },
+              ...(agentLogFiles.length > 0 ? [{ value: 'agent-log' as const, label: 'Step Log' }] : []),
+              { value: 'audit' as const, label: 'Audit Log' },
+              ...(definition ? [{ value: 'diagram' as const, label: 'Diagram' }] : []),
             ].map(({ value, label }) => (
               <button
                 key={value}
@@ -448,6 +472,12 @@ export function ProcessDetail({
             className={cn('flex-1 min-h-0 overflow-y-auto p-4', rightTab !== 'audit' && 'hidden')}
           >
             <AuditLogTab events={auditEvents} loading={auditEventsLoading} error={auditEventsError} />
+          </div>
+
+          <div className={cn('flex-1 min-h-0 overflow-hidden', rightTab !== 'diagram' && 'hidden')}>
+            {definition && rightTab === 'diagram' && (
+              <WorkflowDiagram definition={definition} className="h-full w-full" />
+            )}
           </div>
         </div>
       </div>
