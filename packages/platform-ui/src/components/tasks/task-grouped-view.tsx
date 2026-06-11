@@ -543,6 +543,8 @@ export function TaskGroupedView({
       byDef.set(name, group);
     }
 
+    // Groups with only completed items are intentionally included when hideCompleted=false;
+    // the hide-completed toggle is the user's control for suppressing them.
     const activeSet = new Set(activeItems.map(getItemId));
     const groups = [...byDef.entries()].sort(
       ([, a], [, b]) =>

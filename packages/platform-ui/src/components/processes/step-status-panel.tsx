@@ -420,7 +420,7 @@ function ElapsedTimer({ startedAt }: { startedAt: string }) {
     return () => clearInterval(id);
   }, [startedAt]);
 
-  const totalSeconds = Math.floor(elapsed / 1000);
+  const totalSeconds = Math.floor(Math.max(0, elapsed) / 1000);
   const days = Math.floor(totalSeconds / 86400);
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
