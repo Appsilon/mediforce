@@ -9,6 +9,7 @@
  *   list_run_tasks          — pending human tasks for a run
  *   complete_task           — complete a human task with payload
  *   get_run_logs            — audit events + step executions
+ *   list_models             — query the model registry
  *
  * API tools require APP_BASE_URL + PLATFORM_API_KEY env vars.
  * Runs via stdio transport.
@@ -348,22 +349,27 @@ server.registerTool(
     },
   },
   async (args) => {
-    const client = getClient();
-    const result = await client.models.list({
-      provider: args.provider as string | undefined,
-      supportsTools: args.supportsTools as boolean | undefined,
-    });
+    try {
+      const client = getClient();
+      const result = await client.models.list({
+        provider: args.provider as string | undefined,
+        supportsTools: args.supportsTools as boolean | undefined,
+      });
 
-    const models = result.models.map((m) => ({
-      id: m.id,
-      contextLength: m.contextLength,
-      inputPrice: m.inputPrice,
-      outputPrice: m.outputPrice,
-      supportsTools: m.supportsTools,
-      supportsVision: m.supportsVision,
-    }));
+      const models = result.models.map((m) => ({
+        id: m.id,
+        contextLength: m.contextLength,
+        inputPrice: m.inputPrice,
+        outputPrice: m.outputPrice,
+        supportsTools: m.supportsTools,
+        supportsVision: m.supportsVision,
+      }));
 
-    return mcpJson({ count: models.length, models });
+      return mcpJson({ count: models.length, models });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return mcpText(`Error listing models: ${message}`);
+    }
   },
 );
 
