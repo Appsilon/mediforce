@@ -86,7 +86,7 @@ function getStatusInfo(item: ActionItem): { label: string; className: string } {
     case 'cancelled':
       return { label: 'Cancelled', className: 'bg-red-500/10 text-red-700 dark:text-red-400' };
     case 'claimed':
-      return { label: 'Claimed', className: 'bg-primary/10 text-primary' };
+      return { label: 'Claimed', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' };
     case 'pending':
       return { label: 'Pending', className: 'bg-muted text-muted-foreground' };
   }
