@@ -189,6 +189,8 @@ function TaskRow({
   return (
     <tr className={cn('transition-colors', selected ? 'bg-primary/5' : 'hover:bg-muted/20', muted && 'opacity-60')}>
       <TD className="w-10">
+        {/* Row checkbox: never indeterminate, so plain <input> is correct here.
+            IndeterminateCheckbox is used only for the select-all header. */}
         <input
           type="checkbox"
           checked={selected}

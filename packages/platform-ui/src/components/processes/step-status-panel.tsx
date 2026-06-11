@@ -212,12 +212,51 @@ function TypeBadge({ type, executorType }: { type: Step['type']; executorType?: 
   );
 }
 
+function VirtualRowMeta({
+  stepId,
+  currentTask,
+  stepConfigMap,
+}: {
+  stepId: string;
+  currentTask?: HumanTask | null;
+  stepConfigMap?: Map<string, StepConfigInfo>;
+}) {
+  const taskForStep = currentTask?.stepId === stepId ? currentTask : undefined;
+  const cfg = stepConfigMap?.get(stepId);
+  return (
+    <div className="flex items-center gap-2 mt-1 flex-wrap">
+      {taskForStep && (
+        <>
+          <span className="text-xs text-muted-foreground">
+            <span className="text-muted-foreground/60 mr-1">Started</span>
+            {format(new Date(taskForStep.createdAt), 'MMM d, HH:mm')}
+          </span>
+          <span className="text-muted-foreground/40">·</span>
+          <span className="text-xs text-muted-foreground">
+            <ElapsedTimer startedAt={taskForStep.createdAt} />
+          </span>
+          <span className="text-muted-foreground/40">·</span>
+        </>
+      )}
+      {cfg && (
+        <ExecutedBy
+          executedBy={taskForStep?.assignedUserId ?? ''}
+          executorType={cfg.executorType}
+          plugin={cfg.plugin}
+          autonomyLevel={cfg.autonomyLevel}
+          runtime={cfg.agentConfig?.runtime}
+        />
+      )}
+    </div>
+  );
+}
+
 function formatRuntime(runtime: string): string {
   return `${runtime.charAt(0).toUpperCase()}${runtime.slice(1)} script`;
 }
 
-function ExecutedBy({ executedBy, executorType, plugin, autonomyLevel, runtime }: {
-  executedBy: string;
+function ExecutedBy({ executedBy = '', executorType, plugin, autonomyLevel, runtime }: {
+  executedBy?: string;
   executorType?: string;
   plugin?: string;
   autonomyLevel?: string;
@@ -240,6 +279,14 @@ function ExecutedBy({ executedBy, executorType, plugin, autonomyLevel, runtime }
       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
         <FileCode className="h-3 w-3 shrink-0" />
         {label}
+      </span>
+    );
+  }
+  if (!executedBy) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <User className="h-3 w-3 shrink-0" />
+        Human
       </span>
     );
   }
@@ -365,6 +412,8 @@ function StepConfigDetail({
   );
 }
 
+// formatDuration from @/lib/format covers seconds/minutes but not days or hours.
+// This live-updating timer adds those tiers and re-renders every second.
 function ElapsedTimer({ startedAt }: { startedAt: string }) {
   const [elapsed, setElapsed] = React.useState(() => Date.now() - new Date(startedAt).getTime());
 
@@ -428,7 +477,14 @@ export function StepStatusPanel({
     [stepExecutions, instance, definitionSteps],
   );
 
-  if (history.length === 0) return null;
+  if (history.length === 0) {
+    return (
+      <div className="rounded-lg border bg-card p-4">
+        <h3 className="text-sm font-medium mb-3">Execution History</h3>
+        <p className="text-xs text-muted-foreground">No steps started yet.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-lg border bg-card p-4 space-y-1">
@@ -454,52 +510,11 @@ export function StepStatusPanel({
                       <RetryStepButton instanceId={instance.id} stepId={item.stepId} />
                     )}
                   </div>
-                  {(() => {
-                    const taskForStep = currentTask?.stepId === item.stepId ? currentTask : undefined;
-                    const cfg = stepConfigMap?.get(item.stepId);
-                    return (
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        {taskForStep && (
-                          <>
-                            <span className="text-xs text-muted-foreground">
-                              <span className="text-muted-foreground/60 mr-1">Started</span>
-                              {format(new Date(taskForStep.createdAt), 'MMM d, HH:mm')}
-                            </span>
-                            <span className="text-muted-foreground/40">·</span>
-                            <span className="text-xs text-muted-foreground">
-                              <ElapsedTimer startedAt={taskForStep.createdAt} />
-                            </span>
-                            <span className="text-muted-foreground/40">·</span>
-                          </>
-                        )}
-                        {taskForStep?.assignedUserId ? (
-                          <ExecutedBy
-                            executedBy={taskForStep.assignedUserId}
-                            executorType={cfg?.executorType}
-                            plugin={cfg?.plugin}
-                            autonomyLevel={cfg?.autonomyLevel}
-                            runtime={cfg?.agentConfig?.runtime}
-                          />
-                        ) : cfg?.executorType === 'agent' ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                            <Bot className="h-3 w-3 shrink-0" />
-                            {cfg.plugin ? `agent:${cfg.plugin}` : 'Agent'}
-                            {cfg.autonomyLevel && <AutonomyBadge level={cfg.autonomyLevel} />}
-                          </span>
-                        ) : cfg?.executorType === 'script' ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                            <FileCode className="h-3 w-3 shrink-0" />
-                            {cfg.agentConfig?.runtime ? formatRuntime(cfg.agentConfig.runtime) : 'Script'}
-                          </span>
-                        ) : cfg ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                            <User className="h-3 w-3 shrink-0" />
-                            Human
-                          </span>
-                        ) : null}
-                      </div>
-                    );
-                  })()}
+                  <VirtualRowMeta
+                    stepId={item.stepId}
+                    currentTask={currentTask}
+                    stepConfigMap={stepConfigMap}
+                  />
                 </div>
               </li>
             );
