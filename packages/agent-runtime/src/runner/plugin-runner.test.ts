@@ -3,7 +3,7 @@ import { PluginRunner } from './plugin-runner';
 import { InMemoryAgentEventLog } from '../testing/index';
 import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin';
 import { NoopLlmClient } from '../testing/index';
-import type { StepConfig, ProcessConfig, AgentOutputEnvelope } from '@mediforce/platform-core';
+import type { ProcessConfig, AgentOutputEnvelope } from '@mediforce/platform-core';
 
 function makeProcessConfig(): ProcessConfig {
   return {
@@ -142,6 +142,21 @@ describe('PluginRunner', () => {
     const events = eventLog.getEvents('instance-1', 'step-1');
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe('status');
+  });
+
+  it('captures error when initialize() throws', async () => {
+    const eventLog = new InMemoryAgentEventLog();
+    const runner = new PluginRunner(eventLog);
+    const plugin: AgentPlugin = {
+      initialize: async () => { throw new Error('MCP server unreachable'); },
+      run: async () => {},
+    };
+
+    const result = await runner.execute(plugin, makeContext(), 30_000);
+
+    expect(result.timedOut).toBe(false);
+    expect(result.errorMessage).toBe('MCP server unreachable');
+    expect(result.resultPayload).toBeNull();
   });
 
   it('returns last result event when multiple result events emitted', async () => {

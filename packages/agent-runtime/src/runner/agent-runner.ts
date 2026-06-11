@@ -10,7 +10,7 @@ import {
   type WorkflowStep,
 } from '@mediforce/platform-core';
 import { randomUUID } from 'crypto';
-import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitPayload } from '../interfaces/agent-plugin';
+import type { AgentPlugin, AgentContext, WorkflowAgentContext } from '../interfaces/agent-plugin';
 import type { AgentEventLog } from './agent-event-log';
 import { FallbackHandler } from './fallback-handler';
 import { PluginRunner } from './plugin-runner';
@@ -346,6 +346,7 @@ export class AgentRunner {
 
     switch (level) {
       case 'L0':
+        // Silent Observer — run completes but output not surfaced
         return {
           status: 'completed',
           envelope,
@@ -354,6 +355,7 @@ export class AgentRunner {
         };
 
       case 'L1':
+        // Shadow — emit shadow_result event to event log
         await this.eventLog.write(processInstanceId, stepId, {
           type: 'shadow_result',
           payload: envelope,
@@ -367,6 +369,7 @@ export class AgentRunner {
         };
 
       case 'L2':
+        // Annotator — annotations already in event log from plugin emissions
         return {
           status: 'completed',
           envelope,
@@ -375,6 +378,7 @@ export class AgentRunner {
         };
 
       case 'L3':
+        // Advisor — pause instance awaiting approval
         await this.instanceRepository.update(context.processInstanceId, {
           status: 'paused',
           pauseReason: 'awaiting_agent_approval',
@@ -387,6 +391,7 @@ export class AgentRunner {
         };
 
       case 'L4':
+        // Autopilot — result applied directly to workflow
         return {
           status: 'completed',
           envelope,
@@ -395,6 +400,7 @@ export class AgentRunner {
         };
 
       default:
+        // Unknown autonomy level — treat as L0 (safe default)
         return {
           status: 'completed',
           envelope,

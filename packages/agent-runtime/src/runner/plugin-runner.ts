@@ -28,13 +28,13 @@ export class PluginRunner {
       await this.eventLog.write(processInstanceId, stepId, event);
     };
 
-    await plugin.initialize(context);
-
+    let timerId: ReturnType<typeof setTimeout>;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new PluginTimeoutError()), timeoutMs);
+      timerId = setTimeout(() => reject(new PluginTimeoutError()), timeoutMs);
     });
 
     try {
+      await plugin.initialize(context);
       await Promise.race([plugin.run(emit), timeoutPromise]);
 
       const events = this.eventLog.getEvents(processInstanceId, stepId);
@@ -54,6 +54,8 @@ export class PluginRunner {
         timedOut: false,
         errorMessage: err instanceof Error ? err.message : String(err),
       };
+    } finally {
+      clearTimeout(timerId!);
     }
   }
 }
