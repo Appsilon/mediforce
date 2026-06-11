@@ -609,7 +609,7 @@ export function TaskGroupedView({
         )}
         {completedItems.length > 0 && (
           <button
-            onClick={() => setHideCompleted((v) => !v)}
+            onClick={() => { setHideCompleted((v) => !v); setSelectedIds(new Set()); }}
             className={cn(
               'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs transition-colors',
               hideCompleted

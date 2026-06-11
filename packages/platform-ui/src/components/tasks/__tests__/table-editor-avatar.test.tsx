@@ -19,7 +19,8 @@ vi.mock('@/lib/mediforce', () => ({
 }));
 
 import { mediforce } from '@/lib/mediforce';
-import { deriveInitials, TableEditorView } from '../table-editor-view';
+import { deriveInitials } from '@/lib/format';
+import { TableEditorView } from '../table-editor-view';
 import type { ColumnSpec } from '../table-editor-view';
 
 const completeMock = vi.mocked(mediforce.tasks.complete);

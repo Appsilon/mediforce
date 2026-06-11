@@ -456,8 +456,6 @@ function StaticCell({ field, href, link }: { field: unknown; href: string | unde
   return <span className="font-medium">{text}</span>;
 }
 
-export { deriveInitials };
-
 function InitialsCircle({ fallback, size }: { fallback?: string; size: number }) {
   const initials = fallback !== undefined ? deriveInitials(fallback) : '?';
   return (

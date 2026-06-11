@@ -6,7 +6,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { GitBranch, Plus, Layers, ExternalLink, SlidersHorizontal, Check, ChevronRight } from 'lucide-react';
 import { ProcessInstanceRow } from '@/components/processes/process-run-section';
 import { StartRunButton } from '@/components/processes/start-run-button';
-import { formatStepName } from '@/components/tasks/task-utils';
+import { formatStepName } from '@/lib/format';
 import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
 import type { WorkflowRunSummary } from '@mediforce/platform-api/contract';
