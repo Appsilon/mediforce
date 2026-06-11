@@ -1,9 +1,7 @@
-// Workflow-native agent step executor.
-// Reads executor type, plugin, autonomy level, and all step settings directly
-// from WorkflowStep — no separate ProcessConfig required.
-//
-// This is the WorkflowDefinition counterpart to execute-agent-step.ts (legacy ProcessConfig path).
-// Called by the auto-runner loop when the instance was created via fireWorkflow (no configName).
+// Workflow-native agent step orchestrator.
+// Builds the execution context (plugin, MCP, OAuth, secrets, identity) from the
+// WorkflowStep, then dispatches to the right StepExecutor strategy:
+// AgentStepExecutor (autonomy, review, escalation) or ScriptStepExecutor (direct).
 
 import { getPlatformServices } from './platform-services';
 import {
@@ -11,12 +9,12 @@ import {
   resolveOAuthToken,
   OAuthTokenUnavailableError,
   PluginNotFoundError,
-  type AgentPlugin,
+  type StepExecutorPlugin,
   type ResolvedOAuthBinding,
   type WorkflowAgentContext,
+  type StepExecutorServices,
 } from '@mediforce/agent-runtime';
 import {
-  calculateEstimatedCost,
   type AgentOAuthTokenRepository,
   type OAuthProviderRepository,
   type ResolvedMcpConfig,
@@ -51,6 +49,8 @@ export async function executeAgentStep(
   const {
     engine,
     agentRunner,
+    scriptStepExecutor,
+    agentStepExecutor,
     pluginRegistry,
     instanceRepo,
     processRepo,
@@ -83,7 +83,7 @@ export async function executeAgentStep(
 
   // Resolve plugin: use workflowStep.plugin when set, fall back to stepId
   const pluginId = workflowStep.plugin ?? stepId;
-  let plugin: AgentPlugin;
+  let plugin: StepExecutorPlugin;
   try {
     plugin = pluginRegistry.get(pluginId);
   } catch (err) {
@@ -105,35 +105,11 @@ export async function executeAgentStep(
     ? 'L4'
     : (workflowStep.autonomyLevel ?? 'L2');
 
-  const executorType = workflowStep.executor === 'script' ? ('script' as const) : ('agent' as const);
-
   // Merge step params into context — stepParams take lower priority than appContext
   const mergedInput: Record<string, unknown> = {
     ...(workflowStep.stepParams ?? {}),
     ...appContext,
   };
-
-  const isScript = executorType === 'script';
-  await auditRepo.append({
-    actorId: `${isScript ? 'script' : 'agent'}:${pluginId}`,
-    actorType: isScript ? 'system' : 'agent',
-    actorRole: autonomyLevel,
-    action: isScript ? 'script.step.started' : 'agent.step.started',
-    description: isScript
-      ? `Script step '${stepId}' started (plugin: ${pluginId})`
-      : `Workflow agent step '${stepId}' started (plugin: ${pluginId}, autonomy: ${autonomyLevel})`,
-    timestamp: new Date().toISOString(),
-    inputSnapshot: { stepId, pluginId, ...(isScript ? {} : { autonomyLevel }), ...appContext },
-    outputSnapshot: {},
-    basis: `Triggered by ${triggeredBy}`,
-    entityType: 'processInstance',
-    entityId: instanceId,
-    processInstanceId: instanceId,
-    stepId,
-    processDefinitionVersion: instance.definitionVersion,
-    executorType,
-    reviewerType: 'none',
-  });
 
   // Pre-fetch secrets for {{TEMPLATE}} resolution.
   // Namespace secrets provide org-wide defaults; workflow secrets override per-workflow.
@@ -208,324 +184,50 @@ export async function executeAgentStep(
     },
   };
 
-  const runResult = await agentRunner.runWithWorkflowStep(plugin, workflowAgentContext);
-
-  // Persist agent output to step execution
-  const envelope = runResult.envelope;
-  const costResult = envelope ? await estimateCostField(envelope, modelRegistryRepo) : {};
-  if (stepExecutionId) {
-    const isFailed = runResult.fallbackReason === 'error' || runResult.fallbackReason === 'timeout';
-    // L3 + escalated (non-error) routes to human review below, so the execution
-    // is not a failure — the run produced a usable envelope, just flagged for review.
-    const isEscalatedToL3Review = autonomyLevel === 'L3' && runResult.status === 'escalated' && !isFailed;
-    await instanceRepo.updateStepExecution(instanceId, stepExecutionId, {
-      output: envelope?.result ?? null,
-      status: !isFailed && (runResult.status === 'completed' || runResult.status === 'paused' || isEscalatedToL3Review) ? 'completed' : 'failed',
-      completedAt: new Date().toISOString(),
-      ...(isFailed && runResult.errorMessage ? { error: runResult.errorMessage } : {}),
-      agentOutput: envelope
-        ? {
-            confidence: envelope.confidence ?? null,
-            confidence_rationale: envelope.confidence_rationale ?? null,
-            reasoning: envelope.reasoning_summary ?? null,
-            model: envelope.model ?? null,
-            duration_ms: envelope.duration_ms ?? null,
-            gitMetadata: envelope.gitMetadata ?? null,
-            deliverableFile: (envelope.deliverableFile as string | undefined) ?? null,
-            presentation: envelope.presentation ?? null,
-            ...(envelope.tokenUsage ? { tokenUsage: envelope.tokenUsage } : {}),
-            ...costResult,
-          }
-        : null,
-    });
-  }
-
-  // When the agent/script crashes (fallbackReason='error'), surface the error on the
-  // run overview by writing it to processInstance.error. Without this the error
-  // is only visible on the step detail page.
-  const isFailed = runResult.fallbackReason === 'error' || runResult.fallbackReason === 'timeout';
-  if (isFailed) {
-    const failLabel = runResult.fallbackReason === 'timeout' ? 'timed out' : 'failed';
-    const stepKind = isScript ? 'Script' : 'Agent';
-    const errorDetail = runResult.errorMessage ?? (runResult.fallbackReason === 'timeout' ? `${stepKind.toLowerCase()} execution timed out` : null);
-    if (errorDetail !== null) {
-      await instanceRepo.update(instanceId, {
-        error: `${stepKind} step '${stepId}' ${failLabel}: ${errorDetail}`,
-        updatedAt: new Date().toISOString(),
-      });
-    }
-  }
-
-  // Persist output to instance.variables so subsequent steps can read it.
-  // Also accumulate totalCostUsd on the instance for list views.
-  // Note: read-then-increment is not atomic, but steps execute sequentially
-  // per instance (auto-runner loop is serial). If parallel branches are
-  // added, switch to Firestore FieldValue.increment().
-  const agentOutput = envelope?.result ?? null;
-  const stepCost = costResult.estimatedCostUsd;
-  if (agentOutput !== null || stepCost !== undefined) {
-    const freshInstance = await instanceRepo.getById(instanceId);
-    if (freshInstance) {
-      await instanceRepo.update(instanceId, {
-        ...(agentOutput !== null ? {
-          variables: {
-            ...freshInstance.variables,
-            [stepId]: agentOutput,
-          },
-        } : {}),
-        ...(stepCost !== undefined ? {
-          totalCostUsd: (freshInstance.totalCostUsd ?? 0) + stepCost,
-        } : {}),
-      });
-    }
-  }
-
-  // Create a human review task for an L3 step, append audit, pause instance.
-  // Used for: (a) paused/escalated agent run, (b) agent reviewer returned no
-  // verdict, (c) agent reviewer exhausted the iteration limit.
-  const createAgentReviewHumanTask = async (
-    escalationReason: 'low_confidence' | 'timeout' | 'error' | 'iterations_limit' | null,
-    auditBasis: string,
-  ): Promise<void> => {
-    const reviewTaskId = crypto.randomUUID();
-    const reviewTaskNow = new Date().toISOString();
-    const assignedRole = workflowStep.allowedRoles?.[0] ?? 'reviewer';
-
-    // Iteration count = number of prior executions of this step on this
-    // instance. Lets the UI/audit show "Iter N of M" instead of every L3
-    // review task showing as iteration 0.
-    const priorReviewExecutions = (await instanceRepo.getStepExecutions(instanceId))
-      .filter((e) => e.stepId === stepId).length;
-
-    await humanTaskRepo.create({
-      id: reviewTaskId,
-      processInstanceId: instanceId,
-      stepId,
-      assignedRole,
-      assignedUserId: null,
-      status: 'pending',
-      deadline: null,
-      createdAt: reviewTaskNow,
-      updatedAt: reviewTaskNow,
-      completedAt: null,
-      completionData: {
-        reviewType: 'agent_output_review',
-        agentOutput: {
-          confidence: envelope?.confidence ?? null,
-          reasoning: envelope?.reasoning_summary ?? null,
-          result: envelope?.result ?? null,
-          model: envelope?.model ?? null,
-          annotations: envelope?.annotations ?? null,
-          duration_ms: envelope?.duration_ms ?? null,
-          gitMetadata: envelope?.gitMetadata ?? null,
-          presentation: envelope?.presentation ?? null,
-          escalationReason,
-        },
-        iterationNumber: priorReviewExecutions,
-      },
-      creationReason: 'agent_review_l3',
-    });
-
-    await auditRepo.append({
-      actorId: `agent:${pluginId}`,
-      actorType: 'agent',
-      actorRole: autonomyLevel,
-      action: 'task.created',
-      description: `Human task created for workflow step '${stepId}' (reason: agent_review_l3)`,
-      timestamp: reviewTaskNow,
-      inputSnapshot: { taskId: reviewTaskId, stepId, reason: 'agent_review_l3', assignedRole },
-      outputSnapshot: {},
-      basis: auditBasis,
-      entityType: 'humanTask',
-      entityId: reviewTaskId,
-      processInstanceId: instanceId,
-      stepId,
-      processDefinitionVersion: instance.definitionVersion,
-      executorType,
-      reviewerType: 'human',
-    });
-
-    await instanceRepo.update(instanceId, {
-      status: 'paused',
-      pauseReason: 'waiting_for_human',
-      updatedAt: new Date().toISOString(),
-    });
+  const services: StepExecutorServices = {
+    auditRepo,
+    instanceRepo,
+    engine,
+    humanTaskRepo,
+    modelRegistryRepo,
   };
 
-  // ---- L3 Review Routing (skip when agent errored — nothing to review) ----
-  // Escalation from fallback handler (status='escalated') always needs a human,
-  // even when review.type='agent' — the whole point of escalate_to_human is that
-  // the agent couldn't self-resolve.
-  if ((runResult.status === 'paused' || runResult.status === 'escalated') && autonomyLevel === 'L3' && runResult.fallbackReason !== 'error') {
-    const reviewerType = workflowStep.review?.type ?? 'human';
-    const isEscalation = runResult.status === 'escalated';
+  const meta = {
+    instanceId,
+    stepId,
+    pluginId,
+    triggeredBy,
+    stepExecutionId,
+    definitionVersion: instance.definitionVersion,
+  };
 
-    if (reviewerType === 'human' || reviewerType === 'none' || isEscalation) {
-      await createAgentReviewHumanTask(
-        isEscalation ? runResult.fallbackReason : null,
-        'L3 workflow agent step paused — human reviewer task created',
-      );
-      return {
-        instanceId,
-        status: 'paused',
-        currentStepId: stepId,
-        agentRunStatus: runResult.status,
-      };
-    }
-  }
+  // Dispatch to the right executor based on step type
+  const executor = workflowStep.executor === 'script'
+    ? scriptStepExecutor
+    : agentStepExecutor;
 
-  // ---- L3 Agent-as-Reviewer: submit verdict via engine.submitReviewVerdict ----
-  // review.type='agent' on a review step: the agent's verdict flows through
-  // ReviewTracker so iteration counting and maxIterations enforcement fire.
-  // On verdict='revise' the step routes back to a prior creation step; when
-  // iterations are exhausted, the engine pauses with max_iterations_exceeded
-  // and we create a human escalation task so the process stays actionable.
-  if (
-    autonomyLevel === 'L3' &&
-    workflowStep.review?.type === 'agent' &&
-    workflowStep.type === 'review' &&
-    runResult.status === 'completed' &&
-    runResult.appliedToWorkflow
-  ) {
-    const resultObj =
-      envelope?.result && typeof envelope.result === 'object' ? (envelope.result as Record<string, unknown>) : null;
-    const verdictValue = typeof resultObj?.verdict === 'string' ? resultObj.verdict : null;
+  const executionResult = await executor.execute(plugin, workflowAgentContext, services, meta);
 
-    if (verdictValue === null || verdictValue.length === 0) {
-      await createAgentReviewHumanTask(
-        'error',
-        `Agent reviewer for step '${stepId}' returned envelope without a verdict`,
-      );
-      return {
-        instanceId,
-        status: 'paused',
-        currentStepId: stepId,
-        agentRunStatus: 'escalated',
-      };
-    }
-
-    const commentValue = typeof resultObj?.comment === 'string' ? resultObj.comment : null;
-    const reviewerId = `agent:${pluginId}`;
-
-    const updated = await engine.submitReviewVerdict(
-      instanceId,
-      stepId,
-      {
-        reviewerId,
-        reviewerRole: 'agent',
-        verdict: verdictValue,
-        comment: commentValue,
-        timestamp: new Date().toISOString(),
-      },
-      { id: reviewerId, role: 'agent' },
-    );
-
-    if (updated.status === 'paused' && updated.pauseReason === 'max_iterations_exceeded') {
-      await createAgentReviewHumanTask(
-        'iterations_limit',
-        `Agent reviewer for step '${stepId}' exhausted iteration limit`,
-      );
-      return {
-        instanceId,
-        status: 'paused',
-        currentStepId: stepId,
-        agentRunStatus: 'escalated',
-      };
-    }
-
+  // Use the executor's authoritative instance state when available (avoids a
+  // redundant getById — the executor already updated the instance and knows
+  // its final state from engine responses). Fall back to a fresh read when
+  // the executor didn't track the instance state (e.g. fallback/unknown paths).
+  const instState = executionResult.instanceState;
+  if (instState) {
     return {
       instanceId,
-      status: updated.status,
-      currentStepId: updated.currentStepId,
-      agentRunStatus: 'completed',
+      status: instState.status,
+      currentStepId: instState.currentStepId,
+      agentRunStatus: executionResult.status,
     };
   }
 
-  // ---- Escalation/Pause (non-L3) ----
-  if (runResult.status === 'escalated' || runResult.status === 'paused') {
-    await auditRepo.append({
-      actorId: `${isScript ? 'script' : 'agent'}:${pluginId}`,
-      actorType: isScript ? 'system' : 'agent',
-      actorRole: autonomyLevel,
-      action: isScript ? 'script.escalated' : 'agent.escalated',
-      description: isScript
-        ? `Script step '${stepId}' failed — reason: ${runResult.fallbackReason ?? 'unknown'}`
-        : `Workflow step '${stepId}' escalated — reason: ${runResult.fallbackReason ?? 'unknown'}`,
-      timestamp: new Date().toISOString(),
-      inputSnapshot: { stepId, fallbackReason: runResult.fallbackReason ?? null },
-      outputSnapshot: { status: runResult.status },
-      basis: isScript
-        ? 'Script step could not complete'
-        : 'FallbackHandler: agent could not complete step autonomously',
-      entityType: 'processInstance',
-      entityId: instanceId,
-      processInstanceId: instanceId,
-      stepId,
-      processDefinitionVersion: instance.definitionVersion,
-      executorType,
-      reviewerType: 'none',
-    });
-    const currentInstance = await instanceRepo.getById(instanceId);
-    return {
-      instanceId,
-      status: currentInstance?.status ?? 'paused',
-      currentStepId: currentInstance?.currentStepId ?? null,
-      agentRunStatus: runResult.status,
-    };
-  }
-
-  // L4: appliedToWorkflow=true — advance the step using WorkflowEngine
-  if (runResult.appliedToWorkflow) {
-    const stepResult = runResult.envelope?.result;
-    if (stepResult === null || stepResult === undefined) {
-      throw new Error(
-        `Workflow step '${stepId}' completed with null result — cannot advance. ` +
-        `Reason: ${runResult.fallbackReason ?? runResult.envelope?.reasoning_summary ?? 'unknown'}`,
-      );
-    }
-
-    const updatedInstance = await engine.advanceStep(
-      instanceId,
-      stepResult,
-      { id: triggeredBy, role: 'agent' },
-      undefined,
-      runResult,
-    );
-
-    return {
-      instanceId,
-      status: updatedInstance.status,
-      currentStepId: updatedInstance.currentStepId,
-      agentRunStatus: runResult.status,
-    };
-  }
-
-  // L0/L1/L2: agent completed but didn't auto-apply — advance to next step.
-  // If the next step is human, advanceStep creates a HumanTask and pauses.
-  if (runResult.status === 'completed') {
-    const stepResult = runResult.envelope?.result ?? {};
-    const updatedInstance = await engine.advanceStep(
-      instanceId,
-      stepResult,
-      { id: triggeredBy, role: 'agent' },
-      undefined,
-    );
-
-    return {
-      instanceId,
-      status: updatedInstance.status,
-      currentStepId: updatedInstance.currentStepId,
-      agentRunStatus: runResult.status,
-    };
-  }
-
-  // Fallback: unknown status — return current state (should not reach here)
   const currentInstance = await instanceRepo.getById(instanceId);
   return {
     instanceId,
-    status: currentInstance?.status ?? instance.status,
-    currentStepId: currentInstance?.currentStepId ?? instance.currentStepId,
-    agentRunStatus: runResult.status,
+    status: currentInstance?.status ?? executionResult.status,
+    currentStepId: currentInstance?.currentStepId ?? null,
+    agentRunStatus: executionResult.status,
   };
 }
 
@@ -584,17 +286,4 @@ async function loadOAuthTokens(
   }
 
   return Object.keys(result).length > 0 ? result : undefined;
-}
-
-async function estimateCostField(
-  envelope: { model: string | null; tokenUsage?: { inputTokens: number; outputTokens: number; cachedInputTokens?: number } },
-  modelRegistryRepo: { getById(id: string): Promise<{ pricing: { input: number; output: number; cacheRead?: number } } | null> },
-): Promise<{ estimatedCostUsd: number } | Record<string, never>> {
-  if (!envelope.tokenUsage || !envelope.model) return {};
-  const entry = await modelRegistryRepo.getById(envelope.model);
-  if (!entry) {
-    console.warn(`[cost] model "${envelope.model}" not found in registry — cost unavailable`);
-    return {};
-  }
-  return { estimatedCostUsd: calculateEstimatedCost(envelope.tokenUsage, entry.pricing) };
 }

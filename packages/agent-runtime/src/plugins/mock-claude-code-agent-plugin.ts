@@ -1,8 +1,8 @@
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
-import type { AgentContext, AgentPlugin, EmitFn, WorkflowAgentContext } from '../interfaces/agent-plugin';
+import type { AgentContext, StepExecutorPlugin, EmitFn, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
 import { ClaudeCodeAgentPlugin } from './claude-code-agent-plugin';
 
-export class MockClaudeCodeAgentPlugin implements AgentPlugin {
+export class MockClaudeCodeAgentPlugin implements StepExecutorPlugin {
   readonly metadata: PluginCapabilityMetadata = new ClaudeCodeAgentPlugin().metadata;
 
   private context: AgentContext | WorkflowAgentContext | null = null;
