@@ -925,6 +925,34 @@ describe('executeAgentStep', () => {
     );
   });
 
+  it('[DATA] emits script.step.started audit event for script executor', async () => {
+    const scriptStep: WorkflowStep = {
+      id: 'gather-data', name: 'Gather Data', type: 'creation', executor: 'script',
+    };
+    const updatedInstance = buildProcessInstance({ id: 'inst-wf-001', status: 'running' });
+    mockEngine.advanceStep.mockResolvedValue(updatedInstance);
+
+    await executeAgentStep('inst-wf-001', 'gather-data', scriptStep, { topic: 'test' }, 'user-1');
+
+    expect(mockAuditRepo.append).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'script.step.started',
+        actorId: 'script:gather-data',
+        actorType: 'system',
+        entityId: 'inst-wf-001',
+        processInstanceId: 'inst-wf-001',
+        executorType: 'script',
+      }),
+    );
+
+    // Description must NOT contain autonomy level for scripts
+    const scriptStartedCall = mockAuditRepo.append.mock.calls.find(
+      (call: unknown[]) => (call[0] as Record<string, unknown>).action === 'script.step.started',
+    );
+    expect(scriptStartedCall).toBeDefined();
+    expect((scriptStartedCall![0] as Record<string, unknown>).description).not.toContain('autonomy');
+  });
+
   // ---- OAuth token loading + refresh pass-through ----
   //
   // Verifies execute-agent-step wires the binding → token repo → refresh →

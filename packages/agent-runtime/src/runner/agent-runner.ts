@@ -399,6 +399,7 @@ export class AgentRunner {
     errorMessage: string | null = null,
   ): Promise<void> {
     const pluginId = context.step.plugin ?? context.stepId;
+    const isScript = context.step.executor === 'script';
     const reviewerType = context.autonomyLevel === 'L4'
       ? 'none'
       : context.autonomyLevel === 'L3'
@@ -406,15 +407,17 @@ export class AgentRunner {
         : 'none';
 
     await this.auditRepository.append({
-      actorId: `agent:${pluginId}`,
-      actorType: 'agent',
+      actorId: `${isScript ? 'script' : 'agent'}:${pluginId}`,
+      actorType: isScript ? 'system' : 'agent',
       actorRole: context.autonomyLevel,
-      action: 'agent.run',
-      description: `Agent run completed with status '${runStatus}' at autonomy level ${context.autonomyLevel}`,
+      action: isScript ? 'script.run' : 'agent.run',
+      description: isScript
+        ? `Script completed with status '${runStatus}'`
+        : `Agent run completed with status '${runStatus}' at autonomy level ${context.autonomyLevel}`,
       timestamp: new Date().toISOString(),
       inputSnapshot: {
         stepInput: context.stepInput,
-        autonomyLevel: context.autonomyLevel,
+        ...(isScript ? {} : { autonomyLevel: context.autonomyLevel }),
         model: context.step.agent?.model ?? envelope?.model ?? null,
       },
       outputSnapshot: {
@@ -426,13 +429,15 @@ export class AgentRunner {
         result: envelope?.result ?? null,
         ...(errorMessage !== null ? { error: errorMessage } : {}),
       },
-      basis: `Autonomy level ${context.autonomyLevel} — ${this.getBasisDescription(context.autonomyLevel)}`,
+      basis: isScript
+        ? 'Deterministic script execution'
+        : `Autonomy level ${context.autonomyLevel} — ${this.getBasisDescription(context.autonomyLevel)}`,
       entityType: 'process_instance',
       entityId: context.processInstanceId,
       processInstanceId: context.processInstanceId,
       stepId: context.stepId,
       processDefinitionVersion: context.definitionVersion,
-      executorType: context.step.executor === 'script' ? 'script' : 'agent',
+      executorType: isScript ? 'script' : 'agent',
       reviewerType,
     });
   }
