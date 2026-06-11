@@ -39,6 +39,7 @@ export async function listWorkflows(
       const stepsByVersion: Record<string, string[]> = {};
       for (const instance of rawSummary.latest) {
         const key = instance.definitionVersion;
+        if (key === null) continue;
         if (!(key in stepsByVersion)) {
           const def = group.versions.find((v) => String(v.version) === instance.definitionVersion);
           if (def) {
