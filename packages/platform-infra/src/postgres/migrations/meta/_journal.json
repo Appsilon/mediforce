@@ -176,6 +176,13 @@
       "when": 1780588800006,
       "tag": "0024_script_step_config",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1780588800007,
+      "tag": "0025_workflow_definition_source",
+      "breakpoints": true
     }
   ]
 }

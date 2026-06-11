@@ -60,6 +60,11 @@ function contract(
       const def = definitionFor('ws-1', {
         title: 'My WD',
         metadata: { owner: 'team-x' },
+        source: {
+          repo: 'https://github.com/Appsilon/mediforce-workflows',
+          path: 'workflows/adverse-event-review.wd.json',
+          ref: 'main',
+        },
       });
       await repo.saveWorkflowDefinition(def);
 
@@ -70,6 +75,11 @@ function contract(
       expect(fetched?.version).toBe(1);
       expect(fetched?.title).toBe('My WD');
       expect(fetched?.metadata).toEqual({ owner: 'team-x' });
+      expect(fetched?.source).toEqual({
+        repo: 'https://github.com/Appsilon/mediforce-workflows',
+        path: 'workflows/adverse-event-review.wd.json',
+        ref: 'main',
+      });
     });
 
     it('getWorkflowDefinition returns null for unknown triple', async () => {

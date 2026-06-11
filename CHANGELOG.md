@@ -11,6 +11,10 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Fixed
+- Postgres workflow definitions now persist imported workflow `source` provenance, so get/list calls keep the advertised repo/path/ref after GitHub imports.
+- `pnpm test` is now fully self-contained — Playwright `globalSetup` auto-starts the Firebase Auth emulator when absent and runs pending DB migrations, so E2E tests pass without manual pre-flight steps.
+
 ## [2026-06-07]
 
 ### Added

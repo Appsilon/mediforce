@@ -66,6 +66,7 @@ export const workflowDefinitions = pgTable(
     repo: jsonb('repo'),
     url: text('url'),
     copiedFrom: jsonb('copied_from'),
+    source: jsonb('source'),
     inputForNextRun: jsonb('input_for_next_run'),
 
     archivedAt: timestamp('archived_at', { withTimezone: true }),
