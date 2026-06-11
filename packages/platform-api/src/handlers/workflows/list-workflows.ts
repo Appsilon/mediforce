@@ -40,7 +40,7 @@ export async function listWorkflows(
       for (const instance of rawSummary.latest) {
         const key = String(instance.definitionVersion);
         if (!(key in stepsByVersion)) {
-          const def = group.versions.find((v) => v.version === instance.definitionVersion);
+          const def = group.versions.find((v) => String(v.version) === instance.definitionVersion);
           if (def) {
             stepsByVersion[key] = def.steps
               .filter((s) => s.type !== 'terminal')
