@@ -261,15 +261,29 @@ export function ProcessDetail({
               <span className="text-xs text-destructive shrink-0">{cancelError}</span>
             )}
             <button
-              onClick={() => setLogsOpen((prev) => !prev)}
+              onClick={() => {
+                if (logsOpen && rightTab !== 'diagram') {
+                  setLogsOpen(false);
+                } else {
+                  setRightTab(agentLogFiles.length > 0 ? 'agent-log' : 'audit');
+                  setLogsOpen(true);
+                }
+              }}
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shrink-0"
             >
               <ScrollText className="h-3.5 w-3.5" />
-              {logsOpen && rightTab !== 'diagram' ? 'Hide Detailed Log' : 'Show Detailed Log'}
+              {logsOpen && rightTab !== 'diagram' ? 'Hide Execution Log' : 'Execution Log'}
             </button>
             {definition && (
               <button
-                onClick={() => { setRightTab('diagram'); setLogsOpen(true); }}
+                onClick={() => {
+                  if (logsOpen && rightTab === 'diagram') {
+                    setLogsOpen(false);
+                  } else {
+                    setRightTab('diagram');
+                    setLogsOpen(true);
+                  }
+                }}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors shrink-0',
                   logsOpen && rightTab === 'diagram'
@@ -424,14 +438,13 @@ export function ProcessDetail({
         {/* Toggle strip — always visible */}
         <button
           onClick={() => setLogsOpen((prev) => !prev)}
-          className="w-10 shrink-0 flex flex-col items-center justify-center gap-2 hover:bg-muted/50 transition-colors"
-          title={logsOpen ? 'Collapse logs' : 'Expand logs'}
+          className="w-10 shrink-0 flex flex-col items-center justify-center hover:bg-muted/50 transition-colors"
+          title={logsOpen ? 'Collapse panel' : 'Expand panel'}
         >
           {logsOpen
             ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
             : <ChevronLeft className="h-4 w-4 text-muted-foreground" />
           }
-          <ScrollText className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
 
         {/* Log content — fades in/out with the panel */}
@@ -474,9 +487,11 @@ export function ProcessDetail({
             <AuditLogTab events={auditEvents} loading={auditEventsLoading} error={auditEventsError} />
           </div>
 
-          <div className={cn('flex-1 min-h-0 overflow-hidden', rightTab !== 'diagram' && 'hidden')}>
+          <div className={cn('flex-1 min-h-0 relative', rightTab !== 'diagram' && 'hidden')}>
             {definition && rightTab === 'diagram' && (
-              <WorkflowDiagram definition={definition} className="h-full w-full" />
+              <div className="absolute inset-0">
+                <WorkflowDiagram definition={definition} className="h-full w-full" />
+              </div>
             )}
           </div>
         </div>
