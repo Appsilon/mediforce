@@ -94,17 +94,16 @@ server.registerTool(
     },
   },
   async (args) => {
-    const client = getClient();
-    const namespace = (args.namespace as string | undefined) ?? process.env.MEDIFORCE_NAMESPACE;
-    if (!namespace) {
-      return mcpText('Error: namespace not provided and MEDIFORCE_NAMESPACE env var not set.');
-    }
-    const definition = args.definition as Record<string, unknown>;
-    const triggerInput = args.triggerInput as Record<string, unknown> | undefined;
-
-    console.error(`[mediforce-mcp] dry_run_workflow: namespace=${namespace} baseUrl=${process.env.APP_BASE_URL} apiKey=${process.env.PLATFORM_API_KEY ? '***set***' : '***MISSING***'}`);
-
     try {
+      const client = getClient();
+      const namespace = (args.namespace as string | undefined) ?? process.env.MEDIFORCE_NAMESPACE;
+      if (!namespace) {
+        return mcpText('Error: namespace not provided and MEDIFORCE_NAMESPACE env var not set.');
+      }
+      const definition = args.definition as Record<string, unknown>;
+      const triggerInput = args.triggerInput as Record<string, unknown> | undefined;
+
+      console.error(`[mediforce-mcp] dry_run_workflow: namespace=${namespace} baseUrl=${process.env.APP_BASE_URL} apiKey=${process.env.PLATFORM_API_KEY ? '***set***' : '***MISSING***'}`);
       const registered = await client.workflows.register(
         definition,
         { namespace },
