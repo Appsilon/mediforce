@@ -70,11 +70,51 @@ One attempt to execute one Workflow Step inside a Workflow Run. Captures
 input, output, verdict, gate result, iteration number, error. Optionally has
 0..1 Agent Run, 0..1 Cowork Session, 0..N Human Tasks attached.
 
+### Step execution model
+
+**Step Executor** *(dispatch strategy)*:
+The abstraction that dispatches a Workflow Step to its runtime and collects
+the result. Two concrete strategies today: `AgentStepExecutor` (LLM-driven,
+with autonomy levels, review/escalation) and `ScriptStepExecutor`
+(deterministic, auto-applied, no autonomy concept). Each delegates to a
+`PluginRunner` which calls the `StepExecutorPlugin`.
+_Code:_ `StepExecutor` interface with `execute()`. Replaces the monolithic
+`executeAgentStep()` function.
+_Avoid_: "AgentRunner" for script steps — AgentRunner is agent-only.
+
+**Step Executor Plugin** *(runtime implementation)*:
+Interface a plugin implements to be runnable by the `PluginRunner`:
+`initialize()` + `run()`. Implementations: `claude-code`, `opencode`,
+`script-container`, `databricks-job`, plus mocks. Registered in
+PluginRegistry.
+_Code:_ `StepExecutorPlugin` (rename from `AgentPlugin`).
+_Avoid_: conflating with Plugin (the glossary entry below is the
+domain-level concept; StepExecutorPlugin is the code interface).
+
+**Plugin Runner** *(shared infrastructure)*:
+Runs a `StepExecutorPlugin` — dispatch, collect output, report status.
+Shared by both `AgentStepExecutor` and `ScriptStepExecutor`. Does not
+know about autonomy levels, review, or escalation.
+_Code:_ `PluginRunner` (extracted from `AgentRunner`).
+
+**Step Output Envelope** *(base result shape)*:
+What every Step Execution produces: `result`, `duration_ms`, `annotations`,
+`gitMetadata`, `outputFiles`. Executor-agnostic.
+_Code:_ `StepOutputEnvelope` schema.
+
+**Agent Output Envelope** *(agent-specific extension)*:
+Extends Step Output Envelope with LLM-specific fields: `confidence`,
+`confidence_rationale`, `model`, `reasoning_summary`, `reasoning_chain`,
+`tokenUsage`. Only populated by agent-type steps.
+_Code:_ `AgentOutputEnvelope extends StepOutputEnvelope`.
+_Avoid_: using Agent Output Envelope for script steps — scripts produce
+Step Output Envelope (no confidence, no model).
+
 ### What an agent / human / cowork produces
 
 **Output** (`StepExecution.output`):
 Immediate result of one Step Execution. Polymorphic — shape depends on
-executor (form submission, agent envelope, gate decision).
+executor (form submission, agent envelope, script envelope, gate decision).
 
 **Variables** (`ProcessInstance.variables`):
 Accumulated outputs across all completed Step Executions of one Process
@@ -101,6 +141,8 @@ The execution of one `agent`-type Step inside a Workflow Run. An autonomous
 (L0–L4) attempt by one Agent (the template the Step's `agentId` resolves to)
 to produce the Step's Output. Belongs to the workflow domain — not an
 agent-side concept. Result: an Agent Output Envelope. Immutable once created.
+_Note_: Autonomy levels (L0–L4) are an agent-only concept. Script steps
+have no autonomy level — they are deterministic and auto-applied.
 
 **Cowork Session**:
 A real-time, human-in-the-loop session attached to a Step Execution where
@@ -133,9 +175,13 @@ question, resolution. Lifecycle: `created → acknowledged → resolved`.
 ### Plugin / Skill / MCP
 
 **Plugin** *(runtime strategy)*:
-A pluggable agent runtime implementation. Today: `claude-code`, `opencode`,
-`script-container`, plus mocks. Each implements `BaseContainerAgentPlugin` and
-declares roles (`executor`, `reviewer`). Registered in PluginRegistry.
+A pluggable step executor implementation. Today: `claude-code`, `opencode`,
+`script-container`, `databricks-job`, plus mocks. Each implements
+`StepExecutorPlugin` and is registered in PluginRegistry. Two families:
+agent plugins (LLM-driven, container-based) and script plugins
+(deterministic, container or remote API).
+_Code:_ `StepExecutorPlugin` interface (rename from `AgentPlugin`).
+_Avoid_: conflating with Skill — Plugin is the runtime; Skill is data.
 
 **Skill** *(code payload)*:
 A code artifact (script or git repo) consumed by an agent at spawn time
