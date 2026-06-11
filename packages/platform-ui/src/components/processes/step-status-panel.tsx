@@ -251,10 +251,6 @@ function VirtualRowMeta({
   );
 }
 
-function formatRuntime(runtime: string): string {
-  return `${runtime.charAt(0).toUpperCase()}${runtime.slice(1)} script`;
-}
-
 function ExecutedBy({ executedBy = '', executorType, plugin, autonomyLevel, runtime }: {
   executedBy?: string;
   executorType?: string;
@@ -274,7 +270,7 @@ function ExecutedBy({ executedBy = '', executorType, plugin, autonomyLevel, runt
     );
   }
   if (executorType === 'script') {
-    const label = runtime ? formatRuntime(runtime) : 'Script';
+    const label = runtime ? `${runtime.charAt(0).toUpperCase()}${runtime.slice(1)} script` : 'Script';
     return (
       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
         <FileCode className="h-3 w-3 shrink-0" />
@@ -537,7 +533,7 @@ export function StepStatusPanel({
 
           // For review steps: show the verdict that was actually taken.
           const verdicts = step?.verdicts;
-          const takenVerdict = latestExec.verdict;
+          const takenVerdict = latestExec.status === 'completed' ? latestExec.verdict : undefined;
           const takenVerdictTarget = takenVerdict && verdicts
             ? Object.entries(verdicts).find(([k]) => k === takenVerdict)?.[1]?.target
             : undefined;

@@ -23,6 +23,7 @@ import {
   isItemCompleted,
 } from './action-type';
 import { formatStepName } from './task-utils';
+import { deriveInitials } from './table-editor-view';
 
 export type GroupByField = 'process' | 'action';
 
@@ -61,12 +62,6 @@ function sortItems(items: ActionItem[], currentUserId: string): ActionItem[] {
     }
     return getItemCreatedAt(a).localeCompare(getItemCreatedAt(b));
   });
-}
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) return (parts[0]![0] + parts[parts.length - 1]![0]).toUpperCase();
-  return parts[0]!.slice(0, 2).toUpperCase();
 }
 
 function getItemDescription(item: ActionItem): string | null {
@@ -259,7 +254,7 @@ function TaskRow({
               )}
               title={assigneeName}
             >
-              {getInitials(assigneeName)}
+              {deriveInitials(assigneeName)}
             </span>
             <span className="truncate text-sm">{assigneeName}</span>
           </div>
@@ -507,9 +502,13 @@ export function TaskGroupedView({
     }
     cancelMutation.mutate(
       { runIds: [...runIds] },
-      { onSettled: () => void qc.invalidateQueries({ queryKey: queryKeys.tasks.all() }) },
+      {
+        onSettled: () => {
+          void qc.invalidateQueries({ queryKey: queryKeys.tasks.all() });
+          setSelectedIds(new Set());
+        },
+      },
     );
-    setSelectedIds(new Set());
   }, [selectedIds, itemById, cancelMutation, qc]);
 
   const sharedTableProps: Omit<TaskTableProps, 'items' | 'showWorkflow'> = {
@@ -563,7 +562,10 @@ export function TaskGroupedView({
       byAction.set(action.type, group);
     }
 
-    const groups = [...byAction.entries()].sort(([, a], [, b]) => b.length - a.length);
+    const activeSet = new Set(activeItems.map(getItemId));
+    const groups = [...byAction.entries()]
+      .filter(([, items]) => items.some((i) => activeSet.has(getItemId(i))))
+      .sort(([, a], [, b]) => b.length - a.length);
 
     tableContent = groups.length === 0
       ? <EmptyState />

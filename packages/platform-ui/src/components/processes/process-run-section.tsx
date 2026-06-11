@@ -206,8 +206,8 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
               <span className="text-muted-foreground shrink-0">{STATUS_LABELS[wfStatus.displayStatus]}</span>
               <span className="text-border shrink-0">·</span>
               {activeTaskId ? (
-                <span
-                  role="link"
+                <button
+                  type="button"
                   onClick={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -217,7 +217,7 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
                 >
                   {toHumanLabel(instance.currentStepId)}
                   <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
-                </span>
+                </button>
               ) : (
                 <span className="inline-flex bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium truncate">
                   {toHumanLabel(instance.currentStepId)}
