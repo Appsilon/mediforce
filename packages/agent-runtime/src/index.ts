@@ -33,6 +33,8 @@ export type { DockerSpawnStrategy, DockerSpawnRequest, DockerSpawnResult } from 
 export type { AgentEventLog } from './runner/agent-event-log';
 export { PluginRegistry, PluginNotFoundError } from './runner/plugin-registry';
 export { OpenRouterLlmClient } from './runner/llm-client';
+export { PluginRunner } from './runner/plugin-runner';
+export type { PluginRunResult } from './runner/plugin-runner';
 export { AgentRunner } from './runner/agent-runner';
 export type { AgentRunResult } from './runner/agent-runner';
 export { FallbackHandler } from './runner/fallback-handler';
