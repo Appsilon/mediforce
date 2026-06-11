@@ -11,6 +11,11 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Added
+- **Run view UX** — execution history panel (renamed from "Step Status"), scrollable workflow diagram, active step info (started time, live elapsed timer, executor name/claimer for claimed human tasks)
+- **Task view** — spreadsheet-style table replaces card grid; status column, clickable run links, bulk cancel via batch endpoint, hide-completed toggle
+- **Process card** — step-progress dots rendered against the run's actual definition version instead of the latest definition
+
 ### Changed
 - **StepExecutor strategy pattern (ADR-0008)** — agent and script steps now execute through separate `StepExecutor` strategies (`AgentStepExecutor`, `ScriptStepExecutor`) instead of a monolithic `AgentRunner` with `isScript` branches. Each strategy owns its full lifecycle (run, audit, advance/review, cost tracking). `AgentPlugin` interface renamed to `StepExecutorPlugin` to reflect that scripts and Databricks jobs are peers, not special-cased agents:
   - `StepOutputEnvelope` base schema in platform-core [#688](https://github.com/Appsilon/mediforce/pull/688)

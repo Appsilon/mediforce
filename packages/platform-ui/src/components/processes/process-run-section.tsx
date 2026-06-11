@@ -9,16 +9,7 @@ import { getWorkflowStatus, type WorkflowDisplayStatus } from '@/lib/workflow-st
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { formatCostUsd } from '@/lib/format';
-
-function rowStatusLabel(displayStatus: WorkflowDisplayStatus): string {
-  switch (displayStatus) {
-    case 'in_progress': return 'In Progress';
-    case 'waiting_for_human': return 'Waiting for Human';
-    case 'error': return 'Error';
-    case 'completed': return 'Completed';
-    case 'cancelled': return 'Cancelled';
-  }
-}
+import { STATUS_LABELS } from './process-status-badge';
 
 function toHumanLabel(identifier: string): string {
   return identifier
@@ -206,11 +197,11 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
             <span className="text-xs text-muted-foreground truncate flex-1">Completed</span>
           ) : wfStatus.displayStatus === 'error' || wfStatus.displayStatus === 'cancelled' ? (
             <span className="text-xs text-red-600/70 dark:text-red-400/70 truncate flex-1">
-              {rowStatusLabel(wfStatus.displayStatus)}{instance.currentStepId ? ` · ${toHumanLabel(instance.currentStepId)}` : ''}
+              {STATUS_LABELS[wfStatus.displayStatus]}{instance.currentStepId ? ` · ${toHumanLabel(instance.currentStepId)}` : ''}
             </span>
           ) : instance.currentStepId ? (
             <span className="text-xs flex-1 inline-flex items-center gap-1.5 min-w-0 overflow-hidden">
-              <span className="text-muted-foreground shrink-0">{rowStatusLabel(wfStatus.displayStatus)}</span>
+              <span className="text-muted-foreground shrink-0">{STATUS_LABELS[wfStatus.displayStatus]}</span>
               <span className="text-border shrink-0">·</span>
               {activeTaskId ? (
                 <span
@@ -233,7 +224,7 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
             </span>
           ) : (
             <span className="text-xs text-muted-foreground truncate flex-1">
-              {rowStatusLabel(wfStatus.displayStatus)}
+              {STATUS_LABELS[wfStatus.displayStatus]}
             </span>
           )}
         </>

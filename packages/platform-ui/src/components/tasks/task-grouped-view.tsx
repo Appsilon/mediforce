@@ -9,8 +9,8 @@ import { useUserDisplayNames } from '@/hooks/use-users';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
-import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
+import { useBulkCancelRuns } from '@/hooks/use-run-mutations';
 import {
   type ActionItem,
   getActionType,
@@ -89,10 +89,10 @@ function getStatusInfo(item: ActionItem): { label: string; className: string } {
       return { label: 'Claimed', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' };
     case 'pending':
       return { label: 'Pending', className: 'bg-muted text-muted-foreground' };
+    default:
+      return { label: item.data.status, className: 'bg-muted text-muted-foreground' };
   }
 }
-
-// --- Indeterminate checkbox ---
 
 function IndeterminateCheckbox({
   checked,
@@ -118,7 +118,7 @@ function IndeterminateCheckbox({
   );
 }
 
-// --- Table primitives ---
+
 
 function TH({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
@@ -141,7 +141,7 @@ function TD({ children, className }: { children?: React.ReactNode; className?: s
   );
 }
 
-// --- Task row ---
+
 
 function TaskRow({
   item,
@@ -285,8 +285,6 @@ function TaskRow({
   );
 }
 
-// --- Table ---
-
 interface TaskTableProps {
   items: ActionItem[];
   selectedIds: Set<string>;
@@ -356,8 +354,6 @@ function TaskTable({
   );
 }
 
-// --- Section header for grouped view ---
-
 function SectionHeader({ title, count, icon }: { title: string; count: number; icon?: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 pt-5 pb-2 first:pt-0">
@@ -369,8 +365,6 @@ function SectionHeader({ title, count, icon }: { title: string; count: number; i
     </div>
   );
 }
-
-// --- Bulk action toolbar ---
 
 function BulkActionBar({
   selectedCount,
@@ -408,8 +402,6 @@ function BulkActionBar({
     </div>
   );
 }
-
-// --- Loading & empty states ---
 
 function LoadingSkeleton() {
   return (
@@ -450,8 +442,6 @@ function EmptyState() {
   );
 }
 
-// --- Main component ---
-
 export function TaskGroupedView({
   activeItems,
   completedItems,
@@ -471,11 +461,11 @@ export function TaskGroupedView({
   const processNameMap = useProcessNameMap(handle);
   const userNames = useUserDisplayNames(handle);
   const qc = useQueryClient();
+  const cancelMutation = useBulkCancelRuns();
   const groupByProcess = groupByFields.has('process');
   const groupByAction = groupByFields.has('action');
 
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
-  const [cancelling, setCancelling] = React.useState(false);
   const [hideCompleted, setHideCompleted] = React.useState(false);
 
   const visibleCompleted = hideCompleted ? [] : completedItems;
@@ -511,24 +501,18 @@ export function TaskGroupedView({
     });
   }, []);
 
-  const handleCancelRuns = React.useCallback(async () => {
+  const handleCancelRuns = React.useCallback(() => {
     const runIds = new Set<string>();
     for (const id of selectedIds) {
       const item = itemById.get(id);
       if (item) runIds.add(getItemProcessInstanceId(item));
     }
-    setCancelling(true);
-    try {
-      await Promise.all([...runIds].map((runId) => mediforce.runs.cancel({ runId })));
-      setSelectedIds(new Set());
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: queryKeys.tasks.all() }),
-        qc.invalidateQueries({ queryKey: queryKeys.runs.all() }),
-      ]);
-    } finally {
-      setCancelling(false);
-    }
-  }, [selectedIds, itemById, qc]);
+    cancelMutation.mutate(
+      { runIds: [...runIds] },
+      { onSettled: () => void qc.invalidateQueries({ queryKey: queryKeys.tasks.all() }) },
+    );
+    setSelectedIds(new Set());
+  }, [selectedIds, itemById, cancelMutation, qc]);
 
   const sharedTableProps: Omit<TaskTableProps, 'items' | 'showWorkflow'> = {
     selectedIds,
@@ -613,7 +597,7 @@ export function TaskGroupedView({
             selectedCount={selectedIds.size}
             onCancelRuns={handleCancelRuns}
             onClear={() => setSelectedIds(new Set())}
-            loading={cancelling}
+            loading={cancelMutation.isPending}
           />
         ) : (
           <div />

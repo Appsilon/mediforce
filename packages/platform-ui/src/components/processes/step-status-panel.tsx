@@ -57,10 +57,6 @@ interface StepStatusPanelProps {
   currentTask?: HumanTask | null;
 }
 
-// ---------------------------------------------------------------------------
-// History model
-// ---------------------------------------------------------------------------
-
 /** One entry in the execution history. */
 type HistoryItem =
   | {
@@ -128,10 +124,6 @@ function buildHistory(
   return items;
 }
 
-// ---------------------------------------------------------------------------
-// Effective status
-// ---------------------------------------------------------------------------
-
 type EffectiveStatus = 'pending' | 'running' | 'completed' | 'failed' | 'waiting';
 
 function getExecEffectiveStatus(exec: StepExecution, instance: ProcessInstance): EffectiveStatus {
@@ -152,10 +144,6 @@ function getVirtualEffectiveStatus(instance: ProcessInstance): EffectiveStatus {
   if (getWorkflowStatus(instance).displayStatus === 'waiting_for_human') return 'waiting';
   return 'running';
 }
-
-// ---------------------------------------------------------------------------
-// Sub-components (unchanged from original)
-// ---------------------------------------------------------------------------
 
 function StatusIcon({ status }: { status: EffectiveStatus }) {
   switch (status) {
@@ -404,10 +392,6 @@ function getLeftBorderClass(status: EffectiveStatus): string {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Main export
-// ---------------------------------------------------------------------------
-
 export function StepStatusPanel({
   instance,
   definitionSteps,
@@ -449,7 +433,6 @@ export function StepStatusPanel({
         {history.map((item, i) => {
           const isLast = i === history.length - 1;
 
-          // --- Virtual row (no execution record yet) ---
           if (item.kind === 'virtual') {
             const status = getVirtualEffectiveStatus(instance);
             return (
@@ -520,7 +503,6 @@ export function StepStatusPanel({
             );
           }
 
-          // --- Executed row ---
           const { anchor, retries, latestExec, step, isCurrent } = item;
           const execId = anchor.id;
           const stepId = anchor.stepId;

@@ -6,11 +6,6 @@ import dynamic from 'next/dynamic';
 import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, FileBarChart, Archive, ArchiveRestore, ScrollText, X, GitBranch } from 'lucide-react';
 import type { ProcessInstance, StepExecution, AuditEvent, Step, WorkflowStep, WorkflowDefinition } from '@mediforce/platform-core';
-
-const WorkflowDiagram = dynamic(
-  () => import('@/components/workflows/workflow-diagram').then((m) => ({ default: m.WorkflowDiagram })),
-  { ssr: false, loading: () => <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Loading diagram…</div> },
-);
 import { ProcessStatusBadge } from './process-status-badge';
 import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
@@ -32,6 +27,11 @@ import { AgentEscalatedBanner } from './agent-escalated-banner';
 import { PreviousRunBanner } from './previous-run-banner';
 import { formatDuration, formatCostUsd } from '@/lib/format';
 import { getWorkflowStatus } from '@/lib/workflow-status';
+
+const WorkflowDiagram = dynamic(
+  () => import('@/components/workflows/workflow-diagram').then((m) => ({ default: m.WorkflowDiagram })),
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Loading diagram…</div> },
+);
 
 function resolveStepLabel(stepId: string, steps: Step[]): string {
   const found = steps.find((s) => s.id === stepId);
