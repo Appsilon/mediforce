@@ -7,6 +7,7 @@ import type {
   AgentEvent,
   AuditEvent,
   ProcessConfig,
+  StepOutputEnvelope,
   AgentOutputEnvelope,
   FileMetadata,
 } from '../index';
@@ -156,6 +157,21 @@ export function buildHumanTask(
     updatedAt: DEFAULT_UPDATED_TIMESTAMP,
     completedAt: null,
     completionData: null,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// buildStepOutputEnvelope
+// ---------------------------------------------------------------------------
+
+export function buildStepOutputEnvelope(
+  overrides?: Partial<StepOutputEnvelope>,
+): StepOutputEnvelope {
+  return {
+    duration_ms: 1500,
+    result: { status: 'ok' },
+    annotations: [],
     ...overrides,
   };
 }

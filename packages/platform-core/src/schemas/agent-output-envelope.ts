@@ -39,18 +39,21 @@ const PresentationFieldSchema = z.union([z.string(), PresentationSchema])
     typeof value === 'string' ? { kind: 'html' as const, content: value } : value,
   );
 
-export const AgentOutputEnvelopeSchema = z.object({
+export const StepOutputEnvelopeSchema = z.object({
+  duration_ms: z.number().int().nonnegative(),
+  result: z.record(z.string(), z.unknown()).nullable(),
+  annotations: z.array(AnnotationSchema),
+  gitMetadata: GitMetadataSchema.nullable().optional(),
+  presentation: PresentationFieldSchema.nullable().optional(),
+  deliverableFile: z.string().nullable().optional(),
+});
+
+export const AgentOutputEnvelopeSchema = StepOutputEnvelopeSchema.extend({
   confidence: z.number().min(0).max(1),
   confidence_rationale: z.string().optional(),
   reasoning_summary: z.string(),
   reasoning_chain: z.array(z.string()),
-  annotations: z.array(AnnotationSchema),
-  model: z.string().nullable(), // null for non-LLM agents
-  duration_ms: z.number().int().nonnegative(),
-  result: z.record(z.string(), z.unknown()).nullable(), // nullable for L0/L2 annotations-only
-  gitMetadata: GitMetadataSchema.nullable().optional(), // container execution git output
-  presentation: PresentationFieldSchema.nullable().optional(),
-  deliverableFile: z.string().nullable().optional(), // persisted deliverable file path
+  model: z.string().nullable(),
   tokenUsage: TokenUsageSchema.optional(),
 });
 
@@ -58,4 +61,5 @@ export type Annotation = z.infer<typeof AnnotationSchema>;
 export type GitMetadata = z.infer<typeof GitMetadataSchema>;
 export type TokenUsage = z.infer<typeof TokenUsageSchema>;
 export type Presentation = z.infer<typeof PresentationSchema>;
+export type StepOutputEnvelope = z.infer<typeof StepOutputEnvelopeSchema>;
 export type AgentOutputEnvelope = z.infer<typeof AgentOutputEnvelopeSchema>;

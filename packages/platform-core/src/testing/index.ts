@@ -35,6 +35,7 @@ export {
   buildAuditEvent,
   buildProcessConfig,
   buildWorkflowDefinition,
+  buildStepOutputEnvelope,
   buildAgentOutputEnvelope,
   buildFileMetadata,
   buildCoworkSession,
