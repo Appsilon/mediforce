@@ -1,4 +1,4 @@
-import type { CoworkSession } from '@mediforce/platform-core';
+import type { CoworkSession, ConversationTurn, ToolTurn, AgentTurn } from '@mediforce/platform-core';
 import type { McpToolDefinition } from '@mediforce/mcp-client';
 import type { OpenRouterChatMessage } from '../../../services/openrouter-client';
 
@@ -118,12 +118,91 @@ export function buildMessages(
     });
   }
 
-  for (const turn of session.turns) {
-    if (turn.role === 'tool') continue;
-    messages.push({
-      role: turn.role === 'human' ? 'user' : 'assistant',
-      content: turn.content,
-    });
+  messages.push(...buildConversationMessages(session.turns));
+
+  return messages;
+}
+
+/**
+ * Reconstruct the OpenRouter/OpenAI message history from persisted turns.
+ *
+ * Persisted order is: human → tool, tool, ... → agent → human → ...
+ * Tool turns are saved DURING the tool loop; the agent turn is appended
+ * AFTER the loop finishes. So tools PRECEDE their associated agent turn.
+ *
+ * For each agent turn we collect all immediately preceding tool turns and
+ * emit:
+ *   1. `assistant` message with `content` + `tool_calls` array
+ *   2. `tool` messages with matching `tool_call_id`
+ *
+ * Tool turns at the tail with no following agent turn are in-progress
+ * (current request) — they're already handled by the live `messages` array
+ * in the tool loop, so we skip them here.
+ */
+function buildConversationMessages(turns: ConversationTurn[]): ChatMessage[] {
+  const messages: ChatMessage[] = [];
+  let i = 0;
+
+  while (i < turns.length) {
+    const turn = turns[i];
+
+    if (turn.role === 'human') {
+      messages.push({ role: 'user', content: turn.content });
+      i++;
+      continue;
+    }
+
+    if (turn.role === 'tool') {
+      // Collect consecutive tool turns
+      const toolTurns: ToolTurn[] = [];
+      while (i < turns.length && turns[i].role === 'tool') {
+        toolTurns.push(turns[i] as ToolTurn);
+        i++;
+      }
+
+      // If the next turn is an agent turn, these tools belong to it
+      if (i < turns.length && turns[i].role === 'agent') {
+        const agentTurn = turns[i] as AgentTurn;
+
+        const toolCalls = toolTurns.map((t, idx) => ({
+          id: t.toolCallId ?? `${agentTurn.id}-tc${idx}`,
+          type: 'function' as const,
+          function: {
+            name: t.toolName,
+            arguments: JSON.stringify(t.toolArgs),
+          },
+        }));
+
+        // Assistant message with tool_calls
+        messages.push({
+          role: 'assistant',
+          content: agentTurn.content,
+          tool_calls: toolCalls,
+        });
+
+        // Tool result messages
+        for (let j = 0; j < toolTurns.length; j++) {
+          messages.push({
+            role: 'tool',
+            content: toolTurns[j].toolResult ?? '',
+            tool_call_id: toolCalls[j].id,
+          });
+        }
+
+        i++; // skip the agent turn (already consumed)
+      }
+      // else: orphan tool turns at the end (current turn's in-progress tools) — skip
+      continue;
+    }
+
+    if (turn.role === 'agent') {
+      // Agent turn with no preceding tool turns — plain text response
+      messages.push({ role: 'assistant', content: turn.content });
+      i++;
+      continue;
+    }
+
+    i++;
   }
 
   return messages;

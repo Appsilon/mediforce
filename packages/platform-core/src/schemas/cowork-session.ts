@@ -47,6 +47,9 @@ export const ToolTurnSchema = z.object({
   toolStatus: z.enum(['running', 'success', 'error']),
   /** MCP server name that owns this tool */
   serverName: z.string(),
+  /** OpenRouter tool_call_id — links this result to the assistant's tool_calls entry.
+   *  Optional for backward compat with sessions created before this field existed. */
+  toolCallId: z.string().optional(),
 });
 
 export const ConversationTurnSchema = z.discriminatedUnion('role', [
