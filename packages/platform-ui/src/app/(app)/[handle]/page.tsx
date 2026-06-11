@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { Pencil, Check, X, Settings, GitBranch, Plus } from 'lucide-react';
+import { Pencil, Check, X, Settings, GitBranch, Plus, Download } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useNamespace } from '@/hooks/use-namespace';
@@ -13,12 +13,14 @@ import { useUserProfiles } from '@/hooks/use-users';
 import { useProcessDefinitions } from '@/hooks/use-process-definitions';
 import { useWorkflowDefinitionsApi } from '@/hooks/use-workflows-api';
 import { useMyActionableTasks } from '@/hooks/use-tasks';
+import { useQueryClient } from '@tanstack/react-query';
 import { useUserMe } from '@/hooks/use-user-me';
 import { useUpdateNamespace } from '@/hooks/use-namespace-mutations';
 import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons } from '@/components/processes/process-card';
 import { WorkflowProblems } from '@/components/processes/workflow-problems';
 import { OpenRouterCreditsIndicator } from '@/components/namespace/openrouter-credits-indicator';
 import { WorkflowSecretKeysProvider } from '@/hooks/use-workflow-secret-keys';
+import { ImportWorkflowDialog } from '@/components/workflows/import-workflow-dialog';
 import { cn } from '@/lib/utils';
 import type { Namespace } from '@mediforce/platform-core';
 
@@ -424,6 +426,8 @@ function WorkflowCatalogPublic({ handle }: { handle: string }) {
 function WorkflowCatalogMember({ handle }: { handle: string }) {
   const [showCompleted, setShowCompleted] = React.useState(true);
   const [showArchived, setShowArchived] = React.useState(false);
+  const [importOpen, setImportOpen] = React.useState(false);
+  const queryClient = useQueryClient();
 
   const { definitions, stepsByDefinition, latestDocs, loading: defsLoading } = useProcessDefinitions(showCompleted);
   const { data: activeTasks } = useMyActionableTasks();
@@ -476,6 +480,16 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
             onToggleArchived={() => setShowArchived((prev) => !prev)}
             hasArchivedDefinitions={hasArchivedDefinitions}
           />
+          <button
+            onClick={() => setImportOpen(true)}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap shrink-0',
+              'border hover:bg-muted transition-colors',
+            )}
+          >
+            <Download className="h-3.5 w-3.5" />
+            Import from git
+          </button>
           <Link
             href={`/${handle}/workflows/new`}
             className={cn(
@@ -488,6 +502,12 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
           </Link>
         </div>
       </div>
+      <ImportWorkflowDialog
+        namespace={handle}
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => void queryClient.invalidateQueries({ queryKey: ['workflows', 'list'] })}
+      />
 
       {loading ? (
         <WorkflowCatalogSkeletons />

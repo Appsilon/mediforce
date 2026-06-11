@@ -31,6 +31,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
   - Artifact panel: collapsible JSON tree explorer replaces raw `JSON.stringify`; tabbed Data/Preview view.
   - Built-in tool calls (`update_artifact`, `update_presentation`) now persist as live tool turns visible in the cowork chat UI.
   - Postgres migration 0018: `validation_result` (jsonb) + `presentation` (text) columns on `cowork_sessions`.
+### Added
+- Workflows can now be imported from a public GitHub repo as a one-time copy: `mediforce workflow import --repo <url> --path <wd.json-path> --namespace <ns>` CLI command, a manifest-browser dialog in the workspace toolbar (fetches `index.json`, multi-select, progress bar), and `POST /api/workflow-definitions/import` + `GET /api/workflow-definitions/manifest` server-side handlers — imported definitions carry `source.{repo,path,ref}` provenance metadata [#561](https://github.com/Appsilon/mediforce/issues/561).
 
 ### Changed
 - **Breaking (schema + data migration 0023):** deterministic script-step config moved from `step.agent` to a typed `step.script` key; `agent`/`autonomyLevel`/`cowork` are now rejected on `executor: 'script'` steps and audit events record `executorType: 'script'` (forward-only). Stored workflow definitions are rewritten in-place by Postgres migration `0023_script_step_config` — it must ship in the same release, because definitions are re-parsed on read.

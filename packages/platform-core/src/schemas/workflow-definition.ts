@@ -574,6 +574,13 @@ export type TriggerInputField = z.infer<typeof TriggerInputFieldSchema>;
 export const WorkflowVisibilitySchema = z.enum(['public', 'private']);
 export type WorkflowVisibility = z.infer<typeof WorkflowVisibilitySchema>;
 
+export const WorkflowSourceSchema = z.object({
+  repo: z.string().url(),
+  path: z.string().min(1),
+  ref: z.string().optional(),
+});
+export type WorkflowSource = z.infer<typeof WorkflowSourceSchema>;
+
 export const WorkflowDefinitionBaseSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
@@ -601,6 +608,7 @@ export const WorkflowDefinitionBaseSchema = z.object({
     name: z.string().min(1),
     version: z.number().int().positive(),
   }).optional(),
+  source: WorkflowSourceSchema.optional(),
   archived: z.boolean().optional(),
   deleted: z.boolean().optional(),
   createdAt: z.string().datetime().optional(),

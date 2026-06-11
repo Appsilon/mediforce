@@ -247,6 +247,12 @@ the user-facing immutable log.
 
 ## Flagged ambiguities
 
+- **Workflow Definition `source`** *(resolved 2026-06-02)*: A Workflow Definition
+  imported from a git repo carries an optional `source: { repo, path, ref? }`
+  record identifying the git origin (GitHub-only). Informational only — no
+  automatic sync. Distinct from `copiedFrom`, which tracks within-Deployment
+  copies.
+
 - **Namespace vs Workspace** *(active rename in flight)*: Code uses
   `namespace` everywhere — schema fields, repos, Firestore collection,
   Postgres columns (post-migration). UI uses "Workspace" in user-facing

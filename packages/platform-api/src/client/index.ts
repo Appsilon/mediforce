@@ -38,6 +38,9 @@ import {
   GetWorkflowRunCountOutputSchema,
   TransferWorkflowInputSchema,
   TransferWorkflowOutputSchema,
+  ImportWorkflowInputSchema,
+  GetManifestInputSchema,
+  GetManifestOutputSchema,
   DockerInfoResponseSchema,
   OpenRouterCreditsInputSchema,
   OpenRouterCreditsOutputSchema,
@@ -245,6 +248,10 @@ import {
   type GetWorkflowRunCountOutput,
   type TransferWorkflowInput,
   type TransferWorkflowOutput,
+  type ImportWorkflowInput,
+  type ImportWorkflowOutput,
+  type GetManifestInput,
+  type GetManifestOutput,
   type GetRunInput,
   type GetRunOutput,
   type StartRunInput,
@@ -497,6 +504,8 @@ export class Mediforce {
     delete: (input: DeleteWorkflowInput) => Promise<DeleteWorkflowOutput>;
     getRunCount: (input: GetWorkflowRunCountInput) => Promise<GetWorkflowRunCountOutput>;
     transferNamespace: (input: TransferWorkflowInput) => Promise<TransferWorkflowOutput>;
+    importFromRepo: (input: ImportWorkflowInput) => Promise<ImportWorkflowOutput>;
+    getManifest: (input: GetManifestInput) => Promise<GetManifestOutput>;
   };
 
   readonly runs: {
@@ -967,6 +976,24 @@ export class Mediforce {
           CopyWorkflowOutputSchema,
           'mediforce.workflows.copy',
         );
+      },
+      importFromRepo: async (input) => {
+        const validated = ImportWorkflowInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions/import${qs}`,
+          { repo: validated.repo, path: validated.path, ref: validated.ref },
+          RegisterWorkflowOutputSchema,
+          'mediforce.workflows.importFromRepo',
+        );
+      },
+      getManifest: async (input) => {
+        const validated = GetManifestInputSchema.parse(input);
+        const qs = toSearchParams({ repo: validated.repo, ref: validated.ref });
+        const res = await this.request(`/api/workflow-definitions/manifest${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.getManifest');
+        return GetManifestOutputSchema.parse(body);
       },
     };
 
