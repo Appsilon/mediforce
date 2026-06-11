@@ -44,14 +44,6 @@ function getClient(): Mediforce {
   return _client;
 }
 
-function getNamespace(): string {
-  const ns = process.env.MEDIFORCE_NAMESPACE;
-  if (!ns) {
-    throw new Error('mediforce-mcp: MEDIFORCE_NAMESPACE env var is required.');
-  }
-  return ns;
-}
-
 function mcpText(text: string) {
   return { content: [{ type: 'text' as const, text }] };
 }
@@ -87,10 +79,13 @@ server.registerTool(
     description:
       'Register the current workflow definition and start a dry run. ' +
       'Returns the run ID for subsequent polling. ' +
-      'Pass the complete WorkflowDefinition as `definition` and optional `triggerInput` for trigger payload.',
+      'Pass the complete WorkflowDefinition as `definition`, the `namespace` (workspace handle), and optional `triggerInput` for trigger payload.',
     inputSchema: {
       definition: z.record(z.string(), z.unknown()).describe(
         'Complete WorkflowDefinition object (name, version, steps, transitions, triggers)',
+      ),
+      namespace: z.string().min(1).describe(
+        'Workspace namespace/handle where the workflow should be registered and run',
       ),
       triggerInput: z.record(z.string(), z.unknown()).optional().describe(
         'Optional trigger input payload (key-value pairs for triggerInput fields)',
@@ -99,31 +94,42 @@ server.registerTool(
   },
   async (args) => {
     const client = getClient();
-    const namespace = getNamespace();
+    const namespace = args.namespace as string;
     const definition = args.definition as Record<string, unknown>;
     const triggerInput = args.triggerInput as Record<string, unknown> | undefined;
 
-    const registered = await client.workflows.register(
-      definition,
-      { namespace },
-    );
+    console.error(`[mediforce-mcp] dry_run_workflow: namespace=${namespace} baseUrl=${process.env.APP_BASE_URL} apiKey=${process.env.PLATFORM_API_KEY ? '***set***' : '***MISSING***'}`);
 
-    const startResult = await client.runs.start({
-      namespace,
-      definitionName: registered.name,
-      definitionVersion: registered.version,
-      triggerName: 'manual',
-      triggeredBy: 'workflow-designer-dry-run',
-      payload: triggerInput,
-      dryRun: true,
-    });
+    try {
+      const registered = await client.workflows.register(
+        definition,
+        { namespace },
+      );
+      console.error(`[mediforce-mcp] registered: ${registered.name} v${registered.version}`);
 
-    return mcpJson({
-      runId: startResult.run.id,
-      definitionName: registered.name,
-      definitionVersion: registered.version,
-      status: startResult.run.status,
-    });
+      const startResult = await client.runs.start({
+        namespace,
+        definitionName: registered.name,
+        definitionVersion: registered.version,
+        triggerName: 'manual',
+        triggeredBy: 'workflow-designer-dry-run',
+        payload: triggerInput,
+        dryRun: true,
+      });
+      console.error(`[mediforce-mcp] dry run started: ${startResult.run.id}`);
+
+      return mcpJson({
+        runId: startResult.run.id,
+        definitionName: registered.name,
+        definitionVersion: registered.version,
+        status: startResult.run.status,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const details = (err as { body?: unknown }).body ?? '';
+      console.error(`[mediforce-mcp] dry_run_workflow FAILED: ${message}`, details);
+      return mcpText(`Error starting dry run: ${message}`);
+    }
   },
 );
 
@@ -297,6 +303,44 @@ server.registerTool(
       steps,
       auditEvents: events,
     });
+  },
+);
+
+// --- list_models ------------------------------------------------------------
+
+server.registerTool(
+  'list_models',
+  {
+    description:
+      'List available models in the Mediforce model registry. ' +
+      'Use this to find valid model IDs for agent steps (e.g. "anthropic/claude-sonnet-4"). ' +
+      'Optionally filter by provider or capability.',
+    inputSchema: {
+      provider: z.string().optional().describe(
+        'Filter by provider prefix (e.g. "anthropic", "openai", "google")',
+      ),
+      supportsTools: z.boolean().optional().describe(
+        'Filter to models that support tool use',
+      ),
+    },
+  },
+  async (args) => {
+    const client = getClient();
+    const result = await client.models.list({
+      provider: args.provider as string | undefined,
+      supportsTools: args.supportsTools as boolean | undefined,
+    });
+
+    const models = result.models.map((m) => ({
+      id: m.id,
+      contextLength: m.contextLength,
+      inputPrice: m.inputPrice,
+      outputPrice: m.outputPrice,
+      supportsTools: m.supportsTools,
+      supportsVision: m.supportsVision,
+    }));
+
+    return mcpJson({ count: models.length, models });
   },
 );
 
