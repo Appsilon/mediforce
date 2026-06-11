@@ -1,11 +1,6 @@
 import type { HumanTask, ProcessInstance, Presentation } from '@mediforce/platform-core';
-
-/** Format a stepId into a human-readable title. */
-export function formatStepName(stepId: string): string {
-  return stepId
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
+export { formatStepName } from '@/lib/format';
+import { formatStepName } from '@/lib/format';
 
 /** Check if a task is an agent output review (L3 approval).
  *  Checks multiple signals: completionData.reviewType, completionData.agentOutput,
