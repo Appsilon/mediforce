@@ -172,6 +172,7 @@ function toolRunningTurn(
   toolName: string,
   serverName: string,
   toolArgs: Record<string, unknown>,
+  toolCallId?: string,
 ): ConversationTurn {
   return {
     id: crypto.randomUUID(),
@@ -183,6 +184,7 @@ function toolRunningTurn(
     toolArgs,
     toolStatus: 'running',
     serverName,
+    ...(toolCallId !== undefined ? { toolCallId } : {}),
   };
 }
 
@@ -243,7 +245,7 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
     );
 
     for (const call of artifactCalls) {
-      const turn = toolRunningTurn('update_artifact', '_builtin', {});
+      const turn = toolRunningTurn('update_artifact', '_builtin', {}, call.id);
       await addTurn(scope, ctx.session.id, turn);
 
       const parsed = applyArtifactUpdate(call);
@@ -278,7 +280,7 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
     }
 
     for (const call of presentationCalls) {
-      const turn = toolRunningTurn('update_presentation', '_builtin', {});
+      const turn = toolRunningTurn('update_presentation', '_builtin', {}, call.id);
       await addTurn(scope, ctx.session.id, turn);
 
       const html = applyPresentationUpdate(call);
@@ -354,7 +356,7 @@ async function executeMcpTool(
   const serverName = sep > 0 ? toolName.slice(0, sep) : 'unknown';
   const toolArgs = parseToolArgs(call.function.arguments);
 
-  const turn = toolRunningTurn(toolName, serverName, toolArgs);
+  const turn = toolRunningTurn(toolName, serverName, toolArgs, call.id);
   await scope.coworkSessions.addTurn(sessionId, turn);
 
   const result = await mcp.manager.callTool(toolName, toolArgs);
