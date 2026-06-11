@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { CheckSquare, X, Loader2, AlertTriangle } from 'lucide-react';
+import { CheckSquare, X, Loader2, AlertTriangle, EyeOff } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useProcessNameMap } from '@/hooks/use-agent-runs';
 import { useUserDisplayNames } from '@/hooks/use-users';
@@ -44,12 +44,10 @@ function formatAbsoluteDate(iso: string): string {
 
 function sortItems(items: ActionItem[], currentUserId: string): ActionItem[] {
   return [...items].sort((a, b) => {
-    // Claimed by current user comes first.
     const aOwn = a.kind === 'task' && a.data.status === 'claimed' && a.data.assignedUserId === currentUserId;
     const bOwn = b.kind === 'task' && b.data.status === 'claimed' && b.data.assignedUserId === currentUserId;
     if (aOwn !== bOwn) return aOwn ? -1 : 1;
 
-    // Completed items sink to the bottom.
     const aDone = isItemCompleted(a);
     const bDone = isItemCompleted(b);
     if (aDone !== bDone) return aDone ? 1 : -1;
@@ -67,7 +65,7 @@ function sortItems(items: ActionItem[], currentUserId: string): ActionItem[] {
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) return (parts[0][0]! + parts[parts.length - 1]![0]).toUpperCase();
+  if (parts.length >= 2) return (parts[0]![0] + parts[parts.length - 1]![0]).toUpperCase();
   return parts[0]!.slice(0, 2).toUpperCase();
 }
 
@@ -76,18 +74,34 @@ function getItemDescription(item: ActionItem): string | null {
   return item.data.params?.[0]?.description ?? null;
 }
 
-// --- Indeterminate checkbox (needs ref for the indeterminate DOM prop) ---
+function getStatusInfo(item: ActionItem): { label: string; className: string } {
+  if (item.kind === 'cowork') {
+    return item.data.status === 'finalized'
+      ? { label: 'Finalized', className: 'bg-green-500/10 text-green-700 dark:text-green-400' }
+      : { label: 'Active', className: 'bg-blue-500/10 text-blue-700 dark:text-blue-400' };
+  }
+  switch (item.data.status) {
+    case 'completed':
+      return { label: 'Completed', className: 'bg-green-500/10 text-green-700 dark:text-green-400' };
+    case 'cancelled':
+      return { label: 'Cancelled', className: 'bg-red-500/10 text-red-700 dark:text-red-400' };
+    case 'claimed':
+      return { label: 'Claimed', className: 'bg-primary/10 text-primary' };
+    case 'pending':
+      return { label: 'Pending', className: 'bg-muted text-muted-foreground' };
+  }
+}
+
+// --- Indeterminate checkbox ---
 
 function IndeterminateCheckbox({
   checked,
   indeterminate,
   onChange,
-  className,
 }: {
   checked: boolean;
   indeterminate: boolean;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  className?: string;
 }) {
   const ref = React.useRef<HTMLInputElement>(null);
   React.useEffect(() => {
@@ -99,7 +113,7 @@ function IndeterminateCheckbox({
       type="checkbox"
       checked={checked}
       onChange={onChange}
-      className={cn('h-4 w-4 rounded border-border accent-primary cursor-pointer', className)}
+      className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
     />
   );
 }
@@ -163,14 +177,18 @@ function TaskRow({
   const muted = isItemCompleted(item);
   const instanceId = getItemProcessInstanceId(item);
   const workflowName = processNameMap.get(instanceId);
+  const status = getStatusInfo(item);
 
   const definitionName = item.kind === 'task' ? workflowName : undefined;
-  const href =
+  const taskHref =
     item.kind === 'cowork'
       ? routes.cowork(handle, item.data.id)
       : definitionName !== undefined
         ? routes.workflowRunStep(handle, definitionName, instanceId, item.data.stepId)
         : routes.task(handle, item.data.id);
+
+  const workflowHref = workflowName ? routes.workflow(handle, workflowName) : null;
+  const runHref = workflowName ? routes.workflowRun(handle, workflowName, instanceId) : null;
 
   return (
     <tr className={cn('transition-colors', selected ? 'bg-primary/5' : 'hover:bg-muted/20', muted && 'opacity-60')}>
@@ -184,7 +202,7 @@ function TaskRow({
       </TD>
       <TD className="min-w-[200px] max-w-[300px]">
         <Link
-          href={href}
+          href={taskHref}
           className="flex items-center gap-2 group/link hover:text-primary transition-colors"
         >
           <ActionIcon className={cn('h-3.5 w-3.5 shrink-0', actionType.colorClass)} />
@@ -192,6 +210,11 @@ function TaskRow({
             {getItemLabel(item)}
           </span>
         </Link>
+      </TD>
+      <TD className="w-[100px]">
+        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', status.className)}>
+          {status.label}
+        </span>
       </TD>
       <TD className="max-w-[220px] hidden md:table-cell">
         {description ? (
@@ -202,15 +225,29 @@ function TaskRow({
       </TD>
       {showWorkflow && (
         <TD className="max-w-[180px] hidden lg:table-cell">
-          {workflowName ? (
-            <span className="text-muted-foreground truncate block">{formatStepName(workflowName)}</span>
+          {workflowHref ? (
+            <Link
+              href={workflowHref}
+              className="text-muted-foreground hover:text-foreground hover:underline truncate block transition-colors"
+            >
+              {formatStepName(workflowName!)}
+            </Link>
           ) : (
-            <span className="font-mono text-xs text-muted-foreground/50">{instanceId.slice(0, 8)}</span>
+            <span className="text-muted-foreground/40 text-xs">—</span>
           )}
         </TD>
       )}
       <TD className="w-[100px]">
-        <span className="font-mono text-xs text-muted-foreground">{instanceId.slice(0, 8)}</span>
+        {runHref ? (
+          <Link
+            href={runHref}
+            className="font-mono text-xs text-muted-foreground hover:text-foreground hover:underline transition-colors"
+          >
+            {instanceId.slice(0, 8)}
+          </Link>
+        ) : (
+          <span className="font-mono text-xs text-muted-foreground">{instanceId.slice(0, 8)}</span>
+        )}
       </TD>
       <TD className="w-[180px]">
         {assigneeName ? (
@@ -290,6 +327,7 @@ function TaskTable({
               />
             </TH>
             <TH>Task</TH>
+            <TH className="w-[100px]">Status</TH>
             <TH className="hidden md:table-cell">Description</TH>
             {showWorkflow && <TH className="hidden lg:table-cell">Workflow</TH>}
             <TH>Run ID</TH>
@@ -376,8 +414,8 @@ function BulkActionBar({
 function LoadingSkeleton() {
   return (
     <div className="rounded-lg border border-border overflow-hidden animate-pulse">
-      <div className="bg-muted/30 border-b border-border px-3 py-2.5 flex gap-8">
-        {[40, 180, 140, 90, 130, 100, 90].map((w, i) => (
+      <div className="bg-muted/30 border-b border-border px-3 py-2.5 flex gap-6">
+        {[40, 180, 80, 140, 90, 130, 100, 90].map((w, i) => (
           <div key={i} className="h-3 bg-muted rounded" style={{ width: w }} />
         ))}
       </div>
@@ -385,6 +423,7 @@ function LoadingSkeleton() {
         <div key={i} className="flex items-center gap-4 px-3 py-2.5 border-b border-border/40 last:border-b-0">
           <div className="h-4 w-4 rounded bg-muted shrink-0" />
           <div className="h-4 bg-muted rounded flex-1 max-w-[200px]" />
+          <div className="h-5 bg-muted rounded-full w-16" />
           <div className="h-3 bg-muted rounded w-32 hidden md:block" />
           <div className="h-3 bg-muted rounded w-24 hidden lg:block" />
           <div className="h-3 bg-muted rounded w-16" />
@@ -437,10 +476,13 @@ export function TaskGroupedView({
 
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [cancelling, setCancelling] = React.useState(false);
+  const [hideCompleted, setHideCompleted] = React.useState(false);
+
+  const visibleCompleted = hideCompleted ? [] : completedItems;
 
   const allItems = React.useMemo(
-    () => sortItems([...activeItems, ...completedItems], currentUserId),
-    [activeItems, completedItems, currentUserId],
+    () => sortItems([...activeItems, ...visibleCompleted], currentUserId),
+    [activeItems, visibleCompleted, currentUserId],
   );
 
   const itemById = React.useMemo(() => {
@@ -499,7 +541,9 @@ export function TaskGroupedView({
   };
 
   if (loading) return <LoadingSkeleton />;
-  if (allItems.length === 0) return <EmptyState />;
+
+  const totalItems = activeItems.length + completedItems.length;
+  if (totalItems === 0) return <EmptyState />;
 
   let tableContent: React.ReactNode;
 
@@ -520,12 +564,14 @@ export function TaskGroupedView({
         a.filter((i) => activeSet.has(getItemId(i))).length,
     );
 
-    tableContent = groups.map(([name, items]) => (
-      <div key={name}>
-        <SectionHeader title={formatStepName(name)} count={items.length} />
-        <TaskTable items={items} {...sharedTableProps} showWorkflow={false} />
-      </div>
-    ));
+    tableContent = groups.length === 0
+      ? <EmptyState />
+      : groups.map(([name, items]) => (
+          <div key={name}>
+            <SectionHeader title={formatStepName(name)} count={items.length} />
+            <TaskTable items={items} {...sharedTableProps} showWorkflow={false} />
+          </div>
+        ));
   } else if (groupByAction) {
     const byAction = new Map<string, ActionItem[]>();
     for (const item of allItems) {
@@ -537,34 +583,56 @@ export function TaskGroupedView({
 
     const groups = [...byAction.entries()].sort(([, a], [, b]) => b.length - a.length);
 
-    tableContent = groups.map(([type, items]) => {
-      const actionInfo = getActionType(items[0]!);
-      const Icon = actionInfo.icon;
-      return (
-        <div key={type}>
-          <SectionHeader
-            title={actionInfo.label}
-            count={items.length}
-            icon={<Icon className={cn('h-4 w-4', actionInfo.colorClass)} />}
-          />
-          <TaskTable items={items} {...sharedTableProps} showWorkflow />
-        </div>
-      );
-    });
+    tableContent = groups.length === 0
+      ? <EmptyState />
+      : groups.map(([type, items]) => {
+          const actionInfo = getActionType(items[0]!);
+          const Icon = actionInfo.icon;
+          return (
+            <div key={type}>
+              <SectionHeader
+                title={actionInfo.label}
+                count={items.length}
+                icon={<Icon className={cn('h-4 w-4', actionInfo.colorClass)} />}
+              />
+              <TaskTable items={items} {...sharedTableProps} showWorkflow />
+            </div>
+          );
+        });
   } else {
-    tableContent = <TaskTable items={allItems} {...sharedTableProps} showWorkflow />;
+    tableContent = allItems.length === 0
+      ? <EmptyState />
+      : <TaskTable items={allItems} {...sharedTableProps} showWorkflow />;
   }
 
   return (
     <div className="flex flex-col gap-2">
-      {selectedIds.size > 0 && (
-        <BulkActionBar
-          selectedCount={selectedIds.size}
-          onCancelRuns={handleCancelRuns}
-          onClear={() => setSelectedIds(new Set())}
-          loading={cancelling}
-        />
-      )}
+      <div className="flex items-center justify-between">
+        {selectedIds.size > 0 ? (
+          <BulkActionBar
+            selectedCount={selectedIds.size}
+            onCancelRuns={handleCancelRuns}
+            onClear={() => setSelectedIds(new Set())}
+            loading={cancelling}
+          />
+        ) : (
+          <div />
+        )}
+        {completedItems.length > 0 && (
+          <button
+            onClick={() => setHideCompleted((v) => !v)}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs transition-colors',
+              hideCompleted
+                ? 'bg-primary/10 text-primary font-medium'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+            )}
+          >
+            <EyeOff className="h-3.5 w-3.5" />
+            {hideCompleted ? `Showing active only (${completedItems.length} hidden)` : 'Hide completed'}
+          </button>
+        )}
+      </div>
       {tableContent}
     </div>
   );
