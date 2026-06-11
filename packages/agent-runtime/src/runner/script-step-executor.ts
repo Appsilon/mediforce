@@ -117,7 +117,6 @@ export class ScriptStepExecutor implements StepExecutor {
         reviewerType: 'none',
       });
 
-      const currentInstance = await instanceRepo.getById(instanceId);
       return {
         status: 'escalated',
         envelope,

@@ -264,6 +264,7 @@ export class AgentStepExecutor implements StepExecutor {
 
     // ---- Escalation/Pause (non-L3) ----
     if (runResult.status === 'escalated' || runResult.status === 'paused') {
+      const escalationStatus = runResult.status;
       await auditRepo.append({
         actorId: `agent:${pluginId}`,
         actorType: 'agent',
@@ -272,7 +273,7 @@ export class AgentStepExecutor implements StepExecutor {
         description: `Workflow step '${stepId}' escalated — reason: ${runResult.fallbackReason ?? 'unknown'}`,
         timestamp: new Date().toISOString(),
         inputSnapshot: { stepId, fallbackReason: runResult.fallbackReason ?? null },
-        outputSnapshot: { status: runResult.status },
+        outputSnapshot: { status: escalationStatus },
         basis: 'FallbackHandler: agent could not complete step autonomously',
         entityType: 'processInstance',
         entityId: instanceId,
@@ -283,7 +284,7 @@ export class AgentStepExecutor implements StepExecutor {
         reviewerType: 'none',
       });
       return {
-        status: runResult.status as StepExecutionResult['status'],
+        status: escalationStatus,
         envelope,
         appliedToWorkflow: false,
         fallbackReason: runResult.fallbackReason,
@@ -339,10 +340,9 @@ export class AgentStepExecutor implements StepExecutor {
       };
     }
 
-    // Fallback: unknown status
-    const currentInstance = await instanceRepo.getById(instanceId);
+    // Fallback: unknown status — should not reach here
     return {
-      status: (currentInstance?.status ?? 'completed') as StepExecutionResult['status'],
+      status: 'completed',
       envelope,
       appliedToWorkflow: false,
       fallbackReason: runResult.fallbackReason,

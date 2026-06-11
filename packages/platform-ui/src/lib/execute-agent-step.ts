@@ -1,9 +1,7 @@
-// Workflow-native agent step executor.
-// Reads executor type, plugin, autonomy level, and all step settings directly
-// from WorkflowStep — no separate ProcessConfig required.
-//
-// This is the WorkflowDefinition counterpart to execute-agent-step.ts (legacy ProcessConfig path).
-// Called by the auto-runner loop when the instance was created via fireWorkflow (no configName).
+// Workflow-native agent step orchestrator.
+// Builds the execution context (plugin, MCP, OAuth, secrets, identity) from the
+// WorkflowStep, then dispatches to the right StepExecutor strategy:
+// AgentStepExecutor (autonomy, review, escalation) or ScriptStepExecutor (direct).
 
 import { getPlatformServices } from './platform-services';
 import {
