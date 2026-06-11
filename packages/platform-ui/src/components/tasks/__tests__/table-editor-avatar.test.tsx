@@ -55,8 +55,9 @@ describe('deriveInitials', () => {
     expect(deriveInitials('Alice Wonderland')).toBe('AW');
   });
 
-  it('returns single initial for one-word name', () => {
-    expect(deriveInitials('Eve')).toBe('E');
+  it('returns first two chars for one-word name', () => {
+    expect(deriveInitials('Eve')).toBe('EV');
+    expect(deriveInitials('E')).toBe('E');
   });
 
   it('picks first and last word for multi-word names', () => {
