@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText, FileCode, Paperclip, RotateCcw } from 'lucide-react';
-import type { ProcessInstance, StepExecution, Step } from '@mediforce/platform-core';
+import type { ProcessInstance, StepExecution, Step, HumanTask } from '@mediforce/platform-core';
 import type { RunOutputFileEntry } from '@mediforce/platform-api/contract';
 import { AutonomyBadge } from '../agents/autonomy-badge';
 import { RetryStepButton } from './retry-step-button';
@@ -53,6 +53,8 @@ interface StepStatusPanelProps {
   outputFiles?: RunOutputFileEntry[];
   onAgentLogClick?: (stepId: string) => void;
   stepDetailBaseHref?: string;
+  /** Active human task for the current step — provides createdAt and assignedUserId for virtual rows. */
+  currentTask?: HumanTask | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -371,6 +373,29 @@ function StepConfigDetail({
   );
 }
 
+function ElapsedTimer({ startedAt }: { startedAt: string }) {
+  const [elapsed, setElapsed] = React.useState(() => Date.now() - new Date(startedAt).getTime());
+
+  React.useEffect(() => {
+    const id = setInterval(() => setElapsed(Date.now() - new Date(startedAt).getTime()), 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+
+  const totalSeconds = Math.floor(elapsed / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  let label: string;
+  if (days > 0) label = `${days}d ${hours}h`;
+  else if (hours > 0) label = `${hours}h ${minutes}m`;
+  else if (minutes > 0) label = `${minutes}m ${seconds}s`;
+  else label = `${seconds}s`;
+
+  return <span className="tabular-nums">{label}</span>;
+}
+
 function getLeftBorderClass(status: EffectiveStatus): string {
   switch (status) {
     case 'running': return 'border-l-4 border-blue-500';
@@ -392,6 +417,7 @@ export function StepStatusPanel({
   outputFiles = [],
   onAgentLogClick,
   stepDetailBaseHref,
+  currentTask,
 }: StepStatusPanelProps) {
   // Key expanded state by execution ID so loop revisits of the same step each
   // have independent expand/collapse.
@@ -441,7 +467,54 @@ export function StepStatusPanel({
                       <RetryStepButton instanceId={instance.id} stepId={item.stepId} />
                     )}
                   </div>
-                  <div className="text-xs font-mono text-muted-foreground mt-0.5">{item.stepId}</div>
+                  {(() => {
+                    const taskForStep = currentTask?.stepId === item.stepId ? currentTask : undefined;
+                    const cfg = stepConfigMap?.get(item.stepId);
+                    return (
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {taskForStep && (
+                          <>
+                            <span className="text-xs text-muted-foreground">
+                              <span className="text-muted-foreground/60 mr-1">Started</span>
+                              {format(new Date(taskForStep.createdAt), 'MMM d, HH:mm')}
+                            </span>
+                            <span className="text-muted-foreground/40">·</span>
+                            <span className="text-xs text-muted-foreground">
+                              <ElapsedTimer startedAt={taskForStep.createdAt} />
+                            </span>
+                            <span className="text-muted-foreground/40">·</span>
+                          </>
+                        )}
+                        {taskForStep?.assignedUserId ? (
+                          <ExecutedBy
+                            executedBy={taskForStep.assignedUserId}
+                            executorType={cfg?.executorType}
+                            plugin={cfg?.plugin}
+                            autonomyLevel={cfg?.autonomyLevel}
+                            runtime={cfg?.agentConfig?.runtime}
+                          />
+                        ) : cfg?.executorType === 'agent' ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                            <Bot className="h-3 w-3 shrink-0" />
+                            {cfg.plugin ? `agent:${cfg.plugin}` : 'Agent'}
+                            {cfg.autonomyLevel && <AutonomyBadge level={cfg.autonomyLevel} />}
+                          </span>
+                        ) : cfg?.executorType === 'script' ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                            <FileCode className="h-3 w-3 shrink-0" />
+                            {cfg.agentConfig?.runtime
+                              ? `${cfg.agentConfig.runtime.charAt(0).toUpperCase()}${cfg.agentConfig.runtime.slice(1)} script`
+                              : 'Script'}
+                          </span>
+                        ) : cfg ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                            <User className="h-3 w-3 shrink-0" />
+                            Human
+                          </span>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
                 </div>
               </li>
             );
@@ -543,13 +616,19 @@ export function StepStatusPanel({
                   )}
                 </div>
 
-                <div className="text-xs font-mono text-muted-foreground mt-0.5">{stepId}</div>
-
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span className="text-xs text-muted-foreground">
                     <span className="text-muted-foreground/60 mr-1">Started</span>
                     {format(new Date(latestExec.startedAt), 'MMM d, HH:mm')}
                   </span>
+                  {!latestExec.completedAt && (
+                    <>
+                      <span className="text-muted-foreground/40">·</span>
+                      <span className="text-xs text-muted-foreground">
+                        <ElapsedTimer startedAt={latestExec.startedAt} />
+                      </span>
+                    </>
+                  )}
                   {latestExec.completedAt && (
                     <>
                       <span className="text-muted-foreground/40">·</span>

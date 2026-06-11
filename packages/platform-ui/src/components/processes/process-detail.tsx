@@ -419,6 +419,7 @@ export function ProcessDetail({
             stepConfigMap={stepConfigMap}
             outputFiles={outputFiles}
             stepDetailBaseHref={runDetailHref}
+            currentTask={blockingTask}
             onAgentLogClick={(stepId: string) => {
               setAgentLogStepId(stepId);
               if (agentLogFiles.length > 0) setRightTab('agent-log');
