@@ -118,8 +118,6 @@ function IndeterminateCheckbox({
   );
 }
 
-
-
 function TH({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
     <th
@@ -140,8 +138,6 @@ function TD({ children, className }: { children?: React.ReactNode; className?: s
     </td>
   );
 }
-
-
 
 function TaskRow({
   item,
