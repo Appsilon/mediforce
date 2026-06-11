@@ -11,7 +11,6 @@ import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { queryKeys } from '@/lib/query-keys';
 import { useBulkCancelRuns } from '@/hooks/use-run-mutations';
-import { ApiError } from '@/lib/mediforce';
 import { useToast } from '@/components/command-palette/toast-provider';
 import {
   type ActionItem,
@@ -507,7 +506,7 @@ export function TaskGroupedView({
       { runIds: [...runIds] },
       {
         onError: (err) => {
-          const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Bulk cancel failed';
+          const message = err instanceof Error ? err.message : 'Bulk cancel failed';
           toast({ title: 'Bulk cancel failed', description: message, variant: 'error' });
         },
         onSettled: () => {

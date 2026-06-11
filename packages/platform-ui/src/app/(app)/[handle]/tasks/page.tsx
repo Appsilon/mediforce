@@ -82,13 +82,8 @@ export default function TasksPage() {
 
   const toggleField = React.useCallback((field: GroupByField) => {
     setGroupByFields((prev) => {
-      const next = new Set(prev);
-      if (next.has(field)) {
-        next.delete(field);
-      } else {
-        next.add(field);
-      }
-      return next;
+      if (prev.has(field)) return new Set<GroupByField>();
+      return new Set<GroupByField>([field]);
     });
   }, []);
 
