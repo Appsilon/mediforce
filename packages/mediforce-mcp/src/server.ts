@@ -84,8 +84,8 @@ server.registerTool(
       definition: z.record(z.string(), z.unknown()).describe(
         'Complete WorkflowDefinition object (name, version, steps, transitions, triggers)',
       ),
-      namespace: z.string().min(1).describe(
-        'Workspace namespace/handle where the workflow should be registered and run',
+      namespace: z.string().optional().describe(
+        'Workspace namespace/handle (auto-detected from session context if omitted)',
       ),
       triggerInput: z.record(z.string(), z.unknown()).optional().describe(
         'Optional trigger input payload (key-value pairs for triggerInput fields)',
@@ -94,7 +94,10 @@ server.registerTool(
   },
   async (args) => {
     const client = getClient();
-    const namespace = args.namespace as string;
+    const namespace = (args.namespace as string | undefined) ?? process.env.MEDIFORCE_NAMESPACE;
+    if (!namespace) {
+      return mcpText('Error: namespace not provided and MEDIFORCE_NAMESPACE env var not set.');
+    }
     const definition = args.definition as Record<string, unknown>;
     const triggerInput = args.triggerInput as Record<string, unknown> | undefined;
 
