@@ -7,8 +7,14 @@ import { cn, isBrowsableRepoUrl } from '@/lib/utils';
 import { formatDuration, formatStepName, formatCostUsd } from '@/lib/format';
 import { SandboxedHtmlIframe } from '@/components/tasks/sandboxed-html-iframe';
 
+interface StepConfigInfo {
+  executorType?: string;
+  [key: string]: unknown;
+}
+
 interface RunResultsPanelProps {
   stepExecutions: StepExecution[];
+  stepConfigMap?: Map<string, StepConfigInfo>;
 }
 
 const RESULT_KEY_LABELS: Record<string, string> = {
@@ -167,7 +173,7 @@ function findFinalAgentOutput(stepExecutions: StepExecution[]): {
   };
 }
 
-export function RunResultsPanel({ stepExecutions }: RunResultsPanelProps) {
+export function RunResultsPanel({ stepExecutions, stepConfigMap }: RunResultsPanelProps) {
   const finalOutput = React.useMemo(
     () => findFinalAgentOutput(stepExecutions),
     [stepExecutions],
@@ -176,7 +182,8 @@ export function RunResultsPanel({ stepExecutions }: RunResultsPanelProps) {
   if (!finalOutput) return null;
 
   const { stepId, output, result } = finalOutput;
-  const confidencePct = output.confidence !== null
+  const isScript = stepConfigMap?.get(stepId)?.executorType === 'script';
+  const confidencePct = !isScript && output.confidence !== null
     ? Math.round(output.confidence * 100)
     : null;
   const git = output.gitMetadata;
@@ -209,10 +216,10 @@ export function RunResultsPanel({ stepExecutions }: RunResultsPanelProps) {
               )}>{confidencePct}%</span>
             </div>
           )}
-          {output.confidence_rationale && (
+          {!isScript && output.confidence_rationale && (
             <p className="text-xs text-muted-foreground italic">{output.confidence_rationale}</p>
           )}
-          {output.model && (
+          {!isScript && output.model && (
             <div className="flex items-center gap-1.5">
               <span className="text-muted-foreground">Model:</span>
               <span className="font-mono text-xs">{output.model}</span>
