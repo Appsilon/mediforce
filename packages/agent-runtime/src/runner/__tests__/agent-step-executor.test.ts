@@ -1,13 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AgentStepExecutor } from '../agent-step-executor';
-import type { AgentRunResult } from '../agent-runner';
 import type { StepExecutorServices, StepExecutorMeta } from '../step-executor';
 import type { AgentPlugin, WorkflowAgentContext } from '../../interfaces/agent-plugin';
 import { buildAgentOutputEnvelope, buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import type { WorkflowStep } from '@mediforce/platform-core';
 
 const mockAgentRunner = {
-  runWithWorkflowStep: vi.fn<[], Promise<AgentRunResult>>(),
+  runWithWorkflowStep: vi.fn(),
 };
 
 const mockAuditRepo = { append: vi.fn() };

@@ -27,13 +27,13 @@ export interface StepExecutorServices {
 }
 
 export interface StepExecutorAuditRepo {
-  append(event: Record<string, unknown>): Promise<void>;
+  append(event: Record<string, unknown>): Promise<unknown>;
 }
 
 export interface StepExecutorInstanceRepo {
   getById(id: string): Promise<{ status: string; currentStepId: string | null; definitionVersion: string; variables: Record<string, unknown>; totalCostUsd?: number } | null>;
-  update(id: string, data: Record<string, unknown>): Promise<void>;
-  updateStepExecution(instanceId: string, executionId: string, data: Record<string, unknown>): Promise<void>;
+  update(id: string, data: Record<string, unknown>): Promise<unknown>;
+  updateStepExecution(instanceId: string, executionId: string, data: Record<string, unknown>): Promise<unknown>;
   getStepExecutions(instanceId: string): Promise<Array<{ stepId: string; output: unknown }>>;
 }
 
@@ -50,11 +50,11 @@ export interface StepExecutorEngine {
     stepId: string,
     verdict: Record<string, unknown>,
     actor: { id: string; role: string },
-  ): Promise<{ status: string; currentStepId: string | null; pauseReason?: string }>;
+  ): Promise<{ status: string; currentStepId: string | null; pauseReason?: string | null }>;
 }
 
 export interface StepExecutorHumanTaskRepo {
-  create(task: Record<string, unknown>): Promise<void>;
+  create(task: Record<string, unknown>): Promise<unknown>;
 }
 
 export interface StepExecutorModelRegistryRepo {

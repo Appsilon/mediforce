@@ -1,13 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ScriptStepExecutor } from '../script-step-executor';
-import type { PluginRunResult } from '../plugin-runner';
 import type { StepExecutorServices, StepExecutorMeta } from '../step-executor';
 import type { AgentPlugin, WorkflowAgentContext } from '../../interfaces/agent-plugin';
 import { buildStepOutputEnvelope, buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import type { WorkflowStep } from '@mediforce/platform-core';
 
 const mockPluginRunner = {
-  execute: vi.fn<[], Promise<PluginRunResult>>(),
+  execute: vi.fn(),
 };
 
 const mockAuditRepo = { append: vi.fn() };
