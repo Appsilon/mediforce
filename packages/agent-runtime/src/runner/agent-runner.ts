@@ -10,7 +10,7 @@ import {
   type WorkflowStep,
 } from '@mediforce/platform-core';
 import { randomUUID } from 'crypto';
-import type { AgentPlugin, AgentContext, WorkflowAgentContext } from '../interfaces/agent-plugin';
+import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
 import type { AgentEventLog } from './agent-event-log';
 import { FallbackHandler } from './fallback-handler';
 import { PluginRunner } from './plugin-runner';
@@ -44,7 +44,7 @@ export class AgentRunner {
    * step.autonomyLevel / step.plugin; timeout via resolveStepTimeoutMinutes.
    */
   async runWithWorkflowStep(
-    plugin: AgentPlugin,
+    plugin: StepExecutorPlugin,
     context: WorkflowAgentContext,
   ): Promise<AgentRunResult> {
     const startedAt = Date.now();
@@ -146,7 +146,7 @@ export class AgentRunner {
    * StepConfig model which is being replaced by WorkflowStep.
    */
   async run(
-    plugin: AgentPlugin,
+    plugin: StepExecutorPlugin,
     context: AgentContext,
     stepConfig: StepConfig,
   ): Promise<AgentRunResult> {

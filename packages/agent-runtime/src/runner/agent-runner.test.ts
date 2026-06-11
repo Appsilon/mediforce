@@ -7,10 +7,10 @@ import {
 import { InMemoryAgentEventLog } from '../testing/index';
 import { NoopLlmClient } from '../testing/index';
 import type {
-  AgentPlugin,
+  StepExecutorPlugin,
   AgentContext,
   EmitFn,
-} from '../interfaces/agent-plugin';
+} from '../interfaces/step-executor-plugin';
 import type {
   StepConfig,
   ProcessConfig,
@@ -66,7 +66,7 @@ function makeValidEnvelope(overrides: Partial<AgentOutputEnvelope> = {}): AgentO
 }
 
 /** Simple plugin that emits events synchronously then resolves */
-function makeSuccessPlugin(envelope: AgentOutputEnvelope): AgentPlugin {
+function makeSuccessPlugin(envelope: AgentOutputEnvelope): StepExecutorPlugin {
   return {
     initialize: async (_context: AgentContext) => {},
     run: async (emit: EmitFn) => {
@@ -85,7 +85,7 @@ function makeSuccessPlugin(envelope: AgentOutputEnvelope): AgentPlugin {
 }
 
 /** Plugin that emits status events before a slow result (for timeout test) */
-function makeSlowPlugin(delayMs: number, envelope: AgentOutputEnvelope): AgentPlugin {
+function makeSlowPlugin(delayMs: number, envelope: AgentOutputEnvelope): StepExecutorPlugin {
   return {
     initialize: async (_context: AgentContext) => {},
     run: async (emit: EmitFn) => {
@@ -105,7 +105,7 @@ function makeSlowPlugin(delayMs: number, envelope: AgentOutputEnvelope): AgentPl
 }
 
 /** Plugin that emits an invalid result payload */
-function makeInvalidEnvelopePlugin(): AgentPlugin {
+function makeInvalidEnvelopePlugin(): StepExecutorPlugin {
   return {
     initialize: async (_context: AgentContext) => {},
     run: async (emit: EmitFn) => {
@@ -119,7 +119,7 @@ function makeInvalidEnvelopePlugin(): AgentPlugin {
 }
 
 /** Plugin that emits multiple events before result */
-function makeMultiEventPlugin(envelope: AgentOutputEnvelope): AgentPlugin {
+function makeMultiEventPlugin(envelope: AgentOutputEnvelope): StepExecutorPlugin {
   return {
     initialize: async (_context: AgentContext) => {},
     run: async (emit: EmitFn) => {
@@ -383,7 +383,7 @@ describe('AgentRunner', () => {
   // --- Plugin throws a raw Error ---
 
   it('plugin throw: fallbackReason is error, instance paused with agent_escalated', async () => {
-    const plugin: AgentPlugin = {
+    const plugin: StepExecutorPlugin = {
       initialize: async () => {},
       run: async () => { throw new Error('LLM API key invalid'); },
     };
@@ -402,7 +402,7 @@ describe('AgentRunner', () => {
   });
 
   it('plugin throw: error message is captured in audit outputSnapshot', async () => {
-    const plugin: AgentPlugin = {
+    const plugin: StepExecutorPlugin = {
       initialize: async () => {},
       run: async () => { throw new Error('OpenRouter 401 Unauthorized'); },
     };
@@ -420,7 +420,7 @@ describe('AgentRunner', () => {
   });
 
   it('plugin throw after partial work: partial events preserved in event log', async () => {
-    const plugin: AgentPlugin = {
+    const plugin: StepExecutorPlugin = {
       initialize: async () => {},
       run: async (emit: EmitFn) => {
         await emit({ type: 'status', payload: 'Starting...', timestamp: new Date().toISOString() });
@@ -438,7 +438,7 @@ describe('AgentRunner', () => {
   });
 
   it('plugin throw: audit event written even when no result emitted', async () => {
-    const plugin: AgentPlugin = {
+    const plugin: StepExecutorPlugin = {
       initialize: async () => {},
       run: async () => { throw new TypeError('Cannot read properties of undefined'); },
     };

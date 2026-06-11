@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AgentStepExecutor } from '../agent-step-executor';
 import type { StepExecutorServices, StepExecutorMeta } from '../step-executor';
-import type { AgentPlugin, WorkflowAgentContext } from '../../interfaces/agent-plugin';
+import type { StepExecutorPlugin, WorkflowAgentContext } from '../../interfaces/step-executor-plugin';
 import { buildAgentOutputEnvelope, buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import type { WorkflowStep } from '@mediforce/platform-core';
 
@@ -50,7 +50,7 @@ const defaultEnvelope = buildAgentOutputEnvelope({
   result: { summary: 'analysis complete' },
 });
 
-const mockPlugin: AgentPlugin = {
+const mockPlugin: StepExecutorPlugin = {
   initialize: vi.fn(),
   run: vi.fn(),
 };

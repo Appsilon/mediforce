@@ -2,7 +2,7 @@ import {
   calculateEstimatedCost,
   type AgentOutputEnvelope,
 } from '@mediforce/platform-core';
-import type { AgentPlugin, WorkflowAgentContext } from '../interfaces/agent-plugin';
+import type { StepExecutorPlugin, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
 import type { AgentRunner, AgentRunResult } from './agent-runner';
 import type {
   StepExecutor,
@@ -15,7 +15,7 @@ export class AgentStepExecutor implements StepExecutor {
   constructor(private readonly agentRunner: AgentRunner) {}
 
   async execute(
-    plugin: AgentPlugin,
+    plugin: StepExecutorPlugin,
     context: WorkflowAgentContext,
     services: StepExecutorServices,
     meta: StepExecutorMeta,

@@ -3,7 +3,7 @@ import {
   resolveStepTimeoutMinutes,
   type StepOutputEnvelope,
 } from '@mediforce/platform-core';
-import type { AgentPlugin, WorkflowAgentContext } from '../interfaces/agent-plugin';
+import type { StepExecutorPlugin, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
 import type { PluginRunner } from './plugin-runner';
 import type {
   StepExecutor,
@@ -16,7 +16,7 @@ export class ScriptStepExecutor implements StepExecutor {
   constructor(private readonly pluginRunner: PluginRunner) {}
 
   async execute(
-    plugin: AgentPlugin,
+    plugin: StepExecutorPlugin,
     context: WorkflowAgentContext,
     services: StepExecutorServices,
     meta: StepExecutorMeta,

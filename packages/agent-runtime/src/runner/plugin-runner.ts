@@ -1,4 +1,4 @@
-import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitPayload } from '../interfaces/agent-plugin';
+import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitPayload } from '../interfaces/step-executor-plugin';
 import type { AgentEventLog } from './agent-event-log';
 
 export interface PluginRunResult {
@@ -18,7 +18,7 @@ export class PluginRunner {
   constructor(private readonly eventLog: AgentEventLog) {}
 
   async execute(
-    plugin: AgentPlugin,
+    plugin: StepExecutorPlugin,
     context: AgentContext | WorkflowAgentContext,
     timeoutMs: number,
   ): Promise<PluginRunResult> {

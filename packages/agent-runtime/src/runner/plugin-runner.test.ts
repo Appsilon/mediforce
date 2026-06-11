@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { PluginRunner } from './plugin-runner';
 import { InMemoryAgentEventLog } from '../testing/index';
-import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin';
+import type { StepExecutorPlugin, AgentContext, EmitFn } from '../interfaces/step-executor-plugin';
 import { NoopLlmClient } from '../testing/index';
 import type { ProcessConfig, AgentOutputEnvelope } from '@mediforce/platform-core';
 
@@ -41,7 +41,7 @@ function makeValidEnvelope(overrides: Partial<AgentOutputEnvelope> = {}): AgentO
   };
 }
 
-function makeSuccessPlugin(envelope: AgentOutputEnvelope): AgentPlugin {
+function makeSuccessPlugin(envelope: AgentOutputEnvelope): StepExecutorPlugin {
   return {
     initialize: async () => {},
     run: async (emit: EmitFn) => {
@@ -76,7 +76,7 @@ describe('PluginRunner', () => {
   it('returns null resultPayload when no result event emitted', async () => {
     const eventLog = new InMemoryAgentEventLog();
     const runner = new PluginRunner(eventLog);
-    const plugin: AgentPlugin = {
+    const plugin: StepExecutorPlugin = {
       initialize: async () => {},
       run: async (emit: EmitFn) => {
         await emit({
@@ -97,7 +97,7 @@ describe('PluginRunner', () => {
   it('returns timedOut: true when plugin exceeds timeout', async () => {
     const eventLog = new InMemoryAgentEventLog();
     const runner = new PluginRunner(eventLog);
-    const plugin: AgentPlugin = {
+    const plugin: StepExecutorPlugin = {
       initialize: async () => {},
       run: async () => {
         await new Promise<void>((resolve) => setTimeout(resolve, 200));
@@ -114,7 +114,7 @@ describe('PluginRunner', () => {
   it('captures error message when plugin throws', async () => {
     const eventLog = new InMemoryAgentEventLog();
     const runner = new PluginRunner(eventLog);
-    const plugin: AgentPlugin = {
+    const plugin: StepExecutorPlugin = {
       initialize: async () => {},
       run: async () => { throw new Error('API key invalid'); },
     };
@@ -129,7 +129,7 @@ describe('PluginRunner', () => {
   it('preserves partial events in event log after plugin throw', async () => {
     const eventLog = new InMemoryAgentEventLog();
     const runner = new PluginRunner(eventLog);
-    const plugin: AgentPlugin = {
+    const plugin: StepExecutorPlugin = {
       initialize: async () => {},
       run: async (emit: EmitFn) => {
         await emit({ type: 'status', payload: 'partial', timestamp: new Date().toISOString() });
@@ -147,7 +147,7 @@ describe('PluginRunner', () => {
   it('captures error when initialize() throws', async () => {
     const eventLog = new InMemoryAgentEventLog();
     const runner = new PluginRunner(eventLog);
-    const plugin: AgentPlugin = {
+    const plugin: StepExecutorPlugin = {
       initialize: async () => { throw new Error('MCP server unreachable'); },
       run: async () => {},
     };
@@ -162,7 +162,7 @@ describe('PluginRunner', () => {
   it('returns last result event when multiple result events emitted', async () => {
     const eventLog = new InMemoryAgentEventLog();
     const runner = new PluginRunner(eventLog);
-    const plugin: AgentPlugin = {
+    const plugin: StepExecutorPlugin = {
       initialize: async () => {},
       run: async (emit: EmitFn) => {
         await emit({

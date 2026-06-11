@@ -9,7 +9,7 @@ import {
   resolveOAuthToken,
   OAuthTokenUnavailableError,
   PluginNotFoundError,
-  type AgentPlugin,
+  type StepExecutorPlugin,
   type ResolvedOAuthBinding,
   type WorkflowAgentContext,
   type StepExecutorServices,
@@ -83,7 +83,7 @@ export async function executeAgentStep(
 
   // Resolve plugin: use workflowStep.plugin when set, fall back to stepId
   const pluginId = workflowStep.plugin ?? stepId;
-  let plugin: AgentPlugin;
+  let plugin: StepExecutorPlugin;
   try {
     plugin = pluginRegistry.get(pluginId);
   } catch (err) {

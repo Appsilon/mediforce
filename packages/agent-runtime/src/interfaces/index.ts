@@ -8,8 +8,8 @@ export type {
   ResolvedOAuthBinding,
   EmitPayload,
   EmitFn,
-  AgentPlugin,
-} from './agent-plugin';
+  StepExecutorPlugin,
+} from './step-executor-plugin';
 
 export type {
   ReviewPlugin,
