@@ -149,40 +149,45 @@ server.registerTool(
     },
   },
   async (args) => {
-    const client = getClient();
-    const runId = args.runId as string;
+    try {
+      const client = getClient();
+      const runId = args.runId as string;
 
-    const [run, stepsResult] = await Promise.all([
-      client.runs.get({ runId }),
-      client.processes.getSteps({ instanceId: runId }),
-    ]);
+      const [run, stepsResult] = await Promise.all([
+        client.runs.get({ runId }),
+        client.processes.getSteps({ instanceId: runId }),
+      ]);
 
-    const steps = stepsResult.steps.map((s) => ({
-      stepId: s.stepId,
-      name: s.name,
-      type: s.type,
-      executorType: s.executorType,
-      status: s.status,
-      ...(s.execution?.error ? { error: s.execution.error } : {}),
-      ...(s.execution?.startedAt && s.execution?.completedAt
-        ? {
-            durationSec: Math.round(
-              (new Date(s.execution.completedAt).getTime() -
-                new Date(s.execution.startedAt).getTime()) /
-                1000,
-            ),
-          }
-        : {}),
-    }));
+      const steps = stepsResult.steps.map((s) => ({
+        stepId: s.stepId,
+        name: s.name,
+        type: s.type,
+        executorType: s.executorType,
+        status: s.status,
+        ...(s.execution?.error ? { error: s.execution.error } : {}),
+        ...(s.execution?.startedAt && s.execution?.completedAt
+          ? {
+              durationSec: Math.round(
+                (new Date(s.execution.completedAt).getTime() -
+                  new Date(s.execution.startedAt).getTime()) /
+                  1000,
+              ),
+            }
+          : {}),
+      }));
 
-    return mcpJson({
-      runId: run.runId,
-      status: run.status,
-      currentStepId: run.currentStepId,
-      dryRun: run.dryRun,
-      error: run.error,
-      steps,
-    });
+      return mcpJson({
+        runId: run.runId,
+        status: run.status,
+        currentStepId: run.currentStepId,
+        dryRun: run.dryRun,
+        error: run.error,
+        steps,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return mcpText(`Error getting run status for '${args.runId}': ${message}`);
+    }
   },
 );
 
@@ -199,21 +204,26 @@ server.registerTool(
     },
   },
   async (args) => {
-    const client = getClient();
-    const result = await client.tasks.list({
-      instanceId: args.runId as string,
-    });
+    try {
+      const client = getClient();
+      const result = await client.tasks.list({
+        instanceId: args.runId as string,
+      });
 
-    const tasks = result.tasks.map((t) => ({
-      taskId: t.id,
-      stepId: t.stepId,
-      role: t.assignedRole,
-      status: t.status,
-      params: t.params,
-      verdicts: t.verdicts,
-    }));
+      const tasks = result.tasks.map((t) => ({
+        taskId: t.id,
+        stepId: t.stepId,
+        role: t.assignedRole,
+        status: t.status,
+        params: t.params,
+        verdicts: t.verdicts,
+      }));
 
-    return mcpJson({ runId: args.runId, tasks });
+      return mcpJson({ runId: args.runId, tasks });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return mcpText(`Error listing tasks for run '${args.runId}': ${message}`);
+    }
   },
 );
 
@@ -229,25 +239,30 @@ server.registerTool(
       '{"kind":"verdict","verdict":"approve"} for review steps, ' +
       '{"kind":"verdict-with-params","verdict":"approve","paramValues":{...}} for review+form steps.',
     inputSchema: {
-      taskId: z.string().min(1).describe('Task ID to complete'),
+      taskId: z.string().min(1).describe('Task ID to complete (UUID from list_run_tasks)'),
       payload: z.record(z.string(), z.unknown()).describe(
         'Task completion payload (must include "kind" field)',
       ),
     },
   },
   async (args) => {
-    const client = getClient();
-    const result = await client.tasks.complete({
-      taskId: args.taskId as string,
-      payload: args.payload as Parameters<typeof client.tasks.complete>[0]['payload'],
-    });
+    try {
+      const client = getClient();
+      const result = await client.tasks.complete({
+        taskId: args.taskId as string,
+        payload: args.payload as Parameters<typeof client.tasks.complete>[0]['payload'],
+      });
 
-    return mcpJson({
-      taskId: result.task.id,
-      taskStatus: result.task.status,
-      runId: result.run.id,
-      runStatus: result.run.status,
-    });
+      return mcpJson({
+        taskId: result.task.id,
+        taskStatus: result.task.status,
+        runId: result.run.id,
+        runStatus: result.run.status,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return mcpText(`Error completing task '${args.taskId}': ${message}`);
+    }
   },
 );
 
@@ -264,48 +279,53 @@ server.registerTool(
     },
   },
   async (args) => {
-    const client = getClient();
-    const runId = args.runId as string;
+    try {
+      const client = getClient();
+      const runId = args.runId as string;
 
-    const [auditResult, stepsResult] = await Promise.all([
-      client.processes.listAuditEvents({ instanceId: runId }),
-      client.processes.getSteps({ instanceId: runId }),
-    ]);
+      const [auditResult, stepsResult] = await Promise.all([
+        client.processes.listAuditEvents({ instanceId: runId }),
+        client.processes.getSteps({ instanceId: runId }),
+      ]);
 
-    const steps = stepsResult.steps.map((s) => ({
-      stepId: s.stepId,
-      name: s.name,
-      type: s.type,
-      executorType: s.executorType,
-      status: s.status,
-      input: s.input,
-      output: s.output,
-      ...(s.execution
-        ? {
-            execution: {
-              status: s.execution.status,
-              error: s.execution.error,
-              startedAt: s.execution.startedAt,
-              completedAt: s.execution.completedAt,
-              verdict: s.execution.verdict,
-            },
-          }
-        : {}),
-    }));
+      const steps = stepsResult.steps.map((s) => ({
+        stepId: s.stepId,
+        name: s.name,
+        type: s.type,
+        executorType: s.executorType,
+        status: s.status,
+        input: s.input,
+        output: s.output,
+        ...(s.execution
+          ? {
+              execution: {
+                status: s.execution.status,
+                error: s.execution.error,
+                startedAt: s.execution.startedAt,
+                completedAt: s.execution.completedAt,
+                verdict: s.execution.verdict,
+              },
+            }
+          : {}),
+      }));
 
-    const events = auditResult.events.map((e) => ({
-      timestamp: e.timestamp,
-      action: e.action,
-      description: e.description,
-    }));
+      const events = auditResult.events.map((e) => ({
+        timestamp: e.timestamp,
+        action: e.action,
+        description: e.description,
+      }));
 
-    return mcpJson({
-      runId,
-      instanceStatus: stepsResult.instanceStatus,
-      currentStepId: stepsResult.currentStepId,
-      steps,
-      auditEvents: events,
-    });
+      return mcpJson({
+        runId,
+        instanceStatus: stepsResult.instanceStatus,
+        currentStepId: stepsResult.currentStepId,
+        steps,
+        auditEvents: events,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return mcpText(`Error getting logs for run '${args.runId}': ${message}`);
+    }
   },
 );
 
