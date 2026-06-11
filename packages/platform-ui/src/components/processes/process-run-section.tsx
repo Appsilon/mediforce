@@ -5,10 +5,20 @@ import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { ChevronRight, ExternalLink } from 'lucide-react';
 import type { ProcessInstance } from '@mediforce/platform-core';
-import { StatusDot } from '@/components/ui/status-dot';
+import { getWorkflowStatus, type WorkflowDisplayStatus } from '@/lib/workflow-status';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { formatCostUsd } from '@/lib/format';
+
+function rowStatusLabel(displayStatus: WorkflowDisplayStatus): string {
+  switch (displayStatus) {
+    case 'in_progress': return 'In Progress';
+    case 'waiting_for_human': return 'Waiting for Human';
+    case 'error': return 'Error';
+    case 'completed': return 'Completed';
+    case 'cancelled': return 'Cancelled';
+  }
+}
 
 function toHumanLabel(identifier: string): string {
   return identifier
@@ -19,14 +29,14 @@ function toHumanLabel(identifier: string): string {
 function StepDots({
   steps,
   currentStepId,
-  instanceStatus,
+  displayStatus,
 }: {
   steps: string[];
   currentStepId: string | null;
-  instanceStatus: string;
+  displayStatus: WorkflowDisplayStatus;
 }) {
   if (steps.length === 0) return null;
-  const isCompleted = instanceStatus === 'completed';
+  const isCompleted = displayStatus === 'completed';
   const currentIndex = currentStepId ? steps.indexOf(currentStepId) : -1;
 
   const title = isCompleted
@@ -38,23 +48,24 @@ function StepDots({
   return (
     <div className="flex items-center gap-0.5 shrink-0" title={title}>
       {steps.map((stepId, index) => {
+        const isCurrent = index === currentIndex;
         let dotClass: string;
         if (isCompleted) {
           dotClass = 'bg-green-500/60';
         } else if (index < currentIndex) {
           dotClass = 'bg-green-500/60';
-        } else if (index === currentIndex) {
-          if (instanceStatus === 'running') dotClass = 'ring-[1.5px] ring-blue-500 bg-transparent animate-pulse';
-          else if (instanceStatus === 'paused') dotClass = 'ring-[1.5px] ring-amber-500 bg-transparent';
-          else if (instanceStatus === 'failed') dotClass = 'ring-[1.5px] ring-red-500 bg-transparent';
-          else dotClass = 'ring-[1.5px] ring-primary bg-transparent';
+        } else if (isCurrent) {
+          if (displayStatus === 'in_progress') dotClass = 'bg-blue-500 animate-pulse';
+          else if (displayStatus === 'waiting_for_human') dotClass = 'bg-amber-500';
+          else if (displayStatus === 'error' || displayStatus === 'cancelled') dotClass = 'bg-red-500';
+          else dotClass = 'bg-primary';
         } else {
           dotClass = 'bg-border';
         }
         return (
           <span
             key={stepId}
-            className={`w-1.5 h-1.5 rounded-full ${dotClass}`}
+            className={`${isCurrent ? 'w-2.5 h-2.5' : 'w-1.5 h-1.5'} rounded-full ${dotClass}`}
             title={toHumanLabel(stepId)}
           />
         );
@@ -160,23 +171,19 @@ function shortTimeAgo(date: Date): string {
 
 export function ProcessInstanceRow({ instance, showProcess = false, steps, stepStyle = 'dots', activeTaskId }: { instance: ProcessInstance; showProcess?: boolean; steps?: string[]; stepStyle?: 'dots' | 'bar'; activeTaskId?: string }) {
   const handle = useHandleFromPath();
-  const shortHash = `#${instance.id.slice(0, 6)}`;
   const timeAgo = shortTimeAgo(new Date(instance.createdAt));
   const fullTimeAgo = formatDistanceToNow(new Date(instance.createdAt), { addSuffix: true });
   const detailHref = routes.workflowRun(handle, instance.definitionName, instance.id);
   const currentStepHref = instance.currentStepId
     ? routes.workflowRunStep(handle, instance.definitionName, instance.id, instance.currentStepId)
     : null;
+  const wfStatus = getWorkflowStatus(instance);
 
   return (
     <Link
       href={detailHref}
       className="group flex items-center gap-2 px-4 py-1.5 min-h-[36px] hover:bg-muted/50 transition-colors border-b border-border/40 last:border-b-0"
     >
-      <StatusDot status={instance.status} />
-      <span className="font-mono text-xs text-muted-foreground w-[52px] shrink-0">
-        {shortHash}
-      </span>
       {showProcess && (
         <span className="text-xs text-muted-foreground truncate max-w-[120px] shrink-0">
           {toHumanLabel(instance.definitionName)}
@@ -193,34 +200,40 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
           <StepDots
             steps={steps ?? []}
             currentStepId={instance.currentStepId}
-            instanceStatus={instance.status}
+            displayStatus={wfStatus.displayStatus}
           />
-          {instance.status === 'completed' || instance.status === 'failed' ? (
-            <span className="text-xs text-muted-foreground truncate flex-1">
-              {instance.status === 'failed' ? 'Failed' : 'Completed'}
+          {wfStatus.displayStatus === 'completed' ? (
+            <span className="text-xs text-muted-foreground truncate flex-1">Completed</span>
+          ) : wfStatus.displayStatus === 'error' || wfStatus.displayStatus === 'cancelled' ? (
+            <span className="text-xs text-red-600/70 dark:text-red-400/70 truncate flex-1">
+              {rowStatusLabel(wfStatus.displayStatus)}{instance.currentStepId ? ` · ${toHumanLabel(instance.currentStepId)}` : ''}
+            </span>
+          ) : instance.currentStepId ? (
+            <span className="text-xs flex-1 inline-flex items-center gap-1.5 min-w-0 overflow-hidden">
+              <span className="text-muted-foreground shrink-0">{rowStatusLabel(wfStatus.displayStatus)}</span>
+              <span className="text-border shrink-0">·</span>
+              {activeTaskId ? (
+                <span
+                  role="link"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.location.href = currentStepHref ?? routes.task(handle, activeTaskId);
+                  }}
+                  className="inline-flex items-center gap-1 bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors truncate"
+                >
+                  {toHumanLabel(instance.currentStepId)}
+                  <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
+                </span>
+              ) : (
+                <span className="inline-flex bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium truncate">
+                  {toHumanLabel(instance.currentStepId)}
+                </span>
+              )}
             </span>
           ) : (
-            <span className="text-xs truncate flex-1">
-              {instance.currentStepId ? (
-                activeTaskId ? (
-                  <span
-                    role="link"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      window.location.href = currentStepHref ?? routes.task(handle, activeTaskId);
-                    }}
-                    className="inline-flex items-center gap-1 bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
-                  >
-                    {toHumanLabel(instance.currentStepId)}
-                    <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
-                  </span>
-                ) : (
-                  <span className="inline-flex bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium">
-                    {toHumanLabel(instance.currentStepId)}
-                  </span>
-                )
-              ) : 'Starting...'}
+            <span className="text-xs text-muted-foreground truncate flex-1">
+              {rowStatusLabel(wfStatus.displayStatus)}
             </span>
           )}
         </>
