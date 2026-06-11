@@ -51,7 +51,7 @@ export function mapApiToDefinitionGroups(
         namespace: def.namespace,
         visibility: def.visibility,
         // Public profile shows definitions only, never runs.
-        runSummary: { total: 0, active: 0, latest: [] },
+        runSummary: { total: 0, active: 0, latest: [], stepsByVersion: {} },
       };
     });
 }
