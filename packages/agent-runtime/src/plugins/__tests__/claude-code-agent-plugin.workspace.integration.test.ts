@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
-import type { EmitPayload, EmitFn, WorkflowAgentContext } from '../../interfaces/agent-plugin';
+import type { EmitPayload, EmitFn, WorkflowAgentContext } from '../../interfaces/step-executor-plugin';
 import type { AgentCommandSpec } from '../base-container-agent-plugin';
 
 type GetAgentCommandTarget = { getAgentCommand: (promptPath: string, options?: unknown) => AgentCommandSpec };

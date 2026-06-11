@@ -1,5 +1,5 @@
 import type { AgentEvent } from '@mediforce/platform-core';
-import type { EmitPayload } from '../interfaces/agent-plugin';
+import type { EmitPayload } from '../interfaces/step-executor-plugin';
 
 export interface AgentEventLog {
   write(instanceId: string, stepId: string, event: EmitPayload): Promise<void>;

@@ -9,7 +9,7 @@ export type {
   ResolvedOAuthBinding,
   EmitPayload,
   EmitFn,
-  AgentPlugin,
+  StepExecutorPlugin,
   ReviewPlugin,
   ReviewPluginContext,
   ReviewPluginResult,

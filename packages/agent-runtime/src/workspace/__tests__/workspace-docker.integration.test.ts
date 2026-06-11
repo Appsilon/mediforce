@@ -28,7 +28,7 @@ import type {
   EmitFn,
   EmitPayload,
   WorkflowAgentContext,
-} from '../../interfaces/agent-plugin';
+} from '../../interfaces/step-executor-plugin';
 
 function dockerAvailable(): boolean {
   try {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { execSync } from 'node:child_process';
-import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin';
+import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/step-executor-plugin';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { ScriptContainerPlugin } from '../script-container-plugin';
 

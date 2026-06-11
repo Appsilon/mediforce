@@ -1,7 +1,7 @@
-import type { AgentPlugin, AgentContext, EmitFn } from '@mediforce/agent-runtime';
+import type { StepExecutorPlugin, AgentContext, EmitFn } from '@mediforce/agent-runtime';
 
 /**
- * ExampleAgent: Reference implementation of AgentPlugin.
+ * ExampleAgent: Reference implementation of StepExecutorPlugin.
  *
  * Plugin pattern:
  * 1. initialize(): receive and store context (step input, config, LLM client)
@@ -13,7 +13,7 @@ import type { AgentPlugin, AgentContext, EmitFn } from '@mediforce/agent-runtime
  * Autonomy behavior is applied by AgentRunner AFTER run() completes.
  * Plugins are autonomy-agnostic — never check context.autonomyLevel.
  */
-export class ExampleAgent implements AgentPlugin {
+export class ExampleAgent implements StepExecutorPlugin {
   private context!: AgentContext;
 
   async initialize(context: AgentContext): Promise<void> {

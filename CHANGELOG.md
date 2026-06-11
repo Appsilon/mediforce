@@ -11,6 +11,13 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Changed
+- **StepExecutor strategy pattern (ADR-0008)** — agent and script steps now execute through separate `StepExecutor` strategies (`AgentStepExecutor`, `ScriptStepExecutor`) instead of a monolithic `AgentRunner` with `isScript` branches. Each strategy owns its full lifecycle (run, audit, advance/review, cost tracking). `AgentPlugin` interface renamed to `StepExecutorPlugin` to reflect that scripts and Databricks jobs are peers, not special-cased agents:
+  - `StepOutputEnvelope` base schema in platform-core [#688](https://github.com/Appsilon/mediforce/pull/688)
+  - `PluginRunner` extracted from `AgentRunner` [#691](https://github.com/Appsilon/mediforce/pull/691)
+  - `StepExecutor` interface + `AgentStepExecutor` + `ScriptStepExecutor` [#692](https://github.com/Appsilon/mediforce/pull/692)
+  - `AgentPlugin` → `StepExecutorPlugin` rename [#694](https://github.com/Appsilon/mediforce/pull/694)
+
 ## [2026-06-07]
 
 ### Added

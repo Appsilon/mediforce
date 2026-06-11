@@ -1,5 +1,5 @@
 import type { StepOutputEnvelope, AgentOutputEnvelope } from '@mediforce/platform-core';
-import type { AgentPlugin, WorkflowAgentContext } from '../interfaces/agent-plugin';
+import type { StepExecutorPlugin, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
 
 export type StepExecutionStatus = 'completed' | 'paused' | 'escalated' | 'failed';
 
@@ -63,7 +63,7 @@ export interface StepExecutorModelRegistryRepo {
 
 export interface StepExecutor {
   execute(
-    plugin: AgentPlugin,
+    plugin: StepExecutorPlugin,
     context: WorkflowAgentContext,
     services: StepExecutorServices,
     meta: StepExecutorMeta,

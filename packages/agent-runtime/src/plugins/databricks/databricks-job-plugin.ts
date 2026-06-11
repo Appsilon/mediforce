@@ -6,7 +6,7 @@ import {
   type InterpolationSources,
   type PluginCapabilityMetadata,
 } from '@mediforce/platform-core';
-import type { AgentContext, AgentPlugin, EmitFn, WorkflowAgentContext } from '../../interfaces/agent-plugin';
+import type { AgentContext, StepExecutorPlugin, EmitFn, WorkflowAgentContext } from '../../interfaces/step-executor-plugin';
 import { isWorkflowAgentContext } from '../container-plugin';
 import { DatabricksClient, isTerminalLifecycle } from './databricks-client';
 
@@ -33,7 +33,7 @@ export interface DatabricksJobPluginInit {
  * Errors fail the step (never a low-confidence result) — same rule as
  * ScriptContainerPlugin.
  */
-export class DatabricksJobPlugin implements AgentPlugin {
+export class DatabricksJobPlugin implements StepExecutorPlugin {
   readonly metadata: PluginCapabilityMetadata = {
     name: 'Databricks Job',
     description: 'Triggers an existing Databricks job via REST and waits for its result — no LLM involved.',

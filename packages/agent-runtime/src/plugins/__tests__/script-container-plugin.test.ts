@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events';
 import { Readable, Writable } from 'node:stream';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ChildProcess } from 'node:child_process';
-import type { AgentContext, WorkflowAgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin';
+import type { AgentContext, WorkflowAgentContext, EmitFn, EmitPayload } from '../../interfaces/step-executor-plugin';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { ScriptContainerPlugin } from '../script-container-plugin';

@@ -1,7 +1,7 @@
-import type { LlmMessage, LlmResponse } from '../interfaces/agent-plugin';
+import type { LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
 
 // Re-export the interface defined in interfaces/ for barrel convenience
-export type { LlmClient, LlmMessage, LlmResponse } from '../interfaces/agent-plugin';
+export type { LlmClient, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
 
 // OpenRouterLlmClient: wraps the OpenRouter API for LLM access.
 // Platform provides this to agents — agents never call OpenRouter directly.
