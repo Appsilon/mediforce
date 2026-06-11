@@ -256,7 +256,7 @@ export function ProcessDetail({
             )}
             <button
               onClick={() => {
-                if (logsOpen && rightTab !== 'diagram') {
+                if (logsOpen) {
                   setLogsOpen(false);
                 } else {
                   setRightTab(agentLogFiles.length > 0 ? 'agent-log' : 'audit');
@@ -266,7 +266,7 @@ export function ProcessDetail({
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shrink-0"
             >
               <ScrollText className="h-3.5 w-3.5" />
-              {logsOpen && rightTab !== 'diagram' ? 'Hide Execution Log' : 'Execution Log'}
+              {logsOpen ? 'Hide Execution Log' : 'Execution Log'}
             </button>
             {definition && (
               <button

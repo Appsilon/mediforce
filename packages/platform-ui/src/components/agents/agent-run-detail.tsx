@@ -72,7 +72,6 @@ function formatDuration(start: string, end: string | null): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-
 /** Render a record as flat key-value table rows (primitives) + collapsible JSON (objects/arrays) */
 function LightFormattedData({ data }: { data: Record<string, unknown> }) {
   const entries = Object.entries(data);

@@ -235,17 +235,19 @@ function VirtualRowMeta({
           <span className="text-xs text-muted-foreground">
             <ElapsedTimer startedAt={taskForStep.createdAt} />
           </span>
-          <span className="text-muted-foreground/40">·</span>
         </>
       )}
       {cfg && (
-        <ExecutedBy
-          executedBy={taskForStep?.assignedUserId ?? ''}
-          executorType={cfg.executorType}
-          plugin={cfg.plugin}
-          autonomyLevel={cfg.autonomyLevel}
-          runtime={cfg.agentConfig?.runtime}
-        />
+        <>
+          {taskForStep && <span className="text-muted-foreground/40">·</span>}
+          <ExecutedBy
+            executedBy={taskForStep?.assignedUserId ?? ''}
+            executorType={cfg.executorType}
+            plugin={cfg.plugin}
+            autonomyLevel={cfg.autonomyLevel}
+            runtime={cfg.agentConfig?.runtime}
+          />
+        </>
       )}
     </div>
   );
