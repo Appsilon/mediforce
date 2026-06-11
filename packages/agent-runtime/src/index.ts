@@ -38,6 +38,15 @@ export type { PluginRunResult } from './runner/plugin-runner';
 export { AgentRunner } from './runner/agent-runner';
 export type { AgentRunResult } from './runner/agent-runner';
 export { FallbackHandler } from './runner/fallback-handler';
+export { ScriptStepExecutor } from './runner/script-step-executor';
+export { AgentStepExecutor } from './runner/agent-step-executor';
+export type {
+  StepExecutor,
+  StepExecutionResult,
+  StepExecutionStatus,
+  StepExecutorServices,
+  StepExecutorMeta,
+} from './runner/step-executor';
 
 // Env validation
 export { validateWorkflowEnv, validateWorkflowModels, validateRetiredModels } from './plugins/resolve-env';

@@ -71,6 +71,7 @@ import {
 } from '@mediforce/workflow-engine';
 import {
   AgentRunner,
+  PluginRunner,
   PluginRegistry,
   OpenRouterLlmClient,
   ClaudeCodeAgentPlugin,
@@ -78,6 +79,8 @@ import {
   OpenCodeAgentPlugin,
   ScriptContainerPlugin,
   DatabricksJobPlugin,
+  ScriptStepExecutor,
+  AgentStepExecutor,
 } from '@mediforce/agent-runtime';
 import {
   ActionRegistry,
@@ -103,6 +106,8 @@ export interface PlatformServices {
   webhookRouter: WebhookRouter;
   actionRegistry: ActionRegistry;
   agentRunner: AgentRunner;
+  scriptStepExecutor: ScriptStepExecutor;
+  agentStepExecutor: AgentStepExecutor;
   pluginRegistry: PluginRegistry;
   llmClient: OpenRouterLlmClient;
   processRepo: ProcessRepository;
@@ -341,12 +346,17 @@ export function getPlatformServices(): PlatformServices {
     userDirectoryService,
   );
 
+  const pluginRunner = new PluginRunner(eventLog);
+
   const agentRunner = new AgentRunner(
     instanceRepo,
     auditRepo,
     eventLog,
     agentRunRepo,
   );
+
+  const scriptStepExecutor = new ScriptStepExecutor(pluginRunner);
+  const agentStepExecutor = new AgentStepExecutor(agentRunner);
 
   const manualTrigger = new ManualTrigger(engine, processRepo);
 
@@ -393,6 +403,8 @@ export function getPlatformServices(): PlatformServices {
     webhookRouter,
     actionRegistry,
     agentRunner,
+    scriptStepExecutor,
+    agentStepExecutor,
     pluginRegistry,
     llmClient,
     processRepo,
