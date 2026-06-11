@@ -97,14 +97,15 @@ export function useProcessDefinitions(includeCompletedRuns: boolean = true) {
 
   const stepsByDefinition = useMemo((): Map<string, string[]> => {
     const result = new Map<string, string[]>();
-    for (const doc of latestDocs.values()) {
+    for (const g of groups) {
+      if (g.definition === null) continue;
       result.set(
-        doc.name,
-        doc.steps.filter((step) => step.type !== 'terminal').map((step) => step.id),
+        g.name,
+        g.definition.steps.filter((step) => step.type !== 'terminal').map((step) => step.id),
       );
     }
     return result;
-  }, [latestDocs]);
+  }, [groups]);
 
   return {
     definitions,

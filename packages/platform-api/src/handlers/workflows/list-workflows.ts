@@ -30,18 +30,32 @@ export async function listWorkflows(
   const summaries: WorkflowDefinitionGroupSummary[] = await Promise.all(
     inScope.map(async (group) => {
       const latest = group.versions.find((v) => v.version === group.latestVersion) ?? null;
-      const runSummary = await scope.runs.summarizeRuns(
+      const rawSummary = await scope.runs.summarizeRuns(
         group.namespace,
         group.name,
         input.includeCompletedRuns,
       );
+
+      const stepsByVersion: Record<string, string[]> = {};
+      for (const instance of rawSummary.latest) {
+        const key = String(instance.definitionVersion);
+        if (!(key in stepsByVersion)) {
+          const def = group.versions.find((v) => v.version === instance.definitionVersion);
+          if (def) {
+            stepsByVersion[key] = def.steps
+              .filter((s) => s.type !== 'terminal')
+              .map((s) => s.id);
+          }
+        }
+      }
+
       return {
         namespace: group.namespace,
         name: group.name,
         latestVersion: group.latestVersion,
         defaultVersion: group.defaultVersion,
         definition: latest,
-        runSummary,
+        runSummary: { ...rawSummary, stepsByVersion },
       };
     }),
   );

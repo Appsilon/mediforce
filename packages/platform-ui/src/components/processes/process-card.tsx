@@ -206,7 +206,7 @@ export function ProcessCard({
               <ProcessInstanceRow
                 key={instance.id}
                 instance={instance}
-                steps={steps}
+                steps={runSummary.stepsByVersion[String(instance.definitionVersion)] ?? steps}
                 activeTaskId={activeTaskByInstance.get(instance.id)}
               />
             ))}
