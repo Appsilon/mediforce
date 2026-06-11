@@ -487,11 +487,9 @@ export function ProcessDetail({
             <AuditLogTab events={auditEvents} loading={auditEventsLoading} error={auditEventsError} />
           </div>
 
-          <div className={cn('flex-1 min-h-0 relative', rightTab !== 'diagram' && 'hidden')}>
+          <div className={cn('flex-1 min-h-0 overflow-y-auto', rightTab !== 'diagram' && 'hidden')}>
             {definition && rightTab === 'diagram' && (
-              <div className="absolute inset-0">
-                <WorkflowDiagram definition={definition} className="h-full w-full" />
-              </div>
+              <WorkflowDiagram definition={definition} className="w-full" />
             )}
           </div>
         </div>
