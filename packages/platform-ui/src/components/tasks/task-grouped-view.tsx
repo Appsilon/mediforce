@@ -11,6 +11,8 @@ import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { queryKeys } from '@/lib/query-keys';
 import { useBulkCancelRuns } from '@/hooks/use-run-mutations';
+import { ApiError } from '@/lib/mediforce';
+import { useToast } from '@/components/command-palette/toast-provider';
 import {
   type ActionItem,
   getActionType,
@@ -455,6 +457,7 @@ export function TaskGroupedView({
   const userNames = useUserDisplayNames(handle);
   const qc = useQueryClient();
   const cancelMutation = useBulkCancelRuns();
+  const { toast } = useToast();
   const groupByProcess = groupByFields.has('process');
   const groupByAction = groupByFields.has('action');
 
@@ -503,13 +506,17 @@ export function TaskGroupedView({
     cancelMutation.mutate(
       { runIds: [...runIds] },
       {
+        onError: (err) => {
+          const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Bulk cancel failed';
+          toast({ title: 'Bulk cancel failed', description: message, variant: 'error' });
+        },
         onSettled: () => {
           void qc.invalidateQueries({ queryKey: queryKeys.tasks.all() });
           setSelectedIds(new Set());
         },
       },
     );
-  }, [selectedIds, itemById, cancelMutation, qc]);
+  }, [selectedIds, itemById, cancelMutation, qc, toast]);
 
   const sharedTableProps: Omit<TaskTableProps, 'items' | 'showWorkflow'> = {
     selectedIds,
