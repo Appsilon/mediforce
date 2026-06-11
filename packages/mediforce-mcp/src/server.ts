@@ -223,14 +223,16 @@ server.registerTool(
         instanceId: args.runId as string,
       });
 
-      const tasks = result.tasks.map((t) => ({
-        taskId: t.id,
-        stepId: t.stepId,
-        role: t.assignedRole,
-        status: t.status,
-        params: t.params,
-        verdicts: t.verdicts,
-      }));
+      const tasks = result.tasks
+        .filter((t) => t.status === 'pending' || t.status === 'claimed')
+        .map((t) => ({
+          taskId: t.id,
+          stepId: t.stepId,
+          role: t.assignedRole,
+          status: t.status,
+          params: t.params,
+          verdicts: t.verdicts,
+        }));
 
       return mcpJson({ runId: args.runId, tasks });
     } catch (err) {
