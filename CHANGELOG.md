@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Changed
+- Added a reusable markdown-to-PDF renderer for research docs with four print styles (`github-raw`, `print-memo`, `editorial`, `technical-brief`) under `docs/research/`, and locally ignored generated `rendered-pdfs/` artifacts to keep review exports out of git.
 - **StepExecutor strategy pattern (ADR-0008)** — agent and script steps now execute through separate `StepExecutor` strategies (`AgentStepExecutor`, `ScriptStepExecutor`) instead of a monolithic `AgentRunner` with `isScript` branches. Each strategy owns its full lifecycle (run, audit, advance/review, cost tracking). `AgentPlugin` interface renamed to `StepExecutorPlugin` to reflect that scripts and Databricks jobs are peers, not special-cased agents:
   - `StepOutputEnvelope` base schema in platform-core [#688](https://github.com/Appsilon/mediforce/pull/688)
   - `PluginRunner` extracted from `AgentRunner` [#691](https://github.com/Appsilon/mediforce/pull/691)
