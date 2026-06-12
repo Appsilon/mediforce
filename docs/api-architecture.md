@@ -82,8 +82,7 @@ Handler stays one file. New consumers wrap it from outside.
   — Mutation handler contract: error envelope, typed `ApiError`, HTTP
   status mapping, response shape, Server Action policy, audit-bridge.
 - [`docs/headless-migration.md`](./headless-migration.md)
-  — Living phased plan executing the separation. Gets deleted when the
-  migration completes; ADRs persist.
+  — Historical record; migration concluded in PR #534 (2026-05-31). ADRs persist.
 
 ## Adapter responsibilities, in detail
 
