@@ -8,6 +8,8 @@ const IMAGES: DockerImageInfo[] = [
   { repository: 'python', tag: '3.11-slim', id: 'def', size: '200MB', created: '2w ago' },
 ];
 
+const BASE_CTX = { handle: 'acme', workflowName: 'my-wf' };
+
 function makeDefinition(overrides?: { image?: string; env?: Record<string, string> }) {
   const wd = buildWorkflowDefinition({ name: 'test-wf' });
   wd.steps[0].executor = 'script';
@@ -19,50 +21,73 @@ function makeDefinition(overrides?: { image?: string; env?: Record<string, strin
 describe('runPreflightChecks', () => {
   it('returns no warnings when image exists and no secrets referenced', () => {
     const wd = makeDefinition({ image: 'python:3.11-slim' });
-    const result = runPreflightChecks(wd, { dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
+    const result = runPreflightChecks(wd, { ...BASE_CTX, dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
     expect(result).toEqual([]);
   });
 
-  it('warns about missing Docker image grouped by resource', () => {
+  it('warns about missing Docker image with actionable paths', () => {
     const wd = makeDefinition({ image: 'mediforce/nonexistent:v1' });
-    const result = runPreflightChecks(wd, { dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
+    const result = runPreflightChecks(wd, { ...BASE_CTX, dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
-      category: 'missing-image',
-      resource: 'mediforce/nonexistent:v1',
-      stepNames: [wd.steps[0].name],
-      hint: expect.stringContaining('build source'),
+    const w = result[0];
+    expect(w.category).toBe('missing-image');
+    expect(w.resource).toBe('mediforce/nonexistent:v1');
+    expect(w.stepNames).toEqual([wd.steps[0].name]);
+    const labels = w.actions.map((a) => a.label);
+    expect(labels).toContain('Configure build source');
+    expect(labels).toContain('Build manually');
+    expect(labels).not.toContain('Contact admin');
+  });
+
+  it('includes Contact admin action when adminEmail provided', () => {
+    const wd = makeDefinition({ image: 'bad:v1' });
+    const result = runPreflightChecks(wd, {
+      ...BASE_CTX,
+      dockerImages: IMAGES,
+      dockerAvailable: true,
+      secretKeys: [],
+      adminEmail: 'admin@acme.test',
     });
+    const w = result[0];
+    const adminAction = w.actions.find((a) => a.label === 'Contact admin');
+    expect(adminAction?.href).toBe('mailto:admin@acme.test');
+  });
+
+  it('Configure build source href points to workflow editor', () => {
+    const wd = makeDefinition({ image: 'bad:v1' });
+    const result = runPreflightChecks(wd, { ...BASE_CTX, dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
+    const action = result[0].actions.find((a) => a.label === 'Configure build source');
+    expect(action?.href).toBe('/acme/workflows/my-wf');
   });
 
   it('skips image warning when repo + commit configured (engine auto-builds)', () => {
     const wd = makeDefinition({ image: 'mediforce/nonexistent:v1' });
     wd.steps[0].script = { ...wd.steps[0].script, repo: 'git@github.com:org/repo.git', commit: 'abc1234' };
-    const result = runPreflightChecks(wd, { dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
+    const result = runPreflightChecks(wd, { ...BASE_CTX, dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
     expect(result.filter((w) => w.category === 'missing-image')).toEqual([]);
   });
 
   it('skips image check when docker unavailable', () => {
     const wd = makeDefinition({ image: 'mediforce/nonexistent:v1' });
-    const result = runPreflightChecks(wd, { dockerAvailable: false, secretKeys: [] });
+    const result = runPreflightChecks(wd, { ...BASE_CTX, dockerAvailable: false, secretKeys: [] });
     expect(result).toEqual([]);
   });
 
-  it('warns about missing secret grouped by key', () => {
+  it('warns about missing secret with Secrets panel link', () => {
     const wd = makeDefinition({ env: { API_KEY: '{{MY_SECRET}}' } });
-    const result = runPreflightChecks(wd, { dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
+    const result = runPreflightChecks(wd, { ...BASE_CTX, dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
-      category: 'missing-secret',
-      resource: 'MY_SECRET',
-      stepNames: [wd.steps[0].name],
-      hint: expect.stringContaining('Secrets panel'),
-    });
+    const w = result[0];
+    expect(w.category).toBe('missing-secret');
+    expect(w.resource).toBe('MY_SECRET');
+    expect(w.stepNames).toEqual([wd.steps[0].name]);
+    const action = w.actions.find((a) => a.label === 'Configure in Secrets panel');
+    expect(action?.href).toContain('?tab=secrets&setup=MY_SECRET');
   });
 
   it('no warning when secret is configured', () => {
     const wd = makeDefinition({ env: { API_KEY: '{{MY_SECRET}}' } });
-    const result = runPreflightChecks(wd, { dockerImages: IMAGES, dockerAvailable: true, secretKeys: ['MY_SECRET'] });
+    const result = runPreflightChecks(wd, { ...BASE_CTX, dockerImages: IMAGES, dockerAvailable: true, secretKeys: ['MY_SECRET'] });
     expect(result.filter((w) => w.category === 'missing-secret')).toEqual([]);
   });
 
@@ -77,7 +102,7 @@ describe('runPreflightChecks', () => {
       reviewStep.agent = { image: 'bad:v1' };
       reviewStep.env = { KEY: '{{SHARED_SECRET}}' };
     }
-    const result = runPreflightChecks(wd, { dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
+    const result = runPreflightChecks(wd, { ...BASE_CTX, dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
     const imageWarning = result.find((w) => w.category === 'missing-image');
     const secretWarning = result.find((w) => w.category === 'missing-secret');
     expect(imageWarning?.stepNames.length).toBeGreaterThanOrEqual(2);
@@ -86,7 +111,7 @@ describe('runPreflightChecks', () => {
 
   it('detects both missing image and missing secret', () => {
     const wd = makeDefinition({ image: 'bad:v1', env: { KEY: '{{MISSING}}' } });
-    const result = runPreflightChecks(wd, { dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
+    const result = runPreflightChecks(wd, { ...BASE_CTX, dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
     const categories = result.map((w) => w.category);
     expect(categories).toContain('missing-image');
     expect(categories).toContain('missing-secret');
@@ -96,7 +121,7 @@ describe('runPreflightChecks', () => {
     const wd = buildWorkflowDefinition({ name: 'test-wf' });
     wd.steps[0].executor = 'human';
     wd.steps[0].env = { KEY: '{{SECRET}}' };
-    const result = runPreflightChecks(wd, { dockerAvailable: true, secretKeys: [] });
+    const result = runPreflightChecks(wd, { ...BASE_CTX, dockerAvailable: true, secretKeys: [] });
     expect(result).toEqual([]);
   });
 });

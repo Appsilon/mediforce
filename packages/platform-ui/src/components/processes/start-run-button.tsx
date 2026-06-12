@@ -14,6 +14,7 @@ import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { useOpenRouterCredits } from '@/hooks/use-openrouter-credits';
+import { useNamespaceAdminContact } from '@/hooks/use-namespace-admin-contact';
 import { runPreflightChecks, type PreflightWarning } from '@/lib/preflight-checks';
 import { ParamField } from '@/components/ui/param-field';
 import type { TriggerInputField } from '@mediforce/platform-core';
@@ -39,6 +40,7 @@ export function StartRunButton({
   const { versions: definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowVersions(workflowName, handle);
   const { images: dockerImages, isAvailable: dockerAvailable, isLoading: dockerLoading } = useDockerImages();
   const openRouterCredits = useOpenRouterCredits();
+  const adminContact = useNamespaceAdminContact(handle);
   const [starting, setStarting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const startMutation = useStartRun();
@@ -126,10 +128,13 @@ export function StartRunButton({
         available: openRouterCredits.available,
         remaining: openRouterCredits.remaining,
       },
+      handle,
+      workflowName,
+      adminEmail: adminContact.email ?? undefined,
     });
-  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining]);
+  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining, handle, workflowName, adminContact.email]);
 
-  const preflightLoading = dockerLoading || secretKeysLoading || openRouterCredits.isLoading;
+  const preflightLoading = dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading;
   const hasWarnings = warnings.length > 0;
   const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
 
@@ -465,7 +470,21 @@ function WarningGroup({ title, warnings }: { title: string; warnings: PreflightW
               <div>
                 <p className="font-mono font-medium">{w.message || w.resource}</p>
                 <p className="text-muted-foreground mt-0.5">Used by: {formatStepList(w.stepNames)}</p>
-                <p className="text-muted-foreground/70 mt-0.5">{w.hint}</p>
+                {w.actions.length > 0 && (
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                    {w.actions.map((action) => (
+                      <a
+                        key={action.label}
+                        href={action.href}
+                        target={action.href.startsWith('mailto:') || action.href.startsWith('/') ? undefined : '_blank'}
+                        rel={action.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                        className="text-primary hover:underline"
+                      >
+                        {action.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </li>
