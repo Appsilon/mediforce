@@ -262,6 +262,46 @@ Key-value secrets visible to all workflows in a Namespace. Resolved via
 Secrets scoped to one Workflow Definition. Wins over Namespace Secret if
 same key exists (precedence).
 
+### Evaluation domain
+
+*(Layered model and system-of-record split defined in
+[ADR-0007](docs/adr/0007-llm-evaluation-observability.md). Score / Eval
+Dataset / Eval Run are reserved canonical names; their detailed design is
+deliberately deferred until tracing ships.)*
+
+**Trace**:
+The telemetry record of one Agent Run's execution — a tree of spans (LLM
+calls, tool invocations) carrying model, token, latency and correlation
+attributes. Lives in an external, per-deployment trace store — **not** a
+platform entity. Whether prompt/completion content is included is a
+per-deployment switch (off by default in production).
+_Avoid_: confusing with **Agent Event** (transient runtime emission,
+discarded after the envelope is built) and **Audit Event** (the compliance
+ledger). A Trace is operational telemetry.
+
+**Score**:
+An external quality judgment attached to one Agent Run or one Workflow Run
+(polymorphic subject). Three sources: deterministic check, LLM-as-judge,
+human review. The unit of evaluation is the **Agent Run**; Workflow-Run-level
+Scores arise only from production monitoring (e.g. a final human verdict) —
+offline replay of whole workflows is explicitly out of scope.
+_Avoid_: confusing with `AgentOutputEnvelope.confidence` — confidence is the
+agent's **self-assessment**, a Score is an **external judgment**. Also avoid
+"evaluation" for a single judgment (an evaluation is a process; a Score is
+one data point).
+
+**Eval Dataset** *(reserved; design deferred)*:
+A curated set of golden / regression cases (input → accepted output) frozen
+from selected production Agent Runs. Namespace-scoped platform entity.
+_Avoid_: "Dataset" alone (collides with generic data-engineering usage),
+"Benchmark" (implies public/academic suites).
+
+**Eval Run** *(reserved; design deferred)*:
+One execution of an Eval Dataset against a configuration (model, prompt,
+agent variant), producing Scores and a champion-vs-challenger comparison.
+Platform entity; fits the existing Run family (Workflow Run, Agent Run).
+_Avoid_: "Experiment" (vague, collides with nothing but explains nothing).
+
 ### Audit / observability
 
 **Audit Event**:

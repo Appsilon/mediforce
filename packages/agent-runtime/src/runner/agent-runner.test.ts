@@ -1,21 +1,26 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AgentRunner } from './agent-runner';
 import {
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
+  type WorkflowStep,
 } from '@mediforce/platform-core';
+import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { InMemoryAgentEventLog } from '../testing/index';
 import { NoopLlmClient } from '../testing/index';
 import type {
   StepExecutorPlugin,
   AgentContext,
   EmitFn,
+  WorkflowAgentContext,
 } from '../interfaces/step-executor-plugin';
 import type {
   StepConfig,
   ProcessConfig,
   AgentOutputEnvelope,
 } from '@mediforce/platform-core';
+import { trace } from '@opentelemetry/api';
+import { RecordingTracerProvider } from '../testing/index';
 
 // --- Test helpers ---
 
@@ -48,6 +53,39 @@ function makeStepConfig(overrides: Partial<StepConfig> = {}): StepConfig {
     executorType: 'agent',
     plugin: 'test-plugin',
     model: 'anthropic/claude-sonnet-4',
+    ...overrides,
+  };
+}
+
+function makeWorkflowContext(overrides: Partial<WorkflowAgentContext> = {}): WorkflowAgentContext {
+  const step: WorkflowStep = {
+    id: 'step-1',
+    name: 'Review output',
+    type: 'review',
+    executor: 'agent',
+    plugin: 'test-plugin',
+    agent: {
+      model: 'anthropic/claude-sonnet-4',
+    },
+  };
+
+  return {
+    stepId: 'step-1',
+    processInstanceId: 'instance-1',
+    runNamespace: 'acme-trials',
+    definitionVersion: '7',
+    stepInput: { patientId: 'P001' },
+    autonomyLevel: 'L4',
+    workflowDefinition: buildWorkflowDefinition({
+      name: 'Protocol Review',
+      version: 7,
+      namespace: 'acme-trials',
+      steps: [step],
+      transitions: [],
+    }),
+    step,
+    llm: new NoopLlmClient(),
+    getPreviousStepOutputs: async () => ({}),
     ...overrides,
   };
 }
@@ -181,6 +219,10 @@ describe('AgentRunner', () => {
     await createTestInstance(instanceRepository);
   });
 
+  afterEach(() => {
+    trace.disable();
+  });
+
   // --- Test 1: Successful L4 (Autopilot) run ---
   it('L4 Autopilot: completes run, applies to workflow, appends audit event', async () => {
     const envelope = makeValidEnvelope();
@@ -199,6 +241,65 @@ describe('AgentRunner', () => {
     const audits = auditRepository.getAll();
     expect(audits).toHaveLength(1);
     expect(audits[0].actorType).toBe('agent');
+  });
+
+  it('runWithWorkflowStep emits an OpenTelemetry root span with workflow correlation attributes', async () => {
+    const tracerProvider = new RecordingTracerProvider();
+    trace.setGlobalTracerProvider(tracerProvider);
+
+    const envelope = makeValidEnvelope();
+    const plugin = makeSuccessPlugin(envelope);
+    const context = makeWorkflowContext();
+
+    const result = await runner.runWithWorkflowStep(plugin, context);
+
+    expect(result.status).toBe('completed');
+
+    const span = tracerProvider.spans[0];
+    expect(span.name).toBe('mediforce.agent.run');
+    expect(span.attributes['mediforce.agent_run.id']).toEqual(expect.any(String));
+    expect(span.attributes['mediforce.process_instance.id']).toBe('instance-1');
+    expect(span.attributes['mediforce.namespace']).toBe('acme-trials');
+    expect(span.attributes['mediforce.workflow.name']).toBe('Protocol Review');
+    expect(span.attributes['mediforce.workflow.version']).toBe(7);
+    expect(span.attributes['mediforce.workflow.step_id']).toBe('step-1');
+    expect(span.attributes['gen_ai.request.model']).toBe('anthropic/claude-sonnet-4');
+    expect(span.attributes['openinference.span.kind']).toBe('AGENT');
+    expect(span.ended).toBe(true);
+  });
+
+  it('does not record run input/output on the span by default (content capture off)', async () => {
+    const tracerProvider = new RecordingTracerProvider();
+    trace.setGlobalTracerProvider(tracerProvider);
+
+    const plugin = makeSuccessPlugin(makeValidEnvelope());
+    await runner.runWithWorkflowStep(plugin, makeWorkflowContext());
+
+    const span = tracerProvider.spans[0];
+    expect(span.attributes['input.value']).toBeUndefined();
+    expect(span.attributes['output.value']).toBeUndefined();
+  });
+
+  it('records run input/output on the span when content capture is enabled', async () => {
+    const tracerProvider = new RecordingTracerProvider();
+    trace.setGlobalTracerProvider(tracerProvider);
+
+    const capturingRunner = new AgentRunner(
+      instanceRepository,
+      auditRepository,
+      eventLog,
+      undefined,
+      { captureContent: true },
+    );
+    const plugin = makeSuccessPlugin(makeValidEnvelope());
+    await capturingRunner.runWithWorkflowStep(plugin, makeWorkflowContext());
+
+    const span = tracerProvider.spans[0];
+    expect(span.attributes['input.value']).toBe(JSON.stringify({ patientId: 'P001' }));
+    expect(span.attributes['output.value']).toBe(
+      JSON.stringify({ recommendation: 'continue_monitoring' }),
+    );
+    expect(span.attributes['output.mime_type']).toBe('application/json');
   });
 
   // --- Test 2: L0 (Silent Observer) — output not surfaced ---
