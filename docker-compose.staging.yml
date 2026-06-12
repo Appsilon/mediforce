@@ -28,7 +28,7 @@ services:
     restart: unless-stopped
     mem_limit: ${PHOENIX_MEM_LIMIT:-512m}
     ports:
-      - "6006:6006"
+      - "127.0.0.1:6006:6006"
     environment:
       - PHOENIX_WORKING_DIR=/mnt/data
     volumes:
