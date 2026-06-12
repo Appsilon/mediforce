@@ -501,7 +501,17 @@ export function StepStatusPanel({
                 </div>
                 <div className="pb-1 min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium">{item.step?.name ?? item.stepId}</span>
+                    {stepDetailBaseHref ? (
+                      <Link
+                        href={`${stepDetailBaseHref}/steps/${encodeURIComponent(item.stepId)}`}
+                        className="text-sm font-medium text-primary hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {item.step?.name ?? item.stepId}
+                      </Link>
+                    ) : (
+                      <span className="text-sm font-medium">{item.step?.name ?? item.stepId}</span>
+                    )}
                     {item.step && <TypeBadge type={item.step.type} executorType={stepConfigMap?.get(item.stepId)?.executorType} />}
                     <StatusLabel status={status} />
                     {wfStatus.isRetryable && instance.currentStepId === item.stepId && (

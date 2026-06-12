@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import * as Popover from '@radix-ui/react-popover';
-import { GitBranch, Plus, Layers, ExternalLink, SlidersHorizontal, Check, ChevronRight } from 'lucide-react';
+import { GitBranch, Plus, Layers, ExternalLink, SlidersHorizontal, Check, Settings } from 'lucide-react';
 import { ProcessInstanceRow } from '@/components/processes/process-run-section';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { formatStepName } from '@/lib/format';
@@ -168,7 +168,7 @@ export function ProcessCard({
               </div>
             </div>
           </div>
-          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <Settings className="h-4 w-4 text-muted-foreground shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" />
         </Link>
         {isMember && (
         <div className="flex items-center justify-between px-4 pb-3">
