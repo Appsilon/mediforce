@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { MockClaudeCodeAgentPlugin } from '../mock-claude-code-agent-plugin';
-import type { EmitPayload, WorkflowAgentContext } from '../../interfaces/agent-plugin';
+import type { EmitPayload, WorkflowAgentContext } from '../../interfaces/step-executor-plugin';
 
 describe('MockClaudeCodeAgentPlugin', () => {
   it('[DATA] emits deterministic output without step.agent config', async () => {

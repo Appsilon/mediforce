@@ -1,6 +1,6 @@
 import type { AgentEvent } from '@mediforce/platform-core';
 import type { AgentEventLog } from '../runner/agent-event-log';
-import type { EmitPayload } from '../interfaces/agent-plugin';
+import type { EmitPayload } from '../interfaces/step-executor-plugin';
 
 export class InMemoryAgentEventLog implements AgentEventLog {
   private events: AgentEvent[] = [];

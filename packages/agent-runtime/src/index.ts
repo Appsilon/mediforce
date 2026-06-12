@@ -9,7 +9,7 @@ export type {
   ResolvedOAuthBinding,
   EmitPayload,
   EmitFn,
-  AgentPlugin,
+  StepExecutorPlugin,
   ReviewPlugin,
   ReviewPluginContext,
   ReviewPluginResult,
@@ -33,9 +33,20 @@ export type { DockerSpawnStrategy, DockerSpawnRequest, DockerSpawnResult } from 
 export type { AgentEventLog } from './runner/agent-event-log';
 export { PluginRegistry, PluginNotFoundError } from './runner/plugin-registry';
 export { OpenRouterLlmClient } from './runner/llm-client';
+export { PluginRunner } from './runner/plugin-runner';
+export type { PluginRunResult } from './runner/plugin-runner';
 export { AgentRunner } from './runner/agent-runner';
 export type { AgentRunResult } from './runner/agent-runner';
 export { FallbackHandler } from './runner/fallback-handler';
+export { ScriptStepExecutor } from './runner/script-step-executor';
+export { AgentStepExecutor } from './runner/agent-step-executor';
+export type {
+  StepExecutor,
+  StepExecutionResult,
+  StepExecutionStatus,
+  StepExecutorServices,
+  StepExecutorMeta,
+} from './runner/step-executor';
 
 // Env validation
 export { validateWorkflowEnv, validateWorkflowModels, validateRetiredModels } from './plugins/resolve-env';

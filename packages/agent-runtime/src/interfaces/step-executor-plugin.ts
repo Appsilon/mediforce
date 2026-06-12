@@ -108,7 +108,7 @@ export interface WorkflowAgentContext {
 export type EmitPayload = Omit<AgentEvent, 'id' | 'sequence' | 'processInstanceId' | 'stepId'>;
 export type EmitFn = (event: EmitPayload) => Promise<void>;
 
-export interface AgentPlugin {
+export interface StepExecutorPlugin {
   metadata?: PluginCapabilityMetadata;
   initialize(context: AgentContext | WorkflowAgentContext): Promise<void>;
   run(emit: EmitFn): Promise<void>;

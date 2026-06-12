@@ -41,7 +41,7 @@ export async function chatCoworkSession(
   scope: CallerScope,
 ): Promise<ChatCoworkSessionOutput> {
   const ctx = await loadChatContext(input.sessionId, scope);
-  const mcp = await connectMcp(ctx.session);
+  const mcp = await connectMcp(ctx.session, ctx.namespace);
   try {
     await addTurn(scope, input.sessionId, humanTurn(input.message));
     const reloaded = await loadOr404(
@@ -74,6 +74,7 @@ interface ChatContext {
   readonly openRouterKey: string;
   readonly stepContext: Record<string, unknown> | undefined;
   readonly model: string;
+  readonly namespace: string;
 }
 
 async function loadChatContext(
@@ -117,6 +118,7 @@ async function loadChatContext(
     openRouterKey,
     stepContext: instance.variables as Record<string, unknown> | undefined,
     model: session.model ?? DEFAULT_MODEL,
+    namespace,
   };
 }
 
@@ -125,9 +127,13 @@ interface McpHandle {
   readonly tools: McpToolDefinition[];
 }
 
-async function connectMcp(session: CoworkSession): Promise<McpHandle | null> {
+async function connectMcp(session: CoworkSession, namespace: string): Promise<McpHandle | null> {
   if (!session.mcpServers || session.mcpServers.length === 0) return null;
-  const manager = new McpClientManager(session.mcpServers);
+  const serversWithNamespace = session.mcpServers.map((s) => ({
+    ...s,
+    env: { ...s.env, MEDIFORCE_NAMESPACE: namespace },
+  }));
+  const manager = new McpClientManager(serversWithNamespace);
   try {
     const tools = await manager.connect();
     return { manager, tools };
@@ -166,6 +172,7 @@ function toolRunningTurn(
   toolName: string,
   serverName: string,
   toolArgs: Record<string, unknown>,
+  toolCallId?: string,
 ): ConversationTurn {
   return {
     id: crypto.randomUUID(),
@@ -177,6 +184,7 @@ function toolRunningTurn(
     toolArgs,
     toolStatus: 'running',
     serverName,
+    ...(toolCallId !== undefined ? { toolCallId } : {}),
   };
 }
 
@@ -237,7 +245,7 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
     );
 
     for (const call of artifactCalls) {
-      const turn = toolRunningTurn('update_artifact', '_builtin', {});
+      const turn = toolRunningTurn('update_artifact', '_builtin', {}, call.id);
       await addTurn(scope, ctx.session.id, turn);
 
       const parsed = applyArtifactUpdate(call);
@@ -272,7 +280,7 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
     }
 
     for (const call of presentationCalls) {
-      const turn = toolRunningTurn('update_presentation', '_builtin', {});
+      const turn = toolRunningTurn('update_presentation', '_builtin', {}, call.id);
       await addTurn(scope, ctx.session.id, turn);
 
       const html = applyPresentationUpdate(call);
@@ -348,7 +356,7 @@ async function executeMcpTool(
   const serverName = sep > 0 ? toolName.slice(0, sep) : 'unknown';
   const toolArgs = parseToolArgs(call.function.arguments);
 
-  const turn = toolRunningTurn(toolName, serverName, toolArgs);
+  const turn = toolRunningTurn(toolName, serverName, toolArgs, call.id);
   await scope.coworkSessions.addTurn(sessionId, turn);
 
   const result = await mcp.manager.callTool(toolName, toolArgs);

@@ -16,7 +16,7 @@ End-to-end flow for clicking through the run-scoped git workspace in the UI, wit
 python3 packages/platform-ui/scripts/bootstrap_e2e.py
 ```
 
-Starts Firebase Auth (9099) + Firestore (8080), writes `.env.local` with demo creds, installs Playwright chromium and ffmpeg if missing. Idempotent — safe to re-run.
+Starts Firebase Auth (9099), writes `.env.local` with demo creds, installs Playwright chromium and ffmpeg if missing. Idempotent — safe to re-run.
 
 ### 2. Seed demo data
 
@@ -24,7 +24,7 @@ Starts Firebase Auth (9099) + Firestore (8080), writes `.env.local` with demo cr
 pnpm seed
 ```
 
-Seeds the test user + workflow definitions into the emulator Firestore. Includes the **Sales CSV Report** workflow — a two-step pipeline that exercises the workspace (generates `data/sales.csv`, summarises to `report/summary.md`).
+Seeds the test user into Firebase Auth emulator and workflow definitions into Postgres. Includes the **Sales CSV Report** workflow — a two-step pipeline that exercises the workspace (generates `data/sales.csv`, summarises to `report/summary.md`).
 
 Credentials: `test@mediforce.dev` / `test123456`
 
@@ -65,7 +65,7 @@ The bare repo holds one `run/<runId>` branch per trigger, each with three commit
 Emulator data + workspace state are independent.
 
 ```bash
-# Reset emulator Firestore + re-seed
+# Reset Auth emulator + re-seed
 cd packages/platform-ui && pnpm seed:dev
 
 # Wipe workspace state

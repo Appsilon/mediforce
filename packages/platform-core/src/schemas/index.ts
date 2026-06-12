@@ -81,11 +81,13 @@ export {
 export {
   AnnotationSchema,
   GitMetadataSchema,
+  StepOutputEnvelopeSchema,
   AgentOutputEnvelopeSchema,
   TokenUsageSchema,
   type Annotation,
   type GitMetadata,
   type TokenUsage,
+  type StepOutputEnvelope,
   type AgentOutputEnvelope,
 } from './agent-output-envelope';
 

@@ -12,7 +12,7 @@ import type { PluginCapabilityMetadata, WorkflowDefinition, WorkflowStep, Workfl
 import { WorkspaceManager, type RunWorkspaceHandle } from '../workspace-manager';
 import { copyOutputFilesIntoWorkspace } from '../output-files';
 import { ContainerPlugin, type CommitRunWorkspaceOptions, type WorkspaceManagerLike } from '../../plugins/container-plugin';
-import type { AgentContext, WorkflowAgentContext, EmitFn } from '../../interfaces/agent-plugin';
+import type { AgentContext, WorkflowAgentContext, EmitFn } from '../../interfaces/step-executor-plugin';
 import type { GitMetadata } from '@mediforce/platform-core';
 
 const MAX_BYTES_ENV = 'MEDIFORCE_OUTPUT_FILE_MAX_BYTES';

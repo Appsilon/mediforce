@@ -362,7 +362,7 @@ export function ProcessDetail({
 
         {/* Results */}
         {instance.status === 'completed' && (
-          <RunResultsPanel stepExecutions={stepExecutions} />
+          <RunResultsPanel stepExecutions={stepExecutions} stepConfigMap={stepConfigMap} />
         )}
 
         {/* Output Files — hidden until the run has at least one */}

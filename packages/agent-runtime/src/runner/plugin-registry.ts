@@ -1,5 +1,5 @@
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
-import type { AgentPlugin } from '../interfaces/agent-plugin';
+import type { StepExecutorPlugin } from '../interfaces/step-executor-plugin';
 
 export class PluginNotFoundError extends Error {
   override name = 'PluginNotFoundError';
@@ -10,16 +10,16 @@ export class PluginNotFoundError extends Error {
 }
 
 export class PluginRegistry {
-  private plugins = new Map<string, AgentPlugin>();
+  private plugins = new Map<string, StepExecutorPlugin>();
 
-  register(name: string, plugin: AgentPlugin): void {
+  register(name: string, plugin: StepExecutorPlugin): void {
     if (this.plugins.has(name)) {
       throw new Error(`Plugin "${name}" is already registered. Duplicate registration is not allowed.`);
     }
     this.plugins.set(name, plugin);
   }
 
-  get(name: string): AgentPlugin {
+  get(name: string): StepExecutorPlugin {
     const plugin = this.plugins.get(name);
     if (!plugin) throw new PluginNotFoundError(name);
     return plugin;

@@ -8,6 +8,11 @@ export async function register(): Promise<void> {
     // Edge runtime build never parses it. See instrumentation-node.ts.
     const { validateEnv } = await import('./instrumentation-node');
     validateEnv(existsSync);
+
+    // OTel trace export (ADR-0007) — no-op unless OTEL_EXPORTER_OTLP_ENDPOINT
+    // is set. See instrumentation-otel.ts.
+    const { initOpenTelemetry } = await import('./instrumentation-otel');
+    await initOpenTelemetry();
   }
 }
 

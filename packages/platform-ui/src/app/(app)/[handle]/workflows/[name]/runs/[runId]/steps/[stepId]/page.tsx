@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { format } from 'date-fns';
 import { CheckCircle2, Clock, XCircle, Circle, Pause, Bot, User, ExternalLink, FileText, GitBranch, Gauge, ChevronDown, ChevronRight, MessageSquare, DollarSign } from 'lucide-react';
-import type { StepExecution, Step, AgentEvent, HumanTask } from '@mediforce/platform-core';
+import type { StepExecution, Step, AgentEvent, HumanTask, WorkflowStep } from '@mediforce/platform-core';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { useStepExecutions } from '@/hooks/use-step-executions';
 import { useAgentEvents } from '@/hooks/use-agent-events';
@@ -63,6 +63,11 @@ export default function StepDetailPage() {
   const definitionStep = useMemo((): Step | null => {
     return definition?.steps?.find((s) => s.id === decodedStepId) ?? null;
   }, [definition, decodedStepId]);
+
+  const executorType = useMemo(() => {
+    if (!definitionStep) return undefined;
+    return (definitionStep as unknown as WorkflowStep).executor;
+  }, [definitionStep]);
 
   // Find previous step name for the "From:" label
   const previousStepName = useMemo(() => {
@@ -233,7 +238,7 @@ export default function StepDetailPage() {
                   previousStepName={previousStepName}
                   promptEvent={promptEvent}
                 />
-                <OutputColumn execution={execution} />
+                <OutputColumn execution={execution} executorType={executorType} />
               </div>
             </Collapsible.Content>
           </Collapsible.Root>
@@ -244,7 +249,7 @@ export default function StepDetailPage() {
               previousStepName={previousStepName}
               promptEvent={promptEvent}
             />
-            <OutputColumn execution={execution} />
+            <OutputColumn execution={execution} executorType={executorType} />
           </div>
         )
       ) : (
@@ -331,7 +336,7 @@ function CollapsiblePrompt({ prompt }: { prompt: unknown }) {
 
 // ── Output Column ───────────────────────────────────────────────────────────
 
-function OutputColumn({ execution }: { execution: StepExecution }) {
+function OutputColumn({ execution, executorType }: { execution: StepExecution; executorType?: string }) {
   const agentOutput = execution.agentOutput;
   const hasAgent = agentOutput !== undefined;
   const output = execution.output;
@@ -348,7 +353,7 @@ function OutputColumn({ execution }: { execution: StepExecution }) {
         ) : (
           <div className="divide-y">
             {hasAgent && agentOutput && (
-              <AgentMetadataSection agentOutput={agentOutput} />
+              <AgentMetadataSection agentOutput={agentOutput} executorType={executorType} />
             )}
 
             {hasAgent && agentOutput?.gitMetadata && (
@@ -367,8 +372,9 @@ function OutputColumn({ execution }: { execution: StepExecution }) {
 
 // ── Agent Metadata ──────────────────────────────────────────────────────────
 
-function AgentMetadataSection({ agentOutput }: { agentOutput: NonNullable<StepExecution['agentOutput']> }) {
-  const confidencePct = agentOutput.confidence !== null
+function AgentMetadataSection({ agentOutput, executorType }: { agentOutput: NonNullable<StepExecution['agentOutput']>; executorType?: string }) {
+  const isScript = executorType === 'script';
+  const confidencePct = !isScript && agentOutput.confidence !== null
     ? Math.round(agentOutput.confidence * 100)
     : null;
 
@@ -391,7 +397,7 @@ function AgentMetadataSection({ agentOutput }: { agentOutput: NonNullable<StepEx
             )}>{confidencePct}%</span>
           </div>
         )}
-        {agentOutput.model && (
+        {!isScript && agentOutput.model && (
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground">Model:</span>
             <span className="font-mono text-xs">{agentOutput.model}</span>
@@ -418,7 +424,7 @@ function AgentMetadataSection({ agentOutput }: { agentOutput: NonNullable<StepEx
           </div>
         )}
       </div>
-      {agentOutput.confidence_rationale && (
+      {!isScript && agentOutput.confidence_rationale && (
         <p className="text-xs text-muted-foreground italic">{agentOutput.confidence_rationale}</p>
       )}
       {agentOutput.reasoning && (
