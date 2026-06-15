@@ -1,6 +1,10 @@
 #!/bin/bash
-export JAVA_HOME=/opt/homebrew/Cellar/openjdk@21/21.0.10/libexec/openjdk.jdk/Contents/Home
-export PATH="$JAVA_HOME/bin:$PATH"
+# Resolve Java home from homebrew without hardcoding the patch version.
+BREW_OPENJDK="$(brew --prefix openjdk@21 2>/dev/null)"
+if [ -n "$BREW_OPENJDK" ] && [ -d "$BREW_OPENJDK/libexec/openjdk.jdk/Contents/Home" ]; then
+  export JAVA_HOME="$BREW_OPENJDK/libexec/openjdk.jdk/Contents/Home"
+  export PATH="$JAVA_HOME/bin:$PATH"
+fi
 
 PORTS=(9099 9199 4000)
 blocked=()

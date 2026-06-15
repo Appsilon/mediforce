@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Added
+- The "Before you start" pre-flight dialog now shows actionable resolution paths per warning instead of a static hint: missing-image warnings link to "Configure build source" (workflow editor), "Build manually" (Docker setup tutorial), and "Contact admin" (mailto: to the namespace owner); missing-secret warnings deep-link directly to the Secrets panel for the affected key. Backed by a new `GET /api/namespaces/:handle/admin-contact` endpoint that resolves the earliest owner's email [#312](https://github.com/Appsilon/mediforce/pull/312).
+
 ### Changed
 - **StepExecutor strategy pattern (ADR-0008)** — agent and script steps now execute through separate `StepExecutor` strategies (`AgentStepExecutor`, `ScriptStepExecutor`) instead of a monolithic `AgentRunner` with `isScript` branches. Each strategy owns its full lifecycle (run, audit, advance/review, cost tracking). `AgentPlugin` interface renamed to `StepExecutorPlugin` to reflect that scripts and Databricks jobs are peers, not special-cased agents:
   - `StepOutputEnvelope` base schema in platform-core [#688](https://github.com/Appsilon/mediforce/pull/688)

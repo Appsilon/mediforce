@@ -1,12 +1,17 @@
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 
+export interface PreflightAction {
+  label: string;
+  href: string;
+}
+
 export interface PreflightWarning {
   category: 'missing-image' | 'missing-secret' | 'low-credits';
   resource: string;
   stepNames: string[];
   message: string;
-  hint: string;
+  actions: PreflightAction[];
 }
 
 const TEMPLATE_RE = /^\{\{(?:[A-Z]+:)?([A-Za-z0-9_-]+)\}\}$/;
@@ -17,6 +22,9 @@ export interface OpenRouterCreditsInfo {
 }
 
 const LOW_CREDITS_THRESHOLD = 0.5;
+const DOCKER_TUTORIAL_URL =
+  'https://github.com/Appsilon/mediforce/blob/main/docs/how-to/docker-image-setup.md';
+const OPENROUTER_CREDITS_URL = 'https://openrouter.ai/settings/credits';
 
 export function runPreflightChecks(
   definition: WorkflowDefinition,
@@ -26,6 +34,10 @@ export function runPreflightChecks(
     secretKeys?: string[];
     namespaceSecretKeys?: string[];
     openRouterCredits?: OpenRouterCreditsInfo;
+    handle: string;
+    workflowName: string;
+    version?: number;
+    adminEmail?: string;
   },
 ): PreflightWarning[] {
   const imageMap = new Map<string, string[]>();
@@ -77,14 +89,30 @@ export function runPreflightChecks(
   }
 
   const warnings: PreflightWarning[] = [];
+  const encodedName = encodeURIComponent(options.workflowName);
 
   for (const [image, stepNames] of imageMap) {
+    const actions: PreflightAction[] = [
+      {
+        label: 'Configure build source',
+        href: options.version !== undefined
+          ? `/${options.handle}/workflows/${encodedName}/definitions/${options.version}`
+          : `/${options.handle}/workflows/${encodedName}`,
+      },
+      {
+        label: 'Build manually',
+        href: DOCKER_TUTORIAL_URL,
+      },
+    ];
+    if (typeof options.adminEmail === 'string' && options.adminEmail.length > 0) {
+      actions.push({ label: 'Contact admin', href: `mailto:${options.adminEmail}` });
+    }
     warnings.push({
       category: 'missing-image',
       resource: image,
       stepNames,
       message: `Image '${image}' not found on platform`,
-      hint: 'Configure a build source (repo + commit) on this step, or contact your admin.',
+      actions,
     });
   }
 
@@ -94,7 +122,12 @@ export function runPreflightChecks(
       resource: key,
       stepNames,
       message: `Secret '${key}' not configured (referenced as ${envVar})`,
-      hint: 'Add this secret in workspace settings (shared) or the workflow Secrets panel (per-workflow).',
+      actions: [
+        {
+          label: 'Configure in Secrets panel',
+          href: `/${options.handle}/workflows/${encodedName}?tab=secrets&setup=${encodeURIComponent(key)}`,
+        },
+      ],
     });
   }
 
@@ -111,7 +144,9 @@ export function runPreflightChecks(
         message: remaining <= 0
           ? 'OpenRouter credits exhausted ($0.00 remaining)'
           : `OpenRouter credits low ($${remaining.toFixed(2)} remaining)`,
-        hint: 'Top up credits at https://openrouter.ai/settings/credits or the run will fail.',
+        actions: [
+          { label: 'Top up credits', href: OPENROUTER_CREDITS_URL },
+        ],
       });
     }
   }

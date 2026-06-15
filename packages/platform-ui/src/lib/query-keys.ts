@@ -97,6 +97,7 @@ export const queryKeys = {
   },
   /** Single-namespace detail (members + metadata). */
   namespace: (handle: string) => ['namespace', handle] as const,
+  namespaceMembers: (handle: string) => ['namespace-members', handle] as const,
   agentRuns: {
     /** Prefix matcher — `['agent-runs']` invalidates every list slice. */
     all: () => ['agent-runs'] as const,
