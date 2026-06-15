@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-06-14]
+
 ### Added
 - The "Before you start" pre-flight dialog now shows actionable resolution paths per warning instead of a static hint: missing-image warnings link to "Configure build source" (workflow editor), "Build manually" (Docker setup tutorial), and "Contact admin" (mailto: to the namespace owner); missing-secret warnings deep-link directly to the Secrets panel for the affected key. Backed by a new `GET /api/namespaces/:handle/admin-contact` endpoint that resolves the earliest owner's email [#312](https://github.com/Appsilon/mediforce/pull/312).
 
