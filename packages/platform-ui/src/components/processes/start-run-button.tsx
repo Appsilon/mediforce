@@ -130,6 +130,7 @@ export function StartRunButton({
       },
       handle,
       workflowName,
+      version: preflightVersion ?? undefined,
       adminEmail: adminContact.email ?? undefined,
     });
   }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining, handle, workflowName, adminContact.email]);

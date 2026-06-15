@@ -36,6 +36,7 @@ export function runPreflightChecks(
     openRouterCredits?: OpenRouterCreditsInfo;
     handle: string;
     workflowName: string;
+    version?: number;
     adminEmail?: string;
   },
 ): PreflightWarning[] {
@@ -94,7 +95,9 @@ export function runPreflightChecks(
     const actions: PreflightAction[] = [
       {
         label: 'Configure build source',
-        href: `/${options.handle}/workflows/${encodedName}`,
+        href: options.version !== undefined
+          ? `/${options.handle}/workflows/${encodedName}/definitions/${options.version}`
+          : `/${options.handle}/workflows/${encodedName}`,
       },
       {
         label: 'Build manually',

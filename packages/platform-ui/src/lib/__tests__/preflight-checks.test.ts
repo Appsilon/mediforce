@@ -8,7 +8,7 @@ const IMAGES: DockerImageInfo[] = [
   { repository: 'python', tag: '3.11-slim', id: 'def', size: '200MB', created: '2w ago' },
 ];
 
-const BASE_CTX = { handle: 'acme', workflowName: 'my-wf' };
+const BASE_CTX = { handle: 'acme', workflowName: 'my-wf', version: 3 };
 
 function makeDefinition(overrides?: { image?: string; env?: Record<string, string> }) {
   const wd = buildWorkflowDefinition({ name: 'test-wf' });
@@ -53,9 +53,16 @@ describe('runPreflightChecks', () => {
     expect(adminAction?.href).toBe('mailto:admin@acme.test');
   });
 
-  it('Configure build source href points to workflow editor', () => {
+  it('Configure build source href deep-links to definition editor', () => {
     const wd = makeDefinition({ image: 'bad:v1' });
     const result = runPreflightChecks(wd, { ...BASE_CTX, dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
+    const action = result[0].actions.find((a) => a.label === 'Configure build source');
+    expect(action?.href).toBe('/acme/workflows/my-wf/definitions/3');
+  });
+
+  it('Configure build source falls back to workflow page when version unknown', () => {
+    const wd = makeDefinition({ image: 'bad:v1' });
+    const result = runPreflightChecks(wd, { handle: 'acme', workflowName: 'my-wf', dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
     const action = result[0].actions.find((a) => a.label === 'Configure build source');
     expect(action?.href).toBe('/acme/workflows/my-wf');
   });
