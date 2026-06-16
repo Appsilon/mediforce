@@ -19,7 +19,7 @@ function normaliseModelId(raw: string): string {
 }
 
 export function useModelValidation(
-  definition: WorkflowDefinition | undefined,
+  definition: WorkflowDefinition | null | undefined,
 ): ModelValidationResult {
   const [unknown, setUnknown] = React.useState<UnknownModelEntry[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
