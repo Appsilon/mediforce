@@ -56,7 +56,7 @@ export function StartRunButton({
 
   const effectiveVersion = version ?? hookEffectiveVersion;
   const preflightVersion = pendingVersion ?? effectiveVersion;
-  const { definition: effectiveDefinition } = useWorkflowVersion(
+  const { definition: effectiveDefinition, loading: definitionLoading } = useWorkflowVersion(
     workflowName,
     handle,
     preflightVersion,
@@ -138,7 +138,7 @@ export function StartRunButton({
     });
   }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining, handle, workflowName, adminContact.email, modelValidation.isLoading, modelValidation.unknown]);
 
-  const preflightLoading = dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading || modelValidation.isLoading;
+  const preflightLoading = definitionLoading || dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading || modelValidation.isLoading;
   const hasWarnings = warnings.length > 0;
   const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
 
@@ -214,7 +214,8 @@ export function StartRunButton({
   }
 
   function handleStart(v?: number) {
-    if (hasTriggerInput || hasWarnings) {
+    const versionChanged = v !== undefined && v !== effectiveVersion;
+    if (hasTriggerInput || hasWarnings || versionChanged) {
       setPendingVersion(v);
       setDialogOpen(true);
     } else {

@@ -111,12 +111,7 @@ export interface UnknownModel {
   steps: Array<{ stepId: string; stepName: string }>;
 }
 
-/** Normalise Firestore-encoded model IDs ("a__b" → "a/b"). */
-function normaliseModelId(raw: string): string {
-  if (raw.includes('/')) return raw;
-  const idx = raw.indexOf('__');
-  return idx < 0 ? raw : `${raw.slice(0, idx)}/${raw.slice(idx + 2)}`;
-}
+import { normaliseModelId } from '@mediforce/platform-core';
 
 /**
  * Validate that every agent step's model exists in the model registry.

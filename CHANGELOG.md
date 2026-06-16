@@ -11,6 +11,13 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Added
+- Pre-flight model validation: agent steps with unknown model IDs show an "Unknown model" warning (with Levenshtein-based "did you mean?" suggestions) in the start-run dialog before the run begins.
+
+### Fixed
+- Start-run dialog: selecting a different workflow version from the dropdown no longer skips pre-flight checks — the dialog now waits for the new version's definition and validation to load before allowing start.
+- Extracted `normaliseModelId` to `platform-core` — was duplicated 5 times across 3 packages.
+
 ## [2026-06-14]
 
 ### Added

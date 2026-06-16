@@ -1,21 +1,15 @@
 import * as React from 'react';
-import { apiFetch } from '@/lib/api-fetch';
+import { normaliseModelId } from '@mediforce/platform-core';
+import type { ValidateModelsOutput } from '@mediforce/platform-api/contract';
+import { mediforce } from '@/lib/mediforce';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 
-interface UnknownModelEntry {
-  id: string;
-  suggestion: string | null;
-}
+type UnknownModelEntry = ValidateModelsOutput['unknown'][number];
 
 interface ModelValidationResult {
   unknown: UnknownModelEntry[];
   isLoading: boolean;
-}
-
-function normaliseModelId(raw: string): string {
-  if (raw.includes('/')) return raw;
-  const idx = raw.indexOf('__');
-  return idx < 0 ? raw : `${raw.slice(0, idx)}/${raw.slice(idx + 2)}`;
+  error: Error | null;
 }
 
 export function useModelValidation(
@@ -23,6 +17,7 @@ export function useModelValidation(
 ): ModelValidationResult {
   const [unknown, setUnknown] = React.useState<UnknownModelEntry[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState<Error | null>(null);
 
   const modelIds = React.useMemo(() => {
     if (!definition) return [];
@@ -44,31 +39,30 @@ export function useModelValidation(
     if (modelIds.length === 0) {
       setUnknown([]);
       setIsLoading(false);
+      setError(null);
       return;
     }
 
     let cancelled = false;
     setIsLoading(true);
+    setError(null);
 
-    apiFetch('/api/model-registry/validate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ modelIds }),
-    })
-      .then((res) => res.json())
+    mediforce.models.validate({ modelIds })
       .then((data) => {
         if (cancelled) return;
         setUnknown(data.unknown ?? []);
         setIsLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return;
+        console.error('[useModelValidation] validation failed:', err);
+        setError(err instanceof Error ? err : new Error('Model validation failed'));
         setUnknown([]);
         setIsLoading(false);
       });
 
     return () => { cancelled = true; };
-  }, [cacheKey]);
+  }, [cacheKey, modelIds]);
 
-  return { unknown, isLoading };
+  return { unknown, isLoading, error };
 }

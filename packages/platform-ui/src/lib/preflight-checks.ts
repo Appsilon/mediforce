@@ -1,5 +1,5 @@
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
-import type { WorkflowDefinition } from '@mediforce/platform-core';
+import { type WorkflowDefinition, normaliseModelId } from '@mediforce/platform-core';
 
 export interface PreflightAction {
   label: string;
@@ -19,12 +19,6 @@ const TEMPLATE_RE = /^\{\{(?:[A-Z]+:)?([A-Za-z0-9_-]+)\}\}$/;
 export interface OpenRouterCreditsInfo {
   available: boolean;
   remaining: number;
-}
-
-function normaliseModelId(raw: string): string {
-  if (raw.includes('/')) return raw;
-  const idx = raw.indexOf('__');
-  return idx < 0 ? raw : `${raw.slice(0, idx)}/${raw.slice(idx + 2)}`;
 }
 
 const LOW_CREDITS_THRESHOLD = 0.5;

@@ -1,4 +1,4 @@
-import type { ModelRegistryRepository } from '@mediforce/platform-core';
+import { type ModelRegistryRepository, normaliseModelId } from '@mediforce/platform-core';
 import type { ValidateModelsInput, ValidateModelsOutput } from '../../contract/models';
 
 export interface ValidateModelsDeps {
@@ -19,12 +19,6 @@ function levenshtein(a: string, b: string): number {
     }
   }
   return dp[m][n];
-}
-
-function normaliseModelId(raw: string): string {
-  if (raw.includes('/')) return raw;
-  const idx = raw.indexOf('__');
-  return idx < 0 ? raw : `${raw.slice(0, idx)}/${raw.slice(idx + 2)}`;
 }
 
 function findSuggestion(unknownId: string, knownIds: string[]): string | null {
