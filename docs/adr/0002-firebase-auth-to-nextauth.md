@@ -5,7 +5,7 @@
 - **Authors:** Marek Rogala (@marekrogala)
 - **Reviewers:** Filip Stachura (@filipstachura), Paweł Przytuła (@przytu1)
 - **Depends on:** [ADR-0001](./0001-firestore-to-postgres.md) (Postgres + Drizzle is the adapter target)
-- **Coordinates with:** [ADR-0004](./0004-scoped-data-access-authorization.md) (the `CallerIdentity` and session resolver this ADR defines feed the caller-set repository base from ADR-0004) and the headless migration's Phase 4 typed `apiClient` (the browser `Mediforce` client's `bearerToken` callback flips from `auth.currentUser.getIdToken()` to a NextAuth session resolver — `await getSession()` — when this ADR lands; tracked in [`docs/headless-migration.md`](../headless-migration.md))
+- **Coordinates with:** [ADR-0004](./0004-scoped-data-access-authorization.md) (the `CallerIdentity` this ADR resolves feeds the caller-set repository base from ADR-0004 — the carrier change is orthogonal to that shape, as [ADR-0005](./0005-headless-platform-api-ui-separation.md) already noted) and the headless Phase 1–4 auth boundary (`proxy.ts` + `lib/api-auth.ts`). The browser `Mediforce` client / `apiFetch` **stop attaching an `Authorization` header for same-origin `/api/*` calls** — the NextAuth httpOnly session cookie rides automatically (see §6). Tracked in [`docs/headless-migration.md`](../headless-migration.md).
 - **Implementation plan:** [PLAN-0002.md](./PLAN-0002.md)
 
 ## Context
@@ -20,7 +20,21 @@ Google's identity layer.
 Today's auth surface in Mediforce:
 
 - Browser sign-in via `firebase/auth` SDK: Google OAuth popup + email/password.
-- Server-side ID-token verification in `packages/platform-ui/src/middleware.ts`.
+- **Two-stage server-side ID-token verification** (the headless Phase 1–4
+  boundary — there is no `middleware.ts`):
+  1. `packages/platform-ui/src/proxy.ts` (`matcher: '/api/:path*'`) — coarse
+     gate accepting **either** `X-Api-Key` (`hasValidApiKey`, server-to-server)
+     **or** `Authorization: Bearer <Firebase ID token>`
+     (`hasValidFirebaseToken`, verified via `jose` + Firebase JWKS). Proves the
+     caller is authenticated, not what they may touch.
+  2. `packages/platform-ui/src/lib/api-auth.ts` (`resolveCallerIdentity`) —
+     per-route, re-verifies the Bearer via Admin SDK `verifyIdToken`, then
+     loads workspace memberships from Postgres into `CallerIdentity`.
+- The browser is today **just another Bearer client**: `lib/firebase-id-token.ts`
+  → `lib/mediforce.ts` / `lib/api-fetch.ts` attach `auth.currentUser.getIdToken()`.
+  This Bearer-in-browser shape is a Firebase-SDK artifact (client-first token
+  minting), not a deliberate architectural goal; this ADR returns the browser
+  to the standard same-origin cookie model (§6).
 - Admin SDK `getAuth()` server-side for invites and user directory.
 - **Custom claims** carry two distinct concepts: `role: 'admin'` (deployment
   superuser) and `roles: string[]` (process-domain functional roles).
@@ -85,12 +99,33 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
      `workspace_members.membership` (renamed from today's `members.role`
      to remove the naming collision with process-domain roles).
 
-6. **Middleware.** `hasValidFirebaseToken()` in
-   `packages/platform-ui/src/middleware.ts` is removed. Browser requests
-   carry NextAuth's `authjs.session-token` httpOnly cookie; the middleware
-   resolves the user via `await auth()`. `hasValidApiKey()` (the
-   `PLATFORM_API_KEY` path for CLI / cron) **stays untouched** — out of
-   scope of this ADR.
+6. **Auth boundary — cookie for the browser, key/token for machines.**
+   The carrier splits cleanly by client kind, which is the industry-standard
+   shape for a same-origin Next.js app whose `/api/*` routes are also consumed
+   by non-browser clients (browser → cookie session; CLI / agents / MCP →
+   API key or PAT). Concretely:
+
+   - `hasValidFirebaseToken()` in `proxy.ts` is **replaced** by a NextAuth
+     session-cookie check (`auth()` / session-token lookup). The browser
+     carries NextAuth's `authjs.session-token` httpOnly cookie; no
+     `Authorization` header on same-origin `/api/*` calls.
+   - `hasValidApiKey()` in `proxy.ts` (the `PLATFORM_API_KEY` path, and the
+     per-user PATs from #376) **stays untouched** — out of scope of this ADR.
+   - `lib/api-auth.ts` `resolveCallerIdentity` resolves `uid` from the
+     NextAuth session instead of `verifyIdToken(Bearer)`; the
+     membership-load-into-`CallerIdentity` tail is unchanged.
+   - `lib/firebase-id-token.ts`, and the `Authorization`-attaching paths in
+     `lib/mediforce.ts` / `lib/api-fetch.ts`, are deleted — the same-origin
+     cookie rides automatically.
+
+   **Same-origin assumption (decision 2026-06-16).** The target post-Firebase
+   deployment is a single self-hosted Next.js server (one origin for UI + API);
+   cookie sessions are the natural fit. The current `proxy.ts` CORS allowlist
+   + `*.hosted.app` pattern is a Firebase Hosting artifact that retires with
+   the Firebase exit. If a real cross-origin front (separate mobile / partner
+   SPA) ever lands, reconcile then via a same-site reverse proxy (preferred)
+   or `SameSite=None; Secure` cookies + a strict CORS allowlist — not by
+   reverting the browser to Bearer.
 
 7. **Existing-user migration.** Google users migrate **seamlessly**: a
    Python script seeds them into `auth_users` keyed by email; the first
@@ -180,5 +215,14 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
   this stays a supported option, not "demo only".
 - Session strategy `database` vs `jwt` — confirm `database` for revocation
   and audit.
-- Cutover sequencing — confirm ADR-0001 lands first, then ADR-0002, not
-  bundled.
+
+### Resolved during the 2026-06-16 grilling
+
+- **Auth carrier (browser → API).** Resolved: cookie-native, same-origin
+  (decision §6). The browser uses the NextAuth httpOnly session cookie;
+  machines keep `X-Api-Key` / PAT. Reconciled with the headless `proxy.ts`
+  + `api-auth.ts` boundary that did not exist when this ADR was drafted.
+- **Cutover sequencing.** Moot: ADR-0001 already landed (Postgres cutover
+  completed 2026-05-31, PR #534). Mediforce now runs on Postgres + Firebase
+  Auth — exactly the stable hybrid this ADR's §8 assumed. ADR-0002 is the
+  next cutover; no bundling question remains.
