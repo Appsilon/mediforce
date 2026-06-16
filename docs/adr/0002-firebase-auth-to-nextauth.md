@@ -127,14 +127,26 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
    or `SameSite=None; Secure` cookies + a strict CORS allowlist — not by
    reverting the browser to Bearer.
 
-7. **Existing-user migration.** Google users migrate **seamlessly**: a
-   Python script seeds them into `auth_users` keyed by email; the first
-   NextAuth Google sign-in matches the pre-seeded row, links the account,
-   and they're in. **Password users do not have their hashes migrated** —
-   Firebase password hashes are not exportable in any form NextAuth can
-   accept. Active production users are mostly Google; the few password
-   accounts are internal/testing and re-enroll via the magic-link or
-   password provider (whichever the deployment has enabled).
+7. **Existing-user migration — none required (decision 2026-06-16).** There
+   are **no production deployments** at cutover time. The only Firebase Auth
+   users that exist are dev / staging / demo accounts, which are disposable
+   and re-enroll by signing in fresh (the NextAuth drizzle-adapter creates
+   the `auth_users` row on first sign-in). Consequently:
+
+   - `auth_users.id` is a fresh adapter-generated `uuid` (idiomatic NextAuth /
+     `@auth/drizzle-adapter`). No need to preserve Firebase uids, because no
+     immutable audit trail or production reference graph exists to keep
+     consistent. (Had production data existed, the safer path would have been
+     to keep the Firebase uid as a `text` id — mirroring the
+     `process_instance_id` "stay text, no convert" precedent — to avoid
+     rewriting `audit_events.actor_id`. Not our situation.)
+   - The bulk user-migration script (firebase_uid → uuid mapping + reference
+     rewrite across `workspace_members` / `audit_events` / `human_tasks` / …)
+     is **dropped**. Nothing to migrate.
+
+   _Pre-2026-06-16 draft assumed a seamless Google-user pre-seed + password
+   re-enroll. Superseded: with zero production users there is nobody to
+   pre-seed._
 
 8. **Cutover.** **Sequential after ADR-0001**, not bundled. ADR-0001 lands
    first; mediforce runs on Postgres + Firebase Auth for a stable interval
