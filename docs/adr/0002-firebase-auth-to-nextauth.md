@@ -127,26 +127,31 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
    or `SameSite=None; Secure` cookies + a strict CORS allowlist — not by
    reverting the browser to Bearer.
 
-7. **Existing-user migration — none required (decision 2026-06-16).** There
-   are **no production deployments** at cutover time. The only Firebase Auth
-   users that exist are dev / staging / demo accounts, which are disposable
-   and re-enroll by signing in fresh (the NextAuth drizzle-adapter creates
-   the `auth_users` row on first sign-in). Consequently:
+7. **Existing-user migration — greenfield schema, one-time staging remap
+   (decision 2026-06-16).** There are **no production deployments**, so the
+   schema is written **greenfield** (the project default: build it as if from
+   scratch unless a concrete reason forbids it). `auth_users.id` is a fresh
+   adapter-generated `uuid` — no Firebase-uid baggage carried into the new
+   schema. Staging is the only environment with existing users + data, and we
+   keep it:
 
-   - `auth_users.id` is a fresh adapter-generated `uuid` (idiomatic NextAuth /
-     `@auth/drizzle-adapter`). No need to preserve Firebase uids, because no
-     immutable audit trail or production reference graph exists to keep
-     consistent. (Had production data existed, the safer path would have been
-     to keep the Firebase uid as a `text` id — mirroring the
-     `process_instance_id` "stay text, no convert" precedent — to avoid
-     rewriting `audit_events.actor_id`. Not our situation.)
-   - The bulk user-migration script (firebase_uid → uuid mapping + reference
-     rewrite across `workspace_members` / `audit_events` / `human_tasks` / …)
-     is **dropped**. Nothing to migrate.
+   - **Structural changes ship as Drizzle migrations** (create `auth_*` +
+     `user_profiles` reshape; `workspace_members` rename `role` → `membership`
+     + add `roles text[]`).
+   - **The firebase_uid → uuid remap ships as a one-time script, not a SQL
+     migration** — building the mapping requires reading Firebase Auth
+     (`listUsers`), which a pure SQL migration cannot do. The script reads
+     Firebase Auth, inserts `auth_users` (fresh uuid), builds the map, and
+     rewrites the staging references (`workspace_members.uid`,
+     `audit_events.actor_id`, `human_tasks.*`, `cowork_sessions.*`,
+     `handoff.*`, `workspaces.linked_user_id`). Safe on staging — no 21 CFR
+     immutability bar applies there. Run once; new deployments never need it.
+   - No "seamless Google pre-seed" is required (zero production users to make
+     seamless). Dev / staging users re-enroll by signing in, or are placed by
+     the reworked seed (§Test infrastructure in PLAN).
 
-   _Pre-2026-06-16 draft assumed a seamless Google-user pre-seed + password
-   re-enroll. Superseded: with zero production users there is nobody to
-   pre-seed._
+   _Supersedes the pre-2026-06-16 draft's seamless-Google-pre-seed +
+   password-re-enroll plan._
 
 8. **Cutover.** **Sequential after ADR-0001**, not bundled. ADR-0001 lands
    first; mediforce runs on Postgres + Firebase Auth for a stable interval
