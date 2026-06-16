@@ -60,11 +60,30 @@ replacement service.
    Single `docker-compose up` keeps working; air-gapped pharma deploys
    need no extra configuration to start.
 
-4. **Firebase Storage is removed end-to-end** during the storage cutover
-   for ADR-0001. The same Python migration script that moves Firestore
-   data to Postgres also reads every `agentSkills/…` and `tasks/…/…`
-   object from Firebase Storage, ingests them into Postgres, and stops
-   touching Firebase Storage thereafter.
+4. **Firebase Storage is removed via a standalone storage-only migration**
+   (decision 2026-06-16). The original draft bundled storage ingestion into
+   ADR-0001's Firestore → Postgres script, but **that cutover already shipped**
+   (#534, 2026-05-31). So a separate one-time script reads every
+   `agentSkills/…` and `tasks/…/…` object from Firebase Storage, ingests them
+   into Postgres (`agent_definition_skills` / `task_attachments` +
+   `task_attachment_blobs`), and the deployment stops touching Firebase
+   Storage thereafter. Like the ADR-0002 user remap, this runs once against
+   staging; new deployments start clean.
+
+5. **Sequencing — Storage lands before Auth (ADR-0002).** Task / skill / logo
+   uploads today go **client-direct** to Firebase Storage, authorized by the
+   Firebase Auth session (`storage.rules`: `allow write: if request.auth != null`).
+   Removing Firebase Auth first would null `request.auth` and break every
+   upload. This ADR moves uploads to server-mediated headless routes →
+   Postgres, severing the Firebase-Auth dependency, so it must land first.
+   Consequently `task_attachments.uploaded_by` is a Firebase-uid `text` column
+   (no FK to ADR-0002's not-yet-existing `auth_users`); ADR-0002's staging
+   remap rewrites it when fresh uuids land.
+
+6. **No new Server Actions.** All new write paths (skill upload, attachment
+   upload/delete) ship as headless handlers + route adapters + typed
+   `mediforce.X.Y()` per ADR-0005 / AGENTS.md §8 — never Server Actions.
+   (The pre-2026-06-16 PLAN-0003 draft said "server action"; superseded.)
 
 ## Considered alternatives
 

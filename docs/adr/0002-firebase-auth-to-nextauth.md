@@ -144,8 +144,9 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
      Firebase Auth, inserts `auth_users` (fresh uuid), builds the map, and
      rewrites the staging references (`workspace_members.uid`,
      `audit_events.actor_id`, `human_tasks.*`, `cowork_sessions.*`,
-     `handoff.*`, `workspaces.linked_user_id`). Safe on staging — no 21 CFR
-     immutability bar applies there. Run once; new deployments never need it.
+     `handoff.*`, `workspaces.linked_user_id`, `task_attachments.uploaded_by`
+     — the last added by ADR-0003, which lands first and writes it as a
+     Firebase-uid `text` column).
    - No "seamless Google pre-seed" is required (zero production users to make
      seamless). Dev / staging users re-enroll by signing in, or are placed by
      the reworked seed (§Test infrastructure in PLAN).
