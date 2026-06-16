@@ -164,6 +164,15 @@ descriptions are the router, no manual table needed. Reach for one when its
 trigger phrases match the action you're about to take. List with
 `ls .claude/skills/`.
 
+For Codex: repo skills live in `skills/<name>/SKILL.md` and may be symlinked
+under `.codex/skills/` for discovery. Treat them as shared workflow
+instructions, but translate Claude-specific tool syntax instead of executing it
+literally: `Agent(...)` → Codex subagents, `Bash` / `Read` / `Edit` / `Write` /
+`Grep` / `Glob` → Codex shell and file tools, `WebFetch` → Codex web or GitHub
+tools, and `agent-browser` CLI steps → the Codex Browser plugin when available.
+Slash commands like `/new-test` mean "read and follow
+`skills/new-test/SKILL.md`".
+
 ## Reminder — re-read at the top of every task
 
 1. Simplify before coding.
