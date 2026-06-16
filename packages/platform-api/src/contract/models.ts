@@ -56,3 +56,20 @@ export const GetMetaOutputSchema = z.object({
 });
 
 export type GetMetaOutput = z.infer<typeof GetMetaOutputSchema>;
+
+export const ValidateModelsInputSchema = z.object({
+  modelIds: z.array(z.string().min(1)).min(1),
+});
+
+export type ValidateModelsInput = z.infer<typeof ValidateModelsInputSchema>;
+
+export const ValidateModelsOutputSchema = z.object({
+  unknown: z.array(
+    z.object({
+      id: z.string(),
+      suggestion: z.string().nullable(),
+    }),
+  ),
+});
+
+export type ValidateModelsOutput = z.infer<typeof ValidateModelsOutputSchema>;

@@ -131,4 +131,56 @@ describe('runPreflightChecks', () => {
     const result = runPreflightChecks(wd, { ...BASE_CTX, dockerAvailable: true, secretKeys: [] });
     expect(result).toEqual([]);
   });
+
+  it('warns about unknown model with suggestion', () => {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.steps[0].executor = 'agent';
+    wd.steps[0].agent = { model: 'anthropic/claude-haiku-3.5' };
+    const result = runPreflightChecks(wd, {
+      ...BASE_CTX,
+      dockerAvailable: true,
+      secretKeys: [],
+      modelValidation: {
+        unknown: [{ id: 'anthropic/claude-haiku-3.5', suggestion: 'anthropic/claude-3.5-haiku' }],
+      },
+    });
+    const w = result.find((r) => r.category === 'unknown-model');
+    expect(w).toBeDefined();
+    expect(w!.resource).toBe('anthropic/claude-haiku-3.5');
+    expect(w!.message).toContain('did you mean');
+    expect(w!.message).toContain('anthropic/claude-3.5-haiku');
+    expect(w!.stepNames).toEqual([wd.steps[0].name]);
+    expect(w!.actions).toHaveLength(1);
+    expect(w!.actions[0].label).toBe('Edit workflow');
+  });
+
+  it('warns about unknown model without suggestion', () => {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.steps[0].executor = 'agent';
+    wd.steps[0].agent = { model: 'sonnet' };
+    const result = runPreflightChecks(wd, {
+      ...BASE_CTX,
+      dockerAvailable: true,
+      secretKeys: [],
+      modelValidation: {
+        unknown: [{ id: 'sonnet', suggestion: null }],
+      },
+    });
+    const w = result.find((r) => r.category === 'unknown-model');
+    expect(w).toBeDefined();
+    expect(w!.message).toBe("Model 'sonnet' not found in registry");
+    expect(w!.message).not.toContain('did you mean');
+  });
+
+  it('skips model check when modelValidation not provided', () => {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.steps[0].executor = 'agent';
+    wd.steps[0].agent = { model: 'unknown-model' };
+    const result = runPreflightChecks(wd, {
+      ...BASE_CTX,
+      dockerAvailable: true,
+      secretKeys: [],
+    });
+    expect(result.filter((r) => r.category === 'unknown-model')).toEqual([]);
+  });
 });

@@ -7,7 +7,7 @@ export interface PreflightAction {
 }
 
 export interface PreflightWarning {
-  category: 'missing-image' | 'missing-secret' | 'low-credits';
+  category: 'missing-image' | 'missing-secret' | 'low-credits' | 'unknown-model';
   resource: string;
   stepNames: string[];
   message: string;
@@ -19,6 +19,12 @@ const TEMPLATE_RE = /^\{\{(?:[A-Z]+:)?([A-Za-z0-9_-]+)\}\}$/;
 export interface OpenRouterCreditsInfo {
   available: boolean;
   remaining: number;
+}
+
+function normaliseModelId(raw: string): string {
+  if (raw.includes('/')) return raw;
+  const idx = raw.indexOf('__');
+  return idx < 0 ? raw : `${raw.slice(0, idx)}/${raw.slice(idx + 2)}`;
 }
 
 const LOW_CREDITS_THRESHOLD = 0.5;
@@ -38,6 +44,7 @@ export function runPreflightChecks(
     workflowName: string;
     version?: number;
     adminEmail?: string;
+    modelValidation?: { unknown: Array<{ id: string; suggestion: string | null }> };
   },
 ): PreflightWarning[] {
   const imageMap = new Map<string, string[]>();
@@ -146,6 +153,42 @@ export function runPreflightChecks(
           : `OpenRouter credits low ($${remaining.toFixed(2)} remaining)`,
         actions: [
           { label: 'Top up credits', href: OPENROUTER_CREDITS_URL },
+        ],
+      });
+    }
+  }
+
+  if (options.modelValidation) {
+    const modelStepMap = new Map<string, string[]>();
+    for (const step of steps) {
+      if (step.executor !== 'agent') continue;
+      const raw = step.agent?.model;
+      if (typeof raw === 'string' && raw.length > 0) {
+        const normalised = normaliseModelId(raw);
+        const existing = modelStepMap.get(normalised);
+        if (existing) { existing.push(step.name); }
+        else { modelStepMap.set(normalised, [step.name]); }
+      }
+    }
+    for (const entry of options.modelValidation.unknown) {
+      const stepNames = modelStepMap.get(entry.id) ?? [];
+      if (stepNames.length === 0) continue;
+      const suggestion = entry.suggestion;
+      const message = suggestion
+        ? `Model '${entry.id}' not found in registry — did you mean '${suggestion}'?`
+        : `Model '${entry.id}' not found in registry`;
+      warnings.push({
+        category: 'unknown-model',
+        resource: entry.id,
+        stepNames,
+        message,
+        actions: [
+          {
+            label: 'Edit workflow',
+            href: options.version !== undefined
+              ? `/${options.handle}/workflows/${encodedName}/definitions/${options.version}`
+              : `/${options.handle}/workflows/${encodedName}`,
+          },
         ],
       });
     }
