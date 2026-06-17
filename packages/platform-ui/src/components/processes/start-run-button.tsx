@@ -273,7 +273,9 @@ export function StartRunButton({
               <Dialog.Description className="text-xs text-muted-foreground mt-0.5">
                 {hasTriggerInput
                   ? 'Provide input values for this workflow run.'
-                  : `${warnings.length} item${warnings.length !== 1 ? 's' : ''} to review for a smooth run.`}
+                  : preflightLoading
+                    ? 'Checking workflow readiness...'
+                    : `${warnings.length} item${warnings.length !== 1 ? 's' : ''} to review for a smooth run.`}
               </Dialog.Description>
             </div>
             <Dialog.Close className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
@@ -281,46 +283,57 @@ export function StartRunButton({
             </Dialog.Close>
           </div>
 
-          {hasWarnings && (
+          {(hasWarnings || preflightLoading) && (
             <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3 mb-4">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-                <span className="text-xs font-medium text-amber-800 dark:text-amber-300">
-                  {warnings.length} warning{warnings.length !== 1 ? 's' : ''}
-                </span>
-                {missingSecretKeys.length > 0 && (
-                  <button
-                    onClick={() => {
-                      setDialogOpen(false);
-                      const setup = encodeURIComponent(missingSecretKeys.join(','));
-                      const wf = encodeURIComponent(workflowName);
-                      router.push(`/${handle}/workflows/${wf}?tab=secrets&setup=${setup}`);
-                    }}
-                    className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                  >
-                    <KeyRound className="h-3 w-3" />
-                    Set secrets
-                  </button>
-                )}
-              </div>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                <WarningGroup
-                  title="Missing Docker images"
-                  warnings={warnings.filter((w) => w.category === 'missing-image')}
-                />
-                <WarningGroup
-                  title="Missing secrets"
-                  warnings={warnings.filter((w) => w.category === 'missing-secret')}
-                />
-                <WarningGroup
-                  title="LLM credits"
-                  warnings={warnings.filter((w) => w.category === 'low-credits')}
-                />
-                <WarningGroup
-                  title="Unknown models"
-                  warnings={warnings.filter((w) => w.category === 'unknown-model')}
-                />
-              </div>
+              {preflightLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-amber-500 shrink-0" />
+                  <span className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                    Checking models and dependencies...
+                  </span>
+                </div>
+              ) : (
+              <>
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                  <span className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                    {warnings.length} warning{warnings.length !== 1 ? 's' : ''}
+                  </span>
+                  {missingSecretKeys.length > 0 && (
+                    <button
+                      onClick={() => {
+                        setDialogOpen(false);
+                        const setup = encodeURIComponent(missingSecretKeys.join(','));
+                        const wf = encodeURIComponent(workflowName);
+                        router.push(`/${handle}/workflows/${wf}?tab=secrets&setup=${setup}`);
+                      }}
+                      className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                      <KeyRound className="h-3 w-3" />
+                      Set secrets
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  <WarningGroup
+                    title="Missing Docker images"
+                    warnings={warnings.filter((w) => w.category === 'missing-image')}
+                  />
+                  <WarningGroup
+                    title="Missing secrets"
+                    warnings={warnings.filter((w) => w.category === 'missing-secret')}
+                  />
+                  <WarningGroup
+                    title="LLM credits"
+                    warnings={warnings.filter((w) => w.category === 'low-credits')}
+                  />
+                  <WarningGroup
+                    title="Unknown models"
+                    warnings={warnings.filter((w) => w.category === 'unknown-model')}
+                  />
+                </div>
+              </>
+              )}
             </div>
           )}
 
