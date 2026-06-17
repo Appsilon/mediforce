@@ -496,16 +496,14 @@ export function StepEditor({
                 <input
                   value={step.agent?.image ?? ''}
                   onChange={(e) => updateAgent({ image: e.target.value || undefined })}
-                  placeholder="or type custom…"
-                  className={cn(riMono, 'w-36 shrink-0 placeholder:italic placeholder:text-muted-foreground/40')}
+                  className={cn(riMono, 'w-36 shrink-0')}
                 />
               </div>
             ) : (
               <input
                 value={step.agent?.image ?? ''}
                 onChange={(e) => updateAgent({ image: e.target.value || undefined })}
-                placeholder="e.g. python:3.11-slim"
-                className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
+                className={riMono}
               />
             )}
           </FieldRow>
