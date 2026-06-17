@@ -18,7 +18,7 @@ echo "==> Ensuring /var/lib/mediforce exists on host"
 # sudo, so we use a rootful alpine container as a permission-elevation
 # trick — the docker daemon the deploy already has access to (deploy
 # is in the docker group) lets us write outside the user's home tree.
-docker run --rm -v /var/lib:/host/var/lib alpine:latest \
+docker run --rm --platform linux/arm64 -v /var/lib:/host/var/lib alpine:latest \
   sh -c "mkdir -p /host/var/lib/mediforce && chmod 755 /host/var/lib/mediforce"
 
 # Only prune when the Docker data volume is actually filling up — unconditional
