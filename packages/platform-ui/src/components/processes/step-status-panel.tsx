@@ -554,7 +554,7 @@ export function StepStatusPanel({
                 <div className="flex flex-wrap items-center gap-2">
                   {stepDetailBaseHref && status !== 'pending' ? (
                     <Link
-                      href={`${stepDetailBaseHref}/steps/${encodeURIComponent(stepId)}`}
+                      href={`${stepDetailBaseHref}/steps/${encodeURIComponent(stepId)}?executionId=${encodeURIComponent(execId)}`}
                       className="text-sm font-medium text-primary hover:underline"
                       onClick={(e) => e.stopPropagation()}
                     >
