@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { useOpenRouterCredits } from '@/hooks/use-openrouter-credits';
 import { useNamespaceAdminContact } from '@/hooks/use-namespace-admin-contact';
+import { useModelValidation } from '@/hooks/use-model-validation';
 import { runPreflightChecks, type PreflightWarning } from '@/lib/preflight-checks';
 import { ParamField } from '@/components/ui/param-field';
 import type { TriggerInputField } from '@mediforce/platform-core';
@@ -55,11 +56,12 @@ export function StartRunButton({
 
   const effectiveVersion = version ?? hookEffectiveVersion;
   const preflightVersion = pendingVersion ?? effectiveVersion;
-  const { definition: effectiveDefinition } = useWorkflowVersion(
+  const { definition: effectiveDefinition, loading: definitionLoading } = useWorkflowVersion(
     workflowName,
     handle,
     preflightVersion,
   );
+  const modelValidation = useModelValidation(effectiveDefinition);
 
   const hasContext = secretKeysCtx !== null;
   const uid = firebaseUser?.uid;
@@ -132,10 +134,11 @@ export function StartRunButton({
       workflowName,
       version: preflightVersion ?? undefined,
       adminEmail: adminContact.email ?? undefined,
+      modelValidation: modelValidation.isLoading ? undefined : { unknown: modelValidation.unknown },
     });
-  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining, handle, workflowName, adminContact.email]);
+  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining, handle, workflowName, adminContact.email, modelValidation.isLoading, modelValidation.unknown]);
 
-  const preflightLoading = dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading;
+  const preflightLoading = definitionLoading || dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading || modelValidation.isLoading;
   const hasWarnings = warnings.length > 0;
   const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
 
@@ -211,7 +214,8 @@ export function StartRunButton({
   }
 
   function handleStart(v?: number) {
-    if (hasTriggerInput || hasWarnings) {
+    const versionChanged = v !== undefined && v !== effectiveVersion;
+    if (hasTriggerInput || hasWarnings || versionChanged) {
       setPendingVersion(v);
       setDialogOpen(true);
     } else {
@@ -311,6 +315,10 @@ export function StartRunButton({
                 <WarningGroup
                   title="LLM credits"
                   warnings={warnings.filter((w) => w.category === 'low-credits')}
+                />
+                <WarningGroup
+                  title="Unknown models"
+                  warnings={warnings.filter((w) => w.category === 'unknown-model')}
                 />
               </div>
             </div>

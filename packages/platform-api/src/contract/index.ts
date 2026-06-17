@@ -197,6 +197,10 @@ export {
   type UpdateRankingsInput,
   type UpdateRankingsOutput,
   type GetMetaOutput,
+  ValidateModelsInputSchema,
+  ValidateModelsOutputSchema,
+  type ValidateModelsInput,
+  type ValidateModelsOutput,
 } from './models';
 
 export {
