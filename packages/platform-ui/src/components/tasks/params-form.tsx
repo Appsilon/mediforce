@@ -1,13 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { format } from 'date-fns';
-import { CheckCircle, Loader2, Send } from 'lucide-react';
+import { Loader2, Send } from 'lucide-react';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { ParamField } from '@/components/ui/param-field';
 import type { StepParam } from '@mediforce/platform-core';
-import { RemainingTasksFooter } from './verdict-form';
 
 interface ParamsFormProps {
   taskId: string;
@@ -16,10 +14,6 @@ interface ParamsFormProps {
   onCompleted?: () => void;
 }
 
-interface SubmittedValues {
-  values: Record<string, unknown>;
-  timestamp: string;
-}
 
 export function useParamValues(params: StepParam[]) {
   const [values, setValues] = React.useState<Record<string, unknown>>(() => {
@@ -64,7 +58,6 @@ export function ParamsForm({
 }: ParamsFormProps) {
   const { values, setValue, requiredMissing, coerce } = useParamValues(params);
   const [submitting, setSubmitting] = React.useState(false);
-  const [submitted, setSubmitted] = React.useState<SubmittedValues | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent) {
@@ -74,24 +67,17 @@ export function ParamsForm({
     setSubmitting(true);
     setError(null);
 
-    const coerced = coerce();
-
     try {
       await mediforce.tasks.complete({
         taskId,
-        payload: { kind: 'params', paramValues: coerced },
+        payload: { kind: 'params', paramValues: coerce() },
       });
-      setSubmitted({ values: coerced, timestamp: new Date().toISOString() });
       onCompleted?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit');
     }
 
     setSubmitting(false);
-  }
-
-  if (submitted) {
-    return <ParamsConfirmation data={submitted} params={params} remainingTaskCount={remainingTaskCount} />;
   }
 
   return (
@@ -128,71 +114,3 @@ export function ParamsForm({
   );
 }
 
-// --- Post-submission confirmation ---
-
-function ParamsConfirmation({
-  data,
-  params,
-  remainingTaskCount,
-}: {
-  data: SubmittedValues;
-  params: StepParam[];
-  remainingTaskCount?: number;
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:bg-green-900/20 dark:border-green-800">
-        <div className="flex items-center gap-2 mb-3">
-          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-          <span className="font-medium text-sm text-green-800 dark:text-green-300">
-            Submitted successfully
-          </span>
-        </div>
-
-        <dl className="space-y-2">
-          {params.map((param) => {
-            const displayValue = data.values[param.name];
-            if (displayValue === undefined || displayValue === '') return null;
-            return (
-              <div key={param.name}>
-                <dt className="text-xs font-medium text-green-700/70 dark:text-green-400/70">
-                  {param.name}
-                </dt>
-                <dd className="text-sm text-green-800 dark:text-green-300 whitespace-pre-wrap">
-                  {String(displayValue)}
-                </dd>
-              </div>
-            );
-          })}
-        </dl>
-
-        <p className="mt-2 text-xs text-green-600/70 dark:text-green-400/70">
-          {format(new Date(data.timestamp), 'MMM d, yyyy HH:mm')}
-        </p>
-      </div>
-
-      <RemainingTasksFooter remainingTaskCount={remainingTaskCount} />
-    </div>
-  );
-}
-
-/**
- * Read-only params confirmation for already completed tasks.
- */
-export function ParamsConfirmationReadOnly({
-  completionData,
-  params,
-}: {
-  completionData: Record<string, unknown>;
-  params: StepParam[];
-}) {
-  const paramValues = (completionData.paramValues as Record<string, unknown>) ?? {};
-  const timestamp = (completionData.completedAt as string) ?? '';
-
-  return (
-    <ParamsConfirmation
-      data={{ values: paramValues, timestamp }}
-      params={params}
-    />
-  );
-}

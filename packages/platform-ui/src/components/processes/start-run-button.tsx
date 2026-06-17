@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
+import * as Popover from '@radix-ui/react-popover';
 import { useRouter } from 'next/navigation';
 import { Play, FlaskConical, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRound, FileInput } from 'lucide-react';
 import { useWorkflowVersions, useWorkflowVersion } from '@/hooks/use-workflow-versions';
@@ -52,8 +53,6 @@ export function StartRunButton({
   const [localSecretKeys, setLocalSecretKeys] = React.useState<string[] | undefined>(undefined);
   const [localNsSecretKeys, setLocalNsSecretKeys] = React.useState<string[]>([]);
   const [localSecretsLoading, setLocalSecretsLoading] = React.useState(true);
-  const dropdownRef = React.useRef<HTMLDivElement>(null);
-
   const effectiveVersion = version ?? hookEffectiveVersion;
   const preflightVersion = pendingVersion ?? effectiveVersion;
   const { definition: effectiveDefinition, loading: definitionLoading } = useWorkflowVersion(
@@ -141,17 +140,6 @@ export function StartRunButton({
   const preflightLoading = definitionLoading || dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading || modelValidation.isLoading;
   const hasWarnings = warnings.length > 0;
   const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
-
-  React.useEffect(() => {
-    if (!dropdownOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [dropdownOpen]);
 
   async function executeStart(v?: number, dryRun?: boolean) {
     const targetVersion = v ?? effectiveVersion;
@@ -411,7 +399,7 @@ export function StartRunButton({
 
   return (
     <div>
-      <div className="relative inline-flex" ref={dropdownRef}>
+      <div className="relative inline-flex">
         <button
           disabled={isDisabled}
           onClick={() => handleStart()}
@@ -426,47 +414,52 @@ export function StartRunButton({
           {buttonIcon}
           {buttonLabel}
         </button>
-        <button
-          disabled={isDisabled}
-          onClick={() => setDropdownOpen((prev) => !prev)}
-          title={tooltip}
-          aria-disabled={isDisabled}
-          className={cn(
-            'inline-flex items-center rounded-r-md border-l border-white/20 px-1.5 py-1.5 transition-colors',
-            buttonClasses,
-            isDisabled && 'opacity-50 cursor-not-allowed',
-          )}
-        >
-          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', dropdownOpen && 'rotate-180')} />
-        </button>
+        <Popover.Root open={dropdownOpen} onOpenChange={setDropdownOpen}>
+          <Popover.Trigger asChild>
+            <button
+              disabled={isDisabled}
+              title={tooltip}
+              aria-disabled={isDisabled}
+              className={cn(
+                'inline-flex items-center rounded-r-md border-l border-white/20 px-1.5 py-1.5 transition-colors',
+                buttonClasses,
+                isDisabled && 'opacity-50 cursor-not-allowed',
+              )}
+            >
+              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', dropdownOpen && 'rotate-180')} />
+            </button>
+          </Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content
+              align="end"
+              sideOffset={4}
+              className="z-50 min-w-[200px] max-h-60 overflow-y-auto rounded-md border bg-popover shadow-md animate-in fade-in-0 zoom-in-95"
+            >
+              {definitions.filter((def) => def.archived !== true).map((def) => {
+                const isEffective = def.version === effectiveVersion;
+                return (
+                  <button
+                    key={def.version}
+                    onClick={() => handleStart(def.version)}
+                    className={cn(
+                      'flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors first:rounded-t-md last:rounded-b-md',
+                      isEffective && 'bg-muted/30 font-medium',
+                    )}
+                  >
+                    <Check className={cn('h-3.5 w-3.5 shrink-0', isEffective ? 'text-primary' : 'invisible')} />
+                    <VersionLabel version={def.version} title={def.title} variant="inline" />
+                    {isEffective && (
+                      <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400 ml-auto shrink-0">
+                        default
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
         {warningBadge}
-
-        {dropdownOpen && (
-          <div className="absolute right-0 top-full mt-1 z-30 min-w-[200px] rounded-md border bg-popover shadow-md">
-            {definitions.filter((def) => def.archived !== true).map((def) => {
-              const isEffective = def.version === effectiveVersion;
-
-              return (
-                <button
-                  key={def.version}
-                  onClick={() => handleStart(def.version)}
-                  className={cn(
-                    'flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors first:rounded-t-md last:rounded-b-md',
-                    isEffective && 'bg-muted/30 font-medium',
-                  )}
-                >
-                  <Check className={cn('h-3.5 w-3.5 shrink-0', isEffective ? 'text-primary' : 'invisible')} />
-                  <VersionLabel version={def.version} title={def.title} variant="inline" />
-                  {isEffective && (
-                    <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400 ml-auto shrink-0">
-                      default
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
       </div>
       {errorBanner}
       {preflightDialog}

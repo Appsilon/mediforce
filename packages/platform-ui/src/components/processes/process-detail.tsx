@@ -2,9 +2,10 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, FileBarChart, Archive, ArchiveRestore, ScrollText, X } from 'lucide-react';
-import type { ProcessInstance, StepExecution, AuditEvent, Step, WorkflowStep } from '@mediforce/platform-core';
+import { ChevronLeft, ChevronRight, FileBarChart, Archive, ArchiveRestore, ScrollText, X, GitBranch } from 'lucide-react';
+import type { ProcessInstance, StepExecution, AuditEvent, Step, WorkflowStep, WorkflowDefinition } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
 import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
@@ -20,17 +21,16 @@ import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 import { cn } from '@/lib/utils';
-import { formatStepName } from '@/components/tasks/task-utils';
 import { MissingEnvBanner } from './missing-env-banner';
 import { AgentEscalatedBanner } from './agent-escalated-banner';
 import { PreviousRunBanner } from './previous-run-banner';
-import { formatDuration, formatCostUsd } from '@/lib/format';
+import { formatDuration, formatCostUsd, formatStepName } from '@/lib/format';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 
-function resolveStepLabel(stepId: string, steps: Step[]): string {
-  const found = steps.find((s) => s.id === stepId);
-  return found?.name ?? stepId.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
+const WorkflowDiagram = dynamic(
+  () => import('@/components/workflows/workflow-diagram').then((m) => ({ default: m.WorkflowDiagram })),
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Loading diagram…</div> },
+);
 
 export interface AgentEventItem {
   id: string;
@@ -51,6 +51,7 @@ export function ProcessDetail({
   backHref = '/processes',
   stepConfigMap,
   runDetailHref,
+  definition,
 }: {
   instance: ProcessInstance;
   stepExecutions: StepExecution[];
@@ -63,6 +64,8 @@ export function ProcessDetail({
   stepConfigMap?: Map<string, Record<string, unknown>>;
   /** Href for this run's detail page, used to build step detail links. */
   runDetailHref?: string;
+  /** Full workflow definition for the version this run used — powers the diagram tab. */
+  definition?: WorkflowDefinition;
 }) {
   const handle = useHandleFromPath();
   const wfStatus = getWorkflowStatus(instance);
@@ -110,7 +113,7 @@ export function ProcessDetail({
     [stepExecutions],
   );
 
-  const [rightTab, setRightTab] = React.useState<string>(() =>
+  const [rightTab, setRightTab] = React.useState<'agent-log' | 'audit' | 'diagram'>(() =>
     agentLogFiles.length > 0 ? 'agent-log' : 'audit',
   );
 
@@ -252,12 +255,40 @@ export function ProcessDetail({
               <span className="text-xs text-destructive shrink-0">{cancelError}</span>
             )}
             <button
-              onClick={() => setLogsOpen((prev) => !prev)}
+              onClick={() => {
+                if (logsOpen) {
+                  setLogsOpen(false);
+                } else {
+                  setRightTab(agentLogFiles.length > 0 ? 'agent-log' : 'audit');
+                  setLogsOpen(true);
+                }
+              }}
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shrink-0"
             >
               <ScrollText className="h-3.5 w-3.5" />
-              {logsOpen ? 'Hide Detailed Log' : 'Show Detailed Log'}
+              {logsOpen ? 'Hide Execution Log' : 'Execution Log'}
             </button>
+            {definition && (
+              <button
+                onClick={() => {
+                  if (logsOpen && rightTab === 'diagram') {
+                    setLogsOpen(false);
+                  } else {
+                    setRightTab('diagram');
+                    setLogsOpen(true);
+                  }
+                }}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors shrink-0',
+                  logsOpen && rightTab === 'diagram'
+                    ? 'border-primary/40 text-primary bg-primary/5'
+                    : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
+                )}
+              >
+                <GitBranch className="h-3.5 w-3.5" />
+                Workflow Diagram
+              </button>
+            )}
           </div>
 
           {/* Metadata row */}
@@ -297,7 +328,7 @@ export function ProcessDetail({
               <div className="text-sm">
                 <span className="font-medium">Waiting for your input</span>
                 <span className="text-muted-foreground ml-1.5">
-                  — {resolveStepLabel(blockingTask.stepId, definitionSteps)}
+                  — {definitionSteps.find((s) => s.id === blockingTask.stepId)?.name ?? formatStepName(blockingTask.stepId)}
                 </span>
               </div>
               <Link
@@ -313,7 +344,7 @@ export function ProcessDetail({
               <div className="text-sm">
                 <span className="font-medium">Ready to collaborate</span>
                 <span className="text-muted-foreground ml-1.5">
-                  — {resolveStepLabel(coworkSession.stepId, definitionSteps)}
+                  — {definitionSteps.find((s) => s.id === coworkSession.stepId)?.name ?? formatStepName(coworkSession.stepId)}
                 </span>
               </div>
               <Link
@@ -382,6 +413,7 @@ export function ProcessDetail({
             stepConfigMap={stepConfigMap}
             outputFiles={outputFiles}
             stepDetailBaseHref={runDetailHref}
+            currentTask={blockingTask}
             onAgentLogClick={(stepId: string) => {
               setAgentLogStepId(stepId);
               if (agentLogFiles.length > 0) setRightTab('agent-log');
@@ -401,14 +433,13 @@ export function ProcessDetail({
         {/* Toggle strip — always visible */}
         <button
           onClick={() => setLogsOpen((prev) => !prev)}
-          className="w-10 shrink-0 flex flex-col items-center justify-center gap-2 hover:bg-muted/50 transition-colors"
-          title={logsOpen ? 'Collapse logs' : 'Expand logs'}
+          className="w-10 shrink-0 flex flex-col items-center justify-center hover:bg-muted/50 transition-colors"
+          title={logsOpen ? 'Collapse panel' : 'Expand panel'}
         >
           {logsOpen
             ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
             : <ChevronLeft className="h-4 w-4 text-muted-foreground" />
           }
-          <ScrollText className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
 
         {/* Log content — fades in/out with the panel */}
@@ -421,8 +452,9 @@ export function ProcessDetail({
           {/* Tab bar */}
           <div className="flex gap-1 border-b shrink-0">
             {[
-              ...(agentLogFiles.length > 0 ? [{ value: 'agent-log', label: 'Step Log' }] : []),
-              { value: 'audit', label: 'Audit Log' },
+              ...(agentLogFiles.length > 0 ? [{ value: 'agent-log' as const, label: 'Step Log' }] : []),
+              { value: 'audit' as const, label: 'Audit Log' },
+              ...(definition ? [{ value: 'diagram' as const, label: 'Diagram' }] : []),
             ].map(({ value, label }) => (
               <button
                 key={value}
@@ -448,6 +480,12 @@ export function ProcessDetail({
             className={cn('flex-1 min-h-0 overflow-y-auto p-4', rightTab !== 'audit' && 'hidden')}
           >
             <AuditLogTab events={auditEvents} loading={auditEventsLoading} error={auditEventsError} />
+          </div>
+
+          <div className={cn('flex-1 min-h-0 overflow-y-auto', rightTab !== 'diagram' && 'hidden')}>
+            {definition && rightTab === 'diagram' && (
+              <WorkflowDiagram definition={definition} className="w-full" />
+            )}
           </div>
         </div>
       </div>

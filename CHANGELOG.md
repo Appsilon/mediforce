@@ -12,6 +12,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Added
+- **Run view UX** — execution history panel (renamed from "Step Status"), scrollable workflow diagram, active step info (started time, live elapsed timer, executor name/claimer for claimed human tasks)
+- **Task view** — spreadsheet-style table replaces card grid; status column, clickable run links, bulk cancel via batch endpoint, hide-completed toggle. Absolute dates replace relative timestamps in the table. `process × action` cross-grouping (sub-grouping within a process group by action type) is not carried forward in the table layout; each grouping mode renders a flat table.
+- **Process card** — step-progress dots rendered against the run's actual definition version instead of the latest definition
 - Pre-flight model validation: agent steps with unknown model IDs show an "Unknown model" warning (with Levenshtein-based "did you mean?" suggestions) in the start-run dialog before the run begins.
 - Start-run dialog: selecting a different workflow version from the dropdown no longer skips pre-flight checks — the dialog now waits for the new version's definition and validation to load before allowing start.
 - Extracted `normaliseModelId` to `platform-core` — was duplicated 5 times across 3 packages.

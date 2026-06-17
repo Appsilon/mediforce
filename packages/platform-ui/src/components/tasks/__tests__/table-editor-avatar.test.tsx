@@ -19,7 +19,8 @@ vi.mock('@/lib/mediforce', () => ({
 }));
 
 import { mediforce } from '@/lib/mediforce';
-import { deriveInitials, TableEditorView } from '../table-editor-view';
+import { deriveInitials } from '@/lib/format';
+import { TableEditorView } from '../table-editor-view';
 import type { ColumnSpec } from '../table-editor-view';
 
 const completeMock = vi.mocked(mediforce.tasks.complete);
@@ -54,8 +55,9 @@ describe('deriveInitials', () => {
     expect(deriveInitials('Alice Wonderland')).toBe('AW');
   });
 
-  it('returns single initial for one-word name', () => {
-    expect(deriveInitials('Eve')).toBe('E');
+  it('returns first two chars for one-word name', () => {
+    expect(deriveInitials('Eve')).toBe('EV');
+    expect(deriveInitials('E')).toBe('E');
   });
 
   it('picks first and last word for multi-word names', () => {

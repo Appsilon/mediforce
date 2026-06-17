@@ -13,8 +13,10 @@ test.describe('Task Review Journey', () => {
     await showCaption(page, 'Task inbox — flat list with pending actions');
 
     await click(page, page.getByRole('button', { name: /display/i }));
-    await expect(page.getByText('Workflow', { exact: true })).toBeVisible();
-    await expect(page.getByText('Action', { exact: true })).toBeVisible();
+    // The Display popover has "Workflow" and "Action" as group-by buttons.
+    // Use getByRole('button') to distinguish from the "Workflow" table column header.
+    await expect(page.getByRole('button', { name: 'Workflow', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Action', exact: true })).toBeVisible();
     await showCaption(page, 'Display options — group by workflow or action type');
 
     await click(page, page.getByText('Action', { exact: true }));

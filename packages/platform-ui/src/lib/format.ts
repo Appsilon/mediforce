@@ -24,6 +24,14 @@ export function formatStepName(stepId: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+export function deriveInitials(name: string): string {
+  const words = name.trim().split(/\s+/);
+  const first = words[0] ?? '';
+  if (words.length === 1) return first.slice(0, 2).toUpperCase();
+  const last = words[words.length - 1]![0] ?? '';
+  return ((first[0] ?? '') + last).toUpperCase();
+}
+
 export function computeWallClockDuration(
   createdAt: string,
   stepExecutions: StepExecution[],

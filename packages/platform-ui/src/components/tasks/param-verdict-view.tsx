@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { ParamField } from '@/components/ui/param-field';
@@ -82,19 +81,7 @@ function ParamVerdictForm({
   }
 
   if (submitted) {
-    return (
-      <div className="space-y-4">
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:bg-green-900/20 dark:border-green-800">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-            <span className="font-medium text-sm text-green-800 dark:text-green-300">
-              Submitted successfully
-            </span>
-          </div>
-        </div>
-        <RemainingTasksFooter remainingTaskCount={remainingTaskCount} />
-      </div>
-    );
+    return <RemainingTasksFooter remainingTaskCount={remainingTaskCount} />;
   }
 
   return (
