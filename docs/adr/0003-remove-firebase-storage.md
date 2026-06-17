@@ -69,12 +69,11 @@ filesystem implementation now.
    + Redis + worker + the existing `~/.mediforce` volume. `docker-compose up`
    and air-gapped pharma deploys keep working with zero extra configuration.
 
-4. **Configurable size guard, not a hard 10MB cap.** A
-   `MEDIFORCE_ATTACHMENT_MAX_BYTES` env (default **100 MiB**, matching ADR-0007's
-   `MEDIFORCE_OUTPUT_FILE_MAX_BYTES`) guards against disk exhaustion. It is an
-   operational guard, not a design constraint pushing files elsewhere — the
-   filesystem backend handles large files, which is the whole point of the
-   upload.
+4. **Configurable size guard, not a hard 10MB cap.** Its own env,
+   `MEDIFORCE_ATTACHMENT_MAX_BYTES` (independent of any other size knob),
+   guards against disk exhaustion. It is an operational guard, not a design
+   constraint pushing files elsewhere — the filesystem backend handles large
+   files, which is the whole point of the upload.
 
 5. **Sequencing — Storage lands before Auth (ADR-0002).** Today's uploads are
    client-direct and Firebase-Auth-authorized; removing Firebase Auth first
@@ -160,9 +159,10 @@ decision, not a storage-infra necessity.
 
 ## Open questions for review
 
-- **Default `MEDIFORCE_ATTACHMENT_MAX_BYTES`** — 100 MiB proposed (parity with
-  ADR-0007's output-file cap). Confirm it is generous enough for the large
-  workflow files the upload targets, or set higher.
+- **Default `MEDIFORCE_ATTACHMENT_MAX_BYTES`** — a generous default (e.g.
+  100 MiB) chosen on its own merit, not coupled to any other cap. Confirm it
+  is generous enough for the large workflow files the upload targets, or set
+  higher.
 - **`task_attachments.task_id` FK type** — match `human_tasks.id` (Firestore-
   shaped `text` per the ADR-0001 "stay text" precedent). Confirm at impl time.
 - **Attachments scoped to Human Tasks only** — confirmed 2026-06-16: not added
