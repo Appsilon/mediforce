@@ -12,6 +12,7 @@ import {
 } from '../../errors';
 import { actorFromCaller } from '../_helpers';
 import { checkRetiredModels } from './retired-model-check';
+import { isLocalAgentMode } from '../system/_docker';
 
 interface RegisterScopedInput extends RegisterWorkflowInput {
   namespace: string;
@@ -44,6 +45,24 @@ export async function registerWorkflow(
   const retired = checkRetiredModels(parsed.data, allModels);
   if (retired !== null) {
     throw new ValidationError(retired.message.replace('Cannot run', 'Cannot save'));
+  }
+
+  if (!isLocalAgentMode()) {
+    const missingImage = parsed.data.steps
+      .filter((s) => s.executor === 'agent')
+      .filter((s) => {
+        const cfg = s.agent;
+        if (typeof cfg?.image === 'string' && cfg.image.length > 0) return false;
+        if (typeof cfg?.repo === 'string' && cfg.repo.length > 0
+          && typeof cfg?.commit === 'string' && cfg.commit.length > 0) return false;
+        return true;
+      });
+    if (missingImage.length > 0) {
+      const names = missingImage.map((s) => `'${s.name}'`).join(', ');
+      throw new ValidationError(
+        `Agent step(s) ${names} missing Docker image. Set agent.image or configure agent.repo + agent.commit for auto-build.`,
+      );
+    }
   }
 
   const latestVersion = await scope.workflowDefinitions.getLatestVersion(

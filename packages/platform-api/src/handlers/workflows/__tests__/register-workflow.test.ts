@@ -143,6 +143,61 @@ describe('registerWorkflow handler', () => {
       .resolves.toMatchObject({ success: true, name: 'active-flow' });
   });
 
+  it('rejects agent step without Docker image when not in local agent mode', async () => {
+    const scope = buildScope();
+    const body = buildWorkflowDefinition({
+      name: 'no-image-flow',
+      namespace: 'team-alpha',
+      steps: [
+        { id: 'analyze', name: 'AI Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'anthropic/claude-sonnet-4', prompt: 'Analyze' } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'analyze', to: 'done' }],
+    });
+    const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
+
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
+      .rejects.toThrow(ValidationError);
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
+      .rejects.toThrow(/AI Analysis/);
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
+      .rejects.toThrow(/Docker image/i);
+  });
+
+  it('accepts agent step without image when repo + commit configured (auto-build)', async () => {
+    const scope = buildScope();
+    const body = buildWorkflowDefinition({
+      name: 'auto-build-flow',
+      namespace: 'team-alpha',
+      steps: [
+        { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'anthropic/claude-sonnet-4', prompt: 'Analyze', repo: 'git@github.com:org/repo.git', commit: 'abc1234' } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'analyze', to: 'done' }],
+    });
+    const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
+
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
+      .resolves.toMatchObject({ success: true, name: 'auto-build-flow' });
+  });
+
+  it('accepts agent step with Docker image configured', async () => {
+    const scope = buildScope();
+    const body = buildWorkflowDefinition({
+      name: 'with-image-flow',
+      namespace: 'team-alpha',
+      steps: [
+        { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'anthropic/claude-sonnet-4', prompt: 'Analyze', image: 'mediforce-golden-image' } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'analyze', to: 'done' }],
+    });
+    const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
+
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
+      .resolves.toMatchObject({ success: true, name: 'with-image-flow' });
+  });
+
   it('registerWorkflow bumps version and emits workflow.version_added audit when name already exists', async () => {
     await processRepo.saveWorkflowDefinition(
       buildWorkflowDefinition({ name: 'flow-existing', version: 1, namespace: 'team-alpha' }),
