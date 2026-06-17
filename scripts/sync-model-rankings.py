@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sync model registry from OpenRouter API, then scrape rankings for popularity data.
+"""Sync model registry from OpenRouter API, then fetch rankings for popularity data.
 
 Usage:
     python3 scripts/sync-model-rankings.py [--base-url URL]
@@ -9,13 +9,13 @@ Requires MEDIFORCE_API_KEY env var. Defaults to http://localhost:9003.
 
 import json
 import os
-import re
 import sys
 import urllib.error
 import urllib.request
 
 DEFAULT_BASE_URL = "http://localhost:9003"
 MOCK_DEV_BASE_URL = "http://localhost:9007"
+OPENROUTER_RANKINGS_URL = "https://openrouter.ai/api/frontend/rankings/performance"
 
 
 def sync_models(base_url: str, api_key: str) -> dict:
@@ -29,11 +29,7 @@ def sync_models(base_url: str, api_key: str) -> dict:
     return json.loads(body.decode("utf-8"))
 
 
-RANKINGS_PATTERN = re.compile(
-    r'"id":"([^"]+)","slug":"[^"]*","name":"([^"]*)","author":"[^"]*","request_count":(\d+)'
-)
 BROWSER_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
-HEX_ID_RE = re.compile(r'"([0-9a-f]{30,})"')
 
 
 def _fetch(url: str, headers: dict | None = None, data: bytes | None = None,
@@ -47,53 +43,30 @@ def _fetch(url: str, headers: dict | None = None, data: bytes | None = None,
         return resp.read()
 
 
-def _discover_action_id() -> str:
-    """Fetch OpenRouter /rankings, find the JS chunk containing the
-    getPerformanceDataCached server action, return its action ID."""
-    html = _fetch("https://openrouter.ai/rankings").decode("utf-8")
-    chunk_paths = re.findall(r'(/_next/static/chunks/[^"\']+\.js[^"\']*)', html)
-    for path in chunk_paths:
-        try:
-            js = _fetch(f"https://openrouter.ai{path}", timeout=10).decode("utf-8")
-        except Exception:
-            continue
-        if "getPerformanceDataCached" not in js:
-            continue
-        idx = js.index("getPerformanceDataCached")
-        before = js[max(0, idx - 200):idx]
-        hex_ids = HEX_ID_RE.findall(before)
-        if hex_ids:
-            return hex_ids[-1]
-    raise RuntimeError("Could not discover rankings action ID from OpenRouter JS bundles")
-
-
 def scrape_rankings() -> list[dict]:
-    """Call OpenRouter's getPerformanceDataCached server action via RSC
-    protocol and extract request_count per model."""
-    action_id = _discover_action_id()
-    print(f"  Discovered action ID: {action_id}")
-
-    rsc_body = _fetch(
-        "https://openrouter.ai/rankings",
-        headers={
-            "Accept": "text/x-component",
-            "Content-Type": "text/plain;charset=UTF-8",
-            "next-action": action_id,
-            "Origin": "https://openrouter.ai",
-            "Referer": "https://openrouter.ai/rankings",
-        },
-        data=b"[]",
-    ).decode("utf-8")
-
-    matches = RANKINGS_PATTERN.findall(rsc_body)
-    if not matches:
-        print("ERROR: No ranking data in RSC response. Server action format may have changed.",
-              file=sys.stderr)
+    """Fetch OpenRouter performance rankings and extract request_count per model."""
+    body = _fetch(
+        OPENROUTER_RANKINGS_URL,
+        headers={"Accept": "application/json", "Referer": "https://openrouter.ai/rankings"},
+    )
+    payload = json.loads(body.decode("utf-8"))
+    rows = payload.get("data")
+    if not isinstance(rows, list):
+        print("ERROR: Unexpected rankings response from OpenRouter.", file=sys.stderr)
         sys.exit(1)
 
     rankings = []
-    for model_id, _name, count in matches:
-        rankings.append({"id": model_id, "requestCount": int(count)})
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        model_id = row.get("id")
+        count = row.get("request_count")
+        if isinstance(model_id, str) and isinstance(count, int):
+            rankings.append({"id": model_id, "requestCount": count})
+
+    if len(rankings) == 0:
+        print("ERROR: No ranking data in OpenRouter response.", file=sys.stderr)
+        sys.exit(1)
 
     rankings.sort(key=lambda x: x["requestCount"], reverse=True)
     return rankings
@@ -141,8 +114,8 @@ def main():
         sync_result = sync_models(base_url, api_key)
     print(f"  Synced {sync_result['synced']} models ({sync_result['total']} from OpenRouter).")
 
-    # Step 2: Scrape rankings from OpenRouter /rankings page
-    print("\nStep 2: Scraping OpenRouter /rankings for popularity data...")
+    # Step 2: Fetch rankings from OpenRouter
+    print("\nStep 2: Fetching OpenRouter rankings for popularity data...")
     rankings = scrape_rankings()
     print(f"  Found {len(rankings)} models with request counts.")
     print(f"  Top 5:")
