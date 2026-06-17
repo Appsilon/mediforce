@@ -1,0 +1,808 @@
+[ {
+  "type" : "OrgStudyIdType",
+  "values" : [ {
+    "value" : "NIH",
+    "legacyValue" : "U.S. NIH Grant/Contract"
+  }, {
+    "value" : "FDA",
+    "legacyValue" : "U.S. FDA Grant/Contract"
+  }, {
+    "value" : "VA",
+    "legacyValue" : "U.S. VA Grant/Contract"
+  }, {
+    "value" : "CDC",
+    "legacyValue" : "U.S. CDC Grant/Contract"
+  }, {
+    "value" : "AHRQ",
+    "legacyValue" : "U.S. AHRQ Grant/Contract"
+  }, {
+    "value" : "SAMHSA",
+    "legacyValue" : "U.S. SAMHSA Grant/Contract"
+  } ],
+  "pieces" : [ "OrgStudyIdType" ]
+}, {
+  "type" : "SecondaryIdType",
+  "values" : [ {
+    "value" : "NIH",
+    "legacyValue" : "U.S. NIH Grant/Contract"
+  }, {
+    "value" : "FDA",
+    "legacyValue" : "U.S. FDA Grant/Contract"
+  }, {
+    "value" : "VA",
+    "legacyValue" : "U.S. VA Grant/Contract"
+  }, {
+    "value" : "CDC",
+    "legacyValue" : "U.S. CDC Grant/Contract"
+  }, {
+    "value" : "AHRQ",
+    "legacyValue" : "U.S. AHRQ Grant/Contract"
+  }, {
+    "value" : "SAMHSA",
+    "legacyValue" : "U.S. SAMHSA Grant/Contract"
+  }, {
+    "value" : "OTHER_GRANT",
+    "legacyValue" : "Other Grant/Funding Number"
+  }, {
+    "value" : "EUDRACT_NUMBER",
+    "legacyValue" : "EudraCT Number"
+  }, {
+    "value" : "CTIS",
+    "legacyValue" : "EU Trial (CTIS) Number"
+  }, {
+    "value" : "REGISTRY",
+    "legacyValue" : "Registry Identifier"
+  }, {
+    "value" : "OTHER",
+    "legacyValue" : "Other Identifier"
+  } ],
+  "pieces" : [ "SecondaryIdType" ]
+}, {
+  "type" : "AgencyClass",
+  "values" : [ {
+    "value" : "NIH",
+    "legacyValue" : "NIH"
+  }, {
+    "value" : "FED",
+    "legacyValue" : "FED"
+  }, {
+    "value" : "OTHER_GOV",
+    "legacyValue" : "OTHER_GOV"
+  }, {
+    "value" : "INDIV",
+    "legacyValue" : "INDIV"
+  }, {
+    "value" : "INDUSTRY",
+    "legacyValue" : "INDUSTRY"
+  }, {
+    "value" : "NETWORK",
+    "legacyValue" : "NETWORK"
+  }, {
+    "value" : "AMBIG",
+    "legacyValue" : "AMBIG"
+  }, {
+    "value" : "OTHER",
+    "legacyValue" : "OTHER"
+  }, {
+    "value" : "UNKNOWN",
+    "legacyValue" : "UNKNOWN"
+  } ],
+  "pieces" : [ "OrgClass", "LeadSponsorClass", "CollaboratorClass" ]
+}, {
+  "type" : "Status",
+  "values" : [ {
+    "value" : "ACTIVE_NOT_RECRUITING",
+    "legacyValue" : "Active, not recruiting"
+  }, {
+    "value" : "COMPLETED",
+    "legacyValue" : "Completed"
+  }, {
+    "value" : "ENROLLING_BY_INVITATION",
+    "legacyValue" : "Enrolling by invitation"
+  }, {
+    "value" : "NOT_YET_RECRUITING",
+    "legacyValue" : "Not yet recruiting"
+  }, {
+    "value" : "RECRUITING",
+    "legacyValue" : "Recruiting"
+  }, {
+    "value" : "SUSPENDED",
+    "legacyValue" : "Suspended"
+  }, {
+    "value" : "TERMINATED",
+    "legacyValue" : "Terminated"
+  }, {
+    "value" : "WITHDRAWN",
+    "legacyValue" : "Withdrawn"
+  }, {
+    "value" : "AVAILABLE",
+    "legacyValue" : "Available"
+  }, {
+    "value" : "NO_LONGER_AVAILABLE",
+    "legacyValue" : "No longer available"
+  }, {
+    "value" : "TEMPORARILY_NOT_AVAILABLE",
+    "legacyValue" : "Temporarily not available"
+  }, {
+    "value" : "APPROVED_FOR_MARKETING",
+    "legacyValue" : "Approved for marketing"
+  }, {
+    "value" : "WITHHELD",
+    "legacyValue" : "Withheld"
+  }, {
+    "value" : "UNKNOWN",
+    "legacyValue" : "Unknown status"
+  } ],
+  "pieces" : [ "OverallStatus", "LastKnownStatus" ]
+}, {
+  "type" : "ExpandedAccessStatus",
+  "values" : [ {
+    "value" : "AVAILABLE",
+    "legacyValue" : "Available"
+  }, {
+    "value" : "NO_LONGER_AVAILABLE",
+    "legacyValue" : "No longer available"
+  }, {
+    "value" : "TEMPORARILY_NOT_AVAILABLE",
+    "legacyValue" : "Temporarily not available"
+  }, {
+    "value" : "APPROVED_FOR_MARKETING",
+    "legacyValue" : "Approved for marketing"
+  } ],
+  "pieces" : [ "ExpandedAccessStatusForNCTId" ]
+}, {
+  "type" : "DateType",
+  "values" : [ {
+    "value" : "ACTUAL",
+    "legacyValue" : "Actual"
+  }, {
+    "value" : "ESTIMATED",
+    "legacyValue" : "Estimated",
+    "exceptions" : {
+      "StartDateType" : "Anticipated",
+      "PrimaryCompletionDateType" : "Anticipated",
+      "CompletionDateType" : "Anticipated",
+      "StudyFirstPostDateType" : "Estimate",
+      "ResultsFirstPostDateType" : "Estimate",
+      "DispFirstPostDateType" : "Estimate",
+      "LastUpdatePostDateType" : "Estimate",
+      "FirstMCPPostDateType" : "Anticipated"
+    }
+  } ],
+  "pieces" : [ "StartDateType", "PrimaryCompletionDateType", "CompletionDateType", "StudyFirstPostDateType", "ResultsFirstPostDateType", "DispFirstPostDateType", "LastUpdatePostDateType", "FirstMCPPostDateType" ]
+}, {
+  "type" : "ResponsiblePartyType",
+  "values" : [ {
+    "value" : "SPONSOR",
+    "legacyValue" : "Sponsor"
+  }, {
+    "value" : "PRINCIPAL_INVESTIGATOR",
+    "legacyValue" : "Principal Investigator"
+  }, {
+    "value" : "SPONSOR_INVESTIGATOR",
+    "legacyValue" : "Sponsor-Investigator"
+  } ],
+  "pieces" : [ "ResponsiblePartyType" ]
+}, {
+  "type" : "StudyType",
+  "values" : [ {
+    "value" : "EXPANDED_ACCESS",
+    "legacyValue" : "Expanded Access"
+  }, {
+    "value" : "INTERVENTIONAL",
+    "legacyValue" : "Interventional"
+  }, {
+    "value" : "OBSERVATIONAL",
+    "legacyValue" : "Observational"
+  } ],
+  "pieces" : [ "StudyType" ]
+}, {
+  "type" : "Phase",
+  "values" : [ {
+    "value" : "NA",
+    "legacyValue" : "Not Applicable"
+  }, {
+    "value" : "EARLY_PHASE1",
+    "legacyValue" : "Early Phase 1"
+  }, {
+    "value" : "PHASE1",
+    "legacyValue" : "Phase 1"
+  }, {
+    "value" : "PHASE2",
+    "legacyValue" : "Phase 2"
+  }, {
+    "value" : "PHASE3",
+    "legacyValue" : "Phase 3"
+  }, {
+    "value" : "PHASE4",
+    "legacyValue" : "Phase 4"
+  } ],
+  "pieces" : [ "Phase" ]
+}, {
+  "type" : "DesignAllocation",
+  "values" : [ {
+    "value" : "RANDOMIZED",
+    "legacyValue" : "Randomized"
+  }, {
+    "value" : "NON_RANDOMIZED",
+    "legacyValue" : "Non-Randomized"
+  }, {
+    "value" : "NA",
+    "legacyValue" : "N/A"
+  } ],
+  "pieces" : [ "DesignAllocation" ]
+}, {
+  "type" : "InterventionalAssignment",
+  "values" : [ {
+    "value" : "SINGLE_GROUP",
+    "legacyValue" : "Single Group Assignment"
+  }, {
+    "value" : "PARALLEL",
+    "legacyValue" : "Parallel Assignment"
+  }, {
+    "value" : "CROSSOVER",
+    "legacyValue" : "Crossover Assignment"
+  }, {
+    "value" : "FACTORIAL",
+    "legacyValue" : "Factorial Assignment"
+  }, {
+    "value" : "SEQUENTIAL",
+    "legacyValue" : "Sequential Assignment"
+  } ],
+  "pieces" : [ "DesignInterventionModel" ]
+}, {
+  "type" : "PrimaryPurpose",
+  "values" : [ {
+    "value" : "TREATMENT",
+    "legacyValue" : "Treatment"
+  }, {
+    "value" : "PREVENTION",
+    "legacyValue" : "Prevention"
+  }, {
+    "value" : "DIAGNOSTIC",
+    "legacyValue" : "Diagnostic"
+  }, {
+    "value" : "ECT",
+    "legacyValue" : "Educational/Counseling/Training"
+  }, {
+    "value" : "SUPPORTIVE_CARE",
+    "legacyValue" : "Supportive Care"
+  }, {
+    "value" : "SCREENING",
+    "legacyValue" : "Screening"
+  }, {
+    "value" : "HEALTH_SERVICES_RESEARCH",
+    "legacyValue" : "Health Services Research"
+  }, {
+    "value" : "BASIC_SCIENCE",
+    "legacyValue" : "Basic Science"
+  }, {
+    "value" : "DEVICE_FEASIBILITY",
+    "legacyValue" : "Device Feasibility"
+  }, {
+    "value" : "OTHER",
+    "legacyValue" : "Other"
+  } ],
+  "pieces" : [ "DesignPrimaryPurpose" ]
+}, {
+  "type" : "ObservationalModel",
+  "values" : [ {
+    "value" : "COHORT",
+    "legacyValue" : "Cohort"
+  }, {
+    "value" : "CASE_CONTROL",
+    "legacyValue" : "Case-Control"
+  }, {
+    "value" : "CASE_ONLY",
+    "legacyValue" : "Case-Only"
+  }, {
+    "value" : "CASE_CROSSOVER",
+    "legacyValue" : "Case-Crossover"
+  }, {
+    "value" : "ECOLOGIC_OR_COMMUNITY",
+    "legacyValue" : "Ecologic or Community"
+  }, {
+    "value" : "FAMILY_BASED",
+    "legacyValue" : "Family-Based"
+  }, {
+    "value" : "DEFINED_POPULATION",
+    "legacyValue" : "Defined Population"
+  }, {
+    "value" : "NATURAL_HISTORY",
+    "legacyValue" : "Natural History"
+  }, {
+    "value" : "OTHER",
+    "legacyValue" : "Other"
+  } ],
+  "pieces" : [ "DesignObservationalModel" ]
+}, {
+  "type" : "DesignTimePerspective",
+  "values" : [ {
+    "value" : "RETROSPECTIVE",
+    "legacyValue" : "Retrospective"
+  }, {
+    "value" : "PROSPECTIVE",
+    "legacyValue" : "Prospective"
+  }, {
+    "value" : "CROSS_SECTIONAL",
+    "legacyValue" : "Cross-Sectional"
+  }, {
+    "value" : "OTHER",
+    "legacyValue" : "Other"
+  } ],
+  "pieces" : [ "DesignTimePerspective" ]
+}, {
+  "type" : "DesignMasking",
+  "values" : [ {
+    "value" : "NONE",
+    "legacyValue" : "None (Open Label)"
+  }, {
+    "value" : "SINGLE",
+    "legacyValue" : "Single"
+  }, {
+    "value" : "DOUBLE",
+    "legacyValue" : "Double"
+  }, {
+    "value" : "TRIPLE",
+    "legacyValue" : "Triple"
+  }, {
+    "value" : "QUADRUPLE",
+    "legacyValue" : "Quadruple"
+  } ],
+  "pieces" : [ "DesignMasking" ]
+}, {
+  "type" : "WhoMasked",
+  "values" : [ {
+    "value" : "PARTICIPANT",
+    "legacyValue" : "Participant"
+  }, {
+    "value" : "CARE_PROVIDER",
+    "legacyValue" : "Care Provider"
+  }, {
+    "value" : "INVESTIGATOR",
+    "legacyValue" : "Investigator"
+  }, {
+    "value" : "OUTCOMES_ASSESSOR",
+    "legacyValue" : "Outcomes Assessor"
+  } ],
+  "pieces" : [ "DesignWhoMasked" ]
+}, {
+  "type" : "BioSpecRetention",
+  "values" : [ {
+    "value" : "NONE_RETAINED",
+    "legacyValue" : "None Retained"
+  }, {
+    "value" : "SAMPLES_WITH_DNA",
+    "legacyValue" : "Samples With DNA"
+  }, {
+    "value" : "SAMPLES_WITHOUT_DNA",
+    "legacyValue" : "Samples Without DNA"
+  } ],
+  "pieces" : [ "BioSpecRetention" ]
+}, {
+  "type" : "EnrollmentType",
+  "values" : [ {
+    "value" : "ACTUAL",
+    "legacyValue" : "Actual"
+  }, {
+    "value" : "ESTIMATED",
+    "legacyValue" : "Estimated",
+    "exceptions" : {
+      "EnrollmentType" : "Anticipated"
+    }
+  } ],
+  "pieces" : [ "EnrollmentType" ]
+}, {
+  "type" : "ArmGroupType",
+  "values" : [ {
+    "value" : "EXPERIMENTAL",
+    "legacyValue" : "Experimental"
+  }, {
+    "value" : "ACTIVE_COMPARATOR",
+    "legacyValue" : "Active Comparator"
+  }, {
+    "value" : "PLACEBO_COMPARATOR",
+    "legacyValue" : "Placebo Comparator"
+  }, {
+    "value" : "SHAM_COMPARATOR",
+    "legacyValue" : "Sham Comparator"
+  }, {
+    "value" : "NO_INTERVENTION",
+    "legacyValue" : "No Intervention"
+  }, {
+    "value" : "OTHER",
+    "legacyValue" : "Other"
+  } ],
+  "pieces" : [ "ArmGroupType" ]
+}, {
+  "type" : "InterventionType",
+  "values" : [ {
+    "value" : "BEHAVIORAL",
+    "legacyValue" : "Behavioral"
+  }, {
+    "value" : "BIOLOGICAL",
+    "legacyValue" : "Biological"
+  }, {
+    "value" : "COMBINATION_PRODUCT",
+    "legacyValue" : "Combination Product"
+  }, {
+    "value" : "DEVICE",
+    "legacyValue" : "Device"
+  }, {
+    "value" : "DIAGNOSTIC_TEST",
+    "legacyValue" : "Diagnostic Test"
+  }, {
+    "value" : "DIETARY_SUPPLEMENT",
+    "legacyValue" : "Dietary Supplement"
+  }, {
+    "value" : "DRUG",
+    "legacyValue" : "Drug"
+  }, {
+    "value" : "GENETIC",
+    "legacyValue" : "Genetic"
+  }, {
+    "value" : "PROCEDURE",
+    "legacyValue" : "Procedure"
+  }, {
+    "value" : "RADIATION",
+    "legacyValue" : "Radiation"
+  }, {
+    "value" : "OTHER",
+    "legacyValue" : "Other"
+  } ],
+  "pieces" : [ "InterventionType" ]
+}, {
+  "type" : "Sex",
+  "values" : [ {
+    "value" : "FEMALE",
+    "legacyValue" : "Female"
+  }, {
+    "value" : "MALE",
+    "legacyValue" : "Male"
+  }, {
+    "value" : "ALL",
+    "legacyValue" : "All"
+  } ],
+  "pieces" : [ "Sex" ]
+}, {
+  "type" : "StandardAge",
+  "values" : [ {
+    "value" : "CHILD",
+    "legacyValue" : "Child"
+  }, {
+    "value" : "ADULT",
+    "legacyValue" : "Adult"
+  }, {
+    "value" : "OLDER_ADULT",
+    "legacyValue" : "Older Adult"
+  } ],
+  "pieces" : [ "StdAge" ]
+}, {
+  "type" : "SamplingMethod",
+  "values" : [ {
+    "value" : "PROBABILITY_SAMPLE",
+    "legacyValue" : "Probability Sample"
+  }, {
+    "value" : "NON_PROBABILITY_SAMPLE",
+    "legacyValue" : "Non-Probability Sample"
+  } ],
+  "pieces" : [ "SamplingMethod" ]
+}, {
+  "type" : "ContactRole",
+  "values" : [ {
+    "value" : "STUDY_CHAIR",
+    "legacyValue" : "Study Chair"
+  }, {
+    "value" : "STUDY_DIRECTOR",
+    "legacyValue" : "Study Director"
+  }, {
+    "value" : "PRINCIPAL_INVESTIGATOR",
+    "legacyValue" : "Principal Investigator"
+  }, {
+    "value" : "SUB_INVESTIGATOR",
+    "legacyValue" : "Sub-Investigator"
+  }, {
+    "value" : "CONTACT",
+    "legacyValue" : "Contact"
+  } ],
+  "pieces" : [ "CentralContactRole", "LocationContactRole" ]
+}, {
+  "type" : "OfficialRole",
+  "values" : [ {
+    "value" : "STUDY_CHAIR",
+    "legacyValue" : "Study Chair"
+  }, {
+    "value" : "STUDY_DIRECTOR",
+    "legacyValue" : "Study Director"
+  }, {
+    "value" : "PRINCIPAL_INVESTIGATOR",
+    "legacyValue" : "Principal Investigator"
+  }, {
+    "value" : "SUB_INVESTIGATOR",
+    "legacyValue" : "Sub-Investigator"
+  } ],
+  "pieces" : [ "OverallOfficialRole" ]
+}, {
+  "type" : "RecruitmentStatus",
+  "values" : [ {
+    "value" : "ACTIVE_NOT_RECRUITING",
+    "legacyValue" : "Active, not recruiting"
+  }, {
+    "value" : "COMPLETED",
+    "legacyValue" : "Completed"
+  }, {
+    "value" : "ENROLLING_BY_INVITATION",
+    "legacyValue" : "Enrolling by invitation"
+  }, {
+    "value" : "NOT_YET_RECRUITING",
+    "legacyValue" : "Not yet recruiting"
+  }, {
+    "value" : "RECRUITING",
+    "legacyValue" : "Recruiting"
+  }, {
+    "value" : "SUSPENDED",
+    "legacyValue" : "Suspended"
+  }, {
+    "value" : "TERMINATED",
+    "legacyValue" : "Terminated"
+  }, {
+    "value" : "WITHDRAWN",
+    "legacyValue" : "Withdrawn"
+  }, {
+    "value" : "AVAILABLE",
+    "legacyValue" : "Available"
+  } ],
+  "pieces" : [ "LocationStatus" ]
+}, {
+  "type" : "ReferenceType",
+  "values" : [ {
+    "value" : "BACKGROUND",
+    "legacyValue" : "background"
+  }, {
+    "value" : "RESULT",
+    "legacyValue" : "result"
+  }, {
+    "value" : "DERIVED",
+    "legacyValue" : "derived"
+  } ],
+  "pieces" : [ "ReferenceType" ]
+}, {
+  "type" : "IpdSharing",
+  "values" : [ {
+    "value" : "YES",
+    "legacyValue" : "Yes"
+  }, {
+    "value" : "NO",
+    "legacyValue" : "No"
+  }, {
+    "value" : "UNDECIDED",
+    "legacyValue" : "Undecided"
+  } ],
+  "pieces" : [ "IPDSharing" ]
+}, {
+  "type" : "IpdSharingInfoType",
+  "values" : [ {
+    "value" : "STUDY_PROTOCOL",
+    "legacyValue" : "Study Protocol"
+  }, {
+    "value" : "SAP",
+    "legacyValue" : "Statistical Analysis Plan (SAP)"
+  }, {
+    "value" : "ICF",
+    "legacyValue" : "Informed Consent Form (ICF)"
+  }, {
+    "value" : "CSR",
+    "legacyValue" : "Clinical Study Report (CSR)"
+  }, {
+    "value" : "ANALYTIC_CODE",
+    "legacyValue" : "Analytic Code"
+  } ],
+  "pieces" : [ "IPDSharingInfoType" ]
+}, {
+  "type" : "MeasureParam",
+  "values" : [ {
+    "value" : "GEOMETRIC_MEAN",
+    "legacyValue" : "Geometric Mean"
+  }, {
+    "value" : "GEOMETRIC_LEAST_SQUARES_MEAN",
+    "legacyValue" : "Geometric Least Squares Mean"
+  }, {
+    "value" : "LEAST_SQUARES_MEAN",
+    "legacyValue" : "Least Squares Mean"
+  }, {
+    "value" : "LOG_MEAN",
+    "legacyValue" : "Log Mean"
+  }, {
+    "value" : "MEAN",
+    "legacyValue" : "Mean"
+  }, {
+    "value" : "MEDIAN",
+    "legacyValue" : "Median"
+  }, {
+    "value" : "NUMBER",
+    "legacyValue" : "Number"
+  }, {
+    "value" : "COUNT_OF_PARTICIPANTS",
+    "legacyValue" : "Count of Participants"
+  }, {
+    "value" : "COUNT_OF_UNITS",
+    "legacyValue" : "Count of Units"
+  } ],
+  "pieces" : [ "BaselineMeasureParamType", "OutcomeMeasureParamType" ]
+}, {
+  "type" : "MeasureDispersionType",
+  "values" : [ {
+    "value" : "NA",
+    "legacyValue" : "Not Applicable"
+  }, {
+    "value" : "STANDARD_DEVIATION",
+    "legacyValue" : "Standard Deviation"
+  }, {
+    "value" : "STANDARD_ERROR",
+    "legacyValue" : "Standard Error"
+  }, {
+    "value" : "INTER_QUARTILE_RANGE",
+    "legacyValue" : "Inter-Quartile Range"
+  }, {
+    "value" : "FULL_RANGE",
+    "legacyValue" : "Full Range"
+  }, {
+    "value" : "CONFIDENCE_80",
+    "legacyValue" : "80% Confidence Interval"
+  }, {
+    "value" : "CONFIDENCE_90",
+    "legacyValue" : "90% Confidence Interval"
+  }, {
+    "value" : "CONFIDENCE_95",
+    "legacyValue" : "95% Confidence Interval"
+  }, {
+    "value" : "CONFIDENCE_975",
+    "legacyValue" : "97.5% Confidence Interval"
+  }, {
+    "value" : "CONFIDENCE_99",
+    "legacyValue" : "99% Confidence Interval"
+  }, {
+    "value" : "CONFIDENCE_OTHER",
+    "legacyValue" : "Other Confidence Interval Level"
+  }, {
+    "value" : "GEOMETRIC_COEFFICIENT",
+    "legacyValue" : "Geometric Coefficient of Variation"
+  } ],
+  "pieces" : [ "BaselineMeasureDispersionType" ]
+}, {
+  "type" : "OutcomeMeasureType",
+  "values" : [ {
+    "value" : "PRIMARY",
+    "legacyValue" : "Primary"
+  }, {
+    "value" : "SECONDARY",
+    "legacyValue" : "Secondary"
+  }, {
+    "value" : "OTHER_PRE_SPECIFIED",
+    "legacyValue" : "Other Pre-specified"
+  }, {
+    "value" : "POST_HOC",
+    "legacyValue" : "Post-Hoc"
+  } ],
+  "pieces" : [ "OutcomeMeasureType" ]
+}, {
+  "type" : "ReportingStatus",
+  "values" : [ {
+    "value" : "NOT_POSTED",
+    "legacyValue" : "Not Posted"
+  }, {
+    "value" : "POSTED",
+    "legacyValue" : "Posted"
+  } ],
+  "pieces" : [ "OutcomeMeasureReportingStatus" ]
+}, {
+  "type" : "AnalysisDispersionType",
+  "values" : [ {
+    "value" : "STANDARD_DEVIATION",
+    "legacyValue" : "Standard Deviation"
+  }, {
+    "value" : "STANDARD_ERROR_OF_MEAN",
+    "legacyValue" : "Standard Error of the Mean"
+  } ],
+  "pieces" : [ "OutcomeAnalysisDispersionType" ]
+}, {
+  "type" : "ConfidenceIntervalNumSides",
+  "values" : [ {
+    "value" : "ONE_SIDED",
+    "legacyValue" : "1-Sided"
+  }, {
+    "value" : "TWO_SIDED",
+    "legacyValue" : "2-Sided"
+  } ],
+  "pieces" : [ "OutcomeAnalysisCINumSides" ]
+}, {
+  "type" : "NonInferiorityType",
+  "values" : [ {
+    "value" : "SUPERIORITY",
+    "legacyValue" : "Superiority"
+  }, {
+    "value" : "NON_INFERIORITY",
+    "legacyValue" : "Non-Inferiority"
+  }, {
+    "value" : "EQUIVALENCE",
+    "legacyValue" : "Equivalence"
+  }, {
+    "value" : "OTHER",
+    "legacyValue" : "Other"
+  }, {
+    "value" : "NON_INFERIORITY_OR_EQUIVALENCE",
+    "legacyValue" : "Non-Inferiority or Equivalence"
+  }, {
+    "value" : "SUPERIORITY_OR_OTHER",
+    "legacyValue" : "Superiority or Other"
+  }, {
+    "value" : "NON_INFERIORITY_OR_EQUIVALENCE_LEGACY",
+    "legacyValue" : "Non-Inferiority or Equivalence (legacy)"
+  }, {
+    "value" : "SUPERIORITY_OR_OTHER_LEGACY",
+    "legacyValue" : "Superiority or Other (legacy)"
+  } ],
+  "pieces" : [ "OutcomeAnalysisNonInferiorityType" ]
+}, {
+  "type" : "EventAssessment",
+  "values" : [ {
+    "value" : "NON_SYSTEMATIC_ASSESSMENT",
+    "legacyValue" : "Non-systematic Assessment"
+  }, {
+    "value" : "SYSTEMATIC_ASSESSMENT",
+    "legacyValue" : "Systematic Assessment"
+  } ],
+  "pieces" : [ "SeriousEventAssessmentType", "OtherEventAssessmentType" ]
+}, {
+  "type" : "AgreementRestrictionType",
+  "values" : [ {
+    "value" : "LTE60",
+    "legacyValue" : "LTE60"
+  }, {
+    "value" : "GT60",
+    "legacyValue" : "GT60"
+  }, {
+    "value" : "OTHER",
+    "legacyValue" : "OTHER"
+  } ],
+  "pieces" : [ "AgreementRestrictionType" ]
+}, {
+  "type" : "UnpostedEventType",
+  "values" : [ {
+    "value" : "RESET",
+    "legacyValue" : "Reset"
+  }, {
+    "value" : "RELEASE",
+    "legacyValue" : "Release"
+  }, {
+    "value" : "UNRELEASE",
+    "legacyValue" : "Unrelease"
+  } ],
+  "pieces" : [ "UnpostedEventType" ]
+}, {
+  "type" : "ViolationEventType",
+  "values" : [ {
+    "value" : "VIOLATION_IDENTIFIED",
+    "legacyValue" : "Violation Identified by FDA"
+  }, {
+    "value" : "CORRECTION_CONFIRMED",
+    "legacyValue" : "Correction Confirmed by FDA"
+  }, {
+    "value" : "PENALTY_IMPOSED",
+    "legacyValue" : "Penalty Imposed by FDA"
+  }, {
+    "value" : "ISSUES_IN_LETTER_ADDRESSED_CONFIRMED",
+    "legacyValue" : "Issues in letter addressed; confirmed by FDA."
+  } ],
+  "pieces" : [ "ViolationEventType" ]
+}, {
+  "type" : "BrowseLeafRelevance",
+  "values" : [ {
+    "value" : "LOW",
+    "legacyValue" : "low"
+  }, {
+    "value" : "HIGH",
+    "legacyValue" : "high"
+  } ],
+  "pieces" : [ "ConditionBrowseLeafRelevance", "InterventionBrowseLeafRelevance" ]
+} ]
