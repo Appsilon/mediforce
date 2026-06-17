@@ -23,11 +23,14 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ### Fixed
 - `scripts/sync-model-rankings.py` now uses OpenRouter's frontend rankings JSON endpoint instead of a brittle private server-action scrape, restoring local model ranking sync.
 - On-demand preview deploys now work: `/deploy` on a PR runs a real `vercel build` + `vercel deploy --prebuilt` via the Vercel CLI, replacing the empty-commit `[preview]`-marker hack that silently no-op'd.
+- Execution history panel now shows all iterations of looped steps — steps that completed before the current loop revisit (e.g. a timer-wait that ran between two visits to the same decision gate) were previously hidden or incorrectly marked pending due to the steps API returning only the latest execution per step and using a positional definition-order algorithm for status derivation.
 
 ## [2026-06-14]
 
 ### Added
 - The "Before you start" pre-flight dialog now shows actionable resolution paths per warning instead of a static hint: missing-image warnings link to "Configure build source" (workflow editor), "Build manually" (Docker setup tutorial), and "Contact admin" (mailto: to the namespace owner); missing-secret warnings deep-link directly to the Secrets panel for the affected key. Backed by a new `GET /api/namespaces/:handle/admin-contact` endpoint that resolves the earliest owner's email [#312](https://github.com/Appsilon/mediforce/pull/312).
+- **Task view** — spreadsheet-style table replaces card grid; status column, clickable run links, bulk cancel via batch endpoint, hide-completed toggle
+- **Process card** — step-progress dots rendered against the run's actual definition version instead of the latest definition
 
 ### Changed
 - **StepExecutor strategy pattern (ADR-0008)** — agent and script steps now execute through separate `StepExecutor` strategies (`AgentStepExecutor`, `ScriptStepExecutor`) instead of a monolithic `AgentRunner` with `isScript` branches. Each strategy owns its full lifecycle (run, audit, advance/review, cost tracking). `AgentPlugin` interface renamed to `StepExecutorPlugin` to reflect that scripts and Databricks jobs are peers, not special-cased agents:

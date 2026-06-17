@@ -86,6 +86,7 @@ const EXECUTOR_ICON: Record<string, { icon: React.ElementType; color: string; bg
   agent:  { icon: Bot,      color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/30', label: 'Agent' },
   script: { icon: Terminal, color: 'text-amber-600 dark:text-amber-400',   bg: 'bg-amber-100 dark:bg-amber-900/30',  label: 'Script' },
   cowork: { icon: Users,    color: 'text-teal-600 dark:text-teal-400',     bg: 'bg-teal-100 dark:bg-teal-900/30',    label: 'Cowork' },
+  action: { icon: Terminal, color: 'text-sky-600 dark:text-sky-400',       bg: 'bg-sky-100 dark:bg-sky-900/30',      label: 'Action' },
 };
 
 const STEP_TYPE_ICON: Record<string, { icon: React.ElementType; color: string; label: string }> = {

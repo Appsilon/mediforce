@@ -100,7 +100,7 @@ export const StepEntrySchema = z.object({
   status: StepEntryStatusSchema,
   input: z.record(z.string(), z.unknown()).nullable(),
   output: z.record(z.string(), z.unknown()).nullable(),
-  execution: StepExecutionSchema.nullable(),
+  executions: z.array(StepExecutionSchema),
 });
 
 export const GetProcessStepsInputSchema = z.object({

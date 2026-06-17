@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText, FileCode, Paperclip, RotateCcw } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText, FileCode, Paperclip } from 'lucide-react';
 import type { ProcessInstance, StepExecution, Step, HumanTask } from '@mediforce/platform-core';
 import type { RunOutputFileEntry } from '@mediforce/platform-api/contract';
 import { AutonomyBadge } from '../agents/autonomy-badge';
@@ -61,12 +61,7 @@ interface StepStatusPanelProps {
 type HistoryItem =
   | {
       kind: 'executed';
-      /** First attempt of this visit (iterationNumber === 0). */
-      anchor: StepExecution;
-      /** Subsequent retries within this visit (iterationNumber > 0). */
-      retries: StepExecution[];
-      /** Most recent execution in this visit — the one whose metadata we display. */
-      latestExec: StepExecution;
+      execution: StepExecution;
       step: Step | null;
       isCurrent: boolean;
     }
@@ -84,32 +79,15 @@ function buildHistory(
   instance: ProcessInstance,
   definitionSteps: Step[],
 ): HistoryItem[] {
-  // Chronological order — anchors (iterationNumber===0) establish visit order.
   const sorted = [...stepExecutions].sort(
     (a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime(),
   );
 
-  const anchors = sorted.filter((e) => e.iterationNumber === 0);
-
-  const items: HistoryItem[] = anchors.map((anchor, idx) => {
-    // Retries belong to this visit if they come after the anchor but before
-    // the next anchor for the same stepId (which would be a new loop visit).
-    const nextSameStep = anchors.slice(idx + 1).find((a) => a.stepId === anchor.stepId);
-    const retries = sorted.filter(
-      (e) =>
-        e.stepId === anchor.stepId &&
-        e.iterationNumber > 0 &&
-        new Date(e.startedAt) > new Date(anchor.startedAt) &&
-        (nextSameStep === undefined ||
-          new Date(e.startedAt) < new Date(nextSameStep.startedAt)),
-    );
-
-    const latestExec = retries.length > 0 ? retries[retries.length - 1]! : anchor;
-    const step = definitionSteps.find((s) => s.id === anchor.stepId) ?? null;
+  const items: HistoryItem[] = sorted.map((execution) => {
+    const step = definitionSteps.find((s) => s.id === execution.stepId) ?? null;
     const isCurrent =
-      anchor.stepId === instance.currentStepId && ACTIVE_STATUSES.has(latestExec.status);
-
-    return { kind: 'executed', anchor, retries, latestExec, step, isCurrent };
+      execution.stepId === instance.currentStepId && ACTIVE_STATUSES.has(execution.status);
+    return { kind: 'executed', execution, step, isCurrent };
   });
 
   // If the current step has no execution record yet (run just started or
@@ -528,10 +506,10 @@ export function StepStatusPanel({
             );
           }
 
-          const { anchor, retries, latestExec, step, isCurrent } = item;
-          const execId = anchor.id;
-          const stepId = anchor.stepId;
-          const status = getExecEffectiveStatus(latestExec, instance);
+          const { execution, step, isCurrent } = item;
+          const execId = execution.id;
+          const stepId = execution.stepId;
+          const status = getExecEffectiveStatus(execution, instance);
           const stepConfig = stepConfigMap?.get(stepId);
           const hasConfig = stepConfig?.executorType === 'agent';
           const isExpanded = expandedExecId === execId;
@@ -545,7 +523,7 @@ export function StepStatusPanel({
 
           // For review steps: show the verdict that was actually taken.
           const verdicts = step?.verdicts;
-          const takenVerdict = latestExec.status === 'completed' ? latestExec.verdict : undefined;
+          const takenVerdict = execution.status === 'completed' ? execution.verdict : undefined;
           const takenVerdictTarget = takenVerdict && verdicts
             ? Object.entries(verdicts).find(([k]) => k === takenVerdict)?.[1]?.target
             : undefined;
@@ -576,7 +554,7 @@ export function StepStatusPanel({
                 <div className="flex flex-wrap items-center gap-2">
                   {stepDetailBaseHref && status !== 'pending' ? (
                     <Link
-                      href={`${stepDetailBaseHref}/steps/${encodeURIComponent(stepId)}`}
+                      href={`${stepDetailBaseHref}/steps/${encodeURIComponent(stepId)}?executionId=${encodeURIComponent(execId)}`}
                       className="text-sm font-medium text-primary hover:underline"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -593,12 +571,6 @@ export function StepStatusPanel({
                   )}
                   {stepConfig?.executorType === 'agent' && stepConfig.autonomyLevel && (
                     <AutonomyBadge level={stepConfig.autonomyLevel} />
-                  )}
-                  {retries.length > 0 && (
-                    <span className="inline-flex items-center gap-0.5 text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 rounded-full px-1.5 py-0.5">
-                      <RotateCcw className="h-3 w-3" />
-                      Retried ×{retries.length}
-                    </span>
                   )}
                   <StatusLabel status={status} />
                   {stepOutputFiles.length > 0 && (
@@ -626,32 +598,32 @@ export function StepStatusPanel({
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span className="text-xs text-muted-foreground">
                     <span className="text-muted-foreground/60 mr-1">Started</span>
-                    {format(new Date(latestExec.startedAt), 'MMM d, HH:mm')}
+                    {format(new Date(execution.startedAt), 'MMM d, HH:mm')}
                   </span>
-                  {!latestExec.completedAt && (
+                  {!execution.completedAt && (
                     <>
                       <span className="text-muted-foreground/40">·</span>
                       <span className="text-xs text-muted-foreground">
-                        <ElapsedTimer startedAt={latestExec.startedAt} />
+                        <ElapsedTimer startedAt={execution.startedAt} />
                       </span>
                     </>
                   )}
-                  {latestExec.completedAt && (
+                  {execution.completedAt && (
                     <>
                       <span className="text-muted-foreground/40">·</span>
                       <span className="text-xs text-muted-foreground">
                         <span className="text-muted-foreground/60 mr-1">Completed</span>
-                        {format(new Date(latestExec.completedAt), 'MMM d, HH:mm')}
+                        {format(new Date(execution.completedAt), 'MMM d, HH:mm')}
                       </span>
                       <span className="text-muted-foreground/40">·</span>
                       <span className="text-xs text-muted-foreground">
-                        {formatDuration(new Date(latestExec.completedAt).getTime() - new Date(latestExec.startedAt).getTime())}
+                        {formatDuration(new Date(execution.completedAt).getTime() - new Date(execution.startedAt).getTime())}
                       </span>
-                      {latestExec.agentOutput?.estimatedCostUsd != null && (
+                      {execution.agentOutput?.estimatedCostUsd != null && (
                         <>
                           <span className="text-muted-foreground/40">·</span>
                           <span className="text-xs text-muted-foreground">
-                            {formatCostUsd(latestExec.agentOutput.estimatedCostUsd)}
+                            {formatCostUsd(execution.agentOutput.estimatedCostUsd)}
                           </span>
                         </>
                       )}
@@ -659,7 +631,7 @@ export function StepStatusPanel({
                   )}
                   <span className="text-muted-foreground/40">·</span>
                   <ExecutedBy
-                    executedBy={latestExec.executedBy}
+                    executedBy={execution.executedBy}
                     executorType={stepConfig?.executorType}
                     plugin={stepConfig?.plugin}
                     autonomyLevel={stepConfig?.autonomyLevel}

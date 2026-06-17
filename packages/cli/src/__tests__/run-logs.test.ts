@@ -57,10 +57,10 @@ const SAMPLE_STEPS = {
       status: 'completed' as const,
       input: null,
       output: null,
-      execution: mkExecution('step-review', 'completed', {
+      executions: [mkExecution('step-review', 'completed', {
         startedAt: '2026-06-01T10:00:00.000Z',
         completedAt: '2026-06-01T10:00:05.000Z',
-      }),
+      })],
     },
     {
       stepId: 'step-approve',
@@ -70,12 +70,12 @@ const SAMPLE_STEPS = {
       status: 'completed' as const,
       input: null,
       output: null,
-      execution: mkExecution('step-approve', 'failed', {
+      executions: [mkExecution('step-approve', 'failed', {
         startedAt: '2026-06-01T10:00:06.000Z',
         completedAt: '2026-06-01T10:00:08.000Z',
         error: 'rejected by reviewer',
         verdict: 'reject',
-      }),
+      })],
     },
   ],
 };
