@@ -123,6 +123,19 @@
     }
     .progress-step.active { background: var(--accent); }
     .progress-step.done { background: var(--accent); opacity: 0.5; }
+    .progress-step-label {
+      flex: 1;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: 6px;
+      transition: color 0.3s;
+    }
+    .progress-step-label.active { color: var(--accent); }
+    .progress-step-label.done { color: var(--accent); opacity: 0.6; }
     .progress-label {
       font-size: 13px;
       color: var(--text-muted);
@@ -477,6 +490,7 @@
 <div class="container">
   <div class="progress-label" id="progress-label">Step 1 of 7</div>
   <div class="progress" id="progress-bar"></div>
+  <div class="progress" id="progress-labels" style="margin-top:-28px; margin-bottom:32px;"></div>
 
   <!-- Step 1: Repository -->
   <div class="step active" id="step-1">
@@ -814,17 +828,26 @@ ssh -t root@<span class="use-ip">IP</span> bash /tmp/bootstrap.sh</pre>
 
 <script>
 const TOTAL_STEPS = 7;
+const STEP_LABELS = ['GitHub', 'Server', 'Firebase', 'LLM', 'Domain', 'Email', 'Deploy'];
 let currentStep = 1;
 
 // --- Progress bar ---
 function initProgress() {
   const bar = document.getElementById('progress-bar');
+  const labels = document.getElementById('progress-labels');
   bar.innerHTML = '';
+  labels.innerHTML = '';
   for (let i = 1; i <= TOTAL_STEPS; i++) {
     const el = document.createElement('div');
     el.className = 'progress-step';
     el.id = `prog-${i}`;
     bar.appendChild(el);
+
+    const lbl = document.createElement('div');
+    lbl.className = 'progress-step-label';
+    lbl.id = `prog-label-${i}`;
+    lbl.textContent = STEP_LABELS[i - 1];
+    labels.appendChild(lbl);
   }
   updateProgress();
 }
@@ -835,6 +858,11 @@ function updateProgress() {
     el.className = 'progress-step';
     if (i < currentStep) el.classList.add('done');
     if (i === currentStep) el.classList.add('active');
+
+    const lbl = document.getElementById(`prog-label-${i}`);
+    lbl.className = 'progress-step-label';
+    if (i < currentStep) lbl.classList.add('done');
+    if (i === currentStep) lbl.classList.add('active');
   }
   document.getElementById('progress-label').textContent = `Step ${currentStep} of ${TOTAL_STEPS}`;
 }
