@@ -55,7 +55,7 @@ export function useStepExecutions(
     const entries = query.data ?? [];
     const out: StepExecution[] = [];
     for (const entry of entries) {
-      if (entry.execution !== null) out.push(entry.execution);
+      out.push(...entry.executions);
     }
     return out;
   }, [query.data]);

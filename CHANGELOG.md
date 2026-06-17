@@ -23,6 +23,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ### Fixed
 - `scripts/sync-model-rankings.py` now uses OpenRouter's frontend rankings JSON endpoint instead of a brittle private server-action scrape, restoring local model ranking sync.
 - On-demand preview deploys now work: `/deploy` on a PR runs a real `vercel build` + `vercel deploy --prebuilt` via the Vercel CLI, replacing the empty-commit `[preview]`-marker hack that silently no-op'd.
+- Execution history panel now shows all iterations of looped steps — steps that completed before the current loop revisit (e.g. a timer-wait that ran between two visits to the same decision gate) were previously hidden or incorrectly marked pending due to the steps API returning only the latest execution per step and using a positional definition-order algorithm for status derivation.
 
 ## [2026-06-14]
 
