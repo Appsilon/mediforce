@@ -39,6 +39,7 @@ describe('registerWorkflow handler', () => {
       name: 'flow-new',
       namespace: 'team-alpha',
     });
+    body.steps[1].agent = { image: 'test-image' };
     const { version: _omitVersion, createdAt: _omitCreatedAt, namespace: _omitNamespace, ...input } = body;
 
     const result = await registerWorkflow(
@@ -132,7 +133,7 @@ describe('registerWorkflow handler', () => {
       name: 'active-flow',
       namespace: 'team-alpha',
       steps: [
-        { id: 'analyze', name: 'Analyze', type: 'review', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'anthropic/claude-sonnet-4' } },
+        { id: 'analyze', name: 'Analyze', type: 'review', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'anthropic/claude-sonnet-4', image: 'test-image' } },
         { id: 'complete', name: 'Complete', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'analyze', to: 'complete' }],
@@ -207,6 +208,7 @@ describe('registerWorkflow handler', () => {
       name: 'flow-existing',
       namespace: 'team-alpha',
     });
+    body.steps[1].agent = { image: 'test-image' };
     const { version: _omitVersion, createdAt: _omitCreatedAt, namespace: _omitNamespace, ...input } = body;
 
     const result = await registerWorkflow(
