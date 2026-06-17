@@ -24,7 +24,7 @@ if [ "$needs_replacement" = true ]; then
   env | grep '^NEXT_PUBLIC_' | while IFS='=' read -r name value; do
     placeholder="__${name}__"
     # Escape sed special chars in value
-    escaped_value=$(printf '%s\n' "$value" | sed 's/[&/\]/\\&/g')
+    escaped_value=$(printf '%s\n' "$value" | sed 's/[&/\|]/\\&/g')
     find "$STATIC_DIR" -name '*.js' -exec sed -i "s|${placeholder}|${escaped_value}|g" {} + 2>/dev/null || true
     [ -f "$SERVER_JS" ] && sed -i "s|${placeholder}|${escaped_value}|g" "$SERVER_JS" 2>/dev/null || true
   done

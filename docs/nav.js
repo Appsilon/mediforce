@@ -67,7 +67,7 @@
 .site-header .header-links{display:flex;align-items:center;gap:0.25rem}
 .site-header .header-link{display:inline-flex;align-items:center;gap:0.375rem;font-size:0.8125rem;font-weight:500;color:#6B7280;padding:0.375rem 0.75rem;border-radius:0.375rem;text-decoration:none;transition:color 0.15s}
 .site-header .header-link:hover{color:#111827;background:rgba(0,0,0,0.04)}
-.site-header .header-link--active{color:#0D9488;font-weight:600}
+.site-header .header-link--active{color:#0D9488;font-weight:600;background:rgba(13,148,136,0.07)}
 .site-header .header-link--icon{display:flex;align-items:center;padding:0.375rem 0.5rem;color:#9CA3AF}
 .site-header .header-link--icon:hover{color:#111827;background:rgba(0,0,0,0.04)}
 .site-header .header-link--icon svg{width:1.125rem;height:1.125rem}
@@ -91,9 +91,19 @@
 
   document.body.insertAdjacentHTML('afterbegin', html);
 
-  document.getElementById('site-nav-toggle').addEventListener('click', function () {
-    const nav = document.getElementById('site-mobile-nav');
-    const open = nav.classList.toggle('is-open');
+  const toggle = document.getElementById('site-nav-toggle');
+  const mobileNav = document.getElementById('site-mobile-nav');
+
+  toggle.addEventListener('click', function () {
+    const open = mobileNav.classList.toggle('is-open');
     this.setAttribute('aria-expanded', open);
+  });
+
+  document.addEventListener('click', function (e) {
+    if (mobileNav.classList.contains('is-open') &&
+        !mobileNav.contains(e.target) && !toggle.contains(e.target)) {
+      mobileNav.classList.remove('is-open');
+      toggle.setAttribute('aria-expanded', false);
+    }
   });
 })();
