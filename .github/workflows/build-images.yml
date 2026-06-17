@@ -16,7 +16,15 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     permissions:
       contents: read
@@ -32,50 +40,89 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up QEMU (for arm64 cross-compilation on release)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build & push platform-ui
+      - name: Sanitise platform slug
+        run: echo "PLATFORM_SLUG=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_ENV
+
+      - name: Build & push platform-ui (${{ matrix.platform }})
         uses: docker/build-push-action@v6
         with:
           context: .
           file: packages/platform-ui/Dockerfile
           target: runner
-          platforms: ${{ startsWith(github.ref, 'refs/tags/') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          platforms: ${{ matrix.platform }}
           push: true
           tags: |
-            ${{ env.IMAGE_PREFIX }}-platform-ui:latest
-            ${{ env.IMAGE_PREFIX }}-platform-ui:${{ github.sha }}
-          cache-from: type=gha,scope=platform-ui
-          cache-to: type=gha,mode=max,scope=platform-ui
+            ${{ env.IMAGE_PREFIX }}-platform-ui:${{ env.PLATFORM_SLUG }}
+          cache-from: type=gha,scope=platform-ui-${{ env.PLATFORM_SLUG }}
+          cache-to: type=gha,mode=max,scope=platform-ui-${{ env.PLATFORM_SLUG }}
 
-      - name: Build & push migrate
+      - name: Build & push migrate (${{ matrix.platform }})
         uses: docker/build-push-action@v6
         with:
           context: .
           file: packages/platform-ui/Dockerfile
           target: migrate
-          platforms: ${{ startsWith(github.ref, 'refs/tags/') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          platforms: ${{ matrix.platform }}
           push: true
           tags: |
-            ${{ env.IMAGE_PREFIX }}-migrate:latest
-            ${{ env.IMAGE_PREFIX }}-migrate:${{ github.sha }}
-          cache-from: type=gha,scope=migrate
-          cache-to: type=gha,mode=max,scope=migrate
+            ${{ env.IMAGE_PREFIX }}-migrate:${{ env.PLATFORM_SLUG }}
+          cache-from: type=gha,scope=migrate-${{ env.PLATFORM_SLUG }}
+          cache-to: type=gha,mode=max,scope=migrate-${{ env.PLATFORM_SLUG }}
 
-      - name: Build & push container-worker
+      - name: Build & push container-worker (${{ matrix.platform }})
         uses: docker/build-push-action@v6
         with:
           context: .
           file: packages/container-worker/Dockerfile.worker
-          platforms: ${{ startsWith(github.ref, 'refs/tags/') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          platforms: ${{ matrix.platform }}
           push: true
           tags: |
-            ${{ env.IMAGE_PREFIX }}-container-worker:latest
-            ${{ env.IMAGE_PREFIX }}-container-worker:${{ github.sha }}
-          cache-from: type=gha,scope=container-worker
-          cache-to: type=gha,mode=max,scope=container-worker
+            ${{ env.IMAGE_PREFIX }}-container-worker:${{ env.PLATFORM_SLUG }}
+          cache-from: type=gha,scope=container-worker-${{ env.PLATFORM_SLUG }}
+          cache-to: type=gha,mode=max,scope=container-worker-${{ env.PLATFORM_SLUG }}
+
+  merge-manifests:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create multi-arch manifest — platform-ui
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.IMAGE_PREFIX }}-platform-ui:latest \
+            --tag ${{ env.IMAGE_PREFIX }}-platform-ui:${{ github.sha }} \
+            ${{ env.IMAGE_PREFIX }}-platform-ui:linux-amd64 \
+            ${{ env.IMAGE_PREFIX }}-platform-ui:linux-arm64
+
+      - name: Create multi-arch manifest — migrate
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.IMAGE_PREFIX }}-migrate:latest \
+            --tag ${{ env.IMAGE_PREFIX }}-migrate:${{ github.sha }} \
+            ${{ env.IMAGE_PREFIX }}-migrate:linux-amd64 \
+            ${{ env.IMAGE_PREFIX }}-migrate:linux-arm64
+
+      - name: Create multi-arch manifest — container-worker
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.IMAGE_PREFIX }}-container-worker:latest \
+            --tag ${{ env.IMAGE_PREFIX }}-container-worker:${{ github.sha }} \
+            ${{ env.IMAGE_PREFIX }}-container-worker:linux-amd64 \
+            ${{ env.IMAGE_PREFIX }}-container-worker:linux-arm64

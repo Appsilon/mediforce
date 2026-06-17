@@ -37,7 +37,7 @@ fi
 export NEXT_PUBLIC_GIT_SHA=$(git rev-parse --short HEAD)
 
 echo "==> Pulling pre-built platform images from registry"
-$COMPOSE pull --ignore-pull-failures 2>/dev/null || true
+$COMPOSE pull --ignore-pull-failures 2>&1 || true
 
 if [ "${2:-}" = "--no-cache" ]; then
   echo "==> Rebuilding platform-ui (no-cache, SHA: $NEXT_PUBLIC_GIT_SHA)"
