@@ -73,6 +73,10 @@ const riMono = inputBaseMono;
 const rs = selectBase;
 const rt = textareaBase;
 
+function imageRef(img: DockerImageInfo): string {
+  return img.tag && img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.repository;
+}
+
 // ---------------------------------------------------------------------------
 // Executor / step-type icon maps (mirrors workflow-diagram.tsx)
 // ---------------------------------------------------------------------------
@@ -350,7 +354,7 @@ export function StepEditor({
       </FieldGroup>
 
       {/* ── Agent config ─────────────────────────────────────────── */}
-      {isAgent && (
+      {isAgent && (<>
         <FieldGroup>
           <FieldRow label="autonomyLevel" tooltip={TIP.autonomyLevel}>
             <select
@@ -482,13 +486,10 @@ export function StepEditor({
                 >
                   <option value="">Select image…</option>
                   {dockerImages.map((img) => {
-                    const ref = img.tag && img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.repository;
+                    const ref = imageRef(img);
                     return <option key={img.id} value={ref}>{ref}</option>;
                   })}
-                  {step.agent?.image && !dockerImages.some((img) => {
-                    const ref = img.tag && img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.repository;
-                    return ref === step.agent?.image;
-                  }) && (
+                  {step.agent?.image && !dockerImages.some((img) => imageRef(img) === step.agent?.image) && (
                     <option value={step.agent.image}>{step.agent.image}</option>
                   )}
                 </select>
@@ -547,7 +548,7 @@ export function StepEditor({
             />
           </FieldRow>
         </FieldGroup>
-      )}
+      </>)}
 
       {/* ── Script config ────────────────────────────────────────── */}
       {isScript && (
