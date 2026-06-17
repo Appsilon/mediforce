@@ -70,22 +70,47 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
    we can audit; the per-request DB read is indexed (millisecond-scale) and
    negligible for our scale.
 
-4. **Providers, env-gated and additive.** A single configuration ships
-   four providers, each enabled by an env var:
+4. **Providers, env-gated and additive (MVP scope set 2026-06-16).** A single
+   configuration ships providers, each enabled by an env var. The MVP ships
+   **three**; magic-link is deferred:
 
    - **Google OAuth** (`GOOGLE_CLIENT_ID`) — parity with today's
      `signInWithPopup(googleProvider)`. The default for the current
      Mediforce user base.
    - **Credentials / email + password** (`ENABLE_PASSWORD_AUTH=true`) —
-     real password auth (bcrypt-hashed in `auth_users`). Optional. Useful
-     when Google/OIDC aren't available, plus for testing and self-hosted
-     installs.
-   - **Email magic link** (`SMTP_HOST` set) — passwordless via SendGrid
-     (we already operate it in `platform-infra/src/email`). Staging / fallback.
+     real password auth (bcrypt-hashed in `auth_users`). A first-class,
+     production-supported option (not demo-only) — it is also load-bearing
+     for local dev, E2E, and air-gapped demos, replacing today's Firebase
+     Auth emulator password users. **Heavy password policy** (complexity,
+     rotation, lockout, history) is **deferred to a future ADR** — built
+     when a real password-in-production deployment needs 21 CFR-grade
+     controls. The MVP provider is honest, not crippled, but minimal.
    - **OIDC** (`OIDC_ISSUER` set) — pharma SSO to a customer's Keycloak /
      Entra / Okta / generic OIDC server. **One IdP per deployment**;
      mediforce is single-tenant per deployment so per-workspace IdPs are
-     out of scope.
+     out of scope. **Included now but dormant**: it is ~15 lines of
+     env-gated config that ship even with no IdP wired. Real per-customer
+     integration (client registration, callback URL, claim mapping,
+     end-to-end test against the customer's IdP) happens when a customer
+     lands; the MVP at most carries one smoke test against a local Keycloak.
+     Shipped now because it *is* the on-prem SSO GTM story and costs almost
+     nothing dormant.
+   - **Email magic link** — **deferred** (was a fourth provider in the
+     draft). Needs SMTP wiring + the verification-token flow, which nobody
+     needs today. Add when a deployment without Google/OIDC/password asks.
+
+4a. **Email-domain allowlist (decision 2026-06-16).** A deployment-level
+   `ALLOWED_EMAIL_DOMAINS` env (comma-separated, e.g. `appsilon.com`) is
+   enforced in the NextAuth `signIn` callback across **all** providers: a
+   sign-in whose `user.email` domain is not in the list is rejected; an unset
+   value means no restriction. This is **not** optional polish — with Google
+   enabled, *any* Google account on earth could otherwise sign in, so the
+   allowlist is what closes that open door (staging restricts to
+   `appsilon.com`; a customer deployment restricts to its domain, or relies on
+   its OIDC IdP). It is a deployment-operator security policy (env var,
+   boot-validated in `instrumentation.ts`, enforced in the same `signIn`
+   callback as the personal-workspace bootstrap), never a per-workspace
+   in-app setting.
 
 5. **Role / claim resolution.** Firebase custom claims map onto three
    different storage locations:
@@ -154,13 +179,14 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
    _Supersedes the pre-2026-06-16 draft's seamless-Google-pre-seed +
    password-re-enroll plan._
 
-8. **Cutover.** **Sequential after ADR-0001**, not bundled. ADR-0001 lands
-   first; mediforce runs on Postgres + Firebase Auth for a stable interval
-   (hybrid is fine — Firebase Auth talks to Google, doesn't touch our DB).
-   Then ADR-0002 runs its own planned-downtime cutover: deploy NextAuth
-   code, run user migration script, flip `AUTH_BACKEND=nextauth`, restart,
-   smoke-test. Rollback path: flip back to `AUTH_BACKEND=firebase`,
-   investigate. Splitting cutovers isolates failure modes.
+8. **Cutover — straight swap, no dual-backend (decision 2026-06-16).** With
+   no production to protect (§7), there is no `AUTH_BACKEND` flag, no parallel
+   Firebase/NextAuth CI matrix, and no rollback-to-Firebase window. NextAuth
+   replaces Firebase Auth in one PR sequence; the one-time staging remap (§7)
+   preserves staging users; if something breaks, **fix forward**. ADR-0001
+   already landed, so this is simply the next change, not a bundled or flagged
+   cutover. **Lands after ADR-0003** (storage) so client-direct uploads do not
+   break when the Firebase Auth session disappears — see ADR-0003 §5.
 
 ## Considered alternatives
 
@@ -227,14 +253,24 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
 
 ## Open questions for review
 
-- Single OIDC config per deployment vs per workspace — recommended single
-  per deployment given Mediforce's single-tenant model. Confirm.
-- Real password provider toggle (`ENABLE_PASSWORD_AUTH=true`) — confirm
-  this stays a supported option, not "demo only".
-- Session strategy `database` vs `jwt` — confirm `database` for revocation
-  and audit.
+(None blocking. All review questions resolved in the 2026-06-16 grilling —
+see below.)
 
 ### Resolved during the 2026-06-16 grilling
+
+- **OIDC scope.** Resolved: one IdP **per deployment** (single-tenant model),
+  and **included now but dormant** (env-gated, real integration per-customer
+  later). See §4.
+- **Password provider.** Resolved: **production-supported, not demo-only**,
+  env-gated; also the dev/E2E/demo auth path. Heavy 21 CFR password policy
+  deferred to a future ADR. See §4.
+- **Session strategy.** Resolved: **`database`** (immediate revocation +
+  audit; near-free given the Drizzle adapter is present for account linking
+  anyway). See §3.
+- **Email-domain allowlist.** Added: `ALLOWED_EMAIL_DOMAINS` enforced in the
+  `signIn` callback — mandatory in spirit once Google is on. See §4a.
+- **Magic-link provider.** Deferred (SMTP + verification-token flow; nobody
+  needs it today). See §4.
 
 - **Auth carrier (browser → API).** Resolved: cookie-native, same-origin
   (decision §6). The browser uses the NextAuth httpOnly session cookie;
