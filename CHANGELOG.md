@@ -17,6 +17,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Extracted `normaliseModelId` to `platform-core` — was duplicated 5 times across 3 packages.
 - Codex now mirrors Claude's repo-local skill and agent discovery layout via `.codex/skills/*` and `.codex/agents` symlinks, with `AGENTS.md` documenting how Codex should translate Claude-specific skill tool syntax.
 
+### Fixed
+- `scripts/sync-model-rankings.py` now uses OpenRouter's frontend rankings JSON endpoint instead of a brittle private server-action scrape, restoring local model ranking sync.
+
 ## [2026-06-14]
 
 ### Added
