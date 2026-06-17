@@ -19,6 +19,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ### Fixed
 - `scripts/sync-model-rankings.py` now uses OpenRouter's frontend rankings JSON endpoint instead of a brittle private server-action scrape, restoring local model ranking sync.
+- On-demand preview deploys now work: `/deploy` (or `/deploy-preview`) on a PR runs a real `vercel build` + `vercel deploy --prebuilt` via the Vercel CLI, replacing the empty-commit `[preview]`-marker hack that silently no-op'd.
 
 ## [2026-06-14]
 

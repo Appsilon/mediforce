@@ -5,30 +5,24 @@ on:
     types: [created]
 
 permissions:
-  contents: write
-  pull-requests: read
+  pull-requests: write
   issues: write
 
 jobs:
-  trigger:
+  deploy-preview:
     if: |
       github.event.issue.pull_request &&
-      startsWith(github.event.comment.body, '/deploy-preview') &&
+      startsWith(github.event.comment.body, '/deploy') &&
       (
         github.event.comment.author_association == 'OWNER' ||
         github.event.comment.author_association == 'MEMBER' ||
         github.event.comment.author_association == 'COLLABORATOR'
       )
     runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
-      - name: Acknowledge
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api -X POST \
-            repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
-            -f content=rocket
-
       - name: Resolve PR branch
         id: pr
         env:
@@ -43,20 +37,32 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.pr.outputs.ref }}
-          fetch-depth: 2
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push empty commit with [preview] marker
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Pull Vercel environment
+        run: vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build
+        run: vercel build --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy prebuilt artifact
+        id: deploy
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit --allow-empty -m "ci: trigger preview deploy [preview]"
-          git push origin HEAD:${{ steps.pr.outputs.ref }}
+          url=$(vercel deploy --prebuilt --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
-      - name: Post status comment
+      - name: Post preview URL
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh pr comment ${{ github.event.issue.number }} \
             --repo ${{ github.repository }} \
-            --body "Preview deploy triggered via empty commit on \`${{ steps.pr.outputs.ref }}\`. Vercel build will start shortly."
+            --body "Preview deployed: ${{ steps.deploy.outputs.url }}"
