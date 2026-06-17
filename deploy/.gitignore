@@ -1,0 +1,19 @@
+# Terraform local state + provider cache.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Provider lock file: normally you'd commit this, but `terraform/mediforce/`
+# is a child module — it's only ever consumed via `module.source = "git::...//deploy/terraform/mediforce"`
+# from a root project (e.g. cytos-deployment). The root project's lock file
+# is the one that pins providers; a lock here would just be an artifact from
+# someone running `terraform init` locally for validation.
+terraform/mediforce/.terraform.lock.hcl

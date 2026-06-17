@@ -1,0 +1,48 @@
+# Kubernetes deployment image for the Mediforce UI.
+#
+# The upstream `packages/platform-ui/Dockerfile` produces a Next.js standalone
+# image that copies only `.next/standalone`, `.next/static`, `public/`, and
+# `data/` into the runner stage. It does NOT carry `apps/*/plugins/*/skills/`,
+# which the workflow engine resolves at runtime via `MEDIFORCE_ROOT`
+# (packages/agent-runtime/src/plugins/base-container-agent-plugin.ts).
+#
+# Upstream's `docker-compose.prod.yml` works around the gap by host-bind-mounting
+# the entire repo source at `/repo` at runtime. That pattern does not apply in
+# K8s — there's no host source tree to mount. So we bake `apps/` into the image.
+#
+# Usage (from the mediforce repo root):
+#
+#   # 1. Build the upstream image
+#   docker build --platform linux/amd64 \
+#     -f packages/platform-ui/Dockerfile \
+#     --build-arg NEXT_PUBLIC_FIREBASE_API_KEY=... \
+#     --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=... \
+#     --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID=... \
+#     --build-arg NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=... \
+#     --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=... \
+#     --build-arg NEXT_PUBLIC_FIREBASE_APP_ID=... \
+#     --build-arg NEXT_PUBLIC_APP_URL=https://mediforce.example.com \
+#     --build-arg NEXT_PUBLIC_GIT_SHA=$(git rev-parse HEAD) \
+#     -t mediforce-ui-upstream:vX.Y.Z \
+#     .
+#
+#   # 2. Layer on the apps/ tree
+#   docker build --platform linux/amd64 \
+#     -f deploy/docker/Dockerfile.k8s \
+#     --build-arg BASE_IMAGE=mediforce-ui-upstream:vX.Y.Z \
+#     -t mediforce-ui:vX.Y.Z \
+#     .
+#
+# When the upstream Dockerfile folds `COPY apps/` into its own runner stage,
+# this layered build collapses back to a single stage.
+
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+# Bake the workflow apps/skills tree into the image so MEDIFORCE_ROOT can
+# point at a real path inside the container.
+COPY apps/ /app/apps/
+
+# Default for the runtime env var; the Helm chart sets this too, but pinning
+# it here lets `docker run` invocations work without the chart.
+ENV MEDIFORCE_ROOT=/app

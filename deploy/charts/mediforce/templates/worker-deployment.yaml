@@ -1,0 +1,118 @@
+{{- if .Values.worker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mediforce.fullname" . }}-worker
+  labels:
+    {{- include "mediforce.componentLabels" (dict "context" . "component" "worker") | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mediforce.componentSelectorLabels" (dict "context" . "component" "worker") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mediforce.componentSelectorLabels" (dict "context" . "component" "worker") | nindent 8 }}
+      {{- with .Values.worker.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "mediforce.workerServiceAccountName" . }}
+      containers:
+        - name: worker
+          image: "{{ include "mediforce.image" .Values.worker.image }}"
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.worker.service.port }}
+              protocol: TCP
+          env:
+            - name: REDIS_URL
+              value: "redis://{{ include "mediforce.fullname" . }}-redis:{{ .Values.redis.service.port }}"
+            - name: MEDIFORCE_DATA_DIR
+              value: {{ .Values.worker.sharedWorkspace.mountPath | quote }}
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: DOMAIN
+              value: {{ .Values.config.domain | quote }}
+            - name: APP_BASE_URL
+              value: {{ .Values.config.appBaseUrl | quote }}
+            - name: MEDIFORCE_DISABLE_EMAIL
+              value: {{ .Values.config.disableEmail | quote }}
+            {{- if .Values.secrets.firebaseAdmin.enabled }}
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: "{{ .Values.secrets.firebaseAdmin.mountPath }}/{{ .Values.secrets.firebaseAdmin.secretKey }}"
+            {{- end }}
+            {{- if .Values.database.connectionUrlSecretRef.name }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.connectionUrlSecretRef.name }}
+                  key: {{ .Values.database.connectionUrlSecretRef.key | default "DATABASE_URL" }}
+            {{- end }}
+            {{- with .Values.worker.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secrets.appSecretName }}
+            {{- with .Values.worker.envFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.worker.probes.liveness.path }}
+              port: {{ .Values.worker.probes.liveness.port }}
+            initialDelaySeconds: {{ .Values.worker.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.worker.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.worker.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.worker.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.worker.probes.readiness.path }}
+              port: {{ .Values.worker.probes.readiness.port }}
+            initialDelaySeconds: {{ .Values.worker.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.worker.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.worker.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.worker.probes.readiness.failureThreshold }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.worker.sharedWorkspace.enabled }}
+            - name: shared-workspace
+              mountPath: {{ .Values.worker.sharedWorkspace.mountPath }}
+            {{- end }}
+            {{- if .Values.secrets.firebaseAdmin.enabled }}
+            - name: firebase-admin-sa
+              mountPath: {{ .Values.secrets.firebaseAdmin.mountPath }}
+              readOnly: true
+            {{- end }}
+      volumes:
+        {{- if .Values.worker.sharedWorkspace.enabled }}
+        - name: shared-workspace
+          persistentVolumeClaim:
+            claimName: {{ .Values.worker.sharedWorkspace.claimName }}
+        {{- end }}
+        {{- if .Values.secrets.firebaseAdmin.enabled }}
+        - name: firebase-admin-sa
+          secret:
+            secretName: {{ .Values.secrets.firebaseAdmin.secretName }}
+            defaultMode: 0400
+        {{- end }}
+      {{- with .Values.worker.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

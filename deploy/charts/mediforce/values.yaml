@@ -1,0 +1,238 @@
+# Default values for mediforce.
+# All values can be overridden by the Terraform values template
+# (terraform/templates/values.yaml.tpl) and by callers via extra_values.
+
+nameOverride: ""
+fullnameOverride: ""
+
+# ---------------------------------------------------------------------------
+# Secrets
+# Two distinct K8s Secrets — one for env-var-style app secrets (consumed via
+# `envFrom`), one for the Firebase Admin service-account JSON (mounted as a
+# file because the SDK reads it via `GOOGLE_APPLICATION_CREDENTIALS`).
+#
+# The Secrets themselves are NOT created by this chart. Populate them via the
+# `externalSecrets` block below (axon-style loop), which renders one or more
+# `ExternalSecret` resources that pull values from AWS Secrets Manager.
+#
+# Required env-var keys in the `appSecretName` Secret:
+#   PLATFORM_API_KEY          — service-to-server X-Api-Key
+#   SECRETS_ENCRYPTION_KEY    — 32-byte hex master key. Loss = unrecoverable
+#                               workflow secrets. Single most load-bearing key.
+#   OPENROUTER_API_KEY        — host-side LLM key for the main app
+#   DOCKER_DEEPSEEK_API_KEY   — injected into spawned agent containers
+#   DOCKER_OPENROUTER_API_KEY — same
+# Optional (only if MEDIFORCE_DISABLE_EMAIL != "true"):
+#   MAILGUN_API_KEY
+#   MAILGUN_DOMAIN
+#   MAILGUN_FROM_EMAIL
+#
+# Required key in the `firebaseAdmin.secretName` Secret:
+#   sa.json — full Firebase service-account JSON (downloaded from Firebase
+#             Console > Project Settings > Service Accounts > Generate key).
+# ---------------------------------------------------------------------------
+secrets:
+  appSecretName: mediforce-app-secrets
+  firebaseAdmin:
+    enabled: true
+    secretName: mediforce-firebase-sa
+    secretKey: sa.json
+    mountPath: /var/run/secrets/firebase
+
+# ---------------------------------------------------------------------------
+# Database
+# `DATABASE_URL` is read by the UI (Drizzle migrations + runtime queries) and
+# by the worker. Set `database.connectionUrlSecretRef.name` to the name of a
+# Kubernetes Secret that already exists in the release namespace and contains
+# the connection string under the configured key (defaults to `DATABASE_URL`).
+# The Secret can be populated by anything — ExternalSecrets / ESO from a
+# cloud secret manager, GitOps, or a one-shot `kubectl create secret`.
+# Leave `name` empty to skip DATABASE_URL injection entirely (e.g. for a
+# render-only UI mode with no Postgres).
+# ---------------------------------------------------------------------------
+database:
+  connectionUrlSecretRef:
+    name: ""
+    key: DATABASE_URL
+
+# ---------------------------------------------------------------------------
+# Runtime config (non-secret; passed via env on UI + worker)
+# `frameAncestors` controls the `Content-Security-Policy: frame-ancestors`
+# header set by the UI's Next.js config — controls who can embed the UI in
+# an iframe. Default `'none'` (cannot be framed); set to the Portal origin
+# for the Phase 1 iframe-in-Backstage flow.
+# ---------------------------------------------------------------------------
+config:
+  domain: ""
+  appBaseUrl: ""
+  disableEmail: "true"
+  useEmulators: "false"
+  frameAncestors: "'none'"
+  # Path inside the running container that contains the `apps/*/plugins/*/skills/`
+  # tree. Set to "/app" when the image was built via `deploy/docker/Dockerfile.k8s`
+  # (which does `COPY apps/ /app/apps/` over the upstream Next.js standalone image).
+  mediforceRoot: "/app"
+
+# ---------------------------------------------------------------------------
+# UI (Next.js)
+# ---------------------------------------------------------------------------
+ui:
+  enabled: true
+  replicaCount: 1
+  image:
+    registry: ""
+    repository: mediforce-ui
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 3000
+  env: []
+  envFrom: []
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  probes:
+    liveness:
+      path: /api/health
+      port: 3000
+      initialDelaySeconds: 30
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 5
+    readiness:
+      path: /api/health
+      port: 3000
+      initialDelaySeconds: 10
+      periodSeconds: 15
+      timeoutSeconds: 10
+      failureThreshold: 5
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ---------------------------------------------------------------------------
+# Worker (BullMQ consumer, spawns K8s Jobs)
+# ---------------------------------------------------------------------------
+worker:
+  enabled: true
+  replicaCount: 1
+  image:
+    registry: ""
+    repository: mediforce-worker
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 3001
+  env:
+    # SPAWN_MODE controls which agent-runtime spawn strategy the worker uses.
+    # `docker` is the only strategy that works today on K8s (host or worker
+    # node provides the Docker socket); `kuber` is reserved for a future
+    # KubernetesJobSpawnStrategy that runs each agent step as a transient
+    # K8s Job — once that lands upstream, flip this default back to `kuber`.
+    - name: SPAWN_MODE
+      value: docker
+  envFrom: []
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  probes:
+    liveness:
+      path: /health
+      port: 3001
+      initialDelaySeconds: 30
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 5
+    readiness:
+      path: /health
+      port: 3001
+      initialDelaySeconds: 10
+      periodSeconds: 15
+      timeoutSeconds: 10
+      failureThreshold: 5
+  sharedWorkspace:
+    enabled: true
+    claimName: mediforce-shared
+    mountPath: /var/lib/mediforce
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ---------------------------------------------------------------------------
+# Bundled Redis (BullMQ queue backing store)
+# ---------------------------------------------------------------------------
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    port: 6379
+  persistence:
+    enabled: true
+    storageClass: gp3
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ---------------------------------------------------------------------------
+# Worker RBAC (namespace-scoped Role for batch/jobs)
+# ---------------------------------------------------------------------------
+rbac:
+  create: true
+  serviceAccountName: mediforce-worker
+
+# ---------------------------------------------------------------------------
+# Shared EFS PVC for /var/lib/mediforce
+# The PV + PVC themselves are provisioned by the Terraform module in
+# `deploy/terraform/mediforce/storage.tf`, not by this chart. The chart only
+# references the PVC by name via `worker.sharedWorkspace.claimName`.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# NetworkPolicy egress allowlist
+# Tighten `firebaseEgressDomains` once question #8 confirms the exact subdomain set.
+# ---------------------------------------------------------------------------
+networkPolicy:
+  enabled: true
+  firebaseEgressDomains:
+    - "*.googleapis.com"
+    - "*.firebaseio.com"
+    - "*.firebaseapp.com"
+    - "*.firebasestorage.googleapis.com"
+  allowAlbIngress: true
+
+# ---------------------------------------------------------------------------
+# ExternalSecrets (axon-style loop pattern; populated from Terraform)
+# Example:
+#   externalSecrets:
+#     - name: mediforce-app-secrets
+#       refreshInterval: "1h"
+#       data:
+#         - secretKey: firebase-admin-sa
+#           remoteRef:
+#             key: dev/mediforce/firebase
+#             property: admin_sa_json
+# ---------------------------------------------------------------------------
+externalSecrets: []

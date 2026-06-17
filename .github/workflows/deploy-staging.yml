@@ -5,6 +5,8 @@ on:
     workflows: ["Build & Push Docker Images"]
     types: [completed]
     branches: [main]
+    paths-ignore:
+      - 'deploy/**'
   workflow_dispatch:
 
 concurrency:
