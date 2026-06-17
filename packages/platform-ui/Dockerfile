@@ -35,15 +35,17 @@ WORKDIR /app
 COPY --from=deps /app ./
 COPY . .
 
-# Firebase config must be available at build time (NEXT_PUBLIC_* vars are inlined)
-ARG NEXT_PUBLIC_FIREBASE_API_KEY
-ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID
-ARG NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-ARG NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-ARG NEXT_PUBLIC_FIREBASE_APP_ID
-ARG NEXT_PUBLIC_APP_URL
-ARG NEXT_PUBLIC_GIT_SHA
+# NEXT_PUBLIC_* placeholders — replaced at container start by docker-entrypoint.sh.
+# Pass real values as build args to bake them in (local dev), or leave as
+# placeholders for generic registry images (CI).
+ARG NEXT_PUBLIC_FIREBASE_API_KEY=__NEXT_PUBLIC_FIREBASE_API_KEY__
+ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=__NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN__
+ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID=__NEXT_PUBLIC_FIREBASE_PROJECT_ID__
+ARG NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=__NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET__
+ARG NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=__NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID__
+ARG NEXT_PUBLIC_FIREBASE_APP_ID=__NEXT_PUBLIC_FIREBASE_APP_ID__
+ARG NEXT_PUBLIC_APP_URL=__NEXT_PUBLIC_APP_URL__
+ARG NEXT_PUBLIC_GIT_SHA=__NEXT_PUBLIC_GIT_SHA__
 
 RUN pnpm --filter @mediforce/platform-ui build
 
@@ -101,6 +103,10 @@ COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/node_modules ./node_modules
 RUN npm install -g tsx@4 && cd packages/mediforce-mcp && npm link
 
+COPY packages/platform-ui/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 EXPOSE 3000
 
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "packages/platform-ui/server.js"]

@@ -1377,15 +1377,15 @@ function generateScript() {
   s += 'ufw --force enable\n';
   s += 'echo "✓ Firewall (22, 80, 443)"\n\n';
 
-  // Step 11: Deploy
+  // Step 11: Pull pre-built images + start platform
   s += '# ── 11. First deploy ──\n';
   s += 'echo ""\n';
-  s += 'echo "▸ Starting first deploy — this takes 5-15 minutes..."\n';
+  s += 'echo "▸ Starting platform — pulling pre-built images..."\n';
   s += 'echo ""\n';
   s += 'cd "$DEPLOY_DIR"\n';
   s += 'export NEXT_PUBLIC_GIT_SHA=$(git rev-parse --short HEAD)\n';
-  s += 'sudo -u deploy bash scripts/rebuild-docker-images.sh\n';
-  s += 'sudo -u deploy docker compose -f docker-compose.prod.yml build\n';
+  s += '# Pull pre-built images from registry (fast). Falls back to local build.\n';
+  s += 'sudo -u deploy docker compose -f docker-compose.prod.yml pull --ignore-pull-failures 2>/dev/null || true\n';
   s += 'sudo -u deploy docker compose -f docker-compose.prod.yml up -d --remove-orphans\n';
   s += 'docker image prune -f > /dev/null 2>&1\n';
   s += 'echo ""\n';
@@ -1395,6 +1395,19 @@ function generateScript() {
   s += 'echo "═══════════════════════════════════════════════════════════"\n';
   s += 'echo ""\n';
   s += 'docker compose -f docker-compose.prod.yml ps\n';
+  s += 'echo ""\n';
+
+  // Step 12: Build agent images in background
+  s += '# ── 12. Build agent images (background) ──\n';
+  s += 'echo "▸ Building agent images in background..."\n';
+  s += 'echo "  Workflows will be available once images finish building."\n';
+  s += 'echo "  Monitor progress: tail -f /var/log/mediforce-deploy.log"\n';
+  s += 'echo ""\n';
+  s += 'AGENT_LOG="/var/log/mediforce-deploy.log"\n';
+  s += 'nohup sudo -u deploy bash -c \'\n';
+  s += '  bash scripts/rebuild-docker-images.sh >> "$0" 2>&1\n';
+  s += '  echo "[$(date -Iseconds)] Agent images ready" >> "$0"\n';
+  s += '\' "$AGENT_LOG" >> "$AGENT_LOG" 2>&1 &\n';
 
   // Store raw script for copy
   window._generatedScript = s;
