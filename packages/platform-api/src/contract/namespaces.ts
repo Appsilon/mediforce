@@ -9,6 +9,7 @@ export const GetNamespaceInputSchema = z.object({ handle: HandleSchema });
 export const GetNamespaceOutputSchema = z.object({
   namespace: NamespaceSchema,
   members: z.array(NamespaceMemberSchema),
+  personalHandles: z.record(z.string(), z.string()).optional(),
 });
 
 export type GetNamespaceInput = z.infer<typeof GetNamespaceInputSchema>;

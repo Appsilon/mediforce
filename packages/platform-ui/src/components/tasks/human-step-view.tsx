@@ -12,7 +12,8 @@ import { resolveTaskBody } from './task-body-registry';
 import { getTaskDisplayTitle, isAgentReviewTask, type AgentOutputData } from './task-utils';
 import type { HumanStepAccess } from './resolve-step-view';
 import { useMyActionableTasksByRole } from '@/hooks/use-tasks';
-import { useUserDisplayNames } from '@/hooks/use-users';
+import { useUserDisplayNames, usePersonalHandles } from '@/hooks/use-users';
+import { UserProfileLink } from '@/components/user-profile-link';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
@@ -53,6 +54,7 @@ export function HumanStepView({
 }: HumanStepViewProps) {
   const handle = useHandleFromPath();
   const userNames = useUserDisplayNames(handle);
+  const personalHandles = usePersonalHandles(handle);
 
   const { data: remainingTasks } = useMyActionableTasksByRole(task.assignedRole);
   const remainingTaskCount = remainingTasks.filter((t) => t.id !== task.id).length;
@@ -89,9 +91,9 @@ export function HumanStepView({
           </span>
         </div>
 
-        {readOnly && <AccessBanner access={access} userNames={userNames} />}
+        {readOnly && <AccessBanner access={access} userNames={userNames} personalHandles={personalHandles} />}
 
-        <TaskMetadataCard task={task} processInstance={processInstance} handle={handle} userNames={userNames} />
+        <TaskMetadataCard task={task} processInstance={processInstance} handle={handle} userNames={userNames} personalHandles={personalHandles} />
 
         {!bodyIsWide && body}
 
@@ -126,9 +128,11 @@ export function HumanStepView({
 function AccessBanner({
   access,
   userNames,
+  personalHandles,
 }: {
   access: HumanStepAccess;
   userNames: Map<string, string>;
+  personalHandles: Map<string, string>;
 }) {
   if (access.kind === 'claimed-by-other') {
     return (
@@ -136,7 +140,11 @@ function AccessBanner({
         <Lock className="h-4 w-4 mt-0.5 shrink-0" />
         <div>
           <p className="font-medium">
-            Claimed by {userNames.get(access.claimedBy) ?? access.claimedBy}
+            Claimed by{' '}
+            <UserProfileLink
+              displayName={userNames.get(access.claimedBy) ?? access.claimedBy}
+              personalHandle={personalHandles.get(access.claimedBy)}
+            />
           </p>
           <p className="text-xs mt-0.5 opacity-80">Only the claimant can act on this task.</p>
         </div>
@@ -162,11 +170,13 @@ function TaskMetadataCard({
   processInstance,
   handle,
   userNames,
+  personalHandles,
 }: {
   task: HumanTask;
   processInstance: ProcessInstance | null;
   handle: string;
   userNames: Map<string, string>;
+  personalHandles: Map<string, string>;
 }) {
   return (
     <div className="rounded-lg border p-4 grid grid-cols-2 gap-4 text-sm">
@@ -206,7 +216,12 @@ function TaskMetadataCard({
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             Assigned To
           </div>
-          <div>{userNames.get(task.assignedUserId) ?? task.assignedUserId}</div>
+          <div>
+            <UserProfileLink
+              displayName={userNames.get(task.assignedUserId) ?? task.assignedUserId}
+              personalHandle={personalHandles.get(task.assignedUserId)}
+            />
+          </div>
         </div>
       )}
       {task.completedAt && (
