@@ -1,0 +1,108 @@
+{{- if .Values.ui.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mediforce.fullname" . }}-ui
+  labels:
+    {{- include "mediforce.componentLabels" (dict "context" . "component" "ui") | nindent 4 }}
+spec:
+  replicas: {{ .Values.ui.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mediforce.componentSelectorLabels" (dict "context" . "component" "ui") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mediforce.componentSelectorLabels" (dict "context" . "component" "ui") | nindent 8 }}
+      {{- with .Values.ui.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      containers:
+        - name: ui
+          image: "{{ include "mediforce.image" .Values.ui.image }}"
+          imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.ui.service.port }}
+              protocol: TCP
+          env:
+            - name: REDIS_URL
+              value: "redis://{{ include "mediforce.fullname" . }}-redis:{{ .Values.redis.service.port }}"
+            - name: DOMAIN
+              value: {{ .Values.config.domain | quote }}
+            - name: APP_BASE_URL
+              value: {{ .Values.config.appBaseUrl | quote }}
+            - name: MEDIFORCE_DISABLE_EMAIL
+              value: {{ .Values.config.disableEmail | quote }}
+            - name: NEXT_PUBLIC_USE_EMULATORS
+              value: {{ .Values.config.useEmulators | quote }}
+            - name: FRAME_ANCESTORS
+              value: {{ .Values.config.frameAncestors | quote }}
+            - name: MEDIFORCE_ROOT
+              value: {{ .Values.config.mediforceRoot | quote }}
+            {{- if .Values.secrets.firebaseAdmin.enabled }}
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: "{{ .Values.secrets.firebaseAdmin.mountPath }}/{{ .Values.secrets.firebaseAdmin.secretKey }}"
+            {{- end }}
+            {{- if .Values.database.connectionUrlSecretRef.name }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.connectionUrlSecretRef.name }}
+                  key: {{ .Values.database.connectionUrlSecretRef.key | default "DATABASE_URL" }}
+            {{- end }}
+            {{- with .Values.ui.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secrets.appSecretName }}
+            {{- with .Values.ui.envFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.ui.probes.liveness.path }}
+              port: {{ .Values.ui.probes.liveness.port }}
+            initialDelaySeconds: {{ .Values.ui.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.ui.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.ui.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.ui.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.ui.probes.readiness.path }}
+              port: {{ .Values.ui.probes.readiness.port }}
+            initialDelaySeconds: {{ .Values.ui.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.ui.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.ui.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.ui.probes.readiness.failureThreshold }}
+          resources:
+            {{- toYaml .Values.ui.resources | nindent 12 }}
+          {{- if .Values.secrets.firebaseAdmin.enabled }}
+          volumeMounts:
+            - name: firebase-admin-sa
+              mountPath: {{ .Values.secrets.firebaseAdmin.mountPath }}
+              readOnly: true
+          {{- end }}
+      {{- if .Values.secrets.firebaseAdmin.enabled }}
+      volumes:
+        - name: firebase-admin-sa
+          secret:
+            secretName: {{ .Values.secrets.firebaseAdmin.secretName }}
+            defaultMode: 0400
+      {{- end }}
+      {{- with .Values.ui.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.ui.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.ui.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,17 @@
+{{- if .Values.redis.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mediforce.fullname" . }}-redis
+  labels:
+    {{- include "mediforce.componentLabels" (dict "context" . "component" "redis") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: redis
+      port: {{ .Values.redis.service.port }}
+      targetPort: redis
+      protocol: TCP
+  selector:
+    {{- include "mediforce.componentSelectorLabels" (dict "context" . "component" "redis") | nindent 4 }}
+{{- end }}

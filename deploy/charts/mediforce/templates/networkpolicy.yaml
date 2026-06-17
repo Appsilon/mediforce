@@ -1,0 +1,72 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "mediforce.fullname" . }}
+  labels:
+    {{- include "mediforce.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: mediforce
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow intra-namespace traffic (UI <-> worker <-> redis).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: mediforce
+    {{- if .Values.networkPolicy.allowAlbIngress }}
+    # Allow ALB to reach UI on port 3000 (and worker on 3001 if directly target-bound).
+    # Open-from-any-IP within the VPC; tighten by source if a kube-system label
+    # set or aws-load-balancer-controller pod identity becomes available.
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.ui.service.port }}
+        - protocol: TCP
+          port: {{ .Values.worker.service.port }}
+    {{- end }}
+  egress:
+    # Cluster DNS (kube-dns / coredns).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Intra-namespace (worker -> redis, UI -> worker, etc.).
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: mediforce
+    # Spawned Job pods (worker spawns these via batch/jobs API).
+    - to:
+        - podSelector:
+            matchLabels:
+              spawned-by: mediforce-worker
+    # Firebase / Google APIs egress. Hostname-based egress allowlisting is NOT
+    # supported by core NetworkPolicy; this is documented in values.yaml as
+    # a list of domains that operators should restrict at the egress gateway
+    # (e.g. a network firewall or AWS VPC endpoint policy) if tighter control
+    # is required. Here we allow HTTPS:443 to anywhere outside the cluster.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+{{- end }}

@@ -1,0 +1,15 @@
+apiVersion: v2
+name: mediforce
+description: Mediforce — workflow + agent orchestration platform for pharma. Single release with UI + worker Deployments and bundled Redis.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/Appsilon/mediforce
+sources:
+  - https://github.com/Appsilon/mediforce
+maintainers:
+  - name: Appsilon Platform Team
+keywords:
+  - mediforce
+  - workflow
+  - agent-orchestration
