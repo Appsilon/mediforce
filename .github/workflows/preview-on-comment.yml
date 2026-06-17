@@ -7,6 +7,7 @@ on:
 permissions:
   pull-requests: write
   issues: write
+  deployments: write
 
 jobs:
   deploy-preview:
@@ -20,18 +21,25 @@ jobs:
       )
     runs-on: ubuntu-latest
     env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.issue.number }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - name: Resolve PR branch
         id: pr
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ref=$(gh pr view ${{ github.event.issue.number }} \
-            --repo ${{ github.repository }} \
-            --json headRefName -q .headRefName)
+          read -r ref sha < <(gh pr view "$PR" --repo "$REPO" \
+            --json headRefName,headRefOid -q '.headRefName + " " + .headRefOid')
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Acknowledge
+        run: |
+          gh pr comment "$PR" --repo "$REPO" \
+            --body "🚀 Preview deploy started — [watch the run]($RUN_URL)."
 
       - name: Checkout PR branch
         uses: actions/checkout@v4
@@ -48,6 +56,15 @@ jobs:
 
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
+
+      - name: Create GitHub deployment
+        id: deployment
+        run: |
+          id=$(gh api "repos/$REPO/deployments" --input - <<JSON | jq -r '.id'
+          {"ref":"${{ steps.pr.outputs.sha }}","environment":"preview","auto_merge":false,"required_contexts":[],"transient_environment":true,"description":"On-demand Vercel preview"}
+          JSON
+          )
+          echo "id=$id" >> "$GITHUB_OUTPUT"
 
       - name: Pull Vercel environment
         run: vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
@@ -67,10 +84,26 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
-      - name: Post preview URL
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Mark deployment succeeded
         run: |
-          gh pr comment ${{ github.event.issue.number }} \
-            --repo ${{ github.repository }} \
-            --body "Preview deployed: ${{ steps.deploy.outputs.url }}"
+          gh api "repos/$REPO/deployments/${{ steps.deployment.outputs.id }}/statuses" --input - <<JSON
+          {"state":"success","environment":"preview","environment_url":"${{ steps.deploy.outputs.url }}","log_url":"$RUN_URL","description":"Preview ready"}
+          JSON
+
+      - name: Post preview URL
+        run: |
+          gh pr comment "$PR" --repo "$REPO" \
+            --body "✅ Preview deployed: ${{ steps.deploy.outputs.url }}"
+
+      - name: Mark deployment failed
+        if: failure() && steps.deployment.outputs.id != ''
+        run: |
+          gh api "repos/$REPO/deployments/${{ steps.deployment.outputs.id }}/statuses" --input - <<JSON
+          {"state":"failure","environment":"preview","log_url":"$RUN_URL","description":"Preview deploy failed"}
+          JSON
+
+      - name: Report failure
+        if: failure()
+        run: |
+          gh pr comment "$PR" --repo "$REPO" \
+            --body "❌ Preview deploy failed — [see the logs]($RUN_URL)."
