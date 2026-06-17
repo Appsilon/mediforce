@@ -21,6 +21,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Codex now mirrors Claude's repo-local skill and agent discovery layout via `.codex/skills/*` and `.codex/agents` symlinks, with `AGENTS.md` documenting how Codex should translate Claude-specific skill tool syntax.
 
 ### Fixed
+- Staging deploys now pick up each push to main — `build-images.yml` now builds native `linux/amd64 + linux/arm64` images via a matrix job on GitHub-hosted ARM64 runners; the Hetzner ARM64 staging server was silently falling back to a stale local `be65eae4` build because the amd64-only CI images had no matching manifest for `arm64/v8`; deploy script pull errors are now visible instead of swallowed [#740](https://github.com/Appsilon/mediforce/pull/740).
 - `scripts/sync-model-rankings.py` now uses OpenRouter's frontend rankings JSON endpoint instead of a brittle private server-action scrape, restoring local model ranking sync.
 - On-demand preview deploys now work: `/deploy` on a PR runs a real `vercel build` + `vercel deploy --prebuilt` via the Vercel CLI, replacing the empty-commit `[preview]`-marker hack that silently no-op'd.
 - Execution history panel now shows all iterations of looped steps — steps that completed before the current loop revisit (e.g. a timer-wait that ran between two visits to the same decision gate) were previously hidden or incorrectly marked pending due to the steps API returning only the latest execution per step and using a positional definition-order algorithm for status derivation.
