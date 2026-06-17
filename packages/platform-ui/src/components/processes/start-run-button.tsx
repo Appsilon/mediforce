@@ -15,6 +15,8 @@ import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { useOpenRouterCredits } from '@/hooks/use-openrouter-credits';
+import { useNamespaceAdminContact } from '@/hooks/use-namespace-admin-contact';
+import { useModelValidation } from '@/hooks/use-model-validation';
 import { runPreflightChecks, type PreflightWarning } from '@/lib/preflight-checks';
 import { ParamField } from '@/components/ui/param-field';
 import type { TriggerInputField } from '@mediforce/platform-core';
@@ -40,6 +42,7 @@ export function StartRunButton({
   const { versions: definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowVersions(workflowName, handle);
   const { images: dockerImages, isAvailable: dockerAvailable, isLoading: dockerLoading } = useDockerImages();
   const openRouterCredits = useOpenRouterCredits();
+  const adminContact = useNamespaceAdminContact(handle);
   const [starting, setStarting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const startMutation = useStartRun();
@@ -52,11 +55,12 @@ export function StartRunButton({
   const [localSecretsLoading, setLocalSecretsLoading] = React.useState(true);
   const effectiveVersion = version ?? hookEffectiveVersion;
   const preflightVersion = pendingVersion ?? effectiveVersion;
-  const { definition: effectiveDefinition } = useWorkflowVersion(
+  const { definition: effectiveDefinition, loading: definitionLoading } = useWorkflowVersion(
     workflowName,
     handle,
     preflightVersion,
   );
+  const modelValidation = useModelValidation(effectiveDefinition);
 
   const hasContext = secretKeysCtx !== null;
   const uid = firebaseUser?.uid;
@@ -125,10 +129,15 @@ export function StartRunButton({
         available: openRouterCredits.available,
         remaining: openRouterCredits.remaining,
       },
+      handle,
+      workflowName,
+      version: preflightVersion ?? undefined,
+      adminEmail: adminContact.email ?? undefined,
+      modelValidation: modelValidation.isLoading ? undefined : { unknown: modelValidation.unknown },
     });
-  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining]);
+  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining, handle, workflowName, adminContact.email, modelValidation.isLoading, modelValidation.unknown]);
 
-  const preflightLoading = dockerLoading || secretKeysLoading || openRouterCredits.isLoading;
+  const preflightLoading = definitionLoading || dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading || modelValidation.isLoading;
   const hasWarnings = warnings.length > 0;
   const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
 
@@ -193,7 +202,8 @@ export function StartRunButton({
   }
 
   function handleStart(v?: number) {
-    if (hasTriggerInput || hasWarnings) {
+    const versionChanged = v !== undefined && v !== effectiveVersion;
+    if (hasTriggerInput || hasWarnings || versionChanged) {
       setPendingVersion(v);
       setDialogOpen(true);
     } else {
@@ -293,6 +303,10 @@ export function StartRunButton({
                 <WarningGroup
                   title="LLM credits"
                   warnings={warnings.filter((w) => w.category === 'low-credits')}
+                />
+                <WarningGroup
+                  title="Unknown models"
+                  warnings={warnings.filter((w) => w.category === 'unknown-model')}
                 />
               </div>
             </div>
@@ -458,7 +472,21 @@ function WarningGroup({ title, warnings }: { title: string; warnings: PreflightW
               <div>
                 <p className="font-mono font-medium">{w.message || w.resource}</p>
                 <p className="text-muted-foreground mt-0.5">Used by: {formatStepList(w.stepNames)}</p>
-                <p className="text-muted-foreground/70 mt-0.5">{w.hint}</p>
+                {w.actions.length > 0 && (
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                    {w.actions.map((action) => (
+                      <a
+                        key={action.label}
+                        href={action.href}
+                        target={action.href.startsWith('mailto:') || action.href.startsWith('/') ? undefined : '_blank'}
+                        rel={action.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                        className="text-primary hover:underline"
+                      >
+                        {action.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </li>

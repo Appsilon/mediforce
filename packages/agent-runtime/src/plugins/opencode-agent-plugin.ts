@@ -1,6 +1,7 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
+import { type PluginCapabilityMetadata, normaliseModelId } from '@mediforce/platform-core';
+export { normaliseModelId };
 import {
   BaseContainerAgentPlugin,
   type SpawnCliOptions,
@@ -10,19 +11,6 @@ import { isWorkflowAgentContext } from './container-plugin';
 
 /** Default model used when agentConfig.model is not set. */
 const DEFAULT_MODEL = 'deepseek/deepseek-chat';
-
-/**
- * Normalise Firestore-encoded model IDs: "deepseek__deepseek-chat" →
- * "deepseek/deepseek-chat".  Firestore doc IDs can't contain "/" so the
- * model registry historically used "__"; Postgres has no such limitation.
- * Only the FIRST occurrence of "__" is replaced (the provider/model boundary).
- */
-export function normaliseModelId(raw: string): string {
-  if (raw.includes('/')) return raw;
-  const idx = raw.indexOf('__');
-  if (idx < 0) return raw;
-  return `${raw.slice(0, idx)}/${raw.slice(idx + 2)}`;
-}
 
 /**
  * OpenCode agent plugin — runs the OpenCode CLI inside a Docker container.

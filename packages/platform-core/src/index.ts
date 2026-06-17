@@ -387,3 +387,4 @@ export type { LineStreamReader } from './utils/line-stream';
 export { calculateEstimatedCost } from './utils/cost';
 export { formatBytes } from './utils/format';
 export { compact, parseRow } from './utils/compact';
+export { normaliseModelId } from './utils/normalise-model-id';

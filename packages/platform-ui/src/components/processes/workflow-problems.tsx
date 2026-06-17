@@ -51,6 +51,8 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
         dockerAvailable,
         secretKeys,
         namespaceSecretKeys,
+        handle,
+        workflowName: doc.name,
       });
       for (const warning of checks) {
         all.push({ ...warning, workflowName: doc.name, workflowTitle: doc.title });
@@ -74,7 +76,7 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
         : warning.workflowName;
       lines.push(`- [${label}] ${warning.message}`);
       lines.push(`  Steps: ${warning.stepNames.join(', ')}`);
-      lines.push(`  Hint: ${warning.hint}`);
+      lines.push(`  Actions: ${warning.actions.map((a) => `${a.label}: ${a.href}`).join(', ')}`);
     }
     return lines.join('\n');
   }

@@ -301,11 +301,15 @@ import {
   GetModelInputSchema,
   GetModelOutputSchema,
   SyncModelsOutputSchema,
+  ValidateModelsInputSchema,
+  ValidateModelsOutputSchema,
   type ListModelsInput,
   type ListModelsOutput,
   type GetModelInput,
   type GetModelOutput,
   type SyncModelsOutput,
+  type ValidateModelsInput,
+  type ValidateModelsOutput,
   type GetProcessInput,
   type GetProcessOutput,
   type ListAuditEventsInput,
@@ -544,6 +548,7 @@ export class Mediforce {
     list: (input?: ListModelsInput) => Promise<ListModelsOutput>;
     get: (input: GetModelInput) => Promise<GetModelOutput>;
     sync: () => Promise<SyncModelsOutput>;
+    validate: (input: ValidateModelsInput) => Promise<ValidateModelsOutput>;
   };
 
   readonly secrets: {
@@ -1103,6 +1108,16 @@ export class Mediforce {
         const res = await this.request('/api/model-registry/sync', { method: 'POST' });
         const body = await parseJsonOrThrow(res, 'mediforce.models.sync');
         return SyncModelsOutputSchema.parse(body);
+      },
+      validate: async (input) => {
+        const validated = ValidateModelsInputSchema.parse(input);
+        const res = await this.request('/api/model-registry/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.models.validate');
+        return ValidateModelsOutputSchema.parse(body);
       },
     };
 

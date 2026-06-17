@@ -82,7 +82,7 @@ Most workflows under `apps/` use one or both of:
 - `mediforce-golden-image:latest` — Node + common tooling, the base for most
   inline `runtime: javascript` script steps
 - `mediforce-node:latest` — plain Node runtime, the fallback image when a
-  script step omits `agent.image`
+  script step omits `script.image`
 
 Build everything in one go:
 
@@ -240,7 +240,7 @@ curl -X POST http://localhost:9003/api/processes \
 
 Returns:
 ```json
-{ "instanceId": "proc-abc123", "status": "running" }
+{ "run": { "id": "proc-abc123", "status": "running", "definitionName": "my-first-workflow", ... } }
 ```
 
 ### Via UI

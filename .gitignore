@@ -29,6 +29,10 @@ apps/*/secrets/
 memory/
 CLAUDE.local.md
 
+# codex
+.codex/settings.local.json
+.codex/worktrees/
+
 # env
 .env.local
 .env*.local
