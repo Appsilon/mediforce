@@ -1,0 +1,12 @@
+**/node_modules
+.git
+**/.next
+**/tmp
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
+.turbo
+.vercel
+docs/research
+apps/protocol-to-tfl/data
+apps/landing-zone/sample-data
