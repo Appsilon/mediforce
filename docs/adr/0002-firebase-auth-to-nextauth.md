@@ -5,7 +5,7 @@
 - **Authors:** Marek Rogala (@marekrogala)
 - **Reviewers:** Filip Stachura (@filipstachura), Paweł Przytuła (@przytu1)
 - **Depends on:** [ADR-0001](./0001-firestore-to-postgres.md) (Postgres + Drizzle is the adapter target)
-- **Coordinates with:** [ADR-0004](./0004-scoped-data-access-authorization.md) (the `CallerIdentity` and session resolver this ADR defines feed the caller-set repository base from ADR-0004) and the headless migration's Phase 4 typed `apiClient` (the browser `Mediforce` client's `bearerToken` callback flips from `auth.currentUser.getIdToken()` to a NextAuth session resolver — `await getSession()` — when this ADR lands; tracked in [`docs/headless-migration.md`](../headless-migration.md))
+- **Coordinates with:** [ADR-0004](./0004-scoped-data-access-authorization.md) (the `CallerIdentity` this ADR resolves feeds the caller-set repository base from ADR-0004 — the carrier change is orthogonal to that shape, as [ADR-0005](./0005-headless-platform-api-ui-separation.md) already noted) and the headless Phase 1–4 auth boundary (`proxy.ts` + `lib/api-auth.ts`). The browser `Mediforce` client / `apiFetch` **stop attaching an `Authorization` header for same-origin `/api/*` calls** — the NextAuth httpOnly session cookie rides automatically (see §6). Tracked in [`docs/headless-migration.md`](../headless-migration.md).
 - **Implementation plan:** [PLAN-0002.md](./PLAN-0002.md)
 
 ## Context
@@ -20,7 +20,21 @@ Google's identity layer.
 Today's auth surface in Mediforce:
 
 - Browser sign-in via `firebase/auth` SDK: Google OAuth popup + email/password.
-- Server-side ID-token verification in `packages/platform-ui/src/middleware.ts`.
+- **Two-stage server-side ID-token verification** (the headless Phase 1–4
+  boundary — there is no `middleware.ts`):
+  1. `packages/platform-ui/src/proxy.ts` (`matcher: '/api/:path*'`) — coarse
+     gate accepting **either** `X-Api-Key` (`hasValidApiKey`, server-to-server)
+     **or** `Authorization: Bearer <Firebase ID token>`
+     (`hasValidFirebaseToken`, verified via `jose` + Firebase JWKS). Proves the
+     caller is authenticated, not what they may touch.
+  2. `packages/platform-ui/src/lib/api-auth.ts` (`resolveCallerIdentity`) —
+     per-route, re-verifies the Bearer via Admin SDK `verifyIdToken`, then
+     loads workspace memberships from Postgres into `CallerIdentity`.
+- The browser is today **just another Bearer client**: `lib/firebase-id-token.ts`
+  → `lib/mediforce.ts` / `lib/api-fetch.ts` attach `auth.currentUser.getIdToken()`.
+  This Bearer-in-browser shape is a Firebase-SDK artifact (client-first token
+  minting), not a deliberate architectural goal; this ADR returns the browser
+  to the standard same-origin cookie model (§6).
 - Admin SDK `getAuth()` server-side for invites and user directory.
 - **Custom claims** carry two distinct concepts: `role: 'admin'` (deployment
   superuser) and `roles: string[]` (process-domain functional roles).
@@ -56,22 +70,47 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
    we can audit; the per-request DB read is indexed (millisecond-scale) and
    negligible for our scale.
 
-4. **Providers, env-gated and additive.** A single configuration ships
-   four providers, each enabled by an env var:
+4. **Providers, env-gated and additive (MVP scope set 2026-06-16).** A single
+   configuration ships providers, each enabled by an env var. The MVP ships
+   **three**; magic-link is deferred:
 
    - **Google OAuth** (`GOOGLE_CLIENT_ID`) — parity with today's
      `signInWithPopup(googleProvider)`. The default for the current
      Mediforce user base.
    - **Credentials / email + password** (`ENABLE_PASSWORD_AUTH=true`) —
-     real password auth (bcrypt-hashed in `auth_users`). Optional. Useful
-     when Google/OIDC aren't available, plus for testing and self-hosted
-     installs.
-   - **Email magic link** (`SMTP_HOST` set) — passwordless via SendGrid
-     (we already operate it in `platform-infra/src/email`). Staging / fallback.
+     real password auth (bcrypt-hashed in `auth_users`). A first-class,
+     production-supported option (not demo-only) — it is also load-bearing
+     for local dev, E2E, and air-gapped demos, replacing today's Firebase
+     Auth emulator password users. **Heavy password policy** (complexity,
+     rotation, lockout, history) is **deferred to a future ADR** — built
+     when a real password-in-production deployment needs 21 CFR-grade
+     controls. The MVP provider is honest, not crippled, but minimal.
    - **OIDC** (`OIDC_ISSUER` set) — pharma SSO to a customer's Keycloak /
      Entra / Okta / generic OIDC server. **One IdP per deployment**;
      mediforce is single-tenant per deployment so per-workspace IdPs are
-     out of scope.
+     out of scope. **Included now but dormant**: it is ~15 lines of
+     env-gated config that ship even with no IdP wired. Real per-customer
+     integration (client registration, callback URL, claim mapping,
+     end-to-end test against the customer's IdP) happens when a customer
+     lands; the MVP at most carries one smoke test against a local Keycloak.
+     Shipped now because it *is* the on-prem SSO GTM story and costs almost
+     nothing dormant.
+   - **Email magic link** — **deferred** (was a fourth provider in the
+     draft). Needs SMTP wiring + the verification-token flow, which nobody
+     needs today. Add when a deployment without Google/OIDC/password asks.
+
+4a. **Email-domain allowlist (decision 2026-06-16).** A deployment-level
+   `ALLOWED_EMAIL_DOMAINS` env (comma-separated, e.g. `appsilon.com`) is
+   enforced in the NextAuth `signIn` callback across **all** providers: a
+   sign-in whose `user.email` domain is not in the list is rejected; an unset
+   value means no restriction. This is **not** optional polish — with Google
+   enabled, *any* Google account on earth could otherwise sign in, so the
+   allowlist is what closes that open door (staging restricts to
+   `appsilon.com`; a customer deployment restricts to its domain, or relies on
+   its OIDC IdP). It is a deployment-operator security policy (env var,
+   boot-validated in `instrumentation.ts`, enforced in the same `signIn`
+   callback as the personal-workspace bootstrap), never a per-workspace
+   in-app setting.
 
 5. **Role / claim resolution.** Firebase custom claims map onto three
    different storage locations:
@@ -85,29 +124,69 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
      `workspace_members.membership` (renamed from today's `members.role`
      to remove the naming collision with process-domain roles).
 
-6. **Middleware.** `hasValidFirebaseToken()` in
-   `packages/platform-ui/src/middleware.ts` is removed. Browser requests
-   carry NextAuth's `authjs.session-token` httpOnly cookie; the middleware
-   resolves the user via `await auth()`. `hasValidApiKey()` (the
-   `PLATFORM_API_KEY` path for CLI / cron) **stays untouched** — out of
-   scope of this ADR.
+6. **Auth boundary — cookie for the browser, key/token for machines.**
+   The carrier splits cleanly by client kind, which is the industry-standard
+   shape for a same-origin Next.js app whose `/api/*` routes are also consumed
+   by non-browser clients (browser → cookie session; CLI / agents / MCP →
+   API key or PAT). Concretely:
 
-7. **Existing-user migration.** Google users migrate **seamlessly**: a
-   Python script seeds them into `auth_users` keyed by email; the first
-   NextAuth Google sign-in matches the pre-seeded row, links the account,
-   and they're in. **Password users do not have their hashes migrated** —
-   Firebase password hashes are not exportable in any form NextAuth can
-   accept. Active production users are mostly Google; the few password
-   accounts are internal/testing and re-enroll via the magic-link or
-   password provider (whichever the deployment has enabled).
+   - `hasValidFirebaseToken()` in `proxy.ts` is **replaced** by a NextAuth
+     session-cookie check (`auth()` / session-token lookup). The browser
+     carries NextAuth's `authjs.session-token` httpOnly cookie; no
+     `Authorization` header on same-origin `/api/*` calls.
+   - `hasValidApiKey()` in `proxy.ts` (the `PLATFORM_API_KEY` path, and the
+     per-user PATs from #376) **stays untouched** — out of scope of this ADR.
+   - `lib/api-auth.ts` `resolveCallerIdentity` resolves `uid` from the
+     NextAuth session instead of `verifyIdToken(Bearer)`; the
+     membership-load-into-`CallerIdentity` tail is unchanged.
+   - `lib/firebase-id-token.ts`, and the `Authorization`-attaching paths in
+     `lib/mediforce.ts` / `lib/api-fetch.ts`, are deleted — the same-origin
+     cookie rides automatically.
 
-8. **Cutover.** **Sequential after ADR-0001**, not bundled. ADR-0001 lands
-   first; mediforce runs on Postgres + Firebase Auth for a stable interval
-   (hybrid is fine — Firebase Auth talks to Google, doesn't touch our DB).
-   Then ADR-0002 runs its own planned-downtime cutover: deploy NextAuth
-   code, run user migration script, flip `AUTH_BACKEND=nextauth`, restart,
-   smoke-test. Rollback path: flip back to `AUTH_BACKEND=firebase`,
-   investigate. Splitting cutovers isolates failure modes.
+   **Same-origin assumption (decision 2026-06-16).** The target post-Firebase
+   deployment is a single self-hosted Next.js server (one origin for UI + API);
+   cookie sessions are the natural fit. The current `proxy.ts` CORS allowlist
+   + `*.hosted.app` pattern is a Firebase Hosting artifact that retires with
+   the Firebase exit. If a real cross-origin front (separate mobile / partner
+   SPA) ever lands, reconcile then via a same-site reverse proxy (preferred)
+   or `SameSite=None; Secure` cookies + a strict CORS allowlist — not by
+   reverting the browser to Bearer.
+
+7. **Existing-user migration — greenfield schema, one-time staging remap
+   (decision 2026-06-16).** There are **no production deployments**, so the
+   schema is written **greenfield** (the project default: build it as if from
+   scratch unless a concrete reason forbids it). `auth_users.id` is a fresh
+   adapter-generated `uuid` — no Firebase-uid baggage carried into the new
+   schema. Staging is the only environment with existing users + data, and we
+   keep it:
+
+   - **Structural changes ship as Drizzle migrations** (create `auth_*` +
+     `user_profiles` reshape; `workspace_members` rename `role` → `membership`
+     + add `roles text[]`).
+   - **The firebase_uid → uuid remap ships as a one-time script, not a SQL
+     migration** — building the mapping requires reading Firebase Auth
+     (`listUsers`), which a pure SQL migration cannot do. The script reads
+     Firebase Auth, inserts `auth_users` (fresh uuid), builds the map, and
+     rewrites the staging references (`workspace_members.uid`,
+     `audit_events.actor_id`, `human_tasks.*`, `cowork_sessions.*`,
+     `handoff.*`, `workspaces.linked_user_id`, `task_attachments.uploaded_by`
+     — the last added by ADR-0003, which lands first and writes it as a
+     Firebase-uid `text` column).
+   - No "seamless Google pre-seed" is required (zero production users to make
+     seamless). Dev / staging users re-enroll by signing in, or are placed by
+     the reworked seed (§Test infrastructure in PLAN).
+
+   _Supersedes the pre-2026-06-16 draft's seamless-Google-pre-seed +
+   password-re-enroll plan._
+
+8. **Cutover — straight swap, no dual-backend (decision 2026-06-16).** With
+   no production to protect (§7), there is no `AUTH_BACKEND` flag, no parallel
+   Firebase/NextAuth CI matrix, and no rollback-to-Firebase window. NextAuth
+   replaces Firebase Auth in one PR sequence; the one-time staging remap (§7)
+   preserves staging users; if something breaks, **fix forward**. ADR-0001
+   already landed, so this is simply the next change, not a bundled or flagged
+   cutover. **Lands after ADR-0003** (storage) so client-direct uploads do not
+   break when the Firebase Auth session disappears — see ADR-0003 §5.
 
 ## Considered alternatives
 
@@ -174,11 +253,30 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
 
 ## Open questions for review
 
-- Single OIDC config per deployment vs per workspace — recommended single
-  per deployment given Mediforce's single-tenant model. Confirm.
-- Real password provider toggle (`ENABLE_PASSWORD_AUTH=true`) — confirm
-  this stays a supported option, not "demo only".
-- Session strategy `database` vs `jwt` — confirm `database` for revocation
-  and audit.
-- Cutover sequencing — confirm ADR-0001 lands first, then ADR-0002, not
-  bundled.
+(None blocking. All review questions resolved in the 2026-06-16 grilling —
+see below.)
+
+### Resolved during the 2026-06-16 grilling
+
+- **OIDC scope.** Resolved: one IdP **per deployment** (single-tenant model),
+  and **included now but dormant** (env-gated, real integration per-customer
+  later). See §4.
+- **Password provider.** Resolved: **production-supported, not demo-only**,
+  env-gated; also the dev/E2E/demo auth path. Heavy 21 CFR password policy
+  deferred to a future ADR. See §4.
+- **Session strategy.** Resolved: **`database`** (immediate revocation +
+  audit; near-free given the Drizzle adapter is present for account linking
+  anyway). See §3.
+- **Email-domain allowlist.** Added: `ALLOWED_EMAIL_DOMAINS` enforced in the
+  `signIn` callback — mandatory in spirit once Google is on. See §4a.
+- **Magic-link provider.** Deferred (SMTP + verification-token flow; nobody
+  needs it today). See §4.
+
+- **Auth carrier (browser → API).** Resolved: cookie-native, same-origin
+  (decision §6). The browser uses the NextAuth httpOnly session cookie;
+  machines keep `X-Api-Key` / PAT. Reconciled with the headless `proxy.ts`
+  + `api-auth.ts` boundary that did not exist when this ADR was drafted.
+- **Cutover sequencing.** Moot: ADR-0001 already landed (Postgres cutover
+  completed 2026-05-31, PR #534). Mediforce now runs on Postgres + Firebase
+  Auth — exactly the stable hybrid this ADR's §8 assumed. ADR-0002 is the
+  next cutover; no bundling question remains.
