@@ -9,11 +9,11 @@ set -euo pipefail
 # Only runs when placeholders are detected (i.e. image was built without
 # real values). Local `docker compose build` with real build args skips this.
 
-STATIC_DIR="/app/packages/platform-ui/.next/static"
+NEXT_DIR="/app/packages/platform-ui/.next"
 SERVER_JS="/app/packages/platform-ui/server.js"
 
 needs_replacement=false
-if grep -rq '__NEXT_PUBLIC_' "$STATIC_DIR" 2>/dev/null || \
+if grep -rq '__NEXT_PUBLIC_' "$NEXT_DIR" 2>/dev/null || \
    grep -q '__NEXT_PUBLIC_' "$SERVER_JS" 2>/dev/null; then
   needs_replacement=true
 fi
@@ -25,7 +25,8 @@ if [ "$needs_replacement" = true ]; then
     placeholder="__${name}__"
     # Escape sed special chars in value
     escaped_value=$(printf '%s\n' "$value" | sed 's/[&/\|]/\\&/g')
-    find "$STATIC_DIR" -name '*.js' -exec sed -i "s|${placeholder}|${escaped_value}|g" {} + 2>/dev/null || true
+    # Replace in client bundles (.next/static/) AND server chunks (.next/server/)
+    find "$NEXT_DIR" -name '*.js' -exec sed -i "s|${placeholder}|${escaped_value}|g" {} + 2>/dev/null || true
     [ -f "$SERVER_JS" ] && sed -i "s|${placeholder}|${escaped_value}|g" "$SERVER_JS" 2>/dev/null || true
   done
 

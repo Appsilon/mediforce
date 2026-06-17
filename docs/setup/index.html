@@ -1383,7 +1383,7 @@ function generateScript() {
   s += 'echo "▸ Starting platform — pulling pre-built images..."\n';
   s += 'echo ""\n';
   s += 'cd "$DEPLOY_DIR"\n';
-  s += 'export NEXT_PUBLIC_GIT_SHA=$(git rev-parse --short HEAD)\n';
+  s += 'export NEXT_PUBLIC_GIT_SHA=$(sudo -u deploy git -C "$DEPLOY_DIR" rev-parse --short HEAD)\n';
   s += '# Pull pre-built images from registry (fast). Falls back to local build.\n';
   s += 'sudo -u deploy docker compose -f docker-compose.prod.yml pull --ignore-pull-failures 2>/dev/null || true\n';
   s += 'sudo -u deploy docker compose -f docker-compose.prod.yml up -d --remove-orphans\n';
