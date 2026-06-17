@@ -2,14 +2,16 @@
 # Vercel ignoreCommand helper.
 # Exit 0 = skip build, exit 1 = build.
 #
-# Build only on main, or when latest commit message contains [preview].
+# Only main is auto-deployed via Git integration; skip every other branch
+# (on-demand previews go through the `/deploy` PR-comment workflow, which uses
+# the Vercel CLI and bypasses this ignoreCommand).
 # On main, additionally skip doc-only changes.
 set -euo pipefail
 
 ROOT=$(git rev-parse --show-toplevel)
 cd "$ROOT"
 
-if [ "${VERCEL_GIT_COMMIT_REF:-}" != "main" ] && ! git log -1 --pretty=%B | grep -q '\[preview\]'; then
+if [ "${VERCEL_GIT_COMMIT_REF:-}" != "main" ]; then
   exit 0
 fi
 
