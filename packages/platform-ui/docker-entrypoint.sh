@@ -26,7 +26,9 @@ if [ "$needs_replacement" = true ]; then
     # Escape sed special chars in value
     escaped_value=$(printf '%s\n' "$value" | sed 's/[&/\|]/\\&/g')
     # Replace in client bundles (.next/static/) AND server chunks (.next/server/)
-    find "$NEXT_DIR" -name '*.js' -exec sed -i "s|${placeholder}|${escaped_value}|g" {} + 2>/dev/null || true
+    # -type f excludes symlinks (node_modules contains .js symlinks; sed -i on a
+    # symlink fails and aborts the rest of the batch, leaving later files untouched)
+    find "$NEXT_DIR" -name '*.js' -type f -exec sed -i "s|${placeholder}|${escaped_value}|g" {} + 2>/dev/null || true
     [ -f "$SERVER_JS" ] && sed -i "s|${placeholder}|${escaped_value}|g" "$SERVER_JS" 2>/dev/null || true
   done
 
