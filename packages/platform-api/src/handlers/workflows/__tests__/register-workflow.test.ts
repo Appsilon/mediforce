@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   InMemoryAuditRepository,
   InMemoryModelRegistryRepository,
@@ -13,6 +13,15 @@ import {
   createTestScope,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope';
+import { fetchFromContainerWorker } from '../../system/_docker';
+
+vi.mock('../../system/_docker', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../system/_docker')>();
+  return {
+    ...actual,
+    fetchFromContainerWorker: vi.fn().mockResolvedValue({ available: false }),
+  };
+});
 
 describe('registerWorkflow handler', () => {
   let processRepo: InMemoryProcessRepository;
@@ -197,6 +206,35 @@ describe('registerWorkflow handler', () => {
 
     await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
       .resolves.toMatchObject({ success: true, name: 'with-image-flow' });
+  });
+
+  it('returns warning when Docker image not found on platform', async () => {
+    vi.mocked(fetchFromContainerWorker).mockResolvedValueOnce({
+      available: true,
+      images: [
+        { repository: 'mediforce-golden-image', tag: 'latest', id: 'abc', size: '1GB', created: '1d ago' },
+      ],
+      disk: { images: { totalCount: 1, size: '1GB' }, containers: { totalCount: 0, active: 0, size: '0B' }, buildCache: { size: '0B' } },
+    });
+    const scope = buildScope();
+    const body = buildWorkflowDefinition({
+      name: 'warning-flow',
+      namespace: 'team-alpha',
+      steps: [
+        { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'anthropic/claude-sonnet-4', prompt: 'Analyze', image: 'nonexistent-image:v1' } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'analyze', to: 'done' }],
+    });
+    const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
+
+    const result = await registerWorkflow({ ...input, namespace: 'team-alpha' }, scope);
+
+    expect(result.success).toBe(true);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings![0].code).toBe('image-not-found');
+    expect(result.warnings![0].message).toContain('nonexistent-image:v1');
+    expect(result.warnings![0].stepName).toBe('Analyze');
   });
 
   it('registerWorkflow bumps version and emits workflow.version_added audit when name already exists', async () => {

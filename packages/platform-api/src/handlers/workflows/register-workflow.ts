@@ -2,6 +2,7 @@ import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
 import type {
   RegisterWorkflowInput,
   RegisterWorkflowOutput,
+  RegistrationWarning,
 } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
 import {
@@ -12,7 +13,7 @@ import {
 } from '../../errors';
 import { actorFromCaller } from '../_helpers';
 import { checkRetiredModels } from './retired-model-check';
-import { isLocalAgentMode } from '../system/_docker';
+import { isLocalAgentMode, fetchFromContainerWorker } from '../system/_docker';
 
 interface RegisterScopedInput extends RegisterWorkflowInput {
   namespace: string;
@@ -102,5 +103,42 @@ export async function registerWorkflow(
     namespace: input.namespace,
   });
 
-  return { success: true as const, name: definition.name, version: definition.version };
+  const warnings: RegistrationWarning[] = [];
+
+  if (!isLocalAgentMode()) {
+    try {
+      const dockerInfo = await fetchFromContainerWorker();
+      if (dockerInfo.available) {
+        for (const step of definition.steps) {
+          if (step.executor !== 'agent' && step.executor !== 'script') continue;
+          const cfg = step.executor === 'script' ? step.script : step.agent;
+          const image = cfg?.image;
+          if (typeof image !== 'string' || image.length === 0) continue;
+          const hasBuildSource = typeof cfg?.repo === 'string' && cfg.repo.length > 0
+            && typeof cfg?.commit === 'string' && cfg.commit.length > 0;
+          if (hasBuildSource) continue;
+          const [repo, tag = 'latest'] = image.split(':');
+          const found = dockerInfo.images.some(
+            (img) => img.repository === repo && img.tag === tag,
+          );
+          if (!found) {
+            warnings.push({
+              code: 'image-not-found',
+              message: `Image '${image}' not found on platform (step '${step.name}'). The workflow will fail at runtime unless this image is built or pushed before starting a run.`,
+              stepName: step.name,
+            });
+          }
+        }
+      }
+    } catch {
+      // Docker check is best-effort — don't fail registration
+    }
+  }
+
+  return {
+    success: true as const,
+    name: definition.name,
+    version: definition.version,
+    ...(warnings.length > 0 ? { warnings } : {}),
+  };
 }

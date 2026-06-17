@@ -127,6 +127,7 @@ server.registerTool(
         definitionName: registered.name,
         definitionVersion: registered.version,
         status: startResult.run.status,
+        ...(registered.warnings?.length ? { warnings: registered.warnings } : {}),
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
