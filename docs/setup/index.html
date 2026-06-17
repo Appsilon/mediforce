@@ -475,7 +475,7 @@
 </div>
 
 <div class="container">
-  <div class="progress-label" id="progress-label">Step 1 of 6</div>
+  <div class="progress-label" id="progress-label">Step 1 of 7</div>
   <div class="progress" id="progress-bar"></div>
 
   <!-- Step 1: Repository -->
@@ -551,7 +551,7 @@
       <ol>
         <li>Open <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a> &rarr; <strong>Add project</strong></li>
         <li>Go to <strong>Authentication</strong> &rarr; Get started &rarr; enable <strong>Email/Password</strong></li>
-        <li>Go to <strong>Authentication</strong> &rarr; <strong>Settings</strong> &rarr; <strong>Authorized domains</strong> &rarr; add your domain (e.g. <code>cdisc.mediforce.ai</code>) &mdash; <em>sign-in will fail without this!</em></li>
+        <li>Go to <strong>Authentication</strong> &rarr; <strong>Settings</strong> &rarr; <strong>Authorized domains</strong> &rarr; add your domain (e.g. <code>demo.mediforce.ai</code>) &mdash; <em>sign-in will fail without this!</em></li>
         <li>Go to <strong>Project Settings</strong> &rarr; <strong>General</strong> &rarr; add a <strong>Web app</strong> (&lt;/&gt; icon)</li>
         <li>Copy the config snippet below</li>
         <li>Go to <strong>Project Settings</strong> &rarr; <strong>Service Accounts</strong> &rarr; <strong>Generate new private key</strong></li>
@@ -653,8 +653,8 @@ const firebaseConfig = {
     <div id="domain-mediforce" class="collapsible open">
       <div class="field">
         <label for="subdomain">Subdomain</label>
-        <input type="text" id="subdomain" placeholder="e.g. cdisc" />
-        <div class="hint" id="subdomain-preview">Your instance will be at <strong>cdisc.mediforce.ai</strong></div>
+        <input type="text" id="subdomain" placeholder="e.g. demo" />
+        <div class="hint" id="subdomain-preview">Your instance will be at <strong>demo.mediforce.ai</strong></div>
         <div class="error-msg" id="subdomain-error"></div>
       </div>
       <div class="guidance" id="dns-guidance">
@@ -663,7 +663,7 @@ const firebaseConfig = {
           <li>Open <a href="https://dash.cloudflare.com" target="_blank">dash.cloudflare.com</a> &rarr; <strong>mediforce.ai</strong> &rarr; DNS</li>
           <li>Click <strong>Add record</strong></li>
           <li>Type: <strong>A</strong></li>
-          <li>Name: <strong id="dns-name">cdisc</strong></li>
+          <li>Name: <strong id="dns-name">demo</strong></li>
           <li>IPv4 address: <strong id="dns-ip">your server IP</strong></li>
           <li>Proxy status: <strong>DNS only</strong> (grey cloud) &mdash; Caddy handles TLS</li>
           <li>TTL: Auto &rarr; Save</li>
@@ -882,7 +882,16 @@ function handleSaFile(file) {
       document.getElementById('fb-sa-json').value = content;
       const label = document.getElementById('fb-sa-drop-label');
       const drop = document.getElementById('fb-sa-drop');
-      label.innerHTML = '<span style="color:var(--success); font-size:18px;">&#10003;</span> <strong>' + file.name + '</strong> <span style="color:var(--text-secondary);">(' + parsed.project_id + ')</span>';
+      label.textContent = '';
+      const check = document.createElement('span');
+      check.style.cssText = 'color:var(--success); font-size:18px;';
+      check.textContent = '✓';
+      const fname = document.createElement('strong');
+      fname.textContent = ' ' + file.name + ' ';
+      const proj = document.createElement('span');
+      proj.style.color = 'var(--text-secondary)';
+      proj.textContent = '(' + parsed.project_id + ')';
+      label.append(check, fname, proj);
       drop.classList.add('file-loaded');
     } catch {
       setError('fb-sa-json', 'File is not valid JSON.');
@@ -1044,7 +1053,12 @@ function selectDomainType(type) {
 // --- Subdomain live preview ---
 document.getElementById('subdomain').addEventListener('input', function() {
   const sub = this.value.trim() || 'example';
-  document.getElementById('subdomain-preview').innerHTML = `Your instance will be at <strong>${sub}.mediforce.ai</strong>`;
+  const preview = document.getElementById('subdomain-preview');
+  preview.textContent = '';
+  preview.append('Your instance will be at ');
+  const b = document.createElement('strong');
+  b.textContent = `${sub}.mediforce.ai`;
+  preview.appendChild(b);
   document.getElementById('dns-name').textContent = sub;
 });
 
