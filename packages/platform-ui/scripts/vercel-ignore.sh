@@ -16,5 +16,5 @@ if [ "${VERCEL_GIT_COMMIT_REF:-}" != "main" ]; then
 fi
 
 git diff --quiet HEAD^ HEAD -- . \
-  ':!docs' ':!skills' ':!.claude' ':!agents' ':!.planning' \
+  ':!docs' ':!skills' ':!.claude' ':!agents' ':!.planning' ':!deploy' \
   ':!LICENSE' ':(exclude,glob)*.md'
