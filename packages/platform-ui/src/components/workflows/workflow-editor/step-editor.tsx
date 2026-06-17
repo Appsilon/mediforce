@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import type { WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
+import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import {
   AUTONOMY_LEVELS,
@@ -72,6 +73,10 @@ const riMono = inputBaseMono;
 const rs = selectBase;
 const rt = textareaBase;
 
+function imageRef(img: DockerImageInfo): string {
+  return img.tag && img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.repository;
+}
+
 // ---------------------------------------------------------------------------
 // Executor / step-type icon maps (mirrors workflow-diagram.tsx)
 // ---------------------------------------------------------------------------
@@ -114,6 +119,11 @@ const TIP = {
   agentFallback:           'What to do if the agent fails or is below the confidence threshold: escalate to human, retry, or skip.',
   agentAllowedTools:       'Tools the agent may call, comma-separated. Leave empty to allow all available tools.',
   agentPrompt:             'Additional instructions appended to the agent\'s system prompt for this step only.',
+  agentImage:              'Docker image for the agent container (e.g. python:3.11-slim). Required for deployed execution.',
+  agentDockerfile:         'Path to a Dockerfile in agent.repo. When set, the container is built from this file instead of agent.image.',
+  agentRepo:               'Git repository URL to clone into the container before running the agent.',
+  agentCommit:             'Commit SHA or branch to check out from agent.repo. Defaults to the repo\'s default branch.',
+  agentRepoAuth:           'Name of a workflow secret holding the auth token for cloning a private repository.',
 
   scriptRuntime:           'Language runtime for the inline script: javascript, python, r, or bash.',
   scriptCommand:           'Shell command to run in the container, typically to invoke a file from script.repo.',
@@ -203,6 +213,7 @@ export function StepEditor({
   onChange,
   errors,
   imageWarning,
+  dockerImages,
 }: {
   step: WorkflowStep;
   allSteps: WorkflowStep[];
@@ -210,6 +221,7 @@ export function StepEditor({
   onChange: (patch: Partial<WorkflowStep>) => void;
   errors?: Record<string, string>;
   imageWarning?: string;
+  dockerImages?: DockerImageInfo[];
 }) {
   const isNewStep = step.id.startsWith('new-step-');
   const { plugins } = usePlugins();
@@ -342,7 +354,7 @@ export function StepEditor({
       </FieldGroup>
 
       {/* ── Agent config ─────────────────────────────────────────── */}
-      {isAgent && (
+      {isAgent && (<>
         <FieldGroup>
           <FieldRow label="autonomyLevel" tooltip={TIP.autonomyLevel}>
             <select
@@ -462,7 +474,79 @@ export function StepEditor({
             />
           </FieldRow>
         </FieldGroup>
-      )}
+
+        <FieldGroup>
+          <FieldRow label="agent.image" tooltip={TIP.agentImage}>
+            {dockerImages && dockerImages.length > 0 ? (
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={step.agent?.image ?? ''}
+                  onChange={(e) => updateAgent({ image: e.target.value || undefined })}
+                  className={cn(rs, 'flex-1')}
+                >
+                  <option value="">Select image…</option>
+                  {dockerImages.map((img) => {
+                    const ref = imageRef(img);
+                    return <option key={img.id} value={ref}>{ref}</option>;
+                  })}
+                  {step.agent?.image && !dockerImages.some((img) => imageRef(img) === step.agent?.image) && (
+                    <option value={step.agent.image}>{step.agent.image}</option>
+                  )}
+                </select>
+                <input
+                  value={step.agent?.image ?? ''}
+                  onChange={(e) => updateAgent({ image: e.target.value || undefined })}
+                  className={cn(riMono, 'w-36 shrink-0')}
+                />
+              </div>
+            ) : (
+              <input
+                value={step.agent?.image ?? ''}
+                onChange={(e) => updateAgent({ image: e.target.value || undefined })}
+                className={riMono}
+              />
+            )}
+          </FieldRow>
+          {imageWarning && (
+            <div className="flex items-center gap-1.5 px-3 -mt-1">
+              <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" strokeWidth={2} />
+              <span className="text-[11px] text-amber-600 dark:text-amber-400">{imageWarning}</span>
+            </div>
+          )}
+
+          <FieldRow label="agent.dockerfile" tooltip={TIP.agentDockerfile}>
+            <input
+              value={step.agent?.dockerfile ?? ''}
+              onChange={(e) => updateAgent({ dockerfile: e.target.value || undefined })}
+              className={riMono}
+            />
+          </FieldRow>
+
+          <FieldRow label="agent.repo" tooltip={TIP.agentRepo}>
+            <input
+              value={step.agent?.repo ?? ''}
+              onChange={(e) => updateAgent({ repo: e.target.value || undefined })}
+              className={riMono}
+            />
+          </FieldRow>
+
+          <FieldRow label="agent.commit" tooltip={TIP.agentCommit}>
+            <input
+              value={step.agent?.commit ?? ''}
+              onChange={(e) => updateAgent({ commit: e.target.value || undefined })}
+              className={riMono}
+            />
+          </FieldRow>
+
+          <FieldRow label="agent.repoAuth" tooltip={TIP.agentRepoAuth}>
+            <input
+              value={step.agent?.repoAuth ?? ''}
+              onChange={(e) => updateAgent({ repoAuth: e.target.value || undefined })}
+              className={riMono}
+            />
+          </FieldRow>
+        </FieldGroup>
+      </>)}
 
       {/* ── Script config ────────────────────────────────────────── */}
       {isScript && (
