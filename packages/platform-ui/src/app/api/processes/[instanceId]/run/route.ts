@@ -558,7 +558,28 @@ export async function POST(
                     variables: { ...instance.variables, __wait: waitMeta },
                     updatedAt: new Date().toISOString(),
                   });
-                  console.log(`[auto-runner] Wait action paused instance '${instanceId}' until ${waitMeta.resumeAt}`);
+
+                  // Verify the write persisted. Two sequential writes with no
+                  // transaction guarantee mean the second write (pauseReason +
+                  // __wait) can be lost silently — the run ends up paused/null,
+                  // invisible to the heartbeat sweep, and stranded forever.
+                  const afterWrite = await instanceRepo.getById(instanceId);
+                  if (afterWrite?.pauseReason !== 'waiting_for_timer') {
+                    console.error(
+                      `[auto-runner] Wait sentinel write lost for '${instanceId}': ` +
+                      `pauseReason=${afterWrite?.pauseReason} — escalating to failed`,
+                    );
+                    await instanceRepo.update(instanceId, {
+                      status: 'failed',
+                      error:
+                        `Wait step '${instance.currentStepId}' could not register its timer — ` +
+                        `the scheduler metadata was not persisted. ` +
+                        `Resume this run to restart from the wait step.`,
+                      updatedAt: new Date().toISOString(),
+                    });
+                  } else {
+                    console.log(`[auto-runner] Wait action paused instance '${instanceId}' until ${waitMeta.resumeAt}`);
+                  }
                   break;
                 }
               }

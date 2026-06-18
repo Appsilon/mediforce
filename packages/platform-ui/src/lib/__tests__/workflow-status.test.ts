@@ -121,6 +121,14 @@ describe('getWorkflowStatus', () => {
       expect(result.isRetryable).toBe(false);
     });
 
+    it('null pause reason surfaces actionable error', () => {
+      const result = getWorkflowStatus({ status: 'paused', pauseReason: null });
+      expect(result.displayStatus).toBe('error');
+      expect(result.rawReason).toBeNull();
+      expect(result.reason).toContain('Resume this run');
+      expect(result.isRetryable).toBe(false);
+    });
+
     it('unknown pause reason falls back to error', () => {
       const result = getWorkflowStatus({ status: 'paused', pauseReason: 'something_new' });
       expect(result.displayStatus).toBe('error');

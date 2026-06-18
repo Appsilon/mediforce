@@ -129,5 +129,43 @@ export async function heartbeat(
     }
   }
 
+  // Sweep: escalate runs that are paused with no recorded reason.
+  // These are stranded — the heartbeat can never resume them and no UI
+  // action clears them. Fail them so the user sees a retryable error
+  // rather than a run stuck at "in progress" indefinitely.
+  const orphanedInstances = pausedInstances.filter(
+    (inst) => inst.pauseReason === null || inst.pauseReason === undefined,
+  );
+
+  for (const inst of orphanedInstances) {
+    try {
+      await scope.runs.update(inst.id, {
+        status: 'failed',
+        error:
+          `Run paused without a recorded reason — the scheduler could not resume it automatically. ` +
+          `Resume this run to restart from the current step.`,
+        updatedAt: new Date().toISOString(),
+      });
+      await scope.system.audit.append({
+        actorId: 'cron-heartbeat',
+        actorType: 'system',
+        actorRole: 'scheduler',
+        action: 'instance.orphan_escalated',
+        description: `Orphaned paused run '${inst.id}' escalated to failed (no pauseReason recorded)`,
+        timestamp: new Date().toISOString(),
+        inputSnapshot: { runId: inst.id, currentStepId: inst.currentStepId },
+        outputSnapshot: { status: 'failed' },
+        basis: 'Heartbeat orphan sweep: paused run with null pauseReason',
+        entityType: 'processInstance',
+        entityId: inst.id,
+        processInstanceId: inst.id,
+        processDefinitionVersion: inst.definitionVersion,
+      });
+      console.log(`[cron-heartbeat] Escalated orphaned paused run '${inst.id}' (step: ${inst.currentStepId}) to failed`);
+    } catch (err) {
+      console.error(`[cron-heartbeat] Failed to escalate orphaned run '${inst.id}':`, err);
+    }
+  }
+
   return { triggered, skipped };
 }
