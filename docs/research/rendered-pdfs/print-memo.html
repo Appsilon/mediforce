@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang xml:lang>
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="Filip Stachura, with Claude" />
+  <meta name="dcterms.date" content="2026-06-12" />
+  <title>Layer 2 Scores Research - Print Memo</title>
+  <style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+  <style type="text/css">:root {
+color-scheme: light;
+--ink: #1a1a18;
+--muted: #5f5b54;
+--rule: #d9d1c3;
+--panel: #f5efe4;
+--accent: #8a5a2b;
+}
+@page {
+size: A4;
+margin: 22mm 18mm 20mm;
+}
+html {
+font-size: 16px;
+-webkit-print-color-adjust: exact;
+print-color-adjust: exact;
+}
+body {
+color: var(--ink);
+font-family: Georgia, "Times New Roman", serif;
+font-size: 11.5pt;
+line-height: 1.62;
+margin: 0 auto;
+max-width: 760px;
+padding: 20px 8px 32px;
+}
+h1, h2, h3, h4 {
+color: #111;
+page-break-after: avoid;
+}
+h1 {
+border-bottom: 2px solid var(--accent);
+font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+font-size: 24pt;
+font-weight: 700;
+letter-spacing: -0.02em;
+margin: 0 0 0.8rem;
+padding-bottom: 0.45rem;
+}
+h2 {
+border-top: 1px solid var(--rule);
+font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+font-size: 17pt;
+font-weight: 700;
+margin: 2.6rem 0 0.8rem;
+padding-top: 1.2rem;
+page-break-before: always;
+}
+h2:first-of-type {
+page-break-before: auto;
+}
+h3 {
+font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+font-size: 12.5pt;
+font-weight: 700;
+letter-spacing: 0.01em;
+margin: 1.7rem 0 0.5rem;
+}
+p:first-of-type strong:first-child {
+letter-spacing: 0.01em;
+}
+p, li {
+orphans: 3;
+widows: 3;
+}
+a {
+color: inherit;
+text-decoration-color: #c6a47f;
+}
+hr {
+border: 0;
+border-top: 1px solid var(--rule);
+margin: 1.8rem 0;
+}
+blockquote {
+background: var(--panel);
+border-left: 4px solid var(--accent);
+margin: 1.2rem 0 1.4rem;
+padding: 0.9rem 1rem;
+}
+blockquote p {
+margin: 0;
+}
+code {
+background: #f0e7d8;
+border-radius: 4px;
+font-family: "SF Mono", Menlo, Consolas, monospace;
+font-size: 0.9em;
+padding: 0.14em 0.32em;
+}
+pre {
+background: #faf7f1;
+border: 1px solid #e7ddce;
+border-radius: 8px;
+font-size: 0.88em;
+line-height: 1.5;
+padding: 1rem 1.1rem;
+white-space: pre-wrap;
+}
+pre code {
+background: transparent;
+padding: 0;
+}
+table {
+border-collapse: collapse;
+font-size: 0.93em;
+margin: 1rem 0 1.3rem;
+width: 100%;
+}
+th, td {
+border-bottom: 1px solid var(--rule);
+padding: 0.55rem 0.6rem;
+text-align: left;
+vertical-align: top;
+}
+th {
+border-top: 1px solid var(--rule);
+font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+font-size: 0.86em;
+letter-spacing: 0.04em;
+text-transform: uppercase;
+}
+ul, ol {
+padding-left: 1.35rem;
+}
+li {
+margin: 0.2rem 0;
+}
+img, table, pre {
+page-break-inside: avoid;
+}
+#TOC {
+background: var(--panel);
+border: 1px solid #e6dcca;
+border-radius: 8px;
+margin: 1.6rem 0 2rem;
+padding: 1rem 1.2rem;
+}
+#TOC::before {
+color: var(--accent);
+content: "Review Map";
+display: block;
+font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+font-size: 0.82rem;
+font-weight: 700;
+letter-spacing: 0.08em;
+margin-bottom: 0.45rem;
+text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Layer 2 (Scores) - Research Document</h1>
+<p class="author">Filip Stachura, with Claude</p>
+<p class="date">2026-06-12</p>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#layer-2-scores--research-document" id="toc-layer-2-scores--research-document">Layer 2 (Scores) — Research
+Document</a>
+<ul>
+<li><a href="#1-user-workflow-integration" id="toc-1-user-workflow-integration">1. User Workflow
+Integration</a></li>
+<li><a href="#2-external-tools-landscape" id="toc-2-external-tools-landscape">2. External Tools Landscape</a></li>
+<li><a href="#3-integration-with-layer-1-traces" id="toc-3-integration-with-layer-1-traces">3. Integration with Layer 1
+(Traces)</a></li>
+<li><a href="#proposed-score-schema-sketch" id="toc-proposed-score-schema-sketch">Proposed Score Schema
+(sketch)</a></li>
+<li><a href="#open-questions-for-the-team" id="toc-open-questions-for-the-team">Open Questions for the
+Team</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="layer-2-scores--research-document">Layer 2 (Scores) — Research
+Document</h1>
+<p><strong>Date:</strong> 2026-06-12 <strong>Author:</strong> Filip
+Stachura, with Claude <strong>Status:</strong> Research — no code, no
+PRs <strong>Builds on:</strong> <a href="../adr/0007-llm-evaluation-observability.md">ADR-0007</a> (Layer 1
+shipped in PR #677)</p>
+<hr />
+<h2 id="1-user-workflow-integration">1. User Workflow Integration</h2>
+<h3 id="key-design-question">Key design question</h3>
+<p>How do Scores fit into the daily work of three personas — workflow
+operators, agent developers, compliance/QA — without adding friction or
+duplicating existing surfaces?</p>
+<h3 id="1a-workflow-operators-pharma-teams-running-workflows">1a.
+Workflow operators (pharma teams running workflows)</h3>
+<p><strong>When they see scores.</strong> Operators already interact
+with agent results at two touchpoints: (1) the run step detail view
+(showing the Agent Output Envelope — result, confidence, reasoning), and
+(2) the L3 human review flow where they approve/reject/revise agent
+output. Scores should appear alongside these, not in a separate
+&quot;evaluation&quot; area.</p>
+<p><strong>Human verdict = ground truth Score.</strong> The L3 approval
+flow (<code>complete-human-task.ts</code> →
+<code>buildVerdictStepOutput()</code>) already captures a structured
+verdict: <code>{key, intent, comment}</code>. This IS the
+highest-quality Score source — a domain expert&#39;s judgment on agent
+output. The platform should auto-create a Score when a HumanTask with
+<code>creationReason: &#39;agent_review_l3&#39;</code> completes, with zero
+extra operator action:</p>
+<pre><code>Score {
+  subject:    { type: &#39;agent_run&#39;, id: agentRunId }
+  name:       &#39;human_verdict&#39;
+  source:     &#39;human&#39;
+  value:      intent === &#39;success&#39; ? 1.0 : intent === &#39;danger&#39; ? 0.0 : 0.5
+  label:      verdict.key          // e.g. &#39;approve&#39;, &#39;reject&#39;, &#39;revise&#39;
+  comment:    verdict.comment      // operator&#39;s free-text reasoning
+  createdBy:  userId
+  agentRunId, processInstanceId, namespace, stepId  // correlation
+}</code></pre>
+<p>This bridges the existing workflow surface to the evaluation domain
+with no new UI and no new operator behavior. The <code>intent</code> →
+numeric mapping is lossy on purpose — it normalizes across different
+verdict vocabularies (workflows define custom verdicts) for aggregation.
+The <code>label</code> preserves the original verdict key.</p>
+<p><strong>Deterministic scores on every agent run.</strong> Some checks
+need no human or LLM — they can fire automatically after every agent
+step completes:</p>
+<ul>
+<li><strong>Has result</strong>: <code>envelope.result !== null</code>
+(binary)</li>
+<li><strong>Confidence threshold</strong>:
+<code>envelope.confidence &gt;= step.agent.minConfidence</code></li>
+<li><strong>Token budget</strong>:
+<code>envelope.tokenUsage.total &lt;= step.agent.maxTokens</code></li>
+<li><strong>Duration</strong>:
+<code>envelope.duration_ms &lt;= step.agent.timeoutMs</code></li>
+<li><strong>Schema compliance</strong>: does
+<code>envelope.result</code> match the step&#39;s expected output schema (if
+one is defined)?</li>
+</ul>
+<p>These are cheap, instant, and provide the baseline quality signal
+even for L0/L1 autonomous runs where no human reviews the output.</p>
+<h3 id="1b-agent-developers-buildingtuning-agent-plugins">1b. Agent
+developers (building/tuning agent plugins)</h3>
+<p><strong>The feedback loop.</strong> Today an agent developer can see
+individual run results in the UI and traces in Phoenix. What&#39;s missing:
+systematic comparison across runs. The Score entity enables:</p>
+<ol type="1">
+<li><strong>Run agent</strong> → Scores auto-generated (deterministic +
+optional LLM judge)</li>
+<li><strong>See scores</strong> → per-run detail + aggregated per-agent
+view</li>
+<li><strong>Change prompt/model</strong> → re-run same workflow
+step</li>
+<li><strong>Compare</strong> → side-by-side scores: old model vs new,
+old prompt vs new</li>
+</ol>
+<p>The comparison surface is the precursor to Layer 4 (Eval Runs /
+champion vs challenger), but simple aggregation (&quot;average human_verdict
+score for agent X over the last 30 days&quot;) is Layer 2 work.</p>
+<p><strong>LLM-as-judge for developer iteration.</strong>
+<code>ReviewPlugin.review()</code> already returns
+<code>{verdict: ReviewVerdict, reasoning: string, feedback?: string, confidence: number}</code>
+— this is an LLM-as-judge interface that exists but isn&#39;t wired to
+scoring. Mapping:</p>
+<pre><code>ReviewPluginResult → Score {
+  name:       &#39;llm_judge&#39;
+  source:     &#39;llm_judge&#39;
+  value:      verdict === &#39;approve&#39; ? 1.0 : verdict === &#39;reject&#39; ? 0.0 : 0.5
+  label:      verdict                       // &#39;approve&#39; | &#39;reject&#39; | &#39;revise&#39;
+  comment:    reasoning
+  metadata:   { judgeModel, confidence, feedback }
+}</code></pre>
+<p>The developer can attach LLM-as-judge scoring to a workflow step
+configuration: &quot;after the agent runs, also run ReviewPlugin and store
+its output as a Score.&quot; This is opt-in per step — not every run needs an
+LLM judge (cost, latency).</p>
+<h3 id="1c-complianceqa-teams">1c. Compliance/QA teams</h3>
+<p><strong>Scores as audit trail.</strong> Every Score write MUST
+produce an AuditEvent via the existing
+<code>AuditRepository.append()</code>. The AuditEvent captures:</p>
+<ul>
+<li><code>actorType</code>: &#39;user&#39; (human verdict), &#39;agent&#39; (LLM judge),
+&#39;system&#39; (deterministic check)</li>
+<li><code>action</code>: &#39;score.created&#39;</li>
+<li><code>entityType</code>: &#39;score&#39;, <code>entityId</code>:
+scoreId</li>
+<li><code>inputSnapshot</code>: the scoring input (agent output being
+judged)</li>
+<li><code>outputSnapshot</code>: the Score value + reasoning</li>
+<li><code>basis</code>: which scoring rule/config triggered this</li>
+</ul>
+<p>This means the audit trail already knows WHO scored WHAT, WHEN, and
+WHY — the GxP qualification requirement from ADR-0007 D2.</p>
+<p><strong>Immutability.</strong> Scores should be append-only. A
+revised judgment creates a new Score with a <code>supersedes</code>
+pointer, not an update. This matches AuditEvent&#39;s append-only pattern
+and 21 CFR Part 11 requirements.</p>
+<p><strong>Model swap justification.</strong> &quot;Model M passed eval suite
+S before deployment into workflow W&quot; = a query across Scores: &quot;all
+Scores where subject is an AgentRun using model M in workflow W, grouped
+by Score name, with passing averages.&quot; This is the Layer 4 (Eval Run)
+story, but the Score entity must carry enough correlation data to make
+the query possible at Layer 2.</p>
+<h3 id="1d-dashboard--reporting">1d. Dashboard / reporting</h3>
+<p><strong>Aggregations that matter:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Question answered</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Per agent</td>
+<td>&quot;Is agent X getting better or worse?&quot;</td>
+</tr>
+<tr>
+<td>Per model</td>
+<td>&quot;Is claude-sonnet-4 good enough to replace opus?&quot;</td>
+</tr>
+<tr>
+<td>Per workflow</td>
+<td>&quot;Which workflow has the lowest quality?&quot;</td>
+</tr>
+<tr>
+<td>Per step</td>
+<td>&quot;Which step in this workflow fails most?&quot;</td>
+</tr>
+<tr>
+<td>Per scorer</td>
+<td>&quot;Which scoring criteria fail most?&quot;</td>
+</tr>
+<tr>
+<td>Over time</td>
+<td>&quot;Quality trend for agent X over last 30 days&quot;</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Drift detection = score trend going down.</strong> Simplest
+viable: compute a rolling average of Score values per (agent, scorer
+name) over time. Alert when the 7-day average drops below the 30-day
+average by &gt;N%. This is purely a read concern — no new entity needed
+beyond Score. The complexity is in the aggregation query and the
+alerting threshold, not the data model.</p>
+<p><strong>Dashboard scope.</strong> Layer 2 delivers: per-run score
+detail (on the existing run/step detail pages), per-agent score summary
+(new lightweight view or card), and a time-series chart of scores over
+time. Full dashboarding with custom queries and drill-downs is Layer 3-4
+territory.</p>
+<hr />
+<h2 id="2-external-tools-landscape">2. External Tools Landscape</h2>
+<h3 id="key-design-question-1">Key design question</h3>
+<p>What&#39;s worth using vs building? ADR-0007 D2 says Scores live
+in-platform. But external tools have scoring UIs, eval runners,
+annotation queues. Where exactly is the line?</p>
+<h3 id="2a-phoenix-already-deployed">2a. Phoenix (already deployed)</h3>
+<p><strong>What it has:</strong></p>
+<ul>
+<li><code>px.Client().log_evaluations(SpanEvaluations(eval_name, dataframe))</code>
+— pushes scores to Phoenix keyed by <code>span_id</code>, displayed
+alongside traces</li>
+<li><code>TraceEvaluations</code> for trace-level scores</li>
+<li>Experiments API:
+<code>run_experiment(dataset, task, evaluators)</code> with built-in
+evaluators (Hallucination, QA, Relevance, Toxicity, Summarization) and
+code evaluators (ContainsKeyword, MatchesRegex, etc.)</li>
+<li><code>arize-phoenix-evals</code> Python package:
+<code>llm_classify</code>, <code>run_evals</code>, model wrappers
+(OpenAI, Anthropic, Bedrock, LiteLLM)</li>
+<li>Dataset upload/management via
+<code>px.Client().upload_dataset()</code></li>
+</ul>
+<p><strong>Architecture detail:</strong> Phoenix stores annotations in a
+<strong>separate table</strong> (<code>span_annotations</code>), not
+inside OTel span attributes. Annotations are a mutable overlay on
+immutable OTel data — linked by <code>span_id</code> as FK. This is the
+right model: spans are portable to any backend, scores are
+Phoenix-specific. Upsert semantics on
+<code>(name, span_id, identifier)</code>.</p>
+<p><strong>What we should use:</strong> Score visualization alongside
+traces. When a Score is created in-platform, sync it to Phoenix via
+<code>POST /v1/span_annotations</code> (JSON REST endpoint, works from
+TypeScript via <code>@arizeai/phoenix-client</code>). Write-only,
+platform → Phoenix.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co">// TypeScript — push a score to Phoenix</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="cf">await</span> phoenix<span class="op">.</span><span class="fu">POST</span>(<span class="st">&quot;/v1/span_annotations&quot;</span><span class="op">,</span> {</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  body<span class="op">:</span> { data<span class="op">:</span> [{</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    span_id<span class="op">:</span> agentRun<span class="op">.</span><span class="at">otelSpanId</span><span class="op">,</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    name<span class="op">:</span> score<span class="op">.</span><span class="at">name</span><span class="op">,</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    annotator_kind<span class="op">:</span> score<span class="op">.</span><span class="at">source</span> <span class="op">===</span> <span class="st">&#39;human&#39;</span> <span class="op">?</span> <span class="st">&#39;HUMAN&#39;</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>                  <span class="op">:</span> score<span class="op">.</span><span class="at">source</span> <span class="op">===</span> <span class="st">&#39;llm_judge&#39;</span> <span class="op">?</span> <span class="st">&#39;LLM&#39;</span> <span class="op">:</span> <span class="st">&#39;CODE&#39;</span><span class="op">,</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    result<span class="op">:</span> { label<span class="op">:</span> score<span class="op">.</span><span class="at">label</span><span class="op">,</span> score<span class="op">:</span> score<span class="op">.</span><span class="at">value</span><span class="op">,</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>              explanation<span class="op">:</span> score<span class="op">.</span><span class="at">comment</span> }<span class="op">,</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    metadata<span class="op">:</span> score<span class="op">.</span><span class="at">metadata</span> <span class="op">??</span> {}<span class="op">,</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>  }]}</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span></code></pre></div>
+<p><strong>What we should NOT use:</strong> Phoenix&#39;s
+Experiments/Datasets as the system of record. ADR-0007 D2 is clear: eval
+entities are platform-owned for namespace scoping, audit events, and GxP
+qualification. Phoenix datasets have no namespace concept, no audit
+trail, no authz model.</p>
+<p><strong>What we should watch:</strong> Phoenix&#39;s
+<code>arize-phoenix-evals</code> evaluator library. The built-in
+evaluators (HallucinationEvaluator, QAEvaluator) are well-tested and
+could be used as judge implementations invoked by our platform — but the
+dependency is Python-only. For a TypeScript platform, we&#39;d reimplement
+the prompt templates in our own judge pipeline (the prompts are open
+source, the pattern is simple classification with rails).</p>
+<p><strong>Drift detection caveat:</strong> Phoenix OSS has NO
+score-over-time drift detection or alerting. Only embedding drift
+visualization (UMAP/HDBSCAN). Score time-series charts exist in the UI
+but no automated thresholds. Our platform must own drift detection — a
+simple rolling-average comparison is Layer 2 scope; statistical process
+control is later.</p>
+<p><strong>Recommendation: USE for visualization, IGNORE for system of
+record, WATCH eval library prompts.</strong></p>
+<h3 id="2b-langfuse">2b. Langfuse</h3>
+<p><strong>What it has:</strong></p>
+<ul>
+<li>Scores: <code>POST /api/public/scores</code> — rich schema with
+<code>dataType</code> (NUMERIC, CATEGORICAL, BOOLEAN, TEXT),
+<code>configId</code> for constraints, <code>source</code> (API | EVAL |
+ANNOTATION)</li>
+<li>OTLP ingestion at <code>/api/public/otel</code> — scores attach to
+OTLP-ingested traces via the same API using hex trace_id</li>
+<li>Annotation queues with assignees, score configs</li>
+<li>Datasets:
+<code>input</code>/<code>expectedOutput</code>/<code>metadata</code>
+with optional JSON Schema</li>
+<li>Eval runner:
+<code>langfuse.experiment(dataset, task, evaluators)</code></li>
+</ul>
+<p><strong>Should we reconsider ADR-0007&#39;s &quot;don&#39;t adopt Langfuse
+SDK&quot;?</strong></p>
+<p>No. The reasoning holds:</p>
+<ol type="1">
+<li><strong>Namespace scoping</strong>: Langfuse has &quot;projects&quot; but no
+equivalent to our namespace → workspace → membership model. Scores in
+Langfuse can&#39;t inherit platform authz.</li>
+<li><strong>Audit Events</strong>: Langfuse has no append-only audit log
+meeting 21 CFR Part 11. Score writes in Langfuse are unaudited.</li>
+<li><strong>GxP qualification</strong>: A second system doubles
+qualification scope.</li>
+<li><strong>Self-host footprint</strong>: Langfuse v3 = ClickHouse +
+Redis + S3 + Postgres — heavy for single-tenant on-prem.</li>
+<li><strong>Invariant enforcement</strong>: Platform can&#39;t gate model
+swaps on Langfuse data it doesn&#39;t own.</li>
+</ol>
+<p>However: Langfuse remains a valid <strong>OTLP target</strong> per
+ADR-0007 D3. A customer who already runs Langfuse can point the OTel
+Collector at it and get trace visualization. If we sync Scores to
+Phoenix, the same mechanism could optionally sync to Langfuse via its
+scores API. But this is a nice-to-have, not Layer 2 scope.</p>
+<p><strong>Recommendation: IGNORE for scoring system of record.
+INTEGRATE as optional OTLP trace target (already supported by D3). WATCH
+annotation queue UX for design inspiration.</strong></p>
+<h3 id="2c-braintrust">2c. Braintrust</h3>
+<p><strong>What it has:</strong></p>
+<ul>
+<li>Experiments with <code>Record&lt;string, number&gt;</code> scores
+(0-1 only, no categorical)</li>
+<li><code>autoevals</code> library: <code>Factuality</code>,
+<code>ClosedQA</code>, <code>LLMClassifierFromTemplate</code> — discrete
+classification mapped to numeric via <code>choiceScores</code>, reducing
+variance</li>
+<li>Datasets with automatic versioning (<code>_xact_id</code>),
+experiments pin to dataset version</li>
+<li>Feedback endpoint for updating scores post-hoc</li>
+<li>TypeScript-native SDK</li>
+</ul>
+<p><strong>What&#39;s worth borrowing:</strong></p>
+<ul>
+<li>The <code>Score</code> interface:
+<code>{name: string, score: number, metadata?: Record&lt;string, unknown&gt;}</code>
+— simple, composable. Our Score schema should be equally simple at its
+core.</li>
+<li><code>LLMClassifierFromTemplate</code> pattern: define discrete
+choices mapped to numeric scores, force LLM to classify. More reliable
+than asking for a raw 1-10 number. Our LLM-as-judge implementation
+should use this pattern.</li>
+<li>Experiment-dataset version pinning: when we build Layer 3-4,
+snapshot the dataset version used in each eval run.</li>
+</ul>
+<p><strong>Recommendation: IGNORE as platform (cloud-only, no
+self-host). BORROW patterns for Score schema design and LLM-as-judge
+reliability.</strong></p>
+<h3 id="2d-humanloop">2d. Humanloop</h3>
+<p>Acquired by Anthropic in 2025; standalone platform sunset September
+2025. Not a viable integration target.</p>
+<p><strong>Worth noting:</strong> Their evaluator taxonomy (Code / AI /
+Human) maps exactly to our three Score sources (deterministic /
+LLM-as-judge / human review). And their &quot;online evaluators&quot; concept
+(auto-run on production logs for drift detection) is worth considering
+for our deterministic scores.</p>
+<p><strong>Recommendation: IGNORE. BORROW evaluator taxonomy
+naming.</strong></p>
+<h3 id="2e-llm-as-judge-frameworks">2e. LLM-as-judge frameworks</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Language</th>
+<th>Key pattern</th>
+<th>Relevance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RAGAS</td>
+<td>Python</td>
+<td><code>AspectCritic(definition, strictness)</code> — multi-vote</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>DeepEval</td>
+<td>Python</td>
+<td><code>GEval(criteria, evaluation_steps)</code> — CoT + 0-10
+scale</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>promptfoo</td>
+<td>TypeScript</td>
+<td>YAML <code>llm-rubric</code> assertions,
+<code>GradingResult</code></td>
+<td>High</td>
+</tr>
+<tr>
+<td>autoevals</td>
+<td>TS+Python</td>
+<td><code>LLMClassifier(choiceScores)</code> — discrete
+classification</td>
+<td>High</td>
+</tr>
+<tr>
+<td>LangSmith</td>
+<td>Python</td>
+<td><code>CriteriaEvalChain</code>,
+<code>EvaluationResult(key, score)</code></td>
+<td>Low</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Cross-framework patterns we should adopt:</strong></p>
+<ol type="1">
+<li><strong>Rubric = free-text string.</strong> Every framework accepts
+plain English. Our <code>ScoreConfig</code> should have a
+<code>rubric: string</code> field.</li>
+<li><strong>Score normalization to 0-1 float.</strong> Universal. No
+reason to diverge.</li>
+<li><strong>Multi-criteria = composition.</strong> N independent
+scorers, not one multi-output scorer. Each Score is one (name, value)
+pair.</li>
+<li><strong>Score + reason.</strong> Always capture reasoning alongside
+the numeric value. Essential for debugging and audit.</li>
+<li><strong>CoT before scoring.</strong> Reasoning field MUST precede
+score in the LLM schema to force chain-of-thought. +10-20%
+consistency.</li>
+<li><strong>Discrete classification &gt; raw numbers.</strong>
+Binary/categorical choices mapped to numeric are more reliable than
+asking an LLM for a 1-10 rating. Use the <code>choiceScores</code>
+pattern.</li>
+</ol>
+<p><strong>Recommendation for LLM-as-judge implementation:</strong>
+Don&#39;t adopt an external framework as a runtime dependency. Our platform
+already has <code>ReviewPlugin</code> with the right interface shape and
+<code>OpenRouterLlmClient</code> for LLM calls. Build the judge pipeline
+in TypeScript using patterns from autoevals (discrete classification,
+CoT). The judge prompt templates can be platform-configurable (Score
+Config entity, Layer 2 scope) or hardcoded initially.</p>
+<h3 id="2f-summary-table">2f. Summary table</h3>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Verdict</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Phoenix</td>
+<td><strong>USE</strong></td>
+<td>Trace viz + score overlay via
+<code>POST /v1/span_annotations</code></td>
+</tr>
+<tr>
+<td>Langfuse</td>
+<td>INTEGRATE</td>
+<td>Optional OTLP target per D3; don&#39;t adopt scoring</td>
+</tr>
+<tr>
+<td>Braintrust</td>
+<td>IGNORE</td>
+<td>Cloud-only; borrow Score schema + classifier pattern</td>
+</tr>
+<tr>
+<td>Humanloop</td>
+<td>IGNORE</td>
+<td>Sunset; borrow evaluator taxonomy</td>
+</tr>
+<tr>
+<td>RAGAS</td>
+<td>IGNORE</td>
+<td>Python-only; borrow multi-vote pattern if needed</td>
+</tr>
+<tr>
+<td>DeepEval</td>
+<td>IGNORE</td>
+<td>Python-only; borrow CoT + evaluation_steps pattern</td>
+</tr>
+<tr>
+<td>promptfoo</td>
+<td><strong>WATCH</strong></td>
+<td>TypeScript, good assertion model; possible future CLI tool</td>
+</tr>
+<tr>
+<td>autoevals</td>
+<td>IGNORE</td>
+<td>Borrow <code>LLMClassifier</code> + <code>choiceScores</code>
+pattern</td>
+</tr>
+<tr>
+<td>LangSmith</td>
+<td>IGNORE</td>
+<td>LangChain ecosystem; not relevant to our stack</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-integration-with-layer-1-traces">3. Integration with Layer 1
+(Traces)</h2>
+<h3 id="key-design-question-2">Key design question</h3>
+<p>How do Scores connect back to trace data when traces live externally
+(Phoenix/Jaeger/Datadog) and Scores live in-platform?</p>
+<h3 id="3a-the-join-key-agentrunid-not-traceid">3a. The join key:
+agentRunId, not traceId</h3>
+<p>The correlation contract (D4) puts
+<code>mediforce.agent_run.id</code> on every span. Score.subject is
+<code>{type: &#39;agent_run&#39;, id: agentRunId}</code>. This means:</p>
+<ul>
+<li><strong>Platform → trace store</strong>: Given a Score, find its
+traces by querying the trace store for spans where
+<code>mediforce.agent_run.id = score.subjectId</code>. This works
+regardless of which trace backend is deployed.</li>
+<li><strong>Trace store → platform</strong>: Given a trace, find its
+Scores by querying the platform for Scores where
+<code>subjectId = span.attributes[&#39;mediforce.agent_run.id&#39;]</code>.</li>
+</ul>
+<p>The join is <code>agentRunId</code>, a platform-owned ID. We do NOT
+use traceId or spanId as the join key because: (a) they&#39;re generated by
+OTel, not the platform; (b) they&#39;re ephemeral — trace stores have
+retention policies; (c) traceId format varies by backend (hex vs b64).
+The platform owns the identity; the trace store is a view.</p>
+<p><strong>For Workflow Run-level Scores</strong>, the join key is
+<code>processInstanceId</code>. Same logic — the platform ID is
+canonical.</p>
+<h3 id="3b-pushing-scores-to-phoenix-for-visualization">3b. Pushing
+Scores to Phoenix for visualization</h3>
+<p><strong>Mechanism:</strong> After a Score is created in-platform,
+push it to Phoenix via <code>POST /v1/span_annotations</code> (REST,
+JSON, works from TypeScript — see §2a code snippet). This requires
+knowing the <code>span_id</code> of the root agent run span.</p>
+<p><strong>Problem:</strong> The platform doesn&#39;t currently store the
+OTel span ID. The span is created by <code>withAgentRunSpan()</code> in
+<code>agent-runner.ts</code> and exported to the trace backend, but the
+span ID isn&#39;t persisted on the AgentRun entity.</p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+<th>Tradeoff</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A. Store spanId on AgentRun</td>
+<td>Add <code>otelSpanId?: string</code> to AgentRunSchema, set it in
+<code>withAgentRunSpan()</code></td>
+<td>Clean join. Small schema change.</td>
+</tr>
+<tr>
+<td>B. Query Phoenix by agentRunId attribute</td>
+<td>Phoenix supports querying spans by attribute value</td>
+<td>Works, but couples the sync path to Phoenix&#39;s query API</td>
+</tr>
+<tr>
+<td>C. Don&#39;t sync to Phoenix</td>
+<td>Scores visible only in platform UI</td>
+<td>Misses the &quot;see quality alongside traces&quot; benefit</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Recommendation: Option A.</strong> Store the OTel span ID on
+the AgentRun at creation time. It&#39;s a single field addition, set in the
+same code path that already creates the span. Then the Phoenix sync is a
+simple lookup: <code>agentRun.otelSpanId</code> →
+<code>SpanEvaluations(span_id=otelSpanId)</code>.</p>
+<p><strong>Sync direction:</strong> Platform → Phoenix only. Never read
+Scores back from Phoenix. The platform is the system of record (D2).
+Phoenix is a visualization convenience. If Phoenix is unavailable,
+Scores still exist.</p>
+<p><strong>Sync trigger:</strong> Background job or event hook after
+Score creation. Not synchronous — Score creation should not block on
+Phoenix availability. Initially, a simple async fire-and-forget; later,
+a proper outbox pattern if reliability matters.</p>
+<h3 id="3c-content-access-for-llm-as-judge-scoring">3c. Content access
+for LLM-as-judge scoring</h3>
+<p>LLM-as-judge needs the prompt and completion to evaluate. Where does
+it get them?</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Pros</th>
+<th>Cons</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>AgentOutputEnvelope</strong> (in-platform)</td>
+<td>Always available. Has result, reasoning_chain, confidence. No
+external dependency.</td>
+<td>Doesn&#39;t have the raw prompt (system prompt + user message). Has the
+output but not the exact LLM conversation.</td>
+</tr>
+<tr>
+<td><strong>Trace store</strong> (Phoenix)</td>
+<td>Has full prompt/completion when
+<code>MEDIFORCE_OTEL_CAPTURE_CONTENT=true</code>.</td>
+<td>External dependency. Content capture may be off in production (D5).
+Requires Phoenix query API.</td>
+</tr>
+<tr>
+<td><strong>Store scoring-relevant content in-platform</strong></td>
+<td>Full control. Available regardless of trace backend or content
+capture setting.</td>
+<td>Duplication. Storage cost.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Recommendation: Use AgentOutputEnvelope as primary source +
+capture judge-relevant content at scoring time.</strong></p>
+<p>The envelope already has <code>result</code> (the agent&#39;s structured
+output), <code>reasoning_summary</code>, <code>reasoning_chain</code>,
+and the step&#39;s <code>stepInput</code> (via WorkflowAgentContext). For
+most scoring criteria (correctness, completeness, relevance), this is
+sufficient — the judge evaluates &quot;given this input, is this output
+good?&quot; rather than inspecting raw LLM token-level conversation.</p>
+<p>For criteria that need the raw prompt/completion (e.g., safety
+screening of what the LLM actually said), the scoring pipeline should
+pull from the trace store when
+<code>MEDIFORCE_OTEL_CAPTURE_CONTENT=true</code> and fail gracefully
+when it&#39;s not. This is an advanced path — not Layer 2 MVP.</p>
+<h3 id="3d-layer-3-prerequisites-what-layer-2-must-capture">3d. Layer 3
+prerequisites: what Layer 2 must capture</h3>
+<p>For &quot;add this agent run to an eval dataset&quot; (Layer 3) to work, the
+Score entity must carry or be joinable to:</p>
+<table>
+<thead>
+<tr>
+<th>Data needed for dataset entry</th>
+<th>Where it lives</th>
+<th>Layer 2 action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Input (what the agent was asked)</td>
+<td><code>StepExecution.input</code> /
+<code>WorkflowAgentContext.stepInput</code></td>
+<td>Score has <code>agentRunId</code> → join to AgentRun → join to
+StepExecution</td>
+</tr>
+<tr>
+<td>Output (what the agent produced)</td>
+<td><code>AgentOutputEnvelope</code> on AgentRun</td>
+<td>Same join path</td>
+</tr>
+<tr>
+<td>Expected output (ground truth)</td>
+<td>Doesn&#39;t exist today</td>
+<td>Layer 3 concern — but the human verdict Score IS implicit ground
+truth</td>
+</tr>
+<tr>
+<td>Model used</td>
+<td><code>AgentOutputEnvelope.model</code></td>
+<td>Already on AgentRun</td>
+</tr>
+<tr>
+<td>Quality judgment</td>
+<td>Score.value + Score.label</td>
+<td>This IS the Score</td>
+</tr>
+<tr>
+<td>Correlation context</td>
+<td>namespace, workflow name+version, stepId</td>
+<td>Score carries these via correlation fields</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key insight:</strong> A human verdict Score (source=&#39;human&#39;,
+name=&#39;human_verdict&#39;) on an AgentRun with <code>intent=&#39;success&#39;</code>
+is an implicit &quot;this output is correct&quot; signal. Layer 3 can offer: &quot;This
+agent run was approved by a human. Add it to the eval dataset as a
+golden case?&quot; The Score doesn&#39;t need to store the input/output — it just
+needs the join key (<code>agentRunId</code>) to retrieve them.</p>
+<p><strong>Score must carry enough correlation to support Layer 3-4
+queries:</strong></p>
+<ul>
+<li><code>agentRunId</code> (the subject)</li>
+<li><code>processInstanceId</code> (which workflow run)</li>
+<li><code>namespace</code> (scoping)</li>
+<li><code>stepId</code> (which step in the workflow)</li>
+<li>Workflow <code>name</code> + <code>version</code> (via the AgentRun
+→ StepExecution join, or denormalized on Score for query
+performance)</li>
+</ul>
+<hr />
+<h2 id="proposed-score-schema-sketch">Proposed Score Schema
+(sketch)</h2>
+<p>Based on the research above, a minimal Score schema for Layer 2:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> ScoreSchema <span class="op">=</span> z<span class="op">.</span><span class="fu">object</span>({</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  id<span class="op">:</span> z<span class="op">.</span><span class="fu">string</span>()<span class="op">.</span><span class="fu">uuid</span>()<span class="op">,</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">// What is being scored</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  subject<span class="op">:</span> z<span class="op">.</span><span class="fu">discriminatedUnion</span>(<span class="st">&#39;type&#39;</span><span class="op">,</span> [</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    z<span class="op">.</span><span class="fu">object</span>({ type<span class="op">:</span> z<span class="op">.</span><span class="fu">literal</span>(<span class="st">&#39;agent_run&#39;</span>)<span class="op">,</span> id<span class="op">:</span> z<span class="op">.</span><span class="fu">string</span>() })<span class="op">,</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    z<span class="op">.</span><span class="fu">object</span>({ type<span class="op">:</span> z<span class="op">.</span><span class="fu">literal</span>(<span class="st">&#39;workflow_run&#39;</span>)<span class="op">,</span> id<span class="op">:</span> z<span class="op">.</span><span class="fu">string</span>() })<span class="op">,</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  ])<span class="op">,</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The score itself</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  name<span class="op">:</span> z<span class="op">.</span><span class="fu">string</span>()<span class="op">.</span><span class="fu">min</span>(<span class="dv">1</span>)<span class="op">,</span>              <span class="co">// e.g. &#39;human_verdict&#39;, &#39;llm_judge&#39;, &#39;has_result&#39;</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  value<span class="op">:</span> z<span class="op">.</span><span class="fu">number</span>()<span class="op">.</span><span class="fu">min</span>(<span class="dv">0</span>)<span class="op">.</span><span class="fu">max</span>(<span class="dv">1</span>)<span class="op">,</span>      <span class="co">// normalized 0-1</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  label<span class="op">:</span> z<span class="op">.</span><span class="fu">string</span>()<span class="op">.</span><span class="fu">nullable</span>()<span class="op">,</span>         <span class="co">// categorical label, e.g. &#39;approve&#39;, &#39;reject&#39;</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  comment<span class="op">:</span> z<span class="op">.</span><span class="fu">string</span>()<span class="op">.</span><span class="fu">nullable</span>()<span class="op">,</span>       <span class="co">// reasoning / explanation</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Source discrimination</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>  source<span class="op">:</span> z<span class="op">.</span><span class="fu">enum</span>([<span class="st">&#39;human&#39;</span><span class="op">,</span> <span class="st">&#39;llm_judge&#39;</span><span class="op">,</span> <span class="st">&#39;deterministic&#39;</span>])<span class="op">,</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Who/what created this score</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>  createdBy<span class="op">:</span> z<span class="op">.</span><span class="fu">string</span>()<span class="op">.</span><span class="fu">nullable</span>()<span class="op">,</span>     <span class="co">// userId for human, null for automated</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Metadata (extensible, source-specific)</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>  metadata<span class="op">:</span> z<span class="op">.</span><span class="fu">record</span>(z<span class="op">.</span><span class="fu">string</span>()<span class="op">,</span> z<span class="op">.</span><span class="fu">unknown</span>())<span class="op">.</span><span class="fu">nullable</span>()<span class="op">,</span></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>  <span class="co">// For llm_judge: { judgeModel, confidence, rubric, ... }</span></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>  <span class="co">// For deterministic: { rule, threshold, actual, ... }</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>  <span class="co">// For human: { verdictKey, intent, ... }</span></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Correlation (denormalized for query performance)</span></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>  namespace<span class="op">:</span> z<span class="op">.</span><span class="fu">string</span>()<span class="op">,</span></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>  processInstanceId<span class="op">:</span> z<span class="op">.</span><span class="fu">string</span>()<span class="op">.</span><span class="fu">nullable</span>()<span class="op">,</span> <span class="co">// null if scoring a standalone agent run</span></span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>  stepId<span class="op">:</span> z<span class="op">.</span><span class="fu">string</span>()<span class="op">.</span><span class="fu">nullable</span>()<span class="op">,</span></span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Immutability</span></span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>  supersedes<span class="op">:</span> z<span class="op">.</span><span class="fu">string</span>()<span class="op">.</span><span class="fu">uuid</span>()<span class="op">.</span><span class="fu">nullable</span>()<span class="op">,</span> <span class="co">// points to previous Score if revised</span></span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Timestamps</span></span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a>  createdAt<span class="op">:</span> z<span class="op">.</span><span class="fu">string</span>()<span class="op">.</span><span class="fu">datetime</span>()<span class="op">,</span></span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Optional: Score Config reference (Layer 2 stretch)</span></span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a>  configId<span class="op">:</span> z<span class="op">.</span><span class="fu">string</span>()<span class="op">.</span><span class="fu">uuid</span>()<span class="op">.</span><span class="fu">nullable</span>()<span class="op">,</span></span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span></code></pre></div>
+<p>This follows the patterns from existing platform entities: Zod
+schema, namespace-scoped, correlation fields for joins, append-only with
+<code>supersedes</code> for revisions.</p>
+<hr />
+<h2 id="open-questions-for-the-team">Open Questions for the Team</h2>
+<h3 id="design-decisions">Design decisions</h3>
+<ol type="1">
+<li><p><strong>Should deterministic scores auto-fire on every agent run,
+or be opt-in per workflow step?</strong> Auto-fire is simpler and gives
+universal baseline coverage. Opt-in reduces noise for workflows where
+certain checks don&#39;t apply. Proposal: auto-fire a small set (has_result,
+confidence_threshold) always; additional checks opt-in via step
+config.</p></li>
+<li><p><strong>Should LLM-as-judge scores block the workflow or run
+async?</strong> Blocking adds latency and cost to every agent step.
+Async means the score arrives after the step has already progressed. For
+L3 (human review required), the human is already blocking — running the
+LLM judge while waiting for the human is free latency-wise. For
+autonomous steps (L0-L2, L4), async is the only sane option.</p></li>
+<li><p><strong>Score Config entity — Layer 2 or defer?</strong> A Score
+Config would define &quot;how to score&quot; (rubric, judge model, threshold,
+enabled/disabled) and be attached to a workflow step definition. This
+makes scoring declarative and configurable. But it&#39;s also a new entity,
+new UI, new handler. Could ship Layer 2 with hardcoded score names and
+add Config in Layer 2.5.</p></li>
+<li><p><strong>Denormalize workflow name+version on Score, or always
+join through AgentRun?</strong> Denormalization speeds up &quot;all scores
+for workflow X&quot; queries but adds write-time complexity. The AgentRun
+already has <code>processInstanceId</code> → join to ProcessInstance →
+has workflow name+version. Propose: start with join, add denormalized
+columns if query performance demands it.</p></li>
+</ol>
+<h3 id="technical-decisions">Technical decisions</h3>
+<ol start="5" type="1">
+<li><p><strong>Phoenix sync mechanism.</strong> <del>Resolved</del>:
+Phoenix exposes <code>POST /v1/span_annotations</code> as a JSON REST
+endpoint. TypeScript SDK <code>@arizeai/phoenix-client</code> provides
+typed wrappers generated from OpenAPI. No Python sidecar needed.
+Remaining question: should the sync be fire-and-forget from the Score
+creation handler, or a separate background job with retry?
+Fire-and-forget is simpler but loses scores if Phoenix is down.
+Background job (BullMQ) is more reliable but adds infra dependency
+(Redis). Proposal: fire-and-forget for Layer 2 MVP, BullMQ job if we
+find scores missing in practice.</p></li>
+<li><p><strong>OTel span ID storage.</strong> Adding
+<code>otelSpanId</code> to AgentRun requires a Postgres migration and a
+change to <code>withAgentRunSpan()</code> in agent-runner.ts. Low-risk,
+small change. Should it happen as part of Layer 2 or as a standalone
+prep PR?</p></li>
+<li><p><strong>Score table design.</strong> Single <code>scores</code>
+table with JSONB <code>metadata</code> column (like AuditEvent&#39;s
+pattern), or separate tables per source type? Single table with JSONB is
+simpler, matches our existing patterns, and the <code>source</code>
+discriminator handles type-specific queries. Propose: single
+table.</p></li>
+<li><p><strong>Existing AgentRun fields vs Score.</strong>
+<code>AgentOutputEnvelope</code> already has <code>confidence</code>
+(self-assessment). Should we also auto-create a Score from
+<code>confidence</code>, or keep self-assessment and external judgment
+as separate concepts? ADR-0007 / CONTEXT.md explicitly distinguishes
+them: &quot;confidence is the agent&#39;s self-assessment, a Score is an external
+judgment.&quot; Propose: do NOT auto-create a Score from confidence. They&#39;re
+different things; mixing them pollutes the score distribution.</p></li>
+</ol>
+<h3 id="scope-decisions">Scope decisions</h3>
+<ol start="9" type="1">
+<li><p><strong>Layer 2 MVP scope.</strong> Propose: Score schema + repo
++ handler (CRUD), auto-create human_verdict Score from L3 approvals, 2-3
+deterministic scores auto-firing, basic per-agent score aggregation
+endpoint. Defer: LLM-as-judge pipeline, Score Config entity, Phoenix
+sync, dashboard UI, drift alerting.</p></li>
+<li><p><strong>CLI support.</strong>
+<code>mediforce score list --agent-run &lt;id&gt;</code>,
+<code>mediforce score create --agent-run &lt;id&gt; --name &lt;name&gt; --value &lt;value&gt;</code>.
+Follows the dogfood rule (CLI &gt; REST). Should land in the same PR as
+the handler.</p></li>
+</ol>
+</body>
+</html>
