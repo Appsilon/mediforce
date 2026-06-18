@@ -15,6 +15,8 @@ export { MailgunNotificationService } from './notifications/mailgun-notification
 export { WebhookNotificationService } from './notifications/webhook-notification-service';
 export { createMailgunSender } from './email/mailgun-client';
 export type { MailgunConfig } from './email/mailgun-client';
+export { createSmtpSender } from './email/smtp-client';
+export type { SmtpConfig } from './email/smtp-client';
 
 // Postgres repositories — the only data backend (ADR-0001).
 export { PostgresToolCatalogRepository } from './postgres/repositories/tool-catalog-repository';
