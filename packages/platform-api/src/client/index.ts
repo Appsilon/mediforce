@@ -368,6 +368,10 @@ import {
   type GetConfigByPrefixOutput,
   type SetConfigOutput,
   type TestWebhookOutput,
+  GetEmailStatusInputSchema,
+  GetEmailStatusOutputSchema,
+  type GetEmailStatusInput,
+  type GetEmailStatusOutput,
 } from '../contract/index';
 // SDK consumers reach for one path:
 //   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
@@ -571,6 +575,7 @@ export class Mediforce {
   readonly system: {
     dockerInfo: () => Promise<DockerInfoResponse>;
     credits: (input: OpenRouterCreditsInput) => Promise<OpenRouterCreditsOutput>;
+    emailStatus: () => Promise<GetEmailStatusOutput>;
   };
 
   readonly cron: {
@@ -1347,6 +1352,11 @@ export class Mediforce {
         const res = await this.request(`/api/system/openrouter-credits${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.system.credits');
         return OpenRouterCreditsOutputSchema.parse(body);
+      },
+      emailStatus: async () => {
+        const res = await this.request('/api/admin/email-status');
+        const body = await parseJsonOrThrow(res, 'mediforce.system.emailStatus');
+        return GetEmailStatusOutputSchema.parse(body);
       },
     };
 

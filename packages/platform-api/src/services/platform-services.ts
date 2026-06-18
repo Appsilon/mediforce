@@ -23,6 +23,7 @@ import {
   FirebaseInviteService,
   validateSecretsKey,
   createMailgunSender,
+  createSmtpSender,
   MailgunNotificationService,
   FirebaseUserDirectoryService,
   getAdminAuth,
@@ -35,6 +36,7 @@ import type {
   AuditRepository,
   CoworkSessionRepository,
   CronTriggerStateRepository,
+  EmailProviderInfo,
   HandoffRepository,
   HumanTaskRepository,
   ModelRegistryRepository,
@@ -130,8 +132,9 @@ export interface PlatformServices {
   secretsRepo: WorkflowSecretsRepository;
   namespaceSecretsRepo: NamespaceSecretsRepository;
   inviteService: InviteService;
-  /** `null` when Mailgun env vars are unset (email disabled). */
+  /** `null` when email env vars are unset (email disabled). */
   inviteNotificationService: InviteNotificationService | null;
+  emailProviderInfo: EmailProviderInfo | null;
   dockerImages: DockerImagesService;
   /**
    * Firebase Auth metadata lookup (uid → email, lastSignInTime). Always wired
@@ -303,34 +306,71 @@ export function getPlatformServices(): PlatformServices {
   const mailgunDomain = process.env.MAILGUN_DOMAIN ?? '';
   const mailgunFrom = process.env.MAILGUN_FROM_EMAIL ?? '';
   const mailgunSenderName = process.env.MAILGUN_SENDER_NAME ?? 'Mediforce';
-
   const mailgunConfigured = mailgunApiKey !== '' && mailgunDomain !== '' && mailgunFrom !== '';
-  if (!emailDisabled && !mailgunConfigured) {
-    const missing = [
-      !mailgunApiKey && 'MAILGUN_API_KEY',
-      !mailgunDomain && 'MAILGUN_DOMAIN',
-      !mailgunFrom && 'MAILGUN_FROM_EMAIL',
-    ].filter(Boolean).join(', ');
-    throw new Error(
-      `Email is enabled but Mailgun config incomplete (missing: ${missing}). ` +
-      `Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.`,
-    );
-  }
+
+  const smtpHost = process.env.SMTP_HOST ?? '';
+  const smtpPort = process.env.SMTP_PORT ?? '';
+  const smtpUser = process.env.SMTP_USER ?? '';
+  const smtpPass = process.env.SMTP_PASS ?? '';
+  const smtpSecure = process.env.SMTP_SECURE !== 'false';
+  const smtpFrom = process.env.SMTP_FROM_EMAIL ?? '';
+  const smtpConfigured = smtpHost !== '' && smtpFrom !== '';
+
+  const explicitProvider = process.env.EMAIL_PROVIDER as 'mailgun' | 'smtp' | undefined;
+  const resolvedProvider = resolveEmailProvider(explicitProvider, mailgunConfigured, smtpConfigured);
+
   if (emailDisabled) {
     console.log('[platform-services] MEDIFORCE_DISABLE_EMAIL=true — email handler and notifications disabled');
   }
 
-  const mailgunSender = mailgunConfigured
-    ? createMailgunSender({
-        apiKey: mailgunApiKey,
-        domain: mailgunDomain,
-        defaultFrom: mailgunFrom,
-        defaultSenderName: mailgunSenderName,
-      })
-    : undefined;
+  let emailSender: SendEmailFn | undefined;
+  let emailProviderInfo: EmailProviderInfo | null = null;
 
-  const notificationService = mailgunSender
-    ? new MailgunNotificationService(mailgunSender)
+  if (!emailDisabled && resolvedProvider === 'mailgun') {
+    if (!mailgunConfigured) {
+      const missing = [
+        !mailgunApiKey && 'MAILGUN_API_KEY',
+        !mailgunDomain && 'MAILGUN_DOMAIN',
+        !mailgunFrom && 'MAILGUN_FROM_EMAIL',
+      ].filter(Boolean).join(', ');
+      throw new Error(
+        `EMAIL_PROVIDER=mailgun but config incomplete (missing: ${missing}). ` +
+        `Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.`,
+      );
+    }
+    emailSender = createMailgunSender({
+      apiKey: mailgunApiKey,
+      domain: mailgunDomain,
+      defaultFrom: mailgunFrom,
+      defaultSenderName: mailgunSenderName,
+    });
+    emailProviderInfo = { provider: 'mailgun', configured: true, from: mailgunFrom };
+    console.log('[platform-services] Email provider: Mailgun');
+  } else if (!emailDisabled && resolvedProvider === 'smtp') {
+    if (!smtpConfigured) {
+      const missing = [
+        !smtpHost && 'SMTP_HOST',
+        !smtpFrom && 'SMTP_FROM_EMAIL',
+      ].filter(Boolean).join(', ');
+      throw new Error(
+        `EMAIL_PROVIDER=smtp but config incomplete (missing: ${missing}). ` +
+        `Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.`,
+      );
+    }
+    emailSender = createSmtpSender({
+      host: smtpHost,
+      port: smtpPort !== '' ? Number(smtpPort) : 587,
+      secure: smtpSecure,
+      user: smtpUser,
+      pass: smtpPass,
+      defaultFrom: smtpFrom,
+    });
+    emailProviderInfo = { provider: 'smtp', configured: true, from: smtpFrom };
+    console.log('[platform-services] Email provider: SMTP');
+  }
+
+  const notificationService = emailSender
+    ? new MailgunNotificationService(emailSender)
     : undefined;
   // Wired whenever Firebase Auth is available — independent of Mailgun.
   // Email-disabled deployments still need uid → email/lastSignInTime lookups
@@ -375,8 +415,8 @@ export function getPlatformServices(): PlatformServices {
   });
   actionRegistry.register('spawn', createSpawnActionHandler(manualTrigger, processRepo, spawnRunKicker));
   actionRegistry.register('wait', waitActionHandler);
-  if (mailgunSender) {
-    actionRegistry.register('email', createEmailActionHandler(mailgunSender));
+  if (emailSender) {
+    actionRegistry.register('email', createEmailActionHandler(emailSender));
   }
 
   const webhookRouter = new WebhookRouter(engine, processRepo);
@@ -391,8 +431,9 @@ export function getPlatformServices(): PlatformServices {
   // NEXT_PUBLIC_PLATFORM_URL still renders sensible links.
   const inviteAppUrl =
     process.env.NEXT_PUBLIC_PLATFORM_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
-  const inviteNotificationService = mailgunSender
-    ? new MailgunInviteNotificationService(mailgunSender, inviteAppUrl, mailgunSenderName)
+  const senderName = resolvedProvider === 'mailgun' ? mailgunSenderName : 'Mediforce';
+  const inviteNotificationService = emailSender
+    ? new MailgunInviteNotificationService(emailSender, inviteAppUrl, senderName)
     : null;
 
   const dockerImages: DockerImagesService = isLocalAgentMode()
@@ -434,6 +475,7 @@ export function getPlatformServices(): PlatformServices {
     namespaceSecretsRepo,
     inviteService,
     inviteNotificationService,
+    emailProviderInfo,
     dockerImages,
     userDirectory: userDirectoryService,
   };
@@ -452,4 +494,20 @@ export function getPlatformServices(): PlatformServices {
   }
 
   return services;
+}
+
+function resolveEmailProvider(
+  explicit: 'mailgun' | 'smtp' | undefined,
+  mailgunConfigured: boolean,
+  smtpConfigured: boolean,
+): 'mailgun' | 'smtp' | null {
+  if (explicit !== undefined) return explicit;
+  if (mailgunConfigured && smtpConfigured) {
+    throw new Error(
+      'Both Mailgun and SMTP env vars are set. Set EMAIL_PROVIDER=mailgun or EMAIL_PROVIDER=smtp to disambiguate.',
+    );
+  }
+  if (mailgunConfigured) return 'mailgun';
+  if (smtpConfigured) return 'smtp';
+  return null;
 }

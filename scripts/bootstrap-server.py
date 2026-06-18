@@ -1424,11 +1424,18 @@ def _render_compose_env(ctx: Context) -> str:
         "# Caddy — site block matcher (real domain → Let's Encrypt cert, IP → self-signed)",
         f"DOMAIN={_caddy_site(ctx)}",
         "",
-        "# Mailgun — email notifications (invite emails, alerts)",
+        "# Email — provider + credentials (Mailgun or SMTP)",
+        f"EMAIL_PROVIDER={ctx.collected.get('EMAIL_PROVIDER', '')}",
         f"MAILGUN_API_KEY={ctx.collected.get('MAILGUN_API_KEY', '')}",
         f"MAILGUN_DOMAIN={ctx.collected.get('MAILGUN_DOMAIN', '')}",
         f"MAILGUN_FROM_EMAIL={ctx.collected.get('MAILGUN_FROM_EMAIL', '')}",
         f"MAILGUN_SENDER_NAME={ctx.collected.get('MAILGUN_SENDER_NAME', 'Mediforce')}",
+        f"SMTP_HOST={ctx.collected.get('SMTP_HOST', '')}",
+        f"SMTP_PORT={ctx.collected.get('SMTP_PORT', '587')}",
+        f"SMTP_USER={ctx.collected.get('SMTP_USER', '')}",
+        f"SMTP_PASS={ctx.collected.get('SMTP_PASS', '')}",
+        f"SMTP_FROM_EMAIL={ctx.collected.get('SMTP_FROM_EMAIL', '')}",
+        f"SMTP_SECURE={ctx.collected.get('SMTP_SECURE', 'true')}",
         "",
     ]
     return "\n".join(lines)
@@ -1523,28 +1530,29 @@ def _ensure_api_keys(ctx: Context) -> None:
         ctx.collected["POSTGRES_PASSWORD"] = secrets.token_urlsafe(32)
         ok("POSTGRES_PASSWORD auto-generated (32 bytes url-safe) — back this up; losing it locks you out of the Postgres data volume")
 
-    if "MAILGUN_API_KEY" not in ctx.collected:
-        if confirm("Configure Mailgun for email notifications (invite emails, alerts)?", default=False):
-            ctx.collected["MAILGUN_API_KEY"] = ask(
-                "Mailgun API key",
-                secret=True,
+    if "EMAIL_PROVIDER" not in ctx.collected:
+        if confirm("Configure email notifications (invite emails, alerts)?", default=False):
+            provider = ask(
+                "Email provider — 'mailgun' or 'smtp'",
+                validate=lambda v: v in ("mailgun", "smtp"),
             )
-            ctx.collected["MAILGUN_DOMAIN"] = ask(
-                "Mailgun domain (e.g. mg.mediforce.ai)",
-            )
-            ctx.collected["MAILGUN_FROM_EMAIL"] = ask(
-                "From email address (e.g. noreply@mediforce.ai)",
-            )
-            ctx.collected["MAILGUN_SENDER_NAME"] = ask(
-                "Sender name",
-                default="Mediforce",
-            )
-            ok("Mailgun config accepted")
+            ctx.collected["EMAIL_PROVIDER"] = provider
+            if provider == "mailgun":
+                ctx.collected["MAILGUN_API_KEY"] = ask("Mailgun API key", secret=True)
+                ctx.collected["MAILGUN_DOMAIN"] = ask("Mailgun domain (e.g. mg.mediforce.ai)")
+                ctx.collected["MAILGUN_FROM_EMAIL"] = ask("From email address (e.g. noreply@mediforce.ai)")
+                ctx.collected["MAILGUN_SENDER_NAME"] = ask("Sender name", default="Mediforce")
+                ok("Mailgun config accepted")
+            else:
+                ctx.collected["SMTP_HOST"] = ask("SMTP host (e.g. smtp.gmail.com)")
+                ctx.collected["SMTP_PORT"] = ask("SMTP port", default="587")
+                ctx.collected["SMTP_USER"] = ask("SMTP username (leave empty if none)", default="")
+                ctx.collected["SMTP_PASS"] = ask("SMTP password", secret=True, default="")
+                ctx.collected["SMTP_FROM_EMAIL"] = ask("From email address (e.g. noreply@example.com)")
+                ctx.collected["SMTP_SECURE"] = ask("Use implicit TLS? (true for port 465, false for STARTTLS on 587)", default="false")
+                ok("SMTP config accepted")
         else:
-            ctx.collected["MAILGUN_API_KEY"] = ""
-            ctx.collected["MAILGUN_DOMAIN"] = ""
-            ctx.collected["MAILGUN_FROM_EMAIL"] = ""
-            ctx.collected["MAILGUN_SENDER_NAME"] = ""
+            ctx.collected["EMAIL_PROVIDER"] = ""
 
 
 def step_env_local(ctx: Context) -> None:
