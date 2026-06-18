@@ -930,6 +930,17 @@ export default function WorkspaceConfigPage() {
                 </div>
                 <ArrowLeft className="h-4 w-4 text-muted-foreground rotate-180 group-hover:text-primary transition-colors" />
               </Link>
+              <div className="border-t" />
+              <Link
+                href={`/${handle}/admin/email-status`}
+                className="flex items-center justify-between group"
+              >
+                <div>
+                  <p className="text-sm font-medium group-hover:text-primary transition-colors">Email</p>
+                  <p className="text-xs text-muted-foreground">Email provider configuration status</p>
+                </div>
+                <ArrowLeft className="h-4 w-4 text-muted-foreground rotate-180 group-hover:text-primary transition-colors" />
+              </Link>
             </div>
           </div>
         )}
