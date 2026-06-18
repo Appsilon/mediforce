@@ -41,6 +41,8 @@ export {
   type RegisterWorkflowBody,
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
+  RegistrationWarningSchema,
+  type RegistrationWarning,
   WorkflowRunSummarySchema,
   type WorkflowRunSummary,
   type WorkflowDefinitionGroupSummary,

@@ -131,8 +131,12 @@ export async function registerWorkflow(
         }
       }
     }
-  } catch (err) {
-    console.error('[register-workflow] Docker image check failed:', err);
+  } catch {
+    warnings.push({
+      code: 'image-check-unavailable',
+      message: 'Could not verify Docker images — the container runtime is unreachable. Image availability will be checked again at run start.',
+      stepName: '',
+    });
   }
 
   return {
