@@ -9,6 +9,7 @@ import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-can
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { parseStepErrors, validateSteps, mergeVerdictTransitions } from '@/lib/workflow-save-utils';
+import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
@@ -62,6 +63,7 @@ function toWorkflowId(name: string): string {
 export default function NewWorkflowPage() {
   const { handle } = useParams<{ handle: string }>();
   const router = useRouter();
+  const { toast } = useToast();
   const { firebaseUser } = useAuth();
   const { namespaces, loading: namespacesLoading } = useAllUserNamespaces(firebaseUser?.uid);
 
@@ -131,6 +133,13 @@ export default function NewWorkflowPage() {
         { namespace: effectiveNamespace },
       );
       setSaveState({ status: 'saved', name: result.name });
+      if (result.warnings?.length) {
+        toast({
+          title: `Saved with ${String(result.warnings.length)} warning(s)`,
+          description: result.warnings.map((w) => w.message).join('\n'),
+          variant: 'warning',
+        });
+      }
       redirectTimerRef.current = setTimeout(() => {
         router.push(`/${handle}/workflows/${encodeURIComponent(result.name)}/definitions/${result.version}`);
       }, 500);
