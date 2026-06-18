@@ -23,6 +23,11 @@ export const StepParamSchema = z.object({
   // still fails parsing loudly.
   type: z.string().min(1).default('string'),
   required: z.boolean().default(false),
+  // When set, the param is only required when the user chooses one of these
+  // verdict keys — all other verdicts can be submitted without filling it.
+  // Takes precedence over `required` for the named verdicts; `required: true`
+  // still blocks every verdict unconditionally.
+  requiredForVerdicts: z.array(z.string()).optional(),
   description: z.string().optional(),
   default: z.unknown().optional(),
   options: z.array(z.string()).optional(),

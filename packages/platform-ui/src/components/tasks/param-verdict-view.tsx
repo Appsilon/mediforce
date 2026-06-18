@@ -36,6 +36,19 @@ export function ParamVerdictView({ task, remainingTaskCount }: TaskBodyProps) {
   return null;
 }
 
+function isParamBlockedForVerdict(
+  verdictKey: string,
+  params: StepParam[],
+  values: Record<string, unknown>,
+): boolean {
+  return params.some((p) => {
+    const val = values[p.name];
+    const missing = val === undefined || val === '';
+    if (!missing) return false;
+    return p.required || p.requiredForVerdicts?.includes(verdictKey) === true;
+  });
+}
+
 function ParamVerdictForm({
   taskId,
   params,
@@ -47,7 +60,7 @@ function ParamVerdictForm({
   verdicts: TaskVerdict[];
   remainingTaskCount?: number;
 }) {
-  const { values, setValue, requiredMissing, coerce } = useParamValues(params);
+  const { values, setValue, coerce } = useParamValues(params);
   const [comment, setComment] = React.useState('');
   const [submitting, setSubmitting] = React.useState<string | null>(null);
   const [submitted, setSubmitted] = React.useState(false);
@@ -56,7 +69,7 @@ function ParamVerdictForm({
   const trimmedComment = comment.trim();
 
   async function handleVerdict(cfg: TaskVerdict) {
-    if (requiredMissing) return;
+    if (isParamBlockedForVerdict(cfg.key, params, values)) return;
     if (cfg.requiresComment && !trimmedComment) return;
     if (submitting !== null) return;
 
@@ -118,7 +131,7 @@ function ParamVerdictForm({
         verdicts={verdicts}
         submitting={submitting}
         trimmedComment={trimmedComment}
-        outerBlocked={requiredMissing}
+        isVerdictBlocked={(key) => isParamBlockedForVerdict(key, params, values)}
         outerBlockedHint="Fill required fields first"
         onVerdict={handleVerdict}
       />
