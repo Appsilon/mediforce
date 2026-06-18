@@ -4,10 +4,11 @@ import { createTransport } from 'nodemailer';
 export interface SmtpConfig {
   host: string;
   port: number;
-  secure: boolean; // true for port 465 (implicit TLS), false for STARTTLS on 587
+  secure: boolean;
   user: string;
   pass: string;
   defaultFrom: string;
+  defaultSenderName: string;
 }
 
 export function createSmtpSender(
@@ -21,7 +22,7 @@ export function createSmtpSender(
   });
 
   return async (params) => {
-    const from = params.from ?? config.defaultFrom;
+    const from = params.from ?? `${config.defaultSenderName} <${config.defaultFrom}>`;
     const info = await transport.sendMail({
       from,
       to: params.to.join(', '),

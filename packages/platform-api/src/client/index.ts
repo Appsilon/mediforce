@@ -368,9 +368,7 @@ import {
   type GetConfigByPrefixOutput,
   type SetConfigOutput,
   type TestWebhookOutput,
-  GetEmailStatusInputSchema,
   GetEmailStatusOutputSchema,
-  type GetEmailStatusInput,
   type GetEmailStatusOutput,
 } from '../contract/index';
 // SDK consumers reach for one path:

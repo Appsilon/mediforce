@@ -11,7 +11,7 @@ export {
 export type { FirebaseConfig } from './config/firebase-init';
 
 // Notifications + email
-export { MailgunNotificationService } from './notifications/mailgun-notification-service';
+export { EmailNotificationService } from './notifications/mailgun-notification-service';
 export { WebhookNotificationService } from './notifications/webhook-notification-service';
 export { createMailgunSender } from './email/mailgun-client';
 export type { MailgunConfig } from './email/mailgun-client';

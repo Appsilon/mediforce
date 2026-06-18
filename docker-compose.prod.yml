@@ -133,6 +133,7 @@ services:
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
       - SMTP_SECURE=${SMTP_SECURE:-true}
+      - SMTP_SENDER_NAME=${SMTP_SENDER_NAME:-Mediforce}
       # Firebase Admin SDK credentials for server-side Firestore/Auth access.
       # Mounted read-only from host ./secrets/firebase-admin-sa.json.
       - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-sa.json

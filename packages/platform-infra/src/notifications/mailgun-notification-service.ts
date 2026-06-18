@@ -1,6 +1,6 @@
 import type { NotificationService, NotificationEvent, NotificationTarget, SendEmailFn } from '@mediforce/platform-core';
 
-export class MailgunNotificationService implements NotificationService {
+export class EmailNotificationService implements NotificationService {
   constructor(private readonly sendEmail: SendEmailFn) {}
 
   async send(event: NotificationEvent, targets: NotificationTarget[]): Promise<void> {

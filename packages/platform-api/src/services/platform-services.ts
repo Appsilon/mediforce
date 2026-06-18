@@ -24,7 +24,7 @@ import {
   validateSecretsKey,
   createMailgunSender,
   createSmtpSender,
-  MailgunNotificationService,
+  EmailNotificationService,
   FirebaseUserDirectoryService,
   getAdminAuth,
 } from '@mediforce/platform-infra';
@@ -205,11 +205,11 @@ class FirebaseInviteServiceAdapter implements InviteService {
 }
 
 /**
- * Adapts the Mailgun `SendEmailFn` into the `InviteNotificationService`
+ * Adapts a `SendEmailFn` into the `InviteNotificationService`
  * interface — delegates to the existing pure email-body helpers and supplies
  * deployment config (app URL, sender name) so handlers never see env vars.
  */
-class MailgunInviteNotificationService implements InviteNotificationService {
+class EmailInviteNotificationService implements InviteNotificationService {
   constructor(
     private readonly sendEmail: SendEmailFn,
     private readonly appUrl: string,
@@ -314,9 +314,16 @@ export function getPlatformServices(): PlatformServices {
   const smtpPass = process.env.SMTP_PASS ?? '';
   const smtpSecure = process.env.SMTP_SECURE !== 'false';
   const smtpFrom = process.env.SMTP_FROM_EMAIL ?? '';
+  const smtpSenderName = process.env.SMTP_SENDER_NAME ?? 'Mediforce';
   const smtpConfigured = smtpHost !== '' && smtpFrom !== '';
 
-  const explicitProvider = process.env.EMAIL_PROVIDER as 'mailgun' | 'smtp' | undefined;
+  const rawEmailProvider = process.env.EMAIL_PROVIDER || undefined;
+  if (rawEmailProvider !== undefined && rawEmailProvider !== 'mailgun' && rawEmailProvider !== 'smtp') {
+    throw new Error(
+      `EMAIL_PROVIDER="${rawEmailProvider}" is not valid. Use "mailgun" or "smtp".`,
+    );
+  }
+  const explicitProvider = rawEmailProvider as 'mailgun' | 'smtp' | undefined;
   const resolvedProvider = resolveEmailProvider(explicitProvider, mailgunConfigured, smtpConfigured);
 
   if (emailDisabled) {
@@ -364,15 +371,21 @@ export function getPlatformServices(): PlatformServices {
       user: smtpUser,
       pass: smtpPass,
       defaultFrom: smtpFrom,
+      defaultSenderName: smtpSenderName,
     });
     emailProviderInfo = { provider: 'smtp', configured: true, from: smtpFrom };
     console.log('[platform-services] Email provider: SMTP');
+  } else if (!emailDisabled && resolvedProvider === null) {
+    throw new Error(
+      'Email is enabled but no email provider is configured. ' +
+      'Set MAILGUN_* or SMTP_* env vars, or set MEDIFORCE_DISABLE_EMAIL=true to start without email.',
+    );
   }
 
   const notificationService = emailSender
-    ? new MailgunNotificationService(emailSender)
+    ? new EmailNotificationService(emailSender)
     : undefined;
-  // Wired whenever Firebase Auth is available — independent of Mailgun.
+  // Wired whenever Firebase Auth is available — independent of email provider.
   // Email-disabled deployments still need uid → email/lastSignInTime lookups
   // for the namespace-members endpoint.
   const userDirectoryService: UserDirectoryService = new FirebaseUserDirectoryService(
@@ -431,9 +444,9 @@ export function getPlatformServices(): PlatformServices {
   // NEXT_PUBLIC_PLATFORM_URL still renders sensible links.
   const inviteAppUrl =
     process.env.NEXT_PUBLIC_PLATFORM_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
-  const senderName = resolvedProvider === 'mailgun' ? mailgunSenderName : 'Mediforce';
+  const senderName = resolvedProvider === 'mailgun' ? mailgunSenderName : smtpSenderName;
   const inviteNotificationService = emailSender
-    ? new MailgunInviteNotificationService(emailSender, inviteAppUrl, senderName)
+    ? new EmailInviteNotificationService(emailSender, inviteAppUrl, senderName)
     : null;
 
   const dockerImages: DockerImagesService = isLocalAgentMode()
