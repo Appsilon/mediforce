@@ -9,7 +9,7 @@ import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-can
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { mediforce, ApiError } from '@/lib/mediforce';
-import { parseStepErrors, validateSteps, mergeVerdictTransitions } from '@/lib/workflow-save-utils';
+import { parseStepErrors, validateSteps, mergeVerdictTransitions, toastRegistrationWarnings } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
@@ -107,13 +107,7 @@ export default function WorkflowDefinitionVersionPage() {
         });
       }
       setSaveState({ status: 'saved', version: result.version });
-      if (result.warnings?.length) {
-        toast({
-          title: `Saved with ${String(result.warnings.length)} warning(s)`,
-          description: result.warnings.map((w) => w.message).join('\n'),
-          variant: 'warning',
-        });
-      }
+      toastRegistrationWarnings(result.warnings, toast);
       redirectTimerRef.current = setTimeout(() => {
         router.push(`/${handle}/workflows/${name}/definitions/${result.version}`);
       }, 500);

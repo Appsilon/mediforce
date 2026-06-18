@@ -8,7 +8,7 @@ import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { mediforce, ApiError } from '@/lib/mediforce';
-import { parseStepErrors, validateSteps, mergeVerdictTransitions } from '@/lib/workflow-save-utils';
+import { parseStepErrors, validateSteps, mergeVerdictTransitions, toastRegistrationWarnings } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
@@ -133,13 +133,7 @@ export default function NewWorkflowPage() {
         { namespace: effectiveNamespace },
       );
       setSaveState({ status: 'saved', name: result.name });
-      if (result.warnings?.length) {
-        toast({
-          title: `Saved with ${String(result.warnings.length)} warning(s)`,
-          description: result.warnings.map((w) => w.message).join('\n'),
-          variant: 'warning',
-        });
-      }
+      toastRegistrationWarnings(result.warnings, toast);
       redirectTimerRef.current = setTimeout(() => {
         router.push(`/${handle}/workflows/${encodeURIComponent(result.name)}/definitions/${result.version}`);
       }, 500);

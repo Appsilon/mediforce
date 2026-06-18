@@ -143,6 +143,8 @@ export const workflowRegisterCommand = defineCommand({
         for (const w of result.warnings) output.stderr(`  - ${w.message}`);
       }
     }
+    // Server-side warnings are authoritative (platform images); fall back to
+    // local `docker image inspect` only when the server didn't check (e.g. local-agent mode).
     if (!result.warnings?.length) {
       await warnMissingImages(body, output, jsonMode);
     }

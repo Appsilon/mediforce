@@ -131,8 +131,8 @@ export async function registerWorkflow(
         }
       }
     }
-  } catch {
-    // Docker check is best-effort — don't fail registration
+  } catch (err) {
+    console.error('[register-workflow] Docker image check failed:', err);
   }
 
   return {
