@@ -103,6 +103,13 @@ export {
 } from './system';
 
 export {
+  GetEmailStatusInputSchema,
+  GetEmailStatusOutputSchema,
+  type GetEmailStatusInput,
+  type GetEmailStatusOutput,
+} from './email-status';
+
+export {
   ListAgentsInputSchema,
   ListAgentsOutputSchema,
   GetAgentInputSchema,

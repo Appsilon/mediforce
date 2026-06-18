@@ -2,6 +2,7 @@ import type { AgentRunner, PluginRegistry } from '@mediforce/agent-runtime';
 import type {
   AuditRepository,
   CronTriggerStateRepository,
+  EmailProviderInfo,
   ModelRegistryRepository,
   NamespaceRepository,
   PlatformSettingsRepository,
@@ -138,4 +139,5 @@ export interface SystemServices {
    */
   readonly userDirectory: UserDirectoryService | null;
   readonly platformSettings: PlatformSettingsRepository;
+  readonly emailProviderInfo: EmailProviderInfo | null;
 }

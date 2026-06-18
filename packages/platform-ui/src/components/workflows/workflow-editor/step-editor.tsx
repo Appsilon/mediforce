@@ -158,7 +158,7 @@ const TIP = {
   actionTo:                'Recipient email address(es), comma-separated.',
   actionCc:                'CC recipients, comma-separated.',
   actionBcc:               'BCC recipients, comma-separated. Not visible to other recipients.',
-  actionFrom:              'Sender address. Must be an authorised SendGrid verified sender.',
+  actionFrom:              'Sender address. Must be authorised by the configured email provider.',
   actionReplyTo:           'Reply-to address. Replies from recipients go here instead of action.from.',
   actionSubject:           'Email subject line. Supports ${variables.field} interpolation.',
   actionEmailBody:         'Plain-text email body. Displayed by clients that do not support HTML.',

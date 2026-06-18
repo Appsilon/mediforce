@@ -22,6 +22,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import type {
   AgentRunRepository,
+  EmailProviderInfo,
   ModelRegistryRepository,
   NamespaceRepository,
   NamespaceSecretsRepository,
@@ -183,6 +184,7 @@ export interface TestScopeOverrides {
   readonly userProfileRepo?: UserProfileRepository;
   readonly userDirectory?: UserDirectoryService | null;
   readonly platformSettingsRepo?: PlatformSettingsRepository;
+  readonly emailProviderInfo?: EmailProviderInfo | null;
 }
 
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
@@ -236,6 +238,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     inviteNotificationService: overrides.inviteNotificationService ?? null,
     dockerImages: overrides.dockerImages ?? null,
     userDirectory: overrides.userDirectory ?? null,
+    emailProviderInfo: overrides.emailProviderInfo ?? null,
   };
   return createCallerScope(services, caller);
 }

@@ -122,10 +122,18 @@ services:
       # directory must exist before first launch:
       #   sudo mkdir -p /var/lib/mediforce
       - MEDIFORCE_DATA_DIR=/var/lib/mediforce
-      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
-      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN}
-      - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL}
+      - EMAIL_PROVIDER=${EMAIL_PROVIDER:-}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY:-}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN:-}
+      - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL:-}
       - MAILGUN_SENDER_NAME=${MAILGUN_SENDER_NAME:-Mediforce}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
+      - SMTP_SECURE=${SMTP_SECURE:-true}
+      - SMTP_SENDER_NAME=${SMTP_SENDER_NAME:-Mediforce}
       # Firebase Admin SDK credentials for server-side Firestore/Auth access.
       # Mounted read-only from host ./secrets/firebase-admin-sa.json.
       - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-sa.json

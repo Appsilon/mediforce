@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Added
+- SMTP email provider as alternative to Mailgun — organisations can now use their own SMTP infrastructure instead of Mailgun by setting `SMTP_*` env vars; `EMAIL_PROVIDER` auto-detects or can be set explicitly; includes read-only admin status page, `mediforce email status` CLI command, and bootstrap script prompts for initial setup [#748](https://github.com/Appsilon/mediforce/issues/748).
 - **Run view UX** — execution history panel (renamed from "Step Status"), scrollable workflow diagram, active step info (started time, live elapsed timer, executor name/claimer for claimed human tasks)
 - **Task view** — spreadsheet-style table replaces card grid; status column, clickable run links, bulk cancel via batch endpoint, hide-completed toggle. Absolute dates replace relative timestamps in the table. `process × action` cross-grouping (sub-grouping within a process group by action type) is not carried forward in the table layout; each grouping mode renders a flat table.
 - **Process card** — step-progress dots rendered against the run's actual definition version instead of the latest definition

@@ -75,6 +75,7 @@ export { saveWorkflowSecrets } from './secrets/save-workflow-secrets';
 
 export { getDockerInfo } from './system/get-docker-info';
 export { getOpenRouterCredits } from './system/get-openrouter-credits';
+export { getEmailStatus } from './admin/email-status';
 
 export { deleteDockerImage } from './docker-images/delete-image';
 
