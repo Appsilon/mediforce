@@ -59,7 +59,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
-import type { AgentConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
+import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import { writeFile } from 'node:fs/promises';
 import type { GitMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env';
@@ -129,41 +129,47 @@ export function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext)
  * Resolve the repo auth token from the step or workflow-level config.
  * `repoAuth` is the name of a key in resolvedEnv (sourced from workflow secrets).
  */
-/**
- * Image-build fields shared by agent config (step.agent) and script config
- * (step.script) — both flavours resolve container images identically.
- */
-export interface ImageBuildConfig {
-  dockerfile?: string;
-  repo?: string;
-  commit?: string;
-  repoAuth?: string;
-}
-
 export function resolveRepoToken(
-  buildConfig: ImageBuildConfig,
+  buildConfig: ContainerConfig,
   context: AgentContext | WorkflowAgentContext,
   resolvedEnv?: Record<string, string>,
 ): string | undefined {
-  // Step-level repoAuth takes priority
+  // Step-level repoAuth takes priority, then workflow-level externalSkillsRepo.auth,
+  // then the deprecated workflow-level repo.auth for backward compatibility.
+  const wfDef = isWorkflowAgentContext(context) ? context.workflowDefinition : undefined;
   const authKey = buildConfig.repoAuth
-    ?? (isWorkflowAgentContext(context) ? context.workflowDefinition.repo?.auth : undefined);
+    ?? wfDef?.externalSkillsRepo?.auth
+    ?? wfDef?.repo?.auth;
   if (!authKey || !resolvedEnv) return undefined;
   return resolvedEnv[authKey];
 }
 
+/**
+ * Derive a deterministic image tag from the build inputs so callers that
+ * omit `image` in build mode still get a stable, cacheable tag.
+ * Format: `mediforce-built:<12-char-sha256-hex>`.
+ */
+export function deriveBuildTag(repoUrl: string, commit: string, dockerfile?: string): string {
+  const hash = createHash('sha256')
+    .update(`${repoUrl}\0${commit}\0${dockerfile ?? ''}`)
+    .digest('hex')
+    .slice(0, 12);
+  return `mediforce-built:${hash}`;
+}
+
 export function resolveImageBuild(
-  image: string,
-  buildConfig: ImageBuildConfig,
+  image: string | undefined,
+  buildConfig: ContainerConfig,
   context: AgentContext | WorkflowAgentContext,
   resolvedEnv?: Record<string, string>,
 ): ImageBuildMeta | undefined {
   const { dockerfile, repo, commit } = buildConfig;
 
   if (repo && commit) {
+    const repoUrl = normalizeRepoUrls(repo).gitUrl;
     return {
-      image,
-      repoUrl: normalizeRepoUrls(repo).gitUrl,
+      image: image ?? deriveBuildTag(repoUrl, commit, dockerfile),
+      repoUrl,
       commit,
       dockerfile,
       repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
@@ -171,11 +177,16 @@ export function resolveImageBuild(
   }
 
   if (dockerfile && isWorkflowAgentContext(context)) {
-    const wfRepo = context.workflowDefinition.repo;
+    // Fallback: use the workflow-level externalSkillsRepo (or deprecated repo) as the
+    // build context. Retained for backward compatibility with existing stored workflow
+    // definitions. Will be removed together with the deprecated `repo` field — see
+    // the TODO in WorkflowDefinitionBaseSchema.repo (workflow-definition.ts).
+    const wfRepo = context.workflowDefinition.externalSkillsRepo ?? context.workflowDefinition.repo;
     if (wfRepo?.url && wfRepo?.commit) {
+      const repoUrl = repo ? normalizeRepoUrls(repo).gitUrl : normalizeRepoUrls(wfRepo.url).gitUrl;
       return {
-        image,
-        repoUrl: repo ? normalizeRepoUrls(repo).gitUrl : normalizeRepoUrls(wfRepo.url).gitUrl,
+        image: image ?? deriveBuildTag(repoUrl, commit ?? wfRepo.commit, dockerfile),
+        repoUrl,
         commit: commit ?? wfRepo.commit,
         dockerfile,
         repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),

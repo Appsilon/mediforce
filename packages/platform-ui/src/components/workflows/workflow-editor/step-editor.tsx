@@ -479,27 +479,20 @@ export function StepEditor({
         <FieldGroup>
           <FieldRow label="agent.image" tooltip={TIP.agentImage}>
             {dockerImages && dockerImages.length > 0 ? (
-              <div className="flex items-center gap-1.5">
-                <select
-                  value={step.agent?.image ?? ''}
-                  onChange={(e) => updateAgent({ image: e.target.value || undefined })}
-                  className={cn(rs, 'flex-1')}
-                >
-                  <option value="">Select image…</option>
-                  {dockerImages.map((img) => {
-                    const ref = imageRef(img);
-                    return <option key={img.id} value={ref}>{ref}</option>;
-                  })}
-                  {step.agent?.image && !dockerImages.some((img) => imageRef(img) === step.agent?.image) && (
-                    <option value={step.agent.image}>{step.agent.image}</option>
-                  )}
-                </select>
-                <input
-                  value={step.agent?.image ?? ''}
-                  onChange={(e) => updateAgent({ image: e.target.value || undefined })}
-                  className={cn(riMono, 'w-36 shrink-0')}
-                />
-              </div>
+              <select
+                value={step.agent?.image ?? ''}
+                onChange={(e) => updateAgent({ image: e.target.value || undefined })}
+                className={rs}
+              >
+                <option value="">Select image…</option>
+                {dockerImages.map((img) => {
+                  const ref = imageRef(img);
+                  return <option key={img.id} value={ref}>{ref}</option>;
+                })}
+                {step.agent?.image && !dockerImages.some((img) => imageRef(img) === step.agent?.image) && (
+                  <option value={step.agent.image}>{step.agent.image}</option>
+                )}
+              </select>
             ) : (
               <input
                 value={step.agent?.image ?? ''}

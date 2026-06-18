@@ -623,11 +623,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         );
       }
 
-      if (!stepAgent.image && !isLocalExecutionAllowed()) {
+      const agentInBuildMode = !!(stepAgent.dockerfile || stepAgent.repo);
+      if (!stepAgent.image && !agentInBuildMode && !isLocalExecutionAllowed()) {
         throw new Error(
           `No Docker image configured in step.agent for step '${context.stepId}'. ` +
           'Local agent execution requires ALLOW_LOCAL_AGENTS=true. ' +
-          'Either set step.agent.image for Docker execution, or enable local execution.',
+          'Either set step.agent.image for Docker execution, set step.agent.dockerfile + ' +
+          'repo + commit for build mode, or enable local execution.',
         );
       }
 
@@ -761,9 +763,12 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       await this.resolveRunWorkspace();
       const workingDirForPrompt = isLocalMode ? this.runWorkspaceHandle!.path : '/workspace';
 
-      // Fetch skills from workflow repo if configured
+      // Fetch skills from the workflow's external skills repo if configured.
+      // Reads externalSkillsRepo first; falls back to the deprecated repo field
+      // for backward compatibility with stored workflow definitions.
       if (this.agentConfig.skillsDir && isWorkflowAgentContext(this.context)) {
-        const wfRepo = this.context.workflowDefinition.repo;
+        const wfRepo = this.context.workflowDefinition.externalSkillsRepo
+          ?? this.context.workflowDefinition.repo;
         if (wfRepo?.url && wfRepo?.commit) {
           const repoToken = resolveRepoToken(this.agentConfig, this.context, this.resolvedEnv.vars);
           await this.fetchSkillsFromRepo(
@@ -1428,16 +1433,23 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     prompt: string,
     options?: SpawnCliOptions,
   ): Promise<SpawnDockerResult> {
-    const image = this.agentConfig.image;
-
-    if (!image) {
+    const inBuildMode = !!(this.agentConfig.dockerfile || this.agentConfig.repo);
+    if (!this.agentConfig.image && !inBuildMode) {
       throw new Error(`agentConfig.image is required for Docker container execution`);
     }
     if (!this.runWorkspaceHandle) {
       throw new Error('runWorkspaceHandle is not set — resolveRunWorkspace() must run before spawnDockerContainer()');
     }
 
-    const imageBuild = resolveImageBuild(image, this.agentConfig, this.context, this.resolvedEnv.vars);
+    const imageBuild = resolveImageBuild(this.agentConfig.image, this.agentConfig, this.context, this.resolvedEnv.vars);
+    const image = imageBuild?.image ?? this.agentConfig.image;
+    if (!image) {
+      throw new Error(
+        `No Docker image could be resolved for step '${this.context.stepId}'. ` +
+        'In build mode set dockerfile + repo + commit on the step, or provide ' +
+        'externalSkillsRepo (with commit) on the workflow definition.',
+      );
+    }
 
     // Merge config-driven env vars with plugin-internal env vars
     const internalVars = this.getInternalEnvVars();

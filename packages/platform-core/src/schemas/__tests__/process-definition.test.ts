@@ -444,12 +444,26 @@ describe('ProcessDefinitionSchema', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.repo?.url).toBe('https://github.com/org/repo');
-      expect(result.data.repo?.branch).toBeUndefined();
-      expect(result.data.repo?.directory).toBeUndefined();
     }
   });
 
-  it('should accept a definition with repo including branch and directory', () => {
+  it('should accept a definition with repo including commit and auth', () => {
+    const result = ProcessDefinitionSchema.safeParse({
+      ...minimalDefinition,
+      repo: {
+        url: 'https://github.com/org/monorepo',
+        commit: 'abc1234',
+        auth: 'GITHUB_TOKEN',
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.repo?.commit).toBe('abc1234');
+      expect(result.data.repo?.auth).toBe('GITHUB_TOKEN');
+    }
+  });
+
+  it('should preserve deprecated branch and directory fields to prevent silent data loss on re-save', () => {
     const result = ProcessDefinitionSchema.safeParse({
       ...minimalDefinition,
       repo: {
