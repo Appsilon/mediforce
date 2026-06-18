@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Added
+- Docker image validation at workflow registration — server warns when a referenced image is not found on the platform, CLI deduplicates server vs local warnings, and the workflow editor shows an amber toast on save [#734](https://github.com/Appsilon/mediforce/pull/734).
 - Pre-flight model validation: agent steps with unknown model IDs show an "Unknown model" warning (with Levenshtein-based "did you mean?" suggestions) in the start-run dialog before the run begins.
 - Start-run dialog: selecting a different workflow version from the dropdown no longer skips pre-flight checks — the dialog now waits for the new version's definition and validation to load before allowing start.
 - Extracted `normaliseModelId` to `platform-core` — was duplicated 5 times across 3 packages.
