@@ -221,7 +221,7 @@ describe('listWorkflows handler', () => {
       const result = await listWorkflows({ includeCompletedRuns: true }, scope);
 
       const flowA = result.definitions.find((d) => d.name === 'flow-a');
-      expect(flowA?.runSummary).toEqual({ total: 0, active: 0, latest: [] });
+      expect(flowA?.runSummary).toEqual({ total: 0, active: 0, latest: [], stepsByVersion: {} });
     });
   });
 });

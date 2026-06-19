@@ -70,6 +70,7 @@ const EXECUTOR_STYLES: Record<string, { icon: typeof User; color: string; bg: st
   agent: { icon: Bot, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/30' },
   script: { icon: Terminal, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
   cowork: { icon: Users, color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-100 dark:bg-teal-900/30' },
+  action: { icon: Terminal, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-100 dark:bg-sky-900/30' },
 };
 
 // ---------------------------------------------------------------------------
@@ -212,7 +213,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
               <span className={cn('text-[10px] font-semibold', typeConfig.color)}>{typeConfig.label}</span>
               <span className="text-[10px] text-muted-foreground/30">·</span>
               <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                {{ human: 'Human', agent: 'Agent', script: 'Script', cowork: 'Cowork' }[data.executor] ?? data.executor}
+                {{ human: 'Human', agent: 'Agent', script: 'Script', cowork: 'Cowork', action: 'Action' }[data.executor] ?? data.executor}
               </span>
               {data.autonomyLevel && data.executor === 'agent' && (
                 <span className="text-[10px] font-mono text-muted-foreground/70">

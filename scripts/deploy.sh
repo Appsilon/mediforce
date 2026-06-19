@@ -32,22 +32,29 @@ git reset --hard "origin/$BRANCH"
 export NEXT_PUBLIC_GIT_SHA=$(git rev-parse --short HEAD)
 log "Git SHA: $NEXT_PUBLIC_GIT_SHA"
 
-# Build agent images
-log "Building agent images"
-bash "$DEPLOY_DIR/scripts/rebuild-docker-images.sh"
+# Pull pre-built images from registry (skips the 5-7 min local build).
+# Falls back to local build if registry is unreachable or first deploy
+# before CI has run.
+log "Pulling platform images from registry"
+docker compose -f "$COMPOSE_FILE" pull --ignore-pull-failures 2>&1 | tee -a "$LOG_FILE" || true
 
-# Build and restart services
-log "Building images"
-docker compose -f "$COMPOSE_FILE" build
-
-log "Starting services"
+log "Starting services (builds locally if pull missed any image)"
 # --remove-orphans kills containers left over from services that no longer
 # exist in the compose file (prevents stale workers consuming shared queues).
 docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
 
-# Clean up old images and build cache
-docker image prune -f >> "$LOG_FILE" 2>&1
-docker builder prune -f --keep-storage=5GB >> "$LOG_FILE" 2>&1
-
-log "Deployment complete"
+log "Platform deployed"
 docker compose -f "$COMPOSE_FILE" ps
+
+# Build agent images in the background — platform is already serving.
+# Workflows that need a container will fail until images are ready;
+# that's fine because the user still needs to set up workflows first.
+log "Building agent images in background (log: $LOG_FILE)"
+nohup bash -c "
+  bash '$DEPLOY_DIR/scripts/rebuild-docker-images.sh' >> '$LOG_FILE' 2>&1
+  docker image prune -f >> '$LOG_FILE' 2>&1
+  docker builder prune -f --keep-storage=5GB >> '$LOG_FILE' 2>&1
+  echo \"[\$(date -Iseconds)] Agent images ready\" >> '$LOG_FILE'
+" >> "$LOG_FILE" 2>&1 &
+
+log "Deployment complete — agent images still building in background"

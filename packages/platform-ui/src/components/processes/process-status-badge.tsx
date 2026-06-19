@@ -10,7 +10,7 @@ const STATUS_STYLES: Record<WorkflowDisplayStatus, string> = {
   completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
 };
 
-const STATUS_LABELS: Record<WorkflowDisplayStatus, string> = {
+export const STATUS_LABELS: Record<WorkflowDisplayStatus, string> = {
   in_progress: 'In Progress',
   waiting_for_human: 'Waiting for human',
   error: 'Error',

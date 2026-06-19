@@ -60,6 +60,7 @@ export function VerdictButtons({
   trimmedComment,
   outerBlocked,
   outerBlockedHint,
+  isVerdictBlocked,
   onVerdict,
 }: {
   verdicts: TaskVerdict[];
@@ -67,6 +68,8 @@ export function VerdictButtons({
   trimmedComment: string;
   outerBlocked?: boolean;
   outerBlockedHint?: string;
+  /** Per-verdict param block — overrides `outerBlocked` when provided. */
+  isVerdictBlocked?: (key: string) => boolean;
   onVerdict: (cfg: TaskVerdict) => void;
 }) {
   const sorted = [...verdicts].sort((a, b) =>
@@ -76,9 +79,10 @@ export function VerdictButtons({
   return (
     <div className="flex flex-col gap-2">
       {sorted.map((cfg) => {
+        const paramBlocked = isVerdictBlocked ? isVerdictBlocked(cfg.key) : !!outerBlocked;
         const commentBlocked = cfg.requiresComment && !trimmedComment;
         const isSubmittingThis = submitting === cfg.key;
-        const isDisabled = submitting !== null || !!outerBlocked || commentBlocked;
+        const isDisabled = submitting !== null || paramBlocked || commentBlocked;
         return (
           <div key={cfg.key} className="flex flex-col items-start gap-1">
             <button
@@ -96,10 +100,10 @@ export function VerdictButtons({
                 : <IntentIcon intent={cfg.intent} className="h-4 w-4" />}
               {cfg.label}
             </button>
-            {outerBlocked && outerBlockedHint && (
+            {paramBlocked && outerBlockedHint && (
               <span className="text-xs text-muted-foreground/70 pl-1">{outerBlockedHint}</span>
             )}
-            {!outerBlocked && commentBlocked && (
+            {!paramBlocked && commentBlocked && (
               <span className="text-xs text-muted-foreground/70 pl-1">Comment required</span>
             )}
           </div>

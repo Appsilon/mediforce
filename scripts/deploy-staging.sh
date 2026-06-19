@@ -18,7 +18,7 @@ echo "==> Ensuring /var/lib/mediforce exists on host"
 # sudo, so we use a rootful alpine container as a permission-elevation
 # trick — the docker daemon the deploy already has access to (deploy
 # is in the docker group) lets us write outside the user's home tree.
-docker run --rm -v /var/lib:/host/var/lib alpine:latest \
+docker run --rm --platform linux/arm64 -v /var/lib:/host/var/lib alpine:latest \
   sh -c "mkdir -p /host/var/lib/mediforce && chmod 755 /host/var/lib/mediforce"
 
 # Only prune when the Docker data volume is actually filling up — unconditional
@@ -35,25 +35,30 @@ else
 fi
 
 export NEXT_PUBLIC_GIT_SHA=$(git rev-parse --short HEAD)
-echo "==> Building compose services (SHA: $NEXT_PUBLIC_GIT_SHA)"
+
+echo "==> Pulling pre-built platform images from registry"
+$COMPOSE pull --ignore-pull-failures 2>&1 || true
 
 if [ "${2:-}" = "--no-cache" ]; then
+  echo "==> Rebuilding platform-ui (no-cache, SHA: $NEXT_PUBLIC_GIT_SHA)"
   $COMPOSE build --no-cache platform-ui
 else
-  $COMPOSE build
+  echo "==> Starting services (builds locally if pull missed any image, SHA: $NEXT_PUBLIC_GIT_SHA)"
 fi
 
-echo "==> Building agent runtime images (golden-image, app containers)"
-bash scripts/rebuild-docker-images.sh
-
-echo "==> Restarting services"
 # --remove-orphans kills containers left over from services that no longer
 # exist in the compose files — an orphaned worker once kept consuming the
 # BullMQ queue with weeks-old code.
 $COMPOSE up -d --force-recreate --remove-orphans
 
-echo "==> Pruning dangling images from previous builds"
-docker image prune -f 2>/dev/null || true
-
-echo "==> Done"
+echo "==> Platform running"
 $COMPOSE ps
+
+echo "==> Building agent runtime images in background"
+nohup bash -c "
+  bash scripts/rebuild-docker-images.sh >> /var/log/mediforce-deploy.log 2>&1
+  docker image prune -f >> /var/log/mediforce-deploy.log 2>&1
+  echo \"[\$(date -Iseconds)] Agent images ready\" >> /var/log/mediforce-deploy.log
+" >> /var/log/mediforce-deploy.log 2>&1 &
+
+echo "==> Done — agent images building in background"

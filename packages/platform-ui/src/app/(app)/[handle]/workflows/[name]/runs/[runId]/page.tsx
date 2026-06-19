@@ -92,6 +92,7 @@ export default function RunDetailPage() {
       auditEventsLoading={auditLoading}
       auditEventsError={auditError}
       definitionSteps={definitionSteps}
+      definition={runDefinition ?? undefined}
       agentEvents={agentEvents}
       backHref={`/${handle}/workflows/${encodeURIComponent(decodedName)}`}
       stepConfigMap={stepConfigMap}

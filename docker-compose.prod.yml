@@ -58,6 +58,7 @@ services:
   # service_completed_successfully so the app boot never races a
   # half-applied schema.
   migrate:
+    image: ghcr.io/appsilon/mediforce-migrate:latest
     build:
       context: .
       dockerfile: packages/platform-ui/Dockerfile
@@ -70,6 +71,7 @@ services:
         condition: service_healthy
 
   platform-ui:
+    image: ghcr.io/appsilon/mediforce-platform-ui:latest
     build:
       context: .
       dockerfile: packages/platform-ui/Dockerfile
@@ -92,6 +94,16 @@ services:
       # the `migrate` init container before this service starts
       # (depends_on: { migrate: { condition: service_completed_successfully } }).
       - DATABASE_URL=postgresql://${POSTGRES_USER:-mediforce}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mediforce}
+      # NEXT_PUBLIC_* — injected at container start by docker-entrypoint.sh
+      # (replaces __PLACEHOLDER__ values in pre-built registry images).
+      - NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY}
+      - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
+      - NEXT_PUBLIC_FIREBASE_PROJECT_ID=${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
+      - NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}
+      - NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}
+      - NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+      - NEXT_PUBLIC_GIT_SHA
       - PLATFORM_API_KEY=${PLATFORM_API_KEY}
       - SECRETS_ENCRYPTION_KEY=${SECRETS_ENCRYPTION_KEY}
       - DOCKER_DEEPSEEK_API_KEY=${DOCKER_DEEPSEEK_API_KEY}
@@ -110,10 +122,18 @@ services:
       # directory must exist before first launch:
       #   sudo mkdir -p /var/lib/mediforce
       - MEDIFORCE_DATA_DIR=/var/lib/mediforce
-      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
-      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN}
-      - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL}
+      - EMAIL_PROVIDER=${EMAIL_PROVIDER:-}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY:-}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN:-}
+      - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL:-}
       - MAILGUN_SENDER_NAME=${MAILGUN_SENDER_NAME:-Mediforce}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
+      - SMTP_SECURE=${SMTP_SECURE:-true}
+      - SMTP_SENDER_NAME=${SMTP_SENDER_NAME:-Mediforce}
       # Firebase Admin SDK credentials for server-side Firestore/Auth access.
       # Mounted read-only from host ./secrets/firebase-admin-sa.json.
       - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-sa.json
@@ -131,6 +151,7 @@ services:
         condition: service_completed_successfully
 
   container-worker:
+    image: ghcr.io/appsilon/mediforce-container-worker:latest
     build:
       context: .
       dockerfile: packages/container-worker/Dockerfile.worker

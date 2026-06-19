@@ -51,9 +51,19 @@ export function TaskContextPanel({
     const currentStepExecs = executions
       .filter((e) => e.stepId === stepId)
       .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
-    const currentStepStart = currentStepExecs.length > 0
-      ? new Date(currentStepExecs[currentStepExecs.length - 1].startedAt).getTime()
-      : Infinity;
+
+    // In a loop revisit, the engine hasn't created an execution record for the
+    // new active visit yet. All known executions for this step are completed
+    // (they belong to past iterations). Use Infinity so the most recent
+    // preceding step from the current loop pass is found as context.
+    const isLoopRevisitWithNoRecord =
+      instance?.currentStepId === stepId &&
+      currentStepExecs.every((e) => e.status === 'completed');
+
+    const currentStepStart =
+      currentStepExecs.length === 0 || isLoopRevisitWithNoRecord
+        ? Infinity
+        : new Date(currentStepExecs[currentStepExecs.length - 1].startedAt).getTime();
 
     const completed = executions
       .filter((e) =>

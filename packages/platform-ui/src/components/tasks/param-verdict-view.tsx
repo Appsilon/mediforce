@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { ParamField } from '@/components/ui/param-field';
@@ -37,6 +36,19 @@ export function ParamVerdictView({ task, remainingTaskCount }: TaskBodyProps) {
   return null;
 }
 
+function isParamBlockedForVerdict(
+  verdictKey: string,
+  params: StepParam[],
+  values: Record<string, unknown>,
+): boolean {
+  return params.some((p) => {
+    const val = values[p.name];
+    const missing = val === undefined || val === '';
+    if (!missing) return false;
+    return p.required || p.requiredForVerdicts?.includes(verdictKey) === true;
+  });
+}
+
 function ParamVerdictForm({
   taskId,
   params,
@@ -48,7 +60,7 @@ function ParamVerdictForm({
   verdicts: TaskVerdict[];
   remainingTaskCount?: number;
 }) {
-  const { values, setValue, requiredMissing, coerce } = useParamValues(params);
+  const { values, setValue, coerce } = useParamValues(params);
   const [comment, setComment] = React.useState('');
   const [submitting, setSubmitting] = React.useState<string | null>(null);
   const [submitted, setSubmitted] = React.useState(false);
@@ -57,7 +69,7 @@ function ParamVerdictForm({
   const trimmedComment = comment.trim();
 
   async function handleVerdict(cfg: TaskVerdict) {
-    if (requiredMissing) return;
+    if (isParamBlockedForVerdict(cfg.key, params, values)) return;
     if (cfg.requiresComment && !trimmedComment) return;
     if (submitting !== null) return;
 
@@ -82,19 +94,7 @@ function ParamVerdictForm({
   }
 
   if (submitted) {
-    return (
-      <div className="space-y-4">
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:bg-green-900/20 dark:border-green-800">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-            <span className="font-medium text-sm text-green-800 dark:text-green-300">
-              Submitted successfully
-            </span>
-          </div>
-        </div>
-        <RemainingTasksFooter remainingTaskCount={remainingTaskCount} />
-      </div>
-    );
+    return <RemainingTasksFooter remainingTaskCount={remainingTaskCount} />;
   }
 
   return (
@@ -131,7 +131,7 @@ function ParamVerdictForm({
         verdicts={verdicts}
         submitting={submitting}
         trimmedComment={trimmedComment}
-        outerBlocked={requiredMissing}
+        isVerdictBlocked={(key) => isParamBlockedForVerdict(key, params, values)}
         outerBlockedHint="Fill required fields first"
         onVerdict={handleVerdict}
       />

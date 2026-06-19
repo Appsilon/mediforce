@@ -245,6 +245,7 @@ export type {
   SendEmailParams,
   SendEmailResult,
   SendEmailFn,
+  EmailProviderInfo,
 } from './interfaces/index';
 
 export { encodeCursor, decodeCursor } from './cursors/cursor';

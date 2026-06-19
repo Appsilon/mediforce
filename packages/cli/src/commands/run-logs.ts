@@ -28,14 +28,21 @@ export const runLogsCommand = defineCommand({
     if (stepsResult.steps.length > 0) {
       output.stdout('Steps:');
       for (const step of stepsResult.steps) {
-        const exec = step.execution;
-        const status = exec?.status ?? step.status;
-        const duration = exec?.startedAt && exec?.completedAt
-          ? `${Math.round((new Date(exec.completedAt).getTime() - new Date(exec.startedAt).getTime()) / 1000)}s`
-          : '';
-        output.stdout(`  ${status.padEnd(12)} ${step.stepId}${duration ? `  (${duration})` : ''}`);
-        if (exec?.error) output.stdout(`             error: ${exec.error}`);
-        if (exec?.verdict) output.stdout(`             verdict: ${exec.verdict}`);
+        const execs = [...step.executions].sort(
+          (a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime(),
+        );
+        if (execs.length === 0) {
+          output.stdout(`  ${step.status.padEnd(12)} ${step.stepId}`);
+        } else {
+          for (const exec of execs) {
+            const duration = exec.startedAt && exec.completedAt
+              ? `${Math.round((new Date(exec.completedAt).getTime() - new Date(exec.startedAt).getTime()) / 1000)}s`
+              : '';
+            output.stdout(`  ${exec.status.padEnd(12)} ${step.stepId}${duration ? `  (${duration})` : ''}`);
+            if (exec.error) output.stdout(`             error: ${exec.error}`);
+            if (exec.verdict) output.stdout(`             verdict: ${exec.verdict}`);
+          }
+        }
       }
       output.stdout('');
     }

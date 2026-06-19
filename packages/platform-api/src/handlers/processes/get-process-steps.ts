@@ -39,13 +39,15 @@ export async function getProcessSteps(
     );
   }
 
-  const executions = await scope.runs.getStepExecutions(instanceId);
+  const allExecutions = await scope.runs.getStepExecutions(instanceId);
 
-  const executionsByStep = new Map<string, StepExecution>();
-  for (const exec of executions) {
-    const existing = executionsByStep.get(exec.stepId);
-    if (existing === undefined || exec.startedAt > existing.startedAt) {
-      executionsByStep.set(exec.stepId, exec);
+  const executionsByStep = new Map<string, StepExecution[]>();
+  for (const exec of allExecutions) {
+    const bucket = executionsByStep.get(exec.stepId);
+    if (bucket === undefined) {
+      executionsByStep.set(exec.stepId, [exec]);
+    } else {
+      bucket.push(exec);
     }
   }
 
@@ -53,38 +55,41 @@ export async function getProcessSteps(
   const variables = (instance.variables ?? {}) as Record<string, Record<string, unknown>>;
 
   const stepEntries: StepEntry[] = [];
-  let pastCurrentStep = false;
 
   for (const step of definition.steps) {
     if (step.type === 'terminal') continue;
 
     const executorType: StepEntry['executorType'] = step.executor ?? 'unknown';
-    const execution = executionsByStep.get(step.id) ?? null;
+    const stepExecs = executionsByStep.get(step.id) ?? [];
+    const latestExec = stepExecs.reduce<StepExecution | null>(
+      (best, e) => (best === null || e.startedAt > best.startedAt ? e : best),
+      null,
+    );
     const stepVariables = variables[step.id] ?? null;
 
     let status: StepEntry['status'];
-    if (pastCurrentStep) {
-      status = 'pending';
+    if (instance.status === 'completed') {
+      if (currentStepId === null) {
+        status = latestExec !== null || stepVariables !== null ? 'completed' : 'pending';
+      } else if (step.id === currentStepId) {
+        status = 'completed';
+      } else {
+        const hasOutput = latestExec?.output !== null || stepVariables !== null;
+        status = hasOutput ? 'completed' : 'pending';
+      }
     } else if (step.id === currentStepId) {
       status = 'running';
-      pastCurrentStep = true;
     } else {
-      const hasOutput = execution?.output !== null || stepVariables !== null;
-      status = hasOutput ? 'completed' : 'pending';
-    }
-    if (step.id === currentStepId && instance.status === 'completed') {
-      status = 'completed';
-    }
-    if (instance.status === 'completed' && currentStepId === null) {
-      const hasOutput = execution?.output !== null || stepVariables !== null;
-      status = hasOutput ? 'completed' : 'pending';
+      const hasCompleted =
+        stepExecs.some((e) => e.status === 'completed') || stepVariables !== null;
+      status = hasCompleted ? 'completed' : 'pending';
     }
 
     let stepInput: Record<string, unknown> | null = null;
     let stepOutput: Record<string, unknown> | null = null;
-    if (executorType === 'agent' && execution !== null) {
-      stepInput = execution.input;
-      stepOutput = execution.output;
+    if (executorType === 'agent' && latestExec !== null) {
+      stepInput = latestExec.input;
+      stepOutput = latestExec.output;
     } else if (executorType === 'human') {
       stepInput = step.ui !== undefined ? { ui: step.ui } : null;
       stepOutput = stepVariables;
@@ -98,7 +103,7 @@ export async function getProcessSteps(
       status,
       input: stepInput,
       output: stepOutput,
-      execution,
+      executions: stepExecs,
     });
   }
 

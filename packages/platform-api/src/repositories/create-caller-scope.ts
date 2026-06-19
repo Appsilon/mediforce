@@ -7,6 +7,7 @@ import type {
   AuditRepository,
   CoworkSessionRepository,
   CronTriggerStateRepository,
+  EmailProviderInfo,
   HandoffRepository,
   HumanTaskRepository,
   ModelRegistryRepository,
@@ -83,6 +84,7 @@ export interface CallerScopeServices {
   readonly dockerImages: DockerImagesService | null;
   readonly userDirectory: UserDirectoryService | null;
   readonly platformSettingsRepo: PlatformSettingsRepository;
+  readonly emailProviderInfo: EmailProviderInfo | null;
 }
 
 /**
@@ -150,6 +152,7 @@ export function createCallerScope(
       dockerImages: services.dockerImages,
       userDirectory: services.userDirectory,
       platformSettings: services.platformSettingsRepo,
+      emailProviderInfo: services.emailProviderInfo,
     },
   };
 }

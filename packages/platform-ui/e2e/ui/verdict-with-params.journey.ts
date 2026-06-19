@@ -20,7 +20,7 @@ test.describe('Verdict With Params Journey', () => {
 
     // Submit verdict — single click, no secondary confirmation step
     await click(page, page.getByRole('button', { name: /^Approve$/ }));
-    await expect(page.getByText(/Submitted successfully/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Submitted: Approve')).toBeVisible({ timeout: 15_000 });
     await showCaption(page, 'Verdict submitted with param values', 3500);
 
     await endRecording(page);

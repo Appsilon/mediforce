@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { AlertTriangle, Bot } from 'lucide-react';
 import type { AgentOutputData } from './task-utils';
-import { formatStepName } from './task-utils';
+import { formatStepName } from '@/lib/format';
 import { AgentOutputDisplay } from '@/components/agents/agent-output-display';
 
 interface AgentOutputReviewPanelProps {

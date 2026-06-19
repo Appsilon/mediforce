@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { format } from 'date-fns';
@@ -38,6 +38,8 @@ function StatusIcon({ status }: { status: string }) {
 
 export default function StepDetailPage() {
   const { name, runId, stepId, handle } = useParams<{ name: string; runId: string; stepId: string; handle: string }>();
+  const searchParams = useSearchParams();
+  const executionId = searchParams.get('executionId') ?? undefined;
 
   const decodedName = name ? decodeURIComponent(name) : '';
   const decodedStepId = stepId ? decodeURIComponent(stepId) : '';
@@ -78,13 +80,16 @@ export default function StepDetailPage() {
     return prevStep?.name ?? formatStepName(incoming.from);
   }, [definition, decodedStepId]);
 
-  // Get the latest execution for this step
+  // Resolve the execution: pin to executionId from the URL when present (so
+  // each row in the history links to a different view), otherwise fall back
+  // to the latest execution for the step.
   const execution = useMemo((): StepExecution | null => {
-    const execs = stepExecutions
-      .filter((e) => e.stepId === decodedStepId)
-      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
-    return execs[0] ?? null;
-  }, [stepExecutions, decodedStepId]);
+    const execs = stepExecutions.filter((e) => e.stepId === decodedStepId);
+    if (executionId !== undefined) {
+      return execs.find((e) => e.id === executionId) ?? null;
+    }
+    return execs.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0] ?? null;
+  }, [stepExecutions, decodedStepId, executionId]);
 
   // Agent prompt event for this step
   const promptEvent = useMemo(() => {

@@ -13,7 +13,7 @@ complexity estimates because of medical vocabulary.
 packages/
   platform-core/    Zod schemas, repo interfaces, in-memory test doubles
   platform-api/     Contract + framework-free handlers
-  platform-infra/   Postgres, Firebase Auth, SendGrid
+  platform-infra/   Postgres, Firebase Auth, email (Mailgun/SMTP)
   platform-ui/      Next.js 15 App Router (dev :9003, e2e :9007)
   workflow-engine/  Engine, transitions, expression DSL
   agent-runtime/    PluginRegistry, AgentRunner, Docker spawn

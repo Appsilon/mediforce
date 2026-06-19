@@ -36,6 +36,7 @@ import {
   systemDiskCommand,
   systemRmiCommand,
 } from './commands/system-status';
+import { emailStatusCommand } from './commands/email-status';
 import { systemCreditsCommand } from './commands/system-credits';
 import { agentListCommand } from './commands/agent-list';
 import { agentGetCommand } from './commands/agent-get';
@@ -218,6 +219,12 @@ export const TREE: Record<string, BranchEntry> = {
       rmi: { description: 'Remove a Docker image by ID or name:tag', fn: systemRmiCommand },
       disk: { description: 'Docker disk usage breakdown', fn: systemDiskCommand },
       credits: { description: 'OpenRouter credit balance for a workspace', fn: systemCreditsCommand },
+    },
+  },
+  email: {
+    description: 'Email provider status',
+    leaves: {
+      status: { description: 'Show configured email provider', fn: emailStatusCommand },
     },
   },
   config: {
