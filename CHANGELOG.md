@@ -22,6 +22,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Extracted `normaliseModelId` to `platform-core` — was duplicated 5 times across 3 packages.
 - Codex now mirrors Claude's repo-local skill and agent discovery layout via `.codex/skills/*` and `.codex/agents` symlinks, with `AGENTS.md` documenting how Codex should translate Claude-specific skill tool syntax.
 
+### Removed
+- Dead uploaded-skills feature — dropped `AgentDefinition.skillFileNames` + the `agents.skill_file_names` column, the skill-upload UI, and the Firebase Storage skill download from agent identity resolution; `skillsDir` is now the only skill mechanism (ADR-0003 PR1).
+
 ### Fixed
 - `datetime` params now store UTC ISO strings — scheduled wait steps fire at the user's intended local time instead of being off by the browser-to-UTC offset; the datetime field shows the detected browser timezone (e.g. "Europe/Warsaw (UTC+2)") so users can see exactly what time the server will act on.
 - Runs stuck at a wait step with no recorded `pauseReason` are now surfaced as errors instead of silently stalling forever: the auto-runner verifies the `waiting_for_timer` write after it commits and escalates to `failed` if the write was lost; the heartbeat sweeps and escalates any surviving `paused/null` orphans; the run view shows an actionable message ("Resume this run to restart from the current step") instead of "Workflow stopped unexpectedly".

@@ -27,7 +27,6 @@ export const agentGetCommand = defineCommand({
       ['runtimeId', agent.runtimeId],
       ['visibility', agent.visibility],
       ['namespace', agent.namespace],
-      ['skills', agent.skillFileNames.length > 0 ? agent.skillFileNames.join(', ') : undefined],
     ]);
     return 0;
   },

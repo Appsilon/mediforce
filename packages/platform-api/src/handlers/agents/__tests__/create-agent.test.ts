@@ -42,7 +42,6 @@ describe('createAgent handler', () => {
         systemPrompt: 'p',
         inputDescription: 'in',
         outputDescription: 'out',
-        skillFileNames: [],
         namespace: 'team-alpha',
         visibility: 'private',
       },

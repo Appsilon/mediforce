@@ -24,9 +24,6 @@ import { workspaces } from './workspace';
  *
  * Small primitive fields are lifted to columns. `mcp_servers` stays as
  * `jsonb` (variable-size map of bindings, never queried by element).
- * `skill_file_names` likewise lands in `jsonb` — Postgres `text[]`
- * round-trips awkwardly through drizzle and the column is never
- * queried by element.
  */
 export const agents = pgTable(
   'agents',
@@ -44,7 +41,6 @@ export const agents = pgTable(
     systemPrompt: text('system_prompt').notNull(),
     inputDescription: text('input_description').notNull(),
     outputDescription: text('output_description').notNull(),
-    skillFileNames: jsonb('skill_file_names').notNull().$type<string[]>(),
     mcpServers: jsonb('mcp_servers'),
     namespace: text('namespace'),
     visibility: text('visibility').notNull().default('private'),

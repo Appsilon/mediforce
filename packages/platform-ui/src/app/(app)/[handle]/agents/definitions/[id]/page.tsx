@@ -8,10 +8,8 @@ import {
   ArrowLeft,
   Bot, Cpu, Terminal, BarChart3, Brain, Zap,
   Shield, Code, Database, Globe, Sparkles, Settings,
-  Check, Upload, X, ChevronDown, Eye, EyeOff,
+  Check, ChevronDown, Eye, EyeOff,
 } from 'lucide-react';
-import { ref, uploadBytes } from 'firebase/storage';
-import { storage } from '@/lib/firebase';
 import { apiFetch } from '@/lib/api-fetch';
 import { FOUNDATION_MODELS } from '@/lib/agent-models';
 import { cn } from '@/lib/utils';
@@ -66,14 +64,10 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const [outputDescription, setOutputDescription] = useState('');
   const [selectedModelId, setSelectedModelId] = useState('');
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
-  const [existingSkillPaths, setExistingSkillPaths] = useState<string[]>([]);
-  const [newSkillFiles, setNewSkillFiles] = useState<File[]>([]);
-  const [skillsDragOver, setSkillsDragOver] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
   const [saving, setSaving] = useState(false);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -95,7 +89,6 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         setInputDescription(def.inputDescription);
         setOutputDescription(def.outputDescription);
         setSelectedModelId(def.foundationModel);
-        setExistingSkillPaths(def.skillFileNames);
         setPrompt(def.systemPrompt);
         setVisibility(def.visibility ?? 'private');
       })
@@ -105,64 +98,9 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const activeModel = FOUNDATION_MODELS.find((m) => m.id === selectedModelId);
   const canSave = name.trim().length > 0 && selectedModelId !== '' && !saving;
 
-  const MAX_SKILL_FILES = 10;
-  const MAX_SKILL_FILE_BYTES = 100 * 1024;
-  const [skillFileErrors, setSkillFileErrors] = useState<string[]>([]);
-
-  function addSkillFiles(incoming: FileList | File[]) {
-    const files = Array.from(incoming);
-    const errors: string[] = [];
-    const totalAfter = existingSkillPaths.length + newSkillFiles.length + files.length;
-    if (totalAfter > MAX_SKILL_FILES) {
-      errors.push(`Maximum ${MAX_SKILL_FILES} skill files allowed.`);
-      setSkillFileErrors(errors);
-      return;
-    }
-    const accepted: File[] = [];
-    for (const file of files) {
-      if (file.size > MAX_SKILL_FILE_BYTES) {
-        errors.push(`"${file.name}" exceeds 100 KB — split into smaller files or reduce content.`);
-      } else {
-        accepted.push(file);
-      }
-    }
-    setSkillFileErrors(errors);
-    if (accepted.length > 0) {
-      setNewSkillFiles((prev) => [...prev, ...accepted]);
-    }
-  }
-
-  function handleSkillDrop(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    setSkillsDragOver(false);
-    if (event.dataTransfer.files.length > 0) addSkillFiles(event.dataTransfer.files);
-  }
-
-  function removeSkillEntry(index: number) {
-    if (index < existingSkillPaths.length) {
-      setExistingSkillPaths((prev) => prev.filter((_, i) => i !== index));
-    } else {
-      const newIdx = index - existingSkillPaths.length;
-      setNewSkillFiles((prev) => prev.filter((_, i) => i !== newIdx));
-    }
-  }
-
   async function handleSave() {
     setSaving(true);
     try {
-      let uploadedPaths: string[] = [];
-      if (newSkillFiles.length > 0) {
-        uploadedPaths = await Promise.all(
-          newSkillFiles.map(async (file) => {
-            const storagePath = `agentSkills/${id}/${file.name}`;
-            await uploadBytes(ref(storage, storagePath), file, {
-              contentType: file.type || 'application/octet-stream',
-            });
-            return storagePath;
-          }),
-        );
-      }
-
       const payload = {
         name: name.trim(),
         iconName: selectedIcon,
@@ -171,7 +109,6 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         outputDescription,
         foundationModel: selectedModelId,
         systemPrompt: prompt,
-        skillFileNames: [...existingSkillPaths, ...uploadedPaths],
         visibility,
       };
       await apiFetch(`/api/agents/${id}`, {
@@ -361,74 +298,6 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
                 </div>
               )}
             </div>
-          </div>
-
-          {/* 5. Skills file upload */}
-          <div className="space-y-2">
-            <div>
-              <label className="text-sm font-medium">Skills</label>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Upload skill definition files (.yaml, .json, .md) that extend agent capabilities.
-              </p>
-            </div>
-
-            <div
-              onDrop={handleSkillDrop}
-              onDragOver={(e) => { e.preventDefault(); setSkillsDragOver(true); }}
-              onDragLeave={() => setSkillsDragOver(false)}
-              onClick={() => fileInputRef.current?.click()}
-              className={cn(
-                'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 cursor-pointer transition-colors',
-                skillsDragOver
-                  ? 'border-primary bg-primary/5'
-                  : 'border-muted-foreground/25 hover:border-primary/50',
-              )}
-            >
-              <Upload className="h-6 w-6 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Drop files here or click to browse</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept=".yaml,.yml,.json,.md,.txt,.csv"
-                onChange={(e) => {
-                  if (e.target.files) { addSkillFiles(e.target.files); e.target.value = ''; }
-                }}
-                className="hidden"
-              />
-            </div>
-
-            {skillFileErrors.length > 0 && (
-              <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
-                {skillFileErrors.map((err, i) => (
-                  <p key={i} className="text-xs text-destructive">{err}</p>
-                ))}
-              </div>
-            )}
-
-            {(existingSkillPaths.length > 0 || newSkillFiles.length > 0) && (
-              <ul className="space-y-1.5">
-                {[
-                  ...existingSkillPaths.map((p) => p.split('/').pop() ?? p),
-                  ...newSkillFiles.map((f) => f.name),
-                ].map((displayName, index) => (
-                  <li
-                    key={`${displayName}-${index}`}
-                    className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
-                  >
-                    <span className="truncate text-foreground/80">{displayName}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeSkillEntry(index)}
-                      className="ml-2 shrink-0 rounded p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                      aria-label={`Remove ${displayName}`}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
 
           {/* MCP Servers — bindings persisted separately via /mcp-servers endpoints */}

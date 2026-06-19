@@ -66,7 +66,6 @@ describe('resolveMcpForStep', () => {
       systemPrompt: '',
       inputDescription: '',
       outputDescription: '',
-      skillFileNames: [],
       visibility: 'private',
     });
     const step = makeStep({ agentId: 'bare-agent' });
@@ -96,7 +95,6 @@ describe('resolveMcpForStep', () => {
       systemPrompt: '',
       inputDescription: '',
       outputDescription: '',
-      skillFileNames: [],
       mcpServers: {
         tealflow: { type: 'stdio', catalogId: 'tealflow-mcp' },
       },
@@ -128,7 +126,6 @@ describe('resolveMcpForStep', () => {
       systemPrompt: '',
       inputDescription: '',
       outputDescription: '',
-      skillFileNames: [],
       mcpServers: {
         tealflow: { type: 'stdio', catalogId: 'never-seeded' },
       },
@@ -158,7 +155,6 @@ describe('resolveMcpForStep', () => {
       systemPrompt: '',
       inputDescription: '',
       outputDescription: '',
-      skillFileNames: [],
       mcpServers: {
         github: {
           type: 'stdio',
@@ -200,7 +196,6 @@ describe('resolveMcpForStep', () => {
       systemPrompt: '',
       inputDescription: '',
       outputDescription: '',
-      skillFileNames: [],
       mcpServers: {
         webmcp: { type: 'http', url: 'https://mcp.example.com/v1' },
       },
