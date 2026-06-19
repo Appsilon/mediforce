@@ -98,15 +98,18 @@ export class ScriptStepExecutor implements StepExecutor {
         });
       }
 
+      const truncatedError = errorDetail ? errorDetail.slice(0, 2000) : null;
       await auditRepo.append({
         actorId: `script:${pluginId}`,
         actorType: 'system',
         actorRole: 'L4',
         action: 'script.escalated',
-        description: `Script step '${stepId}' failed — reason: ${fallbackReason}`,
+        description: truncatedError
+          ? `Script step '${stepId}' failed — ${truncatedError}`
+          : `Script step '${stepId}' failed — reason: ${fallbackReason}`,
         timestamp: new Date().toISOString(),
         inputSnapshot: { stepId, fallbackReason },
-        outputSnapshot: { status: 'escalated' },
+        outputSnapshot: { status: 'escalated', ...(truncatedError ? { error: truncatedError } : {}) },
         basis: 'Script step could not complete',
         entityType: 'processInstance',
         entityId: instanceId,

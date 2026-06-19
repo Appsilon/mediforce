@@ -112,6 +112,7 @@ export async function getProcessSteps(
     definitionName: instance.definitionName,
     definitionVersion: instance.definitionVersion,
     instanceStatus: instance.status,
+    instanceError: instance.error ?? null,
     currentStepId,
     steps: stepEntries,
   };
