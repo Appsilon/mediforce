@@ -627,25 +627,10 @@ export const WorkflowDefinitionBaseSchema = z.object({
    *
    * `commit` is required — omitting it silently no-ops the skills fetch.
    * `auth` names a workflow secret that holds the clone token for private repos.
-   *
-   * Replaces the deprecated `repo` field (see below). Use this for new workflows.
    */
   externalSkillsRepo: RepoSchema.extend({
     commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)'),
   }).optional(),
-  /**
-   * @deprecated Use `externalSkillsRepo` instead.
-   *
-   * This field is retained for backward compatibility with stored workflow
-   * definitions that have not yet been migrated. The runtime reads
-   * `externalSkillsRepo ?? repo` so existing definitions continue to work.
-   *
-   * TODO: file a follow-up issue to migrate all stored definitions from `repo`
-   * to `externalSkillsRepo`, then drop this field. The legacy build-context
-   * fallback in `resolveImageBuild` (container-plugin.ts) should be removed
-   * at the same time.
-   */
-  repo: RepoSchema.optional(),
   url: z.string().url().optional(),
   roles: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),

@@ -463,22 +463,6 @@ describe('ProcessDefinitionSchema', () => {
     }
   });
 
-  it('should preserve deprecated branch and directory fields to prevent silent data loss on re-save', () => {
-    const result = ProcessDefinitionSchema.safeParse({
-      ...minimalDefinition,
-      repo: {
-        url: 'https://github.com/org/monorepo',
-        branch: 'main',
-        directory: 'packages/my-app',
-      },
-    });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.repo?.branch).toBe('main');
-      expect(result.data.repo?.directory).toBe('packages/my-app');
-    }
-  });
-
   it('should reject repo with invalid url', () => {
     const result = ProcessDefinitionSchema.safeParse({
       ...minimalDefinition,
@@ -490,7 +474,7 @@ describe('ProcessDefinitionSchema', () => {
   it('should reject repo without url field', () => {
     const result = ProcessDefinitionSchema.safeParse({
       ...minimalDefinition,
-      repo: { branch: 'main' },
+      repo: { auth: 'GITHUB_TOKEN' },
     });
     expect(result.success).toBe(false);
   });

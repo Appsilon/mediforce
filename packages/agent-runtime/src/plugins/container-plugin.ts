@@ -134,12 +134,10 @@ export function resolveRepoToken(
   context: AgentContext | WorkflowAgentContext,
   resolvedEnv?: Record<string, string>,
 ): string | undefined {
-  // Step-level repoAuth takes priority, then workflow-level externalSkillsRepo.auth,
-  // then the deprecated workflow-level repo.auth for backward compatibility.
+  // Step-level repoAuth takes priority, then workflow-level externalSkillsRepo.auth.
   const wfDef = isWorkflowAgentContext(context) ? context.workflowDefinition : undefined;
   const authKey = buildConfig.repoAuth
-    ?? wfDef?.externalSkillsRepo?.auth
-    ?? wfDef?.repo?.auth;
+    ?? wfDef?.externalSkillsRepo?.auth;
   if (!authKey || !resolvedEnv) return undefined;
   return resolvedEnv[authKey];
 }
@@ -177,11 +175,7 @@ export function resolveImageBuild(
   }
 
   if (dockerfile && isWorkflowAgentContext(context)) {
-    // Fallback: use the workflow-level externalSkillsRepo (or deprecated repo) as the
-    // build context. Retained for backward compatibility with existing stored workflow
-    // definitions. Will be removed together with the deprecated `repo` field — see
-    // the TODO in WorkflowDefinitionBaseSchema.repo (workflow-definition.ts).
-    const wfRepo = context.workflowDefinition.externalSkillsRepo ?? context.workflowDefinition.repo;
+    const wfRepo = context.workflowDefinition.externalSkillsRepo;
     if (wfRepo?.url && wfRepo?.commit) {
       const repoUrl = repo ? normalizeRepoUrls(repo).gitUrl : normalizeRepoUrls(wfRepo.url).gitUrl;
       return {

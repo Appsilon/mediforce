@@ -764,11 +764,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       const workingDirForPrompt = isLocalMode ? this.runWorkspaceHandle!.path : '/workspace';
 
       // Fetch skills from the workflow's external skills repo if configured.
-      // Reads externalSkillsRepo first; falls back to the deprecated repo field
-      // for backward compatibility with stored workflow definitions.
       if (this.agentConfig.skillsDir && isWorkflowAgentContext(this.context)) {
-        const wfRepo = this.context.workflowDefinition.externalSkillsRepo
-          ?? this.context.workflowDefinition.repo;
+        const wfRepo = this.context.workflowDefinition.externalSkillsRepo;
         if (wfRepo?.url && wfRepo?.commit) {
           const repoToken = resolveRepoToken(this.agentConfig, this.context, this.resolvedEnv.vars);
           await this.fetchSkillsFromRepo(
