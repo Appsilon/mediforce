@@ -137,7 +137,17 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
       'Examples: extracted metadata, generated code, analysis reports.',
     roles: ['executor'],
     foundationModel: 'Claude Sonnet 4.6',
+    requiredEnv: [['ANTHROPIC_API_KEY'], ['OPENROUTER_API_KEY', 'ANTHROPIC_BASE_URL']],
   };
+
+  protected override getInternalEnvVars(): Record<string, string> {
+    const vars: Record<string, string> = {};
+    const resolved = this.resolvedEnv?.vars ?? {};
+    if (!resolved.ANTHROPIC_API_KEY && resolved.OPENROUTER_API_KEY) {
+      vars.ANTHROPIC_API_KEY = resolved.OPENROUTER_API_KEY;
+    }
+    return vars;
+  }
 
   getAgentCommand(_promptFilePath: string, options?: SpawnCliOptions): AgentCommandSpec {
     const args: string[] = [

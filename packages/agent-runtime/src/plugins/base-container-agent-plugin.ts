@@ -709,6 +709,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         this.context.workflowDefinition.env,
         this.context.step.env,
         this.context.workflowSecrets,
+        this.metadata.requiredEnv,
+        this.context.namespaceSecretKeys,
       );
     } else {
       const stepConfig = this.context.config.stepConfigs.find(
@@ -859,11 +861,16 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         }
       }
 
-      // Log injected env vars for audit
+      // Log injected env vars with source info for audit
       if (spawnResult.injectedEnvVars.length > 0) {
+        const sources = this.resolvedEnv.sources;
+        const labeled = spawnResult.injectedEnvVars.map((key) => {
+          const src = sources[key];
+          return src && src !== 'literal' ? `${key} (${src})` : key;
+        });
         await emit({
           type: 'status',
-          payload: `injected env vars: ${spawnResult.injectedEnvVars.join(', ')}`,
+          payload: `injected env vars: ${labeled.join(', ')}`,
           timestamp: new Date().toISOString(),
         });
       } else {

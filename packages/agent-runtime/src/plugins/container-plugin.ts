@@ -246,7 +246,7 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
   abstract readonly metadata: PluginCapabilityMetadata;
 
   protected context!: AgentContext | WorkflowAgentContext;
-  protected resolvedEnv: ResolvedEnv = { vars: {}, injectedKeys: [] };
+  protected resolvedEnv: ResolvedEnv = { vars: {}, injectedKeys: [], sources: {} };
   protected imageBuild: ImageBuildMeta | undefined;
   /** Cached skills dir path fetched from git repo. */
   protected repoSkillsDir: string | null = null;
@@ -391,8 +391,9 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
     definitionEnv?: Record<string, string>,
     stepEnv?: Record<string, string>,
     workflowSecrets?: Record<string, string>,
+    namespaceSecretKeys?: ReadonlySet<string>,
   ): void {
-    this.resolvedEnv = resolveStepEnv(definitionEnv, stepEnv, workflowSecrets);
+    this.resolvedEnv = resolveStepEnv(definitionEnv, stepEnv, workflowSecrets, this.metadata.requiredEnv, namespaceSecretKeys);
   }
 
   /**

@@ -161,6 +161,7 @@ export async function executeAgentStep(
     step: workflowStep,
     llm: llmClient,
     workflowSecrets,
+    namespaceSecretKeys: new Set(Object.keys(namespaceSecrets)),
     resolvedMcpConfig,
     ...(instance.previousRun !== undefined
       ? { previousRun: instance.previousRun }

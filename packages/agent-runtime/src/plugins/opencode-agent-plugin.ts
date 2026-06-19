@@ -38,6 +38,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       'Examples: extracted metadata, generated code, analysis reports.',
     roles: ['executor'],
     foundationModel: 'DeepSeek Chat',
+    requiredEnv: [['OPENROUTER_API_KEY']],
   };
 
   protected override getInternalEnvVars(): Record<string, string> {
