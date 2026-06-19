@@ -420,7 +420,6 @@ describe('AgentDefinitionSchema with mcpServers', () => {
     systemPrompt: 'You are a helpful agent.',
     inputDescription: 'document',
     outputDescription: 'extracted data',
-    skillFileNames: [],
     createdAt: '2026-04-22T00:00:00.000Z',
     updatedAt: '2026-04-22T00:00:00.000Z',
   };

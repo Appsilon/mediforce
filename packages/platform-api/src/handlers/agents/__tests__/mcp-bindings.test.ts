@@ -56,7 +56,6 @@ describe('agent MCP binding handlers', () => {
       systemPrompt: 'p',
       inputDescription: 'i',
       outputDescription: 'o',
-      skillFileNames: [],
       namespace: 'team-alpha',
       visibility: 'private',
     });
@@ -82,7 +81,6 @@ describe('agent MCP binding handlers', () => {
       systemPrompt: 'p',
       inputDescription: 'i',
       outputDescription: 'o',
-      skillFileNames: [],
       namespace: undefined,
       visibility: 'public',
     });
@@ -108,7 +106,6 @@ describe('agent MCP binding handlers', () => {
       systemPrompt: 'p',
       inputDescription: 'i',
       outputDescription: 'o',
-      skillFileNames: [],
       namespace: undefined,
       visibility: 'public',
       mcpServers: { github: { type: 'http', url: 'https://example.com' } },
@@ -131,7 +128,6 @@ describe('agent MCP binding handlers', () => {
       systemPrompt: 'p',
       inputDescription: 'i',
       outputDescription: 'o',
-      skillFileNames: [],
       namespace: undefined,
       visibility: 'public',
     });
@@ -156,7 +152,6 @@ describe('agent MCP binding handlers', () => {
       systemPrompt: 'p',
       inputDescription: 'i',
       outputDescription: 'o',
-      skillFileNames: [],
       namespace: 'team-alpha',
       visibility: 'private',
       mcpServers: { github: { type: 'http', url: 'https://example.com' } },

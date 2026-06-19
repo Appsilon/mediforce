@@ -345,7 +345,7 @@ export async function seedPostgresNamespace(
         INSERT INTO agents (
           id, workspace, kind, runtime_id, name, icon_name, description,
           foundation_model, system_prompt, input_description,
-          output_description, skill_file_names, mcp_servers, namespace,
+          output_description, mcp_servers, namespace,
           visibility, created_at, updated_at
         ) VALUES (
           ${id},
@@ -359,7 +359,6 @@ export async function seedPostgresNamespace(
           ${(agent.systemPrompt as string | undefined) ?? ''},
           ${agent.inputDescription as string},
           ${agent.outputDescription as string},
-          ${sql.json((agent.skillFileNames as unknown) ?? [])},
           ${agent.mcpServers ? sql.json(agent.mcpServers as unknown) : null},
           ${(agent.namespace as string | undefined) ?? null},
           ${(agent.visibility as string | undefined) ?? 'private'},

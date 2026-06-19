@@ -53,7 +53,7 @@
  * belongs in its own PR.
  */
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, cpSync, chmodSync, copyFileSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync, chmodSync, copyFileSync, statSync } from 'node:fs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
@@ -79,7 +79,7 @@ let preparedDeployKeyPath: string | null = null;
  */
 export function prepareDeployKeyPath(): string {
   const source = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
-  if (!existsSync(source)) return source;
+  if (!existsSync(source) || !statSync(source).isFile()) return source;
   if (preparedDeployKeyPath && existsSync(preparedDeployKeyPath)) return preparedDeployKeyPath;
   const dir = mkdtempSync(join(tmpdir(), 'mediforce-ssh-'));
   const dest = join(dir, 'deploy_key');

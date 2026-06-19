@@ -343,7 +343,6 @@ def migrate_agents(fs, pg, *, dry_run: bool) -> dict[str, int]:
                 "system_prompt": data.get("systemPrompt") or "",
                 "input_description": data.get("inputDescription") or "",
                 "output_description": data.get("outputDescription") or "",
-                "skill_file_names": data.get("skillFileNames") or [],
                 "mcp_servers": data.get("mcpServers"),
                 "namespace": data.get("namespace"),
                 "visibility": data.get("visibility") or "private",

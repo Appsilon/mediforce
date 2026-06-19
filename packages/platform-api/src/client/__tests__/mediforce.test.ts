@@ -21,7 +21,6 @@ function buildAgentDefinition(overrides: Partial<AgentDefinition> = {}): AgentDe
     systemPrompt: 'You are a test agent',
     inputDescription: 'text',
     outputDescription: 'json',
-    skillFileNames: [],
     visibility: 'private',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',

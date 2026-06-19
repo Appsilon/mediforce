@@ -141,7 +141,6 @@ function buildAgentWithOAuthBinding(): AgentDefinition {
     systemPrompt: '',
     inputDescription: '',
     outputDescription: '',
-    skillFileNames: [],
     mcpServers: {
       gh: {
         type: 'http',

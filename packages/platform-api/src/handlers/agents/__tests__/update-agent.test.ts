@@ -41,7 +41,6 @@ describe('updateAgent handler', () => {
       systemPrompt: 'p',
       inputDescription: 'i',
       outputDescription: 'o',
-      skillFileNames: [],
       namespace: 'team-beta',
       visibility: 'private',
     });
@@ -63,7 +62,6 @@ describe('updateAgent handler', () => {
       systemPrompt: 'p',
       inputDescription: 'i',
       outputDescription: 'o',
-      skillFileNames: [],
       namespace: undefined,
       visibility: 'public',
     });
