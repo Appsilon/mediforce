@@ -16,7 +16,7 @@
  * Literal values (no `{{…}}` wrapper) are passed through as-is.
  */
 
-export type EnvVarSource = 'literal' | 'namespace-secret' | 'workflow-secret' | 'auto-injected';
+export type EnvVarSource = 'literal' | 'namespace-secret' | 'workflow-secret' | 'auto-injected' | 'secret';
 
 export interface ResolvedEnv {
   /** Resolved env vars to inject into the agent process */
@@ -334,7 +334,7 @@ export function resolveStepEnv(
       } else if (namespaceSecretKeys) {
         sources[key] = 'namespace-secret';
       } else {
-        sources[key] = 'workflow-secret';
+        sources[key] = 'secret';
       }
     }
   }

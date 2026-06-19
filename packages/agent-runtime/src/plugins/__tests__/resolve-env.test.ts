@@ -131,6 +131,15 @@ describe('resolve-env', () => {
       expect(result.sources.ANTHROPIC_API_KEY).toBe('auto-injected');
     });
 
+    it('tracks source as secret (unspecified level) when namespaceSecretKeys not provided', () => {
+      const result = resolveStepEnv(
+        undefined,
+        { API_KEY: '{{API_KEY}}' },
+        { API_KEY: 'value' },
+      );
+      expect(result.sources.API_KEY).toBe('secret');
+    });
+
     it('does not auto-inject when no group is satisfiable', () => {
       const result = resolveStepEnv(
         undefined,
