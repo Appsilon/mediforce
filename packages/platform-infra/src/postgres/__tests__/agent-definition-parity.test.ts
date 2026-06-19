@@ -33,7 +33,6 @@ function inputBase(
     systemPrompt: 'You are a reviewer.',
     inputDescription: 'A PR diff',
     outputDescription: 'Review comments',
-    skillFileNames: ['review.md'],
     visibility: 'private',
     ...overrides,
   };
@@ -72,7 +71,6 @@ function contract(
       const created = await repo.create(inputBase());
       expect(created.id).toBeTruthy();
       expect(created.name).toBe('Reviewer');
-      expect(created.skillFileNames).toEqual(['review.md']);
       expect(created.createdAt).toBeDefined();
       expect(created.updatedAt).toBeDefined();
 
@@ -166,7 +164,6 @@ function contract(
       const updated = await repo.update('u1', { name: 'Updated' });
       expect(updated.name).toBe('Updated');
       expect(updated.foundationModel).toBe(created.foundationModel);
-      expect(updated.skillFileNames).toEqual(created.skillFileNames);
       // updatedAt must be no earlier than createdAt. The in-memory default
       // clock returns a fixed timestamp; the Postgres trigger uses real time
       // and the surrounding sleep guarantees strict monotonicity there. The

@@ -9,8 +9,7 @@
     "inputDescription": "Task description and relevant code context",
     "outputDescription": "Generated code, analysis results, or task completion report",
     "foundationModel": "anthropic/claude-sonnet-4",
-    "systemPrompt": "",
-    "skillFileNames": []
+    "systemPrompt": ""
   },
   "opencode-agent": {
     "kind": "plugin",
@@ -22,8 +21,7 @@
     "inputDescription": "Code task description and project context",
     "outputDescription": "Implemented code changes and execution results",
     "foundationModel": "deepseek/deepseek-chat",
-    "systemPrompt": "",
-    "skillFileNames": []
+    "systemPrompt": ""
   },
   "script-container": {
     "kind": "plugin",
@@ -35,8 +33,7 @@
     "inputDescription": "Script definition and input parameters",
     "outputDescription": "Script execution output and exit status",
     "foundationModel": "anthropic/claude-sonnet-4",
-    "systemPrompt": "",
-    "skillFileNames": []
+    "systemPrompt": ""
   },
   "tealflow-cowork-chat": {
     "kind": "cowork",
@@ -49,7 +46,6 @@
     "outputDescription": "Teal module selection artifact",
     "foundationModel": "anthropic/claude-sonnet-4",
     "systemPrompt": "",
-    "skillFileNames": [],
     "mcpServers": {
       "tealflow": { "type": "stdio", "catalogId": "tealflow-mcp" }
     }

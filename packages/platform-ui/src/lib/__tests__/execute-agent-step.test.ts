@@ -139,7 +139,7 @@ vi.mock('@/app/actions/namespace-secrets', () => ({
 }));
 
 vi.mock('@/lib/resolve-agent-identity', () => ({
-  resolveAgentIdentity: vi.fn().mockResolvedValue({ prompt: undefined, warnings: [] }),
+  resolveAgentIdentity: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Import after mock setup

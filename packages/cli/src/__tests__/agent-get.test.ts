@@ -17,7 +17,6 @@ const FAKE_AGENT = {
   systemPrompt: 'You author rules.',
   inputDescription: 'Rule ID',
   outputDescription: 'Rule changes',
-  skillFileNames: ['skill.md', 'patterns.md'],
   createdAt: '2026-05-01T00:00:00Z',
   updatedAt: '2026-05-01T00:00:00Z',
 };
@@ -67,13 +66,12 @@ describe('agent get command', () => {
     expect(text).toMatch(/model:\s+anthropic\/claude-sonnet-4/);
     expect(text).toMatch(/kind:\s+plugin/);
     expect(text).toMatch(/runtimeId:\s+claude-code-agent/);
-    expect(text).toMatch(/skills:\s+skill\.md, patterns\.md/);
   });
 
-  it('omits runtimeId and skills lines when absent/empty', async () => {
-    const { runtimeId: _, skillFileNames: __, ...noOptionals } = FAKE_AGENT;
+  it('omits runtimeId line when absent', async () => {
+    const { runtimeId: _, ...noOptionals } = FAKE_AGENT;
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ agent: { ...noOptionals, skillFileNames: [] } }),
+      jsonResponse({ agent: noOptionals }),
     );
     const output = captureOutput();
     const code = await agentGetCommand({
@@ -84,7 +82,6 @@ describe('agent get command', () => {
     expect(code).toBe(0);
     const text = output.stdoutLines.join('\n');
     expect(text).not.toMatch(/runtimeId/);
-    expect(text).not.toMatch(/skills/);
   });
 
   it('emits structured JSON when --json is set', async () => {

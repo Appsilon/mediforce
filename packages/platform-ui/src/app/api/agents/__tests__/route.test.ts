@@ -43,7 +43,6 @@ const validBody = {
   systemPrompt: '',
   inputDescription: '',
   outputDescription: '',
-  skillFileNames: [],
   namespace: 'ns-1',
   visibility: 'private' as const,
 };
