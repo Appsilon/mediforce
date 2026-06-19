@@ -749,6 +749,16 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         });
       }
 
+      const imageBuild = resolveImageBuild(
+        this.agentConfig.image,
+        this.agentConfig,
+        this.context,
+        this.resolvedEnv.vars,
+      );
+      if (imageBuild?.image) {
+        this.agentConfig.image = imageBuild.image;
+      }
+
       const isLocalMode = !this.agentConfig.image;
       agentLog('run.mode', `execution mode: ${isLocalMode ? 'local' : 'docker'}`, { stepId });
 

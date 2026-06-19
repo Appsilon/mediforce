@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { WorkflowStep } from '@mediforce/platform-core';
+import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 
 // ---- Mocks (must be before component import) ----
 
@@ -37,6 +38,10 @@ function buildStep(overrides: Partial<WorkflowStep> = {}): WorkflowStep {
 }
 
 const noop = () => {};
+
+const dockerImages: DockerImageInfo[] = [
+  { repository: 'mediforce/golden-image', tag: 'latest', id: 'abc', size: '1GB', created: '1d ago' },
+];
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -255,5 +260,23 @@ describe('StepEditor', () => {
       (el) => el.getAttribute('placeholder') !== null && el.getAttribute('placeholder') !== '',
     );
     expect(inputsWithPlaceholder).toHaveLength(0);
+  });
+
+  it('[REGRESSION] allows custom agent image entry when Docker images are discovered', () => {
+    const onChange = vi.fn();
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent' })}
+        allSteps={[]}
+        onChange={onChange}
+        dockerImages={dockerImages}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Custom Docker image'), {
+      target: { value: 'python:3.11-slim' },
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ agent: { image: 'python:3.11-slim' } });
   });
 });

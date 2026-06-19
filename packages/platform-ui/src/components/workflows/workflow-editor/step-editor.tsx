@@ -479,22 +479,32 @@ export function StepEditor({
         <FieldGroup>
           <FieldRow label="agent.image" tooltip={TIP.agentImage}>
             {dockerImages && dockerImages.length > 0 ? (
-              <select
-                value={step.agent?.image ?? ''}
-                onChange={(e) => updateAgent({ image: e.target.value || undefined })}
-                className={rs}
-              >
-                <option value="">Select image…</option>
-                {dockerImages.map((img) => {
-                  const ref = imageRef(img);
-                  return <option key={img.id} value={ref}>{ref}</option>;
-                })}
-                {step.agent?.image && !dockerImages.some((img) => imageRef(img) === step.agent?.image) && (
-                  <option value={step.agent.image}>{step.agent.image}</option>
-                )}
-              </select>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <select
+                  aria-label="Known Docker image"
+                  value={step.agent?.image ?? ''}
+                  onChange={(e) => updateAgent({ image: e.target.value || undefined })}
+                  className={rs}
+                >
+                  <option value="">Select image…</option>
+                  {dockerImages.map((img) => {
+                    const ref = imageRef(img);
+                    return <option key={img.id} value={ref}>{ref}</option>;
+                  })}
+                  {step.agent?.image && !dockerImages.some((img) => imageRef(img) === step.agent?.image) && (
+                    <option value={step.agent.image}>{step.agent.image}</option>
+                  )}
+                </select>
+                <input
+                  aria-label="Custom Docker image"
+                  value={step.agent?.image ?? ''}
+                  onChange={(e) => updateAgent({ image: e.target.value || undefined })}
+                  className={riMono}
+                />
+              </div>
             ) : (
               <input
+                aria-label="Custom Docker image"
                 value={step.agent?.image ?? ''}
                 onChange={(e) => updateAgent({ image: e.target.value || undefined })}
                 className={riMono}
