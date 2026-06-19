@@ -157,7 +157,12 @@ export function validatePluginRequiredEnv(
     const groupResults = groups.map((group) => {
       const missing = group.filter((key) => {
         const value = mergedEnv[key];
-        if (value === undefined) return true;
+        if (value === undefined) {
+          // Key not in env — auto-injection will add it at runtime if
+          // the secret exists, so only report missing when the secret
+          // is also absent.
+          return !(workflowSecrets && key in workflowSecrets && workflowSecrets[key] !== '');
+        }
         const parsed = parseTemplate(value);
         if (parsed === null) return false;
         if (parsed.namespace === 'OAUTH') return false;
