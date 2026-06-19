@@ -335,6 +335,7 @@ server.registerTool(
       return mcpJson({
         runId,
         instanceStatus: stepsResult.instanceStatus,
+        instanceError: stepsResult.instanceError ?? null,
         currentStepId: stepsResult.currentStepId,
         steps,
         auditEvents: events,

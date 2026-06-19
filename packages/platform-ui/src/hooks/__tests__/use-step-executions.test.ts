@@ -43,6 +43,7 @@ function result(instanceId: string, steps: StepEntry[], status: GetStepsResult['
     definitionName: 'wf',
     definitionVersion: '1',
     instanceStatus: status,
+    instanceError: null,
     currentStepId: null,
     steps,
   };
