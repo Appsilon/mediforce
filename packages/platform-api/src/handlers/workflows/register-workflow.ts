@@ -105,38 +105,44 @@ export async function registerWorkflow(
 
   const warnings: RegistrationWarning[] = [];
 
-  try {
-    const dockerInfo = isLocalAgentMode()
-      ? await fetchFromLocalDocker()
-      : await fetchFromContainerWorker();
-    if (dockerInfo.available) {
-      for (const step of definition.steps) {
-        if (step.executor !== 'agent' && step.executor !== 'script') continue;
-        const cfg = step.executor === 'script' ? step.script : step.agent;
-        const image = cfg?.image;
-        if (typeof image !== 'string' || image.length === 0) continue;
-        const hasBuildSource = typeof cfg?.repo === 'string' && cfg.repo.length > 0
-          && typeof cfg?.commit === 'string' && cfg.commit.length > 0;
-        if (hasBuildSource) continue;
-        const [repo, tag = 'latest'] = image.split(':');
-        const found = dockerInfo.images.some(
-          (img) => img.repository === repo && img.tag === tag,
-        );
-        if (!found) {
-          warnings.push({
-            code: 'image-not-found',
-            message: `Image '${image}' not found on platform (step '${step.name}'). The workflow will fail at runtime unless this image is built or pushed before starting a run.`,
-            stepName: step.name,
-          });
+  const hasDockerSteps = definition.steps.some(
+    (s) => s.executor === 'agent' || s.executor === 'script',
+  );
+
+  if (hasDockerSteps) {
+    try {
+      const dockerInfo = isLocalAgentMode()
+        ? await fetchFromLocalDocker()
+        : await fetchFromContainerWorker();
+      if (dockerInfo.available) {
+        for (const step of definition.steps) {
+          if (step.executor !== 'agent' && step.executor !== 'script') continue;
+          const cfg = step.executor === 'script' ? step.script : step.agent;
+          const image = cfg?.image;
+          if (typeof image !== 'string' || image.length === 0) continue;
+          const hasBuildSource = typeof cfg?.repo === 'string' && cfg.repo.length > 0
+            && typeof cfg?.commit === 'string' && cfg.commit.length > 0;
+          if (hasBuildSource) continue;
+          const [repo, tag = 'latest'] = image.split(':');
+          const found = dockerInfo.images.some(
+            (img) => img.repository === repo && img.tag === tag,
+          );
+          if (!found) {
+            warnings.push({
+              code: 'image-not-found',
+              message: `Image '${image}' not found on platform (step '${step.name}'). The workflow will fail at runtime unless this image is built or pushed before starting a run.`,
+              stepName: step.name,
+            });
+          }
         }
       }
+    } catch {
+      warnings.push({
+        code: 'image-check-unavailable',
+        message: 'Could not verify Docker images — the container runtime is unreachable. Image availability will be checked again at run start.',
+        stepName: '',
+      });
     }
-  } catch {
-    warnings.push({
-      code: 'image-check-unavailable',
-      message: 'Could not verify Docker images — the container runtime is unreachable. Image availability will be checked again at run start.',
-      stepName: '',
-    });
   }
 
   return {
