@@ -2,7 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
-import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels } from '@mediforce/agent-runtime';
+import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { checkRetiredModels } from '@mediforce/platform-api/handlers';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
@@ -118,9 +118,35 @@ export async function POST(
         workflowDefinition.steps,
         workflowSecrets,
       );
+
+      // Check plugin-required env vars (implicit agent needs like ANTHROPIC_API_KEY)
+      const { pluginRegistry } = getPlatformServices();
+      const pluginRequiredEnvMap = new Map<string, string[][]>();
+      for (const { name, metadata } of pluginRegistry.list()) {
+        if (metadata?.requiredEnv) {
+          pluginRequiredEnvMap.set(name, metadata.requiredEnv);
+        }
+      }
+      const missingPluginEnv = validatePluginRequiredEnv(
+        workflowDefinition, pluginRequiredEnvMap, workflowSecrets,
+      );
+      const pluginEnvAsMissing = missingPluginEnv.flatMap((m) => {
+        const bestGroup = m.groups.reduce((a, b) => a.missing.length <= b.missing.length ? a : b);
+        return bestGroup.missing.map((key) => ({
+          secretName: key,
+          template: `{{${key}}}`,
+          steps: m.steps,
+          hint: `Required by ${m.pluginName}` +
+            (m.groups.length > 1
+              ? `. Alternatives: ${m.groups.map((g) => g.keys.join(' + ')).join(' or ')}`
+              : ''),
+        }));
+      });
+
       const allMissing = [
         ...missingEnv,
         ...missingActionSecrets.map((m) => ({ ...m, template: `\${secrets.${m.secretName}}` })),
+        ...pluginEnvAsMissing,
       ];
       if (allMissing.length > 0) {
         const names = allMissing.map((m) => m.secretName);

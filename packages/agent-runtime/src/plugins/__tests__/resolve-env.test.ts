@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveStepEnv, validateWorkflowEnv, validateWorkflowModels, validateRetiredModels, resolveValue } from '../resolve-env';
+import { resolveStepEnv, validateWorkflowEnv, validateWorkflowModels, validateRetiredModels, validatePluginRequiredEnv, resolveValue } from '../resolve-env';
 
 describe('resolve-env', () => {
   // ---------------------------------------------------------------------------
@@ -47,7 +47,7 @@ describe('resolve-env', () => {
 
     it('returns empty result when both config and step env are undefined', () => {
       const result = resolveStepEnv(undefined, undefined);
-      expect(result).toEqual({ vars: {}, injectedKeys: [] });
+      expect(result).toEqual({ vars: {}, injectedKeys: [], sources: {} });
     });
 
     it('injectedKeys contains all merged keys', () => {
@@ -56,6 +56,89 @@ describe('resolve-env', () => {
         { B: 'y', C: 'z' },
       );
       expect(result.injectedKeys).toEqual(['A', 'B', 'C']);
+    });
+
+    it('auto-injects plugin required env from secrets when absent from step env', () => {
+      const result = resolveStepEnv(
+        undefined,
+        undefined,
+        { ANTHROPIC_API_KEY: 'sk-ant-xxx' },
+        [['ANTHROPIC_API_KEY'], ['OPENROUTER_API_KEY', 'ANTHROPIC_BASE_URL']],
+      );
+      expect(result.vars).toEqual({ ANTHROPIC_API_KEY: 'sk-ant-xxx' });
+      expect(result.injectedKeys).toContain('ANTHROPIC_API_KEY');
+    });
+
+    it('auto-injection picks first fully-satisfiable group', () => {
+      const result = resolveStepEnv(
+        undefined,
+        undefined,
+        { OPENROUTER_API_KEY: 'sk-or-xxx', ANTHROPIC_BASE_URL: 'https://openrouter.ai' },
+        [['ANTHROPIC_API_KEY'], ['OPENROUTER_API_KEY', 'ANTHROPIC_BASE_URL']],
+      );
+      expect(result.vars.OPENROUTER_API_KEY).toBe('sk-or-xxx');
+      expect(result.vars.ANTHROPIC_BASE_URL).toBe('https://openrouter.ai');
+      expect(result.vars.ANTHROPIC_API_KEY).toBeUndefined();
+    });
+
+    it('explicit env overrides auto-injected values', () => {
+      const result = resolveStepEnv(
+        undefined,
+        { ANTHROPIC_API_KEY: 'explicit-value' },
+        { ANTHROPIC_API_KEY: 'from-secrets' },
+        [['ANTHROPIC_API_KEY']],
+      );
+      expect(result.vars.ANTHROPIC_API_KEY).toBe('explicit-value');
+    });
+
+    it('tracks source as namespace-secret when key is in namespaceSecretKeys', () => {
+      const result = resolveStepEnv(
+        undefined,
+        { API_KEY: '{{API_KEY}}' },
+        { API_KEY: 'value' },
+        undefined,
+        new Set(['API_KEY']),
+      );
+      expect(result.sources.API_KEY).toBe('namespace-secret');
+    });
+
+    it('tracks source as workflow-secret when key is NOT in namespaceSecretKeys', () => {
+      const result = resolveStepEnv(
+        undefined,
+        { API_KEY: '{{API_KEY}}' },
+        { API_KEY: 'value' },
+        undefined,
+        new Set(['OTHER_KEY']),
+      );
+      expect(result.sources.API_KEY).toBe('workflow-secret');
+    });
+
+    it('tracks source as literal for non-template values', () => {
+      const result = resolveStepEnv(
+        undefined,
+        { NODE_ENV: 'production' },
+      );
+      expect(result.sources.NODE_ENV).toBe('literal');
+    });
+
+    it('tracks source as auto-injected for plugin-required env', () => {
+      const result = resolveStepEnv(
+        undefined,
+        undefined,
+        { ANTHROPIC_API_KEY: 'sk-ant-xxx' },
+        [['ANTHROPIC_API_KEY']],
+      );
+      expect(result.sources.ANTHROPIC_API_KEY).toBe('auto-injected');
+    });
+
+    it('does not auto-inject when no group is satisfiable', () => {
+      const result = resolveStepEnv(
+        undefined,
+        undefined,
+        {},
+        [['ANTHROPIC_API_KEY'], ['OPENROUTER_API_KEY', 'ANTHROPIC_BASE_URL']],
+      );
+      expect(result.vars).toEqual({});
     });
   });
 
@@ -304,6 +387,126 @@ describe('resolveValue', () => {
       expect(result).toHaveLength(1);
       expect(result[0].model).toBe('openai/gpt-4');
       expect(result[0].retiredAt).toBe('2026-01-15T00:00:00Z');
+    });
+  });
+
+  describe('validatePluginRequiredEnv', () => {
+    const pluginMap = new Map<string, string[][]>([
+      ['claude-code-agent', [['ANTHROPIC_API_KEY'], ['OPENROUTER_API_KEY', 'ANTHROPIC_BASE_URL']]],
+      ['databricks-job', [['DATABRICKS_HOST', 'DATABRICKS_TOKEN']]],
+    ]);
+
+    it('returns empty when step env declares required key and secret exists', () => {
+      const result = validatePluginRequiredEnv(
+        { steps: [{ id: 's1', name: 'Analyze', executor: 'agent', env: { ANTHROPIC_API_KEY: '{{ANTHROPIC_API_KEY}}' } }] },
+        pluginMap,
+        { ANTHROPIC_API_KEY: 'sk-ant-xxx' },
+      );
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty when alternative group is satisfied', () => {
+      const result = validatePluginRequiredEnv(
+        { steps: [{ id: 's1', name: 'Analyze', executor: 'agent', env: { OPENROUTER_API_KEY: '{{OPENROUTER_API_KEY}}', ANTHROPIC_BASE_URL: 'https://openrouter.ai/api/v1' } }] },
+        pluginMap,
+        { OPENROUTER_API_KEY: 'sk-or-xxx' },
+      );
+      expect(result).toEqual([]);
+    });
+
+    it('detects missing when no env mapping exists and no secrets', () => {
+      const result = validatePluginRequiredEnv(
+        { steps: [{ id: 's1', name: 'Analyze', executor: 'agent' }] },
+        pluginMap,
+        {},
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].pluginName).toBe('claude-code-agent');
+      expect(result[0].steps).toEqual([{ stepId: 's1', stepName: 'Analyze' }]);
+    });
+
+    it('detects missing when env mapping exists but secret is absent', () => {
+      const result = validatePluginRequiredEnv(
+        { steps: [{ id: 's1', name: 'Analyze', executor: 'agent', env: { ANTHROPIC_API_KEY: '{{ANTHROPIC_API_KEY}}' } }] },
+        pluginMap,
+        {},
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].groups.some((g) => g.missing.includes('ANTHROPIC_API_KEY'))).toBe(true);
+    });
+
+    it('defaults to claude-code-agent when step.plugin is unset', () => {
+      const result = validatePluginRequiredEnv(
+        { steps: [{ id: 's1', name: 'Run', executor: 'agent' }] },
+        pluginMap,
+        {},
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].pluginName).toBe('claude-code-agent');
+    });
+
+    it('uses step.plugin when set', () => {
+      const result = validatePluginRequiredEnv(
+        { steps: [{ id: 's1', name: 'Run', executor: 'script', plugin: 'databricks-job' }] },
+        pluginMap,
+        {},
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].pluginName).toBe('databricks-job');
+    });
+
+    it('skips plugins without requiredEnv in the map', () => {
+      const result = validatePluginRequiredEnv(
+        { steps: [{ id: 's1', name: 'Run', executor: 'agent', plugin: 'custom-agent' }] },
+        pluginMap,
+        {},
+      );
+      expect(result).toEqual([]);
+    });
+
+    it('skips non-agent/script steps', () => {
+      const result = validatePluginRequiredEnv(
+        { steps: [{ id: 's1', name: 'Input', executor: 'human' }] },
+        pluginMap,
+        {},
+      );
+      expect(result).toEqual([]);
+    });
+
+    it('groups same missing pattern across multiple steps', () => {
+      const result = validatePluginRequiredEnv(
+        {
+          steps: [
+            { id: 's1', name: 'Step A', executor: 'agent' },
+            { id: 's2', name: 'Step B', executor: 'agent' },
+          ],
+        },
+        pluginMap,
+        {},
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].steps).toHaveLength(2);
+    });
+
+    it('uses config-level env for resolution', () => {
+      const result = validatePluginRequiredEnv(
+        {
+          env: { ANTHROPIC_API_KEY: '{{ANTHROPIC_API_KEY}}' },
+          steps: [{ id: 's1', name: 'Run', executor: 'agent' }],
+        },
+        pluginMap,
+        { ANTHROPIC_API_KEY: 'sk-ant-xxx' },
+      );
+      expect(result).toEqual([]);
+    });
+
+    it('literal env value satisfies requirement (no secret needed)', () => {
+      const result = validatePluginRequiredEnv(
+        { steps: [{ id: 's1', name: 'Run', executor: 'agent', env: { ANTHROPIC_API_KEY: 'sk-ant-hardcoded' } }] },
+        pluginMap,
+        {},
+      );
+      expect(result).toEqual([]);
     });
   });
 

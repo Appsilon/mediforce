@@ -164,7 +164,8 @@ export class ScriptContainerPlugin extends ContainerPlugin {
 
     // Resolve env vars from definition-level + step-level env + workflow secrets
     const workflowSecrets = isWorkflowAgentContext(context) ? context.workflowSecrets : undefined;
-    this.resolveEnvironment(definitionEnv, stepEnv, workflowSecrets);
+    const nsKeys = isWorkflowAgentContext(context) ? context.namespaceSecretKeys : undefined;
+    this.resolveEnvironment(definitionEnv, stepEnv, workflowSecrets, nsKeys);
     this.imageBuild = resolveImageBuild(this.image, scriptConfig, context, this.resolvedEnv.vars);
   }
 
