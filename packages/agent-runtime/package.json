@@ -13,7 +13,7 @@
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
     "@mediforce/platform-core": "workspace:*",
-    "firebase-admin": "^13.6.1"
+    "firebase-admin": "^14.0.0"
   },
   "optionalDependencies": {
     "@mediforce/container-worker": "workspace:*"
