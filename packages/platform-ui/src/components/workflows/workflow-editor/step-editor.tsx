@@ -553,7 +553,7 @@ export function StepEditor({
       </>)}
 
       {/* ── Script config ────────────────────────────────────────── */}
-      {isScript && (
+      {isScript && (<>
         <FieldGroup>
           <FieldRow label="plugin" tooltip={TIP.pluginScript}>
             <input
@@ -578,52 +578,6 @@ export function StepEditor({
             <input
               value={step.script?.command ?? ''}
               onChange={(e) => updateScript({ command: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
-
-          <FieldRow label="script.image" tooltip={TIP.scriptImage}>
-            <input
-              value={step.script?.image ?? ''}
-              onChange={(e) => updateScript({ image: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
-          {imageWarning && (
-            <div className="flex items-center gap-1.5 px-3 -mt-1">
-              <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" strokeWidth={2} />
-              <span className="text-[11px] text-amber-600 dark:text-amber-400">{imageWarning}</span>
-            </div>
-          )}
-
-          <FieldRow label="script.dockerfile" tooltip={TIP.scriptDockerfile}>
-            <input
-              value={step.script?.dockerfile ?? ''}
-              onChange={(e) => updateScript({ dockerfile: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
-
-          <FieldRow label="script.repo" tooltip={TIP.scriptRepo}>
-            <input
-              value={step.script?.repo ?? ''}
-              onChange={(e) => updateScript({ repo: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
-
-          <FieldRow label="script.commit" tooltip={TIP.scriptCommit}>
-            <input
-              value={step.script?.commit ?? ''}
-              onChange={(e) => updateScript({ commit: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
-
-          <FieldRow label="script.repoAuth" tooltip={TIP.scriptRepoAuth}>
-            <input
-              value={step.script?.repoAuth ?? ''}
-              onChange={(e) => updateScript({ repoAuth: e.target.value || undefined })}
               className={riMono}
             />
           </FieldRow>
@@ -702,7 +656,84 @@ export function StepEditor({
           ))}
           </>)}
         </FieldGroup>
-      )}
+
+        {step.plugin !== 'databricks-job' && (
+          <FieldGroup>
+            <FieldRow label="script.image" tooltip={TIP.scriptImage}>
+              {dockerImages && dockerImages.length > 0 ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <select
+                    aria-label="Known Docker image"
+                    value={step.script?.image ?? ''}
+                    onChange={(e) => updateScript({ image: e.target.value || undefined })}
+                    className={rs}
+                  >
+                    <option value="">Select image…</option>
+                    {dockerImages.map((img) => {
+                      const ref = imageRef(img);
+                      return <option key={img.id} value={ref}>{ref}</option>;
+                    })}
+                    {step.script?.image && !dockerImages.some((img) => imageRef(img) === step.script?.image) && (
+                      <option value={step.script.image}>{step.script.image}</option>
+                    )}
+                  </select>
+                  <input
+                    aria-label="Custom Docker image"
+                    value={step.script?.image ?? ''}
+                    onChange={(e) => updateScript({ image: e.target.value || undefined })}
+                    className={riMono}
+                  />
+                </div>
+              ) : (
+                <input
+                  aria-label="Custom Docker image"
+                  value={step.script?.image ?? ''}
+                  onChange={(e) => updateScript({ image: e.target.value || undefined })}
+                  className={riMono}
+                />
+              )}
+            </FieldRow>
+            {imageWarning && (
+              <div className="flex items-center gap-1.5 px-3 -mt-1">
+                <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" strokeWidth={2} />
+                <span className="text-[11px] text-amber-600 dark:text-amber-400">{imageWarning}</span>
+              </div>
+            )}
+
+            <FieldRow label="script.dockerfile" tooltip={TIP.scriptDockerfile}>
+              <input
+                value={step.script?.dockerfile ?? ''}
+                onChange={(e) => updateScript({ dockerfile: e.target.value || undefined })}
+                className={riMono}
+              />
+            </FieldRow>
+
+            <FieldRow label="script.repo" tooltip={TIP.scriptRepo}>
+              <input
+                value={step.script?.repo ?? ''}
+                onChange={(e) => updateScript({ repo: e.target.value || undefined })}
+                className={riMono}
+              />
+            </FieldRow>
+
+            <FieldRow label="script.commit" tooltip={TIP.scriptCommit}>
+              <input
+                value={step.script?.commit ?? ''}
+                onChange={(e) => updateScript({ commit: e.target.value || undefined })}
+                className={riMono}
+              />
+            </FieldRow>
+
+            <FieldRow label="script.repoAuth" tooltip={TIP.scriptRepoAuth}>
+              <input
+                value={step.script?.repoAuth ?? ''}
+                onChange={(e) => updateScript({ repoAuth: e.target.value || undefined })}
+                className={riMono}
+              />
+            </FieldRow>
+          </FieldGroup>
+        )}
+      </>)}
 
       {/* ── Human config ─────────────────────────────────────────── */}
       {isHuman && (
