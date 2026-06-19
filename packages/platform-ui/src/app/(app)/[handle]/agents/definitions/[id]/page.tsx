@@ -250,7 +250,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
             </div>
           </div>
 
-          {/* 5. Foundation model */}
+          {/* 6. Foundation model */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Foundation model</label>
             <div className="relative" ref={dropdownRef}>
@@ -303,7 +303,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
           {/* MCP Servers — bindings persisted separately via /mcp-servers endpoints */}
           <AgentMcpSection agentId={id} handle={handle} />
 
-          {/* 6. System prompt */}
+          {/* 7. System prompt */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">System prompt</label>
             <textarea
@@ -315,7 +315,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
             />
           </div>
 
-          {/* 7. Save */}
+          {/* 8. Save */}
           <div className="flex flex-col items-start gap-1.5 pt-2 pb-6">
             <button
               type="button"
