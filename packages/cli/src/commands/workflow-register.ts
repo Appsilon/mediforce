@@ -128,6 +128,7 @@ export const workflowRegisterCommand = defineCommand({
           `[dry-run] OK — ${body.name} (namespace: ${args.namespace}, ${String(body.steps.length)} steps, ${String(body.transitions.length)} transitions, ${String(body.triggers.length)} triggers)`,
         );
       }
+      await warnMissingImages(body, output, jsonMode);
       return 0;
     }
 
@@ -137,8 +138,16 @@ export const workflowRegisterCommand = defineCommand({
       printJson(output, result);
     } else {
       output.stdout(`Registered ${result.name} v${String(result.version)} (namespace: ${args.namespace})`);
+      if (result.warnings?.length) {
+        output.stderr(`\nWarning: ${String(result.warnings.length)} Docker image(s) not found on platform:`);
+        for (const w of result.warnings) output.stderr(`  - ${w.message}`);
+      }
     }
-    await warnMissingImages(body, output, jsonMode);
+    // Server-side warnings are authoritative (platform images); fall back to
+    // local `docker image inspect` only when the server didn't check (e.g. local-agent mode).
+    if (!result.warnings?.length) {
+      await warnMissingImages(body, output, jsonMode);
+    }
     return 0;
   },
 });
