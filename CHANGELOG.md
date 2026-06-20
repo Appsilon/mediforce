@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-05-24]
+
 ### Added
 - Docker image validation at workflow registration — server warns when a referenced image is not found on the platform, CLI deduplicates server vs local warnings, and the workflow editor shows an amber toast on save [#734](https://github.com/Appsilon/mediforce/pull/734).
 - SMTP email provider as alternative to Mailgun — organisations can now use their own SMTP infrastructure instead of Mailgun by setting `SMTP_*` env vars; `EMAIL_PROVIDER` auto-detects or can be set explicitly; includes read-only admin status page, `mediforce email status` CLI command, and bootstrap script prompts for initial setup [#748](https://github.com/Appsilon/mediforce/issues/748).
