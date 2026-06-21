@@ -1,0 +1,35 @@
+{
+  "impliedDomains": [
+    "AE",
+    "CM",
+    "DM",
+    "DS",
+    "EG",
+    "EX",
+    "IE",
+    "LB",
+    "MH",
+    "PC",
+    "PE",
+    "SU",
+    "VS"
+  ],
+  "populated": [
+    "DM",
+    "VS",
+    "LB",
+    "EX",
+    "CM",
+    "AE",
+    "DS",
+    "MH"
+  ],
+  "deferred": {
+    "EG": "resolvable; not populated this run",
+    "PC": "resolvable; not populated this run",
+    "PE": "resolvable; not populated this run",
+    "SU": "resolvable; not populated this run"
+  },
+  "ctPackagePinned": "sdtmct-2026-03-27",
+  "sdtmigVersion": "3.4"
+}

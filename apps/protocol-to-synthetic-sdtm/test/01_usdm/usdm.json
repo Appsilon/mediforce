@@ -1,0 +1,1125 @@
+{
+  "usdmVersion": "3.0.0",
+  "systemName": "protocol-to-synthetic-sdtm",
+  "study": {
+    "id": "STUDY_AZD9567",
+    "name": "D6470C00005",
+    "label": "Study to Assess the Effect on Glucose Homeostasis of Two Dose Levels of AZD9567, Compared to Prednisolone, in Adults With Type 2 Diabetes",
+    "versions": [
+      {
+        "id": "SV1",
+        "versionIdentifier": "3.0",
+        "rationale": "Built from ClinicalTrials.gov registry record + protocol SoA.",
+        "titles": [
+          {
+            "id": "T_BRIEF",
+            "type": "Brief Study Title",
+            "text": "Study to Assess the Effect on Glucose Homeostasis of Two Dose Levels of AZD9567, Compared to Prednisolone, in Adults With Type 2 Diabetes"
+          },
+          {
+            "id": "T_OFFICIAL",
+            "type": "Official Study Title",
+            "text": "A Phase 2a Randomised, Double Blind, Multi-centre Study to Assess the Effect on Glucose Homeostasis of Two Dose Levels of AZD9567, Compared to Prednisolone, in Adults With Type 2 Diabetes"
+          }
+        ],
+        "studyIdentifiers": [
+          {
+            "id": "ID_NCT",
+            "studyIdentifier": "NCT04556760",
+            "studyIdentifierScope": "ClinicalTrials.gov"
+          },
+          {
+            "id": "ID_SPONSOR",
+            "studyIdentifier": "D6470C00005",
+            "studyIdentifierScope": "AstraZeneca"
+          }
+        ],
+        "studyType": {
+          "code": "C98388",
+          "codeSystem": "NCIt",
+          "decode": "Interventional"
+        },
+        "studyPhase": {
+          "code": "C49686",
+          "codeSystem": "NCIt",
+          "decode": "Phase 2a Trial"
+        },
+        "rationaleOrPurpose": "The study is intended to assess the effect on glycaemic control of AZD9567, as measured by the glucose AUC(0-4) versus baseline following a standardised mixed meal tolerance test (MMTT), compared to prednisolone in adults with type 2 diabetes mellitus (T2DM). The study will also evaluate the safety, tolerability, and pharmacokinetics (PK) of AZD9567.",
+        "businessTherapeuticAreas": [
+          {
+            "code": null,
+            "codeSystem": "NCIt",
+            "decode": "Endocrinology"
+          }
+        ],
+        "studyDesigns": [
+          {
+            "id": "SD1",
+            "name": "Main Study Design",
+            "label": "Phase 2a randomised, double-blind, double-dummy, two-way cross-over",
+            "studyType": {
+              "code": "C98388",
+              "codeSystem": "NCIt",
+              "decode": "Interventional"
+            },
+            "interventionModel": {
+              "code": "C82637",
+              "codeSystem": "NCIt",
+              "decode": "Crossover Study"
+            },
+            "blindingSchema": {
+              "code": "C15228",
+              "codeSystem": "NCIt",
+              "decode": "Double Blind"
+            },
+            "therapeuticAreas": [
+              {
+                "code": "C26747",
+                "codeSystem": "NCIt",
+                "decode": "Type 2 Diabetes Mellitus"
+              }
+            ],
+            "indications": [
+              {
+                "id": "IND1",
+                "name": "T2DM",
+                "description": "Diabetes Mellitus, Type 2",
+                "codes": [
+                  {
+                    "code": "C26747",
+                    "codeSystem": "NCIt",
+                    "decode": "Diabetes Mellitus, Non-Insulin-Dependent"
+                  }
+                ]
+              }
+            ],
+            "population": {
+              "id": "POP1",
+              "name": "Adults with T2DM",
+              "plannedEnrollmentNumber": 46,
+              "plannedSex": [
+                {
+                  "code": null,
+                  "codeSystem": "NCIt",
+                  "decode": "ALL"
+                }
+              ],
+              "plannedAge": {
+                "minValue": "18 Years",
+                "maxValue": "75 Years"
+              },
+              "criteria": "ref:eligibilityCriteria"
+            },
+            "arms": [
+              {
+                "id": "ARM_1",
+                "name": "Cohort 1",
+                "description": "Participants will be randomised in a ratio of 1:1 to receive AZD9567 and prednisolone over two 72 hour periods in a cross over design (72 mg AZD9567 followed by 40 mg prednisolone \\[AB sequence group\\] or 40 mg prednisolone followed by 72 mg AZD9567 \\[BA sequence group\\]).",
+                "type": {
+                  "code": null,
+                  "codeSystem": "NCIt",
+                  "decode": "Experimental"
+                }
+              },
+              {
+                "id": "ARM_2",
+                "name": "Cohort 2",
+                "description": "Participants will be randomised in a ratio of 1:1 to receive AZD9567 and prednisolone over two 72 hour periods in a cross over design (40 mg AZD9567 followed by 20 mg prednisolone \\[AB sequence group\\] or 20 mg prednisolone followed by 40 mg AZD9567 \\[BA sequence group\\]).",
+                "type": {
+                  "code": null,
+                  "codeSystem": "NCIt",
+                  "decode": "Experimental"
+                }
+              },
+              {
+                "id": "ARM_3",
+                "name": "Cohort 3",
+                "description": "Participants will be randomised in a ratio of 1:1 to receive placebo and prednisolone over two 72 hour periods in a cross over design (placebo followed by 5 mg prednisolone \\[AB sequence group\\] or 5 mg prednisolone followed by placebo \\[BA sequence group\\]).",
+                "type": {
+                  "code": null,
+                  "codeSystem": "NCIt",
+                  "decode": "Active Comparator"
+                }
+              }
+            ],
+            "epochs": [
+              {
+                "id": "EP_SCRN",
+                "name": "Screening",
+                "type": {
+                  "code": null,
+                  "codeSystem": "NCIt",
+                  "decode": "Screening"
+                }
+              },
+              {
+                "id": "EP_TP1",
+                "name": "Treatment Period 1",
+                "type": {
+                  "code": null,
+                  "codeSystem": "NCIt",
+                  "decode": "Treatment"
+                }
+              },
+              {
+                "id": "EP_WASH",
+                "name": "Washout",
+                "type": {
+                  "code": null,
+                  "codeSystem": "NCIt",
+                  "decode": "Washout"
+                }
+              },
+              {
+                "id": "EP_TP2",
+                "name": "Treatment Period 2",
+                "type": {
+                  "code": null,
+                  "codeSystem": "NCIt",
+                  "decode": "Treatment"
+                }
+              },
+              {
+                "id": "EP_FU",
+                "name": "Follow-up",
+                "type": {
+                  "code": null,
+                  "codeSystem": "NCIt",
+                  "decode": "Follow_Up"
+                }
+              }
+            ],
+            "encounters": [
+              {
+                "id": "ENC_V1",
+                "name": "Visit 1",
+                "label": "Screening",
+                "scheduledAtEpoch": "EP_SCRN",
+                "plannedTiming": "<= 14 days before start of IMP"
+              },
+              {
+                "id": "ENC_V2",
+                "name": "Visit 2",
+                "label": "Outpatient visit (Day -4)",
+                "scheduledAtEpoch": "EP_TP1",
+                "plannedTiming": "Day -4"
+              },
+              {
+                "id": "ENC_V3",
+                "name": "Visit 3",
+                "label": "Residency in Unit (Treatment Period 1)",
+                "scheduledAtEpoch": "EP_TP1",
+                "plannedTiming": "Days -2 to 4"
+              },
+              {
+                "id": "ENC_WASH",
+                "name": "Washout",
+                "label": "Washout (3 weeks)",
+                "scheduledAtEpoch": "EP_WASH",
+                "plannedTiming": "3 weeks"
+              },
+              {
+                "id": "ENC_V4",
+                "name": "Visit 4",
+                "label": "Outpatient visit (Day 24)",
+                "scheduledAtEpoch": "EP_TP2",
+                "plannedTiming": "Day 24 (-4)"
+              },
+              {
+                "id": "ENC_V5",
+                "name": "Visit 5",
+                "label": "Residency in Unit 2 (Treatment Period 2)",
+                "scheduledAtEpoch": "EP_TP2",
+                "plannedTiming": "Days 26 to 31"
+              },
+              {
+                "id": "ENC_V6",
+                "name": "Visit 6",
+                "label": "Final/ET visit",
+                "scheduledAtEpoch": "EP_FU",
+                "plannedTiming": "Follow-up Day 30 +/- 4 days after last dose"
+              }
+            ],
+            "studyInterventions": [
+              {
+                "id": "INT_1",
+                "name": "AZD9567",
+                "description": "Participants will receive 72 mg/day (oral suspension) of AZD9567 for 3 consecutive days of each treatment period in Cohort 1 and 40 mg/day for 3 consecutive days of each treatment period in Cohort 2.",
+                "type": {
+                  "code": null,
+                  "codeSystem": "NCIt",
+                  "decode": "Drug"
+                },
+                "role": {
+                  "code": null,
+                  "codeSystem": "NCIt",
+                  "decode": "Investigational"
+                }
+              },
+              {
+                "id": "INT_2",
+                "name": "Prednisolone",
+                "description": "Participants will receive 40 mg/day of prednisolone for 3 consecutive days of each treatment period in Cohort 1, 20 mg/day of prednisolone for 3 consecutive days of each treatment period in Cohort 2, and 5 mg/day prednisolone for 3 consecutive days of each treatment period in Cohort 3.",
+                "type": {
+                  "code": null,
+                  "codeSystem": "NCIt",
+                  "decode": "Drug"
+                },
+                "role": {
+                  "code": null,
+                  "codeSystem": "NCIt",
+                  "decode": "Investigational"
+                }
+              },
+              {
+                "id": "INT_3",
+                "name": "Placebo",
+                "description": "Participants will receive placebo for 3 consecutive days of each treatment period in Cohort 3.",
+                "type": {
+                  "code": null,
+                  "codeSystem": "NCIt",
+                  "decode": "Other"
+                },
+                "role": {
+                  "code": null,
+                  "codeSystem": "NCIt",
+                  "decode": "Placebo"
+                }
+              }
+            ],
+            "activities": [
+              {
+                "id": "ACT_IC",
+                "name": "Informed consent",
+                "biomedicalConceptIds": [],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_ELIG",
+                "name": "Verify eligibility criteria",
+                "biomedicalConceptIds": [],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_DM",
+                "name": "Demography",
+                "biomedicalConceptIds": [],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_HTWT",
+                "name": "Height and weight",
+                "biomedicalConceptIds": [
+                  "C25347/C25208"
+                ],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_MH",
+                "name": "Medical History",
+                "biomedicalConceptIds": [],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_PE",
+                "name": "Physical examination",
+                "biomedicalConceptIds": [],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_TOB",
+                "name": "Tobacco use",
+                "biomedicalConceptIds": [],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_ECG",
+                "name": "Safety ECG (12-lead)",
+                "biomedicalConceptIds": [
+                  "C71355"
+                ],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_VS",
+                "name": "Vital signs (SBP, DBP, pulse, temperature)",
+                "biomedicalConceptIds": [
+                  "C54706"
+                ],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_RAND",
+                "name": "Randomisation (IVRS/IWRS)",
+                "biomedicalConceptIds": [],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_AE",
+                "name": "Adverse events",
+                "biomedicalConceptIds": [],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_CM",
+                "name": "Concomitant medication",
+                "biomedicalConceptIds": [],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_HEM",
+                "name": "Haematology",
+                "biomedicalConceptIds": [
+                  "C28133"
+                ],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_CHEM",
+                "name": "Clinical chemistry (incl. triglycerides, HDL-C)",
+                "biomedicalConceptIds": [
+                  "C49237"
+                ],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_COAG",
+                "name": "Coagulation (INR, PT, aPTT)",
+                "biomedicalConceptIds": [
+                  "C61367"
+                ],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_HBA1C",
+                "name": "HbA1c",
+                "biomedicalConceptIds": [
+                  "C64849"
+                ],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_MMTT",
+                "name": "MMTT (glucose, insulin, C-peptide, GLP-1, GIP, glucagon, FFAs)",
+                "biomedicalConceptIds": [
+                  "C105585"
+                ],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_CORT",
+                "name": "Serum cortisol",
+                "biomedicalConceptIds": [
+                  "C105443"
+                ],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_UNAK",
+                "name": "24-h urinary sodium & potassium (U-Na, U-K)",
+                "biomedicalConceptIds": [
+                  "C147062"
+                ],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_UA",
+                "name": "Urinalysis",
+                "biomedicalConceptIds": [
+                  "C17241"
+                ],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_PREG",
+                "name": "Pregnancy test (hCG)",
+                "biomedicalConceptIds": [
+                  "C25640"
+                ],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_PK",
+                "name": "PK sampling (AZD9567, prednisolone)",
+                "biomedicalConceptIds": [],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_DOSE",
+                "name": "IMP administration (AZD9567 / prednisolone / placebo)",
+                "biomedicalConceptIds": [],
+                "definedProcedures": []
+              },
+              {
+                "id": "ACT_DISP",
+                "name": "Study completion / disposition",
+                "biomedicalConceptIds": [],
+                "definedProcedures": []
+              }
+            ],
+            "scheduleTimeline": {
+              "id": "TL1",
+              "name": "Main Timeline",
+              "mainTimeline": true,
+              "instances": [
+                {
+                  "id": "SAI_ACT_IC_ENC_V1",
+                  "activityId": "ACT_IC",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_ELIG_ENC_V1",
+                  "activityId": "ACT_ELIG",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_ELIG_ENC_V4",
+                  "activityId": "ACT_ELIG",
+                  "encounterId": "ENC_V4",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_DM_ENC_V1",
+                  "activityId": "ACT_DM",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_HTWT_ENC_V1",
+                  "activityId": "ACT_HTWT",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_HTWT_ENC_V3",
+                  "activityId": "ACT_HTWT",
+                  "encounterId": "ENC_V3",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_HTWT_ENC_V5",
+                  "activityId": "ACT_HTWT",
+                  "encounterId": "ENC_V5",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_HTWT_ENC_V6",
+                  "activityId": "ACT_HTWT",
+                  "encounterId": "ENC_V6",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_MH_ENC_V1",
+                  "activityId": "ACT_MH",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_PE_ENC_V1",
+                  "activityId": "ACT_PE",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_PE_ENC_V3",
+                  "activityId": "ACT_PE",
+                  "encounterId": "ENC_V3",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_PE_ENC_V5",
+                  "activityId": "ACT_PE",
+                  "encounterId": "ENC_V5",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_PE_ENC_V6",
+                  "activityId": "ACT_PE",
+                  "encounterId": "ENC_V6",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_TOB_ENC_V1",
+                  "activityId": "ACT_TOB",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_TOB_ENC_V2",
+                  "activityId": "ACT_TOB",
+                  "encounterId": "ENC_V2",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_TOB_ENC_V5",
+                  "activityId": "ACT_TOB",
+                  "encounterId": "ENC_V5",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_ECG_ENC_V1",
+                  "activityId": "ACT_ECG",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_ECG_ENC_V3",
+                  "activityId": "ACT_ECG",
+                  "encounterId": "ENC_V3",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_ECG_ENC_V5",
+                  "activityId": "ACT_ECG",
+                  "encounterId": "ENC_V5",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_ECG_ENC_V6",
+                  "activityId": "ACT_ECG",
+                  "encounterId": "ENC_V6",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_VS_ENC_V1",
+                  "activityId": "ACT_VS",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_VS_ENC_V3",
+                  "activityId": "ACT_VS",
+                  "encounterId": "ENC_V3",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_VS_ENC_V5",
+                  "activityId": "ACT_VS",
+                  "encounterId": "ENC_V5",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_VS_ENC_V6",
+                  "activityId": "ACT_VS",
+                  "encounterId": "ENC_V6",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_RAND_ENC_V3",
+                  "activityId": "ACT_RAND",
+                  "encounterId": "ENC_V3",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_AE_ENC_V1",
+                  "activityId": "ACT_AE",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_AE_ENC_V2",
+                  "activityId": "ACT_AE",
+                  "encounterId": "ENC_V2",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_AE_ENC_V3",
+                  "activityId": "ACT_AE",
+                  "encounterId": "ENC_V3",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_AE_ENC_V4",
+                  "activityId": "ACT_AE",
+                  "encounterId": "ENC_V4",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_AE_ENC_V5",
+                  "activityId": "ACT_AE",
+                  "encounterId": "ENC_V5",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_AE_ENC_V6",
+                  "activityId": "ACT_AE",
+                  "encounterId": "ENC_V6",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_CM_ENC_V1",
+                  "activityId": "ACT_CM",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_CM_ENC_V2",
+                  "activityId": "ACT_CM",
+                  "encounterId": "ENC_V2",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_CM_ENC_V3",
+                  "activityId": "ACT_CM",
+                  "encounterId": "ENC_V3",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_CM_ENC_V4",
+                  "activityId": "ACT_CM",
+                  "encounterId": "ENC_V4",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_CM_ENC_V5",
+                  "activityId": "ACT_CM",
+                  "encounterId": "ENC_V5",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_CM_ENC_V6",
+                  "activityId": "ACT_CM",
+                  "encounterId": "ENC_V6",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_HEM_ENC_V1",
+                  "activityId": "ACT_HEM",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_HEM_ENC_V3",
+                  "activityId": "ACT_HEM",
+                  "encounterId": "ENC_V3",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_HEM_ENC_V5",
+                  "activityId": "ACT_HEM",
+                  "encounterId": "ENC_V5",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_HEM_ENC_V6",
+                  "activityId": "ACT_HEM",
+                  "encounterId": "ENC_V6",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_CHEM_ENC_V1",
+                  "activityId": "ACT_CHEM",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_CHEM_ENC_V3",
+                  "activityId": "ACT_CHEM",
+                  "encounterId": "ENC_V3",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_CHEM_ENC_V5",
+                  "activityId": "ACT_CHEM",
+                  "encounterId": "ENC_V5",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_CHEM_ENC_V6",
+                  "activityId": "ACT_CHEM",
+                  "encounterId": "ENC_V6",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_COAG_ENC_V1",
+                  "activityId": "ACT_COAG",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_HBA1C_ENC_V1",
+                  "activityId": "ACT_HBA1C",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_MMTT_ENC_V3",
+                  "activityId": "ACT_MMTT",
+                  "encounterId": "ENC_V3",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_MMTT_ENC_V5",
+                  "activityId": "ACT_MMTT",
+                  "encounterId": "ENC_V5",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_CORT_ENC_V3",
+                  "activityId": "ACT_CORT",
+                  "encounterId": "ENC_V3",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_CORT_ENC_V5",
+                  "activityId": "ACT_CORT",
+                  "encounterId": "ENC_V5",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_CORT_ENC_V6",
+                  "activityId": "ACT_CORT",
+                  "encounterId": "ENC_V6",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_UNAK_ENC_V3",
+                  "activityId": "ACT_UNAK",
+                  "encounterId": "ENC_V3",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_UNAK_ENC_V5",
+                  "activityId": "ACT_UNAK",
+                  "encounterId": "ENC_V5",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_UA_ENC_V1",
+                  "activityId": "ACT_UA",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_UA_ENC_V3",
+                  "activityId": "ACT_UA",
+                  "encounterId": "ENC_V3",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_UA_ENC_V5",
+                  "activityId": "ACT_UA",
+                  "encounterId": "ENC_V5",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_UA_ENC_V6",
+                  "activityId": "ACT_UA",
+                  "encounterId": "ENC_V6",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_PREG_ENC_V1",
+                  "activityId": "ACT_PREG",
+                  "encounterId": "ENC_V1",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_PREG_ENC_V6",
+                  "activityId": "ACT_PREG",
+                  "encounterId": "ENC_V6",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_PK_ENC_V3",
+                  "activityId": "ACT_PK",
+                  "encounterId": "ENC_V3",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_PK_ENC_V5",
+                  "activityId": "ACT_PK",
+                  "encounterId": "ENC_V5",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_DOSE_ENC_V3",
+                  "activityId": "ACT_DOSE",
+                  "encounterId": "ENC_V3",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_DOSE_ENC_V5",
+                  "activityId": "ACT_DOSE",
+                  "encounterId": "ENC_V5",
+                  "type": "ScheduledActivityInstance"
+                },
+                {
+                  "id": "SAI_ACT_DISP_ENC_V6",
+                  "activityId": "ACT_DISP",
+                  "encounterId": "ENC_V6",
+                  "type": "ScheduledActivityInstance"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "eligibilityCriteria": [
+    {
+      "id": "EC_INC_1",
+      "category": "Inclusion",
+      "identifier": "INC1",
+      "text": "Participants with diagnosis of T2DM for 6 months prior to screening: HbA1c in the diabetes range or fasting plasma glucose 126 -220 mg/dL."
+    },
+    {
+      "id": "EC_INC_2",
+      "category": "Inclusion",
+      "identifier": "INC2",
+      "text": "On stable metformin therapy for at least 4 weeks, where no significant dose change (increase or decrease ≥ 500 mg/day) has occurred prior to screening and HbA1c 6% - 9.5%, or on dual therapy with metformin in combination with SGLT2i or DPP4i and HbA1c 6% - 8%. Participants on dual therapy will require 2 weeks wash-out of SGLT2i or DPP4i."
+    },
+    {
+      "id": "EC_INC_3",
+      "category": "Inclusion",
+      "identifier": "INC3",
+      "text": "Venous access suitable for multiple cannulations"
+    },
+    {
+      "id": "EC_INC_4",
+      "category": "Inclusion",
+      "identifier": "INC4",
+      "text": "Contraceptive use by men should be consistent with local regulations regarding the methods of contraception for those participating in clinical studies."
+    },
+    {
+      "id": "EC_INC_5",
+      "category": "Inclusion",
+      "identifier": "INC5",
+      "text": "Female participants must be not lactating and not of childbearing potential."
+    },
+    {
+      "id": "EC_INC_6",
+      "category": "Inclusion",
+      "identifier": "INC6",
+      "text": "If sexually active, nonsterilized males who have a female partner of childbearing potential must practice effective contraceptive measures."
+    },
+    {
+      "id": "EC_INC_7",
+      "category": "Inclusion",
+      "identifier": "INC7",
+      "text": "Capable of giving signed informed consent."
+    },
+    {
+      "id": "EC_INC_8",
+      "category": "Inclusion",
+      "identifier": "INC8",
+      "text": "Provision of informed consent prior to any study specific procedures."
+    },
+    {
+      "id": "EC_EXC_1",
+      "category": "Exclusion",
+      "identifier": "EXC1",
+      "text": "History or presence of type 1 diabetes."
+    },
+    {
+      "id": "EC_EXC_2",
+      "category": "Exclusion",
+      "identifier": "EXC2",
+      "text": "History of severe hypoglycaemia or hypoglycaemia unawareness within the last 6 months."
+    },
+    {
+      "id": "EC_EXC_3",
+      "category": "Exclusion",
+      "identifier": "EXC3",
+      "text": "History or presence of diabetic foot ulcers"
+    },
+    {
+      "id": "EC_EXC_4",
+      "category": "Exclusion",
+      "identifier": "EXC4",
+      "text": "Participants with advanced diabetic complications."
+    },
+    {
+      "id": "EC_EXC_5",
+      "category": "Exclusion",
+      "identifier": "EXC5",
+      "text": "History of clinically significant lactic acidosis or ketoacidosis following diagnosis with T2DM."
+    },
+    {
+      "id": "EC_EXC_6",
+      "category": "Exclusion",
+      "identifier": "EXC6",
+      "text": "History of, or known significant infection or positivity at Visit 1, including hepatitis A, B, or C, HIV, tuberculosis that may put the participant at risk during participation in the study."
+    },
+    {
+      "id": "EC_EXC_7",
+      "category": "Exclusion",
+      "identifier": "EXC7",
+      "text": "History and / or presence of COVID-19."
+    },
+    {
+      "id": "EC_EXC_8",
+      "category": "Exclusion",
+      "identifier": "EXC8",
+      "text": "Donation of blood (≥ 450 mL) within 3 months or donation of plasma within 14 days before Visit 1."
+    },
+    {
+      "id": "EC_EXC_9",
+      "category": "Exclusion",
+      "identifier": "EXC9",
+      "text": "History of or current alcohol or drug abuse (including marijuana), as judged by the investigator."
+    },
+    {
+      "id": "EC_EXC_10",
+      "category": "Exclusion",
+      "identifier": "EXC10",
+      "text": "Previous psychiatric disorders."
+    },
+    {
+      "id": "EC_EXC_11",
+      "category": "Exclusion",
+      "identifier": "EXC11",
+      "text": "Any latent, acute, or chronic infections or at risk of infection, or history of skin abscesses within 90 days prior to the first administration of investigational medicinal product (IMP) at the discretion of the investigator."
+    },
+    {
+      "id": "EC_EXC_12",
+      "category": "Exclusion",
+      "identifier": "EXC12",
+      "text": "History of adrenal insufficiency."
+    },
+    {
+      "id": "EC_EXC_13",
+      "category": "Exclusion",
+      "identifier": "EXC13",
+      "text": "History or current inflammatory disorder."
+    },
+    {
+      "id": "EC_EXC_14",
+      "category": "Exclusion",
+      "identifier": "EXC14",
+      "text": "Any other condition that, in the opinion of the investigator, would interfere with evaluations of the IMP or interpretation of participant safety or study results."
+    },
+    {
+      "id": "EC_EXC_15",
+      "category": "Exclusion",
+      "identifier": "EXC15",
+      "text": "History of severe allergy/hypersensitivity to AZD9567 or any of the excipients of the product, or ongoing clinically important allergy/hypersensitivity as judged by the investigator."
+    },
+    {
+      "id": "EC_EXC_16",
+      "category": "Exclusion",
+      "identifier": "EXC16",
+      "text": "Oral or parenteral steroids 8 weeks prior to randomisation and during the study. Topical and inhaled steroids 4 weeks prior to randomisation are acceptable."
+    },
+    {
+      "id": "EC_EXC_17",
+      "category": "Exclusion",
+      "identifier": "EXC17",
+      "text": "Use of any prohibited medication during the study or if the required washout time of such medication was not adhered to."
+    },
+    {
+      "id": "EC_EXC_18",
+      "category": "Exclusion",
+      "identifier": "EXC18",
+      "text": "Receipt of live or live attenuated vaccine within 4 weeks prior to the first administration of IMP."
+    },
+    {
+      "id": "EC_EXC_19",
+      "category": "Exclusion",
+      "identifier": "EXC19",
+      "text": "Planned in-patient surgery, major dental procedure, or hospitalisation during the study."
+    },
+    {
+      "id": "EC_EXC_20",
+      "category": "Exclusion",
+      "identifier": "EXC20",
+      "text": "Previous participation or participation in any other research study within 1 month prior to Visit 1."
+    },
+    {
+      "id": "EC_EXC_21",
+      "category": "Exclusion",
+      "identifier": "EXC21",
+      "text": "Patient treated with any investigational drug within 30 days (or 5 half-lives, whichever is longer) prior to Visit 1."
+    },
+    {
+      "id": "EC_EXC_22",
+      "category": "Exclusion",
+      "identifier": "EXC22",
+      "text": "Uncontrolled hypertension (BP \\> 160 mmHg systolic or \\> 95 mmHg diastolic)."
+    },
+    {
+      "id": "EC_EXC_23",
+      "category": "Exclusion",
+      "identifier": "EXC23",
+      "text": "Diagnosis of heart failure and current symptoms regardless of definition, ie, HfpEF, HfrEF."
+    },
+    {
+      "id": "EC_EXC_24",
+      "category": "Exclusion",
+      "identifier": "EXC24",
+      "text": "Acute coronary syndrome / unstable angina, coronary intervention procedures (percutaneous coronary intervention or coronary artery bypass graft) within the past 6 months."
+    },
+    {
+      "id": "EC_EXC_25",
+      "category": "Exclusion",
+      "identifier": "EXC25",
+      "text": "Stroke within the past 3 months."
+    },
+    {
+      "id": "EC_EXC_26",
+      "category": "Exclusion",
+      "identifier": "EXC26",
+      "text": "QTcF \\> 470 ms or family history of long QT-syndrome."
+    },
+    {
+      "id": "EC_EXC_27",
+      "category": "Exclusion",
+      "identifier": "EXC27",
+      "text": "AV-block II-III or sinus node dysfunction with significant pause, not treated with pacemaker."
+    }
+  ],
+  "objectives": [
+    {
+      "id": "OBJ1",
+      "level": "Primary",
+      "text": "Assess the effect on glycaemic control of AZD9567 (glucose AUC(0-4) vs baseline following standardised MMTT) compared to prednisolone in adults with T2DM.",
+      "endpoints": [
+        {
+          "id": "EP1",
+          "level": "Primary",
+          "text": "Change From Baseline in Glucose Area Under the Plasma Concentration Versus Time Curve From Zero to 4 Hours Post-dose AUC(0-4)"
+        }
+      ]
+    },
+    {
+      "id": "OBJ2",
+      "level": "Secondary",
+      "text": "Evaluate safety, tolerability and pharmacokinetics of AZD9567.",
+      "endpoints": [
+        {
+          "id": "EP_S1",
+          "level": "Secondary",
+          "text": "Mean Glucose Level as Determined Via the Continuous Glucose Monitoring (CGM) System"
+        },
+        {
+          "id": "EP_S2",
+          "level": "Secondary",
+          "text": "Rise in Mean Glucose Levels Over 24-hour Periods From Start of IMP Dosing"
+        },
+        {
+          "id": "EP_S3",
+          "level": "Secondary",
+          "text": "Change From Baseline in Fasting Glucose"
+        },
+        {
+          "id": "EP_S4",
+          "level": "Secondary",
+          "text": "Change From Baseline AUC(0-4) on Hormones Related to Glucose Homeostasis (Insulin)"
+        },
+        {
+          "id": "EP_S5",
+          "level": "Secondary",
+          "text": "Change From Baseline AUC(0-4) on Hormones Related to Glucose Homeostasis (Glucagon)"
+        },
+        {
+          "id": "EP_S6",
+          "level": "Secondary",
+          "text": "Change From Baseline AUC(0-4) on Hormones Related to Glucose Homeostasis (Glucagon-like Peptide-1 [GLP-1])"
+        }
+      ]
+    }
+  ]
+}

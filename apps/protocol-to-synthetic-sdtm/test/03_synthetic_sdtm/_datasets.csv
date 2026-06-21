@@ -1,0 +1,9 @@
+Filename,Label
+dm,Demographics
+vs,Vital Signs
+lb,Laboratory Test Results
+ex,Exposure
+cm,Concomitant/Prior Medications
+ae,Adverse Events
+ds,Disposition
+mh,Medical History

@@ -1,0 +1,36 @@
+{
+ "_links": {
+  "packages": [
+   {
+    "href": "/mdr/ct/packages/adamct-2014-09-26",
+    "title": "ADaM Controlled Terminology Package 19 Effective 2014-09-26",
+    "type": "Terminology"
+   },
+   {
+    "href": "/mdr/ct/packages/adamct-2015-12-18",
+    "title": "ADaM Controlled Terminology Package 24 Effective 2015-12-18",
+    "type": "Terminology"
+   },
+   {
+    "href": "/mdr/ct/packages/adamct-2016-03-25",
+    "title": "ADaM Controlled Terminology Package 25 Effective 2016-03-25",
+    "type": "Terminology"
+   },
+   {
+    "href": "/mdr/ct/packages/adamct-2016-09-30",
+    "title": "ADaM Controlled Terminology Package 27 Effective 2016-09-30",
+    "type": "Terminology"
+   },
+   {
+    "href": "/mdr/ct/packages/adamct-2016-12-16",
+    "title": "ADaM Controlled Terminology Package 28 Effective 2016-12-16",
+    "type": "Terminology"
+   }
+  ],
+  "self": {
+   "href": "/mdr/ct/packages",
+   "title": "Product Group Terminology",
+   "type": "Controlled Terminology Package List"
+  }
+ }
+}

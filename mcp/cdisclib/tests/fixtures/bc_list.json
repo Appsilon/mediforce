@@ -1,0 +1,38 @@
+{
+ "_links": {
+  "biomedicalConcepts": [
+   {
+    "href": "/mdr/bc/biomedicalconcepts/C105585",
+    "title": "Glucose Measurement",
+    "type": "Biomedical Concept"
+   },
+   {
+    "href": "/mdr/bc/biomedicalconcepts/C147905",
+    "title": "Urine Dipstick Test",
+    "type": "Biomedical Concept"
+   },
+   {
+    "href": "/mdr/bc/biomedicalconcepts/C17241",
+    "title": "Urinalysis",
+    "type": "Biomedical Concept"
+   },
+   {
+    "href": "/mdr/bc/biomedicalconcepts/C28133",
+    "title": "Blood Cell Count",
+    "type": "Biomedical Concept"
+   },
+   {
+    "href": "/mdr/bc/biomedicalconcepts/C49237",
+    "title": "Chemistry Test",
+    "type": "Biomedical Concept"
+   }
+  ],
+  "self": {
+   "href": "/mdr/bc/biomedicalconcepts",
+   "title": "Biomedical Concepts (latest version)",
+   "type": "Biomedical Concept List"
+  }
+ },
+ "name": "Biomedical Concepts (latest version)",
+ "label": "Biomedical Concepts List"
+}

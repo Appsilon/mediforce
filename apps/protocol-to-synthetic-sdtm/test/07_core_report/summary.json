@@ -1,0 +1,116 @@
+{
+  "standard": "SDTMIG V3.4",
+  "ctVersion": "sdtmct-2026-03-27",
+  "engineVersion": "0.14.2",
+  "datasetsValidated": [
+    "AE",
+    "CM",
+    "DM",
+    "DS",
+    "EX",
+    "LB",
+    "MH",
+    "VS"
+  ],
+  "rulesExecuted": 434,
+  "ruleStatusCounts": {
+    "SKIPPED": 257,
+    "SUCCESS": 177
+  },
+  "rulesWithIssues": 12,
+  "totalIssueRecords": 133,
+  "findingsByCategory": {
+    "tabulation_gap": 12
+  },
+  "interpretation": {
+    "data_bug": "Genuine inconsistency in the synthetic generator — fix in Stage 5.",
+    "tabulation_gap": "SDTM derivation not implemented in the CDASH->SDTM pass (EPOCH, --DY study days, variable ordering, expected/required vars).",
+    "harness": "Artifact of validating raw CSV without a Define-XML / unsupplied reference variables; not a data-quality issue."
+  },
+  "findings": [
+    {
+      "dataset": "mh.xpt",
+      "coreId": "CORE-000365",
+      "issues": 83,
+      "category": "tabulation_gap",
+      "message": "MHCAT is grouping all records into one generic group. If no smaller categorization can be applied, then it is not necessary to include or populate this variable."
+    },
+    {
+      "dataset": "ds.xpt",
+      "coreId": "CORE-000767",
+      "issues": 40,
+      "category": "tabulation_gap",
+      "message": "Parent record exists and DSDECOD is not null, but FAOBJ is not equal to DSDECOD."
+    },
+    {
+      "dataset": "ae.xpt",
+      "coreId": "CORE-000334",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "At least one expected variable is missing from dataset"
+    },
+    {
+      "dataset": "ae.xpt",
+      "coreId": "CORE-000355",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "At least one required variable is missing from dataset"
+    },
+    {
+      "dataset": "ae.xpt",
+      "coreId": "CORE-000852",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "Variables are not in the correct order as shown in SDTM for the observation class."
+    },
+    {
+      "dataset": "cm.xpt",
+      "coreId": "CORE-000852",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "Variables are not in the correct order as shown in SDTM for the observation class."
+    },
+    {
+      "dataset": "dm.xpt",
+      "coreId": "CORE-000334",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "At least one expected variable is missing from dataset"
+    },
+    {
+      "dataset": "ds.xpt",
+      "coreId": "CORE-000852",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "Variables are not in the correct order as shown in SDTM for the observation class."
+    },
+    {
+      "dataset": "ex.xpt",
+      "coreId": "CORE-000334",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "At least one expected variable is missing from dataset"
+    },
+    {
+      "dataset": "lb.xpt",
+      "coreId": "CORE-000334",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "At least one expected variable is missing from dataset"
+    },
+    {
+      "dataset": "lb.xpt",
+      "coreId": "CORE-000852",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "Variables are not in the correct order as shown in SDTM for the observation class."
+    },
+    {
+      "dataset": "vs.xpt",
+      "coreId": "CORE-000334",
+      "issues": 1,
+      "category": "tabulation_gap",
+      "message": "At least one expected variable is missing from dataset"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "datasets": 8,
+  "totalIssues": 0,
+  "allPass": true,
+  "perDataset": {
+    "ae": {
+      "rows": 32,
+      "issues": [],
+      "keyUnique": true,
+      "ctMembership": {
+        "AESEV": {
+          "codelist": "C66769",
+          "inCT": true,
+          "violations": []
+        },
+        "AESER": {
+          "codelist": "C66742",
+          "inCT": true,
+          "violations": []
+        },
+        "AEREL": {
+          "codelist": "C66742",
+          "inCT": true,
+          "violations": []
+        }
+      },
+      "provenanceComplete": true,
+      "pass": true
+    },
+    "cm": {
+      "rows": 54,
+      "issues": [],
+      "keyUnique": true,
+      "provenanceComplete": true,
+      "pass": true
+    },
+    "dm": {
+      "rows": 40,
+      "issues": [],
+      "ctMembership": {
+        "SEX": {
+          "codelist": "C66731",
+          "inCT": true,
+          "violations": []
+        }
+      },
+      "provenanceComplete": true,
+      "pass": true
+    },
+    "ds": {
+      "rows": 40,
+      "issues": [],
+      "keyUnique": true,
+      "pass": true
+    },
+    "ex": {
+      "rows": 80,
+      "issues": [],
+      "keyUnique": true,
+      "provenanceComplete": true,
+      "pass": true
+    },
+    "lb": {
+      "rows": 2080,
+      "issues": [],
+      "keyUnique": true,
+      "provenanceComplete": true,
+      "pass": true
+    },
+    "mh": {
+      "rows": 83,
+      "issues": [],
+      "keyUnique": true,
+      "provenanceComplete": true,
+      "pass": true
+    },
+    "vs": {
+      "rows": 720,
+      "issues": [],
+      "keyUnique": true,
+      "ctMembership": {
+        "VSPOS": {
+          "codelist": "C71148",
+          "inCT": true,
+          "violations": []
+        }
+      },
+      "provenanceComplete": true,
+      "pass": true
+    }
+  }
+}

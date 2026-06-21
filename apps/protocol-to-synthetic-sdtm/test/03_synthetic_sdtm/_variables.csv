@@ -1,0 +1,120 @@
+dataset,variable,label,type,length
+dm,STUDYID,Study Identifier,Char,200
+dm,DOMAIN,Domain Abbreviation,Char,200
+dm,USUBJID,Unique Subject Identifier,Char,200
+dm,SUBJID,Subject Identifier for the Study,Char,200
+dm,RFSTDTC,Subject Reference Start Date/Time,Char,200
+dm,RFENDTC,Subject Reference End Date/Time,Char,200
+dm,RFXSTDTC,RFXSTDTC,Char,200
+dm,RFXENDTC,RFXENDTC,Char,200
+dm,SITEID,Study Site Identifier,Char,200
+dm,BRTHDTC,Date/Time of Birth,Char,200
+dm,AGE,Age,Num,8
+dm,AGEU,Age Units,Char,200
+dm,SEX,Sex,Char,200
+dm,RACE,Race,Char,200
+dm,ETHNIC,Ethnicity,Char,200
+dm,ARMCD,Planned Arm Code,Char,200
+dm,ARM,Description of Planned Arm,Char,200
+dm,ACTARMCD,Actual Arm Code,Char,200
+dm,ACTARM,Description of Actual Arm,Char,200
+dm,COUNTRY,Country,Char,200
+vs,STUDYID,Study Identifier,Char,200
+vs,DOMAIN,Domain Abbreviation,Char,200
+vs,USUBJID,Unique Subject Identifier,Char,200
+vs,VSSEQ,Sequence Number,Num,8
+vs,VSTESTCD,Vital Signs Test Short Name,Char,200
+vs,VSTEST,Vital Signs Test Name,Char,200
+vs,VSPOS,Vital Signs Position of Subject,Char,200
+vs,VSORRES,Result or Finding in Original Units,Num,8
+vs,VSORRESU,Original Units,Char,200
+vs,VSSTRESC,Character Result/Finding in Std Format,Char,200
+vs,VSSTRESN,Numeric Result/Finding in Standard Units,Num,8
+vs,VSSTRESU,Standard Units,Char,200
+vs,VISITNUM,Visit Number,Num,8
+vs,VISIT,Visit Name,Char,200
+vs,EPOCH,Epoch,Char,200
+vs,VSDTC,Date/Time of Measurements,Char,200
+vs,VSDY,Study Day of Vital Signs,Num,8
+lb,STUDYID,Study Identifier,Char,200
+lb,DOMAIN,Domain Abbreviation,Char,200
+lb,USUBJID,Unique Subject Identifier,Char,200
+lb,LBSEQ,Sequence Number,Num,8
+lb,LBTESTCD,Lab Test or Examination Short Name,Char,200
+lb,LBTEST,Lab Test or Examination Name,Char,200
+lb,LBCAT,Category for Lab Test,Char,200
+lb,LBSPEC,Specimen Type,Char,200
+lb,LBORRES,Result or Finding in Original Units,Num,8
+lb,LBORRESU,Original Units,Char,200
+lb,LBSTRESC,Character Result/Finding in Std Format,Char,200
+lb,LBSTRESN,Numeric Result/Finding in Standard Units,Num,8
+lb,LBSTRESU,Standard Units,Char,200
+lb,LBORNRLO,Reference Range Lower Limit,Num,8
+lb,LBORNRHI,Reference Range Upper Limit,Num,8
+lb,LBFAST,Fasting Status,Char,200
+lb,VISITNUM,Visit Number,Num,8
+lb,VISIT,Visit Name,Char,200
+lb,EPOCH,Epoch,Char,200
+lb,LBDTC,Date/Time of Specimen Collection,Char,200
+lb,LBDY,Study Day of Specimen Collection,Num,8
+ex,STUDYID,Study Identifier,Char,200
+ex,DOMAIN,Domain Abbreviation,Char,200
+ex,USUBJID,Unique Subject Identifier,Char,200
+ex,EXSEQ,Sequence Number,Num,8
+ex,EXTRT,Name of Treatment,Char,200
+ex,EXDOSE,Dose,Num,8
+ex,EXDOSU,Dose Units,Char,200
+ex,EXROUTE,Route of Administration,Char,200
+ex,VISITNUM,Visit Number,Num,8
+ex,VISIT,Visit Name,Char,200
+ex,EPOCH,Epoch,Char,200
+ex,EXSTDTC,Start Date/Time of Treatment,Char,200
+ex,EXENDTC,End Date/Time of Treatment,Char,200
+ex,EXSTDY,Study Day of Start of Treatment,Num,8
+ex,EXENDY,Study Day of End of Treatment,Num,8
+cm,STUDYID,Study Identifier,Char,200
+cm,DOMAIN,Domain Abbreviation,Char,200
+cm,USUBJID,Unique Subject Identifier,Char,200
+cm,CMSEQ,Sequence Number,Num,8
+cm,CMTRT,"Reported Name of Drug, Med, or Therapy",Char,200
+cm,CMDOSE,Dose per Administration,Num,8
+cm,CMDOSU,Dose Units,Char,200
+cm,CMROUTE,Route of Administration,Char,200
+cm,CMINDC,Indication,Char,200
+cm,EPOCH,Epoch,Char,200
+cm,CMSTDTC,Start Date/Time,Char,200
+cm,CMSTDY,Study Day of Start of Medication,Num,8
+ae,STUDYID,Study Identifier,Char,200
+ae,DOMAIN,Domain Abbreviation,Char,200
+ae,USUBJID,Unique Subject Identifier,Char,200
+ae,AESEQ,Sequence Number,Num,8
+ae,AETERM,Reported Term for the Adverse Event,Char,200
+ae,AESEV,Severity/Intensity,Char,200
+ae,AESER,Serious Event,Char,200
+ae,AEREL,Causality,Char,200
+ae,AEOUT,Outcome of Adverse Event,Char,200
+ae,AEACN,Action Taken with Study Treatment,Char,200
+ae,EPOCH,Epoch,Char,200
+ae,AESTDTC,Start Date/Time of Adverse Event,Char,200
+ae,AEENDTC,End Date/Time of Adverse Event,Char,200
+ae,AESTDY,Study Day of Start of Adverse Event,Num,8
+ae,AEENDY,Study Day of End of Adverse Event,Num,8
+ds,STUDYID,Study Identifier,Char,200
+ds,DOMAIN,Domain Abbreviation,Char,200
+ds,USUBJID,Unique Subject Identifier,Char,200
+ds,DSSEQ,Sequence Number,Num,8
+ds,DSCAT,Category for Disposition Event,Char,200
+ds,DSTERM,Reported Term for the Disposition Event,Char,200
+ds,DSDECOD,Standardized Disposition Term,Char,200
+ds,EPOCH,Epoch,Char,200
+ds,DSSTDTC,Start Date/Time of Disposition Event,Char,200
+ds,DSSTDY,Study Day of Start of Disposition Event,Num,8
+mh,STUDYID,Study Identifier,Char,200
+mh,DOMAIN,Domain Abbreviation,Char,200
+mh,USUBJID,Unique Subject Identifier,Char,200
+mh,MHSEQ,Sequence Number,Num,8
+mh,MHTERM,Reported Term for the Medical History,Char,200
+mh,MHCAT,Category for Medical History,Char,200
+mh,EPOCH,Epoch,Char,200
+mh,MHSTDTC,Start Date/Time of History Event,Char,200
+mh,MHSTDY,Study Day of Start of Medical History Event,Num,8
