@@ -51,6 +51,16 @@ export async function seedPostgresNamespace(
     //   journeys   – other, acme-labs, invited-personal, bio-clear-labs,
     //                bio-clear-owner, journey-user, bootstrap-journey
     //   patterns   – journey-org-* (create-workspace.journey, timestamp suffix)
+    //
+    // Agents use ON DELETE SET NULL for workspace removal, and built-in agents
+    // have no workspace FK at all, so reset the seeded IDs explicitly before
+    // the ON CONFLICT insert path below restores their fixture mcp_servers.
+    const fixtureAgentIds = Object.keys(data.agentDefinitions);
+    await sql`
+      DELETE FROM agents
+      WHERE id IN ${sql(fixtureAgentIds)}
+    `;
+
     const fixtureHandles = [
       TEST_ORG_HANDLE,
       'tenant-a',
