@@ -37,6 +37,14 @@ Notes:
 Level definitions (L1–L5) + the rules: [E2E-STRATEGY.md](E2E-STRATEGY.md).
 Product features must land at **L3**.
 
+### E2E and your dev data
+
+`pnpm test:e2e` resets only the workspaces it owns (`test`, `tenant-a`, `tenant-b`,
+and the handful of handles used by individual journeys). Your personal namespace and
+any workflows you registered there are **never touched**. If a journey creates a new
+workspace handle that isn't in the cleanup list, add it to the `E2E_WORKSPACES` array
+in [e2e/helpers/postgres-seed.ts](../packages/platform-ui/e2e/helpers/postgres-seed.ts).
+
 ## CLI cheat sheet
 
 Dogfood rule: **CLI > REST.** Full guide: [use-mediforce skill](../.claude/skills/use-mediforce/SKILL.md).
