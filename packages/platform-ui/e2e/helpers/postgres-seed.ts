@@ -36,20 +36,37 @@ export async function seedPostgresNamespace(
     const data = buildSeedData(testUserId, { mockOAuthBaseUrl: options.mockOAuthBaseUrl });
 
     // ── 0. Wipe prior fixture rows ──────────────────────────────────────────
-    // Auth-setup `clearEmulators` resets the Auth emulator but does not touch
-    // Postgres, so a re-run of the setup task (Playwright retries, dev-mode
-    // re-auth) would dupe human_tasks / agent_runs / audit_events (uuid PKs,
-    // no business-key unique constraints) and conflict on workflow_definitions
-    // (workspace, name, version) for the tenant-a / tenant-b dynamic WDs that
-    // workflow-namespacing.journey created in the previous attempt. TRUNCATE
-    // every fixture table with CASCADE so children are cleared transitively.
+    // Delete only the workspace handles that e2e tests own. Every child table
+    // (workspace_members, workflow_definitions, workflow_meta, process_instances,
+    // step_executions, human_tasks, agent_runs, audit_events, cowork_sessions,
+    // cowork_turns, agents, tool_catalog_entries, oauth_providers) carries
+    // "FOREIGN KEY (workspace) REFERENCES workspaces(handle) ON DELETE CASCADE",
+    // so one DELETE cascades the full fixture tree without touching workspaces
+    // that belong to the developer (e.g. their personal namespace + registered
+    // workflows). model_registry_entries has no workspace FK; its seed inserts
+    // use ON CONFLICT DO NOTHING so it stays idempotent without a DELETE.
+    //
+    // Handles covered:
+    //   fixture    – test, tenant-a, tenant-b
+    //   journeys   – other, acme-labs, invited-personal, bio-clear-labs,
+    //                bio-clear-owner, journey-user, bootstrap-journey
+    //   patterns   – journey-org-* (create-workspace.journey, timestamp suffix)
+    const fixtureHandles = [
+      TEST_ORG_HANDLE,
+      'tenant-a',
+      'tenant-b',
+      'other',
+      'acme-labs',
+      'invited-personal',
+      'bio-clear-labs',
+      'bio-clear-owner',
+      'journey-user',
+      'bootstrap-journey',
+    ];
     await sql`
-      TRUNCATE TABLE
-        workspaces, workspace_members, workflow_definitions, workflow_meta,
-        process_instances, step_executions, human_tasks, agent_runs,
-        audit_events, cowork_sessions, cowork_turns, agents,
-        model_registry_entries, tool_catalog_entries, oauth_providers
-      RESTART IDENTITY CASCADE
+      DELETE FROM workspaces
+      WHERE handle IN ${sql(fixtureHandles)}
+         OR handle LIKE 'journey-org-%'
     `;
 
     // ── 1. workspaces ───────────────────────────────────────────────────────
