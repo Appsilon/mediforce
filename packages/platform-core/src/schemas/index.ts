@@ -112,6 +112,7 @@ export {
 } from './human-task';
 
 export {
+  ATTACHMENT_MAX_BYTES,
   TaskAttachmentSchema,
   NewTaskAttachmentSchema,
   type TaskAttachment,

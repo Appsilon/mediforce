@@ -134,6 +134,20 @@ function contract(
       const active = await repo.list(taskId);
       expect(active).toHaveLength(0);
     });
+
+    it('re-delete is idempotent: keeps the original deletedAt timestamp', async () => {
+      const taskId = `task-${randomUUID()}`;
+      await registerTask(taskId, 'ws-1');
+      const created = await repo.create(attachmentFor(taskId));
+
+      await repo.delete(created.id);
+      const firstTombstone = await repo.getById(created.id);
+      expect(firstTombstone?.deletedAt).not.toBeNull();
+
+      await repo.delete(created.id);
+      const secondTombstone = await repo.getById(created.id);
+      expect(secondTombstone?.deletedAt).toBe(firstTombstone?.deletedAt);
+    });
   });
 }
 

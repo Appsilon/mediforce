@@ -217,6 +217,7 @@ export type {
   NewTaskAttachment,
 } from './schemas/index';
 export {
+  ATTACHMENT_MAX_BYTES,
   TaskAttachmentSchema,
   NewTaskAttachmentSchema,
 } from './schemas/index';

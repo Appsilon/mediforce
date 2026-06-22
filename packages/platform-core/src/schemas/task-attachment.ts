@@ -1,6 +1,13 @@
 import { z } from 'zod';
 
 /**
+ * Hard ceiling for attachment size in bytes (100 MiB, ADR-0003 §4). Mirrored by
+ * the Postgres `attachment_size_guard` CHECK; the `MEDIFORCE_ATTACHMENT_MAX_BYTES`
+ * env knob may only LOWER this, never raise it above the DB ceiling.
+ */
+export const ATTACHMENT_MAX_BYTES = 104_857_600;
+
+/**
  * Metadata for a file attached to a Human Task (ADR-0003). The bytes live in a
  * `BlobStore` keyed by `blobKey`; only this metadata row is in Postgres.
  *

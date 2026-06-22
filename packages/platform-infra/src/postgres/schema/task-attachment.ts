@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import { ATTACHMENT_MAX_BYTES } from '@mediforce/platform-core';
 import {
   pgTable,
   text,
@@ -55,6 +56,11 @@ export const taskAttachments = pgTable(
       table.workspace,
       table.uploadedAt,
     ),
-    sizeGuard: check('attachment_size_guard', sql`size_bytes <= 104857600`),
+    // Number literal inlined via sql.raw: drizzle would parameterize an
+    // interpolated value, which Postgres rejects inside a CHECK expression.
+    sizeGuard: check(
+      'attachment_size_guard',
+      sql.raw(`size_bytes <= ${ATTACHMENT_MAX_BYTES}`),
+    ),
   }),
 );

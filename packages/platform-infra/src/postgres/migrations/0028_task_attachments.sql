@@ -1,3 +1,4 @@
+-- 104857600 mirrors ATTACHMENT_MAX_BYTES in platform-core (SQL can't import TS).
 CREATE TABLE "task_attachments" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"task_id" text NOT NULL,

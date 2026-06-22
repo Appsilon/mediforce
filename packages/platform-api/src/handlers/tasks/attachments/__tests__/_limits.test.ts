@@ -26,6 +26,11 @@ describe('attachmentMaxBytes', () => {
     expect(attachmentMaxBytes()).toBe(2048);
   });
 
+  it('clamps an override above the hard ceiling down to 100 MiB', () => {
+    process.env[ENV_KEY] = String(104_857_600 + 1);
+    expect(attachmentMaxBytes()).toBe(104_857_600);
+  });
+
   it('throws on a non-positive value', () => {
     process.env[ENV_KEY] = '0';
     expect(() => attachmentMaxBytes()).toThrow();

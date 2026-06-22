@@ -19,7 +19,7 @@ import { taskAttachments } from '../schema/task-attachment';
  * lookup, no `*InNamespaces` variants here.
  *
  * Soft-delete via `deleted_at` (NULL = active). `list` excludes tombstones;
- * `getById` includes them so callers can render a 410-style "deleted" view.
+ * `getById` returns tombstoned rows so callers can detect soft-deletion.
  *
  * Validation matches the in-memory backend: parse on every read AND every
  * write (ADR-0001 Implementation pattern 2).
@@ -71,10 +71,17 @@ export class PostgresTaskAttachmentRepository
   }
 
   async delete(attachmentId: string): Promise<void> {
+    // Re-delete is a no-op: the `deleted_at IS NULL` guard preserves the
+    // original tombstone timestamp, matching the in-memory backend.
     await this.db
       .update(taskAttachments)
       .set({ deletedAt: new Date() })
-      .where(eq(taskAttachments.id, attachmentId));
+      .where(
+        and(
+          eq(taskAttachments.id, attachmentId),
+          isNull(taskAttachments.deletedAt),
+        ),
+      );
   }
 }
 
