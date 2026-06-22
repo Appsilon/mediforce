@@ -4,7 +4,23 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { format } from 'date-fns';
-import { CheckCircle2, Clock, XCircle, Circle, Pause, Bot, User, ExternalLink, FileText, GitBranch, Gauge, ChevronDown, ChevronRight, MessageSquare, DollarSign } from 'lucide-react';
+import {
+  CheckCircle2,
+  Clock,
+  XCircle,
+  Circle,
+  Pause,
+  Bot,
+  User,
+  ExternalLink,
+  FileText,
+  GitBranch,
+  Gauge,
+  ChevronDown,
+  ChevronRight,
+  MessageSquare,
+  DollarSign,
+} from 'lucide-react';
 import type { StepExecution, Step, AgentEvent, HumanTask, WorkflowStep } from '@mediforce/platform-core';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { useStepExecutions } from '@/hooks/use-step-executions';
@@ -45,10 +61,7 @@ export default function StepDetailPage() {
   const decodedStepId = stepId ? decodeURIComponent(stepId) : '';
 
   const { data: instance, loading: instanceLoading } = useProcessInstance(runId ?? null);
-  const { data: stepExecutions, loading: stepsLoading } = useStepExecutions(
-    runId ?? null,
-    instance?.status,
-  );
+  const { data: stepExecutions, loading: stepsLoading } = useStepExecutions(runId ?? null, instance?.status);
   const { data: agentEvents, loading: eventsLoading } = useAgentEvents(
     runId ?? null,
     decodedStepId || null,
@@ -93,10 +106,12 @@ export default function StepDetailPage() {
 
   // Agent prompt event for this step
   const promptEvent = useMemo(() => {
-    return agentEvents
-      .filter((e) => e.stepId === decodedStepId)
-      .sort((a, b) => a.sequence - b.sequence)
-      .find((e) => e.type === 'prompt') ?? null;
+    return (
+      agentEvents
+        .filter((e) => e.stepId === decodedStepId)
+        .sort((a, b) => a.sequence - b.sequence)
+        .find((e) => e.type === 'prompt') ?? null
+    );
   }, [agentEvents, decodedStepId]);
 
   // Locate the agent output for this step. Two sources, in order:
@@ -118,8 +133,7 @@ export default function StepDetailPage() {
       return agentOutputFromEnvelope(latestRun.envelope);
     }
     const candidates = [...stepTasks].sort(
-      (a: HumanTask, b: HumanTask) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      (a: HumanTask, b: HumanTask) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
     for (const task of candidates) {
       const output = getAgentOutput(task);
@@ -147,27 +161,20 @@ export default function StepDetailPage() {
   }
 
   if (!instance) {
-    return (
-      <div className="p-6 text-center text-sm text-muted-foreground">
-        Run not found.
-      </div>
-    );
+    return <div className="p-6 text-center text-sm text-muted-foreground">Run not found.</div>;
   }
 
   const stepName = definitionStep?.name ?? formatStepName(decodedStepId);
   const hasAgentBadge = agentOutput !== null || execution?.agentOutput !== undefined;
 
   if (stepView.kind === 'human-step') {
-    const executionPanel = execution !== null && stepView.access.kind === 'completed' ? (
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <InputColumn
-          execution={execution}
-          previousStepName={previousStepName}
-          promptEvent={promptEvent}
-        />
-        <OutputColumn execution={execution} />
-      </div>
-    ) : undefined;
+    const executionPanel =
+      execution !== null && stepView.access.kind === 'completed' ? (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <InputColumn execution={execution} previousStepName={previousStepName} promptEvent={promptEvent} />
+          <OutputColumn execution={execution} />
+        </div>
+      ) : undefined;
 
     return (
       <div className="p-6">
@@ -196,16 +203,27 @@ export default function StepDetailPage() {
           )}
         </div>
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-          <span>Step ID: <span className="font-mono text-foreground text-xs">{decodedStepId}</span></span>
+          <span>
+            Step ID: <span className="font-mono text-foreground text-xs">{decodedStepId}</span>
+          </span>
           {execution && (
             <>
-              <span>Executed by: <span className="inline-flex items-center gap-1 text-foreground">
-                {execution.executedBy === 'auto-runner' ? <Bot className="h-3 w-3" /> : <User className="h-3 w-3" />}
-                {execution.executedBy}
-              </span></span>
-              <span>Started: <span className="text-foreground">{format(new Date(execution.startedAt), 'MMM d, HH:mm:ss')}</span></span>
+              <span>
+                Executed by:{' '}
+                <span className="inline-flex items-center gap-1 text-foreground">
+                  {execution.executedBy === 'auto-runner' ? <Bot className="h-3 w-3" /> : <User className="h-3 w-3" />}
+                  {execution.executedBy}
+                </span>
+              </span>
+              <span>
+                Started:{' '}
+                <span className="text-foreground">{format(new Date(execution.startedAt), 'MMM d, HH:mm:ss')}</span>
+              </span>
               {execution.completedAt && (
-                <span>Completed: <span className="text-foreground">{format(new Date(execution.completedAt), 'MMM d, HH:mm:ss')}</span></span>
+                <span>
+                  Completed:{' '}
+                  <span className="text-foreground">{format(new Date(execution.completedAt), 'MMM d, HH:mm:ss')}</span>
+                </span>
               )}
             </>
           )}
@@ -238,22 +256,14 @@ export default function StepDetailPage() {
             </Collapsible.Trigger>
             <Collapsible.Content className="mt-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <InputColumn
-                  execution={execution}
-                  previousStepName={previousStepName}
-                  promptEvent={promptEvent}
-                />
+                <InputColumn execution={execution} previousStepName={previousStepName} promptEvent={promptEvent} />
                 <OutputColumn execution={execution} executorType={executorType} />
               </div>
             </Collapsible.Content>
           </Collapsible.Root>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputColumn
-              execution={execution}
-              previousStepName={previousStepName}
-              promptEvent={promptEvent}
-            />
+            <InputColumn execution={execution} previousStepName={previousStepName} promptEvent={promptEvent} />
             <OutputColumn execution={execution} executorType={executorType} />
           </div>
         )
@@ -268,7 +278,11 @@ export default function StepDetailPage() {
 
 // ── Input Column ────────────────────────────────────────────────────────────
 
-function InputColumn({ execution, previousStepName, promptEvent }: {
+function InputColumn({
+  execution,
+  previousStepName,
+  promptEvent,
+}: {
   execution: StepExecution;
   previousStepName: string | null;
   promptEvent: AgentEvent | null;
@@ -296,9 +310,7 @@ function InputColumn({ execution, previousStepName, promptEvent }: {
           </div>
         )}
 
-        {isAgent && promptEvent && (
-          <CollapsiblePrompt prompt={promptEvent.payload} />
-        )}
+        {isAgent && promptEvent && <CollapsiblePrompt prompt={promptEvent.payload} />}
 
         {!hasInput && !promptEvent && (
           <div className="p-6 text-center text-sm text-muted-foreground">
@@ -330,11 +342,7 @@ function CollapsiblePrompt({ prompt }: { prompt: unknown }) {
           <span className="normal-case font-normal">({Math.round(promptText.length / 1000)}k chars)</span>
         )}
       </button>
-      {expanded && (
-        <pre className="rounded-md bg-muted p-3 text-xs whitespace-pre-wrap break-words">
-          {promptText}
-        </pre>
-      )}
+      {expanded && <pre className="rounded-md bg-muted p-3 text-xs whitespace-pre-wrap break-words">{promptText}</pre>}
     </div>
   );
 }
@@ -352,22 +360,15 @@ function OutputColumn({ execution, executorType }: { execution: StepExecution; e
       <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Output</h2>
       <div className="rounded-lg border bg-card">
         {!hasOutput && !hasAgent ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            No output data
-          </div>
+          <div className="p-6 text-center text-sm text-muted-foreground">No output data</div>
         ) : (
           <div className="divide-y">
-            {hasAgent && agentOutput && (
-              <AgentMetadataSection agentOutput={agentOutput} executorType={executorType} />
-            )}
+            {hasAgent && agentOutput && <AgentMetadataSection agentOutput={agentOutput} executorType={executorType} />}
 
-            {hasAgent && agentOutput?.gitMetadata && (
-              <GitSection git={agentOutput.gitMetadata} />
-            )}
+            {hasAgent && agentOutput?.gitMetadata && <GitSection git={agentOutput.gitMetadata} />}
 
-            {hasOutput && Object.entries(output).map(([key, value]) => (
-              <DataEntry key={key} label={key} value={value} />
-            ))}
+            {hasOutput &&
+              Object.entries(output).map(([key, value]) => <DataEntry key={key} label={key} value={value} />)}
           </div>
         )}
       </div>
@@ -377,11 +378,15 @@ function OutputColumn({ execution, executorType }: { execution: StepExecution; e
 
 // ── Agent Metadata ──────────────────────────────────────────────────────────
 
-function AgentMetadataSection({ agentOutput, executorType }: { agentOutput: NonNullable<StepExecution['agentOutput']>; executorType?: string }) {
+function AgentMetadataSection({
+  agentOutput,
+  executorType,
+}: {
+  agentOutput: NonNullable<StepExecution['agentOutput']>;
+  executorType?: string;
+}) {
   const isScript = executorType === 'script';
-  const confidencePct = !isScript && agentOutput.confidence !== null
-    ? Math.round(agentOutput.confidence * 100)
-    : null;
+  const confidencePct = !isScript && agentOutput.confidence !== null ? Math.round(agentOutput.confidence * 100) : null;
 
   return (
     <div className="p-4 space-y-2">
@@ -394,12 +399,18 @@ function AgentMetadataSection({ agentOutput, executorType }: { agentOutput: NonN
           <div className="flex items-center gap-1.5">
             <Gauge className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-muted-foreground">Confidence:</span>
-            <span className={cn(
-              'font-medium',
-              confidencePct >= 80 ? 'text-green-600 dark:text-green-400' :
-              confidencePct >= 50 ? 'text-amber-600 dark:text-amber-400' :
-              'text-red-600 dark:text-red-400'
-            )}>{confidencePct}%</span>
+            <span
+              className={cn(
+                'font-medium',
+                confidencePct >= 80
+                  ? 'text-green-600 dark:text-green-400'
+                  : confidencePct >= 50
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-red-600 dark:text-red-400',
+              )}
+            >
+              {confidencePct}%
+            </span>
           </div>
         )}
         {!isScript && agentOutput.model && (
@@ -432,9 +443,7 @@ function AgentMetadataSection({ agentOutput, executorType }: { agentOutput: NonN
       {!isScript && agentOutput.confidence_rationale && (
         <p className="text-xs text-muted-foreground italic">{agentOutput.confidence_rationale}</p>
       )}
-      {agentOutput.reasoning && (
-        <p className="text-sm text-muted-foreground">{agentOutput.reasoning}</p>
-      )}
+      {agentOutput.reasoning && <p className="text-sm text-muted-foreground">{agentOutput.reasoning}</p>}
     </div>
   );
 }
@@ -462,9 +471,7 @@ function GitSection({ git }: { git: { commitSha: string; branch: string; changed
             <ExternalLink className="h-3 w-3" />
           </a>
         ) : (
-          <span className="font-mono text-xs text-muted-foreground">
-            {git.commitSha.slice(0, 7)}
-          </span>
+          <span className="font-mono text-xs text-muted-foreground">{git.commitSha.slice(0, 7)}</span>
         )}
       </div>
       {git.changedFiles.length > 0 && (
@@ -506,9 +513,7 @@ function DataEntry({ label, value }: { label: string; value: unknown }) {
 
   return (
     <div className="p-4">
-      <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-        {displayLabel}
-      </dt>
+      <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">{displayLabel}</dt>
       <dd className="text-sm">
         <DataValue value={value} />
       </dd>
@@ -594,25 +599,27 @@ interface FileItem {
 
 function isFileArray(arr: unknown[]): boolean {
   return arr.every(
-    (item) =>
-      typeof item === 'object' &&
-      item !== null &&
-      'name' in item &&
-      'size' in item &&
-      'type' in item,
+    (item) => typeof item === 'object' && item !== null && 'name' in item && 'size' in item && 'type' in item,
   );
 }
 
 function FileList({ files }: { files: FileItem[] }) {
   return (
     <div className="space-y-1">
-      <span className="text-xs text-muted-foreground">{files.length} file{files.length !== 1 ? 's' : ''}</span>
+      <span className="text-xs text-muted-foreground">
+        {files.length} file{files.length !== 1 ? 's' : ''}
+      </span>
       <ul className="space-y-0.5">
         {files.map((file) => (
           <li key={file.name} className="flex items-center gap-2 text-sm">
             <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             {file.downloadUrl ? (
-              <a href={file.downloadUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate">
+              <a
+                href={file.downloadUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline truncate"
+              >
                 {file.name}
               </a>
             ) : (

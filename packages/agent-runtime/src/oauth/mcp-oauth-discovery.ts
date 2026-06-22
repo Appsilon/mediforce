@@ -57,9 +57,7 @@ export function deriveProviderSlug(issuerUrl: string): string {
 /** Probe the MCP resource URL, follow the `resource_metadata` hint (or fall
  *  back to the well-known path), then fetch AS metadata. Throws
  *  `McpDiscoveryError` with a stage marker on failure. */
-export async function discoverMcpAuthServer(
-  resourceUrl: string,
-): Promise<DiscoveredAuthServer> {
+export async function discoverMcpAuthServer(resourceUrl: string): Promise<DiscoveredAuthServer> {
   const probe = await probeResource(resourceUrl);
   const resourceMetadata = await fetchResourceMetadata(probe.resourceMetadataUrl);
   const authServer = await fetchAuthServerMetadata(resourceMetadata.authorization_servers[0]);
@@ -124,10 +122,7 @@ async function fetchResourceMetadata(metadataUrl: string): Promise<ProtectedReso
 async function fetchAuthServerMetadata(issuerBase: string): Promise<AuthServerMetadata> {
   // Per RFC 8414: .well-known path is appended to the issuer URL.
   const base = issuerBase.replace(/\/+$/, '');
-  const candidates = [
-    `${base}/.well-known/oauth-authorization-server`,
-    `${base}/.well-known/openid-configuration`,
-  ];
+  const candidates = [`${base}/.well-known/oauth-authorization-server`, `${base}/.well-known/openid-configuration`];
   let lastDetail = '';
   for (const url of candidates) {
     let res: Response;

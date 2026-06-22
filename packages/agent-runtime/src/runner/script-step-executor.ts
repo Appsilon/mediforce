@@ -1,16 +1,7 @@
-import {
-  StepOutputEnvelopeSchema,
-  resolveStepTimeoutMinutes,
-  type StepOutputEnvelope,
-} from '@mediforce/platform-core';
+import { StepOutputEnvelopeSchema, resolveStepTimeoutMinutes, type StepOutputEnvelope } from '@mediforce/platform-core';
 import type { StepExecutorPlugin, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
 import type { PluginRunner } from './plugin-runner';
-import type {
-  StepExecutor,
-  StepExecutorServices,
-  StepExecutorMeta,
-  StepExecutionResult,
-} from './step-executor';
+import type { StepExecutor, StepExecutorServices, StepExecutorMeta, StepExecutionResult } from './step-executor';
 
 export class ScriptStepExecutor implements StepExecutor {
   constructor(private readonly pluginRunner: PluginRunner) {}
@@ -44,9 +35,7 @@ export class ScriptStepExecutor implements StepExecutor {
     });
 
     const timeoutMs = resolveStepTimeoutMinutes(context.step) * 60_000;
-    const { resultPayload, timedOut, errorMessage } = await this.pluginRunner.execute(
-      plugin, context, timeoutMs,
-    );
+    const { resultPayload, timedOut, errorMessage } = await this.pluginRunner.execute(plugin, context, timeoutMs);
 
     let envelope: StepOutputEnvelope | null = null;
     let fallbackReason: 'timeout' | 'error' | null = null;
@@ -146,16 +135,10 @@ export class ScriptStepExecutor implements StepExecutor {
 
     const stepResult = envelope?.result;
     if (stepResult === null || stepResult === undefined) {
-      throw new Error(
-        `Script step '${stepId}' completed with null result — cannot advance.`,
-      );
+      throw new Error(`Script step '${stepId}' completed with null result — cannot advance.`);
     }
 
-    const updatedInstance = await engine.advanceStep(
-      instanceId,
-      stepResult,
-      { id: triggeredBy, role: 'agent' },
-    );
+    const updatedInstance = await engine.advanceStep(instanceId, stepResult, { id: triggeredBy, role: 'agent' });
 
     return {
       status: 'completed' as const,

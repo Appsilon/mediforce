@@ -1,11 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type {
-  ConversationTurn,
-  CoworkSession,
-  CoworkSessionStatus,
-} from '@mediforce/platform-core';
+import type { ConversationTurn, CoworkSession, CoworkSessionStatus } from '@mediforce/platform-core';
 import { ApiError, mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { snapshotCache } from '@/lib/optimistic';
@@ -44,10 +40,10 @@ export function useCoworkSession(
     },
   });
 
-  const err = sessionId === undefined ? null : (query.error as Error | null) ?? null;
+  const err = sessionId === undefined ? null : ((query.error as Error | null) ?? null);
   const notFound = err instanceof ApiError && err.status === 404;
   return {
-    session: sessionId === undefined ? null : query.data ?? null,
+    session: sessionId === undefined ? null : (query.data ?? null),
     loading: query.isLoading && sessionId !== undefined,
     error: notFound ? null : err,
     notFound,
@@ -92,9 +88,7 @@ export function useCoworkTurns(
       const serverTurns = session.turns;
       const cached = qc.getQueryData<ConversationTurn[]>(turnsKey) ?? [];
       const stillPending = cached.filter(
-        (t) =>
-          isOptimisticTurn(t) &&
-          !serverTurns.some((s) => s.role === t.role && s.content === t.content),
+        (t) => isOptimisticTurn(t) && !serverTurns.some((s) => s.role === t.role && s.content === t.content),
       );
       return stillPending.length === 0 ? serverTurns : [...serverTurns, ...stillPending];
     },

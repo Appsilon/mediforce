@@ -60,7 +60,9 @@ export function WorkflowSecretsEditor({ namespace, workflowName, suggestedKeys }
         console.error('Failed to load workflow secrets:', error);
         setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [namespace, workflowName]);
 
   React.useEffect(() => {
@@ -175,11 +177,7 @@ export function WorkflowSecretsEditor({ namespace, workflowName, suggestedKeys }
                   onClick={() => toggleReveal(index)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {revealedIndices.has(index) ? (
-                    <EyeOff className="h-3.5 w-3.5" />
-                  ) : (
-                    <Eye className="h-3.5 w-3.5" />
-                  )}
+                  {revealedIndices.has(index) ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                 </button>
               </div>
               <button
@@ -197,7 +195,8 @@ export function WorkflowSecretsEditor({ namespace, workflowName, suggestedKeys }
       {bulkMode ? (
         <div className="space-y-2 rounded-md border p-3 bg-muted/30">
           <p className="text-xs text-muted-foreground">
-            Paste <code className="font-mono">.env</code> content — one <code className="font-mono">KEY=value</code> per line:
+            Paste <code className="font-mono">.env</code> content — one <code className="font-mono">KEY=value</code> per
+            line:
           </p>
           <textarea
             value={bulkText}
@@ -212,13 +211,12 @@ export function WorkflowSecretsEditor({ namespace, workflowName, suggestedKeys }
           />
           {bulkPreview && (
             <p className="text-xs text-green-600 dark:text-green-400">
-              Detected {bulkPreview.length} variable{bulkPreview.length !== 1 ? 's' : ''}: {bulkPreview.map((p) => p.key).join(', ')}
+              Detected {bulkPreview.length} variable{bulkPreview.length !== 1 ? 's' : ''}:{' '}
+              {bulkPreview.map((p) => p.key).join(', ')}
             </p>
           )}
           {bulkText.trim() !== '' && !bulkPreview && (
-            <p className="text-xs text-destructive">
-              Could not parse — expected KEY=value format, one per line
-            </p>
+            <p className="text-xs text-destructive">Could not parse — expected KEY=value format, one per line</p>
           )}
           <div className="flex gap-2">
             <button
@@ -248,7 +246,11 @@ export function WorkflowSecretsEditor({ namespace, workflowName, suggestedKeys }
             </button>
             <button
               type="button"
-              onClick={() => { setBulkMode(false); setBulkText(''); setBulkPreview(null); }}
+              onClick={() => {
+                setBulkMode(false);
+                setBulkText('');
+                setBulkPreview(null);
+              }}
               className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent transition-colors"
             >
               Cancel
@@ -291,7 +293,11 @@ export function WorkflowSecretsEditor({ namespace, workflowName, suggestedKeys }
         )}
 
         {saveMessage && (
-          <span className={`text-sm ${saveMessage.startsWith('Error:') ? 'text-destructive' : 'text-green-600 dark:text-green-400'}`}>{saveMessage}</span>
+          <span
+            className={`text-sm ${saveMessage.startsWith('Error:') ? 'text-destructive' : 'text-green-600 dark:text-green-400'}`}
+          >
+            {saveMessage}
+          </span>
         )}
       </div>
     </div>

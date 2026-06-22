@@ -5,10 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type {
-  ToolCatalogEntry,
-  ToolCatalogRepository,
-} from '@mediforce/platform-core';
+import type { ToolCatalogEntry, ToolCatalogRepository } from '@mediforce/platform-core';
 import { InMemoryToolCatalogRepository } from '@mediforce/platform-core/testing';
 import { PostgresToolCatalogRepository } from '../repositories/tool-catalog-repository';
 import * as schema from '../schema/index';
@@ -79,9 +76,7 @@ function contract(name: string, factory: () => Promise<ToolCatalogRepository>) {
     });
 
     it('rejects payload that violates schema on upsert', async () => {
-      await expect(
-        repo.upsert('appsilon', { id: 'x', command: '' } as unknown as ToolCatalogEntry),
-      ).rejects.toThrow();
+      await expect(repo.upsert('appsilon', { id: 'x', command: '' } as unknown as ToolCatalogEntry)).rejects.toThrow();
     });
 
     it('preserves args and env on round trip', async () => {
@@ -113,7 +108,9 @@ describe.skipIf(skipPg)('PostgresToolCatalogRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sql);
@@ -153,7 +150,6 @@ describe.skipIf(skipPg)('PostgresToolCatalogRepository (parity)', () => {
       SELECT updated_at::text FROM tool_catalog_entries
       WHERE workspace = 'appsilon' AND id = 'trig'
     `;
-    expect(new Date(after.updated_at).getTime())
-      .toBeGreaterThan(new Date(before.updated_at).getTime());
+    expect(new Date(after.updated_at).getTime()).toBeGreaterThan(new Date(before.updated_at).getTime());
   });
 });

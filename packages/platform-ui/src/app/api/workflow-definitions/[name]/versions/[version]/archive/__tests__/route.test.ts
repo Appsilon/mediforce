@@ -54,9 +54,7 @@ describe('POST /api/workflow-definitions/:name/versions/:version/archive', () =>
     expect(res.status).toBe(200);
     expect(json).toEqual({ success: true, name: 'wf-1', version: 3, archived: true });
     expect(mockSetVersionArchived).toHaveBeenCalledWith('ns-1', 'wf-1', 3, true);
-    expect(mockAuditAppend).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'workflow.version_archived' }),
-    );
+    expect(mockAuditAppend).toHaveBeenCalledWith(expect.objectContaining({ action: 'workflow.version_archived' }));
   });
 
   it('[ERROR] maps repo "not found" to 404', async () => {

@@ -22,14 +22,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { NextRequest } from 'next/server';
-import {
-  ActionRegistry,
-  httpActionHandler,
-} from '@mediforce/core-actions';
-import {
-  WebhookRouter,
-  WorkflowEngine,
-} from '@mediforce/workflow-engine';
+import { ActionRegistry, httpActionHandler } from '@mediforce/core-actions';
+import { WebhookRouter, WorkflowEngine } from '@mediforce/workflow-engine';
 import {
   InMemoryAuditRepository,
   InMemoryCoworkSessionRepository,
@@ -96,9 +90,7 @@ vi.mock('@/app/actions/workflow-secrets', () => ({
 }));
 
 // Imported AFTER vi.mock so handlers receive the in-memory services.
-const { POST: webhookPost } = await import(
-  '@/app/api/triggers/webhook/[...path]/route'
-);
+const { POST: webhookPost } = await import('@/app/api/triggers/webhook/[...path]/route');
 const { POST: runPost } = await import('@/app/api/processes/[instanceId]/run/route');
 const { GET: runsGet } = await import('@/app/api/runs/[runId]/route');
 
@@ -161,9 +153,7 @@ beforeEach(async () => {
   const raw = JSON.parse(readFileSync(TEMPLATE_PATH, 'utf8'));
   const parsed = parseWorkflowTemplate(raw);
   if (!parsed.success) {
-    throw new Error(
-      `Template parse failed: ${parsed.error.issues.map((iss) => iss.message).join(', ')}`,
-    );
+    throw new Error(`Template parse failed: ${parsed.error.issues.map((iss) => iss.message).join(', ')}`);
   }
   const definition: WorkflowDefinition = {
     ...parsed.data,
@@ -218,14 +208,11 @@ describe('execution-summaries-api: webhook → http action → polling → echo 
     // route fire-and-forgets to /api/processes/<id>/run; here we invoke
     // the same handler synchronously so the test polling loop is
     // deterministic.
-    const runReq = new NextRequest(
-      `http://localhost/api/processes/${webhookJson.runId}/run`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ triggeredBy: 'webhook' }),
-      },
-    );
+    const runReq = new NextRequest(`http://localhost/api/processes/${webhookJson.runId}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ triggeredBy: 'webhook' }),
+    });
     await runPost(runReq, { params: Promise.resolve({ instanceId: webhookJson.runId }) });
 
     // Poll up to 10s for completion (paranoia margin — auto-runner just ran
@@ -234,10 +221,7 @@ describe('execution-summaries-api: webhook → http action → polling → echo 
     let polledStatus = 'unknown';
     let polledFinalOutput: unknown = null;
     while (Date.now() < deadline) {
-      const runReq = new NextRequest(
-        `http://localhost/api/runs/${webhookJson.runId}`,
-        { method: 'GET' },
-      );
+      const runReq = new NextRequest(`http://localhost/api/runs/${webhookJson.runId}`, { method: 'GET' });
       const runRes = await runsGet(runReq, {
         params: Promise.resolve({ runId: webhookJson.runId }),
       });

@@ -1,8 +1,4 @@
-import type {
-  ProcessRepository,
-  WorkflowDefinitionListResult,
-  WorkflowDefinitionGroup,
-} from '../index';
+import type { ProcessRepository, WorkflowDefinitionListResult, WorkflowDefinitionGroup } from '../index';
 import type { WorkflowDefinition } from '../schemas/workflow-definition';
 
 /**
@@ -27,11 +23,7 @@ export class InMemoryProcessRepository implements ProcessRepository {
   }
 
   async saveWorkflowDefinition(definition: WorkflowDefinition): Promise<void> {
-    const key = this.compositeKey(
-      definition.namespace,
-      definition.name,
-      String(definition.version),
-    );
+    const key = this.compositeKey(definition.namespace, definition.name, String(definition.version));
     if (this.workflowDefinitions.has(key)) {
       // Mirror Firestore + Postgres semantics: versions are immutable.
       const err = new Error(
@@ -44,9 +36,7 @@ export class InMemoryProcessRepository implements ProcessRepository {
     this.workflowDefinitions.set(key, definition);
   }
 
-  async listAllWorkflowDefinitions(
-    includeArchived: boolean,
-  ): Promise<WorkflowDefinitionListResult> {
+  async listAllWorkflowDefinitions(includeArchived: boolean): Promise<WorkflowDefinitionListResult> {
     return this.buildListResult(includeArchived, () => true);
   }
 
@@ -113,11 +103,7 @@ export class InMemoryProcessRepository implements ProcessRepository {
   async getLatestWorkflowVersion(namespace: string, name: string): Promise<number> {
     let latest = 0;
     for (const definition of this.workflowDefinitions.values()) {
-      if (
-        definition.name === name &&
-        definition.namespace === namespace &&
-        definition.version > latest
-      ) {
+      if (definition.name === name && definition.namespace === namespace && definition.version > latest) {
         latest = definition.version;
       }
     }
@@ -175,11 +161,7 @@ export class InMemoryProcessRepository implements ProcessRepository {
     return 0;
   }
 
-  async transferWorkflowNamespace(
-    sourceNamespace: string,
-    name: string,
-    targetNamespace: string,
-  ): Promise<void> {
+  async transferWorkflowNamespace(sourceNamespace: string, name: string, targetNamespace: string): Promise<void> {
     const moved: Array<[string, ReturnType<typeof this.workflowDefinitions.get>]> = [];
     for (const [key, def] of this.workflowDefinitions) {
       if (def?.name === name && def.namespace === sourceNamespace) {
@@ -197,7 +179,6 @@ export class InMemoryProcessRepository implements ProcessRepository {
       this.workflowDefinitions.set(newKey, newDef);
     }
   }
-
 
   /** Test helper: clear all stored data */
   clear(): void {

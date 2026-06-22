@@ -6,9 +6,22 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
-  Bot, Cpu, Terminal, BarChart3, Brain, Zap,
-  Shield, Code, Database, Globe, Sparkles, Settings,
-  Check, ChevronDown, Eye, EyeOff,
+  Bot,
+  Cpu,
+  Terminal,
+  BarChart3,
+  Brain,
+  Zap,
+  Shield,
+  Code,
+  Database,
+  Globe,
+  Sparkles,
+  Settings,
+  Check,
+  ChevronDown,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { FOUNDATION_MODELS } from '@/lib/agent-models';
@@ -18,16 +31,16 @@ import type { AgentDefinition } from '@mediforce/platform-core';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 
 const ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [
-  { icon: Bot,      label: 'Bot'      },
-  { icon: Cpu,      label: 'CPU'      },
+  { icon: Bot, label: 'Bot' },
+  { icon: Cpu, label: 'CPU' },
   { icon: Terminal, label: 'Terminal' },
-  { icon: BarChart3,label: 'Chart'    },
-  { icon: Brain,    label: 'Brain'    },
-  { icon: Zap,      label: 'Zap'      },
-  { icon: Shield,   label: 'Shield'   },
-  { icon: Code,     label: 'Code'     },
+  { icon: BarChart3, label: 'Chart' },
+  { icon: Brain, label: 'Brain' },
+  { icon: Zap, label: 'Zap' },
+  { icon: Shield, label: 'Shield' },
+  { icon: Code, label: 'Code' },
   { icon: Database, label: 'Database' },
-  { icon: Globe,    label: 'Globe'    },
+  { icon: Globe, label: 'Globe' },
   { icon: Sparkles, label: 'Sparkles' },
   { icon: Settings, label: 'Settings' },
 ];
@@ -137,9 +150,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   return (
     <div className="flex flex-1 flex-col gap-6 p-6 max-w-2xl">
       <div>
-        <p className="text-sm text-muted-foreground">
-          Edit this AI agent&apos;s configuration and capabilities.
-        </p>
+        <p className="text-sm text-muted-foreground">Edit this AI agent&apos;s configuration and capabilities.</p>
       </div>
 
       {loadingDef ? (
@@ -150,7 +161,6 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         </div>
       ) : (
         <div className="space-y-6">
-
           {/* 1. Agent name */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Agent name</label>
@@ -209,9 +219,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
                   onClick={() => setVisibility(v)}
                   className={cn(
                     'flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm transition-colors',
-                    visibility === v
-                      ? 'border-primary bg-primary/5 text-primary'
-                      : 'hover:border-primary/50',
+                    visibility === v ? 'border-primary bg-primary/5 text-primary' : 'hover:border-primary/50',
                   )}
                 >
                   {v === 'private' ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -273,7 +281,10 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
                   <span className="text-muted-foreground">Select a model…</span>
                 )}
                 <ChevronDown
-                  className={cn('h-4 w-4 text-muted-foreground shrink-0 transition-transform', modelDropdownOpen && 'rotate-180')}
+                  className={cn(
+                    'h-4 w-4 text-muted-foreground shrink-0 transition-transform',
+                    modelDropdownOpen && 'rotate-180',
+                  )}
                 />
               </button>
 
@@ -283,7 +294,10 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
                     <button
                       key={model.id}
                       type="button"
-                      onClick={() => { setSelectedModelId(model.id); setModelDropdownOpen(false); }}
+                      onClick={() => {
+                        setSelectedModelId(model.id);
+                        setModelDropdownOpen(false);
+                      }}
                       className={cn(
                         'flex w-full items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-accent transition-colors',
                         selectedModelId === model.id && 'bg-accent',
@@ -330,7 +344,6 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
               {saving ? 'Saving…' : 'Save changes'}
             </button>
           </div>
-
         </div>
       )}
     </div>

@@ -7,15 +7,8 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import type { AgentOAuthToken } from '@mediforce/platform-core';
-import {
-  listAgentOAuthTokens,
-  getAgentOAuthToken,
-  deleteAgentOAuthToken,
-} from '../oauth-tokens';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { listAgentOAuthTokens, getAgentOAuthToken, deleteAgentOAuthToken } from '../oauth-tokens';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { NotFoundError } from '../../../errors';
 
 const sampleToken: AgentOAuthToken = {
@@ -54,10 +47,7 @@ describe('agent OAuth token handlers', () => {
     await agentOAuthTokenRepo.put('team-alpha', 'agent-1', 'github', sampleToken);
     const scope = buildScope();
 
-    const { tokens } = await listAgentOAuthTokens(
-      { id: 'agent-1', namespace: 'team-alpha' },
-      scope,
-    );
+    const { tokens } = await listAgentOAuthTokens({ id: 'agent-1', namespace: 'team-alpha' }, scope);
 
     expect(tokens).toHaveLength(1);
     expect(tokens[0].serverName).toBe('github');

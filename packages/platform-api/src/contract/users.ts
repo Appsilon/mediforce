@@ -1,9 +1,5 @@
 import { z } from 'zod';
-import {
-  HandleSchema,
-  NamespaceMemberSchema,
-  NamespaceTypeSchema,
-} from '@mediforce/platform-core';
+import { HandleSchema, NamespaceMemberSchema, NamespaceTypeSchema } from '@mediforce/platform-core';
 
 export const GetMeInputSchema = z
   .object({

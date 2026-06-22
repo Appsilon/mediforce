@@ -468,19 +468,11 @@ export class Mediforce {
   readonly cowork: {
     list: (input?: ListCoworkSessionsInput) => Promise<ListCoworkSessionsOutput>;
     get: (input: GetCoworkSessionInput) => Promise<GetCoworkSessionOutput>;
-    getByInstance: (
-      input: GetCoworkSessionByInstanceInput,
-    ) => Promise<GetCoworkSessionByInstanceOutput>;
+    getByInstance: (input: GetCoworkSessionByInstanceInput) => Promise<GetCoworkSessionByInstanceOutput>;
     chat: (input: ChatCoworkSessionInput) => Promise<ChatCoworkSessionOutput>;
-    finalize: (
-      input: FinalizeCoworkSessionInput,
-    ) => Promise<FinalizeCoworkSessionOutput>;
-    voiceEphemeralKey: (
-      input: CreateVoiceEphemeralKeyInput,
-    ) => Promise<CreateVoiceEphemeralKeyOutput>;
-    voiceSynthesize: (
-      input: SynthesizeVoiceArtifactInput,
-    ) => Promise<SynthesizeVoiceArtifactOutput>;
+    finalize: (input: FinalizeCoworkSessionInput) => Promise<FinalizeCoworkSessionOutput>;
+    voiceEphemeralKey: (input: CreateVoiceEphemeralKeyInput) => Promise<CreateVoiceEphemeralKeyOutput>;
+    voiceSynthesize: (input: SynthesizeVoiceArtifactInput) => Promise<SynthesizeVoiceArtifactOutput>;
   };
 
   readonly plugins: {
@@ -488,17 +480,17 @@ export class Mediforce {
   };
 
   readonly workflows: {
-    register: (
-      input: RegisterWorkflowBody,
-      options: RegisterWorkflowOptions,
-    ) => Promise<RegisterWorkflowOutput>;
+    register: (input: RegisterWorkflowBody, options: RegisterWorkflowOptions) => Promise<RegisterWorkflowOutput>;
     list: (input?: ListWorkflowsRequest) => Promise<ListWorkflowsOutput>;
     get: (input: GetWorkflowInput) => Promise<GetWorkflowOutput>;
     versions: (input: ListWorkflowVersionsInput) => Promise<ListWorkflowVersionsOutput>;
     archiveVersion: (input: ArchiveVersionInput, options: { namespace: string }) => Promise<ArchiveVersionOutput>;
     archiveAll: (input: ArchiveAllInput, options: { namespace: string }) => Promise<ArchiveAllOutput>;
     setVisibility: (input: SetVisibilityInput, options: { namespace: string }) => Promise<SetVisibilityOutput>;
-    copy: (input: CopyWorkflowInput, options: CopyWorkflowOptions & { sourceNamespace?: string }) => Promise<CopyWorkflowOutput>;
+    copy: (
+      input: CopyWorkflowInput,
+      options: CopyWorkflowOptions & { sourceNamespace?: string },
+    ) => Promise<CopyWorkflowOutput>;
     setDefaultVersion: (input: SetDefaultVersionInput) => Promise<SetDefaultVersionOutput>;
     delete: (input: DeleteWorkflowInput) => Promise<DeleteWorkflowOutput>;
     getRunCount: (input: GetWorkflowRunCountInput) => Promise<GetWorkflowRunCountOutput>;
@@ -526,24 +518,12 @@ export class Mediforce {
     create: (input: CreateAgentBody) => Promise<CreateAgentOutput>;
     delete: (input: DeleteAgentInput) => Promise<DeleteAgentOutput>;
     update: (input: UpdateAgentInput, body: UpdateAgentBody) => Promise<UpdateAgentOutput>;
-    listMcpBindings: (
-      input: ListAgentMcpBindingsInput,
-    ) => Promise<ListAgentMcpBindingsOutput>;
-    upsertMcpBinding: (
-      input: UpsertAgentMcpBindingInput,
-    ) => Promise<UpsertAgentMcpBindingOutput>;
-    deleteMcpBinding: (
-      input: DeleteAgentMcpBindingInput,
-    ) => Promise<DeleteAgentMcpBindingOutput>;
-    listOAuthTokens: (
-      input: ListAgentOAuthTokensInput,
-    ) => Promise<ListAgentOAuthTokensOutput>;
-    getOAuthToken: (
-      input: GetAgentOAuthTokenInput,
-    ) => Promise<GetAgentOAuthTokenOutput>;
-    deleteOAuthToken: (
-      input: DeleteAgentOAuthTokenInput,
-    ) => Promise<DeleteAgentOAuthTokenOutput>;
+    listMcpBindings: (input: ListAgentMcpBindingsInput) => Promise<ListAgentMcpBindingsOutput>;
+    upsertMcpBinding: (input: UpsertAgentMcpBindingInput) => Promise<UpsertAgentMcpBindingOutput>;
+    deleteMcpBinding: (input: DeleteAgentMcpBindingInput) => Promise<DeleteAgentMcpBindingOutput>;
+    listOAuthTokens: (input: ListAgentOAuthTokensInput) => Promise<ListAgentOAuthTokensOutput>;
+    getOAuthToken: (input: GetAgentOAuthTokenInput) => Promise<GetAgentOAuthTokenOutput>;
+    deleteOAuthToken: (input: DeleteAgentOAuthTokenInput) => Promise<DeleteAgentOAuthTokenOutput>;
   };
 
   readonly models: {
@@ -557,12 +537,8 @@ export class Mediforce {
     set: (input: SetSecretInput) => Promise<SetSecretOutput>;
     list: (input: ListSecretKeysInput) => Promise<ListSecretKeysOutput>;
     delete: (input: DeleteSecretInput) => Promise<DeleteSecretOutput>;
-    workspacePreviews: (
-      input: GetWorkspaceSecretPreviewsInput,
-    ) => Promise<GetWorkspaceSecretPreviewsOutput>;
-    workflowKeysBatch: (
-      input: ListWorkflowSecretKeysBatchInput,
-    ) => Promise<ListWorkflowSecretKeysBatchOutput>;
+    workspacePreviews: (input: GetWorkspaceSecretPreviewsInput) => Promise<GetWorkspaceSecretPreviewsOutput>;
+    workflowKeysBatch: (input: ListWorkflowSecretKeysBatchInput) => Promise<ListWorkflowSecretKeysBatchOutput>;
   };
 
   readonly workflowSecrets: {
@@ -684,31 +660,23 @@ export class Mediforce {
       },
       get: async (input) => {
         const validated = GetTaskInputSchema.parse(input);
-        const res = await this.request(
-          `/api/tasks/${encodeURIComponent(validated.taskId)}`,
-        );
+        const res = await this.request(`/api/tasks/${encodeURIComponent(validated.taskId)}`);
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.get');
         return GetTaskOutputSchema.parse(body);
       },
       claim: async (input) => {
         const validated = ClaimTaskInputSchema.parse(input);
-        const res = await this.request(
-          `/api/tasks/${encodeURIComponent(validated.taskId)}/claim`,
-          { method: 'POST' },
-        );
+        const res = await this.request(`/api/tasks/${encodeURIComponent(validated.taskId)}/claim`, { method: 'POST' });
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.claim');
         return ClaimTaskOutputSchema.parse(body);
       },
       complete: async (input) => {
         const validated = CompleteTaskInputSchema.parse(input);
-        const res = await this.request(
-          `/api/tasks/${encodeURIComponent(validated.taskId)}/complete`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(validated.payload),
-          },
-        );
+        const res = await this.request(`/api/tasks/${encodeURIComponent(validated.taskId)}/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validated.payload),
+        });
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.complete');
         return CompleteTaskOutputSchema.parse(body);
       },
@@ -717,17 +685,13 @@ export class Mediforce {
     this.processes = {
       get: async (input) => {
         const validated = GetProcessInputSchema.parse(input);
-        const res = await this.request(
-          `/api/processes/${encodeURIComponent(validated.instanceId)}`,
-        );
+        const res = await this.request(`/api/processes/${encodeURIComponent(validated.instanceId)}`);
         const body = await parseJsonOrThrow(res, 'mediforce.processes.get');
         return GetProcessOutputSchema.parse(body);
       },
       listAuditEvents: async (input) => {
         const validated = ListAuditEventsInputSchema.parse(input);
-        const res = await this.request(
-          `/api/processes/${encodeURIComponent(validated.instanceId)}/audit`,
-        );
+        const res = await this.request(`/api/processes/${encodeURIComponent(validated.instanceId)}/audit`);
         const body = await parseJsonOrThrow(res, 'mediforce.processes.listAuditEvents');
         return ListAuditEventsOutputSchema.parse(body);
       },
@@ -735,22 +699,15 @@ export class Mediforce {
         const validated = ListAgentEventsInputSchema.parse(input);
         const qs = toSearchParams({
           stepId: validated.stepId,
-          afterSequence:
-            validated.afterSequence === undefined
-              ? undefined
-              : String(validated.afterSequence),
+          afterSequence: validated.afterSequence === undefined ? undefined : String(validated.afterSequence),
         });
-        const res = await this.request(
-          `/api/processes/${encodeURIComponent(validated.instanceId)}/agent-events${qs}`,
-        );
+        const res = await this.request(`/api/processes/${encodeURIComponent(validated.instanceId)}/agent-events${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.processes.agentEvents');
         return ListAgentEventsOutputSchema.parse(body);
       },
       getSteps: async (input) => {
         const validated = GetProcessStepsInputSchema.parse(input);
-        const res = await this.request(
-          `/api/processes/${encodeURIComponent(validated.instanceId)}/steps`,
-        );
+        const res = await this.request(`/api/processes/${encodeURIComponent(validated.instanceId)}/steps`);
         const body = await parseJsonOrThrow(res, 'mediforce.processes.getSteps');
         return GetProcessStepsOutputSchema.parse(body);
       },
@@ -769,17 +726,13 @@ export class Mediforce {
       },
       get: async (input) => {
         const validated = GetCoworkSessionInputSchema.parse(input);
-        const res = await this.request(
-          `/api/cowork/${encodeURIComponent(validated.sessionId)}`,
-        );
+        const res = await this.request(`/api/cowork/${encodeURIComponent(validated.sessionId)}`);
         const body = await parseJsonOrThrow(res, 'mediforce.cowork.get');
         return GetCoworkSessionOutputSchema.parse(body);
       },
       getByInstance: async (input) => {
         const validated = GetCoworkSessionByInstanceInputSchema.parse(input);
-        const res = await this.request(
-          `/api/cowork/by-instance/${encodeURIComponent(validated.instanceId)}`,
-        );
+        const res = await this.request(`/api/cowork/by-instance/${encodeURIComponent(validated.instanceId)}`);
         const body = await parseJsonOrThrow(res, 'mediforce.cowork.getByInstance');
         return GetCoworkSessionByInstanceOutputSchema.parse(body);
       },
@@ -838,9 +791,7 @@ export class Mediforce {
         const validatedInput = RegisterWorkflowInputSchema.parse(input);
         const namespace = options.namespace;
         if (typeof namespace !== 'string' || namespace.length === 0) {
-          throw new Error(
-            'mediforce.workflows.register: `namespace` is required (passed as an HTTP query parameter).',
-          );
+          throw new Error('mediforce.workflows.register: `namespace` is required (passed as an HTTP query parameter).');
         }
         const qs = toSearchParams({ namespace });
         return this.sendJson(
@@ -871,18 +822,14 @@ export class Mediforce {
           version: validated.version !== undefined ? String(validated.version) : undefined,
           namespace: validated.namespace,
         });
-        const res = await this.request(
-          `/api/workflow-definitions/${encodeURIComponent(validated.name)}${qs}`,
-        );
+        const res = await this.request(`/api/workflow-definitions/${encodeURIComponent(validated.name)}${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.get');
         return GetWorkflowOutputSchema.parse(body);
       },
       versions: async (input) => {
         const validated = ListWorkflowVersionsInputSchema.parse(input);
         const qs = toSearchParams({ namespace: validated.namespace });
-        const res = await this.request(
-          `/api/workflow-definitions/${encodeURIComponent(validated.name)}/versions${qs}`,
-        );
+        const res = await this.request(`/api/workflow-definitions/${encodeURIComponent(validated.name)}/versions${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.versions');
         return ListWorkflowVersionsOutputSchema.parse(body);
       },
@@ -943,9 +890,7 @@ export class Mediforce {
       getRunCount: async (input) => {
         const v = GetWorkflowRunCountInputSchema.parse(input);
         const qs = toSearchParams({ namespace: v.namespace });
-        const res = await this.request(
-          `/api/workflow-definitions/${encodeURIComponent(v.name)}/run-count${qs}`,
-        );
+        const res = await this.request(`/api/workflow-definitions/${encodeURIComponent(v.name)}/run-count${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.getRunCount');
         return GetWorkflowRunCountOutputSchema.parse(body);
       },
@@ -986,18 +931,13 @@ export class Mediforce {
       },
       get: async (input) => {
         const validated = GetAgentInputSchema.parse(input);
-        const res = await this.request(
-          `/api/agents/${encodeURIComponent(validated.id)}`,
-        );
+        const res = await this.request(`/api/agents/${encodeURIComponent(validated.id)}`);
         const body = await parseJsonOrThrow(res, 'mediforce.agents.get');
         return GetAgentOutputSchema.parse(body);
       },
       delete: async (input) => {
         const validated = DeleteAgentInputSchema.parse(input);
-        const res = await this.request(
-          `/api/agents/${encodeURIComponent(validated.id)}`,
-          { method: 'DELETE' },
-        );
+        const res = await this.request(`/api/agents/${encodeURIComponent(validated.id)}`, { method: 'DELETE' });
         const body = await parseJsonOrThrow(res, 'mediforce.agents.delete');
         return DeleteAgentOutputSchema.parse(body);
       },
@@ -1051,9 +991,7 @@ export class Mediforce {
       listOAuthTokens: async (input) => {
         const v = ListAgentOAuthTokensInputSchema.parse(input);
         const qs = toSearchParams({ namespace: v.namespace });
-        const res = await this.request(
-          `/api/agents/${encodeURIComponent(v.id)}/oauth${qs}`,
-        );
+        const res = await this.request(`/api/agents/${encodeURIComponent(v.id)}/oauth${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.agents.listOAuthTokens');
         return ListAgentOAuthTokensOutputSchema.parse(body);
       },
@@ -1071,9 +1009,7 @@ export class Mediforce {
         const qs = toSearchParams({
           namespace: v.namespace,
           serverName: v.serverName,
-          ...(v.revokeAtProvider !== undefined
-            ? { revokeAtProvider: v.revokeAtProvider ? 'true' : 'false' }
-            : {}),
+          ...(v.revokeAtProvider !== undefined ? { revokeAtProvider: v.revokeAtProvider ? 'true' : 'false' } : {}),
         });
         const res = await this.request(
           `/api/agents/${encodeURIComponent(v.id)}/oauth/${encodeURIComponent(v.provider)}${qs}`,
@@ -1092,7 +1028,8 @@ export class Mediforce {
               provider: validated.provider,
               supportsTools: validated.supportsTools !== undefined ? String(validated.supportsTools) : undefined,
               supportsVision: validated.supportsVision !== undefined ? String(validated.supportsVision) : undefined,
-              minContextLength: validated.minContextLength !== undefined ? String(validated.minContextLength) : undefined,
+              minContextLength:
+                validated.minContextLength !== undefined ? String(validated.minContextLength) : undefined,
             })
           : '';
         const res = await this.request(`/api/model-registry${qs}`);
@@ -1101,9 +1038,7 @@ export class Mediforce {
       },
       get: async (input) => {
         const validated = GetModelInputSchema.parse(input);
-        const res = await this.request(
-          `/api/model-registry/${encodeURIComponent(validated.id)}`,
-        );
+        const res = await this.request(`/api/model-registry/${encodeURIComponent(validated.id)}`);
         const body = await parseJsonOrThrow(res, 'mediforce.models.get');
         return GetModelOutputSchema.parse(body);
       },
@@ -1146,17 +1081,13 @@ export class Mediforce {
       },
       get: async (input) => {
         const validated = GetRunInputSchema.parse(input);
-        const res = await this.request(
-          `/api/runs/${encodeURIComponent(validated.runId)}`,
-        );
+        const res = await this.request(`/api/runs/${encodeURIComponent(validated.runId)}`);
         const body = await parseJsonOrThrow(res, 'mediforce.runs.get');
         return GetRunOutputSchema.parse(body);
       },
       listOutputFiles: async (input) => {
         const validated = ListRunOutputFilesInputSchema.parse(input);
-        const res = await this.request(
-          `/api/runs/${encodeURIComponent(validated.runId)}/files`,
-        );
+        const res = await this.request(`/api/runs/${encodeURIComponent(validated.runId)}/files`);
         const body = await parseJsonOrThrow(res, 'mediforce.runs.listOutputFiles');
         return ListRunOutputFilesOutputSchema.parse(body);
       },
@@ -1164,13 +1095,8 @@ export class Mediforce {
         const validated = DownloadRunOutputFileInputSchema.parse(input);
         // `path` is repo-relative with meaningful slashes (`.mediforce/output/<stepId>/<name>`)
         // — encode each segment, keep the separators.
-        const encodedPath = validated.path
-          .split('/')
-          .map(encodeURIComponent)
-          .join('/');
-        const res = await this.request(
-          `/api/runs/${encodeURIComponent(validated.runId)}/files/${encodedPath}`,
-        );
+        const encodedPath = validated.path.split('/').map(encodeURIComponent).join('/');
+        const res = await this.request(`/api/runs/${encodeURIComponent(validated.runId)}/files/${encodedPath}`);
         if (res.ok === false) {
           // Error responses are the JSON envelope — parseJsonOrThrow always
           // throws ApiError on non-OK.
@@ -1199,23 +1125,19 @@ export class Mediforce {
       cancel: async (input) => {
         const validated = CancelRunInputSchema.parse(input);
         const body = validated.reason !== undefined ? { reason: validated.reason } : {};
-        const res = await this.request(
-          `/api/processes/${encodeURIComponent(validated.runId)}/cancel`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          },
-        );
+        const res = await this.request(`/api/processes/${encodeURIComponent(validated.runId)}/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
         const parsed = await parseJsonOrThrow(res, 'mediforce.runs.cancel');
         return CancelRunOutputSchema.parse(parsed);
       },
       resume: async (input) => {
         const validated = ResumeRunInputSchema.parse(input);
-        const res = await this.request(
-          `/api/processes/${encodeURIComponent(validated.runId)}/resume`,
-          { method: 'POST' },
-        );
+        const res = await this.request(`/api/processes/${encodeURIComponent(validated.runId)}/resume`, {
+          method: 'POST',
+        });
         const parsed = await parseJsonOrThrow(res, 'mediforce.runs.resume');
         return ResumeRunOutputSchema.parse(parsed);
       },
@@ -1378,9 +1300,7 @@ export class Mediforce {
       get: async (input) => {
         const validated = GetOAuthProviderInputSchema.parse(input);
         const qs = toSearchParams({ namespace: validated.namespace });
-        const res = await this.request(
-          `/api/admin/oauth-providers/${encodeURIComponent(validated.id)}${qs}`,
-        );
+        const res = await this.request(`/api/admin/oauth-providers/${encodeURIComponent(validated.id)}${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.get');
         return GetOAuthProviderOutputSchema.parse(body);
       },
@@ -1400,24 +1320,20 @@ export class Mediforce {
         const validated = UpdateOAuthProviderInputApiSchema.parse(input);
         const { namespace, id, ...patch } = validated;
         const qs = toSearchParams({ namespace });
-        const res = await this.request(
-          `/api/admin/oauth-providers/${encodeURIComponent(id)}${qs}`,
-          {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(patch),
-          },
-        );
+        const res = await this.request(`/api/admin/oauth-providers/${encodeURIComponent(id)}${qs}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
         const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.update');
         return UpdateOAuthProviderOutputSchema.parse(body);
       },
       delete: async (input) => {
         const validated = DeleteOAuthProviderInputSchema.parse(input);
         const qs = toSearchParams({ namespace: validated.namespace });
-        const res = await this.request(
-          `/api/admin/oauth-providers/${encodeURIComponent(validated.id)}${qs}`,
-          { method: 'DELETE' },
-        );
+        const res = await this.request(`/api/admin/oauth-providers/${encodeURIComponent(validated.id)}${qs}`, {
+          method: 'DELETE',
+        });
         const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.delete');
         return DeleteOAuthProviderOutputSchema.parse(body);
       },
@@ -1447,9 +1363,7 @@ export class Mediforce {
       get: async (input) => {
         const validated = GetToolCatalogEntryInputSchema.parse(input);
         const qs = toSearchParams({ namespace: validated.namespace });
-        const res = await this.request(
-          `/api/admin/tool-catalog/${encodeURIComponent(validated.id)}${qs}`,
-        );
+        const res = await this.request(`/api/admin/tool-catalog/${encodeURIComponent(validated.id)}${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.get');
         return GetToolCatalogEntryOutputSchema.parse(body);
       },
@@ -1469,24 +1383,20 @@ export class Mediforce {
         const validated = UpdateToolCatalogEntryInputApiSchema.parse(input);
         const { namespace, id, ...patch } = validated;
         const qs = toSearchParams({ namespace });
-        const res = await this.request(
-          `/api/admin/tool-catalog/${encodeURIComponent(id)}${qs}`,
-          {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(patch),
-          },
-        );
+        const res = await this.request(`/api/admin/tool-catalog/${encodeURIComponent(id)}${qs}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
         const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.update');
         return UpdateToolCatalogEntryOutputSchema.parse(body);
       },
       delete: async (input) => {
         const validated = DeleteToolCatalogEntryInputSchema.parse(input);
         const qs = toSearchParams({ namespace: validated.namespace });
-        const res = await this.request(
-          `/api/admin/tool-catalog/${encodeURIComponent(validated.id)}${qs}`,
-          { method: 'DELETE' },
-        );
+        const res = await this.request(`/api/admin/tool-catalog/${encodeURIComponent(validated.id)}${qs}`, {
+          method: 'DELETE',
+        });
         const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.delete');
         return DeleteToolCatalogEntryOutputSchema.parse(body);
       },
@@ -1508,9 +1418,7 @@ export class Mediforce {
       },
       get: async (input) => {
         const validated = GetAgentRunInputSchema.parse(input);
-        const res = await this.request(
-          `/api/agent-runs/${encodeURIComponent(validated.agentRunId)}`,
-        );
+        const res = await this.request(`/api/agent-runs/${encodeURIComponent(validated.agentRunId)}`);
         const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.get');
         return GetAgentRunOutputSchema.parse(body);
       },
@@ -1519,9 +1427,7 @@ export class Mediforce {
     this.monitoring = {
       summary: async (input) => {
         const validated = MonitoringSummaryInputSchema.parse(input);
-        const res = await this.request(
-          `/api/namespaces/${encodeURIComponent(validated.handle)}/monitoring/summary`,
-        );
+        const res = await this.request(`/api/namespaces/${encodeURIComponent(validated.handle)}/monitoring/summary`);
         const body = await parseJsonOrThrow(res, 'mediforce.monitoring.summary');
         return GetMonitoringSummaryOutputSchema.parse(body);
       },
@@ -1556,9 +1462,7 @@ export class Mediforce {
         return ResendInviteOutputSchema.parse(body);
       },
       me: async (input) => {
-        const qs = input?.uid !== undefined && input.uid !== ''
-          ? toSearchParams({ uid: input.uid })
-          : '';
+        const qs = input?.uid !== undefined && input.uid !== '' ? toSearchParams({ uid: input.uid }) : '';
         const res = await this.request(`/api/users/me${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.users.me');
         return GetMeOutputSchema.parse(body);
@@ -1578,9 +1482,7 @@ export class Mediforce {
     this.namespaces = {
       get: async (input) => {
         const validated = GetNamespaceInputSchema.parse(input);
-        const res = await this.request(
-          `/api/namespaces/${encodeURIComponent(validated.handle)}`,
-        );
+        const res = await this.request(`/api/namespaces/${encodeURIComponent(validated.handle)}`);
         const body = await parseJsonOrThrow(res, 'mediforce.namespaces.get');
         return GetNamespaceOutputSchema.parse(body);
       },
@@ -1734,9 +1636,7 @@ export class Mediforce {
   }
 }
 
-function toSearchParams(
-  input: Record<string, string | readonly string[] | undefined>,
-): string {
+function toSearchParams(input: Record<string, string | readonly string[] | undefined>): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(input)) {
     if (value === undefined) continue;

@@ -20,9 +20,7 @@ vi.mock('../../lib/platform-services', () => {
 });
 
 vi.mock('../../lib/api-auth', async () => {
-  const actual = await vi.importActual<typeof import('../../lib/api-auth')>(
-    '../../lib/api-auth',
-  );
+  const actual = await vi.importActual<typeof import('../../lib/api-auth')>('../../lib/api-auth');
   return {
     ...actual,
     resolveCallerIdentity: async () => ({ kind: 'apiKey' as const, isSystemActor: true as const }),
@@ -38,7 +36,8 @@ describe('GET /api/plugins', () => {
 
   beforeEach(async () => {
     const mod = await import('../../lib/platform-services');
-    mockPlugins = (mod as unknown as { _mockPlugins: Map<string, { metadata?: PluginCapabilityMetadata }> })._mockPlugins;
+    mockPlugins = (mod as unknown as { _mockPlugins: Map<string, { metadata?: PluginCapabilityMetadata }> })
+      ._mockPlugins;
     mockPlugins.clear();
   });
 

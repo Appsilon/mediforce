@@ -1,9 +1,6 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { getRun } from '@mediforce/platform-api/handlers';
-import {
-  GetRunInputSchema,
-  type GetRunInput,
-} from '@mediforce/platform-api/contract';
+import { GetRunInputSchema, type GetRunInput } from '@mediforce/platform-api/contract';
 
 interface RouteContext {
   params: Promise<{ runId: string }>;
@@ -21,12 +18,7 @@ interface RouteContext {
  * as 404 (anti-enumeration). This is a deliberate behavioural change from
  * the legacy inline route's 403, matching the Phase 1 pattern.
  */
-export const GET = createRouteAdapter<
-  typeof GetRunInputSchema,
-  GetRunInput,
-  unknown,
-  RouteContext
->(
+export const GET = createRouteAdapter<typeof GetRunInputSchema, GetRunInput, unknown, RouteContext>(
   GetRunInputSchema,
   async (_req, ctx) => ({ runId: (await ctx.params).runId }),
   getRun,

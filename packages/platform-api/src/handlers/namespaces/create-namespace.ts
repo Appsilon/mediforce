@@ -1,10 +1,7 @@
 import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
 import { ConflictError, ForbiddenError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
-import type {
-  CreateNamespaceInput,
-  CreateNamespaceOutput,
-} from '../../contract/namespaces';
+import type { CreateNamespaceInput, CreateNamespaceOutput } from '../../contract/namespaces';
 
 /**
  * Create an organization workspace. Atomic write of namespace doc + owner
@@ -15,14 +12,9 @@ import type {
  * scope until a real abuse signal exists. apiKey callers are rejected — a
  * workspace without a human owner is unreachable through the UI.
  */
-export async function createNamespace(
-  input: CreateNamespaceInput,
-  scope: CallerScope,
-): Promise<CreateNamespaceOutput> {
+export async function createNamespace(input: CreateNamespaceInput, scope: CallerScope): Promise<CreateNamespaceOutput> {
   if (scope.caller.kind !== 'user') {
-    throw new ForbiddenError(
-      'POST /api/namespaces requires an authenticated user (owner has no uid otherwise)',
-    );
+    throw new ForbiddenError('POST /api/namespaces requires an authenticated user (owner has no uid otherwise)');
   }
   const uid = scope.caller.uid;
 
@@ -35,12 +27,14 @@ export async function createNamespace(
   // carries a human-readable `displayName` from day one. Without this, the
   // members list would show the owner's uid until they re-invited themselves.
   // Best-effort: directory unconfigured or lookup failure → no displayName.
-  const callerMetadata = scope.system.userDirectory !== null
-    ? await scope.system.userDirectory.getUserMetadata(uid).catch(() => null)
-    : null;
-  const ownerDisplayName = typeof callerMetadata?.displayName === 'string' && callerMetadata.displayName.length > 0
-    ? callerMetadata.displayName
-    : undefined;
+  const callerMetadata =
+    scope.system.userDirectory !== null
+      ? await scope.system.userDirectory.getUserMetadata(uid).catch(() => null)
+      : null;
+  const ownerDisplayName =
+    typeof callerMetadata?.displayName === 'string' && callerMetadata.displayName.length > 0
+      ? callerMetadata.displayName
+      : undefined;
 
   const now = new Date().toISOString();
   const namespace: Namespace = {

@@ -7,10 +7,7 @@ import {
   buildProcessInstance,
 } from '@mediforce/platform-core/testing';
 import { listAgentRuns, getByIdAdapter } from '@mediforce/platform-api/handlers';
-import {
-  GetAgentRunInputSchema,
-  ListAgentRunsInputSchema,
-} from '@mediforce/platform-api/contract';
+import { GetAgentRunInputSchema, ListAgentRunsInputSchema } from '@mediforce/platform-api/contract';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { Mediforce } from '@mediforce/platform-api/client';
 import { createRouteAdapter } from '../../lib/route-adapter';
@@ -27,10 +24,7 @@ interface RouteWithCtx {
  * registered — the agent-runs list and the agent-runs detail — so the
  * Mediforce client's `list` and `get` exercise the actual adapter stack.
  */
-function loopbackFetch(
-  listRoute: (req: NextRequest) => Promise<Response>,
-  detailRoute: RouteWithCtx,
-): typeof fetch {
+function loopbackFetch(listRoute: (req: NextRequest) => Promise<Response>, detailRoute: RouteWithCtx): typeof fetch {
   return async (input, init) => {
     const url = typeof input === 'string' ? input : input.toString();
     const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
@@ -82,11 +76,7 @@ describe('Mediforce client ↔ route-adapter ↔ agentRuns handlers (in-process)
       async (_req, ctx: { params: Promise<{ agentRunId: string }> }) => ({
         agentRunId: (await ctx.params).agentRunId,
       }),
-      getByIdAdapter(
-        (input, scope) => scope.agentRuns.getById(input.agentRunId),
-        'Agent run not found',
-        'run',
-      ),
+      getByIdAdapter((input, scope) => scope.agentRuns.getById(input.agentRunId), 'Agent run not found', 'run'),
       {
         resolveCaller: async () => apiKeyCaller,
         buildScope: (caller) => createTestScope({ caller, agentRunRepo, instanceRepo }),

@@ -9,10 +9,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import { heartbeat } from '../heartbeat';
 import { ForbiddenError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { noopRunKicker } from '../../../runtime/run-kicker';
 
 /**
@@ -74,9 +71,7 @@ describe('heartbeat handler', () => {
         name: 'nightly-report',
         namespace: 'team-alpha',
         version: 1,
-        triggers: [
-          { type: 'cron', name: 'nightly', schedule: '*/15 * * * *' },
-        ],
+        triggers: [{ type: 'cron', name: 'nightly', schedule: '*/15 * * * *' }],
       }),
     );
     const fireWorkflow = vi.fn().mockResolvedValue({
@@ -116,10 +111,7 @@ describe('heartbeat handler', () => {
     );
 
     // State persisted AFTER successful fire.
-    const persistedState = await cronTriggerStateRepo.get(
-      'nightly-report',
-      'nightly',
-    );
+    const persistedState = await cronTriggerStateRepo.get('nightly-report', 'nightly');
     expect(persistedState).not.toBeNull();
     expect(persistedState!.definitionName).toBe('nightly-report');
     expect(persistedState!.triggerName).toBe('nightly');
@@ -143,9 +135,7 @@ describe('heartbeat handler', () => {
     expect(event.outputSnapshot).toMatchObject({ instanceId: 'inst-new-1' });
 
     // Run kicked.
-    expect(kicker.kicks).toEqual([
-      { instanceId: 'inst-new-1', triggeredBy: 'cron-heartbeat' },
-    ]);
+    expect(kicker.kicks).toEqual([{ instanceId: 'inst-new-1', triggeredBy: 'cron-heartbeat' }]);
   });
 
   it('skips a not-due trigger — no audit, no kick, reason="Not due"', async () => {

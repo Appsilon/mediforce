@@ -24,22 +24,26 @@ describe('validateActionSecrets', () => {
   });
 
   it('detects missing secrets in nested body', () => {
-    const steps = [step('post', {
-      method: 'POST',
-      url: 'https://api.example.com',
-      body: { token: '${secrets.TOKEN}', user: '${secrets.USER}' },
-    })];
+    const steps = [
+      step('post', {
+        method: 'POST',
+        url: 'https://api.example.com',
+        body: { token: '${secrets.TOKEN}', user: '${secrets.USER}' },
+      }),
+    ];
     const result = validateActionSecrets(steps, { TOKEN: 'tok' });
     expect(result).toHaveLength(1);
     expect(result[0].secretName).toBe('USER');
   });
 
   it('detects secrets in arrays', () => {
-    const steps = [step('email', {
-      to: ['${secrets.ADMIN_EMAIL}'],
-      subject: 'test',
-      body: 'hi',
-    })];
+    const steps = [
+      step('email', {
+        to: ['${secrets.ADMIN_EMAIL}'],
+        subject: 'test',
+        body: 'hi',
+      }),
+    ];
     const result = validateActionSecrets(steps, {});
     expect(result).toHaveLength(1);
     expect(result[0].secretName).toBe('ADMIN_EMAIL');

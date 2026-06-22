@@ -6,7 +6,12 @@ import { createQueryWrapper } from '@/test/react-query';
 
 const getMock = vi.fn<(...args: unknown[]) => Promise<CoworkSession>>();
 class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { cowork: { get: getMock } },
@@ -93,9 +98,7 @@ describe('useCoworkTurns — isSending cadence flip', () => {
   });
 
   it('polls every 5 s while idle', async () => {
-    getMock.mockResolvedValue(
-      buildCoworkSession({ id: 'sess-1', status: 'active' }),
-    );
+    getMock.mockResolvedValue(buildCoworkSession({ id: 'sess-1', status: 'active' }));
     const { wrapper } = createQueryWrapper();
 
     renderHook(() => useCoworkTurns('sess-1', false), { wrapper });
@@ -106,9 +109,7 @@ describe('useCoworkTurns — isSending cadence flip', () => {
   });
 
   it('polls every 1 s while isSending=true (CRITICAL LIVE)', async () => {
-    getMock.mockResolvedValue(
-      buildCoworkSession({ id: 'sess-1', status: 'active' }),
-    );
+    getMock.mockResolvedValue(buildCoworkSession({ id: 'sess-1', status: 'active' }));
     const { wrapper } = createQueryWrapper();
 
     renderHook(() => useCoworkTurns('sess-1', true), { wrapper });
@@ -153,22 +154,13 @@ describe('useCoworkTurns — isSending cadence flip', () => {
       timestamp: '2026-05-28T00:00:00.000Z',
       artifactDelta: null,
     };
-    queryClient.setQueryData(
-      ['cowork', 'sess-1', 'turns'],
-      [optimistic],
-    );
-    getMock.mockResolvedValue(
-      buildCoworkSession({ id: 'sess-1', turns: [] }),
-    );
+    queryClient.setQueryData(['cowork', 'sess-1', 'turns'], [optimistic]);
+    getMock.mockResolvedValue(buildCoworkSession({ id: 'sess-1', turns: [] }));
 
     renderHook(() => useCoworkTurns('sess-1', false), { wrapper });
 
     await waitFor(() => expect(getMock).toHaveBeenCalled());
-    const cached = queryClient.getQueryData<typeof optimistic[]>([
-      'cowork',
-      'sess-1',
-      'turns',
-    ]);
+    const cached = queryClient.getQueryData<(typeof optimistic)[]>(['cowork', 'sess-1', 'turns']);
     expect(cached?.some((t) => t.content === 'still flying')).toBe(true);
   });
 
@@ -197,11 +189,7 @@ describe('useCoworkTurns — isSending cadence flip', () => {
     renderHook(() => useCoworkTurns('sess-1', false), { wrapper });
 
     await waitFor(() => expect(getMock).toHaveBeenCalled());
-    const cached = queryClient.getQueryData<typeof optimistic[]>([
-      'cowork',
-      'sess-1',
-      'turns',
-    ]);
+    const cached = queryClient.getQueryData<(typeof optimistic)[]>(['cowork', 'sess-1', 'turns']);
     expect(cached?.length).toBe(1);
     expect(cached?.[0].id).toBe('srv-1');
   });

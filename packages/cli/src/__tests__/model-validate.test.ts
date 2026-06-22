@@ -32,9 +32,7 @@ describe('model validate command', () => {
   });
 
   it('prints success when all models are valid', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ unknown: [] }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ unknown: [] }));
     const output = captureOutput();
     const code = await modelValidateCommand({
       argv: ['anthropic/claude-sonnet-4,openai/gpt-4o', '--base-url', 'http://localhost:5555'],
@@ -47,18 +45,14 @@ describe('model validate command', () => {
   });
 
   it('POSTs to /api/model-registry/validate with correct body', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ unknown: [] }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ unknown: [] }));
     const output = captureOutput();
     await modelValidateCommand({
       argv: ['anthropic/claude-sonnet-4,openai/gpt-4o', '--base-url', 'http://localhost:5555'],
       env: { MEDIFORCE_API_KEY: 'k' },
       output,
     });
-    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
-      'http://localhost:5555/api/model-registry/validate',
-    );
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://localhost:5555/api/model-registry/validate');
     const requestInit = fetchSpy.mock.calls[0]?.[1] as RequestInit;
     expect(requestInit.method).toBe('POST');
     const body: unknown = JSON.parse(requestInit.body as string);
@@ -89,9 +83,7 @@ describe('model validate command', () => {
   });
 
   it('emits structured JSON and exits 0 when all valid', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ unknown: [] }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ unknown: [] }));
     const output = captureOutput();
     const code = await modelValidateCommand({
       argv: ['anthropic/claude-sonnet-4', '--json'],

@@ -14,10 +14,7 @@ export class TriggerHandler {
     private readonly cron?: CronTrigger,
   ) {}
 
-  async fire(
-    triggerType: 'manual' | 'webhook' | 'cron',
-    context: WorkflowTriggerContext,
-  ): Promise<TriggerResult> {
+  async fire(triggerType: 'manual' | 'webhook' | 'cron', context: WorkflowTriggerContext): Promise<TriggerResult> {
     if (triggerType === 'manual') return this.manual.fireWorkflow(context);
     if (triggerType === 'webhook') return this.webhook.fireWorkflow(context);
     if (triggerType === 'cron') {

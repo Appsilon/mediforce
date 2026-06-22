@@ -9,7 +9,12 @@ import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-can
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { mediforce, ApiError } from '@/lib/mediforce';
-import { parseStepErrors, validateSteps, mergeVerdictTransitions, toastRegistrationWarnings } from '@/lib/workflow-save-utils';
+import {
+  parseStepErrors,
+  validateSteps,
+  mergeVerdictTransitions,
+  toastRegistrationWarnings,
+} from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
@@ -40,7 +45,12 @@ export default function WorkflowDefinitionVersionPage() {
   const currentTransitionsRef = useRef<WorkflowDefinition['transitions']>([]);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => { if (redirectTimerRef.current !== null) clearTimeout(redirectTimerRef.current); }, []);
+  useEffect(
+    () => () => {
+      if (redirectTimerRef.current !== null) clearTimeout(redirectTimerRef.current);
+    },
+    [],
+  );
 
   // Sync editable fields and canvas refs when the user navigates to a different
   // version. We intentionally key on version only (not the full definition object)
@@ -55,79 +65,79 @@ export default function WorkflowDefinitionVersionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [definition?.version]);
 
-  const handleCanvasChange = useCallback(
-    (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => {
-      currentStepsRef.current = steps;
-      currentTransitionsRef.current = transitions;
-    },
-    [],
-  );
+  const handleCanvasChange = useCallback((steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => {
+    currentStepsRef.current = steps;
+    currentTransitionsRef.current = transitions;
+  }, []);
 
-  const handleSave = useCallback(async (title: string, setAsDefault: boolean) => {
-    if (!definition) return;
-    const steps = currentStepsRef.current;
-    const transitions = currentTransitionsRef.current;
+  const handleSave = useCallback(
+    async (title: string, setAsDefault: boolean) => {
+      if (!definition) return;
+      const steps = currentStepsRef.current;
+      const transitions = currentTransitionsRef.current;
 
-    const validationError = validateSteps(steps);
-    if (validationError !== null) {
+      const validationError = validateSteps(steps);
+      if (validationError !== null) {
+        setDialogOpen(false);
+        setSaveState({ status: 'error', message: validationError });
+        return;
+      }
+
       setDialogOpen(false);
-      setSaveState({ status: 'error', message: validationError });
-      return;
-    }
+      setStepErrors({});
+      setSaveState({ status: 'saving' });
 
-    setDialogOpen(false);
-    setStepErrors({});
-    setSaveState({ status: 'saving' });
+      const mergedTransitions = mergeVerdictTransitions(steps, transitions);
 
-    const mergedTransitions = mergeVerdictTransitions(steps, transitions);
-
-    try {
-      const result = await mediforce.workflows.register(
-        {
-          name: definition.name,
-          title: title || undefined,
-          description: editedDescription.trim() || undefined,
-          steps,
-          transitions: mergedTransitions,
-          triggers: definition.triggers,
-          roles: definition.roles,
-          env: definition.env,
-          notifications: definition.notifications,
-          metadata: definition.metadata,
-          repo: definition.repo,
-          url: definition.url,
-        },
-        { namespace: definition.namespace },
-      );
-      if (setAsDefault) {
-        await mediforce.workflows.setDefaultVersion({
-          name: definition.name,
-          namespace: definition.namespace,
-          version: result.version,
+      try {
+        const result = await mediforce.workflows.register(
+          {
+            name: definition.name,
+            title: title || undefined,
+            description: editedDescription.trim() || undefined,
+            steps,
+            transitions: mergedTransitions,
+            triggers: definition.triggers,
+            roles: definition.roles,
+            env: definition.env,
+            notifications: definition.notifications,
+            metadata: definition.metadata,
+            repo: definition.repo,
+            url: definition.url,
+          },
+          { namespace: definition.namespace },
+        );
+        if (setAsDefault) {
+          await mediforce.workflows.setDefaultVersion({
+            name: definition.name,
+            namespace: definition.namespace,
+            version: result.version,
+          });
+        }
+        setSaveState({ status: 'saved', version: result.version });
+        toastRegistrationWarnings(result.warnings, toast);
+        redirectTimerRef.current = setTimeout(() => {
+          router.push(`/${handle}/workflows/${name}/definitions/${result.version}`);
+        }, 500);
+      } catch (err) {
+        const issues =
+          err instanceof ApiError && Array.isArray(err.details)
+            ? (err.details as Array<{ path: (string | number)[]; message: string }>)
+            : [];
+        const parsed = parseStepErrors(issues, steps);
+        setStepErrors(parsed);
+        const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Unknown error';
+        setSaveState({
+          status: 'error',
+          message:
+            Object.keys(parsed).length > 0
+              ? 'Some steps have errors — check the highlighted steps in the diagram.'
+              : message,
         });
       }
-      setSaveState({ status: 'saved', version: result.version });
-      toastRegistrationWarnings(result.warnings, toast);
-      redirectTimerRef.current = setTimeout(() => {
-        router.push(`/${handle}/workflows/${name}/definitions/${result.version}`);
-      }, 500);
-    } catch (err) {
-      const issues = err instanceof ApiError && Array.isArray(err.details)
-        ? (err.details as Array<{ path: (string | number)[]; message: string }>)
-        : [];
-      const parsed = parseStepErrors(issues, steps);
-      setStepErrors(parsed);
-      const message = err instanceof ApiError ? err.message
-        : err instanceof Error ? err.message : 'Unknown error';
-      setSaveState({
-        status: 'error',
-        message: Object.keys(parsed).length > 0
-          ? 'Some steps have errors — check the highlighted steps in the diagram.'
-          : message,
-      });
-    }
-  }, [definition, editedDescription, name, handle, router]);
-
+    },
+    [definition, editedDescription, name, handle, router],
+  );
 
   if (loading) {
     return (
@@ -143,7 +153,9 @@ export default function WorkflowDefinitionVersionPage() {
     return (
       <div className="p-6 text-center text-sm text-muted-foreground">
         Definition v{version} for &ldquo;{decodedName}&rdquo; not found.{' '}
-        <Link href={routes.workflow(handle, decodedName)} className="underline">Back to workflow</Link>
+        <Link href={routes.workflow(handle, decodedName)} className="underline">
+          Back to workflow
+        </Link>
       </div>
     );
   }
@@ -157,9 +169,7 @@ export default function WorkflowDefinitionVersionPage() {
         <div className="flex items-start justify-between gap-6">
           {/* Left: workflow identity */}
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground truncate">
-              {decodedName}
-            </h1>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground truncate">{decodedName}</h1>
             <input
               value={editedDescription}
               onChange={(e) => setEditedDescription(e.target.value)}
@@ -176,10 +186,12 @@ export default function WorkflowDefinitionVersionPage() {
                 </>
               )}
               <span className="text-muted-foreground">
-                You are editing workflow version{' '}
-                <span className="font-mono font-medium">v{definition.version}</span>
+                You are editing workflow version <span className="font-mono font-medium">v{definition.version}</span>
                 {definition.title ? (
-                  <> named <span className="font-medium">&ldquo;{definition.title}&rdquo;</span></>
+                  <>
+                    {' '}
+                    named <span className="font-medium">&ldquo;{definition.title}&rdquo;</span>
+                  </>
                 ) : null}
               </span>
             </div>

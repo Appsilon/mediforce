@@ -1,6 +1,4 @@
 {
-  "markdown.marp.themes": [
-    "./docs/pitch/themes/mediforce.css"
-  ],
+  "markdown.marp.themes": ["./docs/pitch/themes/mediforce.css"],
   "markdown.marp.enableHtml": true
 }

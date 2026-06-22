@@ -7,10 +7,7 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { archiveWorkflow } from '../archive-workflow';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('archiveWorkflow handler', () => {
   let processRepo: InMemoryProcessRepository;
@@ -37,10 +34,7 @@ describe('archiveWorkflow handler', () => {
     );
     const scope = buildScope();
 
-    const result = await archiveWorkflow(
-      { name: 'flow-a', namespace: 'team-alpha', archived: true },
-      scope,
-    );
+    const result = await archiveWorkflow({ name: 'flow-a', namespace: 'team-alpha', archived: true }, scope);
 
     expect(result).toEqual({ success: true, name: 'flow-a', archived: true });
     const stored = await processRepo.getWorkflowDefinition('team-alpha', 'flow-a', 1);

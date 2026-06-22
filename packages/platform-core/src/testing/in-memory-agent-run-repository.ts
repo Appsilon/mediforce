@@ -1,14 +1,7 @@
 import { AgentRunSchema, type AgentRun } from '../schemas/agent-run';
-import type {
-  AgentRunRepository,
-  ListAgentRunsOptions,
-  ListAgentRunsPage,
-} from '../interfaces/agent-run-repository';
+import type { AgentRunRepository, ListAgentRunsOptions, ListAgentRunsPage } from '../interfaces/agent-run-repository';
 import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository';
-import {
-  encodeAgentRunCursor,
-  decodeAgentRunCursor,
-} from '../cursors/agent-run-cursor';
+import { encodeAgentRunCursor, decodeAgentRunCursor } from '../cursors/agent-run-cursor';
 
 /**
  * Comparator: startedAt DESC then id DESC. Same ordering in-memory and
@@ -33,10 +26,7 @@ export class InMemoryAgentRunRepository implements AgentRunRepository {
   async getById(runId: string): Promise<AgentRun | null> {
     return this.byId.get(runId) ?? null;
   }
-  async getByIdInNamespaces(
-    runId: string,
-    allowed: readonly string[],
-  ): Promise<AgentRun | null> {
+  async getByIdInNamespaces(runId: string, allowed: readonly string[]): Promise<AgentRun | null> {
     const run = this.byId.get(runId);
     if (!run) return null;
     const parent = await this.requireParents().getById(run.processInstanceId);
@@ -44,14 +34,9 @@ export class InMemoryAgentRunRepository implements AgentRunRepository {
     return allowed.includes(parent.namespace) ? run : null;
   }
   async getByInstanceId(instanceId: string): Promise<AgentRun[]> {
-    return [...this.byId.values()]
-      .filter((r) => r.processInstanceId === instanceId)
-      .sort(compareDesc);
+    return [...this.byId.values()].filter((r) => r.processInstanceId === instanceId).sort(compareDesc);
   }
-  async getByInstanceIdInNamespaces(
-    instanceId: string,
-    allowed: readonly string[],
-  ): Promise<AgentRun[]> {
+  async getByInstanceIdInNamespaces(instanceId: string, allowed: readonly string[]): Promise<AgentRun[]> {
     const parent = await this.requireParents().getById(instanceId);
     if (!parent || typeof parent.namespace !== 'string') return [];
     if (!allowed.includes(parent.namespace)) return [];
@@ -66,10 +51,7 @@ export class InMemoryAgentRunRepository implements AgentRunRepository {
     return this.pageOf(this.applyFilters([...this.byId.values()], opts), opts);
   }
 
-  async listInNamespaces(
-    allowed: readonly string[],
-    opts: ListAgentRunsOptions,
-  ): Promise<ListAgentRunsPage> {
+  async listInNamespaces(allowed: readonly string[], opts: ListAgentRunsOptions): Promise<ListAgentRunsPage> {
     const parents = this.requireParents();
     const allowedSet = new Set(allowed);
     const kept: AgentRun[] = [];
@@ -93,28 +75,22 @@ export class InMemoryAgentRunRepository implements AgentRunRepository {
   private pageOf(runs: AgentRun[], opts: ListAgentRunsOptions): ListAgentRunsPage {
     const sorted = [...runs].sort(compareDesc);
     const after = opts.cursor !== undefined ? decodeAgentRunCursor(opts.cursor) : null;
-    const sliced = after === null
-      ? sorted
-      : sorted.filter((r) =>
-          r.startedAt < after.startedAt
-          || (r.startedAt === after.startedAt && r.id < after.id),
-        );
+    const sliced =
+      after === null
+        ? sorted
+        : sorted.filter((r) => r.startedAt < after.startedAt || (r.startedAt === after.startedAt && r.id < after.id));
     const items = sliced.slice(0, opts.limit);
     const last = items[items.length - 1];
     const hasMore = sliced.length > items.length;
     return {
       items,
-      ...(hasMore && last !== undefined
-        ? { nextCursor: encodeAgentRunCursor(last.startedAt, last.id) }
-        : {}),
+      ...(hasMore && last !== undefined ? { nextCursor: encodeAgentRunCursor(last.startedAt, last.id) } : {}),
     };
   }
 
   private requireParents(): ProcessInstanceRepository {
     if (this.parents === undefined) {
-      throw new Error(
-        'InMemoryAgentRunRepository: ProcessInstanceRepository required for namespace-scoped methods',
-      );
+      throw new Error('InMemoryAgentRunRepository: ProcessInstanceRepository required for namespace-scoped methods');
     }
     return this.parents;
   }

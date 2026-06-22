@@ -14,7 +14,12 @@ const createMock = vi.fn<(input: CreateNamespaceInput) => Promise<CreateNamespac
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { namespaces: { create: createMock } },
   ApiError: class extends Error {
-    constructor(public status: number, message: string) { super(message); }
+    constructor(
+      public status: number,
+      message: string,
+    ) {
+      super(message);
+    }
   },
 }));
 
@@ -23,9 +28,7 @@ const { mediforce } = await import('@/lib/mediforce');
 function makeBundle(): GetMeOutput {
   return {
     user: { uid: 'uid-marek', email: 'marek@example.test', displayName: 'Marek' },
-    namespaces: [
-      { handle: 'marek', type: 'personal', displayName: 'Marek', role: 'owner' },
-    ],
+    namespaces: [{ handle: 'marek', type: 'personal', displayName: 'Marek', role: 'owner' }],
   };
 }
 
@@ -120,9 +123,7 @@ describe('namespaces.create optimistic update (list-affecting template)', () => 
 
     const { result } = renderHook(() => useOptimisticCreate(), { wrapper });
 
-    await expect(
-      result.current.mutateAsync({ handle: 'acme', displayName: 'Acme Co.' }),
-    ).rejects.toThrow('conflict');
+    await expect(result.current.mutateAsync({ handle: 'acme', displayName: 'Acme Co.' })).rejects.toThrow('conflict');
 
     const after = qc.getQueryData<GetMeOutput>(queryKeys.users.me());
     expect(after).toEqual(before);

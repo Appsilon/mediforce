@@ -86,29 +86,17 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
   }
 
   async getById(runId: string): Promise<AgentRun | null> {
-    const rows = await this.db
-      .select()
-      .from(agentRuns)
-      .where(eq(agentRuns.id, runId))
-      .limit(1);
+    const rows = await this.db.select().from(agentRuns).where(eq(agentRuns.id, runId)).limit(1);
     const row = rows[0];
     return row ? toAgentRun(row) : null;
   }
 
-  async getByIdInNamespaces(
-    runId: string,
-    allowed: readonly string[],
-  ): Promise<AgentRun | null> {
+  async getByIdInNamespaces(runId: string, allowed: readonly string[]): Promise<AgentRun | null> {
     if (allowed.length === 0) return null;
     const rows = await this.db
       .select()
       .from(agentRuns)
-      .where(
-        and(
-          eq(agentRuns.id, runId),
-          inArray(agentRuns.workspace, [...allowed]),
-        ),
-      )
+      .where(and(eq(agentRuns.id, runId), inArray(agentRuns.workspace, [...allowed])))
       .limit(1);
     const row = rows[0];
     return row ? toAgentRun(row) : null;
@@ -123,30 +111,18 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
     return rows.map((r) => toAgentRun(r));
   }
 
-  async getByInstanceIdInNamespaces(
-    instanceId: string,
-    allowed: readonly string[],
-  ): Promise<AgentRun[]> {
+  async getByInstanceIdInNamespaces(instanceId: string, allowed: readonly string[]): Promise<AgentRun[]> {
     if (allowed.length === 0) return [];
     const rows = await this.db
       .select()
       .from(agentRuns)
-      .where(
-        and(
-          eq(agentRuns.processInstanceId, instanceId),
-          inArray(agentRuns.workspace, [...allowed]),
-        ),
-      )
+      .where(and(eq(agentRuns.processInstanceId, instanceId), inArray(agentRuns.workspace, [...allowed])))
       .orderBy(desc(agentRuns.startedAt));
     return rows.map((r) => toAgentRun(r));
   }
 
   async getAll(limitN = 100): Promise<AgentRun[]> {
-    const rows = await this.db
-      .select()
-      .from(agentRuns)
-      .orderBy(desc(agentRuns.startedAt))
-      .limit(limitN);
+    const rows = await this.db.select().from(agentRuns).orderBy(desc(agentRuns.startedAt)).limit(limitN);
     return rows.map((r) => toAgentRun(r));
   }
 
@@ -154,10 +130,7 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
     return this.listImpl(opts, undefined);
   }
 
-  async listInNamespaces(
-    allowed: readonly string[],
-    opts: ListAgentRunsOptions,
-  ): Promise<ListAgentRunsPage> {
+  async listInNamespaces(allowed: readonly string[], opts: ListAgentRunsOptions): Promise<ListAgentRunsPage> {
     if (allowed.length === 0) return { items: [] };
     return this.listImpl(opts, [...allowed]);
   }
@@ -186,10 +159,7 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
         conditions.push(
           or(
             lt(agentRuns.startedAt, new Date(after.startedAt)),
-            and(
-              eq(agentRuns.startedAt, new Date(after.startedAt)),
-              sql`${agentRuns.id} < ${after.id}`,
-            ),
+            and(eq(agentRuns.startedAt, new Date(after.startedAt)), sql`${agentRuns.id} < ${after.id}`),
           ),
         );
       }
@@ -235,9 +205,7 @@ interface SplitResult {
  * returns/accepts strings. `cost_usd` lives inside the payload too (the
  * envelope schema doesn't carry it directly today) — leave for follow-up.
  */
-function splitEnvelope(
-  envelope: AgentRun['envelope'],
-): SplitResult {
+function splitEnvelope(envelope: AgentRun['envelope']): SplitResult {
   if (envelope === null) {
     return {
       extracted: {
@@ -251,13 +219,7 @@ function splitEnvelope(
       payload: null,
     };
   }
-  const {
-    confidence,
-    model,
-    duration_ms,
-    tokenUsage,
-    ...rest
-  } = envelope;
+  const { confidence, model, duration_ms, tokenUsage, ...rest } = envelope;
   const restPayload = rest as Record<string, unknown>;
   return {
     extracted: {

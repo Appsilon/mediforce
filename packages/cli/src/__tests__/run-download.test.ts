@@ -70,22 +70,14 @@ describe('run download command', () => {
     const output = captureOutput();
     const code = await runDownloadCommand({ argv: [], env: BASE_ENV, output });
     expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(
-      /Missing required positional argument: RUNID/,
-    );
+    expect(output.stderrLines.join('\n')).toMatch(/Missing required positional argument: RUNID/);
   });
 
   it('downloads a single file byte-identically to <outDir>/<fileName>', async () => {
     mockRunFilesApi();
     const output = captureOutput();
     const code = await runDownloadCommand({
-      argv: [
-        ...BASE_ARGS,
-        'run-1',
-        '.mediforce/output/extract/report.pdf',
-        '--output',
-        tempDir,
-      ],
+      argv: [...BASE_ARGS, 'run-1', '.mediforce/output/extract/report.pdf', '--output', tempDir],
       env: BASE_ENV,
       output,
     });
@@ -120,11 +112,7 @@ describe('run download command', () => {
     expect(code).toBe(0);
     const extractDestination = join(tempDir, 'extract', 'report.pdf');
     const gradeDestination = join(tempDir, 'grade', 'report.pdf');
-    expect(output.stdoutLines).toEqual([
-      extractDestination,
-      gradeDestination,
-      `Downloaded 2 file(s) to ${tempDir}`,
-    ]);
+    expect(output.stdoutLines).toEqual([extractDestination, gradeDestination, `Downloaded 2 file(s) to ${tempDir}`]);
     expect(new Uint8Array(await readFile(extractDestination))).toEqual(PDF_BYTES);
     expect(new Uint8Array(await readFile(gradeDestination))).toEqual(CSV_BYTES);
   });
@@ -160,14 +148,7 @@ describe('run download command', () => {
     mockRunFilesApi();
     const output = captureOutput();
     const code = await runDownloadCommand({
-      argv: [
-        ...BASE_ARGS,
-        'run-1',
-        '.mediforce/output/grade/report.pdf',
-        '--output',
-        tempDir,
-        '--json',
-      ],
+      argv: [...BASE_ARGS, 'run-1', '.mediforce/output/grade/report.pdf', '--output', tempDir, '--json'],
       env: BASE_ENV,
       output,
     });
@@ -177,9 +158,7 @@ describe('run download command', () => {
   });
 
   it('exits 1 with structured error JSON on 404', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Run not found' }, 404),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Run not found' }, 404));
     const output = captureOutput();
     const code = await runDownloadCommand({
       argv: [...BASE_ARGS, 'nope', '--output', tempDir, '--json'],

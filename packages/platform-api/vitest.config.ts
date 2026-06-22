@@ -7,30 +7,12 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@mediforce/platform-core/testing': path.resolve(
-        __dirname,
-        '../platform-core/src/testing/index.ts',
-      ),
-      '@mediforce/platform-core': path.resolve(
-        __dirname,
-        '../platform-core/src/index.ts',
-      ),
-      '@mediforce/workflow-engine': path.resolve(
-        __dirname,
-        '../workflow-engine/src/index.ts',
-      ),
-      '@mediforce/agent-runtime': path.resolve(
-        __dirname,
-        '../agent-runtime/src/index.ts',
-      ),
-      '@mediforce/platform-infra': path.resolve(
-        __dirname,
-        '../platform-infra/src/index.ts',
-      ),
-      '@mediforce/mcp-client': path.resolve(
-        __dirname,
-        '../mcp-client/src/index.ts',
-      ),
+      '@mediforce/platform-core/testing': path.resolve(__dirname, '../platform-core/src/testing/index.ts'),
+      '@mediforce/platform-core': path.resolve(__dirname, '../platform-core/src/index.ts'),
+      '@mediforce/workflow-engine': path.resolve(__dirname, '../workflow-engine/src/index.ts'),
+      '@mediforce/agent-runtime': path.resolve(__dirname, '../agent-runtime/src/index.ts'),
+      '@mediforce/platform-infra': path.resolve(__dirname, '../platform-infra/src/index.ts'),
+      '@mediforce/mcp-client': path.resolve(__dirname, '../mcp-client/src/index.ts'),
     },
   },
 });

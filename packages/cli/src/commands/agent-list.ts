@@ -17,7 +17,9 @@ export const agentListCommand = defineCommand({
     }
     output.stdout(`Found ${String(result.agents.length)} agent(s):`);
     for (const agent of result.agents) {
-      output.stdout(`  ${agent.id}  ${agent.name}  (${agent.foundationModel})  [${agent.visibility}]  ns=${agent.namespace ?? '—'}`);
+      output.stdout(
+        `  ${agent.id}  ${agent.name}  (${agent.foundationModel})  [${agent.visibility}]  ns=${agent.namespace ?? '—'}`,
+      );
     }
     return 0;
   },

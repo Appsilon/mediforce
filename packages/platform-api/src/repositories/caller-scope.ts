@@ -9,12 +9,7 @@ import type {
   UserDirectoryService,
   UserProfileRepository,
 } from '@mediforce/platform-core';
-import type {
-  CronTrigger,
-  ManualTrigger,
-  WebhookRouter,
-  WorkflowEngine,
-} from '@mediforce/workflow-engine';
+import type { CronTrigger, ManualTrigger, WebhookRouter, WorkflowEngine } from '@mediforce/workflow-engine';
 import type { CallerIdentity } from '../auth';
 import type { RunKicker } from '../runtime/run-kicker';
 import type { DockerImagesService } from '../services/docker-images-service';

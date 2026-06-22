@@ -17,8 +17,7 @@ export const GET = createRouteAdapter(
     const namespace = params.get('namespace');
     // Absent => schema default (true). Only an explicit `false` turns it off,
     // mirroring the home page's "show completed" toggle.
-    const includeCompletedRuns =
-      params.get('includeCompletedRuns') === 'false' ? false : undefined;
+    const includeCompletedRuns = params.get('includeCompletedRuns') === 'false' ? false : undefined;
     return {
       ...(namespace !== null ? { namespace } : {}),
       ...(includeCompletedRuns === false ? { includeCompletedRuns } : {}),
@@ -36,10 +35,7 @@ const RegisterScopedSchema = RegisterWorkflowInputSchema.extend({
  * Auto-increments version. Mint-version race preserved (status quo);
  * conflict surfaces as 409 via ConflictError.
  */
-export const POST = createRouteAdapter<
-  typeof RegisterScopedSchema,
-  RegisterWorkflowInput & { namespace: string }
->(
+export const POST = createRouteAdapter<typeof RegisterScopedSchema, RegisterWorkflowInput & { namespace: string }>(
   RegisterScopedSchema,
   async (req) => {
     const namespace = req.nextUrl.searchParams.get('namespace');

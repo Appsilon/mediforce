@@ -1,10 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type {
-  AgentDefinitionRepository,
-  CreateAgentDefinitionInput,
-} from '@mediforce/platform-core';
+import type { AgentDefinitionRepository, CreateAgentDefinitionInput } from '@mediforce/platform-core';
 import { CreateAgentDefinitionInputSchema } from '@mediforce/platform-core';
 
 /** Deterministic slug → AgentDefinition body. Slug doubles as Firestore
@@ -35,9 +32,7 @@ function loadBuiltinAgents(): Record<string, CreateAgentDefinitionInput> {
 
 const BUILTIN_AGENTS = loadBuiltinAgents();
 
-export async function seedBuiltinAgentDefinitions(
-  repo: AgentDefinitionRepository,
-): Promise<void> {
+export async function seedBuiltinAgentDefinitions(repo: AgentDefinitionRepository): Promise<void> {
   await Promise.all(
     Object.entries(BUILTIN_AGENTS).map(async ([id, body]) => {
       const existing = await repo.getById(id);

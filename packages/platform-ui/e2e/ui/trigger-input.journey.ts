@@ -50,9 +50,7 @@ test.describe('Trigger Input Journey', () => {
     // runs. Assert against either the transient "In Progress" badge or
     // the steady-state "Waiting for human" badge — both prove the run
     // started successfully.
-    await expect(
-      page.getByText(/In Progress|Waiting for human/).first(),
-    ).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/In Progress|Waiting for human/).first()).toBeVisible({ timeout: 20_000 });
     await showResult(page);
     await endRecording(page);
   });

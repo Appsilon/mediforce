@@ -1,14 +1,4 @@
-import {
-  pgTable,
-  text,
-  integer,
-  jsonb,
-  timestamp,
-  boolean,
-  index,
-  uniqueIndex,
-  primaryKey,
-} from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, jsonb, timestamp, boolean, index, uniqueIndex, primaryKey } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { workspaces } from './workspace';
 
@@ -37,9 +27,7 @@ import { workspaces } from './workspace';
 export const workflowDefinitions = pgTable(
   'workflow_definitions',
   {
-    id: text('id')
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
+    id: text('id').primaryKey().default(sql`gen_random_uuid()`),
     workspace: text('workspace')
       .notNull()
       .references(() => workspaces.handle, { onDelete: 'cascade' }),
@@ -71,17 +59,15 @@ export const workflowDefinitions = pgTable(
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
 
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    nameVersionUnique: uniqueIndex(
-      'workflow_definitions_workspace_name_version_unique',
-    ).on(table.workspace, table.name, table.version),
+    nameVersionUnique: uniqueIndex('workflow_definitions_workspace_name_version_unique').on(
+      table.workspace,
+      table.name,
+      table.version,
+    ),
     // Hot list: latest live version per (workspace, name).
     liveLatestIdx: index('workflow_definitions_live_latest_idx')
       .on(table.workspace, table.name, table.version.desc())
@@ -89,9 +75,7 @@ export const workflowDefinitions = pgTable(
     // Public cross-tenant feed.
     publicIdx: index('workflow_definitions_public_idx')
       .on(table.visibility, table.workspace, table.name)
-      .where(
-        sql`${table.deletedAt} is null and ${table.visibility} = 'public'`,
-      ),
+      .where(sql`${table.deletedAt} is null and ${table.visibility} = 'public'`),
   }),
 );
 
@@ -114,9 +98,7 @@ export const workflowMeta = pgTable(
     name: text('name').notNull(),
     defaultVersion: integer('default_version'),
     hidden: boolean('hidden').notNull().default(false),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     pk: primaryKey({ columns: [table.workspace, table.name] }),

@@ -2,15 +2,8 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import type {
-  AgentDefinition,
-  Namespace,
-  WorkflowStep,
-} from '@mediforce/platform-core';
-import {
-  resolveMcpForStep,
-  flattenResolvedMcpToLegacy,
-} from '@mediforce/agent-runtime';
+import type { AgentDefinition, Namespace, WorkflowStep } from '@mediforce/platform-core';
+import { resolveMcpForStep, flattenResolvedMcpToLegacy } from '@mediforce/agent-runtime';
 import { McpClientManager } from '@mediforce/mcp-client';
 
 // ---- Gating ---------------------------------------------------------
@@ -49,13 +42,11 @@ const fake = vi.hoisted(() => {
 
   const services = {
     namespaceRepo: {
-      getNamespace: async (handle: string) =>
-        state.namespaces.get(handle) ?? null,
+      getNamespace: async (handle: string) => state.namespaces.get(handle) ?? null,
     },
     toolCatalogRepo: {
       list: async (ns: string) => Array.from(nsCatalog(ns).values()),
-      getById: async (ns: string, id: string) =>
-        nsCatalog(ns).get(id) ?? null,
+      getById: async (ns: string, id: string) => nsCatalog(ns).get(id) ?? null,
       upsert: async (ns: string, entry: unknown) => {
         const typed = entry as { id: string };
         nsCatalog(ns).set(typed.id, entry);
@@ -184,11 +175,7 @@ describe('MCP stdio roundtrip — L5 external sanity (no LLM required)', () => {
     expect(createRes.status).toBe(201);
 
     const bindRes = await mcpServerByNameRoute.PUT(
-      jsonRequest(
-        'PUT',
-        `/api/agents/${COWORK_AGENT.id}/mcp-servers/echo`,
-        { type: 'stdio', catalogId: 'echo-mcp' },
-      ),
+      jsonRequest('PUT', `/api/agents/${COWORK_AGENT.id}/mcp-servers/echo`, { type: 'stdio', catalogId: 'echo-mcp' }),
       { params: Promise.resolve({ id: COWORK_AGENT.id, name: 'echo' }) },
     );
     expect(bindRes.status).toBe(200);
@@ -242,11 +229,7 @@ describe.skipIf(!hasKey)('MCP real-LLM roundtrip — Tier 2 (manual, gated by OP
 
     // 2. Bind it to the cowork agent.
     const bindRes = await mcpServerByNameRoute.PUT(
-      jsonRequest(
-        'PUT',
-        `/api/agents/${COWORK_AGENT.id}/mcp-servers/echo`,
-        { type: 'stdio', catalogId: 'echo-mcp' },
-      ),
+      jsonRequest('PUT', `/api/agents/${COWORK_AGENT.id}/mcp-servers/echo`, { type: 'stdio', catalogId: 'echo-mcp' }),
       { params: Promise.resolve({ id: COWORK_AGENT.id, name: 'echo' }) },
     );
     expect(bindRes.status).toBe(200);
@@ -273,7 +256,7 @@ describe.skipIf(!hasKey)('MCP real-LLM roundtrip — Tier 2 (manual, gated by OP
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openrouterApiKey}`,
+        Authorization: `Bearer ${openrouterApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

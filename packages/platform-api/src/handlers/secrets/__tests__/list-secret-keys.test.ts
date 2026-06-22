@@ -1,14 +1,8 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import type {
-  NamespaceSecretsRepository,
-  WorkflowSecretsRepository,
-} from '@mediforce/platform-core';
+import type { NamespaceSecretsRepository, WorkflowSecretsRepository } from '@mediforce/platform-core';
 import { listSecretKeys } from '../list-secret-keys';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
-import {
-  buildNamespaceSecretsRepo,
-  buildWorkflowSecretsRepo,
-} from './fakes';
+import { buildNamespaceSecretsRepo, buildWorkflowSecretsRepo } from './fakes';
 
 describe('listSecretKeys handler', () => {
   let workspaceSecretsRepo: NamespaceSecretsRepository;
@@ -68,10 +62,7 @@ describe('listSecretKeys handler', () => {
         secretsRepo: workflowSecretsRepo,
       });
 
-      const result = await listSecretKeys(
-        { namespace: 'alpha', workflow: 'wf-1' },
-        scope,
-      );
+      const result = await listSecretKeys({ namespace: 'alpha', workflow: 'wf-1' }, scope);
 
       expect(result.keys).toEqual(['DB_URL']);
     });
@@ -83,10 +74,7 @@ describe('listSecretKeys handler', () => {
         caller: userCaller('u-3', ['gamma']),
       });
 
-      const result = await listSecretKeys(
-        { namespace: 'alpha', workflow: 'wf-1' },
-        scope,
-      );
+      const result = await listSecretKeys({ namespace: 'alpha', workflow: 'wf-1' }, scope);
 
       expect(result.keys).toEqual([]);
     });

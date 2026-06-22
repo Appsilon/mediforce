@@ -18,8 +18,7 @@ export const workflowGetCommand = defineCommand({
     template: { type: 'boolean', description: 'Strip version/createdAt/namespace for re-registration' },
   },
   async run({ args, output, mediforce, jsonMode }) {
-    const version =
-      args.version !== undefined ? Number(args.version) : undefined;
+    const version = args.version !== undefined ? Number(args.version) : undefined;
     if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
       printError(output, { error: `Invalid --version: ${args.version}` }, jsonMode);
       return 2;

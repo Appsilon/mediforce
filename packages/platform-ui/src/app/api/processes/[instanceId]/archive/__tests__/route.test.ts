@@ -65,13 +65,8 @@ describe('POST /api/processes/:instanceId/archive', () => {
 
     expect(res.status).toBe(200);
     expect(json.run.id).toBe('run-1');
-    expect(mockInstanceUpdate).toHaveBeenCalledWith(
-      'run-1',
-      expect.objectContaining({ archived: true }),
-    );
-    expect(mockAuditAppend).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'instance.archived' }),
-    );
+    expect(mockInstanceUpdate).toHaveBeenCalledWith('run-1', expect.objectContaining({ archived: true }));
+    expect(mockAuditAppend).toHaveBeenCalledWith(expect.objectContaining({ action: 'instance.archived' }));
   });
 
   it('[ERROR] returns 409 (precondition_failed) when run is active', async () => {

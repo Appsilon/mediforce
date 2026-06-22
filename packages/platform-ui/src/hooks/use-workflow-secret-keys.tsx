@@ -59,25 +59,17 @@ export function WorkflowSecretKeysProvider({
         setLoading(false);
       });
 
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handle, uid, namesKey]);
 
-  const getKeys = React.useCallback(
-    (workflowName: string) => secretsByWorkflow.get(workflowName),
-    [secretsByWorkflow],
-  );
+  const getKeys = React.useCallback((workflowName: string) => secretsByWorkflow.get(workflowName), [secretsByWorkflow]);
 
-  const value = React.useMemo(
-    () => ({ getKeys, namespaceKeys: nsKeys, loading }),
-    [getKeys, nsKeys, loading],
-  );
+  const value = React.useMemo(() => ({ getKeys, namespaceKeys: nsKeys, loading }), [getKeys, nsKeys, loading]);
 
-  return (
-    <WorkflowSecretKeysContext.Provider value={value}>
-      {children}
-    </WorkflowSecretKeysContext.Provider>
-  );
+  return <WorkflowSecretKeysContext.Provider value={value}>{children}</WorkflowSecretKeysContext.Provider>;
 }
 
 export function useWorkflowSecretKeysContext(): WorkflowSecretKeysContextValue | null {

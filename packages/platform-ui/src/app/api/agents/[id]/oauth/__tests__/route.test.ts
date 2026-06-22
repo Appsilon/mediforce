@@ -78,10 +78,7 @@ describe('GET /api/agents/:id/oauth', () => {
   it('[DATA] returns tokens with public fields only (no access/refresh tokens)', async () => {
     mockTokenListByAgent.mockResolvedValue([buildToken()]);
 
-    const res = await GET(
-      makeGetRequest('agent-1', 'appsilon'),
-      { params: makeParams('agent-1') },
-    );
+    const res = await GET(makeGetRequest('agent-1', 'appsilon'), { params: makeParams('agent-1') });
     const json = (await res.json()) as { tokens: Array<Record<string, unknown>> };
 
     expect(res.status).toBe(200);
@@ -105,10 +102,7 @@ describe('GET /api/agents/:id/oauth', () => {
       buildToken({ serverName: 'gh-two', accountLogin: '@two' }),
     ]);
 
-    const res = await GET(
-      makeGetRequest('agent-1', 'appsilon'),
-      { params: makeParams('agent-1') },
-    );
+    const res = await GET(makeGetRequest('agent-1', 'appsilon'), { params: makeParams('agent-1') });
     const json = (await res.json()) as { tokens: Array<Record<string, unknown>> };
 
     expect(res.status).toBe(200);
@@ -119,10 +113,7 @@ describe('GET /api/agents/:id/oauth', () => {
   it('[DATA] returns empty array when no tokens exist', async () => {
     mockTokenListByAgent.mockResolvedValue([]);
 
-    const res = await GET(
-      makeGetRequest('agent-1', 'appsilon'),
-      { params: makeParams('agent-1') },
-    );
+    const res = await GET(makeGetRequest('agent-1', 'appsilon'), { params: makeParams('agent-1') });
     const json = (await res.json()) as { tokens: unknown[] };
 
     expect(res.status).toBe(200);
@@ -130,10 +121,7 @@ describe('GET /api/agents/:id/oauth', () => {
   });
 
   it('[ERROR] 401 when auth header missing', async () => {
-    const res = await GET(
-      makeGetRequest('agent-1', 'appsilon', null),
-      { params: makeParams('agent-1') },
-    );
+    const res = await GET(makeGetRequest('agent-1', 'appsilon', null), { params: makeParams('agent-1') });
     expect(res.status).toBe(401);
     expect(mockTokenListByAgent).not.toHaveBeenCalled();
   });
@@ -141,18 +129,12 @@ describe('GET /api/agents/:id/oauth', () => {
   it('[ERROR] 401 when token verification fails', async () => {
     mockVerifyIdToken.mockRejectedValue(new Error('bad token'));
 
-    const res = await GET(
-      makeGetRequest('agent-1', 'appsilon'),
-      { params: makeParams('agent-1') },
-    );
+    const res = await GET(makeGetRequest('agent-1', 'appsilon'), { params: makeParams('agent-1') });
     expect(res.status).toBe(401);
   });
 
   it('[ERROR] 400 when namespace missing', async () => {
-    const res = await GET(
-      makeGetRequest('agent-1', null),
-      { params: makeParams('agent-1') },
-    );
+    const res = await GET(makeGetRequest('agent-1', null), { params: makeParams('agent-1') });
     expect(res.status).toBe(400);
     expect(mockTokenListByAgent).not.toHaveBeenCalled();
   });
@@ -161,10 +143,7 @@ describe('GET /api/agents/:id/oauth', () => {
     mockGetMembershipsForUser.mockResolvedValue([{ handle: 'other-ns', role: 'member' as const }]);
     mockTokenListByAgent.mockResolvedValue([]);
 
-    await GET(
-      makeGetRequest('other-agent', 'other-ns'),
-      { params: makeParams('other-agent') },
-    );
+    await GET(makeGetRequest('other-agent', 'other-ns'), { params: makeParams('other-agent') });
 
     expect(mockTokenListByAgent).toHaveBeenCalledWith('other-ns', 'other-agent');
   });
@@ -172,10 +151,7 @@ describe('GET /api/agents/:id/oauth', () => {
   it('[AUTHZ] caller who is not a member of the namespace gets an empty list', async () => {
     mockTokenListByAgent.mockResolvedValue([]);
 
-    const res = await GET(
-      makeGetRequest('agent-1', 'other-ns'),
-      { params: makeParams('agent-1') },
-    );
+    const res = await GET(makeGetRequest('agent-1', 'other-ns'), { params: makeParams('agent-1') });
     const json = (await res.json()) as { tokens: unknown[] };
 
     expect(res.status).toBe(200);
@@ -186,10 +162,7 @@ describe('GET /api/agents/:id/oauth', () => {
   it('[AUTHZ] membership is read once from getMembershipsForUser per request', async () => {
     mockTokenListByAgent.mockResolvedValue([]);
 
-    await GET(
-      makeGetRequest('agent-1', 'appsilon'),
-      { params: makeParams('agent-1') },
-    );
+    await GET(makeGetRequest('agent-1', 'appsilon'), { params: makeParams('agent-1') });
     expect(mockGetMembershipsForUser).toHaveBeenCalledWith('uid-1');
   });
 });

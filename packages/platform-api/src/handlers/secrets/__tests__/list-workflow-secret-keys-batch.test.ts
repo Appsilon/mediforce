@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { listWorkflowSecretKeysBatch } from '../list-workflow-secret-keys-batch';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { buildWorkflowSecretsRepo } from './fakes';
 
 describe('listWorkflowSecretKeysBatch handler', () => {
@@ -38,10 +35,7 @@ describe('listWorkflowSecretKeysBatch handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    const { keysByWorkflow } = await listWorkflowSecretKeysBatch(
-      { namespace: 'team-beta', workflows: ['wf1'] },
-      scope,
-    );
+    const { keysByWorkflow } = await listWorkflowSecretKeysBatch({ namespace: 'team-beta', workflows: ['wf1'] }, scope);
 
     expect(keysByWorkflow.wf1).toEqual([]);
   });

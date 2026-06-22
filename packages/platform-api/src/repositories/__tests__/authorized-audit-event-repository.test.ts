@@ -64,10 +64,7 @@ describe('AuthorizedAuditEventRepository', () => {
     });
 
     it('returns events for an in-scope user caller', async () => {
-      const wrapper = new AuthorizedAuditEventRepository(
-        userCaller('u-1', ['team-alpha']),
-        raw,
-      );
+      const wrapper = new AuthorizedAuditEventRepository(userCaller('u-1', ['team-alpha']), raw);
 
       const events = await wrapper.getByProcess('inst-a');
 
@@ -76,10 +73,7 @@ describe('AuthorizedAuditEventRepository', () => {
     });
 
     it('returns empty for an out-of-scope user caller (anti-enum)', async () => {
-      const wrapper = new AuthorizedAuditEventRepository(
-        userCaller('u-1', ['team-alpha']),
-        raw,
-      );
+      const wrapper = new AuthorizedAuditEventRepository(userCaller('u-1', ['team-alpha']), raw);
 
       const events = await wrapper.getByProcess('inst-b');
 

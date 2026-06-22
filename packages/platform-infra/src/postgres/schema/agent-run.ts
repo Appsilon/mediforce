@@ -1,14 +1,5 @@
 import { sql } from 'drizzle-orm';
-import {
-  pgTable,
-  text,
-  uuid,
-  jsonb,
-  timestamp,
-  integer,
-  numeric,
-  index,
-} from 'drizzle-orm/pg-core';
+import { pgTable, text, uuid, jsonb, timestamp, integer, numeric, index } from 'drizzle-orm/pg-core';
 import { workspaces } from './workspace';
 import { processInstances } from './process-instance';
 
@@ -70,19 +61,11 @@ export const agentRuns = pgTable(
     executorType: text('executor_type'),
     reviewerType: text('reviewer_type'),
 
-    startedAt: timestamp('started_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
   },
   (table) => ({
-    instanceIdx: index('agent_runs_instance_idx').on(
-      table.processInstanceId,
-      table.stepId,
-      table.startedAt.desc(),
-    ),
-    costIdx: index('agent_runs_cost_idx')
-      .on(table.model, table.startedAt)
-      .where(sql`${table.costUsd} is not null`),
+    instanceIdx: index('agent_runs_instance_idx').on(table.processInstanceId, table.stepId, table.startedAt.desc()),
+    costIdx: index('agent_runs_cost_idx').on(table.model, table.startedAt).where(sql`${table.costUsd} is not null`),
   }),
 );

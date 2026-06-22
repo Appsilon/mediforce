@@ -210,17 +210,17 @@ describe('executeAgentStep', () => {
   it('[ERROR] throws when instance not found', async () => {
     mockInstanceRepo.getById.mockResolvedValue(null);
 
-    await expect(
-      executeAgentStep('missing-id', 'gather-data', firstStep, {}, 'user-1'),
-    ).rejects.toThrow('Instance not found: missing-id');
+    await expect(executeAgentStep('missing-id', 'gather-data', firstStep, {}, 'user-1')).rejects.toThrow(
+      'Instance not found: missing-id',
+    );
   });
 
   it('[ERROR] throws when WorkflowDefinition not found', async () => {
     mockProcessRepo.getWorkflowDefinition.mockResolvedValue(null);
 
-    await expect(
-      executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1'),
-    ).rejects.toThrow('WorkflowDefinition not found: community-digest v1');
+    await expect(executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1')).rejects.toThrow(
+      'WorkflowDefinition not found: community-digest v1',
+    );
   });
 
   // ---- Plugin resolution ----
@@ -299,7 +299,11 @@ describe('executeAgentStep', () => {
 
   it('[DATA] script executor uses ScriptStepExecutor (not AgentRunner)', async () => {
     const scriptStep: WorkflowStep = {
-      id: 'gather-data', name: 'Gather Data', type: 'creation', executor: 'script', autonomyLevel: 'L1',
+      id: 'gather-data',
+      name: 'Gather Data',
+      type: 'creation',
+      executor: 'script',
+      autonomyLevel: 'L1',
     };
 
     await executeAgentStep('inst-wf-001', 'gather-data', scriptStep, {}, 'user-1');
@@ -351,12 +355,7 @@ describe('executeAgentStep', () => {
 
       await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
 
-      expect(mockEngine.advanceStep).toHaveBeenCalledWith(
-        'inst-wf-001',
-        {},
-        expect.any(Object),
-        undefined,
-      );
+      expect(mockEngine.advanceStep).toHaveBeenCalledWith('inst-wf-001', {}, expect.any(Object), undefined);
     });
 
     it('[DATA] L2 agent with no envelope uses empty object as stepResult', async () => {
@@ -375,12 +374,7 @@ describe('executeAgentStep', () => {
 
       await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
 
-      expect(mockEngine.advanceStep).toHaveBeenCalledWith(
-        'inst-wf-001',
-        {},
-        expect.any(Object),
-        undefined,
-      );
+      expect(mockEngine.advanceStep).toHaveBeenCalledWith('inst-wf-001', {}, expect.any(Object), undefined);
     });
   });
 
@@ -424,9 +418,9 @@ describe('executeAgentStep', () => {
         fallbackReason: 'low_confidence',
       });
 
-      await expect(
-        executeAgentStep('inst-wf-001', 'gather-data', l4Step, {}, 'user-1'),
-      ).rejects.toThrow("completed with null result");
+      await expect(executeAgentStep('inst-wf-001', 'gather-data', l4Step, {}, 'user-1')).rejects.toThrow(
+        'completed with null result',
+      );
     });
   });
 
@@ -775,10 +769,14 @@ describe('executeAgentStep', () => {
   it('[DATA] persists agent output to step execution when stepExecutionId provided', async () => {
     await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1', 'exec-001');
 
-    expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith('inst-wf-001', 'exec-001', expect.objectContaining({
-      output: { summary: 'gathered data' },
-      status: 'completed',
-    }));
+    expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+      'inst-wf-001',
+      'exec-001',
+      expect.objectContaining({
+        output: { summary: 'gathered data' },
+        status: 'completed',
+      }),
+    );
   });
 
   it('[DATA] does not call updateStepExecution when no stepExecutionId', async () => {
@@ -795,7 +793,11 @@ describe('executeAgentStep', () => {
       .mockResolvedValueOnce(defaultInstance) // initial load
       .mockResolvedValueOnce(defaultInstance); // for variable merge
 
-    const updatedInstance = buildProcessInstance({ id: 'inst-wf-001', status: 'running', currentStepId: 'human-review' });
+    const updatedInstance = buildProcessInstance({
+      id: 'inst-wf-001',
+      status: 'running',
+      currentStepId: 'human-review',
+    });
     mockEngine.advanceStep.mockResolvedValue(updatedInstance);
 
     await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
@@ -819,7 +821,9 @@ describe('executeAgentStep', () => {
     mockEngine.advanceStep.mockResolvedValue(updatedInstance);
 
     await executeAgentStep(
-      'inst-wf-001', 'gather-data', stepWithParams,
+      'inst-wf-001',
+      'gather-data',
+      stepWithParams,
       { shared: 'app-value', extra: 'from-app' },
       'user-1',
     );
@@ -945,7 +949,10 @@ describe('executeAgentStep', () => {
 
   it('[DATA] emits script.step.started audit event for script executor', async () => {
     const scriptStep: WorkflowStep = {
-      id: 'gather-data', name: 'Gather Data', type: 'creation', executor: 'script',
+      id: 'gather-data',
+      name: 'Gather Data',
+      type: 'creation',
+      executor: 'script',
     };
     const updatedInstance = buildProcessInstance({ id: 'inst-wf-001', status: 'running' });
     mockEngine.advanceStep.mockResolvedValue(updatedInstance);
@@ -1049,12 +1056,8 @@ describe('executeAgentStep', () => {
       // Reset in-memory OAuth stores between tests so fixture state from one
       // test doesn't bleed into the next.
       for (const ns of ['acme', 'other']) {
-        oauthProviderRepo
-          .delete(ns, 'github')
-          .catch(() => {});
-        agentOAuthTokenRepo
-          .delete(ns, agentId, 'github')
-          .catch(() => {});
+        oauthProviderRepo.delete(ns, 'github').catch(() => {});
+        agentOAuthTokenRepo.delete(ns, agentId, 'github').catch(() => {});
       }
 
       mockInstanceRepo.getById.mockResolvedValue(
@@ -1089,16 +1092,17 @@ describe('executeAgentStep', () => {
     });
 
     it('[DATA] refreshes near-expiry token and persists updated token back to repo', async () => {
-      const fetchImpl = vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            access_token: 'gh-refreshed',
-            refresh_token: 'rt-new',
-            expires_in: 3_600,
-            scope: 'repo',
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
+      const fetchImpl = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              access_token: 'gh-refreshed',
+              refresh_token: 'rt-new',
+              expires_in: 3_600,
+              scope: 'repo',
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
       );
       // Patch global fetch for the provider refresh exchange. resolveOAuthToken
       // uses the injected fetchImpl when provided — but executeAgentStep calls
@@ -1142,18 +1146,18 @@ describe('executeAgentStep', () => {
       });
       // NOTE: No token put — simulates "binding saved, Connect never clicked".
 
-      await expect(
-        executeAgentStep('inst-gh', 'run-agent', stepWithAgent, {}, 'user-1'),
-      ).rejects.toThrow(/not connected.*Connect the account via the agent editor/);
+      await expect(executeAgentStep('inst-gh', 'run-agent', stepWithAgent, {}, 'user-1')).rejects.toThrow(
+        /not connected.*Connect the account via the agent editor/,
+      );
     });
 
     it('[ERROR] throws when provider config referenced by binding is missing', async () => {
       // Token exists, but provider doc was deleted admin-side.
       await agentOAuthTokenRepo.put(namespace, agentId, 'github', baseToken);
 
-      await expect(
-        executeAgentStep('inst-gh', 'run-agent', stepWithAgent, {}, 'user-1'),
-      ).rejects.toThrow(/provider "github" .* not found/);
+      await expect(executeAgentStep('inst-gh', 'run-agent', stepWithAgent, {}, 'user-1')).rejects.toThrow(
+        /provider "github" .* not found/,
+      );
     });
   });
 });

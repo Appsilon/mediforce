@@ -5,10 +5,7 @@ import { formatStepName } from '@/lib/format';
  *  Checks multiple signals: completionData.reviewType, completionData.agentOutput,
  *  and the process instance's pauseReason.
  */
-export function isAgentReviewTask(
-  task: HumanTask,
-  instance?: ProcessInstance | null,
-): boolean {
+export function isAgentReviewTask(task: HumanTask, instance?: ProcessInstance | null): boolean {
   const data = task.completionData as Record<string, unknown> | null;
   // Direct marker from L3 task creation
   if (data?.reviewType === 'agent_output_review') return true;
@@ -26,10 +23,7 @@ export function isAgentReviewTask(
 }
 
 /** Get a display-friendly title for a task. */
-export function getTaskDisplayTitle(
-  task: HumanTask,
-  instance?: ProcessInstance | null,
-): string {
+export function getTaskDisplayTitle(task: HumanTask, instance?: ProcessInstance | null): string {
   const stepName = formatStepName(task.stepId);
   if (isAgentReviewTask(task, instance)) {
     return `Review: ${stepName}`;
@@ -69,15 +63,14 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
 
   const rawTokenUsage = agentOutput.tokenUsage as Record<string, unknown> | undefined;
   const tokenUsage: TokenUsageData | null =
-    rawTokenUsage &&
-    typeof rawTokenUsage.inputTokens === 'number' &&
-    typeof rawTokenUsage.outputTokens === 'number'
+    rawTokenUsage && typeof rawTokenUsage.inputTokens === 'number' && typeof rawTokenUsage.outputTokens === 'number'
       ? { inputTokens: rawTokenUsage.inputTokens, outputTokens: rawTokenUsage.outputTokens }
       : null;
 
   return {
     confidence: typeof agentOutput.confidence === 'number' ? agentOutput.confidence : null,
-    confidence_rationale: typeof agentOutput.confidence_rationale === 'string' ? agentOutput.confidence_rationale : null,
+    confidence_rationale:
+      typeof agentOutput.confidence_rationale === 'string' ? agentOutput.confidence_rationale : null,
     reasoning: typeof agentOutput.reasoning === 'string' ? agentOutput.reasoning : null,
     result: (agentOutput.result as Record<string, unknown> | null) ?? null,
     model: typeof agentOutput.model === 'string' ? agentOutput.model : null,

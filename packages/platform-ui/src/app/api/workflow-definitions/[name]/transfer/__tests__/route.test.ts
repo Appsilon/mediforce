@@ -27,14 +27,11 @@ import { POST } from '../route';
 const makeParams = (name: string) => Promise.resolve({ name });
 
 function makeRequest(name: string, body: unknown): NextRequest {
-  return new NextRequest(
-    `http://localhost/api/workflow-definitions/${encodeURIComponent(name)}/transfer`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    },
-  );
+  return new NextRequest(`http://localhost/api/workflow-definitions/${encodeURIComponent(name)}/transfer`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 describe('POST /api/workflow-definitions/:name/transfer', () => {
@@ -45,10 +42,9 @@ describe('POST /api/workflow-definitions/:name/transfer', () => {
   });
 
   it('[DATA] transfers workflow and returns 200 with success envelope', async () => {
-    const res = await POST(
-      makeRequest('my-wf', { sourceNamespace: 'src', targetNamespace: 'tgt' }),
-      { params: makeParams('my-wf') },
-    );
+    const res = await POST(makeRequest('my-wf', { sourceNamespace: 'src', targetNamespace: 'tgt' }), {
+      params: makeParams('my-wf'),
+    });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -72,10 +68,9 @@ describe('POST /api/workflow-definitions/:name/transfer', () => {
       isSystemActor: false,
     });
 
-    const res = await POST(
-      makeRequest('my-wf', { sourceNamespace: 'src', targetNamespace: 'tgt' }),
-      { params: makeParams('my-wf') },
-    );
+    const res = await POST(makeRequest('my-wf', { sourceNamespace: 'src', targetNamespace: 'tgt' }), {
+      params: makeParams('my-wf'),
+    });
 
     expect(res.status).toBe(403);
     expect(mockTransferNamespace).not.toHaveBeenCalled();
@@ -90,20 +85,16 @@ describe('POST /api/workflow-definitions/:name/transfer', () => {
       isSystemActor: false,
     });
 
-    const res = await POST(
-      makeRequest('my-wf', { sourceNamespace: 'src', targetNamespace: 'tgt' }),
-      { params: makeParams('my-wf') },
-    );
+    const res = await POST(makeRequest('my-wf', { sourceNamespace: 'src', targetNamespace: 'tgt' }), {
+      params: makeParams('my-wf'),
+    });
 
     expect(res.status).toBe(403);
     expect(mockTransferNamespace).not.toHaveBeenCalled();
   });
 
   it('[ERROR] returns 400 on missing sourceNamespace', async () => {
-    const res = await POST(
-      makeRequest('my-wf', { targetNamespace: 'tgt' }),
-      { params: makeParams('my-wf') },
-    );
+    const res = await POST(makeRequest('my-wf', { targetNamespace: 'tgt' }), { params: makeParams('my-wf') });
 
     expect(res.status).toBe(400);
     expect(mockTransferNamespace).not.toHaveBeenCalled();

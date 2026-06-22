@@ -14,7 +14,6 @@ interface ParamsFormProps {
   onCompleted?: () => void;
 }
 
-
 export function useParamValues(params: StepParam[]) {
   const [values, setValues] = React.useState<Record<string, unknown>>(() => {
     const initial: Record<string, unknown> = {};
@@ -30,9 +29,7 @@ export function useParamValues(params: StepParam[]) {
     return initial;
   });
 
-  const requiredMissing = params.some(
-    (p) => p.required && (values[p.name] === undefined || values[p.name] === ''),
-  );
+  const requiredMissing = params.some((p) => p.required && (values[p.name] === undefined || values[p.name] === ''));
 
   function setValue(name: string, value: unknown) {
     setValues((prev) => ({ ...prev, [name]: value }));
@@ -50,12 +47,7 @@ export function useParamValues(params: StepParam[]) {
   return { values, setValue, requiredMissing, coerce };
 }
 
-export function ParamsForm({
-  taskId,
-  params,
-  remainingTaskCount,
-  onCompleted,
-}: ParamsFormProps) {
+export function ParamsForm({ taskId, params, remainingTaskCount, onCompleted }: ParamsFormProps) {
   const { values, setValue, requiredMissing, coerce } = useParamValues(params);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -94,9 +86,7 @@ export function ParamsForm({
         ))}
       </div>
 
-      {error && (
-        <p className="text-sm text-destructive">{error}</p>
-      )}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <button
         type="submit"
@@ -113,4 +103,3 @@ export function ParamsForm({
     </form>
   );
 }
-

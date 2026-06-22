@@ -47,9 +47,7 @@ describe('InMemoryOAuthProviderRepository', () => {
 
   it('throws ProviderAlreadyExistsError on duplicate id within namespace', async () => {
     await repo.create('acme', providerInput);
-    await expect(repo.create('acme', providerInput)).rejects.toBeInstanceOf(
-      ProviderAlreadyExistsError,
-    );
+    await expect(repo.create('acme', providerInput)).rejects.toBeInstanceOf(ProviderAlreadyExistsError);
   });
 
   it('permits the same id across distinct namespaces', async () => {

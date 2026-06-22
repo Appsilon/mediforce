@@ -4,17 +4,14 @@ import { PreconditionFailedError } from '../../errors';
 import { actorFromCaller, loadOr404 } from '../_helpers';
 
 // `failed` source state covers agent-escalated / agent-paused recovery.
-export async function resumeRun(
-  input: ResumeRunInput,
-  scope: CallerScope,
-): Promise<ResumeRunOutput> {
+export async function resumeRun(input: ResumeRunInput, scope: CallerScope): Promise<ResumeRunOutput> {
   const run = await loadOr404(scope.runs.getById(input.runId), 'Run not found');
 
   if (run.status !== 'paused' && run.status !== 'failed') {
-    throw new PreconditionFailedError(
-      `Cannot resume a ${run.status} run; current status: ${run.status}`,
-      { runId: input.runId, currentStatus: run.status },
-    );
+    throw new PreconditionFailedError(`Cannot resume a ${run.status} run; current status: ${run.status}`, {
+      runId: input.runId,
+      currentStatus: run.status,
+    });
   }
 
   const now = new Date().toISOString();

@@ -4,10 +4,27 @@ import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, OutputSchemaShape } from '@mediforce/platform-core';
+import type {
+  AgentConfig,
+  StepConfig,
+  PluginCapabilityMetadata,
+  GitMetadata,
+  McpServerConfig,
+  ResolvedMcpConfig,
+  Presentation,
+  OutputSchemaShape,
+} from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls, formatExitInfo, type ContainerPluginInit } from './container-plugin';
+import {
+  ContainerPlugin,
+  isWorkflowAgentContext,
+  resolveImageBuild,
+  resolveRepoToken,
+  normalizeRepoUrls,
+  formatExitInfo,
+  type ContainerPluginInit,
+} from './container-plugin';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
 import { createLineStreamReader } from '@mediforce/platform-core';
@@ -23,7 +40,7 @@ export class OAuthTokenUnavailableError extends Error {
   constructor(serverName: string, provider: string) {
     super(
       `OAuth token for MCP server "${serverName}" (provider "${provider}") is not connected. ` +
-      `Connect the account via the agent editor in the UI, then retry the step.`,
+        `Connect the account via the agent editor in the UI, then retry the step.`,
     );
     this.name = 'OAuthTokenUnavailableError';
     this.serverName = serverName;
@@ -121,11 +138,8 @@ export interface AgentCommandSpec {
   promptDelivery: 'stdin' | 'file';
 }
 
-
 function hasFiles(input: Record<string, unknown>): input is Record<string, unknown> & { files: FileEntry[] } {
-  return Array.isArray(input.files) &&
-    input.files.length > 0 &&
-    typeof input.files[0].downloadUrl === 'string';
+  return Array.isArray(input.files) && input.files.length > 0 && typeof input.files[0].downloadUrl === 'string';
 }
 
 /** Download remote files to a temp directory and return updated input with localPath fields. */
@@ -178,7 +192,10 @@ export async function cleanupTempDir(tempDir: string | null): Promise<void> {
  *    generate confusing 401s from the downstream MCP server. */
 function buildHttpHeaders(
   serverName: string,
-  auth: { type: 'headers'; headers: Record<string, string> } | { type: 'oauth'; provider: string; headerName: string; headerValueTemplate: string; scopes?: string[] } | undefined,
+  auth:
+    | { type: 'headers'; headers: Record<string, string> }
+    | { type: 'oauth'; provider: string; headerName: string; headerValueTemplate: string; scopes?: string[] }
+    | undefined,
   oauthTokens: Record<string, { accessToken: string; headerName: string; headerValueTemplate: string }> | undefined,
   workflowSecrets: Record<string, string> | undefined,
 ): Record<string, string> | undefined {
@@ -206,10 +223,7 @@ function buildHttpHeaders(
 
 export type OutputSchema = OutputSchemaShape;
 
-export function validateOutputSchema(
-  output: Record<string, unknown>,
-  schema: OutputSchemaShape,
-): string | null {
+export function validateOutputSchema(output: Record<string, unknown>, schema: OutputSchemaShape): string | null {
   let data = output;
 
   if ('raw' in output && typeof output.raw === 'string' && Object.keys(output).length === 1) {
@@ -223,8 +237,10 @@ export function validateOutputSchema(
     }
   }
 
-  if (Object.keys(data).length === 0
-    || (Object.keys(data).length === 1 && 'raw' in data && (data.raw === '' || data.raw == null))) {
+  if (
+    Object.keys(data).length === 0 ||
+    (Object.keys(data).length === 1 && 'raw' in data && (data.raw === '' || data.raw == null))
+  ) {
     return 'output is empty';
   }
 
@@ -352,9 +368,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     }
 
     // If there's exactly one file, use its content as the result directly
-    const resultPayload = files.length === 1
-      ? collected[files[0].name]
-      : collected;
+    const resultPayload = files.length === 1 ? collected[files[0].name] : collected;
 
     return JSON.stringify({ result: JSON.stringify(resultPayload) });
   }
@@ -377,9 +391,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *      McpServerConfig). Still used by process-mode steps and
    *      by workflow steps that predate the migration to agentId. */
   protected async writeMcpConfig(outputDir: string): Promise<void> {
-    const resolved = isWorkflowAgentContext(this.context)
-      ? this.context.resolvedMcpConfig
-      : undefined;
+    const resolved = isWorkflowAgentContext(this.context) ? this.context.resolvedMcpConfig : undefined;
 
     if (resolved !== undefined) {
       await this.writeResolvedMcpConfig(outputDir, resolved);
@@ -395,28 +407,26 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *  values at write time. For `auth.type === 'oauth'`, the access token
    *  comes from `context.oauthTokens[name]` (pre-loaded + pre-refreshed
    *  by the caller) and is stamped into `headerValueTemplate`. */
-  private async writeResolvedMcpConfig(
-    outputDir: string,
-    resolved: ResolvedMcpConfig,
-  ): Promise<void> {
+  private async writeResolvedMcpConfig(outputDir: string, resolved: ResolvedMcpConfig): Promise<void> {
     const entries = Object.entries(resolved.servers);
     if (entries.length === 0) return;
 
-    const workflowSecrets = isWorkflowAgentContext(this.context)
-      ? this.context.workflowSecrets
-      : undefined;
-    const oauthTokens = isWorkflowAgentContext(this.context)
-      ? this.context.oauthTokens
-      : undefined;
+    const workflowSecrets = isWorkflowAgentContext(this.context) ? this.context.workflowSecrets : undefined;
+    const oauthTokens = isWorkflowAgentContext(this.context) ? this.context.oauthTokens : undefined;
 
-    type StdioEntry = { type: 'stdio'; command: string; args?: string[]; env?: Record<string, string>; allowedTools?: string[] };
+    type StdioEntry = {
+      type: 'stdio';
+      command: string;
+      args?: string[];
+      env?: Record<string, string>;
+      allowedTools?: string[];
+    };
     type HttpEntry = { type: 'http'; url: string; headers?: Record<string, string>; allowedTools?: string[] };
     const mcpConfig: Record<string, StdioEntry | HttpEntry> = {};
 
     for (const [name, server] of entries) {
-      const allowedToolsPart = server.allowedTools && server.allowedTools.length > 0
-        ? { allowedTools: server.allowedTools }
-        : {};
+      const allowedToolsPart =
+        server.allowedTools && server.allowedTools.length > 0 ? { allowedTools: server.allowedTools } : {};
 
       if (server.type === 'stdio') {
         const resolvedEnv: Record<string, string> = {};
@@ -443,11 +453,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       }
     }
 
-    await writeFile(
-      join(outputDir, 'mcp-config.json'),
-      JSON.stringify({ mcpServers: mcpConfig }, null, 2),
-      'utf-8',
-    );
+    await writeFile(join(outputDir, 'mcp-config.json'), JSON.stringify({ mcpServers: mcpConfig }, null, 2), 'utf-8');
 
     agentLog('mcp.config', 'MCP config written (resolver-backed)', {
       stepId: this.context.stepId,
@@ -462,11 +468,15 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const servers = this.agentConfig.mcpServers;
     if (!servers || servers.length === 0) return;
 
-    const workflowSecrets = isWorkflowAgentContext(this.context)
-      ? this.context.workflowSecrets
-      : undefined;
+    const workflowSecrets = isWorkflowAgentContext(this.context) ? this.context.workflowSecrets : undefined;
 
-    type StdioEntry = { type: 'stdio'; command: string; args: string[]; env?: Record<string, string>; allowedTools?: string[] };
+    type StdioEntry = {
+      type: 'stdio';
+      command: string;
+      args: string[];
+      env?: Record<string, string>;
+      allowedTools?: string[];
+    };
     type HttpEntry = { type: 'http'; url: string; allowedTools?: string[] };
     const mcpConfig: Record<string, StdioEntry | HttpEntry> = {};
 
@@ -478,9 +488,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         }
       }
 
-      const allowedToolsPart = server.allowedTools && server.allowedTools.length > 0
-        ? { allowedTools: server.allowedTools }
-        : {};
+      const allowedToolsPart =
+        server.allowedTools && server.allowedTools.length > 0 ? { allowedTools: server.allowedTools } : {};
 
       if (server.command) {
         mcpConfig[server.name] = {
@@ -501,11 +510,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       }
     }
 
-    await writeFile(
-      join(outputDir, 'mcp-config.json'),
-      JSON.stringify({ mcpServers: mcpConfig }, null, 2),
-      'utf-8',
-    );
+    await writeFile(join(outputDir, 'mcp-config.json'), JSON.stringify({ mcpServers: mcpConfig }, null, 2), 'utf-8');
 
     agentLog('mcp.config', 'MCP config written (legacy)', {
       stepId: this.context.stepId,
@@ -612,22 +617,22 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       if (!stepAgent) {
         throw new Error(
           `No agent config found in step '${context.stepId}'. ` +
-          `${this.agentName} plugin requires step.agent with at least image and skill or prompt.`,
+            `${this.agentName} plugin requires step.agent with at least image and skill or prompt.`,
         );
       }
 
       if (!stepAgent.skill && !stepAgent.prompt) {
         throw new Error(
           `Neither skill nor prompt configured in step.agent for step '${context.stepId}'. ` +
-          `${this.agentName} plugin requires at least one of step.agent.skill or step.agent.prompt.`,
+            `${this.agentName} plugin requires at least one of step.agent.skill or step.agent.prompt.`,
         );
       }
 
       if (!stepAgent.image && !isLocalExecutionAllowed()) {
         throw new Error(
           `No Docker image configured in step.agent for step '${context.stepId}'. ` +
-          'Local agent execution requires ALLOW_LOCAL_AGENTS=true. ' +
-          'Either set step.agent.image for Docker execution, or enable local execution.',
+            'Local agent execution requires ALLOW_LOCAL_AGENTS=true. ' +
+            'Either set step.agent.image for Docker execution, or enable local execution.',
         );
       }
 
@@ -646,9 +651,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         allowedTools: stepAgent.allowedTools,
       };
     } else {
-      const stepConfig = context.config.stepConfigs.find(
-        (sc: StepConfig) => sc.stepId === context.stepId,
-      );
+      const stepConfig = context.config.stepConfigs.find((sc: StepConfig) => sc.stepId === context.stepId);
 
       if (!stepConfig) {
         throw new Error(`Step config not found for stepId '${context.stepId}'`);
@@ -658,22 +661,22 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       if (!legacyAgentConfig) {
         throw new Error(
           `No agentConfig found for step '${context.stepId}'. ` +
-          `${this.agentName} plugin requires agentConfig with at least image and skill or prompt.`,
+            `${this.agentName} plugin requires agentConfig with at least image and skill or prompt.`,
         );
       }
 
       if (!legacyAgentConfig.skill && !legacyAgentConfig.prompt) {
         throw new Error(
           `Neither skill nor prompt configured in agentConfig for step '${context.stepId}'. ` +
-          `${this.agentName} plugin requires at least one of agentConfig.skill or agentConfig.prompt.`,
+            `${this.agentName} plugin requires at least one of agentConfig.skill or agentConfig.prompt.`,
         );
       }
 
       if (!legacyAgentConfig.image && !isLocalExecutionAllowed()) {
         throw new Error(
           `No Docker image configured in agentConfig for step '${context.stepId}'. ` +
-          'Local agent execution requires ALLOW_LOCAL_AGENTS=true. ' +
-          'Either set agentConfig.image for Docker execution, or enable local execution.',
+            'Local agent execution requires ALLOW_LOCAL_AGENTS=true. ' +
+            'Either set agentConfig.image for Docker execution, or enable local execution.',
         );
       }
 
@@ -696,7 +699,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const instanceId = this.context.processInstanceId;
 
     agentLog('run.start', `${this.agentName} starting`, {
-      stepId, instanceId, skillName,
+      stepId,
+      instanceId,
+      skillName,
       image: this.agentConfig.image ?? 'local',
       skillsDir: this.agentConfig.skillsDir ?? null,
       MEDIFORCE_ROOT: process.env.MEDIFORCE_ROOT ?? 'NOT_SET',
@@ -713,13 +718,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         this.context.namespaceSecretKeys,
       );
     } else {
-      const stepConfig = this.context.config.stepConfigs.find(
-        (s) => s.stepId === this.context.stepId,
-      );
-      this.resolvedEnv = resolveStepEnv(
-        this.context.config.env,
-        stepConfig?.env,
-      );
+      const stepConfig = this.context.config.stepConfigs.find((s) => s.stepId === this.context.stepId);
+      this.resolvedEnv = resolveStepEnv(this.context.config.env, stepConfig?.env);
     }
 
     await emit({
@@ -734,9 +734,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
     try {
       // Download remote files to local temp dir so the CLI can read them directly
-      const { updatedInput, tempDir: downloadedTempDir } = await downloadFilesToLocal(
-        this.context.stepInput,
-      );
+      const { updatedInput, tempDir: downloadedTempDir } = await downloadFilesToLocal(this.context.stepInput);
       tempDir = downloadedTempDir;
 
       if (tempDir) {
@@ -778,10 +776,18 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       agentLog('run.buildPrompt', 'building prompt', {
         stepId,
         skillsDir: this.agentConfig.skillsDir ?? null,
-        resolvedSkillsDir: this.agentConfig.skillsDir ? this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath) : null,
+        resolvedSkillsDir: this.agentConfig.skillsDir
+          ? this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath)
+          : null,
       });
 
-      const prompt = await this.buildPrompt(updatedInput, timeoutMs, outputDirForPrompt, dockerOutputDir, workingDirForPrompt);
+      const prompt = await this.buildPrompt(
+        updatedInput,
+        timeoutMs,
+        outputDirForPrompt,
+        dockerOutputDir,
+        workingDirForPrompt,
+      );
 
       await emit({
         type: 'prompt',
@@ -838,14 +844,18 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
         try {
           spawnResult = await this.spawnLocalProcess(prompt, options, workingDirForPrompt!);
-          console.log(`[${this.agentName}] Local process finished: step=${this.context.stepId}, hasGitMetadata=${!!spawnResult.gitMetadata}, outputLength=${spawnResult.cliOutput.length}`);
+          console.log(
+            `[${this.agentName}] Local process finished: step=${this.context.stepId}, hasGitMetadata=${!!spawnResult.gitMetadata}, outputLength=${spawnResult.cliOutput.length}`,
+          );
         } catch (localErr) {
           console.error(`[${this.agentName}] Local process FAILED: step=${this.context.stepId}`, localErr);
           throw localErr;
         }
       } else {
         const mockLabel = process.env.MOCK_AGENT === 'true' ? ' (MOCK command)' : '';
-        console.log(`[${this.agentName}] Spawning Docker container: image=${this.agentConfig.image}, step=${this.context.stepId}${mockLabel}`);
+        console.log(
+          `[${this.agentName}] Spawning Docker container: image=${this.agentConfig.image}, step=${this.context.stepId}${mockLabel}`,
+        );
         await emit({
           type: 'status',
           payload: `using Docker container image '${this.agentConfig.image}'${mockLabel}`,
@@ -854,7 +864,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
         try {
           spawnResult = await this.spawnDockerContainer(prompt, options);
-          console.log(`[${this.agentName}] Docker container finished: step=${this.context.stepId}, hasGitMetadata=${!!spawnResult.gitMetadata}, outputLength=${spawnResult.cliOutput.length}`);
+          console.log(
+            `[${this.agentName}] Docker container finished: step=${this.context.stepId}, hasGitMetadata=${!!spawnResult.gitMetadata}, outputLength=${spawnResult.cliOutput.length}`,
+          );
         } catch (dockerErr) {
           console.error(`[${this.agentName}] Docker container FAILED: step=${this.context.stepId}`, dockerErr);
           throw dockerErr;
@@ -884,28 +896,31 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       const duration_ms = Date.now() - startTime;
 
       const outputDirMapping = isLocalMode
-        ? undefined  // Local mode: paths in prompt are already real host paths
+        ? undefined // Local mode: paths in prompt are already real host paths
         : spawnResult.outputDir
           ? { containerPath: '/output/', hostPath: spawnResult.outputDir + '/' }
           : undefined;
       const parsedResult = await this.extractResult(spawnResult.cliOutput, outputDirMapping);
 
-      const confidence = typeof parsedResult.confidence === 'number'
-        ? parsedResult.confidence
-        : 0.7;
+      const confidence = typeof parsedResult.confidence === 'number' ? parsedResult.confidence : 0.7;
 
-      const confidence_rationale = typeof parsedResult.confidence_rationale === 'string'
-        ? parsedResult.confidence_rationale
-        : undefined;
+      const confidence_rationale =
+        typeof parsedResult.confidence_rationale === 'string' ? parsedResult.confidence_rationale : undefined;
 
       let tokenUsage: { inputTokens: number; outputTokens: number; cachedInputTokens?: number } | undefined;
 
       // First: check if agent reported tokenUsage in its result
-      if (parsedResult.tokenUsage !== null
-        && typeof parsedResult.tokenUsage === 'object'
-        && typeof (parsedResult.tokenUsage as Record<string, unknown>).inputTokens === 'number'
-        && typeof (parsedResult.tokenUsage as Record<string, unknown>).outputTokens === 'number') {
-        tokenUsage = parsedResult.tokenUsage as { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
+      if (
+        parsedResult.tokenUsage !== null &&
+        typeof parsedResult.tokenUsage === 'object' &&
+        typeof (parsedResult.tokenUsage as Record<string, unknown>).inputTokens === 'number' &&
+        typeof (parsedResult.tokenUsage as Record<string, unknown>).outputTokens === 'number'
+      ) {
+        tokenUsage = parsedResult.tokenUsage as {
+          inputTokens: number;
+          outputTokens: number;
+          cachedInputTokens?: number;
+        };
       }
 
       // Second: check stream event for CLI-reported usage (e.g. Claude Code stream-json result event)
@@ -918,8 +933,10 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           const rawEvent = JSON.parse(spawnResult.cliOutput) as Record<string, unknown>;
           const usage = rawEvent.usage as Record<string, number> | undefined;
           if (usage && typeof usage.input_tokens === 'number' && typeof usage.output_tokens === 'number') {
-            const cacheCreationTokens = typeof usage.cache_creation_input_tokens === 'number' ? usage.cache_creation_input_tokens : 0;
-            const cacheReadTokens = typeof usage.cache_read_input_tokens === 'number' ? usage.cache_read_input_tokens : 0;
+            const cacheCreationTokens =
+              typeof usage.cache_creation_input_tokens === 'number' ? usage.cache_creation_input_tokens : 0;
+            const cacheReadTokens =
+              typeof usage.cache_read_input_tokens === 'number' ? usage.cache_read_input_tokens : 0;
             tokenUsage = {
               inputTokens: usage.input_tokens + cacheCreationTokens,
               outputTokens: usage.output_tokens,
@@ -928,14 +945,19 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           }
         } catch {
           agentLog('cost.tokenExtraction', 'could not extract token usage from CLI output', {
-            stepId, instanceId, cliOutputLength: spawnResult.cliOutput.length,
+            stepId,
+            instanceId,
+            cliOutputLength: spawnResult.cliOutput.length,
           });
         }
       }
 
       if (tokenUsage) {
         agentLog('cost.tokensExtracted', 'token usage captured', {
-          stepId, instanceId, inputTokens: tokenUsage.inputTokens, outputTokens: tokenUsage.outputTokens,
+          stepId,
+          instanceId,
+          inputTokens: tokenUsage.inputTokens,
+          outputTokens: tokenUsage.outputTokens,
         });
       }
 
@@ -983,7 +1005,10 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       const duration_ms = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : String(error);
       agentLog('run.error', errorMessage, {
-        stepId, instanceId, skillName, duration_ms,
+        stepId,
+        instanceId,
+        skillName,
+        duration_ms,
         stack: error instanceof Error ? error.stack?.split('\n').slice(0, 5) : undefined,
       });
 
@@ -1129,47 +1154,47 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const budgetMinutes = Math.round(budgetMs / 60_000);
     parts.push(
       `## Time Budget\n` +
-      `You have approximately ${budgetMinutes} minutes to complete this task. ` +
-      `Budget your time accordingly — prioritize core extraction over validation if time is tight. ` +
-      `Do not offer conversational summaries or next steps.`,
+        `You have approximately ${budgetMinutes} minutes to complete this task. ` +
+        `Budget your time accordingly — prioritize core extraction over validation if time is tight. ` +
+        `Do not offer conversational summaries or next steps.`,
     );
 
     // 3b. Confidence self-assessment instructions
     parts.push(
       `## Confidence Self-Assessment\n` +
-      `After completing the task, you MUST include a \`confidence\` field (0.0–1.0) and a \`confidence_rationale\` field (1–2 sentences) in your output JSON.\n\n` +
-      `To calibrate your confidence, consider:\n` +
-      `- **Input completeness**: Did you receive all necessary data, or were there gaps you had to work around?\n` +
-      `- **Output completeness**: Did you address every part of the task, or did you skip/simplify anything?\n` +
-      `- **Source reliability**: Were the sources clear and unambiguous, or did you have to interpret/guess?\n` +
-      `- **Task difficulty**: Is this a routine case or an edge case with unusual characteristics?\n\n` +
-      `Think of confidence as a frequency: "If I handled 100 cases like this, how many times would my output be correct?"\n` +
-      `- 0.95+ → Routine case, complete data, high certainty. ~5 or fewer errors per 100.\n` +
-      `- 0.80–0.95 → Minor gaps or ambiguities, but overall solid. ~5–20 errors per 100.\n` +
-      `- 0.50–0.80 → Significant uncertainty — missing data, ambiguous sources, or unusual case. ~20–50 errors per 100.\n` +
-      `- Below 0.50 → Major issues — guesswork involved, recommend human review.\n\n` +
-      `The \`confidence_rationale\` must explain WHY you chose that number. Examples:\n` +
-      `- "0.95 — Routine extraction from well-structured data. All required fields present, no ambiguities."\n` +
-      `- "0.72 — Supplier X pricing data was missing; interpolated from similar category. In ~3/10 similar cases this interpolation would be off by >10%."\n` +
-      `- "0.40 — Source document was a low-quality scan with multiple illegible sections. Significant guesswork on 3 out of 8 fields."`,
+        `After completing the task, you MUST include a \`confidence\` field (0.0–1.0) and a \`confidence_rationale\` field (1–2 sentences) in your output JSON.\n\n` +
+        `To calibrate your confidence, consider:\n` +
+        `- **Input completeness**: Did you receive all necessary data, or were there gaps you had to work around?\n` +
+        `- **Output completeness**: Did you address every part of the task, or did you skip/simplify anything?\n` +
+        `- **Source reliability**: Were the sources clear and unambiguous, or did you have to interpret/guess?\n` +
+        `- **Task difficulty**: Is this a routine case or an edge case with unusual characteristics?\n\n` +
+        `Think of confidence as a frequency: "If I handled 100 cases like this, how many times would my output be correct?"\n` +
+        `- 0.95+ → Routine case, complete data, high certainty. ~5 or fewer errors per 100.\n` +
+        `- 0.80–0.95 → Minor gaps or ambiguities, but overall solid. ~5–20 errors per 100.\n` +
+        `- 0.50–0.80 → Significant uncertainty — missing data, ambiguous sources, or unusual case. ~20–50 errors per 100.\n` +
+        `- Below 0.50 → Major issues — guesswork involved, recommend human review.\n\n` +
+        `The \`confidence_rationale\` must explain WHY you chose that number. Examples:\n` +
+        `- "0.95 — Routine extraction from well-structured data. All required fields present, no ambiguities."\n` +
+        `- "0.72 — Supplier X pricing data was missing; interpolated from similar category. In ~3/10 similar cases this interpolation would be off by >10%."\n` +
+        `- "0.40 — Source document was a low-quality scan with multiple illegible sections. Significant guesswork on 3 out of 8 fields."`,
     );
 
     // 4. Workspace + result contract directories (unified — every run has a git worktree).
     if (workingDir && outputDir) {
       parts.push(
         `## Workspace Directory (Git Worktree)\n` +
-        `Your workspace is at: ${workingDir}\n` +
-        `Write ALL deliverable files here — R scripts, data files, specs, reports, etc.\n` +
-        `Use subdirectories like ${workingDir}/code/ and ${workingDir}/data/ as appropriate.\n` +
-        `Everything in this directory will be committed on step completion.\n` +
-        `Whenever the skill instructions reference {output_dir}, use ${workingDir} instead.\n` +
-        `You MUST use full absolute paths when calling Write. Relative paths will be rejected.`,
+          `Your workspace is at: ${workingDir}\n` +
+          `Write ALL deliverable files here — R scripts, data files, specs, reports, etc.\n` +
+          `Use subdirectories like ${workingDir}/code/ and ${workingDir}/data/ as appropriate.\n` +
+          `Everything in this directory will be committed on step completion.\n` +
+          `Whenever the skill instructions reference {output_dir}, use ${workingDir} instead.\n` +
+          `You MUST use full absolute paths when calling Write. Relative paths will be rejected.`,
       );
       parts.push(
         `## Result Contract Directory\n` +
-        `Write ONLY the output result contract JSON to: ${outputDir}/result.json\n` +
-        `Do NOT write deliverable files to ${outputDir} — they will not be committed.\n` +
-        `The ${outputDir} directory is for the result contract and temporary/intermediate files only.`,
+          `Write ONLY the output result contract JSON to: ${outputDir}/result.json\n` +
+          `Do NOT write deliverable files to ${outputDir} — they will not be committed.\n` +
+          `The ${outputDir} directory is for the result contract and temporary/intermediate files only.`,
       );
     }
 
@@ -1189,11 +1214,11 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     if (isWorkflowAgentContext(this.context) && this.context.previousRun !== undefined) {
       parts.push(
         '## Previous Run Outputs\n' +
-        'Values carried over from the last successfully completed run of this ' +
-        'workflow, per the workflow definition\'s `inputForNextRun` declaration. ' +
-        '`{}` means no predecessor qualified (first run, all previous failed, ' +
-        'or chain reset). Use this to resume where the previous run left off ' +
-        '(e.g. a cursor, last-seen hash, etc.).',
+          'Values carried over from the last successfully completed run of this ' +
+          "workflow, per the workflow definition's `inputForNextRun` declaration. " +
+          '`{}` means no predecessor qualified (first run, all previous failed, ' +
+          'or chain reset). Use this to resume where the previous run left off ' +
+          '(e.g. a cursor, last-seen hash, etc.).',
       );
 
       const previousRun = this.context.previousRun;
@@ -1222,9 +1247,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         if (previousRunFileRefs.length > 0) {
           parts.push(
             '## Large Previous Run Files\n' +
-            'Some previous run values were too large to include inline. ' +
-            `They have been written to files in ${outputDir}/. Read them with \`cat\` or your preferred tool:\n` +
-            previousRunFileRefs.map((r) => `- **${r.field}**: \`${r.containerPath}\``).join('\n'),
+              'Some previous run values were too large to include inline. ' +
+              `They have been written to files in ${outputDir}/. Read them with \`cat\` or your preferred tool:\n` +
+              previousRunFileRefs.map((r) => `- **${r.field}**: \`${r.containerPath}\``).join('\n'),
           );
         }
       } else {
@@ -1272,9 +1297,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       if (fileRefs.length > 0) {
         parts.push(
           '## Large Output Files\n' +
-          'Some previous step outputs were too large to include inline. ' +
-          `They have been written to files in ${outputDir}/. Read them with \`cat\` or your preferred tool:\n` +
-          fileRefs.map((r) => `- **${r.stepId}.${r.field}**: \`${r.containerPath}\``).join('\n'),
+            'Some previous step outputs were too large to include inline. ' +
+            `They have been written to files in ${outputDir}/. Read them with \`cat\` or your preferred tool:\n` +
+            fileRefs.map((r) => `- **${r.stepId}.${r.field}**: \`${r.containerPath}\``).join('\n'),
         );
       }
     } else if (hasPreviousOutputs) {
@@ -1297,8 +1322,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       if (code === 'ENOENT') {
         throw new Error(
           `Skill file not found: ${skillPath}\n` +
-          `Resolved from skillsDir="${skillsDir}", skill="${skill}"\n` +
-          `Project root: ${MONOREPO_ROOT} (MEDIFORCE_ROOT=${process.env.MEDIFORCE_ROOT ?? 'NOT_SET'})`,
+            `Resolved from skillsDir="${skillsDir}", skill="${skill}"\n` +
+            `Project root: ${MONOREPO_ROOT} (MEDIFORCE_ROOT=${process.env.MEDIFORCE_ROOT ?? 'NOT_SET'})`,
         );
       }
       throw err;
@@ -1341,7 +1366,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         console.error(`[${this.agentName}] Local process timeout (${Math.round(timeoutMs / 60_000)} min) — killing`);
         child.kill('SIGTERM');
         // Give the process a moment to clean up, then force kill
-        setTimeout(() => { if (!settled) child.kill('SIGKILL'); }, 5_000);
+        setTimeout(() => {
+          if (!settled) child.kill('SIGKILL');
+        }, 5_000);
       }, timeoutMs);
 
       const rawLines: string[] = [];
@@ -1424,10 +1451,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     return { cliOutput, gitMetadata, presentation: localPresentation, outputDir, injectedEnvVars: [] };
   }
 
-  protected async spawnDockerContainer(
-    prompt: string,
-    options?: SpawnCliOptions,
-  ): Promise<SpawnDockerResult> {
+  protected async spawnDockerContainer(prompt: string, options?: SpawnCliOptions): Promise<SpawnDockerResult> {
     const image = this.agentConfig.image;
 
     if (!image) {
@@ -1470,11 +1494,17 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     // Build docker run args
     const containerName = `mediforce-${processInstanceId}-${stepId}`.slice(0, 63);
     const dockerArgs: string[] = [
-      'run', '--rm', '-i',
-      '--name', containerName,
-      '--memory', '8g',
-      '--cpus', '2',
-      '-v', `${outputDir}:/output`,
+      'run',
+      '--rm',
+      '-i',
+      '--name',
+      containerName,
+      '--memory',
+      '8g',
+      '--cpus',
+      '2',
+      '-v',
+      `${outputDir}:/output`,
     ];
 
     // Inject agent-specific env vars
@@ -1483,10 +1513,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     }
 
     // /workspace: bind-mount the host run worktree (read-write)
-    dockerArgs.push(
-      '-v', `${this.runWorkspaceHandle.path}:/workspace`,
-      '-w', '/workspace',
-    );
+    dockerArgs.push('-v', `${this.runWorkspaceHandle.path}:/workspace`, '-w', '/workspace');
 
     // Bind-mount the Claude Code plugin root (read-only) when skillsDir is configured.
     // The host `options.pluginDir` becomes `${CONTAINER_PLUGIN_MOUNT}` inside the container;
@@ -1534,7 +1561,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const strategy = getDockerSpawnStrategy();
     const spawnResult = await strategy.spawn({
       dockerArgs,
-      stdinPayload: (!isMockAgent && promptViaStdin) ? prompt : null,
+      stdinPayload: !isMockAgent && promptViaStdin ? prompt : null,
       timeoutMs,
       containerName,
       processInstanceId,

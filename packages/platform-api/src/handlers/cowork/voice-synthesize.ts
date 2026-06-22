@@ -1,14 +1,8 @@
-import type {
-  ConversationTurn,
-  CoworkSession,
-} from '@mediforce/platform-core';
+import type { ConversationTurn, CoworkSession } from '@mediforce/platform-core';
 import { HandlerError, PreconditionFailedError } from '../../errors';
 import { loadOr404 } from '../_helpers';
 import type { CallerScope } from '../../repositories/index';
-import type {
-  SynthesizeVoiceArtifactInput,
-  SynthesizeVoiceArtifactOutput,
-} from '../../contract/cowork';
+import type { SynthesizeVoiceArtifactInput, SynthesizeVoiceArtifactOutput } from '../../contract/cowork';
 import { callOpenRouter } from '../../services/openrouter-client';
 
 const DEFAULT_SYNTHESIS_MODEL = 'anthropic/claude-sonnet-4';
@@ -35,20 +29,14 @@ interface SynthesisContext {
   readonly model: string;
 }
 
-async function loadSynthesisContext(
-  sessionId: string,
-  scope: CallerScope,
-): Promise<SynthesisContext> {
-  const session = await loadOr404(
-    scope.coworkSessions.getById(sessionId),
-    `Cowork session '${sessionId}' not found`,
-  );
+async function loadSynthesisContext(sessionId: string, scope: CallerScope): Promise<SynthesisContext> {
+  const session = await loadOr404(scope.coworkSessions.getById(sessionId), `Cowork session '${sessionId}' not found`);
 
   if (session.status !== 'active') {
-    throw new PreconditionFailedError(
-      `Cannot synthesize for a ${session.status} session`,
-      { sessionId, status: session.status },
-    );
+    throw new PreconditionFailedError(`Cannot synthesize for a ${session.status} session`, {
+      sessionId,
+      status: session.status,
+    });
   }
 
   const instance = await loadOr404(
@@ -65,10 +53,7 @@ async function loadSynthesisContext(
   const secrets = await scope.workspaceSecrets.getRuntimeSecrets(namespace, workflowName);
   const openRouterKey = secrets['OPENROUTER_API_KEY'];
   if (!openRouterKey) {
-    throw new HandlerError(
-      'validation',
-      'OPENROUTER_API_KEY not configured in workspace secrets',
-    );
+    throw new HandlerError('validation', 'OPENROUTER_API_KEY not configured in workspace secrets');
   }
 
   return {
@@ -97,7 +82,8 @@ async function callSynthesisLlm(
       {
         role: 'system',
         content:
-          SYNTHESIS_SYSTEM_PROMPT + schemaBlock +
+          SYNTHESIS_SYSTEM_PROMPT +
+          schemaBlock +
           '\n\nReturn ONLY valid JSON matching the schema. No markdown fences, no explanation.',
       },
       {
@@ -127,11 +113,7 @@ function parseSynthesisJson(rawContent: string): Record<string, unknown> {
   }
 }
 
-async function persistTranscriptTurns(
-  scope: CallerScope,
-  sessionId: string,
-  transcript: string,
-): Promise<void> {
+async function persistTranscriptTurns(scope: CallerScope, sessionId: string, transcript: string): Promise<void> {
   for (const turn of parseTranscriptTurns(transcript)) {
     await scope.coworkSessions.addTurn(sessionId, turn);
   }

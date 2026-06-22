@@ -11,20 +11,14 @@ const DEFAULT_REASON = 'Cancelled by user';
 // Audit action `instance.cancelled` aligns with workflow-engine's
 // `instance.*` family (instance.created/started/paused/resumed/aborted/
 // completed). A repo-wide `instance.*` → `run.*` rename is its own pass.
-export async function cancelRun(
-  input: CancelRunInput,
-  scope: CallerScope,
-): Promise<CancelRunOutput> {
-  const run = await loadOr404(
-    scope.runs.getById(input.runId),
-    'Run not found',
-  );
+export async function cancelRun(input: CancelRunInput, scope: CallerScope): Promise<CancelRunOutput> {
+  const run = await loadOr404(scope.runs.getById(input.runId), 'Run not found');
 
   if (run.status !== 'running' && run.status !== 'paused') {
-    throw new PreconditionFailedError(
-      `Cannot cancel a ${run.status} run; current status: ${run.status}`,
-      { runId: input.runId, currentStatus: run.status },
-    );
+    throw new PreconditionFailedError(`Cannot cancel a ${run.status} run; current status: ${run.status}`, {
+      runId: input.runId,
+      currentStatus: run.status,
+    });
   }
 
   const reason = input.reason ?? DEFAULT_REASON;
@@ -53,9 +47,6 @@ export async function cancelRun(
     processDefinitionVersion: run.definitionVersion,
   });
 
-  const updated = await loadOr404(
-    scope.runs.getById(input.runId),
-    'Run not found',
-  );
+  const updated = await loadOr404(scope.runs.getById(input.runId), 'Run not found');
   return { run: updated };
 }

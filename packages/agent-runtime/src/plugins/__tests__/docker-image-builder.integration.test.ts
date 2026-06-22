@@ -5,12 +5,7 @@
  */
 import { execSync } from 'node:child_process';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import {
-  imageExistsLocally,
-  getImageBuildCommit,
-  buildImageFromRepo,
-  ensureImage,
-} from '../docker-image-builder';
+import { imageExistsLocally, getImageBuildCommit, buildImageFromRepo, ensureImage } from '../docker-image-builder';
 import { createTestRepo, addCommitToTestRepo, type TestRepo } from './helpers/create-test-repo';
 
 function dockerAvailable(): boolean {
@@ -79,8 +74,7 @@ describe.skipIf(!dockerAvailable())('docker-image-builder integration', () => {
     });
 
     // Get image ID
-    const idBefore = execSync(`docker inspect --format '{{.Id}}' "${image}"`, { stdio: 'pipe' })
-      .toString().trim();
+    const idBefore = execSync(`docker inspect --format '{{.Id}}' "${image}"`, { stdio: 'pipe' }).toString().trim();
 
     // Second call — should skip
     await ensureImage({
@@ -89,8 +83,7 @@ describe.skipIf(!dockerAvailable())('docker-image-builder integration', () => {
       commit: repo.commitSha,
     });
 
-    const idAfter = execSync(`docker inspect --format '{{.Id}}' "${image}"`, { stdio: 'pipe' })
-      .toString().trim();
+    const idAfter = execSync(`docker inspect --format '{{.Id}}' "${image}"`, { stdio: 'pipe' }).toString().trim();
 
     expect(idAfter).toBe(idBefore);
   }, 60_000);
@@ -105,8 +98,7 @@ describe.skipIf(!dockerAvailable())('docker-image-builder integration', () => {
       commit: repo.commitSha,
     });
 
-    const idBefore = execSync(`docker inspect --format '{{.Id}}' "${image}"`, { stdio: 'pipe' })
-      .toString().trim();
+    const idBefore = execSync(`docker inspect --format '{{.Id}}' "${image}"`, { stdio: 'pipe' }).toString().trim();
 
     // Add new commit with different content
     const newCommit = addCommitToTestRepo(repo.repoPath, {
@@ -120,8 +112,7 @@ describe.skipIf(!dockerAvailable())('docker-image-builder integration', () => {
       commit: newCommit,
     });
 
-    const idAfter = execSync(`docker inspect --format '{{.Id}}' "${image}"`, { stdio: 'pipe' })
-      .toString().trim();
+    const idAfter = execSync(`docker inspect --format '{{.Id}}' "${image}"`, { stdio: 'pipe' }).toString().trim();
     const buildCommit = await getImageBuildCommit(image);
 
     expect(idAfter).not.toBe(idBefore);
@@ -135,7 +126,7 @@ describe.skipIf(!dockerAvailable())('docker-image-builder integration', () => {
 
     // Remove Dockerfile by creating a new commit without it
     const emptyCommit = addCommitToTestRepo(repoNoDockerfile.repoPath, {
-      'Dockerfile': '', // empty — docker build will fail
+      Dockerfile: '', // empty — docker build will fail
       'run.sh': '#!/bin/sh\necho ok',
     });
 
@@ -181,8 +172,8 @@ describe.skipIf(!dockerAvailable())('docker-image-builder integration', () => {
   }, 60_000);
 
   it('throws when image missing and no repo+commit', async () => {
-    await expect(
-      ensureImage({ image: 'mediforce-nonexistent-image-xyz' }),
-    ).rejects.toThrow(/not found locally.*no repo\+commit/i);
+    await expect(ensureImage({ image: 'mediforce-nonexistent-image-xyz' })).rejects.toThrow(
+      /not found locally.*no repo\+commit/i,
+    );
   });
 });

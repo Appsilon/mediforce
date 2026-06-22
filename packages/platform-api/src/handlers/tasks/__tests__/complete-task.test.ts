@@ -10,10 +10,7 @@ import {
 import type { HumanTask, ProcessInstance, CompleteHumanTaskPayload } from '@mediforce/platform-core';
 import { completeTask } from '../complete-task';
 import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { noopRunKicker } from '../../../runtime/run-kicker';
 
 /**
@@ -30,20 +27,11 @@ interface EngineStubCall {
   actorId: string;
 }
 
-function makeEngineStub(opts: {
-  task: HumanTask;
-  instance: ProcessInstance;
-  isL3Revise?: boolean;
-  throws?: Error;
-}) {
+function makeEngineStub(opts: { task: HumanTask; instance: ProcessInstance; isL3Revise?: boolean; throws?: Error }) {
   const calls: EngineStubCall[] = [];
   const stub = {
     calls,
-    async completeHumanTask(
-      taskId: string,
-      payload: CompleteHumanTaskPayload,
-      actorId: string,
-    ) {
+    async completeHumanTask(taskId: string, payload: CompleteHumanTaskPayload, actorId: string) {
       calls.push({ taskId, payload, actorId });
       if (opts.throws) throw opts.throws;
       return {
@@ -68,9 +56,7 @@ describe('completeTask handler', () => {
     instanceRepo = new InMemoryProcessInstanceRepository();
     humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
     auditRepo = new InMemoryAuditRepository(instanceRepo);
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }));
   });
 
   it('returns updated { task, run }, emits audits, and kicks the run', async () => {
@@ -113,9 +99,7 @@ describe('completeTask handler', () => {
     expect(actions).toContain('task.completed');
     expect(actions).toContain('process.resumed_after_task');
 
-    expect(kicker.kicks).toEqual([
-      { instanceId: 'inst-a', triggeredBy: 'u-1' },
-    ]);
+    expect(kicker.kicks).toEqual([{ instanceId: 'inst-a', triggeredBy: 'u-1' }]);
     expect(engineStub.calls[0].actorId).toBe('u-1');
   });
 
@@ -133,13 +117,12 @@ describe('completeTask handler', () => {
       auditRepo,
       caller: userCaller('u-1', ['team-other']),
     });
-    Object.assign(scope.system, { engine: makeEngineStub({ task, instance: (await instanceRepo.getById('inst-a'))! }) });
+    Object.assign(scope.system, {
+      engine: makeEngineStub({ task, instance: (await instanceRepo.getById('inst-a'))! }),
+    });
 
     await expect(
-      completeTask(
-        { taskId: 'task-1', payload: { kind: 'verdict', verdict: 'approve' } },
-        scope,
-      ),
+      completeTask({ taskId: 'task-1', payload: { kind: 'verdict', verdict: 'approve' } }, scope),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -201,10 +184,7 @@ describe('completeTask handler', () => {
     Object.assign(scope.system, { engine: engineStub });
 
     await expect(
-      completeTask(
-        { taskId: 'task-1', payload: { kind: 'verdict', verdict: 'approve' } },
-        scope,
-      ),
+      completeTask({ taskId: 'task-1', payload: { kind: 'verdict', verdict: 'approve' } }, scope),
     ).rejects.toBeInstanceOf(ForbiddenError);
     expect(engineStub.calls).toHaveLength(0);
   });
@@ -231,10 +211,7 @@ describe('completeTask handler', () => {
     });
     Object.assign(scope.system, { engine: engineStub });
 
-    const result = await completeTask(
-      { taskId: 'task-1', payload: { kind: 'verdict', verdict: 'approve' } },
-      scope,
-    );
+    const result = await completeTask({ taskId: 'task-1', payload: { kind: 'verdict', verdict: 'approve' } }, scope);
     expect(result.task.status).toBe('completed');
     // apiKey actor attribution falls back to the claimant for the audit trail.
     expect(engineStub.calls[0].actorId).toBe('u-owner');
@@ -259,10 +236,7 @@ describe('completeTask handler', () => {
     Object.assign(scope.system, { engine: engineStub });
 
     await expect(
-      completeTask(
-        { taskId: 'task-1', payload: { kind: 'verdict', verdict: 'approve' } },
-        scope,
-      ),
+      completeTask({ taskId: 'task-1', payload: { kind: 'verdict', verdict: 'approve' } }, scope),
     ).rejects.toBeInstanceOf(PreconditionFailedError);
   });
 });

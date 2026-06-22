@@ -1,9 +1,6 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { copyWorkflow } from '@mediforce/platform-api/handlers';
-import {
-  CopyWorkflowInputSchema,
-  type CopyWorkflowInput,
-} from '@mediforce/platform-api/contract';
+import { CopyWorkflowInputSchema, type CopyWorkflowInput } from '@mediforce/platform-api/contract';
 import { z } from 'zod';
 
 interface RouteContext {

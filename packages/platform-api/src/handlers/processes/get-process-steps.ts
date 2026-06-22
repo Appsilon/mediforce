@@ -1,11 +1,7 @@
 import type { StepExecution } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
-import type {
-  GetProcessStepsInput,
-  GetProcessStepsOutput,
-  StepEntry,
-} from '../../contract/processes';
+import type { GetProcessStepsInput, GetProcessStepsOutput, StepEntry } from '../../contract/processes';
 
 /**
  * Derived per-step view combining workflow-definition order, the latest step
@@ -13,10 +9,7 @@ import type {
  * Algorithm ported verbatim from the pre-migration Next.js route — status
  * derivation rules unchanged. Workspace gating lives in the run wrapper.
  */
-export async function getProcessSteps(
-  input: GetProcessStepsInput,
-  scope: CallerScope,
-): Promise<GetProcessStepsOutput> {
+export async function getProcessSteps(input: GetProcessStepsInput, scope: CallerScope): Promise<GetProcessStepsOutput> {
   const { instanceId } = input;
 
   const instance = await scope.runs.getById(instanceId);
@@ -26,17 +19,11 @@ export async function getProcessSteps(
 
   const versionNum = Number.parseInt(instance.definitionVersion, 10);
   const definition = Number.isFinite(versionNum)
-    ? await scope.workflowDefinitions.get(
-        instance.namespace ?? '',
-        instance.definitionName,
-        versionNum,
-      )
+    ? await scope.workflowDefinitions.get(instance.namespace ?? '', instance.definitionName, versionNum)
     : null;
 
   if (definition === null) {
-    throw new NotFoundError(
-      `Workflow definition ${instance.definitionName}@${instance.definitionVersion} not found`,
-    );
+    throw new NotFoundError(`Workflow definition ${instance.definitionName}@${instance.definitionVersion} not found`);
   }
 
   const allExecutions = await scope.runs.getStepExecutions(instanceId);
@@ -80,8 +67,7 @@ export async function getProcessSteps(
     } else if (step.id === currentStepId) {
       status = 'running';
     } else {
-      const hasCompleted =
-        stepExecs.some((e) => e.status === 'completed') || stepVariables !== null;
+      const hasCompleted = stepExecs.some((e) => e.status === 'completed') || stepVariables !== null;
       status = hasCompleted ? 'completed' : 'pending';
     }
 

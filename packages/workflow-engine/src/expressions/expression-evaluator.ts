@@ -26,10 +26,7 @@ export class ExpressionError extends Error {
  *   - Logical: &&, ||, !
  *   - Parentheses for grouping
  */
-export function evaluateExpression(
-  expression: string,
-  context: ExpressionContext,
-): boolean {
+export function evaluateExpression(expression: string, context: ExpressionContext): boolean {
   const trimmed = expression.trim();
   if (trimmed.length === 0) {
     throw new ExpressionError('Empty expression');
@@ -57,10 +54,7 @@ class ExpressionParser {
     const result = this.parseOrExpr();
     this.skipWhitespace();
     if (this.pos < this.expr.length) {
-      throw new ExpressionError(
-        `Unexpected character '${this.expr[this.pos]}' at position ${this.pos}`,
-        this.pos,
-      );
+      throw new ExpressionError(`Unexpected character '${this.expr[this.pos]}' at position ${this.pos}`, this.pos);
     }
     return result;
   }
@@ -90,11 +84,7 @@ class ExpressionParser {
   /** unary_expr → '!' unary_expr | comparison */
   private parseUnaryExpr(): unknown {
     this.skipWhitespace();
-    if (
-      this.pos < this.expr.length &&
-      this.expr[this.pos] === '!' &&
-      this.charAt(this.pos + 1) !== '='
-    ) {
+    if (this.pos < this.expr.length && this.expr[this.pos] === '!' && this.charAt(this.pos + 1) !== '=') {
       this.pos++;
       const operand = this.parseUnaryExpr();
       return !Boolean(operand);
@@ -134,10 +124,7 @@ class ExpressionParser {
       const result = this.parseOrExpr();
       this.skipWhitespace();
       if (this.pos >= this.expr.length || this.expr[this.pos] !== ')') {
-        throw new ExpressionError(
-          'Expected closing parenthesis',
-          this.pos,
-        );
+        throw new ExpressionError('Expected closing parenthesis', this.pos);
       }
       this.pos++;
       return result;
@@ -182,9 +169,7 @@ class ExpressionParser {
 
     if (root === 'verdict') {
       if (path.length > 1) {
-        throw new ExpressionError(
-          `'verdict' is a scalar value, cannot access sub-field '${path[1]}'`,
-        );
+        throw new ExpressionError(`'verdict' is a scalar value, cannot access sub-field '${path[1]}'`);
       }
       return this.context.verdict ?? null;
     }
@@ -199,9 +184,7 @@ class ExpressionParser {
       return current ?? null;
     }
 
-    throw new ExpressionError(
-      `Unknown context field '${root}'. Expected 'output', 'variables', or 'verdict'`,
-    );
+    throw new ExpressionError(`Unknown context field '${root}'. Expected 'output', 'variables', or 'verdict'`);
   }
 
   // ---- Comparison helper ----
@@ -266,10 +249,7 @@ class ExpressionParser {
     }
     if (this.pos < this.expr.length && this.expr[this.pos] === '.') {
       this.pos++;
-      while (
-        this.pos < this.expr.length &&
-        this.isDigit(this.expr[this.pos])
-      ) {
+      while (this.pos < this.expr.length && this.isDigit(this.expr[this.pos])) {
         this.pos++;
       }
     }
@@ -284,10 +264,7 @@ class ExpressionParser {
   private parseIdentifier(): string {
     this.skipWhitespace();
     if (this.pos >= this.expr.length || !this.isIdentStart(this.expr[this.pos])) {
-      throw new ExpressionError(
-        `Expected identifier at position ${this.pos}`,
-        this.pos,
-      );
+      throw new ExpressionError(`Expected identifier at position ${this.pos}`, this.pos);
     }
     const start = this.pos;
     while (this.pos < this.expr.length && this.isIdentChar(this.expr[this.pos])) {

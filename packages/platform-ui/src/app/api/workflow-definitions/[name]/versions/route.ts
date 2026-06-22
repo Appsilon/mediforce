@@ -1,9 +1,6 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { listWorkflowVersions } from '@mediforce/platform-api/handlers';
-import {
-  ListWorkflowVersionsInputSchema,
-  type ListWorkflowVersionsInput,
-} from '@mediforce/platform-api/contract';
+import { ListWorkflowVersionsInputSchema, type ListWorkflowVersionsInput } from '@mediforce/platform-api/contract';
 
 interface RouteContext {
   params: Promise<{ name: string }>;

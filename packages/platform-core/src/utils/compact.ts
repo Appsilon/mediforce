@@ -10,9 +10,7 @@ import type { ZodType, z } from 'zod';
  * convert once at the boundary, instead of per-field conditional spreads.
  */
 export function compact<T extends Record<string, unknown>>(o: T): T {
-  return Object.fromEntries(
-    Object.entries(o).filter(([, value]) => value !== undefined),
-  ) as T;
+  return Object.fromEntries(Object.entries(o).filter(([, value]) => value !== undefined)) as T;
 }
 
 /**
@@ -20,9 +18,6 @@ export function compact<T extends Record<string, unknown>>(o: T): T {
  * validate against the schema. Folds the strip + `schema.parse()` that every
  * repository read boundary repeats into a single call.
  */
-export function parseRow<S extends ZodType>(
-  schema: S,
-  raw: Record<string, unknown>,
-): z.infer<S> {
+export function parseRow<S extends ZodType>(schema: S, raw: Record<string, unknown>): z.infer<S> {
   return schema.parse(compact(raw));
 }

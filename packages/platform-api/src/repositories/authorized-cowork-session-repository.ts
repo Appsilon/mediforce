@@ -1,8 +1,4 @@
-import type {
-  ConversationTurn,
-  CoworkSession,
-  CoworkSessionRepository,
-} from '@mediforce/platform-core';
+import type { ConversationTurn, CoworkSession, CoworkSessionRepository } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
 import { ForbiddenError } from '../errors';
 import { AuthorizedScope } from './authorized-repository';
@@ -41,9 +37,7 @@ export class AuthorizedCoworkSessionRepository extends AuthorizedScope {
       return role !== undefined ? this.raw.listByRoleAll(role) : this.raw.listAll();
     }
     const allowed = [...this.caller.namespaces];
-    return role !== undefined
-      ? this.raw.listByRoleInNamespaces(role, allowed)
-      : this.raw.listInNamespaces(allowed);
+    return role !== undefined ? this.raw.listByRoleInNamespaces(role, allowed) : this.raw.listInNamespaces(allowed);
   };
 
   findMostRecentActiveForInstance = async (instanceId: string): Promise<CoworkSession | null> =>
@@ -56,19 +50,12 @@ export class AuthorizedCoworkSessionRepository extends AuthorizedScope {
     return this.raw.addTurn(sessionId, turn);
   };
 
-  updateTurn = async (
-    sessionId: string,
-    turnId: string,
-    patch: Partial<ConversationTurn>,
-  ): Promise<CoworkSession> => {
+  updateTurn = async (sessionId: string, turnId: string, patch: Partial<ConversationTurn>): Promise<CoworkSession> => {
     await this.requireAccess(sessionId);
     return this.raw.updateTurn(sessionId, turnId, patch);
   };
 
-  updateArtifact = async (
-    sessionId: string,
-    artifact: Record<string, unknown>,
-  ): Promise<CoworkSession> => {
+  updateArtifact = async (sessionId: string, artifact: Record<string, unknown>): Promise<CoworkSession> => {
     await this.requireAccess(sessionId);
     return this.raw.updateArtifact(sessionId, artifact);
   };
@@ -81,18 +68,12 @@ export class AuthorizedCoworkSessionRepository extends AuthorizedScope {
     return this.raw.updateValidationResult(sessionId, result);
   };
 
-  updatePresentation = async (
-    sessionId: string,
-    html: string,
-  ): Promise<CoworkSession> => {
+  updatePresentation = async (sessionId: string, html: string): Promise<CoworkSession> => {
     await this.requireAccess(sessionId);
     return this.raw.updatePresentation(sessionId, html);
   };
 
-  finalize = async (
-    sessionId: string,
-    artifact: Record<string, unknown>,
-  ): Promise<CoworkSession> => {
+  finalize = async (sessionId: string, artifact: Record<string, unknown>): Promise<CoworkSession> => {
     await this.requireAccess(sessionId);
     return this.raw.finalize(sessionId, artifact);
   };

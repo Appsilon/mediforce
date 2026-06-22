@@ -1,9 +1,5 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
-import {
-  getWorkflow,
-  setWorkflowVisibility,
-  deleteWorkflow,
-} from '@mediforce/platform-api/handlers';
+import { getWorkflow, setWorkflowVisibility, deleteWorkflow } from '@mediforce/platform-api/handlers';
 import {
   GetWorkflowInputSchema,
   SetVisibilityInputSchema,
@@ -21,12 +17,7 @@ interface RouteContext {
 /**
  * GET /api/workflow-definitions/:name — fetch one (404 anti-enum on private).
  */
-export const GET = createRouteAdapter<
-  typeof GetWorkflowInputSchema,
-  GetWorkflowInput,
-  unknown,
-  RouteContext
->(
+export const GET = createRouteAdapter<typeof GetWorkflowInputSchema, GetWorkflowInput, unknown, RouteContext>(
   GetWorkflowInputSchema,
   async (req, ctx) => {
     const { name } = await ctx.params;
@@ -71,12 +62,7 @@ export const PATCH = createRouteAdapter<
  * is a stale-confirmation guard. Audit actor is sourced from the caller, not
  * hard-coded.
  */
-export const DELETE = createRouteAdapter<
-  typeof DeleteWorkflowInputSchema,
-  DeleteWorkflowInput,
-  unknown,
-  RouteContext
->(
+export const DELETE = createRouteAdapter<typeof DeleteWorkflowInputSchema, DeleteWorkflowInput, unknown, RouteContext>(
   DeleteWorkflowInputSchema,
   async (req, ctx) => {
     const { name } = await ctx.params;

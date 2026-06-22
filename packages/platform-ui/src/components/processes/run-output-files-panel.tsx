@@ -20,10 +20,7 @@ export interface OutputFileGroup {
  * Step names resolve from the definition; missing steps fall back to a
  * title-cased step ID, matching the step labels elsewhere on the page.
  */
-export function groupOutputFilesByStep(
-  files: RunOutputFileEntry[],
-  definitionSteps: Step[],
-): OutputFileGroup[] {
+export function groupOutputFilesByStep(files: RunOutputFileEntry[], definitionSteps: Step[]): OutputFileGroup[] {
   const byStepId = new Map<string, RunOutputFileEntry[]>();
   for (const file of files) {
     const existing = byStepId.get(file.stepId);
@@ -34,17 +31,14 @@ export function groupOutputFilesByStep(
     }
   }
 
-  const definitionOrder = definitionSteps
-    .map((step) => step.id)
-    .filter((stepId) => byStepId.has(stepId));
+  const definitionOrder = definitionSteps.map((step) => step.id).filter((stepId) => byStepId.has(stepId));
   const unknownOrder = [...byStepId.keys()].filter(
     (stepId) => definitionSteps.some((step) => step.id === stepId) === false,
   );
 
   return [...definitionOrder, ...unknownOrder].map((stepId) => ({
     stepId,
-    stepName:
-      definitionSteps.find((step) => step.id === stepId)?.name ?? formatStepName(stepId),
+    stepName: definitionSteps.find((step) => step.id === stepId)?.name ?? formatStepName(stepId),
     files: [...(byStepId.get(stepId) ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
   }));
 }
@@ -56,9 +50,7 @@ const ARCHIVE_EXTENSIONS = new Set(['zip', 'tar', 'gz', 'tgz', '7z']);
 
 function fileTypeIcon(fileName: string): LucideIcon {
   const lastSegment = fileName.split('/').pop() ?? fileName;
-  const extension = lastSegment.includes('.')
-    ? (lastSegment.split('.').pop() ?? '').toLowerCase()
-    : '';
+  const extension = lastSegment.includes('.') ? (lastSegment.split('.').pop() ?? '').toLowerCase() : '';
   if (DOCUMENT_EXTENSIONS.has(extension)) return FileText;
   if (TABLE_EXTENSIONS.has(extension)) return FileSpreadsheet;
   if (IMAGE_EXTENSIONS.has(extension)) return FileImage;
@@ -78,10 +70,7 @@ export function OutputFileRow({ runId, file }: { runId: string; file: RunOutputF
       const downloaded = await mediforce.runs.downloadOutputFile({ runId, path: file.path });
       // `.slice()` re-types the view as Uint8Array<ArrayBuffer> (BlobPart
       // rejects the wider ArrayBufferLike the client returns).
-      saveBlobToDevice(
-        new Blob([downloaded.bytes.slice()], { type: downloaded.contentType }),
-        downloaded.fileName,
-      );
+      saveBlobToDevice(new Blob([downloaded.bytes.slice()], { type: downloaded.contentType }), downloaded.fileName);
     } catch (err) {
       setDownloadError(err instanceof Error ? err.message : 'Download failed');
     } finally {
@@ -92,11 +81,11 @@ export function OutputFileRow({ runId, file }: { runId: string; file: RunOutputF
   return (
     <li className="flex items-center gap-2 text-sm min-w-0">
       <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-      <span className="truncate" title={file.name}>{file.name}</span>
+      <span className="truncate" title={file.name}>
+        {file.name}
+      </span>
       <span className="text-xs text-muted-foreground shrink-0">{formatBytes(file.size)}</span>
-      {downloadError && (
-        <span className="text-xs text-destructive truncate">{downloadError}</span>
-      )}
+      {downloadError && <span className="text-xs text-destructive truncate">{downloadError}</span>}
       <button
         onClick={handleDownload}
         disabled={downloading}
@@ -122,10 +111,7 @@ export function RunOutputFilesPanel({
   files: RunOutputFileEntry[];
   definitionSteps: Step[];
 }) {
-  const groups = React.useMemo(
-    () => groupOutputFilesByStep(files, definitionSteps),
-    [files, definitionSteps],
-  );
+  const groups = React.useMemo(() => groupOutputFilesByStep(files, definitionSteps), [files, definitionSteps]);
 
   if (groups.length === 0) {
     return null;

@@ -1,16 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import {
-  resolveApiKey,
-  resolveBaseUrl,
-  resolveConfig,
-  DEFAULT_BASE_URL,
-} from '../config';
+import { resolveApiKey, resolveBaseUrl, resolveConfig, DEFAULT_BASE_URL } from '../config';
 
 describe('resolveApiKey', () => {
   it('prefers MEDIFORCE_API_KEY over PLATFORM_API_KEY', () => {
-    expect(
-      resolveApiKey({ MEDIFORCE_API_KEY: 'm', PLATFORM_API_KEY: 'p' }),
-    ).toBe('m');
+    expect(resolveApiKey({ MEDIFORCE_API_KEY: 'm', PLATFORM_API_KEY: 'p' })).toBe('m');
   });
 
   it('falls back to PLATFORM_API_KEY when MEDIFORCE_API_KEY is unset', () => {
@@ -18,9 +11,7 @@ describe('resolveApiKey', () => {
   });
 
   it('falls back to PLATFORM_API_KEY when MEDIFORCE_API_KEY is the empty string', () => {
-    expect(
-      resolveApiKey({ MEDIFORCE_API_KEY: '', PLATFORM_API_KEY: 'p' }),
-    ).toBe('p');
+    expect(resolveApiKey({ MEDIFORCE_API_KEY: '', PLATFORM_API_KEY: 'p' })).toBe('p');
   });
 
   it('throws when neither variable is set', () => {
@@ -39,9 +30,7 @@ describe('resolveBaseUrl', () => {
   });
 
   it('falls back to MEDIFORCE_BASE_URL when no flag is given', () => {
-    expect(
-      resolveBaseUrl({ env: { MEDIFORCE_BASE_URL: 'https://env.example.com' } }),
-    ).toBe('https://env.example.com');
+    expect(resolveBaseUrl({ env: { MEDIFORCE_BASE_URL: 'https://env.example.com' } })).toBe('https://env.example.com');
   });
 
   it('falls back to the default when neither flag nor env is set', () => {

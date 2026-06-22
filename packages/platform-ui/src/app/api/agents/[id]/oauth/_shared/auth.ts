@@ -25,15 +25,10 @@ export async function requireFirebaseUid(request: Request): Promise<string | Nex
  *  read or mutate namespace-scoped state must follow up with
  *  `requireNamespaceMembership`. Plain query-param trust is finding #3 from
  *  the PR #263 review. */
-export async function requireNamespaceFromQuery(
-  request: Request,
-): Promise<string | NextResponse> {
+export async function requireNamespaceFromQuery(request: Request): Promise<string | NextResponse> {
   const handle = new URL(request.url).searchParams.get('namespace');
   if (handle === null || handle.length === 0) {
-    return NextResponse.json(
-      { error: 'Missing required query parameter: namespace' },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'Missing required query parameter: namespace' }, { status: 400 });
   }
   return handle;
 }

@@ -1,9 +1,5 @@
 import type { CallerScope } from '../../repositories/index';
-import type {
-  ListWorkflowsInput,
-  ListWorkflowsOutput,
-  WorkflowDefinitionGroupSummary,
-} from '../../contract/workflows';
+import type { ListWorkflowsInput, ListWorkflowsOutput, WorkflowDefinitionGroupSummary } from '../../contract/workflows';
 
 /**
  * List workflow definitions visible to the caller, grouped by name with the
@@ -11,16 +7,11 @@ import type {
  * version the caller cannot see (private + foreign workspace). The optional
  * `namespace` input narrows further but does not grant access.
  */
-export async function listWorkflows(
-  input: ListWorkflowsInput,
-  scope: CallerScope,
-): Promise<ListWorkflowsOutput> {
+export async function listWorkflows(input: ListWorkflowsInput, scope: CallerScope): Promise<ListWorkflowsOutput> {
   const groups = await scope.workflowDefinitions.listGroups(false);
 
   const inScope =
-    input.namespace !== undefined
-      ? groups.filter((group) => group.namespace === input.namespace)
-      : groups;
+    input.namespace !== undefined ? groups.filter((group) => group.namespace === input.namespace) : groups;
 
   // One run summary per card. The summaries come from count() aggregations +
   // a bounded latest-3 query (no full-collection read), so fanning out here
@@ -30,11 +21,7 @@ export async function listWorkflows(
   const summaries: WorkflowDefinitionGroupSummary[] = await Promise.all(
     inScope.map(async (group) => {
       const latest = group.versions.find((v) => v.version === group.latestVersion) ?? null;
-      const rawSummary = await scope.runs.summarizeRuns(
-        group.namespace,
-        group.name,
-        input.includeCompletedRuns,
-      );
+      const rawSummary = await scope.runs.summarizeRuns(group.namespace, group.name, input.includeCompletedRuns);
 
       const stepsByVersion: Record<string, string[]> = {};
       for (const instance of rawSummary.latest) {
@@ -43,9 +30,7 @@ export async function listWorkflows(
         if (!(key in stepsByVersion)) {
           const def = group.versions.find((v) => String(v.version) === instance.definitionVersion);
           if (def) {
-            stepsByVersion[key] = def.steps
-              .filter((s) => s.type !== 'terminal')
-              .map((s) => s.id);
+            stepsByVersion[key] = def.steps.filter((s) => s.type !== 'terminal').map((s) => s.id);
           }
         }
       }

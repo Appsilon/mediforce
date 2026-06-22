@@ -62,7 +62,7 @@ function buildSystemPrompt(session: CoworkSession): string {
 
   parts.push(
     'You are a collaborative assistant working with a human to build an artifact together. ' +
-    'Your goal is to help the human produce a high-quality artifact that satisfies the required schema.',
+      'Your goal is to help the human produce a high-quality artifact that satisfies the required schema.',
   );
 
   if (session.systemPrompt) {
@@ -77,12 +77,12 @@ function buildSystemPrompt(session: CoworkSession): string {
 
   parts.push(
     '\n## Instructions\n' +
-    '- Ask clarifying questions when the human\'s intent is ambiguous.\n' +
-    '- Call the `update_artifact` tool whenever you have enough information to create or improve the artifact.\n' +
-    '- Call `update_presentation` with an HTML fragment to show a visual representation of the artifact (e.g., a flow diagram).\n' +
-    '- Always pass the COMPLETE artifact to `update_artifact`, not a partial delta.\n' +
-    '- Explain what you changed and why after each artifact update.\n' +
-    '- When you believe the artifact is complete, say so and ask the human to review and finalize.',
+      "- Ask clarifying questions when the human's intent is ambiguous.\n" +
+      '- Call the `update_artifact` tool whenever you have enough information to create or improve the artifact.\n' +
+      '- Call `update_presentation` with an HTML fragment to show a visual representation of the artifact (e.g., a flow diagram).\n' +
+      '- Always pass the COMPLETE artifact to `update_artifact`, not a partial delta.\n' +
+      '- Explain what you changed and why after each artifact update.\n' +
+      '- When you believe the artifact is complete, say so and ask the human to review and finalize.',
   );
 
   return parts.join('\n');
@@ -99,10 +99,7 @@ function buildSystemPrompt(session: CoworkSession): string {
  * The caller must persist the new human turn to the session before calling this —
  * `session.turns` is the single source of truth for conversation state.
  */
-export function buildMessages(
-  session: CoworkSession,
-  stepContext?: Record<string, unknown>,
-): ChatMessage[] {
+export function buildMessages(session: CoworkSession, stepContext?: Record<string, unknown>): ChatMessage[] {
   const messages: ChatMessage[] = [];
 
   let systemContent = buildSystemPrompt(session);
@@ -211,7 +208,9 @@ function buildConversationMessages(turns: ConversationTurn[]): ChatMessage[] {
 /**
  * Build the tools array for OpenRouter, combining the artifact tool with MCP tools.
  */
-export function buildToolsArray(mcpTools?: McpToolDefinition[]): Array<typeof ARTIFACT_TOOL | typeof PRESENTATION_TOOL | McpToolDefinition> {
+export function buildToolsArray(
+  mcpTools?: McpToolDefinition[],
+): Array<typeof ARTIFACT_TOOL | typeof PRESENTATION_TOOL | McpToolDefinition> {
   const builtins = [ARTIFACT_TOOL, PRESENTATION_TOOL];
   if (!mcpTools || mcpTools.length === 0) return builtins;
   return [...builtins, ...mcpTools];

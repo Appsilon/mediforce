@@ -65,9 +65,7 @@ describe('POST /api/processes/bulk/archive', () => {
   });
 
   it('[DATA] never aborts batch — failures surface as per-item error entries', async () => {
-    mockInstanceGetById.mockImplementation(async (id: string) =>
-      id === 'r-missing' ? null : completedRun(id),
-    );
+    mockInstanceGetById.mockImplementation(async (id: string) => (id === 'r-missing' ? null : completedRun(id)));
 
     const res = await POST(makeRequest({ runIds: ['r1', 'r-missing', 'r2'] }), {});
     const json = await res.json();
@@ -75,10 +73,7 @@ describe('POST /api/processes/bulk/archive', () => {
     expect(res.status).toBe(200);
     expect(json.results).toHaveLength(3);
     const byId = Object.fromEntries(
-      (json.results as Array<{ id: string; status: string; error?: string }>).map((r) => [
-        r.id,
-        r,
-      ]),
+      (json.results as Array<{ id: string; status: string; error?: string }>).map((r) => [r.id, r]),
     );
     expect(byId.r1.status).toBe('ok');
     expect(byId.r2.status).toBe('ok');

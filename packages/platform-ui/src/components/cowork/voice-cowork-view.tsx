@@ -148,11 +148,14 @@ export function VoiceCoworkView({ session, instance, handle, stepDescription }: 
   // ------------------------------------------------------------------
   // End session
   // ------------------------------------------------------------------
-  const endSession = React.useCallback((reason?: string) => {
-    cleanup();
-    setVoiceStatus('ended');
-    if (reason) setError(reason);
-  }, [cleanup]);
+  const endSession = React.useCallback(
+    (reason?: string) => {
+      cleanup();
+      setVoiceStatus('ended');
+      if (reason) setError(reason);
+    },
+    [cleanup],
+  );
 
   // ------------------------------------------------------------------
   // Send event over data channel
@@ -167,60 +170,63 @@ export function VoiceCoworkView({ session, instance, handle, stepDescription }: 
   // ------------------------------------------------------------------
   // Handle Realtime events from data channel
   // ------------------------------------------------------------------
-  const handleRealtimeEvent = React.useCallback((event: RealtimeEvent) => {
-    switch (event.type) {
-      case 'conversation.item.input_audio_transcription.completed': {
-        const transcript = (event as Record<string, unknown>).transcript as string;
-        if (transcript?.trim()) {
-          setUserTranscript((prev) => [...prev, transcript.trim()]);
-          resetIdleTimer();
-        }
-        break;
-      }
-
-      case 'response.audio_transcript.delta': {
-        const delta = (event as Record<string, unknown>).delta as string;
-        setCurrentAgentText((prev) => prev + delta);
-        resetIdleTimer();
-        break;
-      }
-
-      case 'response.audio_transcript.done': {
-        const transcript = (event as Record<string, unknown>).transcript as string;
-        if (transcript?.trim()) {
-          setAgentTranscript((prev) => [...prev, transcript.trim()]);
-        }
-        setCurrentAgentText('');
-        break;
-      }
-
-      // Live artifact — model calls update_artifact tool during voice
-      case 'response.function_call_arguments.done': {
-        const toolEvent = event as Record<string, unknown>;
-        const toolName = toolEvent.name as string;
-        const callId = toolEvent.call_id as string;
-        if (toolName === 'update_artifact') {
-          try {
-            const parsed = JSON.parse(toolEvent.arguments as string);
-            setArtifact(parsed.artifact ?? parsed);
-          } catch {
-            // ignore parse errors
+  const handleRealtimeEvent = React.useCallback(
+    (event: RealtimeEvent) => {
+      switch (event.type) {
+        case 'conversation.item.input_audio_transcription.completed': {
+          const transcript = (event as Record<string, unknown>).transcript as string;
+          if (transcript?.trim()) {
+            setUserTranscript((prev) => [...prev, transcript.trim()]);
+            resetIdleTimer();
           }
-          // Send tool result back so the model continues
-          sendDataChannelEvent({
-            type: 'conversation.item.create',
-            item: {
-              type: 'function_call_output',
-              call_id: callId,
-              output: JSON.stringify({ status: 'ok', message: 'Artifact updated' }),
-            },
-          });
-          sendDataChannelEvent({ type: 'response.create' });
+          break;
         }
-        break;
+
+        case 'response.audio_transcript.delta': {
+          const delta = (event as Record<string, unknown>).delta as string;
+          setCurrentAgentText((prev) => prev + delta);
+          resetIdleTimer();
+          break;
+        }
+
+        case 'response.audio_transcript.done': {
+          const transcript = (event as Record<string, unknown>).transcript as string;
+          if (transcript?.trim()) {
+            setAgentTranscript((prev) => [...prev, transcript.trim()]);
+          }
+          setCurrentAgentText('');
+          break;
+        }
+
+        // Live artifact — model calls update_artifact tool during voice
+        case 'response.function_call_arguments.done': {
+          const toolEvent = event as Record<string, unknown>;
+          const toolName = toolEvent.name as string;
+          const callId = toolEvent.call_id as string;
+          if (toolName === 'update_artifact') {
+            try {
+              const parsed = JSON.parse(toolEvent.arguments as string);
+              setArtifact(parsed.artifact ?? parsed);
+            } catch {
+              // ignore parse errors
+            }
+            // Send tool result back so the model continues
+            sendDataChannelEvent({
+              type: 'conversation.item.create',
+              item: {
+                type: 'function_call_output',
+                call_id: callId,
+                output: JSON.stringify({ status: 'ok', message: 'Artifact updated' }),
+              },
+            });
+            sendDataChannelEvent({ type: 'response.create' });
+          }
+          break;
+        }
       }
-    }
-  }, [resetIdleTimer, sendDataChannelEvent]);
+    },
+    [resetIdleTimer, sendDataChannelEvent],
+  );
 
   // ------------------------------------------------------------------
   // Start voice session
@@ -290,7 +296,7 @@ export function VoiceCoworkView({ session, instance, handle, stepDescription }: 
       const sdpRes = await fetch(`https://api.openai.com/v1/realtime?model=${model}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${result.ephemeralKey}`,
+          Authorization: `Bearer ${result.ephemeralKey}`,
           'Content-Type': 'application/sdp',
         },
         body: offer.sdp,
@@ -345,9 +351,7 @@ export function VoiceCoworkView({ session, instance, handle, stepDescription }: 
       });
       setArtifact(result.artifact);
     } catch (err) {
-      const fallback = err instanceof ApiError || err instanceof Error
-        ? err.message
-        : 'Synthesis failed';
+      const fallback = err instanceof ApiError || err instanceof Error ? err.message : 'Synthesis failed';
       setError(fallback);
     } finally {
       setSynthesizing(false);
@@ -364,9 +368,7 @@ export function VoiceCoworkView({ session, instance, handle, stepDescription }: 
       await mediforce.cowork.finalize({ sessionId: session.id, artifact });
       setFinalized(true);
     } catch (err) {
-      const fallback = err instanceof ApiError || err instanceof Error
-        ? err.message
-        : 'Finalization failed';
+      const fallback = err instanceof ApiError || err instanceof Error ? err.message : 'Finalization failed';
       setError(fallback);
     } finally {
       setFinalizing(false);
@@ -460,7 +462,11 @@ export function VoiceCoworkView({ session, instance, handle, stepDescription }: 
                     disabled={synthesizing}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700 transition-colors disabled:opacity-50"
                   >
-                    {synthesizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                    {synthesizing ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    )}
                     Re-synthesize
                   </button>
                 </div>
@@ -480,7 +486,11 @@ export function VoiceCoworkView({ session, instance, handle, stepDescription }: 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {userTranscript.length === 0 && agentTranscript.length === 0 && !currentAgentText && (
             <p className="text-sm text-muted-foreground italic text-center mt-8">
-              {voiceStatus === 'connected' ? 'Start speaking...' : voiceStatus === 'idle' ? 'Click "Start voice session" to begin' : 'No transcript yet'}
+              {voiceStatus === 'connected'
+                ? 'Start speaking...'
+                : voiceStatus === 'idle'
+                  ? 'Click "Start voice session" to begin'
+                  : 'No transcript yet'}
             </p>
           )}
           {Array.from({ length: Math.max(userTranscript.length, agentTranscript.length) }).map((_, idx) => (

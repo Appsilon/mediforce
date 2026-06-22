@@ -53,9 +53,7 @@ export function printKv(
 ): void {
   const nullDisplay = options?.nullDisplay ?? '(none)';
   const indent = ' '.repeat(options?.indent ?? 2);
-  const visible = rows.filter(
-    ([, value]) => value !== undefined || options?.nullDisplay !== undefined,
-  );
+  const visible = rows.filter(([, value]) => value !== undefined || options?.nullDisplay !== undefined);
   if (visible.length === 0) return;
   const width = Math.max(...visible.map(([label]) => label.length));
   for (const [label, value] of visible) {
@@ -87,17 +85,12 @@ export function printKv(
  *     compose commands (`cmd | next-tool`) without errors corrupting
  *     the pipe.
  */
-export function printError(
-  sink: OutputSink,
-  payload: ErrorPayload,
-  jsonMode: boolean,
-): void {
+export function printError(sink: OutputSink, payload: ErrorPayload, jsonMode: boolean): void {
   if (jsonMode) {
     sink.stdout(JSON.stringify(payload, null, 2));
     return;
   }
-  const suffix =
-    payload.status !== undefined ? ` (HTTP ${String(payload.status)})` : '';
+  const suffix = payload.status !== undefined ? ` (HTTP ${String(payload.status)})` : '';
   sink.stderr(`Error${suffix}: ${payload.error}`);
   if (payload.cause !== undefined) {
     sink.stderr(`  Reason: ${formatCause(payload.cause)}`);

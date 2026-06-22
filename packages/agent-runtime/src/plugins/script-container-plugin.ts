@@ -3,9 +3,21 @@ import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
-import type { AgentConfig, ScriptStepConfig, StepConfig, PluginCapabilityMetadata, Presentation } from '@mediforce/platform-core';
+import type {
+  AgentConfig,
+  ScriptStepConfig,
+  StepConfig,
+  PluginCapabilityMetadata,
+  Presentation,
+} from '@mediforce/platform-core';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, type ContainerPluginInit } from './container-plugin';
+import {
+  ContainerPlugin,
+  isWorkflowAgentContext,
+  resolveImageBuild,
+  formatExitInfo,
+  type ContainerPluginInit,
+} from './container-plugin';
 import { isLocalExecutionAllowed } from './base-container-agent-plugin';
 
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
@@ -63,7 +75,8 @@ export class ScriptContainerPlugin extends ContainerPlugin {
   readonly metadata: PluginCapabilityMetadata = {
     name: 'Script Container',
     description: 'Runs a deterministic script or inline code inside a Docker container — no LLM involved.',
-    inputDescription: 'Step input JSON at /output/input.json; carry-over from WD inputForNextRun (when declared) at /output/previous_run.json.',
+    inputDescription:
+      'Step input JSON at /output/input.json; carry-over from WD inputForNextRun (when declared) at /output/previous_run.json.',
     outputDescription: 'Container writes result to /output/result.json; parsed and emitted as the step result.',
     roles: ['executor'],
   };
@@ -91,9 +104,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       stepEnv = context.step.env;
       definitionEnv = context.workflowDefinition.env;
     } else {
-      const stepConfig = context.config.stepConfigs.find(
-        (sc: StepConfig) => sc.stepId === context.stepId,
-      );
+      const stepConfig = context.config.stepConfigs.find((sc: StepConfig) => sc.stepId === context.stepId);
       if (!stepConfig) {
         throw new Error(`Step config not found for stepId '${context.stepId}'`);
       }
@@ -105,7 +116,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
     if (!scriptConfig) {
       throw new Error(
         `No script config found for step '${context.stepId}'. ` +
-        `ScriptContainerPlugin requires step.script with command or inlineScript.`,
+          `ScriptContainerPlugin requires step.script with command or inlineScript.`,
       );
     }
 
@@ -115,7 +126,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       if (!runtime) {
         throw new Error(
           `script.runtime is required when using inlineScript for step '${context.stepId}'. ` +
-          `Supported runtimes: ${Object.keys(RUNTIME_CONFIG).join(', ')}`,
+            `Supported runtimes: ${Object.keys(RUNTIME_CONFIG).join(', ')}`,
         );
       }
 
@@ -123,7 +134,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       if (!runtimeCfg) {
         throw new Error(
           `Unknown runtime '${runtime}' for step '${context.stepId}'. ` +
-          `Supported: ${Object.keys(RUNTIME_CONFIG).join(', ')}`,
+            `Supported: ${Object.keys(RUNTIME_CONFIG).join(', ')}`,
         );
       }
 
@@ -149,7 +160,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       if (!scriptConfig.image) {
         throw new Error(
           `No Docker image configured in script config for step '${context.stepId}'. ` +
-          'ScriptContainerPlugin requires script.image when using command mode.',
+            'ScriptContainerPlugin requires script.image when using command mode.',
         );
       }
       this.image = scriptConfig.image;
@@ -158,7 +169,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
     } else {
       throw new Error(
         `No command or inlineScript configured for step '${context.stepId}'. ` +
-        'ScriptContainerPlugin requires either script.command or script.inlineScript.',
+          'ScriptContainerPlugin requires either script.command or script.inlineScript.',
       );
     }
 
@@ -197,11 +208,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       // run. Scripts that don't carry anything simply ignore the file.
       if (isWorkflowAgentContext(this.context) && this.context.previousRun !== undefined) {
         const previousRunPath = join(outputDir, 'previous_run.json');
-        await writeFile(
-          previousRunPath,
-          JSON.stringify(this.context.previousRun, null, 2),
-          'utf-8',
-        );
+        await writeFile(previousRunPath, JSON.stringify(this.context.previousRun, null, 2), 'utf-8');
       }
 
       // Write inline script to /output/script.{ext}
@@ -213,12 +220,10 @@ export class ScriptContainerPlugin extends ContainerPlugin {
 
       const timeoutMinutes = isWorkflowAgentContext(this.context)
         ? this.context.step.script?.timeoutMinutes
-        : this.context.config.stepConfigs.find(
-            (sc: StepConfig) => sc.stepId === this.context.stepId,
-          )?.agentConfig?.timeoutMinutes;
-      const timeoutMs = typeof timeoutMinutes === 'number' && timeoutMinutes > 0
-        ? timeoutMinutes * 60_000
-        : DEFAULT_TIMEOUT_MS;
+        : this.context.config.stepConfigs.find((sc: StepConfig) => sc.stepId === this.context.stepId)?.agentConfig
+            ?.timeoutMinutes;
+      const timeoutMs =
+        typeof timeoutMinutes === 'number' && timeoutMinutes > 0 ? timeoutMinutes * 60_000 : DEFAULT_TIMEOUT_MS;
 
       const logsDir = join(tmpdir(), 'mediforce-step-logs');
       await mkdir(logsDir, { recursive: true });
@@ -284,13 +289,20 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         }
 
         const dockerArgs: string[] = [
-          'run', '--rm',
-          '--name', containerName,
-          '--memory', '8g',
-          '--cpus', '2',
-          '-v', `${outputDir}:/output`,
-          '-v', `${this.runWorkspaceHandle!.path}:/workspace`,
-          '-w', '/workspace',
+          'run',
+          '--rm',
+          '--name',
+          containerName,
+          '--memory',
+          '8g',
+          '--cpus',
+          '2',
+          '-v',
+          `${outputDir}:/output`,
+          '-v',
+          `${this.runWorkspaceHandle!.path}:/workspace`,
+          '-w',
+          '/workspace',
           ...envFlags,
           this.image,
           ...this.commandArgs,
@@ -359,7 +371,9 @@ export class ScriptContainerPlugin extends ContainerPlugin {
             try {
               const inputStat = await stat(join(outputDir, 'input.json'));
               inputSize = `${inputStat.size}b`;
-            } catch { /* missing — shouldn't happen */ }
+            } catch {
+              /* missing — shouldn't happen */
+            }
             detail = `no stdout/stderr/result captured — image=${this.image}, cmd=${this.commandDisplay}, env=[${envKeys}], inputSize=${inputSize}`;
           }
           // The Step Log panel renders the activity log FILE, not the event
@@ -429,11 +443,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         payload: {
           confidence: 1.0,
           reasoning_summary: `Script container completed: ${this.commandDisplay}`,
-          reasoning_chain: [
-            `Image: ${this.image}`,
-            `Command: ${this.commandDisplay}`,
-            `Duration: ${durationMs}ms`,
-          ],
+          reasoning_chain: [`Image: ${this.image}`, `Command: ${this.commandDisplay}`, `Duration: ${durationMs}ms`],
           annotations: [],
           model: 'script',
           duration_ms: durationMs,

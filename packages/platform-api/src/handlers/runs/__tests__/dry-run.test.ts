@@ -11,10 +11,7 @@ import { ListRunsInputSchema } from '../../../contract/runs';
 import { startRun } from '../start-run';
 import { listRuns } from '../list-runs';
 import { getRun } from '../get-run';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { noopRunKicker } from '../../../runtime/run-kicker';
 
 describe('dry run', () => {
@@ -81,9 +78,7 @@ describe('dry run', () => {
         scope,
       );
 
-      expect(fireWorkflow).toHaveBeenCalledWith(
-        expect.objectContaining({ dryRun: true }),
-      );
+      expect(fireWorkflow).toHaveBeenCalledWith(expect.objectContaining({ dryRun: true }));
     });
 
     it('omits dryRun from fireWorkflow when not set', async () => {
@@ -176,9 +171,7 @@ describe('dry run', () => {
 
   describe('getRun', () => {
     it('includes dryRun: true in output for dry runs', async () => {
-      await instanceRepo.create(
-        buildProcessInstance({ id: 'r1', namespace: 'alpha', dryRun: true }),
-      );
+      await instanceRepo.create(buildProcessInstance({ id: 'r1', namespace: 'alpha', dryRun: true }));
 
       const scope = createTestScope({ instanceRepo, processRepo });
       const result = await getRun({ runId: 'r1' }, scope);
@@ -187,9 +180,7 @@ describe('dry run', () => {
     });
 
     it('omits dryRun from output for normal runs', async () => {
-      await instanceRepo.create(
-        buildProcessInstance({ id: 'r1', namespace: 'alpha', dryRun: false }),
-      );
+      await instanceRepo.create(buildProcessInstance({ id: 'r1', namespace: 'alpha', dryRun: false }));
 
       const scope = createTestScope({ instanceRepo, processRepo });
       const result = await getRun({ runId: 'r1' }, scope);

@@ -2,11 +2,7 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { type PluginCapabilityMetadata, normaliseModelId } from '@mediforce/platform-core';
 export { normaliseModelId };
-import {
-  BaseContainerAgentPlugin,
-  type SpawnCliOptions,
-  type AgentCommandSpec,
-} from './base-container-agent-plugin';
+import { BaseContainerAgentPlugin, type SpawnCliOptions, type AgentCommandSpec } from './base-container-agent-plugin';
 import { isWorkflowAgentContext } from './container-plugin';
 
 /** Default model used when agentConfig.model is not set. */
@@ -72,10 +68,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     // OpenCode resolves provider=openrouter, model=deepseek/deepseek-chat.
     const modelArg = this.resolveModelArg(model);
 
-    const args = [
-      'bash', '-c',
-      `opencode run "$(cat ${promptFilePath})" --format json --model ${modelArg}`,
-    ];
+    const args = ['bash', '-c', `opencode run "$(cat ${promptFilePath})" --format json --model ${modelArg}`];
 
     return { args, promptDelivery: 'file' };
   }
@@ -91,9 +84,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     if (normalised.startsWith('openrouter/') || !normalised.includes('/')) {
       return normalised;
     }
-    const workflowSecrets = isWorkflowAgentContext(this.context)
-      ? this.context.workflowSecrets
-      : undefined;
+    const workflowSecrets = isWorkflowAgentContext(this.context) ? this.context.workflowSecrets : undefined;
     const openrouterKey = this.resolvedEnv.vars.OPENROUTER_API_KEY ?? workflowSecrets?.OPENROUTER_API_KEY;
     if (openrouterKey) {
       return `openrouter/${normalised}`;
@@ -105,18 +96,18 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     const copyOutputCmd =
       `cp -r /mock-data/* /output/ 2>/dev/null; ` +
       `if [ -f "/mock-fixtures/${stepId}.json" ]; then ` +
-        `cp /mock-fixtures/${stepId}.json /output/mock-result.json && ` +
-        `echo "[mock-opencode] step=${stepId}: copied data + fixture" >&2; ` +
+      `cp /mock-fixtures/${stepId}.json /output/mock-result.json && ` +
+      `echo "[mock-opencode] step=${stepId}: copied data + fixture" >&2; ` +
       `else ` +
-        `echo '{"mock":true,"summary":"Mock OpenCode output for step ${stepId}"}' > /output/mock-result.json && ` +
-        `echo "[mock-opencode] step=${stepId}: no fixture, generic mock" >&2; ` +
+      `echo '{"mock":true,"summary":"Mock OpenCode output for step ${stepId}"}' > /output/mock-result.json && ` +
+      `echo "[mock-opencode] step=${stepId}: no fixture, generic mock" >&2; ` +
       `fi`;
 
     const copyWorkspaceCmd =
       `WSDIR=$(grep -o '"_workspaceDir"[[:space:]]*:[[:space:]]*"[^"]*"' /mock-fixtures/${stepId}.json 2>/dev/null | sed 's/.*"\\([^"]*\\)"$/\\1/'); ` +
       `if [ -n "$WSDIR" ] && [ -d "/mock-data/$WSDIR" ]; then ` +
-        `cp -r /mock-data/$WSDIR/* /workspace/ && ` +
-        `echo "[mock-opencode] step=${stepId}: copied $WSDIR/ into /workspace/" >&2; ` +
+      `cp -r /mock-data/$WSDIR/* /workspace/ && ` +
+      `echo "[mock-opencode] step=${stepId}: copied $WSDIR/ into /workspace/" >&2; ` +
       `fi`;
 
     const mockAgentResponse = JSON.stringify({
@@ -126,9 +117,9 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     const mockOpenCodeJson = JSON.stringify({ type: 'text', part: { type: 'text', text: mockAgentResponse } });
 
     return [
-      'bash', '-c',
-      `${copyOutputCmd} && ${copyWorkspaceCmd}; ` +
-      `echo '${mockOpenCodeJson.replace(/'/g, "'\\''")}'`,
+      'bash',
+      '-c',
+      `${copyOutputCmd} && ${copyWorkspaceCmd}; ` + `echo '${mockOpenCodeJson.replace(/'/g, "'\\''")}'`,
     ];
   }
 
@@ -163,9 +154,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
         };
       };
 
-      const ts = event.timestamp
-        ? new Date(event.timestamp).toISOString()
-        : new Date().toISOString();
+      const ts = event.timestamp ? new Date(event.timestamp).toISOString() : new Date().toISOString();
 
       if (event.type === 'text' && event.part?.text) {
         return [JSON.stringify({ ts, type: 'assistant', subtype: 'text', text: event.part.text })];
@@ -177,24 +166,26 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
         const state = event.part.state;
 
         // Emit tool_call entry
-        entries.push(JSON.stringify({
-          ts,
-          type: 'assistant',
-          subtype: 'tool_call',
-          tool: toolName,
-          input: state?.input,
-        }));
+        entries.push(
+          JSON.stringify({
+            ts,
+            type: 'assistant',
+            subtype: 'tool_call',
+            tool: toolName,
+            input: state?.input,
+          }),
+        );
 
         // If the state already has output/error, emit a tool_result too
         if (state?.output || state?.error) {
-          entries.push(JSON.stringify({
-            ts,
-            type: 'tool_result',
-            tool_name: toolName,
-            content: state.error
-              ? `[error] ${state.error}`
-              : (state.output ?? '').slice(0, 500),
-          }));
+          entries.push(
+            JSON.stringify({
+              ts,
+              type: 'tool_result',
+              tool_name: toolName,
+              content: state.error ? `[error] ${state.error}` : (state.output ?? '').slice(0, 500),
+            }),
+          );
         }
 
         return entries;
@@ -204,13 +195,15 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
         const cost = event.part.cost;
         const tokens = event.part.tokens;
         const reason = event.part.reason;
-        return [JSON.stringify({
-          ts,
-          type: 'result',
-          subtype: reason ?? 'completed',
-          cost,
-          tokens,
-        })];
+        return [
+          JSON.stringify({
+            ts,
+            type: 'result',
+            subtype: reason ?? 'completed',
+            cost,
+            tokens,
+          }),
+        ];
       }
 
       // Skip step_start and other non-interesting events
@@ -265,9 +258,10 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       return '';
     }
 
-    const usage = (totalInputTokens > 0 || totalOutputTokens > 0)
-      ? { input_tokens: totalInputTokens, output_tokens: totalOutputTokens }
-      : undefined;
+    const usage =
+      totalInputTokens > 0 || totalOutputTokens > 0
+        ? { input_tokens: totalInputTokens, output_tokens: totalOutputTokens }
+        : undefined;
 
     // Find the contract JSON in text parts (scan from last to first).
     // The contract is: {"output_file": "...", "summary": "..."}
@@ -288,7 +282,10 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     }
 
     // Only errors
-    return JSON.stringify({ result: errors.map((e) => `[OpenCode error] ${e}`).join('\n'), ...(usage ? { usage } : {}) });
+    return JSON.stringify({
+      result: errors.map((e) => `[OpenCode error] ${e}`).join('\n'),
+      ...(usage ? { usage } : {}),
+    });
   }
 
   protected override async prepareOutputDir(outputDir: string): Promise<void> {
@@ -298,9 +295,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       permission: 'allow',
     };
 
-    const workflowSecrets = isWorkflowAgentContext(this.context)
-      ? this.context.workflowSecrets
-      : undefined;
+    const workflowSecrets = isWorkflowAgentContext(this.context) ? this.context.workflowSecrets : undefined;
 
     const openrouterKey = this.resolvedEnv.vars.OPENROUTER_API_KEY ?? workflowSecrets?.OPENROUTER_API_KEY;
     const deepseekKey = this.resolvedEnv.vars.DEEPSEEK_API_KEY ?? workflowSecrets?.DEEPSEEK_API_KEY;

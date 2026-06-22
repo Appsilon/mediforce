@@ -72,9 +72,7 @@
         "kind": "email",
         "config": {
           "to": "maria@appsilon.com",
-          "cc": [
-            "filip@appsilon.com"
-          ],
+          "cc": ["filip@appsilon.com"],
           "subject": "${steps.format-email.result.subject}",
           "body": "Pharma Media Report attached as HTML email.",
           "html": "${steps.format-email.result.html}"

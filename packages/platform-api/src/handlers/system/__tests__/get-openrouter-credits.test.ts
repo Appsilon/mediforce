@@ -22,16 +22,12 @@ describe('getOpenRouterCredits handler', () => {
   });
 
   it('fetches credits when the api key is present (apiKey caller)', async () => {
-    const fetchSpy = vi.fn(async () =>
-      makeJsonResponse({ data: { limit: 100, usage: 10, limit_remaining: 90 } }),
-    );
+    const fetchSpy = vi.fn(async () => makeJsonResponse({ data: { limit: 100, usage: 10, limit_remaining: 90 } }));
 
     const scope = createTestScope({ namespaceSecretsRepo: secretsRepo });
-    const result = await getOpenRouterCredits(
-      { namespace: 'alpha' },
-      scope,
-      { fetch: fetchSpy as unknown as typeof globalThis.fetch },
-    );
+    const result = await getOpenRouterCredits({ namespace: 'alpha' }, scope, {
+      fetch: fetchSpy as unknown as typeof globalThis.fetch,
+    });
 
     expect(result).toEqual({ available: true, limit: 100, usage: 10, remaining: 90 });
     expect(fetchSpy).toHaveBeenCalledOnce();
@@ -59,19 +55,15 @@ describe('getOpenRouterCredits handler', () => {
   });
 
   it('returns the available credits for a user caller in the namespace', async () => {
-    const fetchSpy = vi.fn(async () =>
-      makeJsonResponse({ data: { limit: 50, usage: 5, limit_remaining: 45 } }),
-    );
+    const fetchSpy = vi.fn(async () => makeJsonResponse({ data: { limit: 50, usage: 5, limit_remaining: 45 } }));
 
     const scope = createTestScope({
       namespaceSecretsRepo: secretsRepo,
       caller: userCaller('u-2', ['alpha']),
     });
-    const result = await getOpenRouterCredits(
-      { namespace: 'alpha' },
-      scope,
-      { fetch: fetchSpy as unknown as typeof globalThis.fetch },
-    );
+    const result = await getOpenRouterCredits({ namespace: 'alpha' }, scope, {
+      fetch: fetchSpy as unknown as typeof globalThis.fetch,
+    });
 
     expect(result.available).toBe(true);
     expect(result.remaining).toBe(45);
@@ -81,11 +73,9 @@ describe('getOpenRouterCredits handler', () => {
     const fetchSpy = vi.fn(async () => makeJsonResponse({}, false));
 
     const scope = createTestScope({ namespaceSecretsRepo: secretsRepo });
-    const result = await getOpenRouterCredits(
-      { namespace: 'alpha' },
-      scope,
-      { fetch: fetchSpy as unknown as typeof globalThis.fetch },
-    );
+    const result = await getOpenRouterCredits({ namespace: 'alpha' }, scope, {
+      fetch: fetchSpy as unknown as typeof globalThis.fetch,
+    });
 
     expect(result.available).toBe(false);
     expect(result.error).toContain('500');
@@ -95,11 +85,9 @@ describe('getOpenRouterCredits handler', () => {
     const fetchSpy = vi.fn(async () => makeJsonResponse({ data: { limit: 1 } }));
 
     const scope = createTestScope({ namespaceSecretsRepo: secretsRepo });
-    const result = await getOpenRouterCredits(
-      { namespace: 'alpha' },
-      scope,
-      { fetch: fetchSpy as unknown as typeof globalThis.fetch },
-    );
+    const result = await getOpenRouterCredits({ namespace: 'alpha' }, scope, {
+      fetch: fetchSpy as unknown as typeof globalThis.fetch,
+    });
 
     expect(result.available).toBe(false);
     expect(result.error).toMatch(/shape|unexpected/i);

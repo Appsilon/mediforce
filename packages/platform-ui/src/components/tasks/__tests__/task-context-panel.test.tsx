@@ -90,12 +90,7 @@ describe('TaskContextPanel', () => {
     });
     setStepExecutions([execution]);
 
-    render(
-      <TaskContextPanel
-        processInstanceId="inst-1"
-        stepId="human-review"
-      />,
-    );
+    render(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
     await expandPanel();
 
     // Report selected by default when presentation is available; Extracted Data tab present but inactive.
@@ -130,12 +125,7 @@ describe('TaskContextPanel', () => {
     });
     setStepExecutions([execution]);
 
-    render(
-      <TaskContextPanel
-        processInstanceId="inst-1"
-        stepId="human-review"
-      />,
-    );
+    render(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
     await expandPanel();
     await activateReportTab();
 
@@ -153,16 +143,9 @@ describe('TaskContextPanel', () => {
     });
     setStepExecutions([execution]);
 
-    mockApiFetch.mockResolvedValue(
-      new Response('<article id="fetched-report">From file</article>', { status: 200 }),
-    );
+    mockApiFetch.mockResolvedValue(new Response('<article id="fetched-report">From file</article>', { status: 200 }));
 
-    render(
-      <TaskContextPanel
-        processInstanceId="inst-abc"
-        stepId="human-review"
-      />,
-    );
+    render(<TaskContextPanel processInstanceId="inst-abc" stepId="human-review" />);
     await expandPanel();
     await activateReportTab();
 
@@ -191,12 +174,7 @@ describe('TaskContextPanel', () => {
     const execution = buildExecution({ output: { summary: 'Plain output' } });
     setStepExecutions([execution]);
 
-    render(
-      <TaskContextPanel
-        processInstanceId="inst-1"
-        stepId="human-review"
-      />,
-    );
+    render(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
     await expandPanel();
 
     expect(screen.queryByRole('tab', { name: /report/i })).toBeNull();
@@ -210,12 +188,7 @@ describe('TaskContextPanel', () => {
   it('renders nothing when there is no previous step output to show', async () => {
     setStepExecutions([]);
 
-    const { container } = render(
-      <TaskContextPanel
-        processInstanceId="inst-1"
-        stepId="human-review"
-      />,
-    );
+    const { container } = render(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
 
     expect(screen.queryByRole('button', { name: /previous step output/i })).toBeNull();
     expect(container).toBeEmptyDOMElement();
@@ -230,16 +203,9 @@ describe('TaskContextPanel', () => {
     });
     setStepExecutions([execution]);
 
-    mockApiFetch.mockResolvedValue(
-      new Response('Not Found', { status: 404 }),
-    );
+    mockApiFetch.mockResolvedValue(new Response('Not Found', { status: 404 }));
 
-    render(
-      <TaskContextPanel
-        processInstanceId="inst-1"
-        stepId="human-review"
-      />,
-    );
+    render(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
     await expandPanel();
     await activateReportTab();
 
@@ -249,9 +215,7 @@ describe('TaskContextPanel', () => {
 
     // Inline notice shows in Report tab
     await waitFor(() => {
-      expect(
-        screen.getByText(/report file not available — see extracted data tab/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/report file not available — see extracted data tab/i)).toBeInTheDocument();
     });
 
     // No iframe on failure
@@ -272,12 +236,7 @@ describe('TaskContextPanel', () => {
     });
     setStepExecutions([execution]);
 
-    render(
-      <TaskContextPanel
-        processInstanceId="inst-1"
-        stepId="human-review"
-      />,
-    );
+    render(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
     await expandPanel();
     await activateReportTab();
 
@@ -294,12 +253,7 @@ describe('TaskContextPanel', () => {
     });
     setStepExecutions([execution]);
 
-    render(
-      <TaskContextPanel
-        processInstanceId="inst-1"
-        stepId="human-review"
-      />,
-    );
+    render(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
     await expandPanel();
     await activateReportTab();
 
@@ -327,12 +281,7 @@ describe('TaskContextPanel', () => {
     });
     setStepExecutions([execution]);
 
-    render(
-      <TaskContextPanel
-        processInstanceId="inst-1"
-        stepId="human-review"
-      />,
-    );
+    render(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
     await expandPanel();
     await activateReportTab();
 
@@ -360,12 +309,7 @@ describe('TaskContextPanel', () => {
     });
     setStepExecutions([execution]);
 
-    render(
-      <TaskContextPanel
-        processInstanceId="inst-1"
-        stepId="human-review"
-      />,
-    );
+    render(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
     await expandPanel();
     await activateReportTab();
 
@@ -397,12 +341,7 @@ describe('TaskContextPanel', () => {
     });
     setStepExecutions([execution]);
 
-    render(
-      <TaskContextPanel
-        processInstanceId="inst-1"
-        stepId="human-review"
-      />,
-    );
+    render(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
     await expandPanel();
     await activateReportTab();
 
@@ -452,12 +391,7 @@ describe('TaskContextPanel', () => {
     });
     setStepExecutions([execution]);
 
-    render(
-      <TaskContextPanel
-        processInstanceId="inst-1"
-        stepId="human-review"
-      />,
-    );
+    render(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
     await expandPanel();
     await activateReportTab();
 
@@ -488,12 +422,7 @@ describe('TaskContextPanel', () => {
     });
     setStepExecutions([execution]);
 
-    render(
-      <TaskContextPanel
-        processInstanceId="inst-1"
-        stepId="human-review"
-      />,
-    );
+    render(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
     await expandPanel();
     await activateReportTab();
 
@@ -508,12 +437,7 @@ describe('TaskContextPanel', () => {
     });
     setStepExecutions([execution]);
 
-    render(
-      <TaskContextPanel
-        processInstanceId="inst-1"
-        stepId="human-review"
-      />,
-    );
+    render(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
     await expandPanel();
     await activateReportTab();
 
@@ -538,12 +462,7 @@ describe('TaskContextPanel', () => {
 
     mockUseTheme.mockReturnValue({ resolvedTheme: 'light', setTheme: vi.fn() });
 
-    const { rerender } = render(
-      <TaskContextPanel
-        processInstanceId="inst-1"
-        stepId="human-review"
-      />,
-    );
+    const { rerender } = render(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
     await expandPanel();
     await activateReportTab();
 
@@ -553,12 +472,7 @@ describe('TaskContextPanel', () => {
 
     // Switch theme and force a rerender to trigger the effect.
     mockUseTheme.mockReturnValue({ resolvedTheme: 'dark', setTheme: vi.fn() });
-    rerender(
-      <TaskContextPanel
-        processInstanceId="inst-1"
-        stepId="human-review"
-      />,
-    );
+    rerender(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
 
     await waitFor(() => {
       expect(postMessageSpy).toHaveBeenCalledWith({ type: 'theme', dark: true }, '*');

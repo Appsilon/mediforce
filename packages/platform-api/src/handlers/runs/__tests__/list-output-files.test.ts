@@ -52,15 +52,11 @@ describe('listRunOutputFiles handler', () => {
     const result = await listRunOutputFiles({ runId: 'r1' }, scope, reader);
 
     expect(result).toEqual({ files: entries });
-    expect(reader.calls).toEqual([
-      { workflow: { name: 'wf', namespace: 'alpha' }, runId: 'r1' },
-    ]);
+    expect(reader.calls).toEqual([{ workflow: { name: 'wf', namespace: 'alpha' }, runId: 'r1' }]);
   });
 
   it('returns an empty list when the run has no Output Files', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'r1', namespace: 'alpha', definitionName: 'wf' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'r1', namespace: 'alpha', definitionName: 'wf' }));
 
     const scope = createTestScope({ instanceRepo });
     const result = await listRunOutputFiles({ runId: 'r1' }, scope, stubReader([]));
@@ -72,16 +68,12 @@ describe('listRunOutputFiles handler', () => {
     const reader = stubReader([]);
     const scope = createTestScope({ instanceRepo });
 
-    await expect(listRunOutputFiles({ runId: 'missing' }, scope, reader)).rejects.toBeInstanceOf(
-      NotFoundError,
-    );
+    await expect(listRunOutputFiles({ runId: 'missing' }, scope, reader)).rejects.toBeInstanceOf(NotFoundError);
     expect(reader.calls).toEqual([]);
   });
 
   it('throws NotFoundError for a foreign-workspace runId (anti-enumeration) without touching the reader', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'r1', namespace: 'alpha', definitionName: 'wf' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'r1', namespace: 'alpha', definitionName: 'wf' }));
     const reader = stubReader([]);
 
     const scope = createTestScope({
@@ -89,16 +81,12 @@ describe('listRunOutputFiles handler', () => {
       caller: userCaller('u-2', ['beta']),
     });
 
-    await expect(listRunOutputFiles({ runId: 'r1' }, scope, reader)).rejects.toBeInstanceOf(
-      NotFoundError,
-    );
+    await expect(listRunOutputFiles({ runId: 'r1' }, scope, reader)).rejects.toBeInstanceOf(NotFoundError);
     expect(reader.calls).toEqual([]);
   });
 
   it('returns the files for a user caller in the namespace', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'r1', namespace: 'alpha', definitionName: 'wf' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'r1', namespace: 'alpha', definitionName: 'wf' }));
     const entries: OutputFileEntry[] = [
       { stepId: 's1', name: 'out.txt', path: '.mediforce/output/s1/out.txt', size: 3 },
     ];

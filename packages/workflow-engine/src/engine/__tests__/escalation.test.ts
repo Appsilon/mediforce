@@ -6,12 +6,7 @@ import {
   InMemoryHandoffRepository,
   NoopNotificationService,
 } from '@mediforce/platform-core';
-import type {
-  WorkflowDefinition,
-  StepConfig,
-  UserDirectoryService,
-  DirectoryUser,
-} from '@mediforce/platform-core';
+import type { WorkflowDefinition, StepConfig, UserDirectoryService, DirectoryUser } from '@mediforce/platform-core';
 import { WorkflowEngine } from '../workflow-engine';
 import type { StepActor, AgentRunResult } from '../../index';
 
@@ -24,9 +19,7 @@ class InMemoryUserDirectoryService implements UserDirectoryService {
   }
 
   async getUsersByRole(role: string): Promise<DirectoryUser[]> {
-    return this.users
-      .filter((u) => u.role === role)
-      .map((u) => ({ uid: u.uid, email: u.email }));
+    return this.users.filter((u) => u.role === role).map((u) => ({ uid: u.uid, email: u.email }));
   }
 
   async getUserMetadata(): Promise<null> {
@@ -109,13 +102,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
    * to simulate what FallbackHandler does before WorkflowEngine.advanceStep is called.
    */
   async function createRunningInstance(engine: WorkflowEngine): Promise<string> {
-    const instance = await engine.createInstance('test',
-      'agent-process',
-      1,
-      'system',
-      'manual',
-      {},
-    );
+    const instance = await engine.createInstance('test', 'agent-process', 1, 'system', 'manual', {});
     await engine.startInstance(instance.id);
     return instance.id;
   }
@@ -148,13 +135,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     // Re-mark instance as running to call advanceStep (engine checks status)
     await instanceRepo.update(instanceId, { status: 'running', pauseReason: null });
 
-    await engine.advanceStep(
-      instanceId,
-      {},
-      actor,
-      stepConfigWithRole,
-      escalatedResult,
-    );
+    await engine.advanceStep(instanceId, {}, actor, stepConfigWithRole, escalatedResult);
 
     const handoffs = handoffRepo.getAll();
     expect(handoffs).toHaveLength(1);
@@ -164,7 +145,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     expect(handoff.processInstanceId).toBe(instanceId);
     expect(handoff.stepId).toBe('agent-step');
     expect(handoff.agentRunId).toBe('run-001');
-    expect(handoff.assignedRole).toBe('reviewer');   // from stepConfig.allowedRoles[0]
+    expect(handoff.assignedRole).toBe('reviewer'); // from stepConfig.allowedRoles[0]
     expect(handoff.assignedUserId).toBeNull();
     expect(handoff.type).toBe('agent_escalation');
     expect(handoff.agentQuestion).toContain('confidence');
@@ -189,13 +170,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     const instanceId = await createRunningInstance(engine);
     await instanceRepo.update(instanceId, { status: 'running', pauseReason: null });
 
-    await engine.advanceStep(
-      instanceId,
-      {},
-      actor,
-      stepConfigWithRole,
-      escalatedWithEnvelope,
-    );
+    await engine.advanceStep(instanceId, {}, actor, stepConfigWithRole, escalatedWithEnvelope);
 
     const handoffs = handoffRepo.getAll();
     expect(handoffs).toHaveLength(1);
@@ -223,13 +198,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
 
     // Should not throw — gracefully degrades when no handoffRepository
     await expect(
-      engineNoHandoff.advanceStep(
-        instanceId,
-        {},
-        actor,
-        stepConfigWithRole,
-        escalatedResult,
-      ),
+      engineNoHandoff.advanceStep(instanceId, {}, actor, stepConfigWithRole, escalatedResult),
     ).resolves.toBeDefined();
 
     // No handoffs stored (no repository configured)
@@ -257,13 +226,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     const instanceId = await createRunningInstance(engine);
     await instanceRepo.update(instanceId, { status: 'running', pauseReason: null });
 
-    await engine.advanceStep(
-      instanceId,
-      {},
-      actor,
-      stepConfigWithRole,
-      escalatedResult,
-    );
+    await engine.advanceStep(instanceId, {}, actor, stepConfigWithRole, escalatedResult);
 
     // Notification was sent with resolved targets
     expect(notificationService.sent).toHaveLength(1);
@@ -290,13 +253,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     const instanceId = await createRunningInstance(engine);
     await instanceRepo.update(instanceId, { status: 'running', pauseReason: null });
 
-    await engine.advanceStep(
-      instanceId,
-      {},
-      actor,
-      stepConfigWithRole,
-      timeoutEscalatedResult,
-    );
+    await engine.advanceStep(instanceId, {}, actor, stepConfigWithRole, timeoutEscalatedResult);
 
     const handoffs = handoffRepo.getAll();
     expect(handoffs).toHaveLength(1);
@@ -325,13 +282,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     };
 
     // Should proceed normally through StepExecutor (no escalation)
-    const result = await engine.advanceStep(
-      instanceId,
-      { answer: 42 },
-      actor,
-      stepConfigWithRole,
-      completedResult,
-    );
+    const result = await engine.advanceStep(instanceId, { answer: 42 }, actor, stepConfigWithRole, completedResult);
 
     expect(result.status).toBe('completed');
     expect(handoffRepo.getAll()).toHaveLength(0);
@@ -386,13 +337,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     const instanceId = await createRunningInstance(engine);
     await instanceRepo.update(instanceId, { status: 'running', pauseReason: null });
 
-    await engine.advanceStep(
-      instanceId,
-      {},
-      actor,
-      stepConfigWithRole,
-      escalatedResult,
-    );
+    await engine.advanceStep(instanceId, {}, actor, stepConfigWithRole, escalatedResult);
 
     // Notification skipped — no targets resolved because userDirectoryService absent
     expect(notificationService.sent).toHaveLength(0);
@@ -426,9 +371,9 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     const instanceId = await createRunningInstance(engine);
     await instanceRepo.update(instanceId, { status: 'running', pauseReason: null });
 
-    await expect(
-      engine.advanceStep(instanceId, {}, actor, stepConfigWithRole, escalatedResult),
-    ).rejects.toThrow('SMTP failed');
+    await expect(engine.advanceStep(instanceId, {}, actor, stepConfigWithRole, escalatedResult)).rejects.toThrow(
+      'SMTP failed',
+    );
   });
 
   // --- Test 10: No notification when no escalation config in ProcessConfig ---
@@ -460,13 +405,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     const instance = await engine.createInstance('test', 'no-notif-process', 1, 'system', 'manual');
     await engine.startInstance(instance.id);
 
-    await engine.advanceStep(
-      instance.id,
-      {},
-      actor,
-      undefined,
-      escalatedResult,
-    );
+    await engine.advanceStep(instance.id, {}, actor, undefined, escalatedResult);
 
     // No error thrown, no notification sent (no roles to resolve)
     expect(notificationService.sent).toHaveLength(0);

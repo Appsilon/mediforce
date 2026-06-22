@@ -65,9 +65,7 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
       const q = search.toLowerCase();
       result = result.filter(
         (m) =>
-          m.name.toLowerCase().includes(q) ||
-          m.provider.toLowerCase().includes(q) ||
-          m.id.toLowerCase().includes(q),
+          m.name.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q) || m.id.toLowerCase().includes(q),
       );
     }
     if (providerFilter) {
@@ -245,7 +243,9 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
                 <td className="px-3 py-2 text-right tabular-nums">{formatContext(model.contextLength)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{formatPrice(model.pricing.input)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{formatPrice(model.pricing.output)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{formatRequests(model.requestCount)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                  {formatRequests(model.requestCount)}
+                </td>
                 <td className="px-3 py-2 text-center">{model.supportsTools ? '✓' : ''}</td>
                 <td className="px-3 py-2 text-center">{model.supportsVision ? '✓' : ''}</td>
               </tr>
@@ -266,7 +266,8 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
       {/* Pagination */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Showing {Math.min(clampedPage * PAGE_SIZE + 1, sorted.length)}–{Math.min((clampedPage + 1) * PAGE_SIZE, sorted.length)} of {sorted.length} models
+          Showing {Math.min(clampedPage * PAGE_SIZE + 1, sorted.length)}–
+          {Math.min((clampedPage + 1) * PAGE_SIZE, sorted.length)} of {sorted.length} models
           {sorted.length !== models.length && ` (${models.length} total)`}
         </p>
         {sorted.length > PAGE_SIZE && (

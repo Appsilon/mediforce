@@ -21,10 +21,7 @@ export async function listWorkflowVersions(
   input: ListWorkflowVersionsInput,
   scope: CallerScope,
 ): Promise<ListWorkflowVersionsOutput> {
-  const definitions = await scope.workflowDefinitions.listVersions(
-    input.namespace,
-    input.name,
-  );
+  const definitions = await scope.workflowDefinitions.listVersions(input.namespace, input.name);
 
   if (definitions.length === 0) {
     throw new NotFoundError(`Workflow '${input.name}' not found`);
@@ -40,10 +37,7 @@ export async function listWorkflowVersions(
     createdAt: definition.createdAt,
   }));
 
-  const defaultVersion = await scope.workflowDefinitions.getDefaultVersion(
-    input.namespace,
-    input.name,
-  );
+  const defaultVersion = await scope.workflowDefinitions.getDefaultVersion(input.namespace, input.name);
 
   return { versions, defaultVersion };
 }

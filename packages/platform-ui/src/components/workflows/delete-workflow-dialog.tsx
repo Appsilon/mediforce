@@ -20,7 +20,13 @@ type DialogState =
   | { step: 'deleting' }
   | { step: 'error'; message: string; runCount: number };
 
-export function DeleteWorkflowDialog({ workflowName, namespace, open, onOpenChange, onDeleted }: DeleteWorkflowDialogProps) {
+export function DeleteWorkflowDialog({
+  workflowName,
+  namespace,
+  open,
+  onOpenChange,
+  onDeleted,
+}: DeleteWorkflowDialogProps) {
   const [state, setState] = React.useState<DialogState>({ step: 'loading' });
   const [nameInput, setNameInput] = React.useState('');
   const [runCountInput, setRunCountInput] = React.useState('');
@@ -59,14 +65,18 @@ export function DeleteWorkflowDialog({ workflowName, namespace, open, onOpenChan
       onOpenChange(false);
       onDeleted();
     } catch (err) {
-      const message = err instanceof ApiError ? err.message
-        : err instanceof Error ? err.message : 'Unknown error';
+      const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Unknown error';
       setState({ step: 'error', message, runCount });
     }
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={(value) => { if (!value) handleClose(); }}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(value) => {
+        if (!value) handleClose();
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-6 shadow-lg">
@@ -91,8 +101,8 @@ export function DeleteWorkflowDialog({ workflowName, namespace, open, onOpenChan
           {(state.step === 'confirm' || state.step === 'error') && (
             <div className="space-y-4">
               <Dialog.Description className="text-sm text-muted-foreground">
-                This will permanently hide <span className="font-semibold text-foreground">{workflowName}</span> and
-                all its versions from the platform. This action cannot be easily undone.
+                This will permanently hide <span className="font-semibold text-foreground">{workflowName}</span> and all
+                its versions from the platform. This action cannot be easily undone.
               </Dialog.Description>
 
               {runCount > 0 && (
@@ -115,7 +125,8 @@ export function DeleteWorkflowDialog({ workflowName, namespace, open, onOpenChan
               <div className="space-y-3">
                 <div>
                   <label className="text-sm font-medium" htmlFor="delete-name-input">
-                    Type <span className="font-mono bg-muted px-1 py-0.5 rounded text-xs">{workflowName}</span> to confirm
+                    Type <span className="font-mono bg-muted px-1 py-0.5 rounded text-xs">{workflowName}</span> to
+                    confirm
                   </label>
                   <input
                     id="delete-name-input"
@@ -131,7 +142,9 @@ export function DeleteWorkflowDialog({ workflowName, namespace, open, onOpenChan
                 {runCount > 0 && (
                   <div>
                     <label className="text-sm font-medium" htmlFor="delete-run-count-input">
-                      Type the number of runs (<span className="font-mono bg-muted px-1 py-0.5 rounded text-xs">{runCount}</span>) to confirm cascade deletion
+                      Type the number of runs (
+                      <span className="font-mono bg-muted px-1 py-0.5 rounded text-xs">{runCount}</span>) to confirm
+                      cascade deletion
                     </label>
                     <input
                       id="delete-run-count-input"

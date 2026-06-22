@@ -1,8 +1,4 @@
-import type {
-  AgentMcpBinding,
-  HttpAuthConfig,
-  ToolCatalogEntry,
-} from '../schemas/agent-mcp-binding';
+import type { AgentMcpBinding, HttpAuthConfig, ToolCatalogEntry } from '../schemas/agent-mcp-binding';
 import type { AgentDefinition } from '../schemas/agent-definition';
 import type { WorkflowStep } from '../schemas/workflow-definition';
 
@@ -14,9 +10,7 @@ export class CatalogEntryNotFoundError extends Error {
   public readonly catalogId: string;
 
   constructor(serverName: string, catalogId: string) {
-    super(
-      `Tool catalog has no entry for catalogId "${catalogId}" (referenced by MCP server "${serverName}")`,
-    );
+    super(`Tool catalog has no entry for catalogId "${catalogId}" (referenced by MCP server "${serverName}")`);
     this.name = 'CatalogEntryNotFoundError';
     this.serverName = serverName;
     this.catalogId = catalogId;
@@ -32,9 +26,7 @@ export class UnknownRestrictionTargetError extends Error {
   public readonly knownServerNames: readonly string[];
 
   constructor(serverName: string, knownServerNames: readonly string[]) {
-    const knownList = knownServerNames.length === 0
-      ? '<none>'
-      : knownServerNames.join(', ');
+    const knownList = knownServerNames.length === 0 ? '<none>' : knownServerNames.join(', ');
     super(
       `Step mcpRestrictions references MCP server "${serverName}" which is not defined on the agent (known servers: ${knownList})`,
     );
@@ -59,8 +51,8 @@ export class DenyToolsWithoutAllowedToolsError extends Error {
   constructor(serverName: string, denyTools: readonly string[]) {
     super(
       `Step mcpRestrictions.${serverName}.denyTools is set (${denyTools.join(', ')}), ` +
-      `but the agent's binding for "${serverName}" has no allowedTools to subtract from. ` +
-      `Add allowedTools to the binding (so the deny list can be applied) or use disable: true.`,
+        `but the agent's binding for "${serverName}" has no allowedTools to subtract from. ` +
+        `Add allowedTools to the binding (so the deny list can be applied) or use disable: true.`,
     );
     this.name = 'DenyToolsWithoutAllowedToolsError';
     this.serverName = serverName;
@@ -186,13 +178,8 @@ function resolveBinding(
  *  by the time we reach here — resolveEffectiveMcp has already rejected
  *  bindings that lack allowedTools, so every call here has a materialized
  *  allowlist to filter. */
-function applyDenyTools(
-  resolved: ResolvedMcpServer,
-  denyTools: readonly string[] | undefined,
-): void {
+function applyDenyTools(resolved: ResolvedMcpServer, denyTools: readonly string[] | undefined): void {
   if (denyTools === undefined || denyTools.length === 0) return;
   const denySet = new Set(denyTools);
-  resolved.allowedTools = (resolved.allowedTools ?? []).filter(
-    tool => denySet.has(tool) === false,
-  );
+  resolved.allowedTools = (resolved.allowedTools ?? []).filter((tool) => denySet.has(tool) === false);
 }

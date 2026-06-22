@@ -31,14 +31,9 @@ export default function RunsPage() {
         </div>
         <div className="text-center">
           <p className="font-medium">Runs are only visible to workspace members</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Join this workspace to see workflow runs.
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">Join this workspace to see workflow runs.</p>
         </div>
-        <Link
-          href={`/${handle}`}
-          className="text-sm text-primary hover:underline"
-        >
+        <Link href={`/${handle}`} className="text-sm text-primary hover:underline">
           Back to profile
         </Link>
       </div>
@@ -79,11 +74,7 @@ function RunsPageContent({ handle }: { handle: string }) {
   }, [allInstances, dryRunFilter]);
 
   const sorted = React.useMemo(
-    () =>
-      [...filtered].sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      ),
+    () => [...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [filtered],
   );
 
@@ -91,9 +82,7 @@ function RunsPageContent({ handle }: { handle: string }) {
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">
-          {workflowFilter
-            ? 'All runs for this workflow.'
-            : 'All workflow runs across the platform.'}
+          {workflowFilter ? 'All runs for this workflow.' : 'All workflow runs across the platform.'}
         </p>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-md border divide-x text-xs">
@@ -108,9 +97,14 @@ function RunsPageContent({ handle }: { handle: string }) {
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
-                {value === 'all' ? 'All' : value === 'production' ? 'Production' : (
+                {value === 'all' ? (
+                  'All'
+                ) : value === 'production' ? (
+                  'Production'
+                ) : (
                   <span className="inline-flex items-center gap-1">
-                    <FlaskConical className="h-3 w-3" />Dry Runs
+                    <FlaskConical className="h-3 w-3" />
+                    Dry Runs
                   </span>
                 )}
               </button>
@@ -134,17 +128,9 @@ function RunsPageContent({ handle }: { handle: string }) {
       {workflowFilter && (
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
-            Filtered by:{' '}
-            <span className="font-medium text-foreground">
-              {formatStepName(workflowFilter)}
-            </span>
+            Filtered by: <span className="font-medium text-foreground">{formatStepName(workflowFilter)}</span>
           </span>
-          <a
-            href={`/${handle}/runs`}
-            className={cn(
-              'text-xs text-primary hover:underline',
-            )}
-          >
+          <a href={`/${handle}/runs`} className={cn('text-xs text-primary hover:underline')}>
             Clear filter
           </a>
         </div>
@@ -155,11 +141,7 @@ function RunsPageContent({ handle }: { handle: string }) {
         loading={loading}
         showProcess={!workflowFilter}
         activeTaskByInstance={activeTaskByInstance}
-        emptyMessage={
-          workflowFilter
-            ? `No runs found for "${formatStepName(workflowFilter)}".`
-            : 'No runs found.'
-        }
+        emptyMessage={workflowFilter ? `No runs found for "${formatStepName(workflowFilter)}".` : 'No runs found.'}
       />
     </div>
   );

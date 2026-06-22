@@ -7,15 +7,8 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { createVoiceEphemeralKey } from '../voice-ephemeral-key';
-import {
-  HandlerError,
-  NotFoundError,
-  PreconditionFailedError,
-} from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { HandlerError, NotFoundError, PreconditionFailedError } from '../../../errors';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('createVoiceEphemeralKey handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;
@@ -28,9 +21,7 @@ describe('createVoiceEphemeralKey handler', () => {
     coworkSessionRepo = new InMemoryCoworkSessionRepository(instanceRepo);
     process.env.OPENAI_API_KEY = 'sk-test-openai';
 
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }));
   });
 
   afterEach(() => {
@@ -95,9 +86,7 @@ describe('createVoiceEphemeralKey handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    const err = await createVoiceEphemeralKey({ sessionId: 'sess-chat' }, scope).catch(
-      (e) => e,
-    );
+    const err = await createVoiceEphemeralKey({ sessionId: 'sess-chat' }, scope).catch((e) => e);
     expect(err).toBeInstanceOf(HandlerError);
     expect((err as HandlerError).code).toBe('validation');
   });
@@ -119,9 +108,7 @@ describe('createVoiceEphemeralKey handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    const err = await createVoiceEphemeralKey({ sessionId: 'sess-voice' }, scope).catch(
-      (e) => e,
-    );
+    const err = await createVoiceEphemeralKey({ sessionId: 'sess-voice' }, scope).catch((e) => e);
     expect(err).toBeInstanceOf(HandlerError);
     expect((err as HandlerError).message).toMatch(/OPENAI_API_KEY/);
   });
@@ -142,9 +129,9 @@ describe('createVoiceEphemeralKey handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    await expect(
-      createVoiceEphemeralKey({ sessionId: 'sess-done' }, scope),
-    ).rejects.toBeInstanceOf(PreconditionFailedError);
+    await expect(createVoiceEphemeralKey({ sessionId: 'sess-done' }, scope)).rejects.toBeInstanceOf(
+      PreconditionFailedError,
+    );
   });
 
   it('throws NotFoundError for a session in a foreign namespace (anti-enum)', async () => {
@@ -163,8 +150,6 @@ describe('createVoiceEphemeralKey handler', () => {
       caller: userCaller('u-other', ['team-beta']),
     });
 
-    await expect(
-      createVoiceEphemeralKey({ sessionId: 'sess-voice' }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(createVoiceEphemeralKey({ sessionId: 'sess-voice' }, scope)).rejects.toBeInstanceOf(NotFoundError);
   });
 });

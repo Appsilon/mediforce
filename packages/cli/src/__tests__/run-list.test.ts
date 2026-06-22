@@ -39,9 +39,7 @@ const SAMPLE_RUNS = {
 
 describe('run list command', () => {
   it('GETs /api/runs and prints human-readable output', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(SAMPLE_RUNS),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(SAMPLE_RUNS));
     const output = captureOutput();
     const code = await runListCommand({
       argv: ['--base-url', 'http://localhost:5555'],
@@ -58,9 +56,7 @@ describe('run list command', () => {
   });
 
   it('emits structured JSON when --json is set', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(SAMPLE_RUNS),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(SAMPLE_RUNS));
     const output = captureOutput();
     const code = await runListCommand({
       argv: ['--json'],
@@ -73,9 +69,7 @@ describe('run list command', () => {
   });
 
   it('passes --workflow filter as query param', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ runs: [] }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ runs: [] }));
     const output = captureOutput();
     await runListCommand({
       argv: ['--workflow', 'media-monitoring'],
@@ -87,9 +81,7 @@ describe('run list command', () => {
   });
 
   it('passes --status filter as query param', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ runs: [] }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ runs: [] }));
     const output = captureOutput();
     await runListCommand({
       argv: ['--status', 'running'],
@@ -113,9 +105,7 @@ describe('run list command', () => {
   });
 
   it('prints "No runs found" for empty result', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ runs: [] }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ runs: [] }));
     const output = captureOutput();
     const code = await runListCommand({
       argv: [],
@@ -127,9 +117,7 @@ describe('run list command', () => {
   });
 
   it('exits 1 on API error', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Internal error' }, 500),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Internal error' }, 500));
     const output = captureOutput();
     const code = await runListCommand({
       argv: ['--json'],

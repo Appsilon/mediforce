@@ -18,10 +18,7 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  renderWorkflowDiagram,
-  RenderWorkflowDiagramInputSchema,
-} from '@mediforce/platform-api/handlers';
+import { renderWorkflowDiagram, RenderWorkflowDiagramInputSchema } from '@mediforce/platform-api/handlers';
 import { Mediforce } from '@mediforce/platform-api/client';
 
 const server = new McpServer({
@@ -38,9 +35,7 @@ function getClient(): Mediforce {
   const baseUrl = process.env.APP_BASE_URL;
   const apiKey = process.env.PLATFORM_API_KEY;
   if (!baseUrl || !apiKey) {
-    throw new Error(
-      'mediforce-mcp: APP_BASE_URL and PLATFORM_API_KEY env vars are required for API tools.',
-    );
+    throw new Error('mediforce-mcp: APP_BASE_URL and PLATFORM_API_KEY env vars are required for API tools.');
   }
   _client = new Mediforce({ apiKey, baseUrl });
   return _client;
@@ -83,15 +78,17 @@ server.registerTool(
       'Returns the run ID for subsequent polling. ' +
       'Pass the complete WorkflowDefinition as `definition`, the `namespace` (workspace handle), and optional `triggerInput` for trigger payload.',
     inputSchema: {
-      definition: z.record(z.string(), z.unknown()).describe(
-        'Complete WorkflowDefinition object (name, version, steps, transitions, triggers)',
-      ),
-      namespace: z.string().optional().describe(
-        'Workspace namespace/handle (auto-detected from session context if omitted)',
-      ),
-      triggerInput: z.record(z.string(), z.unknown()).optional().describe(
-        'Optional trigger input payload (key-value pairs for triggerInput fields)',
-      ),
+      definition: z
+        .record(z.string(), z.unknown())
+        .describe('Complete WorkflowDefinition object (name, version, steps, transitions, triggers)'),
+      namespace: z
+        .string()
+        .optional()
+        .describe('Workspace namespace/handle (auto-detected from session context if omitted)'),
+      triggerInput: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Optional trigger input payload (key-value pairs for triggerInput fields)'),
     },
   },
   async (args) => {
@@ -104,11 +101,10 @@ server.registerTool(
       const definition = args.definition as Record<string, unknown>;
       const triggerInput = args.triggerInput as Record<string, unknown> | undefined;
 
-      console.error(`[mediforce-mcp] dry_run_workflow: namespace=${namespace} baseUrl=${process.env.APP_BASE_URL} apiKey=${process.env.PLATFORM_API_KEY ? '***set***' : '***MISSING***'}`);
-      const registered = await client.workflows.register(
-        definition,
-        { namespace },
+      console.error(
+        `[mediforce-mcp] dry_run_workflow: namespace=${namespace} baseUrl=${process.env.APP_BASE_URL} apiKey=${process.env.PLATFORM_API_KEY ? '***set***' : '***MISSING***'}`,
       );
+      const registered = await client.workflows.register(definition, { namespace });
       console.error(`[mediforce-mcp] registered: ${registered.name} v${registered.version}`);
 
       const startResult = await client.runs.start({
@@ -144,8 +140,7 @@ server.registerTool(
   'get_run_status',
   {
     description:
-      'Get the current status of a run including per-step progress. ' +
-      'Use this to poll a dry run after starting it.',
+      'Get the current status of a run including per-step progress. ' + 'Use this to poll a dry run after starting it.',
     inputSchema: {
       runId: z.string().min(1).describe('Run/instance ID'),
     },
@@ -171,9 +166,7 @@ server.registerTool(
         ...(s.execution?.startedAt && s.execution?.completedAt
           ? {
               durationSec: Math.round(
-                (new Date(s.execution.completedAt).getTime() -
-                  new Date(s.execution.startedAt).getTime()) /
-                  1000,
+                (new Date(s.execution.completedAt).getTime() - new Date(s.execution.startedAt).getTime()) / 1000,
               ),
             }
           : {}),
@@ -257,9 +250,7 @@ server.registerTool(
       '{"kind":"verdict-with-params","verdict":"approve","paramValues":{...}} for review+form steps.',
     inputSchema: {
       taskId: z.string().min(1).describe('Task ID to complete (UUID from list_run_tasks)'),
-      payload: z.record(z.string(), z.unknown()).describe(
-        'Task completion payload (must include "kind" field)',
-      ),
+      payload: z.record(z.string(), z.unknown()).describe('Task completion payload (must include "kind" field)'),
     },
   },
   async (args) => {
@@ -357,12 +348,8 @@ server.registerTool(
       'Use this to find valid model IDs for agent steps (e.g. "anthropic/claude-sonnet-4"). ' +
       'Optionally filter by provider or capability.',
     inputSchema: {
-      provider: z.string().optional().describe(
-        'Filter by provider prefix (e.g. "anthropic", "openai", "google")',
-      ),
-      supportsTools: z.boolean().optional().describe(
-        'Filter to models that support tool use',
-      ),
+      provider: z.string().optional().describe('Filter by provider prefix (e.g. "anthropic", "openai", "google")'),
+      supportsTools: z.boolean().optional().describe('Filter to models that support tool use'),
     },
   },
   async (args) => {

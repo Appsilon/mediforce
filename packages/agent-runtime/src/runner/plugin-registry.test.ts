@@ -12,7 +12,9 @@ function makeMockPlugin(): StepExecutorPlugin {
 }
 
 // Mock plugin with metadata
-function makeMockPluginWithMetadata(metadata: PluginCapabilityMetadata): StepExecutorPlugin & { metadata: PluginCapabilityMetadata } {
+function makeMockPluginWithMetadata(
+  metadata: PluginCapabilityMetadata,
+): StepExecutorPlugin & { metadata: PluginCapabilityMetadata } {
   return {
     initialize: async (_ctx: AgentContext) => {},
     run: async (_emit: EmitFn) => {},

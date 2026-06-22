@@ -13,7 +13,9 @@ export const modelSyncCommand = defineCommand({
       return 0;
     }
     output.stdout(`Synced ${String(result.synced)} models (${String(result.total)} total from OpenRouter)`);
-    output.stdout(`Retired: ${String(result.retired)}, Reinstated: ${String(result.reinstated)}, Rankings updated: ${String(result.rankingsUpdated)}`);
+    output.stdout(
+      `Retired: ${String(result.retired)}, Reinstated: ${String(result.reinstated)}, Rankings updated: ${String(result.rankingsUpdated)}`,
+    );
     output.stdout(`Last synced: ${result.lastSyncedAt}`);
     return 0;
   },

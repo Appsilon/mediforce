@@ -22,12 +22,7 @@ export class PostgresCronTriggerStateRepository implements CronTriggerStateRepos
     const rows = await this.db
       .select()
       .from(cronTriggerState)
-      .where(
-        and(
-          eq(cronTriggerState.definitionName, definitionName),
-          eq(cronTriggerState.triggerName, triggerName),
-        ),
-      )
+      .where(and(eq(cronTriggerState.definitionName, definitionName), eq(cronTriggerState.triggerName, triggerName)))
       .limit(1);
     const row = rows[0];
     return row ? CronTriggerStateSchema.parse(toState(row)) : null;

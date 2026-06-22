@@ -18,15 +18,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { NextRequest } from 'next/server';
-import {
-  ActionRegistry,
-  httpActionHandler,
-  reshapeActionHandler,
-} from '@mediforce/core-actions';
-import {
-  WebhookRouter,
-  WorkflowEngine,
-} from '@mediforce/workflow-engine';
+import { ActionRegistry, httpActionHandler, reshapeActionHandler } from '@mediforce/core-actions';
+import { WebhookRouter, WorkflowEngine } from '@mediforce/workflow-engine';
 import {
   InMemoryAuditRepository,
   InMemoryCoworkSessionRepository,
@@ -91,9 +84,7 @@ vi.mock('@/app/actions/workflow-secrets', () => ({
   getWorkflowSecretsForRuntime: async () => ({}),
 }));
 
-const { POST: webhookPost } = await import(
-  '@/app/api/triggers/webhook/[...path]/route'
-);
+const { POST: webhookPost } = await import('@/app/api/triggers/webhook/[...path]/route');
 const { POST: runPost } = await import('@/app/api/processes/[instanceId]/run/route');
 const { GET: runsGet } = await import('@/app/api/runs/[runId]/route');
 
@@ -138,9 +129,7 @@ beforeEach(async () => {
   const raw = JSON.parse(readFileSync(TEMPLATE_PATH, 'utf8'));
   const parsed = parseWorkflowTemplate(raw);
   if (!parsed.success) {
-    throw new Error(
-      `Template parse failed: ${parsed.error.issues.map((iss) => iss.message).join(', ')}`,
-    );
+    throw new Error(`Template parse failed: ${parsed.error.issues.map((iss) => iss.message).join(', ')}`);
   }
   const definition: WorkflowDefinition = {
     ...parsed.data,
@@ -170,14 +159,11 @@ afterEach(() => {
 describe('food-log-proxy: webhook → http → reshape → polling', () => {
   it('chains two action steps and reshapes the upstream response', async () => {
     const payload = { meal: 'oats with spinach', kcal: 420 };
-    const webhookReq = new NextRequest(
-      'http://localhost/api/triggers/webhook/examples/food-log-proxy/food-log',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      },
-    );
+    const webhookReq = new NextRequest('http://localhost/api/triggers/webhook/examples/food-log-proxy/food-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
     const webhookRes = await webhookPost(webhookReq, {
       params: Promise.resolve({
@@ -188,24 +174,18 @@ describe('food-log-proxy: webhook → http → reshape → polling', () => {
     const webhookJson = (await webhookRes.json()) as { runId: string; statusUrl: string };
     expect(webhookJson.runId.length).toBeGreaterThan(0);
 
-    const runReq = new NextRequest(
-      `http://localhost/api/processes/${webhookJson.runId}/run`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ triggeredBy: 'webhook' }),
-      },
-    );
+    const runReq = new NextRequest(`http://localhost/api/processes/${webhookJson.runId}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ triggeredBy: 'webhook' }),
+    });
     await runPost(runReq, { params: Promise.resolve({ instanceId: webhookJson.runId }) });
 
     const deadline = Date.now() + 10_000;
     let polledStatus = 'unknown';
     let polledFinalOutput: unknown = null;
     while (Date.now() < deadline) {
-      const pollReq = new NextRequest(
-        `http://localhost/api/runs/${webhookJson.runId}`,
-        { method: 'GET' },
-      );
+      const pollReq = new NextRequest(`http://localhost/api/runs/${webhookJson.runId}`, { method: 'GET' });
       const pollRes = await runsGet(pollReq, {
         params: Promise.resolve({ runId: webhookJson.runId }),
       });

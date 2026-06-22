@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  fetchFromContainerWorker,
-  fetchFromLocalDocker,
-} from '../_docker';
+import { fetchFromContainerWorker, fetchFromLocalDocker } from '../_docker';
 
 describe('fetchFromLocalDocker', () => {
   it('parses one-image-per-line JSON and the disk-df rows', async () => {
@@ -10,8 +7,20 @@ describe('fetchFromLocalDocker', () => {
       if (args[0] === 'images') {
         return {
           stdout: [
-            JSON.stringify({ Repository: 'alpine', Tag: 'latest', ID: 'abc123', Size: '7MB', CreatedSince: '2 days ago' }),
-            JSON.stringify({ Repository: 'nginx', Tag: '1.27', ID: 'def456', Size: '142MB', CreatedSince: '1 week ago' }),
+            JSON.stringify({
+              Repository: 'alpine',
+              Tag: 'latest',
+              ID: 'abc123',
+              Size: '7MB',
+              CreatedSince: '2 days ago',
+            }),
+            JSON.stringify({
+              Repository: 'nginx',
+              Tag: '1.27',
+              ID: 'def456',
+              Size: '142MB',
+              CreatedSince: '1 week ago',
+            }),
           ].join('\n'),
           stderr: '',
         };
@@ -87,9 +96,7 @@ describe('fetchFromContainerWorker', () => {
   }
 
   it('returns parsed payload when both endpoints succeed', async () => {
-    const images = [
-      { repository: 'alpine', tag: 'latest', id: 'abc', size: '7MB', created: '2d' },
-    ];
+    const images = [{ repository: 'alpine', tag: 'latest', id: 'abc', size: '7MB', created: '2d' }];
     const disk = {
       images: { totalCount: 1, size: '7MB' },
       containers: { totalCount: 0, active: 0, size: '0B' },

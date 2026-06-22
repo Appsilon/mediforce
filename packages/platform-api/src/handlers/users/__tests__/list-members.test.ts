@@ -12,7 +12,12 @@ const ALPHA_MEMBERS: NamespaceMember[] = [
 function directoryWith(
   map: ReadonlyMap<
     string,
-    { email: string | null; displayName?: string | null; lastSignInTime: string | null; photoURL?: string | null } | null
+    {
+      email: string | null;
+      displayName?: string | null;
+      lastSignInTime: string | null;
+      photoURL?: string | null;
+    } | null
   >,
 ): UserDirectoryService {
   return {
@@ -20,9 +25,14 @@ function directoryWith(
       return [];
     },
     async getUserMetadata(uid: string) {
-      const entry = map.has(uid) ? map.get(uid) ?? null : null;
+      const entry = map.has(uid) ? (map.get(uid) ?? null) : null;
       if (entry === null) return null;
-      return { displayName: entry.displayName ?? null, email: entry.email, lastSignInTime: entry.lastSignInTime, photoURL: entry.photoURL ?? null };
+      return {
+        displayName: entry.displayName ?? null,
+        email: entry.email,
+        lastSignInTime: entry.lastSignInTime,
+        photoURL: entry.photoURL ?? null,
+      };
     },
   };
 }
@@ -78,11 +88,7 @@ describe('listNamespaceMembers handler', () => {
     const scope = createTestScope({
       namespaceRepo,
       userDirectory: directory,
-      caller: userCaller(
-        'uid-owner',
-        ['alpha'],
-        new Map([['alpha', 'owner' as const]]),
-      ),
+      caller: userCaller('uid-owner', ['alpha'], new Map([['alpha', 'owner' as const]])),
     });
 
     const result = await listNamespaceMembers({ namespace: 'alpha' }, scope);
@@ -97,9 +103,7 @@ describe('listNamespaceMembers handler', () => {
       caller: userCaller('uid-stranger', ['beta']),
     });
 
-    await expect(
-      listNamespaceMembers({ namespace: 'alpha' }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(listNamespaceMembers({ namespace: 'alpha' }, scope)).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('coalesces a transient directory error per uid to null fields', async () => {
@@ -126,9 +130,7 @@ describe('listNamespaceMembers handler', () => {
 
   it('keeps the workspace-scoped displayName when the member doc has one', async () => {
     directory = directoryWith(
-      new Map([
-        ['uid-owner', { email: 'owner@alpha.test', displayName: 'Auth Owner Name', lastSignInTime: null }],
-      ]),
+      new Map([['uid-owner', { email: 'owner@alpha.test', displayName: 'Auth Owner Name', lastSignInTime: null }]]),
     );
     const scope = createTestScope({ namespaceRepo, userDirectory: directory });
 

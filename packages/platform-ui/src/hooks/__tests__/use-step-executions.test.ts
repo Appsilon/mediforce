@@ -37,7 +37,11 @@ function entry(stepId: string, ...executions: StepExecution[]): StepEntry {
   };
 }
 
-function result(instanceId: string, steps: StepEntry[], status: GetStepsResult['instanceStatus'] = 'running'): GetStepsResult {
+function result(
+  instanceId: string,
+  steps: StepEntry[],
+  status: GetStepsResult['instanceStatus'] = 'running',
+): GetStepsResult {
   return {
     instanceId,
     definitionName: 'wf',
@@ -51,7 +55,12 @@ function result(instanceId: string, steps: StepEntry[], status: GetStepsResult['
 
 const getStepsMock = vi.fn<(...args: unknown[]) => Promise<GetStepsResult>>();
 class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { processes: { getSteps: getStepsMock } },
@@ -81,11 +90,7 @@ describe('useStepExecutions', () => {
   it('returns StepExecution[] extracted from entries (null executions filtered)', async () => {
     const ex1 = buildStepExecution({ id: 'ex-1', stepId: 's1' });
     const ex2 = buildStepExecution({ id: 'ex-2', stepId: 's2' });
-    getStepsMock.mockResolvedValue(result('inst-a', [
-      entry('s1', ex1),
-      entry('s-pending'),
-      entry('s2', ex2),
-    ]));
+    getStepsMock.mockResolvedValue(result('inst-a', [entry('s1', ex1), entry('s-pending'), entry('s2', ex2)]));
     const { wrapper } = createQueryWrapper();
     const { result: r } = renderHook(() => useStepExecutions('inst-a', 'running'), { wrapper });
 
@@ -123,17 +128,20 @@ describe('useStepExecutions', () => {
   it('switches in-flight requests when instanceId changes without leaking stale data', async () => {
     let resolveFirst: ((value: GetStepsResult) => void) | null = null;
     getStepsMock.mockImplementationOnce(
-      () => new Promise((resolve) => { resolveFirst = resolve; }),
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
     );
-    getStepsMock.mockResolvedValueOnce(result('inst-b', [
-      entry('s-b', buildStepExecution({ id: 'ex-b', instanceId: 'inst-b' })),
-    ]));
+    getStepsMock.mockResolvedValueOnce(
+      result('inst-b', [entry('s-b', buildStepExecution({ id: 'ex-b', instanceId: 'inst-b' }))]),
+    );
 
     const { wrapper } = createQueryWrapper();
-    const { result: r, rerender } = renderHook(
-      ({ id }: { id: string }) => useStepExecutions(id, 'running'),
-      { wrapper, initialProps: { id: 'inst-a' } },
-    );
+    const { result: r, rerender } = renderHook(({ id }: { id: string }) => useStepExecutions(id, 'running'), {
+      wrapper,
+      initialProps: { id: 'inst-a' },
+    });
 
     rerender({ id: 'inst-b' });
     await waitFor(() => expect(r.current.data.map((e) => e.id)).toEqual(['ex-b']));

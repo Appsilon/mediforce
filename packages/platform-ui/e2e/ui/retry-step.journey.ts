@@ -3,7 +3,9 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Retry Failed Step Journey', () => {
-  test('agent_escalated instance — Fixed try again retries the step and flips banner to waiting_for_human', async ({ page }, testInfo) => {
+  test('agent_escalated instance — Fixed try again retries the step and flips banner to waiting_for_human', async ({
+    page,
+  }, testInfo) => {
     await setupRecording(page, 'retry-step', testInfo);
 
     // proc-retry-test is seeded as:

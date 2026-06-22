@@ -8,10 +8,7 @@ import { CommandPalette } from './palette';
 import { COMMANDS } from './commands';
 import type { Command, CommandContext, Shortcut } from './types';
 
-type PaletteState =
-  | { kind: 'closed' }
-  | { kind: 'list' }
-  | { kind: 'command'; commandId: string };
+type PaletteState = { kind: 'closed' } | { kind: 'list' } | { kind: 'command'; commandId: string };
 
 type CommandPaletteContextValue = {
   open: () => void;
@@ -65,8 +62,7 @@ function CommandPaletteProviderInner({ children }: { children: React.ReactNode }
     () => [
       {
         display: ['⌘', 'K'],
-        matches: (event) =>
-          (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k',
+        matches: (event) => (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k',
         label: 'Open command palette',
         section: 'global',
       },

@@ -9,10 +9,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import { startRun } from '../start-run';
 import { HandlerError, NotFoundError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { noopRunKicker } from '../../../runtime/run-kicker';
 
 /**
@@ -43,9 +40,7 @@ describe('startRun handler', () => {
         version: 1,
       }),
     );
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-new', namespace: 'team-alpha' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-new', namespace: 'team-alpha' }));
 
     const fireWorkflow = vi.fn().mockResolvedValue({
       instanceId: 'inst-new',
@@ -81,9 +76,7 @@ describe('startRun handler', () => {
         triggeredBy: 'u-1',
       }),
     );
-    expect(kicker.kicks).toEqual([
-      { instanceId: 'inst-new', triggeredBy: 'u-1' },
-    ]);
+    expect(kicker.kicks).toEqual([{ instanceId: 'inst-new', triggeredBy: 'u-1' }]);
   });
 
   it('throws NotFoundError when the definition name is unknown', async () => {

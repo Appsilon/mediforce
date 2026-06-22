@@ -75,29 +75,17 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
   }
 
   async getById(taskId: string): Promise<HumanTask | null> {
-    const rows = await this.db
-      .select()
-      .from(humanTasks)
-      .where(eq(humanTasks.id, taskId))
-      .limit(1);
+    const rows = await this.db.select().from(humanTasks).where(eq(humanTasks.id, taskId)).limit(1);
     const row = rows[0];
     return row ? toHumanTask(row) : null;
   }
 
-  async getByIdInNamespaces(
-    taskId: string,
-    allowed: readonly string[],
-  ): Promise<HumanTask | null> {
+  async getByIdInNamespaces(taskId: string, allowed: readonly string[]): Promise<HumanTask | null> {
     if (allowed.length === 0) return null;
     const rows = await this.db
       .select()
       .from(humanTasks)
-      .where(
-        and(
-          eq(humanTasks.id, taskId),
-          inArray(humanTasks.workspace, [...allowed]),
-        ),
-      )
+      .where(and(eq(humanTasks.id, taskId), inArray(humanTasks.workspace, [...allowed])))
       .limit(1);
     const row = rows[0];
     return row ? toHumanTask(row) : null;
@@ -112,17 +100,12 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
     const rows = await this.db
       .select()
       .from(humanTasks)
-      .where(
-        and(eq(humanTasks.assignedRole, role), isNull(humanTasks.deletedAt)),
-      )
+      .where(and(eq(humanTasks.assignedRole, role), isNull(humanTasks.deletedAt)))
       .orderBy(asc(humanTasks.createdAt));
     return rows.map((r) => toHumanTask(r));
   }
 
-  async getByRoleInNamespaces(
-    role: string,
-    allowed: readonly string[],
-  ): Promise<HumanTask[]> {
+  async getByRoleInNamespaces(role: string, allowed: readonly string[]): Promise<HumanTask[]> {
     if (allowed.length === 0) return [];
     const rows = await this.db
       .select()
@@ -139,27 +122,16 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
   }
 
   async getByInstanceId(instanceId: string): Promise<HumanTask[]> {
-    const rows = await this.db
-      .select()
-      .from(humanTasks)
-      .where(eq(humanTasks.processInstanceId, instanceId));
+    const rows = await this.db.select().from(humanTasks).where(eq(humanTasks.processInstanceId, instanceId));
     return rows.map((r) => toHumanTask(r));
   }
 
-  async getByInstanceIdInNamespaces(
-    instanceId: string,
-    allowed: readonly string[],
-  ): Promise<HumanTask[]> {
+  async getByInstanceIdInNamespaces(instanceId: string, allowed: readonly string[]): Promise<HumanTask[]> {
     if (allowed.length === 0) return [];
     const rows = await this.db
       .select()
       .from(humanTasks)
-      .where(
-        and(
-          eq(humanTasks.processInstanceId, instanceId),
-          inArray(humanTasks.workspace, [...allowed]),
-        ),
-      );
+      .where(and(eq(humanTasks.processInstanceId, instanceId), inArray(humanTasks.workspace, [...allowed])));
     return rows.map((r) => toHumanTask(r));
   }
 
@@ -172,20 +144,12 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
     return rows.map((r) => toHumanTask(r));
   }
 
-  async getByInstanceIdsInNamespaces(
-    instanceIds: readonly string[],
-    allowed: readonly string[],
-  ): Promise<HumanTask[]> {
+  async getByInstanceIdsInNamespaces(instanceIds: readonly string[], allowed: readonly string[]): Promise<HumanTask[]> {
     if (instanceIds.length === 0 || allowed.length === 0) return [];
     const rows = await this.db
       .select()
       .from(humanTasks)
-      .where(
-        and(
-          inArray(humanTasks.processInstanceId, [...instanceIds]),
-          inArray(humanTasks.workspace, [...allowed]),
-        ),
-      );
+      .where(and(inArray(humanTasks.processInstanceId, [...instanceIds]), inArray(humanTasks.workspace, [...allowed])));
     return rows.map((r) => toHumanTask(r));
   }
 
@@ -214,10 +178,7 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
     return toHumanTask(row);
   }
 
-  async complete(
-    taskId: string,
-    completionData: Record<string, unknown>,
-  ): Promise<HumanTask> {
+  async complete(taskId: string, completionData: Record<string, unknown>): Promise<HumanTask> {
     const [row] = await this.db
       .update(humanTasks)
       .set({
@@ -241,10 +202,7 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
     return toHumanTask(row);
   }
 
-  async setDeletedByInstanceIds(
-    instanceIds: string[],
-    deleted: boolean,
-  ): Promise<void> {
+  async setDeletedByInstanceIds(instanceIds: string[], deleted: boolean): Promise<void> {
     if (instanceIds.length === 0) return;
     await this.db
       .update(humanTasks)

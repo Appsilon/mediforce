@@ -118,19 +118,13 @@ describe('UpdateOAuthProviderInputSchema', () => {
 
 describe('OAUTH_PROVIDER_PRESETS', () => {
   it('github preset has the canonical endpoints', () => {
-    expect(OAUTH_PROVIDER_PRESETS.github.authorizeUrl).toBe(
-      'https://github.com/login/oauth/authorize',
-    );
+    expect(OAUTH_PROVIDER_PRESETS.github.authorizeUrl).toBe('https://github.com/login/oauth/authorize');
     expect(OAUTH_PROVIDER_PRESETS.github.scopes).toContain('repo');
   });
 
   it('google preset has the token + revoke endpoints', () => {
-    expect(OAUTH_PROVIDER_PRESETS.google.tokenUrl).toBe(
-      'https://oauth2.googleapis.com/token',
-    );
-    expect(OAUTH_PROVIDER_PRESETS.google.revokeUrl).toBe(
-      'https://oauth2.googleapis.com/revoke',
-    );
+    expect(OAUTH_PROVIDER_PRESETS.google.tokenUrl).toBe('https://oauth2.googleapis.com/token');
+    expect(OAUTH_PROVIDER_PRESETS.google.revokeUrl).toBe('https://oauth2.googleapis.com/revoke');
   });
 
   it('presets pass Create schema when credentials are filled in', () => {

@@ -6,10 +6,7 @@ import { actorFromCaller, loadOr404 } from '../_helpers';
 
 // Engine emits `step.retried` (stepExecution-scoped); handler additionally
 // emits `instance.retried` for the processInstance-scoped audit lane.
-export async function retryStep(
-  input: RetryStepInput,
-  scope: CallerScope,
-): Promise<RetryStepOutput> {
+export async function retryStep(input: RetryStepInput, scope: CallerScope): Promise<RetryStepOutput> {
   // Workspace gate up front — engine.retryStep loads via raw repo.
   await loadOr404(scope.runs.getById(input.runId), 'Run not found');
 

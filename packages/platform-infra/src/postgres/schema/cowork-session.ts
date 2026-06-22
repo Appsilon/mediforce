@@ -1,12 +1,4 @@
-import {
-  pgTable,
-  text,
-  integer,
-  jsonb,
-  timestamp,
-  index,
-  uniqueIndex,
-} from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, jsonb, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { workspaces } from './workspace';
 import { processInstances } from './process-instance';
 
@@ -68,12 +60,8 @@ export const coworkSessions = pgTable(
     presentation: text('presentation'),
 
     finalizedAt: timestamp('finalized_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     // Workspace-scoped feed: most reads start here.
@@ -83,16 +71,9 @@ export const coworkSessions = pgTable(
       table.createdAt,
     ),
     // Role queue (system actor reads).
-    roleStatusIdx: index('cowork_sessions_role_status_idx').on(
-      table.assignedRole,
-      table.status,
-      table.createdAt,
-    ),
+    roleStatusIdx: index('cowork_sessions_role_status_idx').on(table.assignedRole, table.status, table.createdAt),
     // Per-instance lookup: `findMostRecentActive` and per-instance feeds.
-    instanceStepIdx: index('cowork_sessions_instance_step_idx').on(
-      table.processInstanceId,
-      table.stepId,
-    ),
+    instanceStepIdx: index('cowork_sessions_instance_step_idx').on(table.processInstanceId, table.stepId),
   }),
 );
 
@@ -138,9 +119,6 @@ export const coworkTurns = pgTable(
     serverName: text('server_name'),
   },
   (table) => ({
-    sessionIdxUnique: uniqueIndex('cowork_turns_session_idx_unique').on(
-      table.sessionId,
-      table.idx,
-    ),
+    sessionIdxUnique: uniqueIndex('cowork_turns_session_idx_unique').on(table.sessionId, table.idx),
   }),
 );

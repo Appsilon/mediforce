@@ -1,12 +1,5 @@
 import { sql } from 'drizzle-orm';
-import {
-  pgTable,
-  text,
-  uuid,
-  jsonb,
-  timestamp,
-  index,
-} from 'drizzle-orm/pg-core';
+import { pgTable, text, uuid, jsonb, timestamp, index } from 'drizzle-orm/pg-core';
 import { workspaces } from './workspace';
 import { processInstances } from './process-instance';
 
@@ -53,8 +46,8 @@ export const humanTasks = pgTable(
 
     // Assignment + lifecycle
     assignedRole: text('assigned_role').notNull(),
-    assignedUserId: text('assigned_user_id'),  // soft claim (null until claimed)
-    status: text('status').notNull(),          // pending | claimed | completed | cancelled
+    assignedUserId: text('assigned_user_id'), // soft claim (null until claimed)
+    status: text('status').notNull(), // pending | claimed | completed | cancelled
     deadline: timestamp('deadline', { withTimezone: true }),
 
     // Completion payload (structured response)
@@ -69,17 +62,13 @@ export const humanTasks = pgTable(
     options: jsonb('options'),
     verdicts: jsonb('verdicts'),
 
-    creationReason: text('creation_reason').notNull(),  // human_executor | agent_review_l3
+    creationReason: text('creation_reason').notNull(), // human_executor | agent_review_l3
 
     // Soft-delete tombstone (NULL = active).
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
 
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     // Role queue: active tasks only, ordered by creation. Partial index
@@ -87,9 +76,6 @@ export const humanTasks = pgTable(
     roleQueueIdx: index('human_tasks_role_queue_idx')
       .on(table.assignedRole, table.status, table.createdAt)
       .where(sql`${table.deletedAt} is null`),
-    instanceIdx: index('human_tasks_instance_idx').on(
-      table.processInstanceId,
-      table.stepId,
-    ),
+    instanceIdx: index('human_tasks_instance_idx').on(table.processInstanceId, table.stepId),
   }),
 );

@@ -6,7 +6,12 @@ import { createQueryWrapper } from '@/test/react-query';
 
 const agentEventsMock = vi.fn<(...args: unknown[]) => Promise<{ events: AgentEvent[] }>>();
 class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { processes: { agentEvents: agentEventsMock } },
@@ -72,10 +77,7 @@ describe('useAgentEvents', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     agentEventsMock
       .mockResolvedValueOnce({
-        events: [
-          buildAgentEvent({ id: 'e-1', sequence: 0 }),
-          buildAgentEvent({ id: 'e-2', sequence: 1 }),
-        ],
+        events: [buildAgentEvent({ id: 'e-1', sequence: 0 }), buildAgentEvent({ id: 'e-2', sequence: 1 })],
       })
       .mockResolvedValueOnce({
         events: [buildAgentEvent({ id: 'e-3', sequence: 2 })],

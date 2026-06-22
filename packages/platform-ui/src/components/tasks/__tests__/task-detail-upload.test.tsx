@@ -33,9 +33,7 @@ vi.mock('firebase/storage', () => ({
 
 // Mock next/link
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
-  ),
+  default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
 }));
 
 vi.mock('@/contexts/auth-context', () => ({
@@ -51,7 +49,10 @@ vi.mock('@/lib/mediforce', () => ({
     },
   },
   ApiError: class ApiError extends Error {
-    constructor(public status: number, message: string) {
+    constructor(
+      public status: number,
+      message: string,
+    ) {
       super(message);
     }
   },
@@ -121,9 +122,7 @@ describe('SelectionView', () => {
     render(<SelectionView task={task} />);
 
     // SelectionView shows "Approve selected", not a bare "Approve" button
-    const approveButtons = screen.getAllByRole('button').filter(
-      (btn) => btn.textContent?.trim() === 'Approve',
-    );
+    const approveButtons = screen.getAllByRole('button').filter((btn) => btn.textContent?.trim() === 'Approve');
     expect(approveButtons).toHaveLength(0);
   });
 
@@ -204,7 +203,9 @@ describe('FileUploadView', () => {
       taskId: task.id,
       payload: {
         kind: 'upload',
-        attachments: [expect.objectContaining({ name: 'protocol.pdf', downloadUrl: 'https://storage.example.com/file.pdf' })],
+        attachments: [
+          expect.objectContaining({ name: 'protocol.pdf', downloadUrl: 'https://storage.example.com/file.pdf' }),
+        ],
       },
     });
   });
@@ -231,8 +232,22 @@ describe('FileUploadView', () => {
       completedAt: '2026-03-10T12:00:00.000Z',
       completionData: {
         files: [
-          { name: 'protocol.pdf', size: 102400, type: 'application/pdf', storagePath: 'tasks/t/a.pdf', downloadUrl: 'https://storage.example.com/protocol.pdf', uploadedAt: '2026-03-10T12:00:00.000Z' },
-          { name: 'appendix.pdf', size: 51200, type: 'application/pdf', storagePath: 'tasks/t/b.pdf', downloadUrl: 'https://storage.example.com/appendix.pdf', uploadedAt: '2026-03-10T12:00:00.000Z' },
+          {
+            name: 'protocol.pdf',
+            size: 102400,
+            type: 'application/pdf',
+            storagePath: 'tasks/t/a.pdf',
+            downloadUrl: 'https://storage.example.com/protocol.pdf',
+            uploadedAt: '2026-03-10T12:00:00.000Z',
+          },
+          {
+            name: 'appendix.pdf',
+            size: 51200,
+            type: 'application/pdf',
+            storagePath: 'tasks/t/b.pdf',
+            downloadUrl: 'https://storage.example.com/appendix.pdf',
+            uploadedAt: '2026-03-10T12:00:00.000Z',
+          },
         ],
         completedAt: '2026-03-10T12:00:00.000Z',
       },

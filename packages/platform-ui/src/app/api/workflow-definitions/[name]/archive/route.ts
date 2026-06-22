@@ -1,9 +1,6 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { archiveWorkflow } from '@mediforce/platform-api/handlers';
-import {
-  ArchiveAllInputSchema,
-  type ArchiveAllInput,
-} from '@mediforce/platform-api/contract';
+import { ArchiveAllInputSchema, type ArchiveAllInput } from '@mediforce/platform-api/contract';
 import { z } from 'zod';
 
 interface RouteContext {

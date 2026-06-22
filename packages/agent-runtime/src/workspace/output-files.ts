@@ -66,7 +66,7 @@ async function collectCopyableFile(
   if (info.size > maxBytes) {
     console.warn(
       `[output-files] Skipping ${relativePath} (${info.size} bytes) — exceeds the ` +
-      `MEDIFORCE_OUTPUT_FILE_MAX_BYTES cap of ${maxBytes} bytes`,
+        `MEDIFORCE_OUTPUT_FILE_MAX_BYTES cap of ${maxBytes} bytes`,
     );
     return;
   }

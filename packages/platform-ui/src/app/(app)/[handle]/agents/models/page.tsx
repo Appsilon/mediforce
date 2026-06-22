@@ -19,9 +19,7 @@ export default function ModelsPage() {
       .then((data: { models: ModelRegistryEntry[] }) => {
         setModels(data.models);
         if (data.models.length > 0) {
-          const latest = data.models.reduce((a, b) =>
-            a.lastSyncedAt > b.lastSyncedAt ? a : b,
-          );
+          const latest = data.models.reduce((a, b) => (a.lastSyncedAt > b.lastSyncedAt ? a : b));
           setLastSynced(latest.lastSyncedAt);
         }
       })
@@ -65,11 +63,7 @@ export default function ModelsPage() {
           </p>
         </div>
         <div className="flex items-center gap-4 shrink-0">
-          {lastSynced && (
-            <span className="text-xs text-muted-foreground">
-              Synced {formatRelativeTime(lastSynced)}
-            </span>
-          )}
+          {lastSynced && <span className="text-xs text-muted-foreground">Synced {formatRelativeTime(lastSynced)}</span>}
           <button
             onClick={handleSync}
             disabled={syncing}

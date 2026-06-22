@@ -25,9 +25,7 @@ export const runDownloadCommand = defineCommand({
     },
   },
   async run({ args, output, mediforce, jsonMode }) {
-    const outDir = resolve(
-      typeof args.output === 'string' && args.output.length > 0 ? args.output : '.',
-    );
+    const outDir = resolve(typeof args.output === 'string' && args.output.length > 0 ? args.output : '.');
     const requestedPath = typeof args.path === 'string' && args.path.length > 0 ? args.path : null;
     const downloadAll = requestedPath === null;
     const written: string[] = [];

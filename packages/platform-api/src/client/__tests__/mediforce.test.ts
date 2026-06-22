@@ -70,9 +70,7 @@ describe('Mediforce', () => {
     });
 
     it('accepts apiKey with a non-empty baseUrl', () => {
-      expect(
-        () => new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL }),
-      ).not.toThrow();
+      expect(() => new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL })).not.toThrow();
     });
 
     it('accepts bearerToken alone', () => {
@@ -93,17 +91,13 @@ describe('Mediforce', () => {
     });
 
     it('throws when apiKey is provided with an empty baseUrl', () => {
-      expect(
-        () => new Mediforce({ apiKey: 'k', baseUrl: '' }),
-      ).toThrow(/apiKey.*baseUrl/i);
+      expect(() => new Mediforce({ apiKey: 'k', baseUrl: '' })).toThrow(/apiKey.*baseUrl/i);
     });
   });
 
   describe('apiKey auth', () => {
     it('attaches X-Api-Key to every request', async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(jsonResponse({ tasks: [] }));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ tasks: [] }));
 
       const mediforce = new Mediforce({ apiKey: 'secret', baseUrl: TEST_BASE_URL });
       await mediforce.tasks.list({ instanceId: 'inst-a' });
@@ -113,38 +107,28 @@ describe('Mediforce', () => {
     });
 
     it('prepends baseUrl to the request path', async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(jsonResponse({ tasks: [] }));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ tasks: [] }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: 'https://mediforce.example.com' });
       await mediforce.tasks.list({ instanceId: 'inst-a' });
 
-      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
-        'https://mediforce.example.com/api/tasks?instanceId=inst-a',
-      );
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe('https://mediforce.example.com/api/tasks?instanceId=inst-a');
     });
   });
 
   describe('bearerToken auth', () => {
     it('attaches Authorization: Bearer when the token is a string', async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(jsonResponse({ tasks: [] }));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ tasks: [] }));
 
       const mediforce = new Mediforce({ bearerToken: async () => 'firebase-id-token' });
       await mediforce.tasks.list({ instanceId: 'inst-a' });
 
       const init = fetchSpy.mock.calls[0]?.[1];
-      expect(new Headers(init?.headers).get('Authorization')).toBe(
-        'Bearer firebase-id-token',
-      );
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer firebase-id-token');
     });
 
     it('omits the header when the token is null (user not signed in)', async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(jsonResponse({ tasks: [] }));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ tasks: [] }));
 
       const mediforce = new Mediforce({ bearerToken: async () => null });
       await mediforce.tasks.list({ instanceId: 'inst-a' });
@@ -155,9 +139,7 @@ describe('Mediforce', () => {
 
     it('calls bearerToken on every request (so rotation works)', async () => {
       // Response bodies can only be consumed once — build a fresh one per call.
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockImplementation(async () => jsonResponse({ tasks: [] }));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({ tasks: [] }));
 
       const bearerToken = vi
         .fn<() => Promise<string | null>>()
@@ -169,20 +151,14 @@ describe('Mediforce', () => {
       await mediforce.tasks.list({ instanceId: 'inst-a' });
 
       expect(bearerToken).toHaveBeenCalledTimes(2);
-      expect(new Headers(fetchSpy.mock.calls[0]?.[1]?.headers).get('Authorization')).toBe(
-        'Bearer token-1',
-      );
-      expect(new Headers(fetchSpy.mock.calls[1]?.[1]?.headers).get('Authorization')).toBe(
-        'Bearer token-2',
-      );
+      expect(new Headers(fetchSpy.mock.calls[0]?.[1]?.headers).get('Authorization')).toBe('Bearer token-1');
+      expect(new Headers(fetchSpy.mock.calls[1]?.[1]?.headers).get('Authorization')).toBe('Bearer token-2');
     });
   });
 
   describe('fetch injection (loopback / retries / tracing)', () => {
     it('uses the injected fetch instead of globalThis.fetch', async () => {
-      const fakeFetch = vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(jsonResponse({ tasks: [buildHumanTask()] }));
+      const fakeFetch = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ tasks: [buildHumanTask()] }));
       const globalSpy = vi.spyOn(globalThis, 'fetch');
 
       const mediforce = new Mediforce({ fetch: fakeFetch });
@@ -196,9 +172,7 @@ describe('Mediforce', () => {
     it('does not attach Mediforce auth headers when the caller supplies fetch', async () => {
       // Under the "exactly one" rule, the caller who supplies `fetch` is
       // responsible for auth (baked into the closure or explicitly none).
-      const fakeFetch = vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(jsonResponse({ tasks: [] }));
+      const fakeFetch = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ tasks: [] }));
 
       const mediforce = new Mediforce({ fetch: fakeFetch });
       await mediforce.tasks.list({ instanceId: 'inst-a' });
@@ -211,8 +185,7 @@ describe('Mediforce', () => {
 
   describe('input validation', () => {
     it('rejects contract violations before firing any request', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch')
-        .mockResolvedValue(jsonResponse({ tasks: [] }));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ tasks: [] }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       // Empty input is the caller-scope axis (GitHub-like default) — fires.
@@ -231,9 +204,7 @@ describe('Mediforce', () => {
 
   describe('output validation', () => {
     it('rejects responses that do not match the output schema', async () => {
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        jsonResponse({ tasks: [{ id: 'broken' }] }),
-      );
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ tasks: [{ id: 'broken' }] }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       await expect(mediforce.tasks.list({ instanceId: 'inst-a' })).rejects.toThrow();
@@ -241,9 +212,7 @@ describe('Mediforce', () => {
 
     it('accepts a well-formed response', async () => {
       const task = buildHumanTask({ id: 't-out-1' });
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        jsonResponse({ tasks: [task] }),
-      );
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ tasks: [task] }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       const result = await mediforce.tasks.list({ instanceId: 'inst-a' });
@@ -260,9 +229,7 @@ describe('Mediforce', () => {
       );
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      const error = await mediforce.tasks
-        .list({ instanceId: 'inst-a' })
-        .catch((err) => err);
+      const error = await mediforce.tasks.list({ instanceId: 'inst-a' }).catch((err) => err);
 
       expect(error).toBeInstanceOf(ApiError);
       expect((error as ApiError).status).toBe(400);
@@ -273,9 +240,7 @@ describe('Mediforce', () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 500 }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      const error = await mediforce.tasks
-        .list({ instanceId: 'inst-a' })
-        .catch((err) => err);
+      const error = await mediforce.tasks.list({ instanceId: 'inst-a' }).catch((err) => err);
 
       expect(error).toBeInstanceOf(ApiError);
       expect((error as ApiError).status).toBe(500);
@@ -401,9 +366,7 @@ describe('Mediforce', () => {
 
   describe.each(methodContracts)('$name', (contract) => {
     it('builds URL + parses 200 response', async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(jsonResponse(contract.fixture));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(contract.fixture));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       const result = await contract.call(mediforce);
@@ -413,9 +376,7 @@ describe('Mediforce', () => {
     });
 
     it('throws ApiError on 404 with parsed body', async () => {
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        jsonResponse({ error: 'Not found' }, 404),
-      );
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Not found' }, 404));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       const err = await contract.call(mediforce).catch((e) => e);
@@ -430,41 +391,31 @@ describe('Mediforce', () => {
   describe('tasks.get (path encoding)', () => {
     it('URL-encodes the taskId path segment', async () => {
       const task = buildHumanTask({ id: 'task 1/2' });
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(jsonResponse(task));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(task));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       const result = await mediforce.tasks.get({ taskId: 'task 1/2' });
 
       expect(result.id).toBe('task 1/2');
-      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
-        `${TEST_BASE_URL}/api/tasks/task%201%2F2`,
-      );
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(`${TEST_BASE_URL}/api/tasks/task%201%2F2`);
     });
   });
 
   describe('workflows.get (version + namespace query)', () => {
     it('calls GET /api/workflow-definitions/:name and parses the envelope', async () => {
       const definition = buildWorkflowDefinition({ name: 'flow-a' });
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(jsonResponse({ definition }));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ definition }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       const result = await mediforce.workflows.get({ name: 'flow-a' });
 
       expect(result.definition.name).toBe('flow-a');
-      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
-        `${TEST_BASE_URL}/api/workflow-definitions/flow-a`,
-      );
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(`${TEST_BASE_URL}/api/workflow-definitions/flow-a`);
     });
 
     it('serialises version and namespace into the query string', async () => {
       const definition = buildWorkflowDefinition({ name: 'flow-a', version: 2 });
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(jsonResponse({ definition }));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ definition }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       await mediforce.workflows.get({
@@ -479,29 +430,19 @@ describe('Mediforce', () => {
     });
 
     it('URL-encodes the name', async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(jsonResponse({ error: 'x' }, 404));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'x' }, 404));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      await mediforce.workflows
-        .get({ name: 'flow/a' })
-        .catch(() => undefined);
+      await mediforce.workflows.get({ name: 'flow/a' }).catch(() => undefined);
 
-      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
-        `${TEST_BASE_URL}/api/workflow-definitions/flow%2Fa`,
-      );
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(`${TEST_BASE_URL}/api/workflow-definitions/flow%2Fa`);
     });
 
     it('throws ApiError on 404', async () => {
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        jsonResponse({ error: 'Workflow not found' }, 404),
-      );
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Workflow not found' }, 404));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      const err = await mediforce.workflows
-        .get({ name: 'missing' })
-        .catch((e) => e);
+      const err = await mediforce.workflows.get({ name: 'missing' }).catch((e) => e);
 
       expect(err).toBeInstanceOf(ApiError);
       expect((err as ApiError).status).toBe(404);
@@ -510,16 +451,12 @@ describe('Mediforce', () => {
 
   describe('workflows.list (namespace query)', () => {
     it('serialises namespace into the query string when provided', async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(jsonResponse({ definitions: [] }));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ definitions: [] }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       await mediforce.workflows.list({ namespace: 'team-alpha' });
 
-      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
-        `${TEST_BASE_URL}/api/workflow-definitions?namespace=team-alpha`,
-      );
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(`${TEST_BASE_URL}/api/workflow-definitions?namespace=team-alpha`);
     });
   });
 
@@ -528,9 +465,7 @@ describe('Mediforce', () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      await expect(
-        mediforce.cowork.getByInstance({ instanceId: '' }),
-      ).rejects.toThrow();
+      await expect(mediforce.cowork.getByInstance({ instanceId: '' })).rejects.toThrow();
       expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
@@ -542,9 +477,7 @@ describe('Mediforce', () => {
         status: 'claimed',
         assignedUserId: 'u-1',
       });
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(jsonResponse({ task }));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ task }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       const result = await mediforce.tasks.claim({ taskId: 'task-1' });
@@ -557,16 +490,12 @@ describe('Mediforce', () => {
 
     it('URL-encodes the taskId path segment', async () => {
       const task = buildHumanTask({ id: 'task 1/2', status: 'claimed', assignedUserId: 'u-1' });
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(jsonResponse({ task }));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ task }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       await mediforce.tasks.claim({ taskId: 'task 1/2' });
 
-      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
-        `${TEST_BASE_URL}/api/tasks/task%201%2F2/claim`,
-      );
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(`${TEST_BASE_URL}/api/tasks/task%201%2F2/claim`);
     });
 
     it('rejects an empty taskId before firing any request', async () => {
@@ -592,9 +521,7 @@ describe('Mediforce', () => {
       );
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      const err = (await mediforce.tasks
-        .claim({ taskId: 'task-1' })
-        .catch((e) => e)) as ApiError;
+      const err = (await mediforce.tasks.claim({ taskId: 'task-1' }).catch((e) => e)) as ApiError;
 
       expect(err).toBeInstanceOf(ApiError);
       expect(err.status).toBe(409);
@@ -607,9 +534,7 @@ describe('Mediforce', () => {
   describe('runs.cancel', () => {
     it('POSTs to /api/processes/:instanceId/cancel and parses the entity envelope', async () => {
       const run = buildProcessInstance({ id: 'inst-a', status: 'failed', error: 'Cancelled by user' });
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(jsonResponse({ run }));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ run }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       const result = await mediforce.runs.cancel({ runId: 'inst-a' });
@@ -622,9 +547,7 @@ describe('Mediforce', () => {
 
     it('forwards the reason in the request body when provided', async () => {
       const run = buildProcessInstance({ id: 'inst-a', status: 'failed', error: 'Audit cleanup' });
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(jsonResponse({ run }));
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ run }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       await mediforce.runs.cancel({ runId: 'inst-a', reason: 'Audit cleanup' });
@@ -647,14 +570,10 @@ describe('Mediforce', () => {
       // shape, and the legacy 5xx surface (`{ error: <string> }`) hasn't
       // been migrated. The client must tolerate both shapes during the
       // transition.
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        jsonResponse({ error: 'Legacy failure mode' }, 500),
-      );
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Legacy failure mode' }, 500));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      const err = (await mediforce.tasks
-        .list({ instanceId: 'inst-a' })
-        .catch((e) => e)) as ApiError;
+      const err = (await mediforce.tasks.list({ instanceId: 'inst-a' }).catch((e) => e)) as ApiError;
 
       expect(err).toBeInstanceOf(ApiError);
       expect(err.status).toBe(500);

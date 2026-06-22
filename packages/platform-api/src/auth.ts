@@ -34,10 +34,7 @@ export type CallerIdentity =
  * Handlers call this AFTER fetching the resource (so 404 still beats 403 for
  * non-existent ids — surfacing "exists but denied" leaks information).
  */
-export function assertNamespaceAccess(
-  caller: CallerIdentity,
-  namespace: string | undefined,
-): void {
+export function assertNamespaceAccess(caller: CallerIdentity, namespace: string | undefined): void {
   if (caller.isSystemActor) return;
   if (typeof namespace !== 'string' || namespace.length === 0) {
     throw new ForbiddenError('Resource has no namespace');
@@ -87,10 +84,7 @@ export function filterByCaller<T>(
  * Per ADR-0004 §4 the wrapper layer (`AuthorizedScope`) does NOT consult roles;
  * this handler-resident helper is the only consumer.
  */
-export function assertCallerIsNamespaceAdmin(
-  caller: CallerIdentity,
-  namespace: string,
-): void {
+export function assertCallerIsNamespaceAdmin(caller: CallerIdentity, namespace: string): void {
   if (caller.isSystemActor) return;
   const role = caller.namespaceRoles.get(namespace);
   if (role !== 'owner' && role !== 'admin') {
@@ -121,10 +115,7 @@ export function assertCallerCanAdminDockerImages(caller: CallerIdentity): void {
  * owner-exclusive mutations: workspace deletion, role flips that promote /
  * demote admins, and the owner-cannot-leave precondition check.
  */
-export function assertCallerIsNamespaceOwner(
-  caller: CallerIdentity,
-  namespace: string,
-): void {
+export function assertCallerIsNamespaceOwner(caller: CallerIdentity, namespace: string): void {
   if (caller.isSystemActor) return;
   const role = caller.namespaceRoles.get(namespace);
   if (role !== 'owner') {

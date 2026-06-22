@@ -103,20 +103,10 @@ export interface ProcessInstanceRepository {
   getLastCompletedByDefinitionName(name: string): Promise<ProcessInstance | null>;
 
   // Step execution subcollection
-  addStepExecution(
-    instanceId: string,
-    execution: StepExecution,
-  ): Promise<StepExecution>;
+  addStepExecution(instanceId: string, execution: StepExecution): Promise<StepExecution>;
   getStepExecutions(instanceId: string): Promise<StepExecution[]>;
-  getLatestStepExecution(
-    instanceId: string,
-    stepId: string,
-  ): Promise<StepExecution | null>;
-  updateStepExecution(
-    instanceId: string,
-    executionId: string,
-    updates: Partial<StepExecution>,
-  ): Promise<void>;
+  getLatestStepExecution(instanceId: string, stepId: string): Promise<StepExecution | null>;
+  updateStepExecution(instanceId: string, executionId: string, updates: Partial<StepExecution>): Promise<void>;
 
   getIdsByDefinitionName(name: string): Promise<string[]>;
   setDeletedByDefinitionName(name: string, deleted: boolean): Promise<void>;

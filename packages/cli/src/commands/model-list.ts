@@ -53,26 +53,44 @@ export const modelListCommand = defineCommand({
     const models = [...result.models].sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
-        case 'name': cmp = a.name.localeCompare(b.name); break;
-        case 'provider': cmp = a.provider.localeCompare(b.provider); break;
-        case 'context': cmp = a.contextLength - b.contextLength; break;
-        case 'price-in': cmp = a.pricing.input - b.pricing.input; break;
-        case 'price-out': cmp = a.pricing.output - b.pricing.output; break;
-        case 'popularity': cmp = (a.requestCount ?? 0) - (b.requestCount ?? 0); break;
+        case 'name':
+          cmp = a.name.localeCompare(b.name);
+          break;
+        case 'provider':
+          cmp = a.provider.localeCompare(b.provider);
+          break;
+        case 'context':
+          cmp = a.contextLength - b.contextLength;
+          break;
+        case 'price-in':
+          cmp = a.pricing.input - b.pricing.input;
+          break;
+        case 'price-out':
+          cmp = a.pricing.output - b.pricing.output;
+          break;
+        case 'popularity':
+          cmp = (a.requestCount ?? 0) - (b.requestCount ?? 0);
+          break;
       }
       return descending ? -cmp : cmp;
     });
 
     output.stdout(`Found ${String(models.length)} model(s):\n`);
-    output.stdout(`  ${'NAME'.padEnd(40)} ${'CONTEXT'.padStart(8)}  ${'PRICE-IN'.padStart(10)}  ${'PRICE-OUT'.padStart(10)}  ${'POPULARITY'.padStart(10)}  CAPS`);
-    output.stdout(`  ${'─'.repeat(40)} ${'─'.repeat(8)}  ${'─'.repeat(10)}  ${'─'.repeat(10)}  ${'─'.repeat(10)}  ${'─'.repeat(12)}`);
+    output.stdout(
+      `  ${'NAME'.padEnd(40)} ${'CONTEXT'.padStart(8)}  ${'PRICE-IN'.padStart(10)}  ${'PRICE-OUT'.padStart(10)}  ${'POPULARITY'.padStart(10)}  CAPS`,
+    );
+    output.stdout(
+      `  ${'─'.repeat(40)} ${'─'.repeat(8)}  ${'─'.repeat(10)}  ${'─'.repeat(10)}  ${'─'.repeat(10)}  ${'─'.repeat(12)}`,
+    );
     for (const model of models) {
       const ctx = formatContext(model.contextLength);
       const inPrice = formatPrice(model.pricing.input);
       const outPrice = formatPrice(model.pricing.output);
       const caps = [model.supportsTools ? 'tools' : '', model.supportsVision ? 'vision' : ''].filter(Boolean).join(',');
       const rank = model.requestCount !== null ? formatRequests(model.requestCount) : '';
-      output.stdout(`  ${model.id.padEnd(40)} ${ctx.padStart(8)}  ${inPrice.padStart(10)}  ${outPrice.padStart(10)}  ${rank.padStart(10)}  ${caps}`);
+      output.stdout(
+        `  ${model.id.padEnd(40)} ${ctx.padStart(8)}  ${inPrice.padStart(10)}  ${outPrice.padStart(10)}  ${rank.padStart(10)}  ${caps}`,
+      );
     }
     return 0;
   },

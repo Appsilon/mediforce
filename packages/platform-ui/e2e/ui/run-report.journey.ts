@@ -16,7 +16,9 @@ test.describe('Run Report Journey', () => {
     // Navigate to report by clicking the link
     await click(page, reportLink);
     await page.waitForURL(/\/report$/, { timeout: 20_000 });
-    await expect(page.getByRole('heading', { name: /Data Quality Review — Run Report/i })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: /Data Quality Review — Run Report/i })).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Step Timeline and step names
     await expect(page.getByText(/Step Timeline/i)).toBeVisible();

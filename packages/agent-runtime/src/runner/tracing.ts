@@ -80,10 +80,7 @@ export async function withAgentRunSpan<T>(
   });
 }
 
-export function annotateAgentRunSpan(
-  span: Span,
-  result: AgentRunSpanResult,
-): void {
+export function annotateAgentRunSpan(span: Span, result: AgentRunSpanResult): void {
   span.setAttributes({
     'mediforce.agent_run.status': result.status,
     'mediforce.agent_run.applied_to_workflow': result.appliedToWorkflow,
@@ -114,10 +111,7 @@ export function annotateAgentRunSpan(
   }
 }
 
-export async function withOpenRouterLlmSpan<T>(
-  input: LlmSpanInput,
-  callback: (span: Span) => Promise<T>,
-): Promise<T> {
+export async function withOpenRouterLlmSpan<T>(input: LlmSpanInput, callback: (span: Span) => Promise<T>): Promise<T> {
   const attributes: Attributes = {
     'openinference.span.kind': 'LLM',
     'gen_ai.request.model': input.selectedModel,

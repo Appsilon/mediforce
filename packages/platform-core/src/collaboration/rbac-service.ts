@@ -11,7 +11,7 @@ export class RbacError extends Error {
   ) {
     super(
       `User '${userId}' lacks required role for step '${stepId}'. ` +
-      `Required: [${requiredRoles.join(', ')}]. Has: [${userRoles.join(', ')}]`,
+        `Required: [${requiredRoles.join(', ')}]. Has: [${userRoles.join(', ')}]`,
     );
   }
 }
@@ -24,10 +24,7 @@ export class RbacService {
    * If allowedRoles is empty or undefined, step is open to any authenticated user.
    * Throws RbacError on failure (caller should catch and log to audit trail).
    */
-  async requireStepAccess(
-    allowedRoles: string[] | undefined,
-    stepId: string,
-  ): Promise<AuthUser> {
+  async requireStepAccess(allowedRoles: string[] | undefined, stepId: string): Promise<AuthUser> {
     const user = await this.authService.requireAuth();
 
     if (!allowedRoles || allowedRoles.length === 0) {

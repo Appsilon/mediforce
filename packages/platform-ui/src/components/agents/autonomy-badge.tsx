@@ -12,11 +12,9 @@ const AUTONOMY_LABELS: Record<string, string> = {
 
 export function AutonomyBadge({ level, showLabel = false }: { level: string; showLabel?: boolean }) {
   return (
-    <span className={cn(
-      'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-      AUTONOMY_STYLE,
-    )}>
-      {level}{showLabel ? ` ${AUTONOMY_LABELS[level] ?? ''}` : ''}
+    <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', AUTONOMY_STYLE)}>
+      {level}
+      {showLabel ? ` ${AUTONOMY_LABELS[level] ?? ''}` : ''}
     </span>
   );
 }

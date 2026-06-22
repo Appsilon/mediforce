@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  AgentOAuthTokenSchema,
-  PublicAgentOAuthTokenSchema,
-} from '../agent-oauth-token';
+import { AgentOAuthTokenSchema, PublicAgentOAuthTokenSchema } from '../agent-oauth-token';
 
 const valid = {
   provider: 'github',
@@ -55,11 +52,7 @@ describe('AgentOAuthTokenSchema', () => {
 
 describe('PublicAgentOAuthTokenSchema', () => {
   it('does not include accessToken or refreshToken in the shape', () => {
-    const {
-      accessToken: _at,
-      refreshToken: _rt,
-      ...publicSlice
-    } = valid;
+    const { accessToken: _at, refreshToken: _rt, ...publicSlice } = valid;
     const result = PublicAgentOAuthTokenSchema.safeParse(publicSlice);
     expect(result.success).toBe(true);
   });

@@ -25,7 +25,10 @@ export const AgentConfigSchema = z.object({
   image: z.string().optional(),
   dockerfile: z.string().optional(),
   repo: z.string().optional(),
-  commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
+  commit: z
+    .string()
+    .regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)')
+    .optional(),
   repoAuth: z.string().optional(),
   mcpServers: z.array(McpServerConfigSchema).optional(),
   allowedTools: z.array(z.string()).optional(),
@@ -37,13 +40,11 @@ export const StepConfigSchema = z.object({
   plugin: z.string().optional(), // e.g. '@mediforce/example-agent'
   autonomyLevel: z.enum(['L0', 'L1', 'L2', 'L3', 'L4']).optional(), // L0 added
   confidenceThreshold: z.number().min(0).max(1).optional(), // default 0 (always pass)
-  fallbackBehavior: z
-    .enum(['escalate_to_human', 'continue_with_flag', 'pause'])
-    .optional(),
+  fallbackBehavior: z.enum(['escalate_to_human', 'continue_with_flag', 'pause']).optional(),
   timeoutMinutes: z.number().optional(),
   model: z.string().optional(), // e.g. 'anthropic/claude-sonnet-4'
   reviewConstraints: ReviewConstraintsSchema.optional(),
-  allowedRoles: z.array(z.string()).optional(),  // RBAC: e.g. ['reviewer', 'approver']
+  allowedRoles: z.array(z.string()).optional(), // RBAC: e.g. ['reviewer', 'approver']
   reviewerType: z.enum(['human', 'agent', 'none']).optional(), // who reviews; 'none' for L4 no-review
   reviewerPlugin: z.string().optional(), // required at runtime when reviewerType='agent'
   agentConfig: AgentConfigSchema.optional(),
@@ -63,7 +64,7 @@ export const ProcessConfigSchema = z.object({
   processName: z.string(),
   configName: z.string().min(1),
   configVersion: z.string().min(1),
-  roles: z.array(z.string()).optional(),          // Declares roles available in this process
+  roles: z.array(z.string()).optional(), // Declares roles available in this process
   stepConfigs: z.array(StepConfigSchema),
   notifications: z.array(ProcessNotificationConfigSchema).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),

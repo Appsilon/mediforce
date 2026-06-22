@@ -1,8 +1,5 @@
 import type { CallerScope } from '../../repositories/index';
-import type {
-  GetWorkflowSecretsFullInput,
-  GetWorkflowSecretsFullOutput,
-} from '../../contract/secrets';
+import type { GetWorkflowSecretsFullInput, GetWorkflowSecretsFullOutput } from '../../contract/secrets';
 import { assertNamespaceAccess } from '../../auth';
 
 /**

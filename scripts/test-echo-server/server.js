@@ -53,9 +53,7 @@ export function createEchoServer() {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const portArgIndex = process.argv.indexOf('--port');
-  const port = portArgIndex !== -1
-    ? Number(process.argv[portArgIndex + 1])
-    : Number(process.env.PORT ?? 9099);
+  const port = portArgIndex !== -1 ? Number(process.argv[portArgIndex + 1]) : Number(process.env.PORT ?? 9099);
   const server = createEchoServer();
   server.listen(port, () => {
     console.log(`[echo-server] listening on port ${port}`);

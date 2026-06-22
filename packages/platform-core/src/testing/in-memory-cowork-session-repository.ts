@@ -31,10 +31,7 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
     return session ? { ...session, turns: [...session.turns] } : null;
   }
 
-  async getByIdInNamespaces(
-    sessionId: string,
-    allowed: readonly string[],
-  ): Promise<CoworkSession | null> {
+  async getByIdInNamespaces(sessionId: string, allowed: readonly string[]): Promise<CoworkSession | null> {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
     const parent = await this.requireParents().getById(session.processInstanceId);
@@ -44,9 +41,7 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
   }
 
   async getByInstanceId(instanceId: string): Promise<CoworkSession[]> {
-    return [...this.sessions.values()].filter(
-      (s) => s.processInstanceId === instanceId,
-    );
+    return [...this.sessions.values()].filter((s) => s.processInstanceId === instanceId);
   }
 
   async listAll(): Promise<CoworkSession[]> {
@@ -66,10 +61,7 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  async listByRoleInNamespaces(
-    role: string,
-    allowed: readonly string[],
-  ): Promise<CoworkSession[]> {
+  async listByRoleInNamespaces(role: string, allowed: readonly string[]): Promise<CoworkSession[]> {
     return this.filterByParentNamespace(await this.listByRoleAll(role), allowed);
   }
 
@@ -104,18 +96,19 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
     return { ...updated, turns: [...updated.turns] };
   }
 
-  async updateTurn(
-    sessionId: string,
-    turnId: string,
-    patch: Partial<ConversationTurn>,
-  ): Promise<CoworkSession> {
+  async updateTurn(sessionId: string, turnId: string, patch: Partial<ConversationTurn>): Promise<CoworkSession> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`CoworkSession not found: ${sessionId}`);
     const index = session.turns.findIndex((t) => t.id === turnId);
     if (index === -1) throw new Error(`Turn not found: ${turnId}`);
     const now = new Date().toISOString();
     // role is the discriminant — patch cannot change it, and id stays fixed.
-    const merged = { ...session.turns[index], ...patch, id: session.turns[index].id, role: session.turns[index].role } as ConversationTurn;
+    const merged = {
+      ...session.turns[index],
+      ...patch,
+      id: session.turns[index].id,
+      role: session.turns[index].role,
+    } as ConversationTurn;
     const newTurns: ConversationTurn[] = session.turns.map((t, i) => (i === index ? merged : t));
     const updated: CoworkSession = {
       ...session,
@@ -196,10 +189,7 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
     return { ...updated, turns: [...updated.turns] };
   }
 
-  private async filterByParentNamespace(
-    rows: CoworkSession[],
-    allowed: readonly string[],
-  ): Promise<CoworkSession[]> {
+  private async filterByParentNamespace(rows: CoworkSession[], allowed: readonly string[]): Promise<CoworkSession[]> {
     if (rows.length === 0) return [];
     const parents = this.requireParents();
     const instanceIds = [...new Set(rows.map((r) => r.processInstanceId))];

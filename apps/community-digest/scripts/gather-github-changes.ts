@@ -117,9 +117,7 @@ async function fetchCommits(repo: string, since: string, until: string): Promise
   const branches = await fetchBranches(repo);
   console.log(`Found ${branches.length} branches: ${branches.join(', ')}`);
 
-  const perBranch = await Promise.all(
-    branches.map((branch) => fetchCommitsForBranch(repo, branch, since, until)),
-  );
+  const perBranch = await Promise.all(branches.map((branch) => fetchCommitsForBranch(repo, branch, since, until)));
 
   // Deduplicate by SHA — keep the first branch a commit appears on
   const seen = new Set<string>();

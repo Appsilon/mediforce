@@ -71,7 +71,9 @@ function DatetimeField({
   classes: string;
 }) {
   const [tzLabel, setTzLabel] = React.useState<string | null>(null);
-  React.useEffect(() => { setTzLabel(buildTzLabel()); }, []);
+  React.useEffect(() => {
+    setTzLabel(buildTzLabel());
+  }, []);
 
   return (
     <div className="space-y-1">
@@ -80,7 +82,10 @@ function DatetimeField({
         value={toLocalDatetimeInput(String(value ?? ''))}
         onChange={(event) => {
           const s = event.target.value;
-          if (!s) { onChange(''); return; }
+          if (!s) {
+            onChange('');
+            return;
+          }
           // Browser parses datetime-local strings as local time; .toISOString()
           // converts to UTC so the server always receives an unambiguous timestamp.
           const date = new Date(s);
@@ -89,9 +94,7 @@ function DatetimeField({
         disabled={disabled}
         className={classes}
       />
-      {tzLabel !== null && (
-        <p className="text-xs text-muted-foreground">{tzLabel}</p>
-      )}
+      {tzLabel !== null && <p className="text-xs text-muted-foreground">{tzLabel}</p>}
     </div>
   );
 }
@@ -105,9 +108,7 @@ export function ParamField({ param, value, onChange, disabled }: ParamFieldProps
         {param.name}
         {param.required && <span className="text-destructive">*</span>}
       </label>
-      {param.description && (
-        <p className="text-xs text-muted-foreground">{param.description}</p>
-      )}
+      {param.description && <p className="text-xs text-muted-foreground">{param.description}</p>}
       {renderInput(type, param, value, onChange, disabled)}
     </div>
   );
@@ -132,9 +133,7 @@ function renderInput(
               type="checkbox"
               checked={selected.includes(opt)}
               onChange={(event) => {
-                const next = event.target.checked
-                  ? [...selected, opt]
-                  : selected.filter((item) => item !== opt);
+                const next = event.target.checked ? [...selected, opt] : selected.filter((item) => item !== opt);
                 onChange(next);
               }}
               disabled={disabled}
@@ -157,7 +156,9 @@ function renderInput(
       >
         <option value="">Select...</option>
         {param.options.map((opt) => (
-          <option key={opt} value={opt}>{opt}</option>
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
         ))}
       </select>
     );

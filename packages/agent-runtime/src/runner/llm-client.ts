@@ -1,9 +1,5 @@
 import type { LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
-import {
-  annotateOpenRouterLlmSpan,
-  type OpenTelemetryTracingOptions,
-  withOpenRouterLlmSpan,
-} from './tracing';
+import { annotateOpenRouterLlmSpan, type OpenTelemetryTracingOptions, withOpenRouterLlmSpan } from './tracing';
 
 // Re-export the interface defined in interfaces/ for barrel convenience
 export type { LlmClient, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
@@ -30,7 +26,7 @@ export class OpenRouterLlmClient {
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            Authorization: `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -46,7 +42,7 @@ export class OpenRouterLlmClient {
           throw new Error(`OpenRouter API error ${response.status}: ${errorText}`);
         }
 
-        const data = await response.json() as {
+        const data = (await response.json()) as {
           model: string;
           choices: Array<{ message: { content: string } }>;
           usage: { prompt_tokens: number; completion_tokens: number };

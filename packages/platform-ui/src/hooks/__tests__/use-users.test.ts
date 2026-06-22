@@ -46,7 +46,11 @@ describe('useUserProfiles', () => {
       ]),
     );
     const { result } = renderHook(() => useUserProfiles('ns1'));
-    expect(result.current.get('u1')).toEqual({ displayName: 'Alice', photoURL: 'https://x/a.png', personalHandle: undefined });
+    expect(result.current.get('u1')).toEqual({
+      displayName: 'Alice',
+      photoURL: 'https://x/a.png',
+      personalHandle: undefined,
+    });
     expect(result.current.get('u2')).toEqual({ displayName: 'Bob', photoURL: undefined, personalHandle: undefined });
   });
 

@@ -5,10 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type {
-  AgentOAuthToken,
-  AgentOAuthTokenRepository,
-} from '@mediforce/platform-core';
+import type { AgentOAuthToken, AgentOAuthTokenRepository } from '@mediforce/platform-core';
 import { InMemoryAgentOAuthTokenRepository } from '@mediforce/platform-core/testing';
 import { PostgresAgentOAuthTokenRepository } from '../repositories/agent-oauth-token-repository';
 import { PostgresNamespaceRepository } from '../repositories/namespace-repository';
@@ -70,12 +67,7 @@ function contract(
 
     it('put is insert-or-replace for the same (agent, server) key', async () => {
       await repo.put('ws-1', 'agent-a', 'github', tokenBase({ accessToken: 'old' }));
-      await repo.put(
-        'ws-1',
-        'agent-a',
-        'github',
-        tokenBase({ accessToken: 'new', refreshToken: 'r' }),
-      );
+      await repo.put('ws-1', 'agent-a', 'github', tokenBase({ accessToken: 'new', refreshToken: 'r' }));
       const got = await repo.get('ws-1', 'agent-a', 'github');
       expect(got?.accessToken).toBe('new');
       expect(got?.refreshToken).toBe('r');
@@ -88,7 +80,7 @@ function contract(
       expect(await repo.delete('ws-1', 'agent-a', 'github')).toBe(false);
     });
 
-    it('listByAgent returns only that agent\'s tokens, sorted by serverName', async () => {
+    it("listByAgent returns only that agent's tokens, sorted by serverName", async () => {
       await repo.put('ws-1', 'agent-a', 'zeta', tokenBase());
       await repo.put('ws-1', 'agent-a', 'alpha', tokenBase());
       await repo.put('ws-1', 'agent-a', 'mid', tokenBase());
@@ -115,9 +107,7 @@ function contract(
     });
 
     it('rejects put with invalid payload (empty accessToken)', async () => {
-      await expect(
-        repo.put('ws-1', 'agent-a', 'github', tokenBase({ accessToken: '' })),
-      ).rejects.toThrow();
+      await expect(repo.put('ws-1', 'agent-a', 'github', tokenBase({ accessToken: '' }))).rejects.toThrow();
     });
   });
 }
@@ -140,7 +130,9 @@ describe.skipIf(skipPg)('PostgresAgentOAuthTokenRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sql);

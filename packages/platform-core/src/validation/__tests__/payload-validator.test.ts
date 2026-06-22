@@ -22,18 +22,12 @@ describe('validatePayload', () => {
   });
 
   it('accepts valid required field', () => {
-    const result = validatePayload(
-      { ruleId: 'CORE-000127' },
-      [field({ name: 'ruleId', required: true })],
-    );
+    const result = validatePayload({ ruleId: 'CORE-000127' }, [field({ name: 'ruleId', required: true })]);
     expect(result.valid).toBe(true);
   });
 
   it('rejects unknown fields (strict)', () => {
-    const result = validatePayload(
-      { ruleId: 'CORE-000127', extra: 'nope' },
-      [field({ name: 'ruleId' })],
-    );
+    const result = validatePayload({ ruleId: 'CORE-000127', extra: 'nope' }, [field({ name: 'ruleId' })]);
     expect(result.valid).toBe(false);
     expect(result.errors[0]!.field).toBe('extra');
     expect(result.errors[0]!.message).toMatch(/unknown/);
@@ -58,81 +52,68 @@ describe('validatePayload', () => {
   });
 
   it('validates select with options', () => {
-    const result = validatePayload(
-      { status: 'invalid' },
-      [field({ name: 'status', type: 'select', options: ['active', 'inactive'] })],
-    );
+    const result = validatePayload({ status: 'invalid' }, [
+      field({ name: 'status', type: 'select', options: ['active', 'inactive'] }),
+    ]);
     expect(result.valid).toBe(false);
     expect(result.errors[0]!.message).toMatch(/one of/);
   });
 
   it('accepts valid select option', () => {
-    const result = validatePayload(
-      { status: 'active' },
-      [field({ name: 'status', type: 'select', options: ['active', 'inactive'] })],
-    );
+    const result = validatePayload({ status: 'active' }, [
+      field({ name: 'status', type: 'select', options: ['active', 'inactive'] }),
+    ]);
     expect(result.valid).toBe(true);
   });
 
   it('validates multiselect must be array', () => {
-    const result = validatePayload(
-      { tags: 'one' },
-      [field({ name: 'tags', type: 'multiselect', options: ['one', 'two'] })],
-    );
+    const result = validatePayload({ tags: 'one' }, [
+      field({ name: 'tags', type: 'multiselect', options: ['one', 'two'] }),
+    ]);
     expect(result.valid).toBe(false);
     expect(result.errors[0]!.message).toMatch(/array/);
   });
 
   it('validates multiselect options', () => {
-    const result = validatePayload(
-      { tags: ['one', 'bad'] },
-      [field({ name: 'tags', type: 'multiselect', options: ['one', 'two'] })],
-    );
+    const result = validatePayload({ tags: ['one', 'bad'] }, [
+      field({ name: 'tags', type: 'multiselect', options: ['one', 'two'] }),
+    ]);
     expect(result.valid).toBe(false);
     expect(result.errors[0]!.message).toMatch(/invalid options/);
   });
 
   it('reports all invalid multiselect options in one error', () => {
-    const result = validatePayload(
-      { tags: ['bad1', 'bad2', 'ok'] },
-      [field({ name: 'tags', type: 'multiselect', options: ['ok', 'also-ok'] })],
-    );
+    const result = validatePayload({ tags: ['bad1', 'bad2', 'ok'] }, [
+      field({ name: 'tags', type: 'multiselect', options: ['ok', 'also-ok'] }),
+    ]);
     expect(result.valid).toBe(false);
     expect(result.errors[0]!.message).toContain('bad1');
     expect(result.errors[0]!.message).toContain('bad2');
   });
 
   it('rejects required multiselect with empty array', () => {
-    const result = validatePayload(
-      { tags: [] },
-      [field({ name: 'tags', type: 'multiselect', required: true, options: ['a', 'b'] })],
-    );
+    const result = validatePayload({ tags: [] }, [
+      field({ name: 'tags', type: 'multiselect', required: true, options: ['a', 'b'] }),
+    ]);
     expect(result.valid).toBe(false);
     expect(result.errors[0]!.message).toMatch(/at least one selection/);
   });
 
   it('accepts optional multiselect with empty array', () => {
-    const result = validatePayload(
-      { tags: [] },
-      [field({ name: 'tags', type: 'multiselect', options: ['a', 'b'] })],
-    );
+    const result = validatePayload({ tags: [] }, [field({ name: 'tags', type: 'multiselect', options: ['a', 'b'] })]);
     expect(result.valid).toBe(true);
   });
 
   it('rejects NaN as number', () => {
-    const result = validatePayload(
-      { count: NaN },
-      [field({ name: 'count', type: 'number' })],
-    );
+    const result = validatePayload({ count: NaN }, [field({ name: 'count', type: 'number' })]);
     expect(result.valid).toBe(false);
     expect(result.errors[0]!.message).toMatch(/number/);
   });
 
   it('accepts valid multiselect', () => {
-    const result = validatePayload(
-      { tags: ['one', 'two'] },
-      [field({ name: 'tags', type: 'multiselect', options: ['one', 'two', 'three'] })],
-    );
+    const result = validatePayload({ tags: ['one', 'two'] }, [
+      field({ name: 'tags', type: 'multiselect', options: ['one', 'two', 'three'] }),
+    ]);
     expect(result.valid).toBe(true);
   });
 
@@ -143,30 +124,21 @@ describe('validatePayload', () => {
   });
 
   it('rejects invalid date string', () => {
-    const result = validatePayload(
-      { dob: 'not-a-date' },
-      [field({ name: 'dob', type: 'date' })],
-    );
+    const result = validatePayload({ dob: 'not-a-date' }, [field({ name: 'dob', type: 'date' })]);
     expect(result.valid).toBe(false);
     expect(result.errors[0]!.message).toMatch(/not a valid date/);
   });
 
   it('accepts valid ISO date', () => {
-    const result = validatePayload(
-      { dob: '2024-01-15' },
-      [field({ name: 'dob', type: 'date' })],
-    );
+    const result = validatePayload({ dob: '2024-01-15' }, [field({ name: 'dob', type: 'date' })]);
     expect(result.valid).toBe(true);
   });
 
   it('collects multiple errors', () => {
-    const result = validatePayload(
-      { extra: 'x' },
-      [
-        field({ name: 'required1', required: true }),
-        field({ name: 'required2', required: true }),
-      ],
-    );
+    const result = validatePayload({ extra: 'x' }, [
+      field({ name: 'required1', required: true }),
+      field({ name: 'required2', required: true }),
+    ]);
     expect(result.valid).toBe(false);
     expect(result.errors.length).toBe(3);
   });

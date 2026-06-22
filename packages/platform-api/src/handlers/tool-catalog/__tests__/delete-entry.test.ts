@@ -1,14 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  InMemoryAuditRepository,
-  InMemoryToolCatalogRepository,
-} from '@mediforce/platform-core/testing';
+import { InMemoryAuditRepository, InMemoryToolCatalogRepository } from '@mediforce/platform-core/testing';
 import { deleteToolCatalogEntry } from '../delete-entry';
 import { ForbiddenError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { adminRoles, memberRoles, sampleEntry } from './fixtures';
 
 describe('deleteToolCatalogEntry handler', () => {
@@ -28,10 +22,7 @@ describe('deleteToolCatalogEntry handler', () => {
       caller: userCaller('u-admin', ['alpha'], adminRoles),
     });
 
-    const result = await deleteToolCatalogEntry(
-      { namespace: 'alpha', id: 'tealflow-mcp' },
-      scope,
-    );
+    const result = await deleteToolCatalogEntry({ namespace: 'alpha', id: 'tealflow-mcp' }, scope);
 
     expect(result.success).toBe(true);
     expect(await repo.getById('alpha', 'tealflow-mcp')).toBeNull();
@@ -48,10 +39,7 @@ describe('deleteToolCatalogEntry handler', () => {
       caller: userCaller('u-admin', ['alpha'], adminRoles),
     });
 
-    const result = await deleteToolCatalogEntry(
-      { namespace: 'alpha', id: 'missing' },
-      scope,
-    );
+    const result = await deleteToolCatalogEntry({ namespace: 'alpha', id: 'missing' }, scope);
 
     expect(result.success).toBe(true);
     const events = await auditRepo.getByEntity('toolCatalogEntry', 'missing');
@@ -65,9 +53,9 @@ describe('deleteToolCatalogEntry handler', () => {
       caller: userCaller('u-member', ['alpha'], memberRoles),
     });
 
-    await expect(
-      deleteToolCatalogEntry({ namespace: 'alpha', id: 'tealflow-mcp' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(deleteToolCatalogEntry({ namespace: 'alpha', id: 'tealflow-mcp' }, scope)).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
 
     expect(await repo.getById('alpha', 'tealflow-mcp')).not.toBeNull();
   });

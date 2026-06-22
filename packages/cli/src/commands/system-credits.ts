@@ -3,8 +3,7 @@ import { printJson, printKv } from '../output';
 
 export const systemCreditsCommand = defineCommand({
   name: 'mediforce system credits',
-  description:
-    'Show OpenRouter credit balance for a workspace. Reads OPENROUTER_API_KEY from workspace secrets.',
+  description: 'Show OpenRouter credit balance for a workspace. Reads OPENROUTER_API_KEY from workspace secrets.',
   args: {
     namespace: { type: 'string', required: true, description: 'Namespace handle' },
   },

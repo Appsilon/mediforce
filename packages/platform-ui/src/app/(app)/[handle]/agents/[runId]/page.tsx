@@ -12,9 +12,7 @@ export default function AgentRunDetailPage() {
   const { data: run, loading } = useAgentRun(runId ?? null);
 
   // Fetch process instance for definition name
-  const { data: processInstance, loading: piLoading } = useProcessInstance(
-    run?.processInstanceId ?? null,
-  );
+  const { data: processInstance, loading: piLoading } = useProcessInstance(run?.processInstanceId ?? null);
 
   // Fetch step executions to find input data (previous step output)
   const { data: stepExecutions, loading: seLoading } = useStepExecutions(
@@ -25,9 +23,7 @@ export default function AgentRunDetailPage() {
   // Find the step execution whose gateResult.next === run.stepId (the previous step)
   const inputData = useMemo(() => {
     if (!run || stepExecutions.length === 0) return null;
-    const prevExec = stepExecutions.find(
-      (se) => se.gateResult?.next === run.stepId,
-    );
+    const prevExec = stepExecutions.find((se) => se.gateResult?.next === run.stepId);
     return prevExec?.output ?? null;
   }, [run, stepExecutions]);
 
@@ -43,18 +39,8 @@ export default function AgentRunDetailPage() {
   }
 
   if (!run) {
-    return (
-      <div className="p-6 text-center text-sm text-muted-foreground">
-        Agent run not found.
-      </div>
-    );
+    return <div className="p-6 text-center text-sm text-muted-foreground">Agent run not found.</div>;
   }
 
-  return (
-    <AgentRunDetail
-      run={run}
-      processInstance={processInstance}
-      inputData={inputData}
-    />
-  );
+  return <AgentRunDetail run={run} processInstance={processInstance} inputData={inputData} />;
 }

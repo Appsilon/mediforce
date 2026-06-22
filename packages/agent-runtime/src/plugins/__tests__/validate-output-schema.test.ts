@@ -25,8 +25,9 @@ describe('validateOutputSchema', () => {
   });
 
   it('returns error for non-JSON raw string', () => {
-    expect(validateOutputSchema({ raw: "I'll process each source sequentially." }, schema))
-      .toBe('output is not valid JSON');
+    expect(validateOutputSchema({ raw: "I'll process each source sequentially." }, schema)).toBe(
+      'output is not valid JSON',
+    );
   });
 
   it('returns error for missing required keys', () => {
@@ -45,22 +46,18 @@ describe('validateOutputSchema', () => {
   });
 
   it('returns error when raw is an array instead of object', () => {
-    expect(validateOutputSchema({ raw: '[]' }, schema))
-      .toBe('expected object, got array');
+    expect(validateOutputSchema({ raw: '[]' }, schema)).toBe('expected object, got array');
   });
 
   it('returns error when raw is null', () => {
-    expect(validateOutputSchema({ raw: null } as Record<string, unknown>, schema))
-      .toBe('output is empty');
+    expect(validateOutputSchema({ raw: null } as Record<string, unknown>, schema)).toBe('output is empty');
   });
 
   it('returns error when raw is undefined', () => {
-    expect(validateOutputSchema({ raw: undefined } as Record<string, unknown>, schema))
-      .toBe('output is empty');
+    expect(validateOutputSchema({ raw: undefined } as Record<string, unknown>, schema)).toBe('output is empty');
   });
 
   it('returns error when raw is a primitive JSON value', () => {
-    expect(validateOutputSchema({ raw: '42' }, schema))
-      .toBe('output is not valid JSON');
+    expect(validateOutputSchema({ raw: '42' }, schema)).toBe('output is not valid JSON');
   });
 });

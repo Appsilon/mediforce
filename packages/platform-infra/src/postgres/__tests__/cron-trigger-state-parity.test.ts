@@ -5,10 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type {
-  CronTriggerState,
-  CronTriggerStateRepository,
-} from '@mediforce/platform-core';
+import type { CronTriggerState, CronTriggerStateRepository } from '@mediforce/platform-core';
 import { InMemoryCronTriggerStateRepository } from '@mediforce/platform-core/testing';
 import { PostgresCronTriggerStateRepository } from '../repositories/cron-trigger-state-repository';
 import * as schema from '../schema/index';
@@ -72,23 +69,16 @@ function contract(name: string, factory: () => Promise<CronTriggerStateRepositor
     });
 
     it('rejects set with invalid payload (empty definitionName)', async () => {
-      await expect(
-        repo.set(stateBase({ definitionName: '' })),
-      ).rejects.toThrow();
+      await expect(repo.set(stateBase({ definitionName: '' }))).rejects.toThrow();
     });
 
     it('rejects set with invalid payload (non-ISO lastTriggeredAt)', async () => {
-      await expect(
-        repo.set(stateBase({ lastTriggeredAt: 'not-a-date' })),
-      ).rejects.toThrow();
+      await expect(repo.set(stateBase({ lastTriggeredAt: 'not-a-date' }))).rejects.toThrow();
     });
   });
 }
 
-contract(
-  'InMemoryCronTriggerStateRepository',
-  async () => new InMemoryCronTriggerStateRepository(),
-);
+contract('InMemoryCronTriggerStateRepository', async () => new InMemoryCronTriggerStateRepository());
 
 describe.skipIf(skipPg)('PostgresCronTriggerStateRepository (parity)', () => {
   const schemaName = `cron_${randomBytes(8).toString('hex')}`;
@@ -103,7 +93,9 @@ describe.skipIf(skipPg)('PostgresCronTriggerStateRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sql);

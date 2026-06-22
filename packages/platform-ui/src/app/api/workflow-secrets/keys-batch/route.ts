@@ -11,10 +11,7 @@ import {
  * Multi-workflow key listing in one round-trip. Used by the run launcher to
  * decorate workflow rows with "N keys configured".
  */
-export const GET = createRouteAdapter<
-  typeof ListWorkflowSecretKeysBatchInputSchema,
-  ListWorkflowSecretKeysBatchInput
->(
+export const GET = createRouteAdapter<typeof ListWorkflowSecretKeysBatchInputSchema, ListWorkflowSecretKeysBatchInput>(
   ListWorkflowSecretKeysBatchInputSchema,
   (req) => ({
     namespace: req.nextUrl.searchParams.get('namespace') ?? undefined,

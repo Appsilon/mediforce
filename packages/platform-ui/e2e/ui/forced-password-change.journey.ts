@@ -1,7 +1,15 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { createTestUser, deleteAuthUser } from '../helpers/emulator';
 import { seedPostgresPersonalNamespace, seedPostgresUserProfile } from '../helpers/postgres-seed';
-import { setupRecording, allowPageErrors, click, showStep, showResult, showCaption, endRecording } from '../helpers/recording';
+import {
+  setupRecording,
+  allowPageErrors,
+  click,
+  showStep,
+  showResult,
+  showCaption,
+  endRecording,
+} from '../helpers/recording';
 
 const INVITED_EMAIL = 'invited-user@mediforce.dev';
 const INVITED_TEMP_PASSWORD = 'TempPass123!';

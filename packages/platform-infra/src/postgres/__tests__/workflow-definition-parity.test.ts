@@ -6,10 +6,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { InMemoryProcessRepository } from '@mediforce/platform-core';
-import type {
-  ProcessRepository,
-  WorkflowDefinition,
-} from '@mediforce/platform-core';
+import type { ProcessRepository, WorkflowDefinition } from '@mediforce/platform-core';
 import { PostgresProcessRepository } from '../repositories/process-repository';
 import { PostgresNamespaceRepository } from '../repositories/namespace-repository';
 import * as schema from '../schema/index';
@@ -20,10 +17,7 @@ const MIGRATIONS_DIR = resolve(__dirname, '..', 'migrations');
 const DATABASE_URL = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const skipPg = !DATABASE_URL;
 
-function definitionFor(
-  namespace: string,
-  overrides: Partial<WorkflowDefinition> = {},
-): WorkflowDefinition {
+function definitionFor(namespace: string, overrides: Partial<WorkflowDefinition> = {}): WorkflowDefinition {
   return {
     namespace,
     name: 'supply-chain-review',
@@ -82,9 +76,7 @@ function contract(
       await registerWorkspace('ws-1');
       await repo.saveWorkflowDefinition(definitionFor('ws-1', { version: 1 }));
       await repo.saveWorkflowDefinition(definitionFor('ws-1', { version: 2 }));
-      await repo.saveWorkflowDefinition(
-        definitionFor('ws-1', { name: 'other-wf', version: 1 }),
-      );
+      await repo.saveWorkflowDefinition(definitionFor('ws-1', { name: 'other-wf', version: 1 }));
 
       const result = await repo.listAllWorkflowDefinitions(false);
       const supply = result.definitions.find((d) => d.name === 'supply-chain-review');
@@ -105,9 +97,7 @@ function contract(
       expect(supply?.versions.map((v) => v.version)).toEqual([1]);
 
       const withArchived = await repo.listAllWorkflowDefinitions(true);
-      const supplyAll = withArchived.definitions.find(
-        (d) => d.name === 'supply-chain-review',
-      );
+      const supplyAll = withArchived.definitions.find((d) => d.name === 'supply-chain-review');
       expect(supplyAll?.versions.map((v) => v.version).sort()).toEqual([1, 2]);
     });
 
@@ -116,20 +106,11 @@ function contract(
       await registerWorkspace('ws-public');
       await registerWorkspace('ws-private');
       await registerWorkspace('ws-allowed');
-      await repo.saveWorkflowDefinition(
-        definitionFor('ws-public', { name: 'public-wf', visibility: 'public' }),
-      );
-      await repo.saveWorkflowDefinition(
-        definitionFor('ws-private', { name: 'private-wf', visibility: 'private' }),
-      );
-      await repo.saveWorkflowDefinition(
-        definitionFor('ws-allowed', { name: 'allowed-wf', visibility: 'private' }),
-      );
+      await repo.saveWorkflowDefinition(definitionFor('ws-public', { name: 'public-wf', visibility: 'public' }));
+      await repo.saveWorkflowDefinition(definitionFor('ws-private', { name: 'private-wf', visibility: 'private' }));
+      await repo.saveWorkflowDefinition(definitionFor('ws-allowed', { name: 'allowed-wf', visibility: 'private' }));
 
-      const result = await repo.listWorkflowDefinitionsVisibleTo(
-        ['ws-allowed'],
-        false,
-      );
+      const result = await repo.listWorkflowDefinitionsVisibleTo(['ws-allowed'], false);
       const names = result.definitions.map((d) => d.name);
       expect(names).toContain('public-wf');
       expect(names).toContain('allowed-wf');
@@ -147,9 +128,7 @@ function contract(
       await repo.saveWorkflowDefinition(definitionFor('ws-1', { version: 1 }));
       await repo.saveWorkflowDefinition(definitionFor('ws-1', { version: 3 }));
       await repo.saveWorkflowDefinition(definitionFor('ws-1', { version: 2 }));
-      expect(
-        await repo.getLatestWorkflowVersion('ws-1', 'supply-chain-review'),
-      ).toBe(3);
+      expect(await repo.getLatestWorkflowVersion('ws-1', 'supply-chain-review')).toBe(3);
     });
 
     it('listWorkflowVersions returns versions ascending, [] for unknown', async () => {
@@ -179,18 +158,12 @@ function contract(
     it('get/setDefaultWorkflowVersion round-trips', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');
-      expect(
-        await repo.getDefaultWorkflowVersion('ws-1', 'supply-chain-review'),
-      ).toBeNull();
+      expect(await repo.getDefaultWorkflowVersion('ws-1', 'supply-chain-review')).toBeNull();
       await repo.setDefaultWorkflowVersion('ws-1', 'supply-chain-review', 2);
-      expect(
-        await repo.getDefaultWorkflowVersion('ws-1', 'supply-chain-review'),
-      ).toBe(2);
+      expect(await repo.getDefaultWorkflowVersion('ws-1', 'supply-chain-review')).toBe(2);
       // Upsert path
       await repo.setDefaultWorkflowVersion('ws-1', 'supply-chain-review', 4);
-      expect(
-        await repo.getDefaultWorkflowVersion('ws-1', 'supply-chain-review'),
-      ).toBe(4);
+      expect(await repo.getDefaultWorkflowVersion('ws-1', 'supply-chain-review')).toBe(4);
     });
 
     it('setProcessArchived flips all versions; listAll(false) hides them', async () => {
@@ -213,9 +186,7 @@ function contract(
     it('setVersionArchived throws on unknown version', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');
-      await expect(
-        repo.setVersionArchived('ws-1', 'missing', 1, true),
-      ).rejects.toThrow();
+      await expect(repo.setVersionArchived('ws-1', 'missing', 1, true)).rejects.toThrow();
     });
 
     it('setWorkflowVisibility flips all versions; throws when none exist', async () => {
@@ -229,9 +200,7 @@ function contract(
       expect(v1?.visibility).toBe('public');
       expect(v2?.visibility).toBe('public');
 
-      await expect(
-        repo.setWorkflowVisibility('missing', 'ws-1', 'public'),
-      ).rejects.toThrow();
+      await expect(repo.setWorkflowVisibility('missing', 'ws-1', 'public')).rejects.toThrow();
     });
 
     it('transferWorkflowNamespace moves all versions; throws when source has none', async () => {
@@ -243,31 +212,21 @@ function contract(
 
       await repo.transferWorkflowNamespace('ws-1', 'supply-chain-review', 'ws-2');
       expect(await repo.getWorkflowDefinition('ws-1', 'supply-chain-review', 1)).toBeNull();
-      expect(
-        (await repo.getWorkflowDefinition('ws-2', 'supply-chain-review', 2))?.namespace,
-      ).toBe('ws-2');
+      expect((await repo.getWorkflowDefinition('ws-2', 'supply-chain-review', 2))?.namespace).toBe('ws-2');
 
       // Non-existent source workflow must reject, not silently no-op.
-      await expect(
-        repo.transferWorkflowNamespace('ws-1', 'missing', 'ws-2'),
-      ).rejects.toThrow();
+      await expect(repo.transferWorkflowNamespace('ws-1', 'missing', 'ws-2')).rejects.toThrow();
     });
 
     it('setWorkflowDeleted + isWorkflowNameDeleted reflect tombstone', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');
       await repo.saveWorkflowDefinition(definitionFor('ws-1', { version: 1 }));
-      expect(await repo.isWorkflowNameDeleted('ws-1', 'supply-chain-review')).toBe(
-        false,
-      );
+      expect(await repo.isWorkflowNameDeleted('ws-1', 'supply-chain-review')).toBe(false);
       await repo.setWorkflowDeleted('ws-1', 'supply-chain-review', true);
-      expect(await repo.isWorkflowNameDeleted('ws-1', 'supply-chain-review')).toBe(
-        true,
-      );
+      expect(await repo.isWorkflowNameDeleted('ws-1', 'supply-chain-review')).toBe(true);
       await repo.setWorkflowDeleted('ws-1', 'supply-chain-review', false);
-      expect(await repo.isWorkflowNameDeleted('ws-1', 'supply-chain-review')).toBe(
-        false,
-      );
+      expect(await repo.isWorkflowNameDeleted('ws-1', 'supply-chain-review')).toBe(false);
     });
 
     it('listAllWorkflowDefinitions excludes soft-deleted workflows', async () => {
@@ -277,39 +236,28 @@ function contract(
       await repo.setWorkflowDeleted('ws-1', 'supply-chain-review', true);
 
       const visible = await repo.listAllWorkflowDefinitions(false);
-      expect(
-        visible.definitions.find((d) => d.name === 'supply-chain-review'),
-      ).toBeUndefined();
+      expect(visible.definitions.find((d) => d.name === 'supply-chain-review')).toBeUndefined();
 
       const withArchived = await repo.listAllWorkflowDefinitions(true);
-      expect(
-        withArchived.definitions.find((d) => d.name === 'supply-chain-review'),
-      ).toBeUndefined();
+      expect(withArchived.definitions.find((d) => d.name === 'supply-chain-review')).toBeUndefined();
     });
 
     it('listWorkflowDefinitionsVisibleTo excludes soft-deleted workflows', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');
-      await repo.saveWorkflowDefinition(
-        definitionFor('ws-1', { version: 1, visibility: 'public' }),
-      );
+      await repo.saveWorkflowDefinition(definitionFor('ws-1', { version: 1, visibility: 'public' }));
       await repo.setWorkflowDeleted('ws-1', 'supply-chain-review', true);
 
       const visible = await repo.listWorkflowDefinitionsVisibleTo(['ws-1'], false);
-      expect(
-        visible.definitions.find((d) => d.name === 'supply-chain-review'),
-      ).toBeUndefined();
+      expect(visible.definitions.find((d) => d.name === 'supply-chain-review')).toBeUndefined();
     });
 
     it('unique (workspace, name, version) — duplicate save throws', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');
       await repo.saveWorkflowDefinition(definitionFor('ws-1', { version: 1 }));
-      await expect(
-        repo.saveWorkflowDefinition(definitionFor('ws-1', { version: 1 })),
-      ).rejects.toThrow();
+      await expect(repo.saveWorkflowDefinition(definitionFor('ws-1', { version: 1 }))).rejects.toThrow();
     });
-
   });
 }
 
@@ -336,7 +284,9 @@ describe.skipIf(skipPg)('PostgresProcessRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sqlText = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sqlText);

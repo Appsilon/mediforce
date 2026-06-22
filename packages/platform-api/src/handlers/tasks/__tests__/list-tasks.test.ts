@@ -44,10 +44,7 @@ describe('listTasks handler', () => {
 
     it('returns empty array when instance has no tasks', async () => {
       const scope = createTestScope({ humanTaskRepo, instanceRepo });
-      const result = await listTasks(
-        { instanceId: 'inst-missing' },
-        scope,
-      );
+      const result = await listTasks({ instanceId: 'inst-missing' }, scope);
       expect(result.tasks).toEqual([]);
     });
   });
@@ -72,10 +69,7 @@ describe('listTasks handler', () => {
       await humanTaskRepo.create(buildHumanTask({ id: 't2', processInstanceId: 'inst-a', status: 'completed' }));
 
       const scope = createTestScope({ humanTaskRepo, instanceRepo });
-      const result = await listTasks(
-        { instanceId: 'inst-a', status: ['completed'] },
-        scope,
-      );
+      const result = await listTasks({ instanceId: 'inst-a', status: ['completed'] }, scope);
 
       expect(result.tasks.map((t) => t.id)).toEqual(['t2']);
     });
@@ -87,10 +81,7 @@ describe('listTasks handler', () => {
       await humanTaskRepo.create(buildHumanTask({ id: 't4', assignedRole: 'reviewer', status: 'cancelled' }));
 
       const scope = createTestScope({ humanTaskRepo, instanceRepo });
-      const result = await listTasks(
-        { role: 'reviewer', status: [...ACTIONABLE_STATUSES] },
-        scope,
-      );
+      const result = await listTasks({ role: 'reviewer', status: [...ACTIONABLE_STATUSES] }, scope);
 
       expect(result.tasks.map((t) => t.id).sort()).toEqual(['t1', 't2']);
     });
@@ -99,10 +90,7 @@ describe('listTasks handler', () => {
       await humanTaskRepo.create(buildHumanTask({ id: 't1', processInstanceId: 'inst-a', status: 'pending' }));
 
       const scope = createTestScope({ humanTaskRepo, instanceRepo });
-      const result = await listTasks(
-        { instanceId: 'inst-a', status: ['completed', 'cancelled'] },
-        scope,
-      );
+      const result = await listTasks({ instanceId: 'inst-a', status: ['completed', 'cancelled'] }, scope);
 
       expect(result.tasks).toEqual([]);
     });
@@ -114,24 +102,24 @@ describe('listTasks handler', () => {
       await humanTaskRepo.create(buildHumanTask({ id: 't2', processInstanceId: 'inst-a', stepId: 'approve' }));
 
       const scope = createTestScope({ humanTaskRepo, instanceRepo });
-      const result = await listTasks(
-        { instanceId: 'inst-a', stepId: 'approve' },
-        scope,
-      );
+      const result = await listTasks({ instanceId: 'inst-a', stepId: 'approve' }, scope);
 
       expect(result.tasks.map((t) => t.id)).toEqual(['t2']);
     });
 
     it('combines with status — both filters apply', async () => {
-      await humanTaskRepo.create(buildHumanTask({ id: 't1', processInstanceId: 'inst-a', stepId: 'review', status: 'pending' }));
-      await humanTaskRepo.create(buildHumanTask({ id: 't2', processInstanceId: 'inst-a', stepId: 'review', status: 'completed' }));
-      await humanTaskRepo.create(buildHumanTask({ id: 't3', processInstanceId: 'inst-a', stepId: 'approve', status: 'pending' }));
+      await humanTaskRepo.create(
+        buildHumanTask({ id: 't1', processInstanceId: 'inst-a', stepId: 'review', status: 'pending' }),
+      );
+      await humanTaskRepo.create(
+        buildHumanTask({ id: 't2', processInstanceId: 'inst-a', stepId: 'review', status: 'completed' }),
+      );
+      await humanTaskRepo.create(
+        buildHumanTask({ id: 't3', processInstanceId: 'inst-a', stepId: 'approve', status: 'pending' }),
+      );
 
       const scope = createTestScope({ humanTaskRepo, instanceRepo });
-      const result = await listTasks(
-        { instanceId: 'inst-a', stepId: 'review', status: ['pending'] },
-        scope,
-      );
+      const result = await listTasks({ instanceId: 'inst-a', stepId: 'review', status: ['pending'] }, scope);
 
       expect(result.tasks.map((t) => t.id)).toEqual(['t1']);
     });
@@ -167,10 +155,7 @@ describe('listTasks handler', () => {
         caller: userCaller('u-1', ['team-alpha']),
       });
 
-      const result = await listTasks(
-        { role: 'reviewer' },
-        scope,
-      );
+      const result = await listTasks({ role: 'reviewer' }, scope);
 
       expect(result.tasks.map((t) => t.id)).toEqual(['t-alpha']);
     });
@@ -182,10 +167,7 @@ describe('listTasks handler', () => {
         caller: userCaller('u-2', ['team-alpha', 'team-beta']),
       });
 
-      const result = await listTasks(
-        { role: 'reviewer' },
-        scope,
-      );
+      const result = await listTasks({ role: 'reviewer' }, scope);
 
       expect(result.tasks.map((t) => t.id).sort()).toEqual(['t-alpha', 't-beta']);
     });
@@ -197,10 +179,7 @@ describe('listTasks handler', () => {
         caller: userCaller('u-3', ['team-gamma']),
       });
 
-      const result = await listTasks(
-        { role: 'reviewer' },
-        scope,
-      );
+      const result = await listTasks({ role: 'reviewer' }, scope);
 
       expect(result.tasks).toEqual([]);
     });
@@ -230,20 +209,19 @@ describe('listTasks handler', () => {
         buildHumanTask({ id: 't-b1', processInstanceId: 'inst-beta', assignedRole: 'reviewer', status: 'pending' }),
       );
       await humanTaskRepo.create(
-        buildHumanTask({ id: 't-orphan', processInstanceId: 'inst-orphan', assignedRole: 'reviewer', status: 'pending' }),
+        buildHumanTask({
+          id: 't-orphan',
+          processInstanceId: 'inst-orphan',
+          assignedRole: 'reviewer',
+          status: 'pending',
+        }),
       );
     });
 
     it('returns every task across all namespaces for api-key callers', async () => {
       const scope = createTestScope({ humanTaskRepo, instanceRepo });
       const result = await listTasks({}, scope);
-      expect(result.tasks.map((t) => t.id).sort()).toEqual([
-        't-a1',
-        't-a2',
-        't-a3',
-        't-b1',
-        't-orphan',
-      ]);
+      expect(result.tasks.map((t) => t.id).sort()).toEqual(['t-a1', 't-a2', 't-a3', 't-b1', 't-orphan']);
     });
 
     it('returns only tasks in the user caller’s namespaces, across roles', async () => {

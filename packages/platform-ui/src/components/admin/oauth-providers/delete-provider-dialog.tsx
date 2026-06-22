@@ -70,19 +70,20 @@ export function DeleteProviderDialog({
           </div>
 
           <Dialog.Description className="text-sm text-muted-foreground">
-            Remove <span className="font-mono text-foreground">{providerId}</span>
-            {' '}({providerName}) from this namespace. Bindings that reference this provider will fail to
-            initiate an OAuth flow until it is re-added or the bindings are updated.
+            Remove <span className="font-mono text-foreground">{providerId}</span> ({providerName}) from this namespace.
+            Bindings that reference this provider will fail to initiate an OAuth flow until it is re-added or the
+            bindings are updated.
           </Dialog.Description>
 
           {referenceCount > 0 && (
             <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
               <p className="font-medium text-amber-700 dark:text-amber-300">
-                {referenceCount} agent {referenceCount === 1 ? 'binding references' : 'bindings reference'} this provider.
+                {referenceCount} agent {referenceCount === 1 ? 'binding references' : 'bindings reference'} this
+                provider.
               </p>
               <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-200/80">
-                Previously-connected tokens continue to work at spawn time, but no new OAuth flow can
-                start for those bindings until the provider is re-added.
+                Previously-connected tokens continue to work at spawn time, but no new OAuth flow can start for those
+                bindings until the provider is re-added.
               </p>
             </div>
           )}

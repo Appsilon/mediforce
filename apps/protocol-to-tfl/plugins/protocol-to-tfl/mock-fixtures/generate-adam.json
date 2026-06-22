@@ -3,16 +3,86 @@
   "study_id": "CDISCPILOT01",
   "generation_date": "2026-03-12",
   "datasets": [
-    { "name": "ADSL", "label": "Subject-Level Analysis Dataset", "structure": "One row per subject", "records": 306, "subjects": 306, "source_sdtm": ["DM", "DS", "EX", "SV", "SC", "MH", "QS", "VS", "SUPPDM"] },
-    { "name": "ADAE", "label": "Adverse Event Analysis Dataset", "structure": "One row per AE per subject", "records": 1191, "subjects": 246, "source_sdtm": ["AE", "SUPPAE"] },
-    { "name": "ADLB", "label": "Laboratory Analysis Dataset", "structure": "One row per subject per param per visit", "records": 58700, "subjects": 254, "source_sdtm": ["LB"] },
-    { "name": "ADVS", "label": "Vital Signs Analysis Dataset", "structure": "One row per subject per param per visit", "records": 29635, "subjects": 254, "source_sdtm": ["VS"] },
-    { "name": "ADEX", "label": "Exposure Analysis Dataset", "structure": "One row per subject per param", "records": 758, "subjects": 254, "source_sdtm": ["EX"] },
-    { "name": "ADQSADAS", "label": "ADAS-Cog(11) Questionnaire Dataset", "structure": "One row per subject per visit", "records": 354, "subjects": 254, "source_sdtm": ["QS"] },
-    { "name": "ADQSCIBC", "label": "CIBIC+ Questionnaire Dataset", "structure": "One row per subject per visit", "records": 105, "subjects": 49, "source_sdtm": ["QS"] },
-    { "name": "ADQSNPIX", "label": "NPI-X Questionnaire Dataset", "structure": "One row per subject per param per visit", "records": 1546, "subjects": 254, "source_sdtm": ["QS"] },
-    { "name": "ADCM", "label": "Concomitant Medication Dataset", "structure": "One row per medication per subject", "records": 7510, "subjects": 229, "source_sdtm": ["CM"] },
-    { "name": "ADTTE", "label": "Time-to-Event Analysis Dataset", "structure": "One row per subject per TTE param", "records": 252, "subjects": 252, "source_sdtm": ["ADSL", "ADAE"] }
+    {
+      "name": "ADSL",
+      "label": "Subject-Level Analysis Dataset",
+      "structure": "One row per subject",
+      "records": 306,
+      "subjects": 306,
+      "source_sdtm": ["DM", "DS", "EX", "SV", "SC", "MH", "QS", "VS", "SUPPDM"]
+    },
+    {
+      "name": "ADAE",
+      "label": "Adverse Event Analysis Dataset",
+      "structure": "One row per AE per subject",
+      "records": 1191,
+      "subjects": 246,
+      "source_sdtm": ["AE", "SUPPAE"]
+    },
+    {
+      "name": "ADLB",
+      "label": "Laboratory Analysis Dataset",
+      "structure": "One row per subject per param per visit",
+      "records": 58700,
+      "subjects": 254,
+      "source_sdtm": ["LB"]
+    },
+    {
+      "name": "ADVS",
+      "label": "Vital Signs Analysis Dataset",
+      "structure": "One row per subject per param per visit",
+      "records": 29635,
+      "subjects": 254,
+      "source_sdtm": ["VS"]
+    },
+    {
+      "name": "ADEX",
+      "label": "Exposure Analysis Dataset",
+      "structure": "One row per subject per param",
+      "records": 758,
+      "subjects": 254,
+      "source_sdtm": ["EX"]
+    },
+    {
+      "name": "ADQSADAS",
+      "label": "ADAS-Cog(11) Questionnaire Dataset",
+      "structure": "One row per subject per visit",
+      "records": 354,
+      "subjects": 254,
+      "source_sdtm": ["QS"]
+    },
+    {
+      "name": "ADQSCIBC",
+      "label": "CIBIC+ Questionnaire Dataset",
+      "structure": "One row per subject per visit",
+      "records": 105,
+      "subjects": 49,
+      "source_sdtm": ["QS"]
+    },
+    {
+      "name": "ADQSNPIX",
+      "label": "NPI-X Questionnaire Dataset",
+      "structure": "One row per subject per param per visit",
+      "records": 1546,
+      "subjects": 254,
+      "source_sdtm": ["QS"]
+    },
+    {
+      "name": "ADCM",
+      "label": "Concomitant Medication Dataset",
+      "structure": "One row per medication per subject",
+      "records": 7510,
+      "subjects": 229,
+      "source_sdtm": ["CM"]
+    },
+    {
+      "name": "ADTTE",
+      "label": "Time-to-Event Analysis Dataset",
+      "structure": "One row per subject per TTE param",
+      "records": 252,
+      "subjects": 252,
+      "source_sdtm": ["ADSL", "ADAE"]
+    }
   ],
   "r_scripts": [
     "adsl.R",

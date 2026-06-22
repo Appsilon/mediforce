@@ -103,9 +103,8 @@ export default function AdminEmailStatusPage() {
 
               {!data.configured && (
                 <p className="text-xs text-muted-foreground">
-                  Set <code className="rounded bg-muted px-1 py-0.5">EMAIL_PROVIDER</code> and
-                  the corresponding provider env vars to enable email.
-                  See the deployment guide for details.
+                  Set <code className="rounded bg-muted px-1 py-0.5">EMAIL_PROVIDER</code> and the corresponding
+                  provider env vars to enable email. See the deployment guide for details.
                 </p>
               )}
             </div>

@@ -30,18 +30,14 @@ afterEach(async () => {
 
 describe.skipIf(!hasTealflowMcp)('McpClientManager integration (tealflow-mcp)', () => {
   it('should connect, discover tools, call tealflow_list_modules, and disconnect', async () => {
-    manager = new McpClientManager([
-      { name: 'tealflow', command: 'tealflow-mcp', args: [] },
-    ]);
+    manager = new McpClientManager([{ name: 'tealflow', command: 'tealflow-mcp', args: [] }]);
 
     // Connect and discover tools
     const tools = await manager.connect();
     expect(tools.length).toBeGreaterThan(0);
 
     // Verify tealflow_list_modules is among discovered tools
-    const listModulesTool = tools.find(
-      (t) => t.function.name === 'tealflow__tealflow_list_modules',
-    );
+    const listModulesTool = tools.find((t) => t.function.name === 'tealflow__tealflow_list_modules');
     expect(listModulesTool).toBeDefined();
     expect(listModulesTool!.type).toBe('function');
 

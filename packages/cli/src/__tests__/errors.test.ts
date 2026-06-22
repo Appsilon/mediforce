@@ -16,9 +16,7 @@ describe('formatCliError', () => {
         address: '127.0.0.1',
         port: 9003,
       },
-      hints: expect.arrayContaining([
-        'Is the dev server running? Start with: pnpm dev',
-      ]),
+      hints: expect.arrayContaining(['Is the dev server running? Start with: pnpm dev']),
     });
   });
 
@@ -86,15 +84,11 @@ describe('formatCliError', () => {
   });
 
   it('hints when a 404 looks like the base URL is not the API host', () => {
-    expect(formatCliError(new ApiError(404, 'Not found', {}), { baseUrl: 'https://example.com' }))
-      .toMatchObject({
-        status: 404,
-        hints: expect.arrayContaining([
-          'The base URL may be wrong. Point MEDIFORCE_BASE_URL at a Mediforce API host.',
-        ]),
-      });
+    expect(formatCliError(new ApiError(404, 'Not found', {}), { baseUrl: 'https://example.com' })).toMatchObject({
+      status: 404,
+      hints: expect.arrayContaining(['The base URL may be wrong. Point MEDIFORCE_BASE_URL at a Mediforce API host.']),
+    });
   });
-
 
   it('extracts network system error from AggregateError fetch causes', () => {
     const aggregateCause = new AggregateError([
@@ -123,8 +117,6 @@ describe('formatCliError', () => {
       ],
     });
   });
-
-
 
   it('falls back gracefully for fetch failures without a cause', () => {
     const error = new TypeError('fetch failed');

@@ -19,12 +19,7 @@ interface RouteContext {
  * coordinated URL rename phase; the adapter translates `params.instanceId`
  * to the contract field `runId`.
  */
-export const POST = createRouteAdapter<
-  typeof CancelRunInputSchema,
-  CancelRunInput,
-  unknown,
-  RouteContext
->(
+export const POST = createRouteAdapter<typeof CancelRunInputSchema, CancelRunInput, unknown, RouteContext>(
   CancelRunInputSchema,
   async (req, ctx) => ({
     runId: (await ctx.params).instanceId,

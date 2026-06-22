@@ -95,12 +95,7 @@ beforeEach(async () => {
 describe('Cowork lifecycle: route → simulate session → finalize → complete', () => {
   it('routes to cowork step, then completes when artifact is provided', async () => {
     // 1. Create and start instance
-    const instance = await engine.createInstance('test',
-      'cowork-designer-test',
-      1,
-      'user-001',
-      'manual',
-    );
+    const instance = await engine.createInstance('test', 'cowork-designer-test', 1, 'user-001', 'manual');
     await engine.startInstance(instance.id);
 
     expect((await instanceRepo.getById(instance.id))!.currentStepId).toBe('intake');
@@ -160,11 +155,7 @@ describe('Cowork lifecycle: route → simulate session → finalize → complete
     await coworkSessionRepo.finalize(session.id, artifact);
 
     // 5. Advance with finalized artifact
-    const afterFinalize = await engine.advanceStep(
-      instance.id,
-      artifact,
-      { id: 'user-001', role: 'designer' },
-    );
+    const afterFinalize = await engine.advanceStep(instance.id, artifact, { id: 'user-001', role: 'designer' });
 
     expect(afterFinalize.status).toBe('completed');
     expect(afterFinalize.variables['design']).toEqual(artifact);
@@ -175,12 +166,7 @@ describe('Cowork lifecycle: route → simulate session → finalize → complete
   });
 
   it('preserves step context in instance variables after cowork finalize', async () => {
-    const instance = await engine.createInstance('test',
-      'cowork-designer-test',
-      1,
-      'user-001',
-      'manual',
-    );
+    const instance = await engine.createInstance('test', 'cowork-designer-test', 1, 'user-001', 'manual');
     await engine.startInstance(instance.id);
 
     // Advance past intake with data

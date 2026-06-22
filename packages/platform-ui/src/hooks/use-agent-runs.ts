@@ -6,11 +6,7 @@ import type { AgentRun, AgentRunStatus } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
-import {
-  CRITICAL_LIVE_INTERVAL_MS,
-  NICE_LIVE_INTERVAL_MS,
-  STANDARD_LIVE_INTERVAL_MS,
-} from '@/lib/polling-cadence';
+import { CRITICAL_LIVE_INTERVAL_MS, NICE_LIVE_INTERVAL_MS, STANDARD_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
 
 const TERMINAL: ReadonlySet<AgentRunStatus> = new Set([
   'completed',
@@ -97,7 +93,7 @@ export function useAgentRunsForStep(
   });
 
   return {
-    data: enabled ? query.data ?? [] : [],
+    data: enabled ? (query.data ?? []) : [],
     loading: enabled && query.isLoading,
     error: (query.error as Error | null) ?? null,
   };
@@ -129,7 +125,7 @@ export function useAgentRun(runId: string | null): {
   });
 
   return {
-    data: runId === null ? null : query.data ?? null,
+    data: runId === null ? null : (query.data ?? null),
     loading: runId !== null && query.isLoading,
   };
 }

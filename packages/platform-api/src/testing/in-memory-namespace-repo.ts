@@ -72,22 +72,34 @@ export class InMemoryNamespaceRepo implements NamespaceRepository {
   }
   async removeMember(handle: string, uid: string): Promise<void> {
     const list = this.members.get(handle) ?? [];
-    this.members.set(handle, list.filter((m) => m.uid !== uid));
+    this.members.set(
+      handle,
+      list.filter((m) => m.uid !== uid),
+    );
   }
   async removeMemberWithOrganizations(handle: string, uid: string): Promise<void> {
     await this.removeMember(handle, uid);
     const orgs = this.userOrganizations.get(uid) ?? [];
-    this.userOrganizations.set(uid, orgs.filter((h) => h !== handle));
+    this.userOrganizations.set(
+      uid,
+      orgs.filter((h) => h !== handle),
+    );
   }
   async setMemberRole(handle: string, uid: string, role: NamespaceMember['role']): Promise<void> {
     const list = this.members.get(handle) ?? [];
-    this.members.set(handle, list.map((m) => (m.uid === uid ? { ...m, role } : m)));
+    this.members.set(
+      handle,
+      list.map((m) => (m.uid === uid ? { ...m, role } : m)),
+    );
   }
   async deleteNamespaceCascade(handle: string): Promise<void> {
     const list = this.members.get(handle) ?? [];
     for (const member of list) {
       const orgs = this.userOrganizations.get(member.uid) ?? [];
-      this.userOrganizations.set(member.uid, orgs.filter((h) => h !== handle));
+      this.userOrganizations.set(
+        member.uid,
+        orgs.filter((h) => h !== handle),
+      );
     }
     this.members.delete(handle);
     this.namespaces.delete(handle);

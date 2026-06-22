@@ -15,10 +15,7 @@ function isDockerAvailable(): boolean {
 
 const hasDocker = isDockerAvailable();
 
-function buildContext(
-  runtime: string,
-  inlineScript: string,
-): AgentContext {
+function buildContext(runtime: string, inlineScript: string): AgentContext {
   return {
     stepId: 'run-script',
     processInstanceId: 'pi-e2e-runtime',

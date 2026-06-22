@@ -34,10 +34,9 @@ export const PresentationSchema = z.discriminatedUnion('kind', [
  *  (pre-#468 envelopes stored `presentation: "<html>..."`). Raw strings
  *  parse as `{kind: 'html', content}` so existing Firestore rows render
  *  without a migration. */
-const PresentationFieldSchema = z.union([z.string(), PresentationSchema])
-  .transform((value) =>
-    typeof value === 'string' ? { kind: 'html' as const, content: value } : value,
-  );
+const PresentationFieldSchema = z
+  .union([z.string(), PresentationSchema])
+  .transform((value) => (typeof value === 'string' ? { kind: 'html' as const, content: value } : value));
 
 export const StepOutputEnvelopeSchema = z.object({
   duration_ms: z.number().int().nonnegative(),

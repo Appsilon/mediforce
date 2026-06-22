@@ -1,7 +1,4 @@
-import {
-  WorkflowSecretsSchema,
-  type WorkflowSecretsRepository,
-} from '../index';
+import { WorkflowSecretsSchema, type WorkflowSecretsRepository } from '../index';
 
 /**
  * In-memory WorkflowSecretsRepository for L2 parity tests.
@@ -26,11 +23,7 @@ export class InMemoryWorkflowSecretsRepository implements WorkflowSecretsReposit
     return scope ? Array.from(scope.keys()) : [];
   }
 
-  async setSecrets(
-    namespace: string,
-    workflowName: string,
-    secrets: Record<string, string>,
-  ): Promise<void> {
+  async setSecrets(namespace: string, workflowName: string, secrets: Record<string, string>): Promise<void> {
     WorkflowSecretsSchema.parse({
       workflowName,
       namespace,
@@ -50,12 +43,7 @@ export class InMemoryWorkflowSecretsRepository implements WorkflowSecretsReposit
     this.workflowScope(namespace, workflowName)?.delete(key);
   }
 
-  async upsertSecret(
-    namespace: string,
-    workflowName: string,
-    key: string,
-    value: string,
-  ): Promise<void> {
+  async upsertSecret(namespace: string, workflowName: string, key: string, value: string): Promise<void> {
     WorkflowSecretsSchema.parse({
       workflowName,
       namespace,

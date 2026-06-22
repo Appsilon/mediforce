@@ -6,15 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  ArrowLeft,
-  Check,
-  ClipboardCopy,
-  LogOut,
-  MailIcon,
-  Trash2,
-  Users,
-} from 'lucide-react';
+import { ArrowLeft, Check, ClipboardCopy, LogOut, MailIcon, Trash2, Users } from 'lucide-react';
 import { ApiError, mediforce } from '@/lib/mediforce';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
@@ -79,16 +71,7 @@ function RoleBadge({ role }: { role: NamespaceMember['role'] }) {
     member: 'bg-muted text-muted-foreground',
   };
 
-  return (
-    <span
-      className={[
-        'rounded-full px-2 py-0.5 text-[11px] font-medium',
-        styles[role],
-      ].join(' ')}
-    >
-      {role}
-    </span>
-  );
+  return <span className={['rounded-full px-2 py-0.5 text-[11px] font-medium', styles[role]].join(' ')}>{role}</span>;
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -136,9 +119,7 @@ function DefaultWorkspaceSection({ handle }: { handle: string }) {
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-medium">Default workspace</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Open this workspace automatically when you sign in.
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">Open this workspace automatically when you sign in.</p>
           </div>
           <Switch.Root
             checked={isDefault}
@@ -175,9 +156,7 @@ export default function WorkspaceConfigPage() {
     if (handle === '') return;
     try {
       const { members: fetched } = await mediforce.users.listMembers({ namespace: handle });
-      setRealtimeMembers(
-        fetched.map((m) => ({ ...m, displayName: m.displayName ?? undefined, id: m.uid })),
-      );
+      setRealtimeMembers(fetched.map((m) => ({ ...m, displayName: m.displayName ?? undefined, id: m.uid })));
     } finally {
       setMembersLoading(false);
     }
@@ -227,9 +206,10 @@ export default function WorkspaceConfigPage() {
         const enrichedDisplayName = displayNameMap.get(member.uid);
         return {
           ...member,
-          displayName: enrichedDisplayName !== undefined && enrichedDisplayName !== null
-            ? enrichedDisplayName
-            : member.displayName,
+          displayName:
+            enrichedDisplayName !== undefined && enrichedDisplayName !== null
+              ? enrichedDisplayName
+              : member.displayName,
           email: emailMap.get(member.uid),
           lastSignInTime: lastSignInMap.get(member.uid),
         };
@@ -241,23 +221,17 @@ export default function WorkspaceConfigPage() {
   }, [realtimeMembers, lastSignInMap, emailMap, displayNameMap]);
 
   const currentUserMember = useMemo(
-    () =>
-      firebaseUser !== null
-        ? members.find((member) => member.uid === firebaseUser.uid)
-        : undefined,
+    () => (firebaseUser !== null ? members.find((member) => member.uid === firebaseUser.uid) : undefined),
     [members, firebaseUser],
   );
 
   const isOwner = currentUserMember?.role === 'owner';
   const canManageMembers =
-    currentUserMember !== undefined &&
-    (currentUserMember.role === 'owner' || currentUserMember.role === 'admin');
+    currentUserMember !== undefined && (currentUserMember.role === 'owner' || currentUserMember.role === 'admin');
 
   // Personal namespaces have no member docs — ownership is via linkedUserId
   const isPersonalOwner =
-    namespace !== null &&
-    namespace.type === 'personal' &&
-    namespace.linkedUserId === firebaseUser?.uid;
+    namespace !== null && namespace.type === 'personal' && namespace.linkedUserId === firebaseUser?.uid;
 
   const canEditProfile = canManageMembers || isPersonalOwner;
 
@@ -590,7 +564,10 @@ export default function WorkspaceConfigPage() {
             {canManageMembers && !showInviteForm && (
               <button
                 type="button"
-                onClick={() => { setInviteResult(null); setShowInviteForm(true); }}
+                onClick={() => {
+                  setInviteResult(null);
+                  setShowInviteForm(true);
+                }}
                 className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 Invite user
@@ -617,9 +594,7 @@ export default function WorkspaceConfigPage() {
                     </div>
                   </div>
                   <p className="text-xs text-blue-600 dark:text-blue-400">
-                    {resendResult.emailSent
-                      ? 'Email sent ✓'
-                      : 'Email not sent — share credentials manually'}
+                    {resendResult.emailSent ? 'Email sent ✓' : 'Email not sent — share credentials manually'}
                   </p>
                 </div>
                 <button
@@ -647,7 +622,9 @@ export default function WorkspaceConfigPage() {
                   </p>
                   {!inviteResult.isExisting && (
                     <div className="text-sm text-green-700 dark:text-green-300 space-y-0.5">
-                      <p>Login: <span className="font-mono">{inviteResult.email}</span></p>
+                      <p>
+                        Login: <span className="font-mono">{inviteResult.email}</span>
+                      </p>
                       <div className="flex items-center gap-2 flex-wrap">
                         <p>
                           Temporary password:{' '}
@@ -673,10 +650,7 @@ export default function WorkspaceConfigPage() {
           {membersLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((index) => (
-                <div
-                  key={index}
-                  className="rounded-lg border bg-card px-4 py-4 animate-pulse flex gap-3"
-                >
+                <div key={index} className="rounded-lg border bg-card px-4 py-4 animate-pulse flex gap-3">
                   <div className="h-8 w-8 rounded-full bg-muted shrink-0" />
                   <div className="space-y-2 flex-1">
                     <div className="h-4 w-36 rounded bg-muted" />
@@ -697,12 +671,24 @@ export default function WorkspaceConfigPage() {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">User</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Email</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Role</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Joined</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Last sign in</th>
-                    <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap sr-only">Actions</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">
+                      User
+                    </th>
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">
+                      Email
+                    </th>
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">
+                      Role
+                    </th>
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">
+                      Joined
+                    </th>
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">
+                      Last sign in
+                    </th>
+                    <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap sr-only">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -764,9 +750,11 @@ export default function WorkspaceConfigPage() {
 
                         {/* Last sign in */}
                         <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">
-                          {member.lastSignInTime === null || member.lastSignInTime === undefined
-                            ? <span className="text-muted-foreground/50">Never</span>
-                            : formatLastSignIn(member.lastSignInTime)}
+                          {member.lastSignInTime === null || member.lastSignInTime === undefined ? (
+                            <span className="text-muted-foreground/50">Never</span>
+                          ) : (
+                            formatLastSignIn(member.lastSignInTime)
+                          )}
                         </td>
 
                         {/* Actions */}
@@ -857,14 +845,15 @@ export default function WorkspaceConfigPage() {
                   </select>
                 </div>
 
-                {error !== null && (
-                  <p className="text-xs text-destructive">{error}</p>
-                )}
+                {error !== null && <p className="text-xs text-destructive">{error}</p>}
 
                 <div className="flex items-center gap-2 pt-1">
                   <button
                     type="button"
-                    onClick={() => { setShowInviteForm(false); setError(null); }}
+                    onClick={() => {
+                      setShowInviteForm(false);
+                      setError(null);
+                    }}
                     disabled={inviting}
                     className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
                   >
@@ -898,10 +887,7 @@ export default function WorkspaceConfigPage() {
           <div className="mb-10 space-y-4">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Administration</h2>
             <div className="rounded-lg border bg-card px-4 py-5 space-y-3">
-              <Link
-                href={`/${handle}/admin/infrastructure`}
-                className="flex items-center justify-between group"
-              >
+              <Link href={`/${handle}/admin/infrastructure`} className="flex items-center justify-between group">
                 <div>
                   <p className="text-sm font-medium group-hover:text-primary transition-colors">Infrastructure</p>
                   <p className="text-xs text-muted-foreground">Docker images and disk usage</p>
@@ -909,10 +895,7 @@ export default function WorkspaceConfigPage() {
                 <ArrowLeft className="h-4 w-4 text-muted-foreground rotate-180 group-hover:text-primary transition-colors" />
               </Link>
               <div className="border-t" />
-              <Link
-                href={`/${handle}/admin/tool-catalog`}
-                className="flex items-center justify-between group"
-              >
+              <Link href={`/${handle}/admin/tool-catalog`} className="flex items-center justify-between group">
                 <div>
                   <p className="text-sm font-medium group-hover:text-primary transition-colors">Tool catalog</p>
                   <p className="text-xs text-muted-foreground">MCP servers available to agents</p>
@@ -920,10 +903,7 @@ export default function WorkspaceConfigPage() {
                 <ArrowLeft className="h-4 w-4 text-muted-foreground rotate-180 group-hover:text-primary transition-colors" />
               </Link>
               <div className="border-t" />
-              <Link
-                href={`/${handle}/admin/oauth-providers`}
-                className="flex items-center justify-between group"
-              >
+              <Link href={`/${handle}/admin/oauth-providers`} className="flex items-center justify-between group">
                 <div>
                   <p className="text-sm font-medium group-hover:text-primary transition-colors">OAuth providers</p>
                   <p className="text-xs text-muted-foreground">External authentication for MCP tools</p>
@@ -931,10 +911,7 @@ export default function WorkspaceConfigPage() {
                 <ArrowLeft className="h-4 w-4 text-muted-foreground rotate-180 group-hover:text-primary transition-colors" />
               </Link>
               <div className="border-t" />
-              <Link
-                href={`/${handle}/admin/email-status`}
-                className="flex items-center justify-between group"
-              >
+              <Link href={`/${handle}/admin/email-status`} className="flex items-center justify-between group">
                 <div>
                   <p className="text-sm font-medium group-hover:text-primary transition-colors">Email</p>
                   <p className="text-xs text-muted-foreground">Email provider configuration status</p>
@@ -974,7 +951,8 @@ export default function WorkspaceConfigPage() {
           <div className="rounded-lg border border-destructive/30 bg-card px-4 py-5">
             <h2 className="text-sm font-semibold mb-1 text-destructive">Delete workspace</h2>
             <p className="text-xs text-muted-foreground mb-3">
-              This will permanently delete <span className="font-semibold">@{handle}</span>, remove all members, and cannot be undone.
+              This will permanently delete <span className="font-semibold">@{handle}</span>, remove all members, and
+              cannot be undone.
             </p>
             {confirmDelete ? (
               <div className="flex items-center gap-2">

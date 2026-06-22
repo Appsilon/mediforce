@@ -11,9 +11,7 @@ export interface SmtpConfig {
   defaultSenderName: string;
 }
 
-export function createSmtpSender(
-  config: SmtpConfig,
-): (params: SendEmailParams) => Promise<SendEmailResult> {
+export function createSmtpSender(config: SmtpConfig): (params: SendEmailParams) => Promise<SendEmailResult> {
   const transport = createTransport({
     host: config.host,
     port: config.port,

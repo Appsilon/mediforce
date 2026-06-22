@@ -49,10 +49,7 @@ export interface AgentOAuthTokenStatus extends PublicAgentOAuthToken {
   serverName: string;
 }
 
-export async function listAgentOAuthTokens(
-  agentId: string,
-  namespace: string,
-): Promise<AgentOAuthTokenStatus[]> {
+export async function listAgentOAuthTokens(agentId: string, namespace: string): Promise<AgentOAuthTokenStatus[]> {
   const { mediforce } = await import('./mediforce');
   const { tokens } = await mediforce.agents.listOAuthTokens({ id: agentId, namespace });
   return tokens as AgentOAuthTokenStatus[];
@@ -77,8 +74,6 @@ export async function disconnectOAuthToken(
     provider,
     namespace,
     serverName,
-    ...(options.revokeAtProvider !== undefined
-      ? { revokeAtProvider: options.revokeAtProvider }
-      : {}),
+    ...(options.revokeAtProvider !== undefined ? { revokeAtProvider: options.revokeAtProvider } : {}),
   });
 }

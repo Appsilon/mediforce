@@ -1,9 +1,6 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { validateModels } from '@mediforce/platform-api/handlers';
-import {
-  ValidateModelsInputSchema,
-  type ValidateModelsInput,
-} from '@mediforce/platform-api/contract';
+import { ValidateModelsInputSchema, type ValidateModelsInput } from '@mediforce/platform-api/contract';
 import { getPlatformServices } from '@/lib/platform-services';
 
 export const POST = createRouteAdapter<typeof ValidateModelsInputSchema, ValidateModelsInput>(

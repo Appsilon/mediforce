@@ -4,10 +4,7 @@
 import { z } from 'zod';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import {
-  DockerDiskInfoSchema,
-  DockerImageInfoSchema,
-} from '../../contract/system';
+import { DockerDiskInfoSchema, DockerImageInfoSchema } from '../../contract/system';
 import type { DockerInfoResponse } from '../../contract/system';
 
 const execFileAsync = promisify(execFile);
@@ -25,19 +22,13 @@ export function isLocalAgentMode(): boolean {
 }
 
 export interface FetchFromLocalDockerOptions {
-  readonly exec?: (
-    file: string,
-    args: readonly string[],
-  ) => Promise<{ stdout: string; stderr: string }>;
+  readonly exec?: (file: string, args: readonly string[]) => Promise<{ stdout: string; stderr: string }>;
 }
 
 /** Shell out to `docker images` + `docker system df` and normalise the output. */
-export async function fetchFromLocalDocker(
-  options: FetchFromLocalDockerOptions = {},
-): Promise<DockerInfoResponse> {
+export async function fetchFromLocalDocker(options: FetchFromLocalDockerOptions = {}): Promise<DockerInfoResponse> {
   const exec =
-    options.exec ??
-    ((file, args) => execFileAsync(file, [...args]) as Promise<{ stdout: string; stderr: string }>);
+    options.exec ?? ((file, args) => execFileAsync(file, [...args]) as Promise<{ stdout: string; stderr: string }>);
 
   const [imagesResult, diskResult] = await Promise.all([
     exec('docker', ['images', '--format', '{{json .}}']),
@@ -102,13 +93,9 @@ export async function fetchFromContainerWorker(
   options: FetchFromContainerWorkerOptions = {},
 ): Promise<DockerInfoResponse> {
   const fetchImpl = options.fetch ?? globalThis.fetch;
-  const baseUrl =
-    options.baseUrl ?? process.env.CONTAINER_WORKER_URL ?? DEFAULT_CONTAINER_WORKER_URL;
+  const baseUrl = options.baseUrl ?? process.env.CONTAINER_WORKER_URL ?? DEFAULT_CONTAINER_WORKER_URL;
 
-  const [imagesRes, diskRes] = await Promise.all([
-    fetchImpl(`${baseUrl}/images`),
-    fetchImpl(`${baseUrl}/disk`),
-  ]);
+  const [imagesRes, diskRes] = await Promise.all([fetchImpl(`${baseUrl}/images`), fetchImpl(`${baseUrl}/disk`)]);
 
   if (!imagesRes.ok || !diskRes.ok) {
     return { available: false };

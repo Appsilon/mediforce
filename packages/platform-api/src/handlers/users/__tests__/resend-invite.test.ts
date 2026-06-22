@@ -1,15 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
 import { resendInvite } from '../resend-invite';
-import {
-  ForbiddenError,
-  HandlerError,
-  PreconditionFailedError,
-} from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { ForbiddenError, HandlerError, PreconditionFailedError } from '../../../errors';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import type {
   InviteNotificationService,
   InviteService,
@@ -91,9 +84,7 @@ describe('resendInvite handler', () => {
       emailSent: true,
     });
     expect(inviteService.resetInvitePassword).toHaveBeenCalledWith('uid-target');
-    expect(notifier.sendInviteEmailCalls).toEqual([
-      { toEmail: 'pending@example.test', temporaryPassword: 'Mf-RESET' },
-    ]);
+    expect(notifier.sendInviteEmailCalls).toEqual([{ toEmail: 'pending@example.test', temporaryPassword: 'Mf-RESET' }]);
   });
 
   it('proceeds for an admin caller of the namespace', async () => {
@@ -134,9 +125,7 @@ describe('resendInvite handler', () => {
       inviteService: null,
     });
 
-    await expect(resendInvite(baseInput, scope)).rejects.toBeInstanceOf(
-      PreconditionFailedError,
-    );
+    await expect(resendInvite(baseInput, scope)).rejects.toBeInstanceOf(PreconditionFailedError);
   });
 
   it('throws HandlerError(validation) when the user has no email', async () => {
@@ -167,9 +156,7 @@ describe('resendInvite handler', () => {
       inviteService,
     });
 
-    await expect(resendInvite(baseInput, scope)).rejects.toBeInstanceOf(
-      PreconditionFailedError,
-    );
+    await expect(resendInvite(baseInput, scope)).rejects.toBeInstanceOf(PreconditionFailedError);
     expect(inviteService.resetInvitePassword).not.toHaveBeenCalled();
   });
 
@@ -247,5 +234,4 @@ describe('resendInvite handler', () => {
       emailSent: false,
     });
   });
-
 });

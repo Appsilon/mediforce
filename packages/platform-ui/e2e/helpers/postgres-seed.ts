@@ -483,10 +483,7 @@ export async function seedPostgresNamespace(
  *
  * Idempotent: re-running the setup (Playwright retries) upserts the flag.
  */
-export async function seedPostgresUserProfile(
-  uid: string,
-  mustChangePassword: boolean,
-): Promise<void> {
+export async function seedPostgresUserProfile(uid: string, mustChangePassword: boolean): Promise<void> {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error('DATABASE_URL must be set to seed Postgres for E2E.');
@@ -515,11 +512,7 @@ export async function seedPostgresUserProfile(
  *
  * Idempotent via ON CONFLICT DO NOTHING.
  */
-export async function seedPostgresPersonalNamespace(
-  handle: string,
-  uid: string,
-  displayName: string,
-): Promise<void> {
+export async function seedPostgresPersonalNamespace(handle: string, uid: string, displayName: string): Promise<void> {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error('DATABASE_URL must be set to seed Postgres for E2E.');

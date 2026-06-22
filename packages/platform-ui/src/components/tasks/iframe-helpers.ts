@@ -47,18 +47,14 @@ export function clampIframeHeight(height: number): number {
  *     written with `h-screen` / `min-h-screen` does not chase the iframe
  *     viewport in a resize feedback loop (see `MAX_IFRAME_HEIGHT`).
  */
-export function buildSrcdoc(
-  presentation: string,
-  result: Record<string, unknown> | null,
-  isDark: boolean,
-): string {
+export function buildSrcdoc(presentation: string, result: Record<string, unknown> | null, isDark: boolean): string {
   const csp = [
     "default-src 'none'",
     "script-src 'unsafe-inline' https://cdn.jsdelivr.net",
     "style-src 'unsafe-inline'",
-    "img-src data: blob:",
-    "font-src data:",
-    "media-src data: blob:",
+    'img-src data: blob:',
+    'font-src data:',
+    'media-src data: blob:',
     "connect-src 'none'",
     "frame-src 'none'",
     "object-src 'none'",

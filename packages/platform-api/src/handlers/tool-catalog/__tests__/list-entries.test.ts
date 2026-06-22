@@ -2,10 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryToolCatalogRepository } from '@mediforce/platform-core/testing';
 import { listToolCatalogEntries } from '../list-entries';
 import { ForbiddenError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { adminRoles, memberRoles, sampleEntry } from './fixtures';
 
 describe('listToolCatalogEntries handler', () => {
@@ -42,9 +39,7 @@ describe('listToolCatalogEntries handler', () => {
       caller: userCaller('u-member', ['alpha'], memberRoles),
     });
 
-    await expect(
-      listToolCatalogEntries({ namespace: 'alpha' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(listToolCatalogEntries({ namespace: 'alpha' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it('throws ForbiddenError for a non-member caller', async () => {
@@ -53,8 +48,6 @@ describe('listToolCatalogEntries handler', () => {
       caller: userCaller('u-other', ['beta']),
     });
 
-    await expect(
-      listToolCatalogEntries({ namespace: 'alpha' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(listToolCatalogEntries({ namespace: 'alpha' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

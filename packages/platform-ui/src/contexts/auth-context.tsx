@@ -40,19 +40,20 @@ async function probeGoogleAuth(): Promise<boolean> {
   const apiKey = auth.app.options.apiKey;
   if (typeof apiKey !== 'string' || apiKey === '') return false;
   try {
-    const response = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ providerId: 'google.com', continueUri: 'http://localhost' }),
-      },
-    );
+    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ providerId: 'google.com', continueUri: 'http://localhost' }),
+    });
     const data: unknown = await response.json();
     if (
-      data !== null && typeof data === 'object' &&
-      'error' in data && data.error !== null && typeof data.error === 'object' &&
-      'message' in data.error && data.error.message === 'OPERATION_NOT_ALLOWED'
+      data !== null &&
+      typeof data === 'object' &&
+      'error' in data &&
+      data.error !== null &&
+      typeof data.error === 'object' &&
+      'message' in data.error &&
+      data.error.message === 'OPERATION_NOT_ALLOWED'
     ) {
       return false;
     }
@@ -71,9 +72,7 @@ async function probeEmailAuth(): Promise<boolean> {
     return true;
   } catch (err: unknown) {
     const code =
-      err !== null && typeof err === 'object' && 'code' in err
-        ? String((err as { code: unknown }).code)
-        : '';
+      err !== null && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : '';
     return code !== 'auth/operation-not-allowed';
   }
 }
@@ -101,16 +100,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // `mustChangePassword: false`, silently bypassing the forced-reset gate.
   // So we stay loading until either: Firebase Auth resolved no user
   // (anonymous path), or both auth and the `me` query have settled.
-  const loading =
-    !firebaseReady ||
-    (firebaseUser !== null && userMe.data === undefined && !userMe.isError);
+  const loading = !firebaseReady || (firebaseUser !== null && userMe.data === undefined && !userMe.isError);
 
   // Fail-closed for the gate: if the `me` query has errored we default the
   // flag to `true`, matching the pre-headless firestore-read behaviour.
   const mustChangePassword =
-    firebaseUser !== null && userMe.isError
-      ? true
-      : userMe.data?.user.mustChangePassword === true;
+    firebaseUser !== null && userMe.isError ? true : userMe.data?.user.mustChangePassword === true;
 
   React.useEffect(() => {
     // In emulator mode both providers are always enabled — skip probes to avoid
@@ -120,8 +115,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setGoogleAuthEnabled(true);
       return;
     }
-    probeEmailAuth().then(setEmailAuthEnabled).catch(() => setEmailAuthEnabled(false));
-    probeGoogleAuth().then(setGoogleAuthEnabled).catch(() => setGoogleAuthEnabled(false));
+    probeEmailAuth()
+      .then(setEmailAuthEnabled)
+      .catch(() => setEmailAuthEnabled(false));
+    probeGoogleAuth()
+      .then(setGoogleAuthEnabled)
+      .catch(() => setGoogleAuthEnabled(false));
   }, []);
 
   React.useEffect(() => {
@@ -162,19 +161,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const signInWithEmail = React.useCallback(async (email: string, password: string) => {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    // If a Google credential is pending (from a previous failed SSO attempt),
-    // link it now so both sign-in methods work going forward.
-    if (pendingGoogleCredential !== null) {
-      try {
-        await linkWithCredential(userCredential.user, pendingGoogleCredential);
-      } catch {
-        // Linking failed (e.g. already linked) — sign-in still succeeded, ignore.
+  const signInWithEmail = React.useCallback(
+    async (email: string, password: string) => {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // If a Google credential is pending (from a previous failed SSO attempt),
+      // link it now so both sign-in methods work going forward.
+      if (pendingGoogleCredential !== null) {
+        try {
+          await linkWithCredential(userCredential.user, pendingGoogleCredential);
+        } catch {
+          // Linking failed (e.g. already linked) — sign-in still succeeded, ignore.
+        }
+        setPendingGoogleCredential(null);
       }
-      setPendingGoogleCredential(null);
-    }
-  }, [pendingGoogleCredential]);
+    },
+    [pendingGoogleCredential],
+  );
 
   const sendPasswordReset = React.useCallback(async (email: string) => {
     await sendPasswordResetEmail(auth, email);
@@ -212,7 +214,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ firebaseUser, loading, mustChangePassword, emailAuthEnabled, googleAuthEnabled, pendingGoogleLink: pendingGoogleCredential !== null, signInWithGoogle, signInWithEmail, sendPasswordReset, clearMustChangePassword, signOut }}>
+    <AuthContext.Provider
+      value={{
+        firebaseUser,
+        loading,
+        mustChangePassword,
+        emailAuthEnabled,
+        googleAuthEnabled,
+        pendingGoogleLink: pendingGoogleCredential !== null,
+        signInWithGoogle,
+        signInWithEmail,
+        sendPasswordReset,
+        clearMustChangePassword,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

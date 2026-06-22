@@ -31,7 +31,7 @@ import { shapeCompletion } from './complete-human-task';
  * Callers who run agents pass this alongside stepOutput when escalation occurs.
  */
 export interface AgentRunResult {
-  status: string;  // 'escalated' triggers HandoffEntity creation
+  status: string; // 'escalated' triggers HandoffEntity creation
   envelope: {
     result?: Record<string, unknown> | null;
     reasoning_summary?: string | null;
@@ -58,7 +58,7 @@ export class WorkflowEngine {
     private readonly processRepository: ProcessRepository,
     private readonly instanceRepository: ProcessInstanceRepository,
     private readonly auditRepository: AuditRepository,
-    private readonly rbacService?: RbacService,          // optional: Phase 4 RBAC enforcement
+    private readonly rbacService?: RbacService, // optional: Phase 4 RBAC enforcement
     private readonly handoffRepository?: HandoffRepository, // optional: Phase 4 handoff creation on escalation
     private readonly notificationService?: NotificationService, // optional: escalation notifications
     private readonly humanTaskRepository?: HumanTaskRepository, // optional: Phase 4.1 HumanTask creation on human step advance
@@ -83,9 +83,7 @@ export class WorkflowEngine {
   ): Promise<ProcessInstance> {
     const definition = await this.processRepository.getWorkflowDefinition(namespace, definitionName, version);
     if (!definition) {
-      throw new Error(
-        `Workflow definition '${definitionName}' version '${version}' not found`,
-      );
+      throw new Error(`Workflow definition '${definitionName}' version '${version}' not found`);
     }
 
     const now = new Date().toISOString();
@@ -114,9 +112,7 @@ export class WorkflowEngine {
       archived: false,
       namespace: definition.namespace,
       ...(carryOver !== null ? { previousRun: carryOver.values } : {}),
-      ...(carryOver?.sourceId !== undefined
-        ? { previousRunSourceId: carryOver.sourceId }
-        : {}),
+      ...(carryOver?.sourceId !== undefined ? { previousRunSourceId: carryOver.sourceId } : {}),
       ...(opts?.parentInstanceId ? { parentInstanceId: opts.parentInstanceId } : {}),
       ...(opts?.parentDefinitionName ? { parentDefinitionName: opts.parentDefinitionName } : {}),
       dryRun: opts?.dryRun === true,
@@ -150,7 +146,7 @@ export class WorkflowEngine {
     instanceId: string,
     stepOutput: Record<string, unknown>,
     actor: StepActor,
-    _stepConfig?: StepConfig,       // ignored — kept for backward compat with callers
+    _stepConfig?: StepConfig, // ignored — kept for backward compat with callers
     agentRunResult?: AgentRunResult,
   ): Promise<ProcessInstance> {
     const instance = await this.loadInstance(instanceId);
@@ -165,10 +161,7 @@ export class WorkflowEngine {
     // RBAC enforcement: check step access before executing
     if (this.rbacService && workflowStep?.allowedRoles) {
       try {
-        await this.rbacService.requireStepAccess(
-          workflowStep.allowedRoles,
-          instance.currentStepId!,
-        );
+        await this.rbacService.requireStepAccess(workflowStep.allowedRoles, instance.currentStepId!);
       } catch (err) {
         if (err instanceof RbacError) {
           await this.auditRepository.append({
@@ -205,11 +198,12 @@ export class WorkflowEngine {
         status: 'created',
         agentWork: (agentRunResult.envelope?.result ?? {}) as Record<string, unknown>,
         agentReasoning: agentRunResult.envelope?.reasoning_summary ?? '',
-        agentQuestion: agentRunResult.fallbackReason === 'low_confidence'
-          ? 'Agent confidence below threshold — please review'
-          : agentRunResult.fallbackReason === 'timeout'
-            ? 'Agent timed out — please complete this step manually'
-            : 'Agent escalated — please review',
+        agentQuestion:
+          agentRunResult.fallbackReason === 'low_confidence'
+            ? 'Agent confidence below threshold — please review'
+            : agentRunResult.fallbackReason === 'timeout'
+              ? 'Agent timed out — please complete this step manually'
+              : 'Agent escalated — please review',
         payload: {},
         resolution: null,
         createdAt: new Date().toISOString(),
@@ -220,9 +214,7 @@ export class WorkflowEngine {
 
       // Send escalation notification using definition.notifications
       if (this.notificationService && this.userDirectoryService) {
-        const escalationConfig = definition.notifications?.find(
-          (n) => n.event === 'agent_escalation',
-        );
+        const escalationConfig = definition.notifications?.find((n) => n.event === 'agent_escalation');
         if (escalationConfig) {
           const targets: NotificationTarget[] = [];
           for (const role of escalationConfig.roles) {
@@ -261,9 +253,7 @@ export class WorkflowEngine {
     if (this.humanTaskRepository) {
       const updatedInstance = await this.loadInstance(instanceId);
       if (updatedInstance.currentStepId !== null) {
-        const nextStep = definition.steps.find(
-          (s) => s.id === updatedInstance.currentStepId,
-        );
+        const nextStep = definition.steps.find((s) => s.id === updatedInstance.currentStepId);
 
         if (nextStep && nextStep.type !== 'terminal' && nextStep.executor === 'human') {
           const assignedRole = nextStep.allowedRoles?.[0] ?? 'unassigned';
@@ -272,9 +262,8 @@ export class WorkflowEngine {
           const selectionFields: { selection?: Selection; options?: Record<string, unknown>[] } = {};
           const prevOutput = updatedInstance.variables[instance.currentStepId!] as Record<string, unknown> | undefined;
           const rawOptions = prevOutput?.options;
-          const opts = Array.isArray(rawOptions) && rawOptions.length > 0
-            ? (rawOptions as Record<string, unknown>[])
-            : null;
+          const opts =
+            Array.isArray(rawOptions) && rawOptions.length > 0 ? (rawOptions as Record<string, unknown>[]) : null;
 
           if (nextStep.selection !== undefined) {
             selectionFields.selection = nextStep.selection;
@@ -427,10 +416,7 @@ export class WorkflowEngine {
     const maxIterations = workflowStep?.review?.maxIterations;
 
     // Check max iterations BEFORE processing verdict
-    if (
-      maxIterations !== undefined &&
-      this.reviewTracker.isMaxIterationsExceeded(stepId, maxIterations)
-    ) {
+    if (maxIterations !== undefined && this.reviewTracker.isMaxIterationsExceeded(stepId, maxIterations)) {
       const now = new Date().toISOString();
       await this.instanceRepository.update(instanceId, {
         status: 'paused',
@@ -447,8 +433,7 @@ export class WorkflowEngine {
         timestamp: now,
         inputSnapshot: {
           stepId,
-          currentIteration:
-            this.reviewTracker.getCurrentIteration(stepId),
+          currentIteration: this.reviewTracker.getCurrentIteration(stepId),
           maxIterations,
         },
         outputSnapshot: {},
@@ -481,17 +466,10 @@ export class WorkflowEngine {
 
     // Check if the step routed back (loop detected) -- increment iteration
     const updatedInstance = await this.loadInstance(instanceId);
-    if (
-      updatedInstance.currentStepId !== null &&
-      updatedInstance.currentStepId !== previousStepId
-    ) {
+    if (updatedInstance.currentStepId !== null && updatedInstance.currentStepId !== previousStepId) {
       // If went to a step that comes before review step, it's a loop
-      const reviewStepIndex = definition.steps.findIndex(
-        (s) => s.id === stepId,
-      );
-      const nextStepIndex = definition.steps.findIndex(
-        (s) => s.id === updatedInstance.currentStepId,
-      );
+      const reviewStepIndex = definition.steps.findIndex((s) => s.id === stepId);
+      const nextStepIndex = definition.steps.findIndex((s) => s.id === updatedInstance.currentStepId);
       if (nextStepIndex <= reviewStepIndex) {
         this.reviewTracker.incrementIteration(stepId);
       }
@@ -500,11 +478,7 @@ export class WorkflowEngine {
     return updatedInstance;
   }
 
-  async pauseInstance(
-    instanceId: string,
-    reason: string,
-    actor: StepActor,
-  ): Promise<ProcessInstance> {
+  async pauseInstance(instanceId: string, reason: string, actor: StepActor): Promise<ProcessInstance> {
     const instance = await this.loadInstance(instanceId);
 
     if (instance.status !== 'running') {
@@ -537,10 +511,7 @@ export class WorkflowEngine {
     return this.loadInstance(instanceId);
   }
 
-  async resumeInstance(
-    instanceId: string,
-    actor: StepActor,
-  ): Promise<ProcessInstance> {
+  async resumeInstance(instanceId: string, actor: StepActor): Promise<ProcessInstance> {
     const instance = await this.loadInstance(instanceId);
 
     if (instance.status !== 'paused') {
@@ -573,10 +544,7 @@ export class WorkflowEngine {
     return this.loadInstance(instanceId);
   }
 
-  async abortInstance(
-    instanceId: string,
-    actor: StepActor,
-  ): Promise<ProcessInstance> {
+  async abortInstance(instanceId: string, actor: StepActor): Promise<ProcessInstance> {
     const instance = await this.loadInstance(instanceId);
 
     const now = new Date().toISOString();
@@ -625,24 +593,13 @@ export class WorkflowEngine {
    * The requested step must match `currentStepId`, and the latest execution
    * for that step must have failed.
    */
-  async retryStep(
-    instanceId: string,
-    stepId: string,
-    actor: StepActor,
-  ): Promise<ProcessInstance> {
+  async retryStep(instanceId: string, stepId: string, actor: StepActor): Promise<ProcessInstance> {
     const instance = await this.loadInstance(instanceId);
 
-    const retryablePauseReasons = new Set([
-      'step_failure',
-      'routing_error',
-      'agent_escalated',
-      'agent_paused',
-    ]);
+    const retryablePauseReasons = new Set(['step_failure', 'routing_error', 'agent_escalated', 'agent_paused']);
     const isFailed = instance.status === 'failed';
     const isRetryablePause =
-      instance.status === 'paused' &&
-      instance.pauseReason !== null &&
-      retryablePauseReasons.has(instance.pauseReason);
+      instance.status === 'paused' && instance.pauseReason !== null && retryablePauseReasons.has(instance.pauseReason);
     if (!isFailed && !isRetryablePause) {
       throw new InvalidTransitionError(instance.status, 'retryStep');
     }
@@ -705,9 +662,7 @@ export class WorkflowEngine {
     isL3Revise: boolean;
   }> {
     if (!this.humanTaskRepository) {
-      throw new Error(
-        'completeHumanTask requires humanTaskRepository — engine was constructed without one',
-      );
+      throw new Error('completeHumanTask requires humanTaskRepository — engine was constructed without one');
     }
 
     const task = await this.humanTaskRepository.getById(taskId);
@@ -726,18 +681,11 @@ export class WorkflowEngine {
     const effectiveActor = resolvedTask.assignedUserId ?? actorId;
     const now = new Date().toISOString();
 
-    const { completionData, stepOutput, isL3Revise } = shapeCompletion(
-      resolvedTask,
-      payload,
-      effectiveActor,
-      now,
-    );
+    const { completionData, stepOutput, isL3Revise } = shapeCompletion(resolvedTask, payload, effectiveActor, now);
 
     await this.humanTaskRepository.complete(taskId, completionData);
 
-    const instance = await this.instanceRepository.getById(
-      resolvedTask.processInstanceId,
-    );
+    const instance = await this.instanceRepository.getById(resolvedTask.processInstanceId);
     if (!instance) {
       throw new ParentInstanceNotFoundError(resolvedTask.processInstanceId);
     }
@@ -759,9 +707,7 @@ export class WorkflowEngine {
     }
 
     const updatedTask = await this.humanTaskRepository.getById(taskId);
-    const updatedInstance = await this.instanceRepository.getById(
-      resolvedTask.processInstanceId,
-    );
+    const updatedInstance = await this.instanceRepository.getById(resolvedTask.processInstanceId);
 
     return {
       task: updatedTask ?? resolvedTask,
@@ -806,9 +752,7 @@ export class WorkflowEngine {
       return null;
     }
 
-    const predecessor = await this.instanceRepository.getLastCompletedByDefinitionName(
-      definition.name,
-    );
+    const predecessor = await this.instanceRepository.getLastCompletedByDefinitionName(definition.name);
     if (!predecessor) {
       return { values: {} };
     }
@@ -817,10 +761,7 @@ export class WorkflowEngine {
     for (const entry of definition.inputForNextRun) {
       // Review loops can run the same step multiple times; we carry the final
       // output from the latest execution.
-      const latest = await this.instanceRepository.getLatestStepExecution(
-        predecessor.id,
-        entry.stepId,
-      );
+      const latest = await this.instanceRepository.getLatestStepExecution(predecessor.id, entry.stepId);
       const output = latest?.output;
       if (output !== null && typeof output === 'object' && entry.output in output) {
         values[entry.as] = (output as Record<string, unknown>)[entry.output];
@@ -834,17 +775,11 @@ export class WorkflowEngine {
    * Load definition for an instance — always returns WorkflowDefinition.
    * Tries exact version match first, falls back to latest version by name.
    */
-  private async loadDefinitionUnified(
-    instance: ProcessInstance,
-  ): Promise<WorkflowDefinition> {
+  private async loadDefinitionUnified(instance: ProcessInstance): Promise<WorkflowDefinition> {
     const ns = instance.namespace ?? '';
     const versionNum = parseInt(instance.definitionVersion, 10);
     if (!isNaN(versionNum)) {
-      const wd = await this.processRepository.getWorkflowDefinition(
-        ns,
-        instance.definitionName,
-        versionNum,
-      );
+      const wd = await this.processRepository.getWorkflowDefinition(ns, instance.definitionName, versionNum);
       if (wd) return wd;
     }
 
@@ -855,9 +790,7 @@ export class WorkflowEngine {
       if (wd) return wd;
     }
 
-    throw new Error(
-      `No WorkflowDefinition found for '${instance.definitionName}'. Run the migration endpoint first.`,
-    );
+    throw new Error(`No WorkflowDefinition found for '${instance.definitionName}'. Run the migration endpoint first.`);
   }
 
   /**

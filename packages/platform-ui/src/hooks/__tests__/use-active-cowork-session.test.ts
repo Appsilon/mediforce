@@ -6,7 +6,12 @@ import { createQueryWrapper } from '@/test/react-query';
 
 const getByInstanceMock = vi.fn<(...args: unknown[]) => Promise<CoworkSession>>();
 class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { cowork: { getByInstance: getByInstanceMock } },
@@ -47,9 +52,7 @@ describe('useActiveCoworkSession', () => {
   });
 
   it('returns null when the session exists but is not active', async () => {
-    getByInstanceMock.mockResolvedValue(
-      buildCoworkSession({ id: 'sess-final', status: 'finalized' }),
-    );
+    getByInstanceMock.mockResolvedValue(buildCoworkSession({ id: 'sess-final', status: 'finalized' }));
 
     const { wrapper } = createQueryWrapper();
     const { result } = renderHook(() => useActiveCoworkSession('inst-a'), { wrapper });
@@ -91,17 +94,18 @@ describe('useActiveCoworkSession', () => {
   it('switches in-flight requests when instanceId changes without leaking stale data', async () => {
     let resolveFirst: ((value: CoworkSession) => void) | null = null;
     getByInstanceMock.mockImplementationOnce(
-      () => new Promise<CoworkSession>((resolve) => { resolveFirst = resolve; }),
+      () =>
+        new Promise<CoworkSession>((resolve) => {
+          resolveFirst = resolve;
+        }),
     );
-    getByInstanceMock.mockResolvedValueOnce(
-      buildCoworkSession({ id: 'sess-b', status: 'active' }),
-    );
+    getByInstanceMock.mockResolvedValueOnce(buildCoworkSession({ id: 'sess-b', status: 'active' }));
 
     const { wrapper } = createQueryWrapper();
-    const { result, rerender } = renderHook(
-      ({ id }: { id: string | null }) => useActiveCoworkSession(id),
-      { wrapper, initialProps: { id: 'inst-a' as string | null } },
-    );
+    const { result, rerender } = renderHook(({ id }: { id: string | null }) => useActiveCoworkSession(id), {
+      wrapper,
+      initialProps: { id: 'inst-a' as string | null },
+    });
 
     rerender({ id: 'inst-b' });
     await vi.waitFor(() => expect(result.current.session?.id).toBe('sess-b'));

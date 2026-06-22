@@ -2,10 +2,7 @@ import { emitAudit } from '../../audit-helpers';
 import { ForbiddenError, PreconditionFailedError, ValidationError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import { resolvePersonalNamespace } from '../_helpers';
-import type {
-  ClearMustChangePasswordInput,
-  ClearMustChangePasswordOutput,
-} from '../../contract/users';
+import type { ClearMustChangePasswordInput, ClearMustChangePasswordOutput } from '../../contract/users';
 
 /**
  * Acknowledge a forced password change. User callers always operate on

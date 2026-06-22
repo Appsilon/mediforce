@@ -15,14 +15,18 @@ interface DefinitionsListProps {
 
 export function DefinitionsList({ workflowName }: DefinitionsListProps) {
   const handle = useHandleFromPath();
-  const { versions: definitions, latestVersion, defaultVersion, loading, refreshDefault } = useWorkflowVersions(workflowName, handle);
+  const {
+    versions: definitions,
+    latestVersion,
+    defaultVersion,
+    loading,
+    refreshDefault,
+  } = useWorkflowVersions(workflowName, handle);
   const [showArchived, setShowArchived] = React.useState(false);
   const [archivingVersion, setArchivingVersion] = React.useState<number | null>(null);
 
   const archivedCount = definitions.filter((d) => d.archived === true).length;
-  const visibleDefinitions = showArchived
-    ? definitions
-    : definitions.filter((d) => d.archived !== true);
+  const visibleDefinitions = showArchived ? definitions : definitions.filter((d) => d.archived !== true);
 
   if (loading) {
     return (
@@ -36,9 +40,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
   if (definitions.length === 0) {
     return (
       <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">
-          No definitions found.
-        </p>
+        <p className="text-sm text-muted-foreground">No definitions found.</p>
         <Link
           href={`/${handle}/workflows/${encodeURIComponent(workflowName)}/definitions/${latestVersion}`}
           className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
@@ -67,9 +69,17 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                   : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
               )}
             >
-              {showArchived
-                ? <><EyeOff className="h-3.5 w-3.5" />Hide archived ({archivedCount})</>
-                : <><Eye className="h-3.5 w-3.5" />Show archived ({archivedCount})</>}
+              {showArchived ? (
+                <>
+                  <EyeOff className="h-3.5 w-3.5" />
+                  Hide archived ({archivedCount})
+                </>
+              ) : (
+                <>
+                  <Eye className="h-3.5 w-3.5" />
+                  Show archived ({archivedCount})
+                </>
+              )}
             </button>
           )}
         </div>
@@ -162,15 +172,21 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                         { namespace: handle },
                       );
                     } catch (err) {
-                      const message = err instanceof ApiError ? err.message
-                        : err instanceof Error ? err.message : 'Unknown error';
+                      const message =
+                        err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Unknown error';
                       alert(`Failed to ${isArchived ? 'unarchive' : 'archive'} v${def.version}: ${message}`);
                     } finally {
                       setArchivingVersion(null);
                     }
                   }}
                   disabled={isArchiving || isDefault}
-                  title={isDefault ? 'Cannot archive the default version' : isArchived ? 'Unarchive this version' : 'Archive this version'}
+                  title={
+                    isDefault
+                      ? 'Cannot archive the default version'
+                      : isArchived
+                        ? 'Unarchive this version'
+                        : 'Archive this version'
+                  }
                   className={cn(
                     'rounded-md p-1 transition-colors',
                     isDefault
@@ -180,9 +196,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                         : 'text-muted-foreground/60 hover:text-foreground md:opacity-0 md:group-hover:opacity-100',
                   )}
                 >
-                  {isArchived
-                    ? <ArchiveRestore className="h-3.5 w-3.5" />
-                    : <Archive className="h-3.5 w-3.5" />}
+                  {isArchived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
                 </button>
 
                 <Link

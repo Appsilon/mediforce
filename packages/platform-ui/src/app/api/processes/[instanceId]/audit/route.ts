@@ -14,12 +14,7 @@ interface RouteContext {
  * which returned a bare array) to keep pagination additive once #231 lands.
  * Workspace gating in `scope.runs` / `scope.auditEvents`.
  */
-export const GET = createRouteAdapter<
-  typeof ListAuditEventsInputSchema,
-  ListAuditEventsInput,
-  unknown,
-  RouteContext
->(
+export const GET = createRouteAdapter<typeof ListAuditEventsInputSchema, ListAuditEventsInput, unknown, RouteContext>(
   ListAuditEventsInputSchema,
   async (_req, ctx) => ({ instanceId: (await ctx.params).instanceId }),
   listAuditEvents,

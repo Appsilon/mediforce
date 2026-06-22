@@ -37,9 +37,7 @@ const DEFAULT_UPDATED_TIMESTAMP = '2026-01-15T10:05:00Z';
 // buildProcessDefinition
 // ---------------------------------------------------------------------------
 
-export function buildProcessDefinition(
-  overrides?: Partial<ProcessDefinition>,
-): ProcessDefinition {
+export function buildProcessDefinition(overrides?: Partial<ProcessDefinition>): ProcessDefinition {
   const id = nextId('proc-def');
   return {
     name: `process-${id}`,
@@ -70,12 +68,8 @@ export function buildProcessDefinition(
         type: 'terminal',
       },
     ],
-    transitions: [
-      { from: 'step-intake', to: 'step-review' },
-    ],
-    triggers: [
-      { type: 'manual', name: 'Start Process' },
-    ],
+    transitions: [{ from: 'step-intake', to: 'step-review' }],
+    triggers: [{ type: 'manual', name: 'Start Process' }],
     ...overrides,
   };
 }
@@ -84,9 +78,7 @@ export function buildProcessDefinition(
 // buildProcessInstance
 // ---------------------------------------------------------------------------
 
-export function buildProcessInstance(
-  overrides?: Partial<ProcessInstance>,
-): ProcessInstance {
+export function buildProcessInstance(overrides?: Partial<ProcessInstance>): ProcessInstance {
   const id = nextId('inst');
   return {
     id,
@@ -115,9 +107,7 @@ export function buildProcessInstance(
 // buildStepExecution
 // ---------------------------------------------------------------------------
 
-export function buildStepExecution(
-  overrides?: Partial<StepExecution>,
-): StepExecution {
+export function buildStepExecution(overrides?: Partial<StepExecution>): StepExecution {
   const id = nextId('exec');
   return {
     id,
@@ -141,9 +131,7 @@ export function buildStepExecution(
 // buildHumanTask
 // ---------------------------------------------------------------------------
 
-export function buildHumanTask(
-  overrides?: Partial<HumanTask>,
-): HumanTask {
+export function buildHumanTask(overrides?: Partial<HumanTask>): HumanTask {
   const id = nextId('task');
   return {
     id,
@@ -165,9 +153,7 @@ export function buildHumanTask(
 // buildStepOutputEnvelope
 // ---------------------------------------------------------------------------
 
-export function buildStepOutputEnvelope(
-  overrides?: Partial<StepOutputEnvelope>,
-): StepOutputEnvelope {
+export function buildStepOutputEnvelope(overrides?: Partial<StepOutputEnvelope>): StepOutputEnvelope {
   return {
     duration_ms: 1500,
     result: { status: 'ok' },
@@ -180,18 +166,13 @@ export function buildStepOutputEnvelope(
 // buildAgentOutputEnvelope
 // ---------------------------------------------------------------------------
 
-export function buildAgentOutputEnvelope(
-  overrides?: Partial<AgentOutputEnvelope>,
-): AgentOutputEnvelope {
+export function buildAgentOutputEnvelope(overrides?: Partial<AgentOutputEnvelope>): AgentOutputEnvelope {
   return {
     confidence: 0.92,
-    confidence_rationale: 'Standard analysis with complete input data. All compliance checks passed with no anomalies — expected error rate below 1 in 10.',
+    confidence_rationale:
+      'Standard analysis with complete input data. All compliance checks passed with no anomalies — expected error rate below 1 in 10.',
     reasoning_summary: 'Analysis completed successfully',
-    reasoning_chain: [
-      'Loaded supplier data',
-      'Ran compliance checks',
-      'Generated report',
-    ],
+    reasoning_chain: ['Loaded supplier data', 'Ran compliance checks', 'Generated report'],
     annotations: [
       {
         id: 'ann-0001',
@@ -210,9 +191,7 @@ export function buildAgentOutputEnvelope(
 // buildAgentRun
 // ---------------------------------------------------------------------------
 
-export function buildAgentRun(
-  overrides?: Partial<AgentRun>,
-): AgentRun {
+export function buildAgentRun(overrides?: Partial<AgentRun>): AgentRun {
   const id = nextId('run');
   return {
     id,
@@ -233,9 +212,7 @@ export function buildAgentRun(
 // buildAuditEvent
 // ---------------------------------------------------------------------------
 
-export function buildAuditEvent(
-  overrides?: Partial<AuditEvent>,
-): AuditEvent {
+export function buildAuditEvent(overrides?: Partial<AuditEvent>): AuditEvent {
   return {
     actorId: 'user-001',
     actorType: 'user',
@@ -258,9 +235,7 @@ export function buildAuditEvent(
 // buildAgentEvent
 // ---------------------------------------------------------------------------
 
-export function buildAgentEvent(
-  overrides?: Partial<AgentEvent>,
-): AgentEvent {
+export function buildAgentEvent(overrides?: Partial<AgentEvent>): AgentEvent {
   const id = nextId('evt');
   return {
     id,
@@ -278,9 +253,7 @@ export function buildAgentEvent(
 // buildFileMetadata
 // ---------------------------------------------------------------------------
 
-export function buildFileMetadata(
-  overrides?: Partial<FileMetadata>,
-): FileMetadata {
+export function buildFileMetadata(overrides?: Partial<FileMetadata>): FileMetadata {
   const id = nextId('file');
   return {
     id,
@@ -297,9 +270,7 @@ export function buildFileMetadata(
 // buildProcessConfig
 // ---------------------------------------------------------------------------
 
-export function buildProcessConfig(
-  overrides?: Partial<ProcessConfig>,
-): ProcessConfig {
+export function buildProcessConfig(overrides?: Partial<ProcessConfig>): ProcessConfig {
   return {
     processName: 'supply-chain-review',
     configName: 'default',
@@ -328,9 +299,7 @@ export function buildProcessConfig(
 // buildWorkflowDefinition
 // ---------------------------------------------------------------------------
 
-export function buildWorkflowDefinition(
-  overrides?: Partial<WorkflowDefinition>,
-): WorkflowDefinition {
+export function buildWorkflowDefinition(overrides?: Partial<WorkflowDefinition>): WorkflowDefinition {
   return {
     name: 'test-workflow',
     version: 1,
@@ -361,9 +330,7 @@ export function buildWorkflowDefinition(
       { from: 'intake', to: 'review' },
       { from: 'review', to: 'complete' },
     ],
-    triggers: [
-      { type: 'manual', name: 'Start' },
-    ],
+    triggers: [{ type: 'manual', name: 'Start' }],
     ...overrides,
   };
 }
@@ -372,9 +339,7 @@ export function buildWorkflowDefinition(
 // buildCoworkSession
 // ---------------------------------------------------------------------------
 
-export function buildCoworkSession(
-  overrides?: Partial<CoworkSession>,
-): CoworkSession {
+export function buildCoworkSession(overrides?: Partial<CoworkSession>): CoworkSession {
   const id = nextId('session');
   return {
     id,

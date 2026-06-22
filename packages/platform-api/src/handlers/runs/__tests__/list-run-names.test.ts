@@ -16,15 +16,9 @@ describe('listRunNames handler', () => {
   });
 
   it('returns projected { id, definitionName } entries for the namespace', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'r1', namespace: 'alpha', definitionName: 'wf-a' }),
-    );
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'r2', namespace: 'alpha', definitionName: 'wf-b' }),
-    );
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'r3', namespace: 'beta', definitionName: 'wf-c' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'r1', namespace: 'alpha', definitionName: 'wf-a' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'r2', namespace: 'alpha', definitionName: 'wf-b' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'r3', namespace: 'beta', definitionName: 'wf-c' }));
 
     const scope = createTestScope({ instanceRepo });
     const result = await listRunNames({ namespace: 'alpha' }, scope);
@@ -47,9 +41,7 @@ describe('listRunNames handler', () => {
   });
 
   it('returns entries for a user caller who is a member of the namespace', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'r1', namespace: 'alpha', definitionName: 'wf' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'r1', namespace: 'alpha', definitionName: 'wf' }));
 
     const scope = createTestScope({ instanceRepo, caller: userCaller('u-1', ['alpha']) });
     const result = await listRunNames({ namespace: 'alpha' }, scope);
@@ -58,9 +50,7 @@ describe('listRunNames handler', () => {
   });
 
   it('returns empty when the user caller is not a member of the namespace', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'r1', namespace: 'alpha', definitionName: 'wf' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'r1', namespace: 'alpha', definitionName: 'wf' }));
 
     const scope = createTestScope({ instanceRepo, caller: userCaller('u-2', ['gamma']) });
     const result = await listRunNames({ namespace: 'alpha' }, scope);
@@ -69,9 +59,7 @@ describe('listRunNames handler', () => {
   });
 
   it('excludes soft-deleted runs', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'live', namespace: 'alpha', definitionName: 'wf' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'live', namespace: 'alpha', definitionName: 'wf' }));
     await instanceRepo.create(
       buildProcessInstance({ id: 'gone', namespace: 'alpha', definitionName: 'wf', deleted: true }),
     );

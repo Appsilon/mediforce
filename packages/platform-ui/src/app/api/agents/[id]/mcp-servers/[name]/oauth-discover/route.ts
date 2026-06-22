@@ -7,10 +7,7 @@ import {
   pickAuthMethod,
   DcrError,
 } from '@mediforce/agent-runtime';
-import {
-  AgentMcpBindingSchema,
-  type CreateOAuthProviderInput,
-} from '@mediforce/platform-core';
+import { AgentMcpBindingSchema, type CreateOAuthProviderInput } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 import { buildOAuthCallbackUrl } from '@/lib/app-base-url';
 
@@ -40,10 +37,7 @@ export async function POST(
 
   const body = (await request.json().catch(() => null)) as DiscoverBody | null;
   if (body === null || typeof body.namespace !== 'string' || body.namespace === '') {
-    return NextResponse.json(
-      { error: 'JSON body with {namespace: string} is required' },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'JSON body with {namespace: string} is required' }, { status: 400 });
   }
   const { namespace } = body;
 
@@ -56,10 +50,7 @@ export async function POST(
 
   const binding = agent.mcpServers?.[serverName];
   if (binding === undefined) {
-    return NextResponse.json(
-      { error: `Agent "${agentId}" has no MCP binding named "${serverName}"` },
-      { status: 404 },
-    );
+    return NextResponse.json({ error: `Agent "${agentId}" has no MCP binding named "${serverName}"` }, { status: 404 });
   }
   if (binding.type !== 'http') {
     return NextResponse.json(
@@ -110,10 +101,7 @@ export async function POST(
     });
   } catch (err) {
     if (err instanceof DcrError) {
-      return NextResponse.json(
-        { error: 'Dynamic Client Registration failed', detail: err.detail },
-        { status: 502 },
-      );
+      return NextResponse.json({ error: 'Dynamic Client Registration failed', detail: err.detail }, { status: 502 });
     }
     throw err;
   }
@@ -130,12 +118,8 @@ export async function POST(
     ...(registration.client_secret !== undefined ? { clientSecret: registration.client_secret } : {}),
     authorizeUrl: authServer.authorization_endpoint,
     tokenUrl: authServer.token_endpoint,
-    ...(authServer.revocation_endpoint !== undefined
-      ? { revokeUrl: authServer.revocation_endpoint }
-      : {}),
-    ...(authServer.userinfo_endpoint !== undefined
-      ? { userInfoUrl: authServer.userinfo_endpoint }
-      : {}),
+    ...(authServer.revocation_endpoint !== undefined ? { revokeUrl: authServer.revocation_endpoint } : {}),
+    ...(authServer.userinfo_endpoint !== undefined ? { userInfoUrl: authServer.userinfo_endpoint } : {}),
     scopes,
     tokenEndpointAuthMethod: actualAuthMethod,
     issuer: authServer.issuer,
@@ -187,10 +171,7 @@ export async function POST(
   );
 }
 
-function existingProviderSlug(
-  binding: { auth?: { type: string; provider?: string } },
-  issuerUrl: string,
-): string {
+function existingProviderSlug(binding: { auth?: { type: string; provider?: string } }, issuerUrl: string): string {
   if (
     binding.auth !== undefined &&
     binding.auth.type === 'oauth' &&
@@ -202,18 +183,16 @@ function existingProviderSlug(
   return deriveProviderSlug(issuerUrl);
 }
 
-function existingHeaderName(
-  binding: { auth?: { type: string; headerName?: string } },
-): string | undefined {
+function existingHeaderName(binding: { auth?: { type: string; headerName?: string } }): string | undefined {
   if (binding.auth?.type === 'oauth' && typeof binding.auth.headerName === 'string') {
     return binding.auth.headerName;
   }
   return undefined;
 }
 
-function existingHeaderValueTemplate(
-  binding: { auth?: { type: string; headerValueTemplate?: string } },
-): string | undefined {
+function existingHeaderValueTemplate(binding: {
+  auth?: { type: string; headerValueTemplate?: string };
+}): string | undefined {
   if (binding.auth?.type === 'oauth' && typeof binding.auth.headerValueTemplate === 'string') {
     return binding.auth.headerValueTemplate;
   }
@@ -227,10 +206,7 @@ function buildDisplayName(issuerUrl: string, serverName: string): string {
 
 /** Union of resource + AS scopes, preserving resource order. At least one
  *  scope is required; fall back to 'openid' when neither advertises. */
-function chooseScopes(
-  resourceScopes: string[] | undefined,
-  asScopes: string[] | undefined,
-): string[] {
+function chooseScopes(resourceScopes: string[] | undefined, asScopes: string[] | undefined): string[] {
   const seen = new Set<string>();
   const picked: string[] = [];
   for (const s of resourceScopes ?? []) {
@@ -248,9 +224,7 @@ function chooseScopes(
   return picked.length > 0 ? picked : ['openid'];
 }
 
-function coerceAuthMethod(
-  val: string | undefined,
-): 'client_secret_basic' | 'client_secret_post' | 'none' | undefined {
+function coerceAuthMethod(val: string | undefined): 'client_secret_basic' | 'client_secret_post' | 'none' | undefined {
   if (val === 'client_secret_basic' || val === 'client_secret_post' || val === 'none') {
     return val;
   }

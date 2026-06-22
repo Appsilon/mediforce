@@ -1,9 +1,5 @@
 import { z } from 'zod';
-import {
-  InstanceStatusSchema,
-  ProcessInstanceSchema,
-  RunNameEntrySchema,
-} from '@mediforce/platform-core';
+import { InstanceStatusSchema, ProcessInstanceSchema, RunNameEntrySchema } from '@mediforce/platform-core';
 
 /**
  * Contract for `GET /api/runs/<runId>`.
@@ -60,9 +56,7 @@ export type StartRunOutput = z.infer<typeof StartRunOutputSchema>;
  */
 export const ListRunsInputSchema = z.object({
   workflow: z.string().min(1).optional(),
-  status: z
-    .enum(['created', 'running', 'paused', 'completed', 'failed'])
-    .optional(),
+  status: z.enum(['created', 'running', 'paused', 'completed', 'failed']).optional(),
   /**
    * Workspace handle. Narrows the result to a single workspace; defense in
    * depth on top of the caller-namespace gate enforced by `scope.runs`.
@@ -76,7 +70,10 @@ export const ListRunsInputSchema = z.object({
   // more runs. Tracked in #588 alongside PR2's identical workaround — the
   // cap drops back to a sane page size once cursor pagination lands.
   limit: z.coerce.number().int().positive().max(10000).default(20),
-  dryRun: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+  dryRun: z
+    .enum(['true', 'false'])
+    .transform((v) => v === 'true')
+    .optional(),
 });
 
 /**

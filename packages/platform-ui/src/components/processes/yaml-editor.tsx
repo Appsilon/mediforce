@@ -73,8 +73,7 @@ export function YamlEditor({ initialValue = '', namespace, onNamespaceChange, on
       setState({ status: 'saved', name: result.name, version: String(result.version) });
       onSaved?.(result.name, String(result.version));
     } catch (err) {
-      const message = err instanceof ApiError ? err.message
-        : err instanceof Error ? err.message : 'Unknown error';
+      const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Unknown error';
       setState({ status: 'error', message });
     }
   };
@@ -142,7 +141,10 @@ export function YamlEditor({ initialValue = '', namespace, onNamespaceChange, on
         {state.status === 'saved' && (
           <span className="flex items-center gap-1 text-sm text-green-600">
             <CheckCircle className="h-4 w-4" />
-            Saved — <span className="font-mono">{state.name} v{state.version}</span>
+            Saved —{' '}
+            <span className="font-mono">
+              {state.name} v{state.version}
+            </span>
           </span>
         )}
 

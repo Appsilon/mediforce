@@ -22,9 +22,7 @@ beforeEach(() => {
 
 describe('agent-run list command', () => {
   it('GETs /api/agent-runs and prints rows', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ runs: [SAMPLE_RUN] }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ runs: [SAMPLE_RUN] }));
     const output = captureOutput();
     const code = await agentRunListCommand({
       argv: ['--namespace', 'team-alpha', '--base-url', 'http://localhost:5555'],
@@ -39,9 +37,7 @@ describe('agent-run list command', () => {
   });
 
   it('passes --run-id and --step-id as query params', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ runs: [] }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ runs: [] }));
     await agentRunListCommand({
       argv: ['--run-id', 'inst-a', '--step-id', 'review'],
       env: { MEDIFORCE_API_KEY: 'k' },
@@ -64,9 +60,7 @@ describe('agent-run list command', () => {
   });
 
   it('renders the nextCursor hint when present', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ runs: [SAMPLE_RUN], nextCursor: 'token-x' }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ runs: [SAMPLE_RUN], nextCursor: 'token-x' }));
     const output = captureOutput();
     await agentRunListCommand({
       argv: [],
@@ -79,9 +73,7 @@ describe('agent-run list command', () => {
 
 describe('agent-run get command', () => {
   it('GETs /api/agent-runs/:id and prints the entity', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ run: SAMPLE_RUN }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ run: SAMPLE_RUN }));
     const output = captureOutput();
     const code = await agentRunGetCommand({
       argv: ['ar-1'],

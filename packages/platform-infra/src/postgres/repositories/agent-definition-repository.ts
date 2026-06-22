@@ -29,10 +29,7 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
 
   async create(input: CreateAgentDefinitionInput): Promise<AgentDefinition> {
     const id = randomUUID();
-    const [row] = await this.db
-      .insert(agents)
-      .values(toRow(id, input))
-      .returning();
+    const [row] = await this.db.insert(agents).values(toRow(id, input)).returning();
     return toAgent(row);
   }
 
@@ -70,19 +67,11 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
     return row ? toAgent(row) : null;
   }
 
-  async getByIdVisibleTo(
-    id: string,
-    allowed: readonly string[],
-  ): Promise<AgentDefinition | null> {
+  async getByIdVisibleTo(id: string, allowed: readonly string[]): Promise<AgentDefinition | null> {
     const rows = await this.db
       .select()
       .from(agents)
-      .where(
-        and(
-          eq(agents.id, id),
-          visibilityFilter(allowed),
-        ),
-      )
+      .where(and(eq(agents.id, id), visibilityFilter(allowed)))
       .limit(1);
     const row = rows[0];
     return row ? toAgent(row) : null;
@@ -94,10 +83,7 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
   }
 
   async listVisibleTo(allowed: readonly string[]): Promise<AgentDefinition[]> {
-    const rows = await this.db
-      .select()
-      .from(agents)
-      .where(visibilityFilter(allowed));
+    const rows = await this.db.select().from(agents).where(visibilityFilter(allowed));
     return rows.map(toAgent);
   }
 
@@ -144,10 +130,7 @@ function visibilityFilter(allowed: readonly string[]) {
   }
   return or(
     eq(agents.visibility, 'public'),
-    and(
-      sql`${agents.namespace} is not null`,
-      inArray(agents.namespace, allowed as string[]),
-    ),
+    and(sql`${agents.namespace} is not null`, inArray(agents.namespace, allowed as string[])),
   );
 }
 
@@ -198,4 +181,3 @@ function toAgent(row: typeof agents.$inferSelect): AgentDefinition {
     namespace: row.namespace ?? undefined,
   });
 }
-

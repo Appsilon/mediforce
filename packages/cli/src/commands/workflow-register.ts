@@ -1,10 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import {
-  RegisterWorkflowInputSchema,
-  type RegisterWorkflowInput,
-} from '@mediforce/platform-api/contract';
+import { RegisterWorkflowInputSchema, type RegisterWorkflowInput } from '@mediforce/platform-api/contract';
 import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
 import { defineCommand } from '../define-command';
 import { printJson, printError, type OutputSink } from '../output';
@@ -20,19 +17,17 @@ async function checkImageExists(image: string): Promise<boolean> {
   }
 }
 
-async function warnMissingImages(
-  body: RegisterWorkflowInput,
-  output: OutputSink,
-  jsonMode: boolean,
-): Promise<void> {
+async function warnMissingImages(body: RegisterWorkflowInput, output: OutputSink, jsonMode: boolean): Promise<void> {
   const images = new Set<string>();
   for (const step of body.steps) {
     // Agent steps configure their container under `agent`; script steps under `script`.
     for (const containerConfig of [step.agent, step.script]) {
       const image = containerConfig?.image;
       const hasBuildSource =
-        typeof containerConfig?.repo === 'string' && containerConfig.repo.length > 0
-        && typeof containerConfig?.commit === 'string' && containerConfig.commit.length > 0;
+        typeof containerConfig?.repo === 'string' &&
+        containerConfig.repo.length > 0 &&
+        typeof containerConfig?.commit === 'string' &&
+        containerConfig.commit.length > 0;
       if (typeof image === 'string' && image.length > 0 && !hasBuildSource) images.add(image);
     }
   }
@@ -69,11 +64,7 @@ export const workflowRegisterCommand = defineCommand({
     try {
       raw = await readFile(args.file, 'utf-8');
     } catch (err) {
-      printError(
-        output,
-        { error: `Failed to read file: ${args.file} — ${String(err)}` },
-        jsonMode,
-      );
+      printError(output, { error: `Failed to read file: ${args.file} — ${String(err)}` }, jsonMode);
       return 1;
     }
 
@@ -86,11 +77,7 @@ export const workflowRegisterCommand = defineCommand({
           : parsedJson;
       const result = RegisterWorkflowInputSchema.safeParse(withVisibilityOverride);
       if (!result.success) {
-        printError(
-          output,
-          { error: 'Invalid workflow definition', body: result.error.issues },
-          jsonMode,
-        );
+        printError(output, { error: 'Invalid workflow definition', body: result.error.issues }, jsonMode);
         return 1;
       }
       body = result.data;
@@ -105,11 +92,7 @@ export const workflowRegisterCommand = defineCommand({
         namespace: args.namespace,
       });
       if (!serverParse.success) {
-        printError(
-          output,
-          { error: 'Validation failed', body: serverParse.error.issues },
-          jsonMode,
-        );
+        printError(output, { error: 'Validation failed', body: serverParse.error.issues }, jsonMode);
         return 1;
       }
       const summary = {

@@ -10,9 +10,7 @@
       "type": "manual"
     }
   ],
-  "roles": [
-    "analyst"
-  ],
+  "roles": ["analyst"],
   "steps": [
     {
       "id": "explore-modules",
@@ -20,27 +18,20 @@
       "type": "creation",
       "executor": "cowork",
       "agentId": "tealflow-cowork-chat",
-      "allowedRoles": [
-        "analyst"
-      ],
+      "allowedRoles": ["analyst"],
       "description": "Chat with AI to explore available teal modules. The AI can query the tealflow MCP server to list modules, get details, and help you decide which to include in your teal app.",
       "cowork": {
         "agent": "chat",
         "systemPrompt": "You are a teal app configuration assistant. You have access to the tealflow MCP tools.\n\n## Your workflow\n1. Start by calling tealflow_list_modules to see what's available\n2. When the user asks about specific modules, use tealflow_get_module to get details\n3. Help the user select which modules to include in their teal app\n4. Call update_artifact with the selected module configuration\n\n## Output format\nThe artifact should be a JSON object with a 'modules' array, where each entry has:\n- name: the teal module function name\n- label: human-readable label for the tab\n- reason: why this module was selected",
         "outputSchema": {
           "type": "object",
-          "required": [
-            "modules"
-          ],
+          "required": ["modules"],
           "properties": {
             "modules": {
               "type": "array",
               "items": {
                 "type": "object",
-                "required": [
-                  "name",
-                  "label"
-                ],
+                "required": ["name", "label"],
                 "properties": {
                   "name": {
                     "type": "string"

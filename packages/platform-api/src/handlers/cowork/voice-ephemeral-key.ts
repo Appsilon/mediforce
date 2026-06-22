@@ -1,10 +1,7 @@
 import { HandlerError, PreconditionFailedError } from '../../errors';
 import { loadOr404 } from '../_helpers';
 import type { CallerScope } from '../../repositories/index';
-import type {
-  CreateVoiceEphemeralKeyInput,
-  CreateVoiceEphemeralKeyOutput,
-} from '../../contract/cowork';
+import type { CreateVoiceEphemeralKeyInput, CreateVoiceEphemeralKeyOutput } from '../../contract/cowork';
 
 const DEFAULT_VOICE_INSTRUCTIONS =
   'You are a collaborative assistant. Help the user design and discuss their requirements through voice conversation. ' +
@@ -45,10 +42,10 @@ export async function createVoiceEphemeralKey(
   );
 
   if (session.status !== 'active') {
-    throw new PreconditionFailedError(
-      `Cannot create key for a ${session.status} session`,
-      { sessionId: input.sessionId, status: session.status },
-    );
+    throw new PreconditionFailedError(`Cannot create key for a ${session.status} session`, {
+      sessionId: input.sessionId,
+      status: session.status,
+    });
   }
 
   if (session.agent !== 'voice-realtime') {

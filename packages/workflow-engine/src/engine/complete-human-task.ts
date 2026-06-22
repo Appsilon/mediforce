@@ -1,8 +1,4 @@
-import type {
-  HumanTask,
-  CompleteHumanTaskPayload,
-  Attachment,
-} from '@mediforce/platform-core';
+import type { HumanTask, CompleteHumanTaskPayload, Attachment } from '@mediforce/platform-core';
 import { CompleteHumanTaskValidationError } from './errors';
 
 // Pure helpers backing engine.completeHumanTask. Split out so per-variant
@@ -27,10 +23,7 @@ export function resolveTaskKind(task: HumanTask): TaskKind {
   return 'verdict';
 }
 
-export function validatePayloadKindMatchesTask(
-  task: HumanTask,
-  payload: CompleteHumanTaskPayload,
-): void {
+export function validatePayloadKindMatchesTask(task: HumanTask, payload: CompleteHumanTaskPayload): void {
   const expected = resolveTaskKind(task);
   if (payload.kind !== expected) {
     throw new CompleteHumanTaskValidationError(
@@ -50,13 +43,9 @@ export function validateVerdictPayload(
 
   const taskVerdicts = task.verdicts;
   const descriptor = taskVerdicts?.find((v) => v.key === verdict);
-  const allowed = taskVerdicts
-    ? descriptor !== undefined
-    : verdict === 'approve' || verdict === 'revise';
+  const allowed = taskVerdicts ? descriptor !== undefined : verdict === 'approve' || verdict === 'revise';
   if (!allowed) {
-    const allowedKeys = taskVerdicts
-      ? taskVerdicts.map((v) => v.key).join(', ')
-      : 'approve, revise';
+    const allowedKeys = taskVerdicts ? taskVerdicts.map((v) => v.key).join(', ') : 'approve, revise';
     throw new CompleteHumanTaskValidationError(
       `verdict '${verdict}' not allowed for step '${task.stepId}' — must be one of: ${allowedKeys}`,
       { stepId: task.stepId, verdict, allowed: allowedKeys },
@@ -66,19 +55,18 @@ export function validateVerdictPayload(
   if (descriptor?.requiresComment) {
     const trimmed = typeof comment === 'string' ? comment.trim() : '';
     if (trimmed.length === 0) {
-      throw new CompleteHumanTaskValidationError(
-        `verdict '${verdict}' requires a non-empty comment`,
-        { stepId: task.stepId, verdict },
-      );
+      throw new CompleteHumanTaskValidationError(`verdict '${verdict}' requires a non-empty comment`, {
+        stepId: task.stepId,
+        verdict,
+      });
     }
   }
 
   if (payload.selectedIndex !== undefined) {
     if (!Array.isArray(task.options) || task.options.length === 0) {
-      throw new CompleteHumanTaskValidationError(
-        'selectedIndex supplied but task has no options',
-        { stepId: task.stepId },
-      );
+      throw new CompleteHumanTaskValidationError('selectedIndex supplied but task has no options', {
+        stepId: task.stepId,
+      });
     }
     if (payload.selectedIndex >= task.options.length) {
       throw new CompleteHumanTaskValidationError(
@@ -99,10 +87,7 @@ export function buildVerdictStepOutput(
   const comment = payload.comment ?? '';
   const selectedIndex = payload.selectedIndex;
 
-  const isSelectionReview =
-    selectedIndex !== undefined &&
-    Array.isArray(task.options) &&
-    task.options.length > 0;
+  const isSelectionReview = selectedIndex !== undefined && Array.isArray(task.options) && task.options.length > 0;
 
   let completionData: Record<string, unknown>;
   let stepOutput: Record<string, unknown>;
@@ -128,14 +113,11 @@ export function buildVerdictStepOutput(
       // Block rubber-stamping an empty agent run.
       if (
         verdict === 'approve' &&
-        (agentResult === null ||
-          agentResult === undefined ||
-          Object.keys(agentResult).length === 0)
+        (agentResult === null || agentResult === undefined || Object.keys(agentResult).length === 0)
       ) {
-        throw new CompleteHumanTaskValidationError(
-          `Cannot approve step '${task.stepId}': agent produced no output`,
-          { stepId: task.stepId },
-        );
+        throw new CompleteHumanTaskValidationError(`Cannot approve step '${task.stepId}': agent produced no output`, {
+          stepId: task.stepId,
+        });
       }
 
       stepOutput = agentResult ?? {};
@@ -167,8 +149,7 @@ export function buildVerdictStepOutput(
       `=== END REVIEWER FEEDBACK ===`;
   }
 
-  const isL3Revise =
-    task.creationReason === 'agent_review_l3' && verdict === 'revise';
+  const isL3Revise = task.creationReason === 'agent_review_l3' && verdict === 'revise';
 
   return { completionData, stepOutput, isL3Revise };
 }
@@ -204,10 +185,11 @@ export function validateUploadPayload(
   const maxFiles = (uiConfig.maxFiles as number) ?? Infinity;
 
   if (attachments.length < minFiles || attachments.length > maxFiles) {
-    throw new CompleteHumanTaskValidationError(
-      `Expected ${minFiles}-${maxFiles} file(s), got ${attachments.length}`,
-      { minFiles, maxFiles, count: attachments.length },
-    );
+    throw new CompleteHumanTaskValidationError(`Expected ${minFiles}-${maxFiles} file(s), got ${attachments.length}`, {
+      minFiles,
+      maxFiles,
+      count: attachments.length,
+    });
   }
 
   const acceptedTypes = uiConfig.acceptedTypes as string[] | undefined;
@@ -242,11 +224,7 @@ export function buildUploadStepOutput(
   };
 }
 
-function isAcceptedType(
-  mimeType: string,
-  fileName: string,
-  acceptedTypes: readonly string[],
-): boolean {
+function isAcceptedType(mimeType: string, fileName: string, acceptedTypes: readonly string[]): boolean {
   for (const accepted of acceptedTypes) {
     if (accepted.startsWith('.')) {
       if (fileName.toLowerCase().endsWith(accepted.toLowerCase())) return true;

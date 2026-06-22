@@ -2,10 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryAuditRepository, InMemoryOAuthProviderRepository } from '@mediforce/platform-core/testing';
 import { deleteOAuthProvider } from '../delete-provider';
 import { ForbiddenError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { adminRoles, memberRoles, sampleProviderInput } from './fixtures';
 
 describe('deleteOAuthProvider handler', () => {
@@ -25,10 +22,7 @@ describe('deleteOAuthProvider handler', () => {
       caller: userCaller('u-admin', ['alpha'], adminRoles),
     });
 
-    const result = await deleteOAuthProvider(
-      { namespace: 'alpha', id: 'github' },
-      scope,
-    );
+    const result = await deleteOAuthProvider({ namespace: 'alpha', id: 'github' }, scope);
 
     expect(result.success).toBe(true);
     expect(await repo.get('alpha', 'github')).toBeNull();
@@ -45,10 +39,7 @@ describe('deleteOAuthProvider handler', () => {
       caller: userCaller('u-admin', ['alpha'], adminRoles),
     });
 
-    const result = await deleteOAuthProvider(
-      { namespace: 'alpha', id: 'missing' },
-      scope,
-    );
+    const result = await deleteOAuthProvider({ namespace: 'alpha', id: 'missing' }, scope);
 
     expect(result.success).toBe(true);
     const events = await auditRepo.getByEntity('oauthProvider', 'missing');
@@ -62,9 +53,9 @@ describe('deleteOAuthProvider handler', () => {
       caller: userCaller('u-member', ['alpha'], memberRoles),
     });
 
-    await expect(
-      deleteOAuthProvider({ namespace: 'alpha', id: 'github' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(deleteOAuthProvider({ namespace: 'alpha', id: 'github' }, scope)).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
 
     expect(await repo.get('alpha', 'github')).not.toBeNull();
   });

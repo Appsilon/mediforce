@@ -96,9 +96,7 @@ describe('PUT /api/workflow-secrets/values', () => {
     expect(res.status).toBe(200);
     expect(json).toEqual({ ok: true, savedKeyCount: 2 });
     expect(mockSetSecrets).toHaveBeenCalledWith('ns-1', 'wf-1', { K1: 'v1', K2: 'v2' });
-    expect(mockAuditAppend).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'workflow_secret.bulk_saved' }),
-    );
+    expect(mockAuditAppend).toHaveBeenCalledWith(expect.objectContaining({ action: 'workflow_secret.bulk_saved' }));
   });
 
   it('[AUTHZ] non-member gets 403 (wrapper assertNamespaceWrite)', async () => {

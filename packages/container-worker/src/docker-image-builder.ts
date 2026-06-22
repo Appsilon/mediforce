@@ -46,10 +46,11 @@ export async function imageExistsLocally(image: string): Promise<boolean> {
 
 export async function getImageBuildCommit(image: string): Promise<string | null> {
   try {
-    const output = execSync(
-      `docker inspect --format '{{index .Config.Labels "${BUILD_COMMIT_LABEL}"}}' "${image}"`,
-      { stdio: 'pipe' },
-    ).toString().trim();
+    const output = execSync(`docker inspect --format '{{index .Config.Labels "${BUILD_COMMIT_LABEL}"}}' "${image}"`, {
+      stdio: 'pipe',
+    })
+      .toString()
+      .trim();
     return output.length > 0 ? output : null;
   } catch {
     return null;
@@ -111,9 +112,7 @@ export async function ensureImage(options: {
   if (!repoUrl || !commit) {
     const exists = await imageExistsLocally(image);
     if (exists) return;
-    throw new Error(
-      `Docker image "${image}" not found locally and no repo+commit configured for auto-build.`,
-    );
+    throw new Error(`Docker image "${image}" not found locally and no repo+commit configured for auto-build.`);
   }
 
   const exists = await imageExistsLocally(image);
@@ -123,7 +122,9 @@ export async function ensureImage(options: {
       console.log(`[docker-image-builder] Image "${image}" up-to-date (commit ${commit.slice(0, 8)})`);
       return;
     }
-    console.log(`[docker-image-builder] Image "${image}" stale (${currentCommit?.slice(0, 8)} → ${commit.slice(0, 8)}), rebuilding`);
+    console.log(
+      `[docker-image-builder] Image "${image}" stale (${currentCommit?.slice(0, 8)} → ${commit.slice(0, 8)}), rebuilding`,
+    );
   }
 
   await buildImageFromRepo({ image, repoUrl, commit, dockerfile, repoToken });

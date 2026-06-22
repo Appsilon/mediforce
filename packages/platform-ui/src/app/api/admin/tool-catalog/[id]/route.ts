@@ -7,11 +7,7 @@ import {
   type GetToolCatalogEntryInput,
   type UpdateToolCatalogEntryInputApi,
 } from '@mediforce/platform-api/contract';
-import {
-  deleteToolCatalogEntry,
-  getToolCatalogEntry,
-  updateToolCatalogEntry,
-} from '@mediforce/platform-api/handlers';
+import { deleteToolCatalogEntry, getToolCatalogEntry, updateToolCatalogEntry } from '@mediforce/platform-api/handlers';
 
 interface RouteContext {
   params: Promise<{ id: string }>;

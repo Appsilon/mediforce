@@ -3,7 +3,7 @@ export interface NotificationEvent {
   processInstanceId: string;
   stepId: string;
   assignedRole: string;
-  entityId: string;   // taskId or handoffEntityId
+  entityId: string; // taskId or handoffEntityId
   timestamp: string;
 }
 

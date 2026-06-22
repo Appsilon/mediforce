@@ -59,9 +59,7 @@ function contract(
         API_KEY: 'sk-abc',
         DB_PASS: 'hunter2',
       });
-      expect(new Set(await repo.getSecretKeys('ws-1'))).toEqual(
-        new Set(['API_KEY', 'DB_PASS']),
-      );
+      expect(new Set(await repo.getSecretKeys('ws-1'))).toEqual(new Set(['API_KEY', 'DB_PASS']));
     });
 
     it('setSecrets replaces the full set (drops removed keys)', async () => {
@@ -102,9 +100,7 @@ function contract(
     });
 
     it('rejects setSecrets with invalid payload (empty namespace)', async () => {
-      await expect(
-        repo.setSecrets('', { A: '1' }),
-      ).rejects.toThrow();
+      await expect(repo.setSecrets('', { A: '1' })).rejects.toThrow();
     });
   });
 }
@@ -127,7 +123,9 @@ describe.skipIf(skipPg)('PostgresNamespaceSecretsRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sql);

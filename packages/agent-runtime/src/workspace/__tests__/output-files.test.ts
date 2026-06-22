@@ -8,10 +8,19 @@ import { mkdtemp, rm, writeFile, mkdir, readFile, stat, symlink } from 'node:fs/
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { PluginCapabilityMetadata, WorkflowDefinition, WorkflowStep, WorkflowWorkspace } from '@mediforce/platform-core';
+import type {
+  PluginCapabilityMetadata,
+  WorkflowDefinition,
+  WorkflowStep,
+  WorkflowWorkspace,
+} from '@mediforce/platform-core';
 import { WorkspaceManager, type RunWorkspaceHandle } from '../workspace-manager';
 import { copyOutputFilesIntoWorkspace } from '../output-files';
-import { ContainerPlugin, type CommitRunWorkspaceOptions, type WorkspaceManagerLike } from '../../plugins/container-plugin';
+import {
+  ContainerPlugin,
+  type CommitRunWorkspaceOptions,
+  type WorkspaceManagerLike,
+} from '../../plugins/container-plugin';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../../interfaces/step-executor-plugin';
 import type { GitMetadata } from '@mediforce/platform-core';
 
@@ -45,9 +54,19 @@ describe('copyOutputFilesIntoWorkspace', () => {
 
   it('filters internal runtime files by name but copies presentation files', async () => {
     const internals = [
-      'auth.json', 'prompt.txt', 'result.json', 'git-result.json', 'mock-result.json', 'opencode.json',
-      'input.json', 'previous_run.json', 'mcp-config.json',
-      'script.mjs', 'script.py', 'script.R', 'script.sh',
+      'auth.json',
+      'prompt.txt',
+      'result.json',
+      'git-result.json',
+      'mock-result.json',
+      'opencode.json',
+      'input.json',
+      'previous_run.json',
+      'mcp-config.json',
+      'script.mjs',
+      'script.py',
+      'script.R',
+      'script.sh',
     ];
     for (const name of internals) {
       await writeFile(join(outputDir, name), '{}');
@@ -219,12 +238,18 @@ describe('ContainerPlugin.commitRunWorkspace output-file capture', () => {
     await rm(outputDir, { recursive: true, force: true }).catch(() => {});
   });
 
-  async function setupPlugin(stepId: string): Promise<{ plugin: TestContainerPlugin; handle: RunWorkspaceHandle; context: WorkflowAgentContext }> {
+  async function setupPlugin(
+    stepId: string,
+  ): Promise<{ plugin: TestContainerPlugin; handle: RunWorkspaceHandle; context: WorkflowAgentContext }> {
     const context = buildWorkflowContext(stepId);
     const plugin = new TestContainerPlugin();
     await plugin.initialize(context);
     const handle = await manager.createRunWorkspace(
-      { name: context.workflowDefinition.name, namespace: context.workflowDefinition.namespace, workspace: {} as WorkflowWorkspace },
+      {
+        name: context.workflowDefinition.name,
+        namespace: context.workflowDefinition.namespace,
+        workspace: {} as WorkflowWorkspace,
+      },
       context.processInstanceId,
     );
     plugin.attachWorkspace(handle, manager);
@@ -240,9 +265,12 @@ describe('ContainerPlugin.commitRunWorkspace output-file capture', () => {
 
     expect(metadata).not.toBeNull();
     const committedFiles = execFileSync(
-      'git', ['diff-tree', '--no-commit-id', '--name-only', '-r', metadata!.commitSha],
+      'git',
+      ['diff-tree', '--no-commit-id', '--name-only', '-r', metadata!.commitSha],
       { cwd: handle.path, encoding: 'utf-8' },
-    ).trim().split('\n');
+    )
+      .trim()
+      .split('\n');
     expect(committedFiles).toContain('.mediforce/output/extract/report.csv');
     expect(committedFiles).not.toContain('.mediforce/output/extract/result.json');
 
@@ -259,9 +287,12 @@ describe('ContainerPlugin.commitRunWorkspace output-file capture', () => {
 
     expect(metadata).not.toBeNull();
     const committedFiles = execFileSync(
-      'git', ['diff-tree', '--no-commit-id', '--name-only', '-r', metadata!.commitSha],
+      'git',
+      ['diff-tree', '--no-commit-id', '--name-only', '-r', metadata!.commitSha],
       { cwd: handle.path, encoding: 'utf-8' },
-    ).trim().split('\n');
+    )
+      .trim()
+      .split('\n');
     expect(committedFiles).toContain('.mediforce/output/doomed/partial.log');
 
     const subject = execFileSync('git', ['log', '-1', '--format=%s'], { cwd: handle.path, encoding: 'utf-8' }).trim();

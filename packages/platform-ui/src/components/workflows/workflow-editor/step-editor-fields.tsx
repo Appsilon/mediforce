@@ -8,7 +8,8 @@ import { cn } from '@/lib/utils';
 // Shared input style tokens — import these instead of defining locally
 // ---------------------------------------------------------------------------
 
-export const inputBase = 'w-full bg-card text-xs rounded border border-border/60 hover:border-border focus:border-primary/60 focus:ring-1 focus:ring-primary/20 focus:outline-none px-2 py-1 transition-colors';
+export const inputBase =
+  'w-full bg-card text-xs rounded border border-border/60 hover:border-border focus:border-primary/60 focus:ring-1 focus:ring-primary/20 focus:outline-none px-2 py-1 transition-colors';
 export const inputBaseMono = `${inputBase} font-mono`;
 export const selectBase = `${inputBase} cursor-pointer`;
 export const textareaBase = `${inputBase} resize-y leading-relaxed`;
@@ -43,7 +44,9 @@ export function FieldRow({
     <div className="border-b border-border/30 last:border-0">
       <div className={cn('grid grid-cols-[184px_1fr] gap-x-3 px-3 py-1', alignStart ? 'items-start' : 'items-center')}>
         <div className="flex items-center gap-1 min-w-0">
-          <span className="font-mono text-[11px] text-muted-foreground/60 select-none leading-5 truncate" title={label}>{label}</span>
+          <span className="font-mono text-[11px] text-muted-foreground/60 select-none leading-5 truncate" title={label}>
+            {label}
+          </span>
           {tooltip && <FieldTooltip text={tooltip} />}
         </div>
         <div className="min-w-0">{children}</div>
@@ -67,9 +70,20 @@ export function Section({ title, children }: { title: string; children: React.Re
   );
 }
 
-export function EditableField({ label, value, onChange, mono, placeholder, suffix }: {
-  label: string; value: string; onChange: (v: string) => void;
-  mono?: boolean; placeholder?: string; suffix?: string;
+export function EditableField({
+  label,
+  value,
+  onChange,
+  mono,
+  placeholder,
+  suffix,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  mono?: boolean;
+  placeholder?: string;
+  suffix?: string;
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3">

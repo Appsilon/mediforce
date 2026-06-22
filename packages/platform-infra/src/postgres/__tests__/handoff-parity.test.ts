@@ -5,10 +5,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  InMemoryHandoffRepository,
-  handoffTypeRegistry,
-} from '@mediforce/platform-core';
+import { InMemoryHandoffRepository, handoffTypeRegistry } from '@mediforce/platform-core';
 import type {
   HandoffEntity,
   HandoffRepository,
@@ -56,29 +53,60 @@ class StubProcessInstanceRepository implements ProcessInstanceRepository {
   }
 
   // Methods unused by the parity contract — throw if accidentally hit.
-  async create(): Promise<ProcessInstance> { throw new Error('stub'); }
-  async getByIdInNamespaces(): Promise<ProcessInstance | null> { throw new Error('stub'); }
-  async listAll(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async listInNamespaces(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async listDefinitionNames(): Promise<never> { throw new Error('stub'); }
-  async summarizeRunsByWorkflow(): Promise<never> { throw new Error('stub'); }
-  async getByStatusAll(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async getByStatusInNamespaces(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async update(): Promise<void> { throw new Error('stub'); }
-  async getByDefinition(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async getLastCompletedByDefinitionName(): Promise<ProcessInstance | null> { throw new Error('stub'); }
-  async addStepExecution(): Promise<never> { throw new Error('stub'); }
-  async getStepExecutions(): Promise<never[]> { throw new Error('stub'); }
-  async getLatestStepExecution(): Promise<null> { throw new Error('stub'); }
-  async updateStepExecution(): Promise<void> { throw new Error('stub'); }
-  async getIdsByDefinitionName(): Promise<string[]> { throw new Error('stub'); }
-  async setDeletedByDefinitionName(): Promise<void> { throw new Error('stub'); }
+  async create(): Promise<ProcessInstance> {
+    throw new Error('stub');
+  }
+  async getByIdInNamespaces(): Promise<ProcessInstance | null> {
+    throw new Error('stub');
+  }
+  async listAll(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async listInNamespaces(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async listDefinitionNames(): Promise<never> {
+    throw new Error('stub');
+  }
+  async summarizeRunsByWorkflow(): Promise<never> {
+    throw new Error('stub');
+  }
+  async getByStatusAll(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async getByStatusInNamespaces(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async update(): Promise<void> {
+    throw new Error('stub');
+  }
+  async getByDefinition(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async getLastCompletedByDefinitionName(): Promise<ProcessInstance | null> {
+    throw new Error('stub');
+  }
+  async addStepExecution(): Promise<never> {
+    throw new Error('stub');
+  }
+  async getStepExecutions(): Promise<never[]> {
+    throw new Error('stub');
+  }
+  async getLatestStepExecution(): Promise<null> {
+    throw new Error('stub');
+  }
+  async updateStepExecution(): Promise<void> {
+    throw new Error('stub');
+  }
+  async getIdsByDefinitionName(): Promise<string[]> {
+    throw new Error('stub');
+  }
+  async setDeletedByDefinitionName(): Promise<void> {
+    throw new Error('stub');
+  }
 }
 
-function handoffFor(
-  instanceId: string,
-  overrides: Partial<HandoffEntity> = {},
-): HandoffEntity {
+function handoffFor(instanceId: string, overrides: Partial<HandoffEntity> = {}): HandoffEntity {
   const now = '2026-05-27T00:00:00.000Z';
   return {
     id: randomUUID(),
@@ -256,13 +284,9 @@ function contract(
     it('acknowledge requires the assigned user', async () => {
       const instanceId = randomUUID();
       await registerInstance(instanceId, 'ws-1');
-      const entity = await repo.create(
-        handoffFor(instanceId, { assignedUserId: 'user-1', status: 'created' }),
-      );
+      const entity = await repo.create(handoffFor(instanceId, { assignedUserId: 'user-1', status: 'created' }));
 
-      await expect(
-        repo.acknowledge(entity.id, 'someone-else'),
-      ).rejects.toThrow();
+      await expect(repo.acknowledge(entity.id, 'someone-else')).rejects.toThrow();
 
       const ack = await repo.acknowledge(entity.id, 'user-1');
       expect(ack.status).toBe('acknowledged');
@@ -271,9 +295,7 @@ function contract(
     it('resolve sets status=resolved + writes resolution + resolvedAt', async () => {
       const instanceId = randomUUID();
       await registerInstance(instanceId, 'ws-1');
-      const entity = await repo.create(
-        handoffFor(instanceId, { assignedUserId: 'user-1', status: 'acknowledged' }),
-      );
+      const entity = await repo.create(handoffFor(instanceId, { assignedUserId: 'user-1', status: 'acknowledged' }));
 
       const resolved = await repo.resolve(entity.id, 'user-1', {
         decision: 'approve',
@@ -287,13 +309,9 @@ function contract(
     it('resolve rejects when caller is not the assigned user', async () => {
       const instanceId = randomUUID();
       await registerInstance(instanceId, 'ws-1');
-      const entity = await repo.create(
-        handoffFor(instanceId, { assignedUserId: 'user-1', status: 'acknowledged' }),
-      );
+      const entity = await repo.create(handoffFor(instanceId, { assignedUserId: 'user-1', status: 'acknowledged' }));
 
-      await expect(
-        repo.resolve(entity.id, 'intruder', { decision: 'approve', note: '' }),
-      ).rejects.toThrow();
+      await expect(repo.resolve(entity.id, 'intruder', { decision: 'approve', note: '' })).rejects.toThrow();
     });
 
     it('workspace isolation prevents cross-tenant reads via getByRoleInNamespaces', async () => {
@@ -370,7 +388,9 @@ describe.skipIf(skipPg)('PostgresHandoffRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sql);

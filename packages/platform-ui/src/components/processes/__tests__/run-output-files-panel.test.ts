@@ -46,10 +46,7 @@ describe('groupOutputFilesByStep', () => {
   });
 
   it('sorts files within a group by name', () => {
-    const grouped = groupOutputFilesByStep(
-      [file('intake', 'zeta.csv'), file('intake', 'alpha.csv')],
-      definitionSteps,
-    );
+    const grouped = groupOutputFilesByStep([file('intake', 'zeta.csv'), file('intake', 'alpha.csv')], definitionSteps);
     expect(grouped[0].files.map((entry) => entry.name)).toEqual(['alpha.csv', 'zeta.csv']);
   });
 });

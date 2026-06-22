@@ -2,10 +2,10 @@ import { z } from 'zod';
 import { StepParamSchema, StepUiSchema, SelectionSchema } from './process-definition';
 
 export const HumanTaskStatusSchema = z.enum([
-  'pending',    // unassigned, visible to all with matching role
-  'claimed',    // pinned by a user, still visible in queue (soft claim)
-  'completed',  // done, workflow advanced
-  'cancelled',  // withdrawn (e.g., process aborted)
+  'pending', // unassigned, visible to all with matching role
+  'claimed', // pinned by a user, still visible in queue (soft claim)
+  'completed', // done, workflow advanced
+  'cancelled', // withdrawn (e.g., process aborted)
 ]);
 
 export const CreationReasonSchema = z.enum(['human_executor', 'agent_review_l3']);
@@ -15,27 +15,31 @@ export const HumanTaskSchema = z.object({
   processInstanceId: z.string().min(1),
   stepId: z.string().min(1),
   assignedRole: z.string().min(1),
-  assignedUserId: z.string().nullable(),      // null until claimed ("pinned")
+  assignedUserId: z.string().nullable(), // null until claimed ("pinned")
   status: HumanTaskStatusSchema,
   deadline: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   completedAt: z.string().datetime().nullable(),
-  completionData: z.record(z.string(), z.unknown()).nullable(),  // structured response on completion
-  ui: StepUiSchema.optional(),  // copied from step definition — tells UI what form to render
-  params: z.array(StepParamSchema).optional(),  // copied from step definition — tells UI what form fields to render
-  creationReason: CreationReasonSchema.optional(),  // why this task was created
-  selection: SelectionSchema.optional(),  // copied from step definition — enables "pick one" review mode
-  options: z.array(z.record(z.string(), z.unknown())).optional(),  // options from previous step output
+  completionData: z.record(z.string(), z.unknown()).nullable(), // structured response on completion
+  ui: StepUiSchema.optional(), // copied from step definition — tells UI what form to render
+  params: z.array(StepParamSchema).optional(), // copied from step definition — tells UI what form fields to render
+  creationReason: CreationReasonSchema.optional(), // why this task was created
+  selection: SelectionSchema.optional(), // copied from step definition — enables "pick one" review mode
+  options: z.array(z.record(z.string(), z.unknown())).optional(), // options from previous step output
   // Resolved verdict descriptors copied from the WD step in WD insertion order
   // (target stripped, defaults filled). Array — order stable through Firestore
   // + Web SDK + React. Records do not guarantee key iteration order.
-  verdicts: z.array(z.object({
-    key: z.string().min(1),
-    label: z.string(),
-    intent: z.enum(['success', 'danger', 'warning', 'neutral']),
-    requiresComment: z.boolean(),
-  })).optional(),
+  verdicts: z
+    .array(
+      z.object({
+        key: z.string().min(1),
+        label: z.string(),
+        intent: z.enum(['success', 'danger', 'warning', 'neutral']),
+        requiresComment: z.boolean(),
+      }),
+    )
+    .optional(),
   deleted: z.boolean().optional(),
 });
 

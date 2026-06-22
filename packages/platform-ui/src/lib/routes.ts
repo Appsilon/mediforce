@@ -19,8 +19,7 @@ export const routes = {
   workflow: (handle: string, name: string) => `/${handle}/workflows/${encode(name)}`,
   workflowDefinition: (handle: string, name: string, version: number | string) =>
     `/${handle}/workflows/${encode(name)}/definitions/${version}`,
-  workflowRun: (handle: string, name: string, runId: string) =>
-    `/${handle}/workflows/${encode(name)}/runs/${runId}`,
+  workflowRun: (handle: string, name: string, runId: string) => `/${handle}/workflows/${encode(name)}/runs/${runId}`,
   workflowRunStep: (handle: string, name: string, runId: string, stepId: string) =>
     `/${handle}/workflows/${encode(name)}/runs/${runId}/steps/${stepId}`,
   workflowRunReport: (handle: string, name: string, runId: string) =>
@@ -44,8 +43,7 @@ export const routes = {
   // ── Agents ─────────────────────────────────────────────────────
   agents: (handle: string) => `/${handle}/agents`,
   agent: (handle: string, runId: string) => `/${handle}/agents/${runId}`,
-  agentDefinition: (handle: string, definitionId: string) =>
-    `/${handle}/agents/definitions/${definitionId}`,
+  agentDefinition: (handle: string, definitionId: string) => `/${handle}/agents/definitions/${definitionId}`,
   agentNew: (handle: string) => `/${handle}/agents/new`,
 
   // ── Configs ────────────────────────────────────────────────────

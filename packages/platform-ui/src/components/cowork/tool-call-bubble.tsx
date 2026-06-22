@@ -30,9 +30,7 @@ export function ToolCallBubble({ turn }: { turn: ToolTurn }) {
   const status = turn.toolStatus;
   const displayName = turn.toolName;
   // Strip server namespace prefix for cleaner display
-  const shortName = displayName.includes('__')
-    ? displayName.slice(displayName.indexOf('__') + 2)
-    : displayName;
+  const shortName = displayName.includes('__') ? displayName.slice(displayName.indexOf('__') + 2) : displayName;
 
   const hasResult = status === 'success' && turn.toolResult;
   const hasError = status === 'error';
@@ -56,29 +54,22 @@ export function ToolCallBubble({ turn }: { turn: ToolTurn }) {
             (hasResult || hasError) && 'cursor-pointer hover:opacity-80',
           )}
         >
-          {status === 'running' && (
-            <Loader2 className="h-3 w-3 animate-spin text-blue-500 shrink-0" />
-          )}
-          {status === 'success' && (
-            <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400 shrink-0" />
-          )}
-          {status === 'error' && (
-            <AlertCircle className="h-3 w-3 text-red-600 dark:text-red-400 shrink-0" />
-          )}
+          {status === 'running' && <Loader2 className="h-3 w-3 animate-spin text-blue-500 shrink-0" />}
+          {status === 'success' && <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400 shrink-0" />}
+          {status === 'error' && <AlertCircle className="h-3 w-3 text-red-600 dark:text-red-400 shrink-0" />}
 
           <Wrench className="h-3 w-3 text-muted-foreground shrink-0" />
 
-          <span className="text-muted-foreground">
-            {status === 'running' ? `Calling ${shortName}` : shortName}
-          </span>
+          <span className="text-muted-foreground">{status === 'running' ? `Calling ${shortName}` : shortName}</span>
 
           {status === 'running' && <ElapsedTimer />}
 
-          {(hasResult || hasError) && (
-            expanded
-              ? <ChevronDown className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />
-              : <ChevronRight className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />
-          )}
+          {(hasResult || hasError) &&
+            (expanded ? (
+              <ChevronDown className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />
+            ) : (
+              <ChevronRight className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />
+            ))}
         </button>
 
         {/* Expanded result */}
@@ -89,9 +80,7 @@ export function ToolCallBubble({ turn }: { turn: ToolTurn }) {
         )}
 
         {expanded && hasError && (
-          <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400">
-            {turn.toolResult ?? 'Tool call failed'}
-          </p>
+          <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400">{turn.toolResult ?? 'Tool call failed'}</p>
         )}
       </div>
     </div>

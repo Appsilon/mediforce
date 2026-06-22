@@ -56,7 +56,9 @@ export function SaveVersionDialog({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-sm font-semibold">Name this version</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Give this revision a short, descriptive title so it's easy to identify later.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Give this revision a short, descriptive title so it's easy to identify later.
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -83,21 +85,18 @@ export function SaveVersionDialog({
         </div>
 
         <p className="text-xs text-muted-foreground leading-relaxed">
-          {trimmed
-            ? (
-              <>
-                Your new workflow version will be saved as{' '}
-                <span className="font-mono font-medium text-foreground">v{nextVersion}</span>{' '}
-                named <span className="font-medium text-foreground">&ldquo;{trimmed}&rdquo;</span>.
-              </>
-            )
-            : (
-              <>
-                Enter a title above to name version{' '}
-                <span className="font-mono font-medium text-foreground">v{nextVersion}</span>.
-              </>
-            )
-          }
+          {trimmed ? (
+            <>
+              Your new workflow version will be saved as{' '}
+              <span className="font-mono font-medium text-foreground">v{nextVersion}</span> named{' '}
+              <span className="font-medium text-foreground">&ldquo;{trimmed}&rdquo;</span>.
+            </>
+          ) : (
+            <>
+              Enter a title above to name version{' '}
+              <span className="font-mono font-medium text-foreground">v{nextVersion}</span>.
+            </>
+          )}
         </p>
 
         <label className="flex items-center gap-2 cursor-pointer select-none">

@@ -139,9 +139,7 @@ describe('McpClientManager', () => {
       ];
 
       // First call returns tealflow tools, second returns filesystem tools
-      mockListTools
-        .mockResolvedValueOnce({ tools: TEALFLOW_TOOLS })
-        .mockResolvedValueOnce({ tools: fsTools });
+      mockListTools.mockResolvedValueOnce({ tools: TEALFLOW_TOOLS }).mockResolvedValueOnce({ tools: fsTools });
 
       const manager = new McpClientManager([stdioServer, secondServer]);
       const tools = await manager.connect();
@@ -199,9 +197,7 @@ describe('McpClientManager', () => {
     it('should allow server.env to override inherited keys', async () => {
       process.env['PATH'] = '/usr/local/bin';
 
-      const manager = new McpClientManager([
-        { name: 'svr', command: 'cmd', args: [], env: { PATH: '/custom/bin' } },
-      ]);
+      const manager = new McpClientManager([{ name: 'svr', command: 'cmd', args: [], env: { PATH: '/custom/bin' } }]);
       await manager.connect();
 
       const envPassed = stdioConstructorCalls[0].env as Record<string, string>;
@@ -265,18 +261,14 @@ describe('McpClientManager', () => {
       const manager = new McpClientManager([stdioServer]);
       await manager.connect();
 
-      await expect(manager.callTool('invalidname', {})).rejects.toThrow(
-        "Invalid namespaced tool name 'invalidname'",
-      );
+      await expect(manager.callTool('invalidname', {})).rejects.toThrow("Invalid namespaced tool name 'invalidname'");
     });
 
     it('should throw for unknown server', async () => {
       const manager = new McpClientManager([stdioServer]);
       await manager.connect();
 
-      await expect(manager.callTool('unknown__tool', {})).rejects.toThrow(
-        "MCP server 'unknown' not connected",
-      );
+      await expect(manager.callTool('unknown__tool', {})).rejects.toThrow("MCP server 'unknown' not connected");
     });
 
     it('should throw for unknown tool on known server', async () => {

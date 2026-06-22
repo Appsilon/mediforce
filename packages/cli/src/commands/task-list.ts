@@ -11,7 +11,7 @@ const STATUS_ICONS: Record<string, string> = {
 export const taskListCommand = defineCommand({
   name: 'mediforce task list',
   description:
-    'List human tasks. With no axis flag returns the caller\'s workspace-visible queue across roles (GitHub-like default).',
+    "List human tasks. With no axis flag returns the caller's workspace-visible queue across roles (GitHub-like default).",
   args: {
     role: { type: 'string', description: 'Filter by assignedRole (mutually exclusive with --instance-id)' },
     'instance-id': { type: 'string', description: 'Filter by process instance (mutually exclusive with --role)' },
@@ -35,11 +35,7 @@ export const taskListCommand = defineCommand({
       ...(status !== undefined ? { status } : {}),
     };
     const input =
-      instanceId !== undefined
-        ? { instanceId, ...filters }
-        : role !== undefined
-          ? { role, ...filters }
-          : filters;
+      instanceId !== undefined ? { instanceId, ...filters } : role !== undefined ? { role, ...filters } : filters;
 
     const result = await mediforce.tasks.list(input);
 

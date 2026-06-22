@@ -1,15 +1,7 @@
-import {
-  calculateEstimatedCost,
-  type AgentOutputEnvelope,
-} from '@mediforce/platform-core';
+import { calculateEstimatedCost, type AgentOutputEnvelope } from '@mediforce/platform-core';
 import type { StepExecutorPlugin, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
 import type { AgentRunner, AgentRunResult } from './agent-runner';
-import type {
-  StepExecutor,
-  StepExecutorServices,
-  StepExecutorMeta,
-  StepExecutionResult,
-} from './step-executor';
+import type { StepExecutor, StepExecutorServices, StepExecutorMeta, StepExecutionResult } from './step-executor';
 
 export class AgentStepExecutor implements StepExecutor {
   constructor(private readonly agentRunner: AgentRunner) {}
@@ -54,7 +46,10 @@ export class AgentStepExecutor implements StepExecutor {
       const isEscalatedToL3Review = autonomyLevel === 'L3' && runResult.status === 'escalated' && !isFailed;
       await instanceRepo.updateStepExecution(instanceId, stepExecutionId, {
         output: envelope?.result ?? null,
-        status: !isFailed && (runResult.status === 'completed' || runResult.status === 'paused' || isEscalatedToL3Review) ? 'completed' : 'failed',
+        status:
+          !isFailed && (runResult.status === 'completed' || runResult.status === 'paused' || isEscalatedToL3Review)
+            ? 'completed'
+            : 'failed',
         completedAt: new Date().toISOString(),
         ...(isFailed && runResult.errorMessage ? { error: runResult.errorMessage } : {}),
         agentOutput: envelope
@@ -77,7 +72,8 @@ export class AgentStepExecutor implements StepExecutor {
     const isFailed = runResult.fallbackReason === 'error' || runResult.fallbackReason === 'timeout';
     if (isFailed) {
       const failLabel = runResult.fallbackReason === 'timeout' ? 'timed out' : 'failed';
-      const errorDetail = runResult.errorMessage ?? (runResult.fallbackReason === 'timeout' ? 'agent execution timed out' : null);
+      const errorDetail =
+        runResult.errorMessage ?? (runResult.fallbackReason === 'timeout' ? 'agent execution timed out' : null);
       if (errorDetail !== null) {
         await instanceRepo.update(instanceId, {
           error: `Agent step '${stepId}' ${failLabel}: ${errorDetail}`,
@@ -93,15 +89,19 @@ export class AgentStepExecutor implements StepExecutor {
       const freshInstance = await instanceRepo.getById(instanceId);
       if (freshInstance) {
         await instanceRepo.update(instanceId, {
-          ...(agentOutput !== null ? {
-            variables: {
-              ...freshInstance.variables,
-              [stepId]: agentOutput,
-            },
-          } : {}),
-          ...(stepCost !== undefined ? {
-            totalCostUsd: (freshInstance.totalCostUsd ?? 0) + stepCost,
-          } : {}),
+          ...(agentOutput !== null
+            ? {
+                variables: {
+                  ...freshInstance.variables,
+                  [stepId]: agentOutput,
+                },
+              }
+            : {}),
+          ...(stepCost !== undefined
+            ? {
+                totalCostUsd: (freshInstance.totalCostUsd ?? 0) + stepCost,
+              }
+            : {}),
         });
       }
     }
@@ -115,8 +115,9 @@ export class AgentStepExecutor implements StepExecutor {
       const reviewTaskNow = new Date().toISOString();
       const assignedRole = workflowStep.allowedRoles?.[0] ?? 'reviewer';
 
-      const priorReviewExecutions = (await instanceRepo.getStepExecutions(instanceId))
-        .filter((e) => e.stepId === stepId).length;
+      const priorReviewExecutions = (await instanceRepo.getStepExecutions(instanceId)).filter(
+        (e) => e.stepId === stepId,
+      ).length;
 
       await humanTaskRepo.create({
         id: reviewTaskId,
@@ -174,7 +175,11 @@ export class AgentStepExecutor implements StepExecutor {
     };
 
     // ---- L3 Review Routing (skip when agent errored) ----
-    if ((runResult.status === 'paused' || runResult.status === 'escalated') && autonomyLevel === 'L3' && runResult.fallbackReason !== 'error') {
+    if (
+      (runResult.status === 'paused' || runResult.status === 'escalated') &&
+      autonomyLevel === 'L3' &&
+      runResult.fallbackReason !== 'error'
+    ) {
       const reviewerType = workflowStep.review?.type ?? 'human';
       const isEscalation = runResult.status === 'escalated';
 
@@ -298,7 +303,7 @@ export class AgentStepExecutor implements StepExecutor {
       if (stepResult === null || stepResult === undefined) {
         throw new Error(
           `Workflow step '${stepId}' completed with null result — cannot advance. ` +
-          `Reason: ${runResult.fallbackReason ?? runResult.envelope?.reasoning_summary ?? 'unknown'}`,
+            `Reason: ${runResult.fallbackReason ?? runResult.envelope?.reasoning_summary ?? 'unknown'}`,
         );
       }
 
@@ -352,8 +357,13 @@ export class AgentStepExecutor implements StepExecutor {
 }
 
 async function estimateCostField(
-  envelope: { model: string | null; tokenUsage?: { inputTokens: number; outputTokens: number; cachedInputTokens?: number } },
-  modelRegistryRepo: { getById(id: string): Promise<{ pricing: { input: number; output: number; cacheRead?: number } } | null> },
+  envelope: {
+    model: string | null;
+    tokenUsage?: { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
+  },
+  modelRegistryRepo: {
+    getById(id: string): Promise<{ pricing: { input: number; output: number; cacheRead?: number } } | null>;
+  },
 ): Promise<{ estimatedCostUsd: number } | Record<string, never>> {
   if (!envelope.tokenUsage || !envelope.model) return {};
   const entry = await modelRegistryRepo.getById(envelope.model);

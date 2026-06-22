@@ -17,10 +17,7 @@ export const NICE_LIVE_INTERVAL_MS = 30_000;
 export const STANDARD_LIVE_INTERVAL_MS = 5_000;
 export const CRITICAL_LIVE_INTERVAL_MS = 1_500;
 
-export const TERMINAL_STATUSES: ReadonlySet<InstanceStatus> = new Set([
-  'completed',
-  'failed',
-]);
+export const TERMINAL_STATUSES: ReadonlySet<InstanceStatus> = new Set(['completed', 'failed']);
 
 /**
  * Workaround cap shared by every legacy `runs.list({})` call that mirrors

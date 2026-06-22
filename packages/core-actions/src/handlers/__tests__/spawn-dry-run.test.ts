@@ -38,9 +38,7 @@ describe('spawn dryRun propagation', () => {
       { ...baseCtx, dryRun: true },
     );
 
-    expect(trigger.fireWorkflow).toHaveBeenCalledWith(
-      expect.objectContaining({ dryRun: true }),
-    );
+    expect(trigger.fireWorkflow).toHaveBeenCalledWith(expect.objectContaining({ dryRun: true }));
   });
 
   it('does not forward dryRun when parent is not a dry run', async () => {
@@ -48,10 +46,7 @@ describe('spawn dryRun propagation', () => {
     const repo = makeProcessRepo();
     const handler = createSpawnActionHandler(trigger as never, repo as never);
 
-    await handler(
-      { targets: { definitionName: 'child-wf' }, continueOnSpawnError: true },
-      baseCtx,
-    );
+    await handler({ targets: { definitionName: 'child-wf' }, continueOnSpawnError: true }, baseCtx);
 
     const call = trigger.fireWorkflow.mock.calls[0][0];
     expect(call.dryRun).toBeUndefined();

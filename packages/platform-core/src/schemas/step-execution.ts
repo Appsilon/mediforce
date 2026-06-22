@@ -1,14 +1,7 @@
 import { z } from 'zod';
 import { PresentationSchema, TokenUsageSchema } from './agent-output-envelope';
 
-export const StepExecutionStatusSchema = z.enum([
-  'pending',
-  'running',
-  'completed',
-  'failed',
-  'escalated',
-  'paused',
-]);
+export const StepExecutionStatusSchema = z.enum(['pending', 'running', 'completed', 'failed', 'escalated', 'paused']);
 
 export const GateResultSchema = z.object({
   next: z.string().min(1),
@@ -29,19 +22,20 @@ export const AgentOutputSnapshotSchema = z.object({
   reasoning: z.string().nullable(),
   model: z.string().nullable(),
   duration_ms: z.number().nullable(),
-  gitMetadata: z.object({
-    commitSha: z.string(),
-    branch: z.string(),
-    changedFiles: z.array(z.string()),
-    repoUrl: z.string(),
-  }).nullable(),
+  gitMetadata: z
+    .object({
+      commitSha: z.string(),
+      branch: z.string(),
+      changedFiles: z.array(z.string()),
+      repoUrl: z.string(),
+    })
+    .nullable(),
   deliverableFile: z.string().nullable().optional(),
   tokenUsage: TokenUsageSchema.optional(),
   estimatedCostUsd: z.number().optional(),
-  presentation: z.union([z.string(), PresentationSchema])
-    .transform((value) =>
-      typeof value === 'string' ? { kind: 'html' as const, content: value } : value,
-    )
+  presentation: z
+    .union([z.string(), PresentationSchema])
+    .transform((value) => (typeof value === 'string' ? { kind: 'html' as const, content: value } : value))
     .nullable()
     .optional(),
 });

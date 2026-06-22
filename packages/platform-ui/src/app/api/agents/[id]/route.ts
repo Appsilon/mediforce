@@ -1,9 +1,5 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
-import {
-  deleteAgent,
-  getByIdAdapter,
-  updateAgent,
-} from '@mediforce/platform-api/handlers';
+import { deleteAgent, getByIdAdapter, updateAgent } from '@mediforce/platform-api/handlers';
 import {
   GetAgentInputSchema,
   DeleteAgentInputSchema,
@@ -23,12 +19,7 @@ interface RouteContext {
 /**
  * GET /api/agents/:id — 404 if missing or private to another workspace.
  */
-export const GET = createRouteAdapter<
-  typeof GetAgentInputSchema,
-  GetAgentInput,
-  unknown,
-  RouteContext
->(
+export const GET = createRouteAdapter<typeof GetAgentInputSchema, GetAgentInput, unknown, RouteContext>(
   GetAgentInputSchema,
   async (_req, ctx) => ({ id: (await ctx.params).id }),
   getByIdAdapter(
@@ -44,12 +35,7 @@ const UpdateAgentRouteInputSchema = z.object({
 });
 type UpdateAgentRouteInput = UpdateAgentInput & { body: UpdateAgentBody };
 
-export const PUT = createRouteAdapter<
-  typeof UpdateAgentRouteInputSchema,
-  UpdateAgentRouteInput,
-  unknown,
-  RouteContext
->(
+export const PUT = createRouteAdapter<typeof UpdateAgentRouteInputSchema, UpdateAgentRouteInput, unknown, RouteContext>(
   UpdateAgentRouteInputSchema,
   async (req, ctx) => ({
     id: (await ctx.params).id,
@@ -58,12 +44,7 @@ export const PUT = createRouteAdapter<
   updateAgent,
 );
 
-export const DELETE = createRouteAdapter<
-  typeof DeleteAgentInputSchema,
-  DeleteAgentInput,
-  unknown,
-  RouteContext
->(
+export const DELETE = createRouteAdapter<typeof DeleteAgentInputSchema, DeleteAgentInput, unknown, RouteContext>(
   DeleteAgentInputSchema,
   async (_req, ctx) => ({ id: (await ctx.params).id }),
   deleteAgent,

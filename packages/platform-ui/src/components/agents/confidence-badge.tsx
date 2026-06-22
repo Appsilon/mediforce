@@ -18,18 +18,16 @@ export function ConfidenceBadge({
   const { color, label } = confidenceToTrafficLight(confidence);
 
   return (
-    <span
-      className={cn('inline-flex items-center gap-1.5 text-sm font-medium', color)}
-      title={rationale ?? undefined}
-    >
+    <span className={cn('inline-flex items-center gap-1.5 text-sm font-medium', color)} title={rationale ?? undefined}>
       {/* Traffic light dot */}
-      <span className={cn('h-2 w-2 rounded-full', {
-        'bg-green-500': confidence >= 0.8,
-        'bg-amber-500': confidence >= 0.5 && confidence < 0.8,
-        'bg-red-500': confidence < 0.5,
-      })} />
-      {pct}%
-      {showLabel && <span className="capitalize text-xs font-normal">({label})</span>}
+      <span
+        className={cn('h-2 w-2 rounded-full', {
+          'bg-green-500': confidence >= 0.8,
+          'bg-amber-500': confidence >= 0.5 && confidence < 0.8,
+          'bg-red-500': confidence < 0.5,
+        })}
+      />
+      {pct}%{showLabel && <span className="capitalize text-xs font-normal">({label})</span>}
     </span>
   );
 }

@@ -7,13 +7,7 @@ import type { ProcessInstance } from '@mediforce/platform-core';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 
-export function StuckProcessesList({
-  processes,
-  loading,
-}: {
-  processes: ProcessInstance[];
-  loading: boolean;
-}) {
+export function StuckProcessesList({ processes, loading }: { processes: ProcessInstance[]; loading: boolean }) {
   const handle = useHandleFromPath();
   if (loading) {
     return (
@@ -42,9 +36,10 @@ export function StuckProcessesList({
         const stuckSince = inst.updatedAt;
         // In a summary list, truncate long error strings (e.g. Docker stack traces from
         // step_failure) so rows don't blow up in height.
-        const displayReason = wfStatus.reason !== null && wfStatus.reason.length > 120
-          ? wfStatus.reason.slice(0, 120) + '…'
-          : wfStatus.reason;
+        const displayReason =
+          wfStatus.reason !== null && wfStatus.reason.length > 120
+            ? wfStatus.reason.slice(0, 120) + '…'
+            : wfStatus.reason;
         return (
           <div
             key={inst.id}
@@ -63,15 +58,9 @@ export function StuckProcessesList({
                   stuck {formatDistanceToNow(new Date(stuckSince), { addSuffix: true })}
                 </span>
               </div>
-              {displayReason && (
-                <div className="text-xs text-amber-700 dark:text-amber-300">
-                  {displayReason}
-                </div>
-              )}
+              {displayReason && <div className="text-xs text-amber-700 dark:text-amber-300">{displayReason}</div>}
               {inst.currentStepId && (
-                <div className="text-xs text-muted-foreground font-mono">
-                  Stuck at: {inst.currentStepId}
-                </div>
+                <div className="text-xs text-muted-foreground font-mono">Stuck at: {inst.currentStepId}</div>
               )}
             </div>
           </div>

@@ -7,13 +7,7 @@ import dynamic from 'next/dynamic';
  * is actually expanded in the config editor. Shows a loading skeleton while
  * the chunk loads.
  */
-export const LazyScriptEditor = dynamic(
-  () =>
-    import('./inline-script-editor').then((mod) => mod.InlineScriptEditor),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-32 rounded-md border bg-muted/30 animate-pulse" />
-    ),
-  },
-);
+export const LazyScriptEditor = dynamic(() => import('./inline-script-editor').then((mod) => mod.InlineScriptEditor), {
+  ssr: false,
+  loading: () => <div className="h-32 rounded-md border bg-muted/30 animate-pulse" />,
+});

@@ -27,15 +27,9 @@ interface TaskContextPanelProps {
  *
  * Renders nothing if the previous step produced no output to show.
  */
-export function TaskContextPanel({
-  processInstanceId,
-  stepId,
-}: TaskContextPanelProps) {
+export function TaskContextPanel({ processInstanceId, stepId }: TaskContextPanelProps) {
   const { data: instance } = useProcessInstance(processInstanceId);
-  const { data: executions, loading } = useStepExecutions(
-    processInstanceId,
-    instance?.status,
-  );
+  const { data: executions, loading } = useStepExecutions(processInstanceId, instance?.status);
 
   // Find the completed step execution that directly precedes this human task's
   // current entry into the review step. On L3 agent-reviewer iteration loops a
@@ -57,8 +51,7 @@ export function TaskContextPanel({
     // (they belong to past iterations). Use Infinity so the most recent
     // preceding step from the current loop pass is found as context.
     const isLoopRevisitWithNoRecord =
-      instance?.currentStepId === stepId &&
-      currentStepExecs.every((e) => e.status === 'completed');
+      instance?.currentStepId === stepId && currentStepExecs.every((e) => e.status === 'completed');
 
     const currentStepStart =
       currentStepExecs.length === 0 || isLoopRevisitWithNoRecord
@@ -66,11 +59,12 @@ export function TaskContextPanel({
         : new Date(currentStepExecs[currentStepExecs.length - 1].startedAt).getTime();
 
     const completed = executions
-      .filter((e) =>
-        e.stepId !== stepId &&
-        e.status === 'completed' &&
-        (e.output !== null || normalizePresentation(e.agentOutput?.presentation) !== null) &&
-        new Date(e.startedAt).getTime() <= currentStepStart,
+      .filter(
+        (e) =>
+          e.stepId !== stepId &&
+          e.status === 'completed' &&
+          (e.output !== null || normalizePresentation(e.agentOutput?.presentation) !== null) &&
+          new Date(e.startedAt).getTime() <= currentStepStart,
       )
       .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
     return completed.length > 0 ? completed[completed.length - 1] : null;
@@ -78,10 +72,8 @@ export function TaskContextPanel({
 
   const hasContent =
     previousStepOutput !== null &&
-    (
-      previousStepOutput.output !== null ||
-      normalizePresentation(previousStepOutput.agentOutput?.presentation) !== null
-    );
+    (previousStepOutput.output !== null ||
+      normalizePresentation(previousStepOutput.agentOutput?.presentation) !== null);
 
   if (loading) {
     return (
@@ -108,9 +100,7 @@ export function TaskContextPanel({
         <Collapsible.Trigger className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Previous Step Output
-            <span className="ml-2 font-normal normal-case text-muted-foreground/70">
-              ({previousStep.stepId})
-            </span>
+            <span className="ml-2 font-normal normal-case text-muted-foreground/70">({previousStep.stepId})</span>
           </div>
           <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 data-[state=open]:rotate-180" />
         </Collapsible.Trigger>
@@ -145,8 +135,9 @@ function PreviousStepOutputTabs({
 }: PreviousStepOutputTabsProps) {
   // Inline presentation prefers the agentOutput field (structured); falls
   // back to a string under `output.presentation` from legacy script outputs.
-  const inlinePresentation: Presentation | null = agentPresentation
-    ?? (output !== null && typeof output.presentation === 'string' && output.presentation.length > 0
+  const inlinePresentation: Presentation | null =
+    agentPresentation ??
+    (output !== null && typeof output.presentation === 'string' && output.presentation.length > 0
       ? { kind: 'html', content: output.presentation }
       : null);
 
@@ -157,11 +148,8 @@ function PreviousStepOutputTabs({
       ? output.htmlReportPath
       : null;
 
-  const reportMode: 'inline' | 'file' | null = inlinePresentation !== null
-    ? 'inline'
-    : htmlReportPath !== null
-      ? 'file'
-      : null;
+  const reportMode: 'inline' | 'file' | null =
+    inlinePresentation !== null ? 'inline' : htmlReportPath !== null ? 'file' : null;
 
   const [fetchedReport, setFetchedReport] = React.useState<string | null>(null);
   const [reportLoading, setReportLoading] = React.useState(false);
@@ -201,8 +189,8 @@ function PreviousStepOutputTabs({
 
   // Resolved presentation: inline structured payload wins; otherwise a
   // fetched file becomes an HTML payload.
-  const resolvedPresentation: Presentation | null = inlinePresentation
-    ?? (fetchedReport !== null ? { kind: 'html', content: fetchedReport } : null);
+  const resolvedPresentation: Presentation | null =
+    inlinePresentation ?? (fetchedReport !== null ? { kind: 'html', content: fetchedReport } : null);
   const showReportTab = reportMode !== null;
 
   const defaultTab = showReportTab ? 'report' : 'summary';
@@ -233,12 +221,7 @@ function PreviousStepOutputTabs({
 
       {showReportTab && (
         <Tabs.Content value="report" className="p-4">
-          <ReportPane
-            presentation={resolvedPresentation}
-            loading={reportLoading}
-            error={reportError}
-            result={output}
-          />
+          <ReportPane presentation={resolvedPresentation} loading={reportLoading} error={reportError} result={output} />
         </Tabs.Content>
       )}
 
@@ -246,9 +229,7 @@ function PreviousStepOutputTabs({
         {output !== null ? (
           <SummaryView output={output} />
         ) : (
-          <pre className="text-sm whitespace-pre-wrap break-words">
-            {String(rawOutput)}
-          </pre>
+          <pre className="text-sm whitespace-pre-wrap break-words">{String(rawOutput)}</pre>
         )}
       </Tabs.Content>
 
@@ -287,33 +268,21 @@ function ReportPane({ presentation, loading, error, result }: ReportPaneProps) {
   }
 
   if (presentation === null) {
-    return (
-      <div className="text-sm text-muted-foreground">
-        No report content.
-      </div>
-    );
+    return <div className="text-sm text-muted-foreground">No report content.</div>;
   }
 
   if (presentation.kind === 'markdown') {
     return <MarkdownPresentation content={presentation.content} />;
   }
 
-  return (
-    <SandboxedHtmlIframe
-      html={presentation.content}
-      result={result}
-      title="Previous step report"
-    />
-  );
+  return <SandboxedHtmlIframe html={presentation.content} result={result} title="Previous step report" />;
 }
 
 /** Renders top-level keys of the output as a definition list. */
 function SummaryView({ output }: { output: Record<string, unknown> }) {
   const entries = Object.entries(output);
   if (entries.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">No output data.</p>
-    );
+    return <p className="text-sm text-muted-foreground">No output data.</p>;
   }
 
   // Feature prominent fields at the top
@@ -326,9 +295,7 @@ function SummaryView({ output }: { output: Record<string, unknown> }) {
       {/* Featured fields */}
       {prominent.map(([key, value]) => (
         <div key={key} className="rounded-md bg-primary/5 border border-primary/10 p-3">
-          <div className="text-xs font-medium text-primary uppercase tracking-wide mb-1">
-            {formatKey(key)}
-          </div>
+          <div className="text-xs font-medium text-primary uppercase tracking-wide mb-1">{formatKey(key)}</div>
           <div className="text-sm">
             <ValueDisplay value={value} />
           </div>
@@ -415,11 +382,13 @@ function ValueDisplay({ value }: { value: unknown }) {
                   <div key={subKey}>
                     <dt className="text-muted-foreground font-medium mb-0.5">{formatKey(subKey)}</dt>
                     <dd className="break-words">
-                      {subValue === null || subValue === undefined
-                        ? <span className="text-muted-foreground italic">-</span>
-                        : typeof subValue === 'object'
-                        ? <ValueDisplay value={subValue} />
-                        : <span className="whitespace-pre-wrap">{String(subValue)}</span>}
+                      {subValue === null || subValue === undefined ? (
+                        <span className="text-muted-foreground italic">-</span>
+                      ) : typeof subValue === 'object' ? (
+                        <ValueDisplay value={subValue} />
+                      ) : (
+                        <span className="whitespace-pre-wrap">{String(subValue)}</span>
+                      )}
                     </dd>
                   </div>
                 ))}
@@ -442,11 +411,13 @@ function ValueDisplay({ value }: { value: unknown }) {
             <div key={subKey}>
               <dt className="text-muted-foreground font-medium mb-0.5">{formatKey(subKey)}</dt>
               <dd className="break-words">
-                {subValue === null || subValue === undefined
-                  ? <span className="text-muted-foreground italic">-</span>
-                  : typeof subValue === 'object'
-                  ? <ValueDisplay value={subValue} />
-                  : <span className="whitespace-pre-wrap">{String(subValue)}</span>}
+                {subValue === null || subValue === undefined ? (
+                  <span className="text-muted-foreground italic">-</span>
+                ) : typeof subValue === 'object' ? (
+                  <ValueDisplay value={subValue} />
+                ) : (
+                  <span className="whitespace-pre-wrap">{String(subValue)}</span>
+                )}
               </dd>
             </div>
           ))}

@@ -29,10 +29,7 @@ export class InMemoryHandoffRepository implements HandoffRepository {
     return entity ? { ...entity } : null;
   }
 
-  async getByIdInNamespaces(
-    entityId: string,
-    allowed: readonly string[],
-  ): Promise<HandoffEntity | null> {
+  async getByIdInNamespaces(entityId: string, allowed: readonly string[]): Promise<HandoffEntity | null> {
     const entity = this.entities.get(entityId);
     if (!entity) return null;
     const parent = await this.requireParents().getById(entity.processInstanceId);
@@ -46,24 +43,16 @@ export class InMemoryHandoffRepository implements HandoffRepository {
     );
   }
 
-  async getByRoleInNamespaces(
-    role: string,
-    allowed: readonly string[],
-  ): Promise<HandoffEntity[]> {
+  async getByRoleInNamespaces(role: string, allowed: readonly string[]): Promise<HandoffEntity[]> {
     const rows = await this.getByRoleAll(role);
     return this.filterByParentNamespace(rows, allowed);
   }
 
   async getByInstanceId(instanceId: string): Promise<HandoffEntity[]> {
-    return [...this.entities.values()].filter(
-      (e) => e.processInstanceId === instanceId,
-    );
+    return [...this.entities.values()].filter((e) => e.processInstanceId === instanceId);
   }
 
-  async getByInstanceIdInNamespaces(
-    instanceId: string,
-    allowed: readonly string[],
-  ): Promise<HandoffEntity[]> {
+  async getByInstanceIdInNamespaces(instanceId: string, allowed: readonly string[]): Promise<HandoffEntity[]> {
     const parent = await this.requireParents().getById(instanceId);
     if (!parent || typeof parent.namespace !== 'string') return [];
     if (!allowed.includes(parent.namespace)) return [];
@@ -102,17 +91,11 @@ export class InMemoryHandoffRepository implements HandoffRepository {
     return { ...updated };
   }
 
-  async resolve(
-    entityId: string,
-    userId: string,
-    resolution: Record<string, unknown>,
-  ): Promise<HandoffEntity> {
+  async resolve(entityId: string, userId: string, resolution: Record<string, unknown>): Promise<HandoffEntity> {
     const entity = this.entities.get(entityId);
     if (!entity) throw new Error(`HandoffEntity not found: ${entityId}`);
     if (entity.assignedUserId !== userId) {
-      throw new Error(
-        `User '${userId}' cannot resolve handoff '${entityId}' — assigned to '${entity.assignedUserId}'`,
-      );
+      throw new Error(`User '${userId}' cannot resolve handoff '${entityId}' — assigned to '${entity.assignedUserId}'`);
     }
     const now = new Date().toISOString();
     const updated: HandoffEntity = {
@@ -128,9 +111,7 @@ export class InMemoryHandoffRepository implements HandoffRepository {
 
   private requireParents(): ProcessInstanceRepository {
     if (this.parents === undefined) {
-      throw new Error(
-        'InMemoryHandoffRepository: ProcessInstanceRepository required for namespace-scoped methods',
-      );
+      throw new Error('InMemoryHandoffRepository: ProcessInstanceRepository required for namespace-scoped methods');
     }
     return this.parents;
   }

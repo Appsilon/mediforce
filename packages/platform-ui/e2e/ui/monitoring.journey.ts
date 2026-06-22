@@ -14,15 +14,14 @@ test.describe('Monitoring Journey', () => {
     // is armed before the request fires.
     const summaryRequest = page.waitForResponse(
       (res) =>
-        res.url().includes(`/api/namespaces/${TEST_ORG_HANDLE}/monitoring/summary`) &&
-        res.request().method() === 'GET',
+        res.url().includes(`/api/namespaces/${TEST_ORG_HANDLE}/monitoring/summary`) && res.request().method() === 'GET',
       { timeout: 30_000 },
     );
 
     await page.goto(`/${TEST_ORG_HANDLE}/monitoring`);
-    await expect(
-      page.getByText('Real-time view of all workflows and task assignments'),
-    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Real-time view of all workflows and task assignments')).toBeVisible({
+      timeout: 30_000,
+    });
     await showStep(page);
 
     const summaryRes = await summaryRequest;
@@ -41,9 +40,7 @@ test.describe('Monitoring Journey', () => {
     // must render from the summary response. Asserting label visibility
     // proves `MonitoringSummaryCards` mounted with the data the hook
     // delivered — the rendering risk this L4 closes.
-    await expect(
-      page.getByRole('heading', { name: 'Workflow Status' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Workflow Status' })).toBeVisible();
     await expect(page.getByText('Running', { exact: true })).toBeVisible();
     await expect(page.getByText('Paused', { exact: true })).toBeVisible();
     await expect(page.getByText('Failed', { exact: true })).toBeVisible();
@@ -54,12 +51,8 @@ test.describe('Monitoring Journey', () => {
     // `summary.roleTaskCounts`; `StuckProcessesList` still pulls from the
     // Firestore subscription (`useProcessInstances`) until that domain's
     // react-query migration lands — both must coexist on the page.
-    await expect(
-      page.getByRole('heading', { name: 'Stuck Workflows' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Task Assignments by Role' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Stuck Workflows' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Task Assignments by Role' })).toBeVisible();
     await showResult(page);
 
     await endRecording(page);

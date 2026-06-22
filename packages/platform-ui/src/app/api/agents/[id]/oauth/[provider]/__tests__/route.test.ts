@@ -50,9 +50,7 @@ function makeDeleteRequest(options: {
   revokeAtProvider?: boolean;
   authHeader?: string | null;
 }): NextRequest {
-  const url = new URL(
-    `http://localhost/api/agents/${options.agentId}/oauth/${options.providerSlug}`,
-  );
+  const url = new URL(`http://localhost/api/agents/${options.agentId}/oauth/${options.providerSlug}`);
   if (options.namespace !== null) url.searchParams.set('namespace', options.namespace);
   if (options.serverName !== null) url.searchParams.set('serverName', options.serverName);
   if (options.revokeAtProvider === true) url.searchParams.set('revokeAtProvider', 'true');

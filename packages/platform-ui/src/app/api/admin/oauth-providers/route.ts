@@ -5,15 +5,9 @@ import {
   type CreateOAuthProviderInputApi,
   type ListOAuthProvidersInput,
 } from '@mediforce/platform-api/contract';
-import {
-  createOAuthProvider,
-  listOAuthProviders,
-} from '@mediforce/platform-api/handlers';
+import { createOAuthProvider, listOAuthProviders } from '@mediforce/platform-api/handlers';
 
-export const GET = createRouteAdapter<
-  typeof ListOAuthProvidersInputSchema,
-  ListOAuthProvidersInput
->(
+export const GET = createRouteAdapter<typeof ListOAuthProvidersInputSchema, ListOAuthProvidersInput>(
   ListOAuthProvidersInputSchema,
   (req) => ({
     namespace: new URL(req.url).searchParams.get('namespace') ?? '',
@@ -21,10 +15,7 @@ export const GET = createRouteAdapter<
   listOAuthProviders,
 );
 
-export const POST = createRouteAdapter<
-  typeof CreateOAuthProviderInputApiSchema,
-  CreateOAuthProviderInputApi
->(
+export const POST = createRouteAdapter<typeof CreateOAuthProviderInputApiSchema, CreateOAuthProviderInputApi>(
   CreateOAuthProviderInputApiSchema,
   async (req) => {
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;

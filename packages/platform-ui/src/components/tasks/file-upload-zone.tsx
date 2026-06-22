@@ -53,9 +53,7 @@ export function FileUploadZone({
     // acceptedTypes can contain MIME types (e.g. "application/pdf") or
     // file extensions (e.g. ".xpt"). Check both.
     const acceptsOctetStream = acceptedTypes.includes('application/octet-stream');
-    const acceptedExtensions = acceptedTypes
-      .filter((type) => type.startsWith('.'))
-      .map((ext) => ext.toLowerCase());
+    const acceptedExtensions = acceptedTypes.filter((type) => type.startsWith('.')).map((ext) => ext.toLowerCase());
     const acceptedMimes = acceptedTypes.filter((type) => !type.startsWith('.'));
 
     const invalid = newFiles.filter((file) => {
@@ -139,15 +137,11 @@ export function FileUploadZone({
         onClick={() => inputRef.current?.click()}
         className={cn(
           'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 cursor-pointer transition-colors',
-          dragOver
-            ? 'border-primary bg-primary/5'
-            : 'border-muted-foreground/25 hover:border-primary/50',
+          dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50',
         )}
       >
         <Upload className="h-8 w-8 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">
-          Drop files here or click to browse
-        </p>
+        <p className="text-sm text-muted-foreground">Drop files here or click to browse</p>
         <p className="text-xs text-muted-foreground/70">
           {typeLabels} — {minFiles} to {maxFiles} files, max {maxFileSizeMB} MB each
         </p>
@@ -163,22 +157,27 @@ export function FileUploadZone({
       </div>
 
       {/* Error */}
-      {error && (
-        <p className="text-sm text-destructive">{error}</p>
-      )}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       {/* File list */}
       {files.length > 0 && (
         <ul className="space-y-2">
           {files.map((file, index) => (
-            <li
-              key={`${file.name}-${index}`}
-              className="flex items-center justify-between rounded-md border px-3 py-2"
-            >
+            <li key={`${file.name}-${index}`} className="flex items-center justify-between rounded-md border px-3 py-2">
               <div className="flex items-center gap-2 min-w-0">
-                <FileText className={cn('h-4 w-4 shrink-0', file.size > maxFileSizeMB * 1024 * 1024 ? 'text-destructive' : 'text-muted-foreground')} />
+                <FileText
+                  className={cn(
+                    'h-4 w-4 shrink-0',
+                    file.size > maxFileSizeMB * 1024 * 1024 ? 'text-destructive' : 'text-muted-foreground',
+                  )}
+                />
                 <span className="text-sm truncate">{file.name}</span>
-                <span className={cn('text-xs shrink-0', file.size > maxFileSizeMB * 1024 * 1024 ? 'text-destructive font-medium' : 'text-muted-foreground')}>
+                <span
+                  className={cn(
+                    'text-xs shrink-0',
+                    file.size > maxFileSizeMB * 1024 * 1024 ? 'text-destructive font-medium' : 'text-muted-foreground',
+                  )}
+                >
                   {formatFileSize(file.size)}
                   {file.size > maxFileSizeMB * 1024 * 1024 && ' (too large)'}
                 </span>

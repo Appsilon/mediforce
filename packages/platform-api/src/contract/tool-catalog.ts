@@ -19,18 +19,16 @@ export const GetToolCatalogEntryOutputSchema = z.object({
  *  when absent. Strict + partial on `id` keeps the wire schema honest about
  *  what the client may send while letting the create handler reject empty
  *  derivations as a validation error. */
-export const CreateToolCatalogEntryInputApiSchema = NamespaceQuery.merge(
-  ToolCatalogEntrySchema.partial({ id: true }),
-);
+export const CreateToolCatalogEntryInputApiSchema = NamespaceQuery.merge(ToolCatalogEntrySchema.partial({ id: true }));
 export const CreateToolCatalogEntryOutputSchema = z.object({
   entry: ToolCatalogEntrySchema,
 });
 
 /** PATCH input: id from URL, partial body, id cannot be renamed (bindings
  *  reference it). */
-export const UpdateToolCatalogEntryInputApiSchema = NamespaceQuery
-  .extend({ id: z.string().min(1) })
-  .merge(ToolCatalogEntrySchema.omit({ id: true }).partial().strict());
+export const UpdateToolCatalogEntryInputApiSchema = NamespaceQuery.extend({ id: z.string().min(1) }).merge(
+  ToolCatalogEntrySchema.omit({ id: true }).partial().strict(),
+);
 export const UpdateToolCatalogEntryOutputSchema = z.object({
   entry: ToolCatalogEntrySchema,
 });

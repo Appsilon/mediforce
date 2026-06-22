@@ -49,8 +49,8 @@ describe('getModel handler', () => {
       retiredAt: null,
     });
 
-    await expect(
-      getModel({ id: 'nonexistent/model' }, { modelRegistryRepo: repo }),
-    ).rejects.toThrow("Model 'nonexistent/model' not found");
+    await expect(getModel({ id: 'nonexistent/model' }, { modelRegistryRepo: repo })).rejects.toThrow(
+      "Model 'nonexistent/model' not found",
+    );
   });
 });

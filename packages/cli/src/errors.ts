@@ -16,10 +16,7 @@ const TLS_CODES = new Set([
   'ERR_TLS_CERT_ALTNAME_INVALID',
 ]);
 
-export function formatCliError(
-  err: unknown,
-  input: FormatCliErrorInput = {},
-): ErrorPayload {
+export function formatCliError(err: unknown, input: FormatCliErrorInput = {}): ErrorPayload {
   if (err instanceof ApiError) {
     return formatApiError(err);
   }
@@ -57,9 +54,7 @@ function formatApiError(err: ApiError): ErrorPayload {
   } else if (err.status === 403) {
     payload.hints = ['Check that MEDIFORCE_API_KEY is valid for this workspace.'];
   } else if (err.status === 404 && looksLikeNonJson404(err.body)) {
-    payload.hints = [
-      'The base URL may be wrong. Point MEDIFORCE_BASE_URL at a Mediforce API host.',
-    ];
+    payload.hints = ['The base URL may be wrong. Point MEDIFORCE_BASE_URL at a Mediforce API host.'];
   }
 
   return payload;
@@ -129,7 +124,6 @@ function networkHints(baseUrl?: string): string[] {
 
   return hints;
 }
-
 
 function findFetchSystemError(err: unknown): SystemErrorShape | null {
   if (!isFetchFailure(err)) {
@@ -234,7 +228,6 @@ function looksLikeNonJson404(body: unknown): boolean {
   // parseJsonOrThrow normalizes non-JSON 404 response bodies to {} in ApiError.body.
   return isRecord(body) && Object.keys(body).length === 0;
 }
-
 
 function isLocalBaseUrl(baseUrl: string | undefined): boolean {
   if (typeof baseUrl !== 'string' || baseUrl.length === 0) {

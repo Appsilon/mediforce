@@ -15,12 +15,7 @@ export default function MonitoringPage() {
   // Paused-instance list lives in the processes domain — it stays on the
   // Firestore-backed `useProcessInstances` hook until that domain's
   // react-query migration lands. Counts come from the headless aggregate.
-  const { data: pausedInstances, loading: pausedLoading } = useProcessInstances(
-    'paused',
-    undefined,
-    false,
-    handle,
-  );
+  const { data: pausedInstances, loading: pausedLoading } = useProcessInstances('paused', undefined, false, handle);
 
   const runs = summary?.runs;
   const roleCounts = useMemo(() => {
@@ -38,15 +33,11 @@ export default function MonitoringPage() {
   return (
     <div className="p-6 space-y-8">
       <div>
-        <p className="text-sm text-muted-foreground">
-          Real-time view of all workflows and task assignments
-        </p>
+        <p className="text-sm text-muted-foreground">Real-time view of all workflows and task assignments</p>
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-          Workflow Status
-        </h2>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Workflow Status</h2>
         <MonitoringSummaryCards
           running={runs?.running ?? 0}
           paused={runs?.paused ?? 0}
@@ -59,9 +50,7 @@ export default function MonitoringPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Stuck Workflows
-            </h2>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Stuck Workflows</h2>
             {pausedInstances.length > 0 && (
               <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
                 {pausedInstances.length} paused

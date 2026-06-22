@@ -18,8 +18,7 @@ export function applyRestrictionUpdate(
   const existing = current?.[serverName] ?? {};
   const merged = { ...existing, ...patch };
   const disable = merged.disable === true ? true : undefined;
-  const denyTools =
-    merged.denyTools !== undefined && merged.denyTools.length > 0 ? merged.denyTools : undefined;
+  const denyTools = merged.denyTools !== undefined && merged.denyTools.length > 0 ? merged.denyTools : undefined;
 
   const rest: StepMcpRestriction = {};
   for (const [key, value] of Object.entries(current ?? {})) {

@@ -27,10 +27,7 @@ const def: WorkflowDefinition = {
 
 const actor: StepActor = { id: 'user-1', role: 'operator' };
 
-async function seedFailedInstance(
-  instanceRepo: InMemoryProcessInstanceRepository,
-  stepId = 'deploy',
-): Promise<string> {
+async function seedFailedInstance(instanceRepo: InMemoryProcessInstanceRepository, stepId = 'deploy'): Promise<string> {
   const now = new Date().toISOString();
   const instance = await instanceRepo.create({
     id: 'instance-1',
@@ -120,9 +117,7 @@ describe('WorkflowEngine.retryStep', () => {
     const instanceId = await seedFailedInstance(instanceRepo);
     await instanceRepo.update(instanceId, { status: 'running' });
 
-    await expect(engine.retryStep(instanceId, 'deploy', actor)).rejects.toThrow(
-      InvalidTransitionError,
-    );
+    await expect(engine.retryStep(instanceId, 'deploy', actor)).rejects.toThrow(InvalidTransitionError);
   });
 
   it.each([
@@ -150,20 +145,14 @@ describe('WorkflowEngine.retryStep', () => {
     const instanceId = await seedFailedInstance(instanceRepo);
     await instanceRepo.update(instanceId, { status: 'paused', pauseReason });
 
-    await expect(engine.retryStep(instanceId, 'deploy', actor)).rejects.toThrow(
-      InvalidTransitionError,
-    );
+    await expect(engine.retryStep(instanceId, 'deploy', actor)).rejects.toThrow(InvalidTransitionError);
   });
 
   it('refuses to retry a step that is not the current step', async () => {
     const instanceId = await seedFailedInstance(instanceRepo, 'deploy');
 
-    await expect(engine.retryStep(instanceId, 'upload', actor)).rejects.toThrow(
-      InvalidTransitionError,
-    );
-    await expect(engine.retryStep(instanceId, 'upload', actor)).rejects.toThrow(
-      /not the current step/i,
-    );
+    await expect(engine.retryStep(instanceId, 'upload', actor)).rejects.toThrow(InvalidTransitionError);
+    await expect(engine.retryStep(instanceId, 'upload', actor)).rejects.toThrow(/not the current step/i);
   });
 
   it('refuses to retry when the latest execution for that step did not fail', async () => {
@@ -173,12 +162,7 @@ describe('WorkflowEngine.retryStep', () => {
       status: 'completed',
     });
 
-    await expect(engine.retryStep(instanceId, 'deploy', actor)).rejects.toThrow(
-      InvalidTransitionError,
-    );
-    await expect(engine.retryStep(instanceId, 'deploy', actor)).rejects.toThrow(
-      /latest execution.*not failed/i,
-    );
+    await expect(engine.retryStep(instanceId, 'deploy', actor)).rejects.toThrow(InvalidTransitionError);
+    await expect(engine.retryStep(instanceId, 'deploy', actor)).rejects.toThrow(/latest execution.*not failed/i);
   });
-
 });

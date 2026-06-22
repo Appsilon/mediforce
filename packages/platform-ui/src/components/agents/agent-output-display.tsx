@@ -51,11 +51,7 @@ function extractOutputFilePath(result: Record<string, unknown>): string | null {
  * raw JSON). Shared between the human-task review wrapper and the workflow
  * step detail page.
  */
-export function AgentOutputDisplay({
-  agentOutput,
-  instanceId,
-  onContentLoaded,
-}: AgentOutputDisplayProps) {
+export function AgentOutputDisplay({ agentOutput, instanceId, onContentLoaded }: AgentOutputDisplayProps) {
   const presentation = agentOutput.presentation;
   const hasPresentation = presentation !== null;
   const result = agentOutput.result ?? {};
@@ -79,7 +75,9 @@ export function AgentOutputDisplay({
     setFileError(null);
     setFileLoading(true);
     let cancelled = false;
-    apiFetch(`/api/agent-output-file?path=${encodeURIComponent(outputFilePath)}&instanceId=${encodeURIComponent(instanceId)}`)
+    apiFetch(
+      `/api/agent-output-file?path=${encodeURIComponent(outputFilePath)}&instanceId=${encodeURIComponent(instanceId)}`,
+    )
       .then((res) => res.json() as Promise<{ content?: string; error?: string }>)
       .then((data) => {
         if (cancelled) return;
@@ -112,9 +110,7 @@ export function AgentOutputDisplay({
   if (!hasContent) {
     return (
       <div className="rounded-lg border border-dashed p-6 text-center">
-        <p className="text-sm text-muted-foreground">
-          No agent output to review.
-        </p>
+        <p className="text-sm text-muted-foreground">No agent output to review.</p>
       </div>
     );
   }
@@ -158,11 +154,7 @@ export function AgentOutputDisplay({
             {presentation.kind === 'markdown' ? (
               <MarkdownPresentation content={presentation.content} />
             ) : (
-              <SandboxedHtmlIframe
-                html={presentation.content}
-                result={agentOutput.result}
-                title="Agent presentation"
-              />
+              <SandboxedHtmlIframe html={presentation.content} result={agentOutput.result} title="Agent presentation" />
             )}
           </Tabs.Content>
         )}
@@ -175,11 +167,7 @@ export function AgentOutputDisplay({
                 <span className="text-sm">Loading content...</span>
               </div>
             )}
-            {fileError && (
-              <div className="text-sm text-amber-600 dark:text-amber-400 py-4">
-                {fileError}
-              </div>
-            )}
+            {fileError && <div className="text-sm text-amber-600 dark:text-amber-400 py-4">{fileError}</div>}
             {fileContent && (
               <div className="prose prose-sm dark:prose-invert max-w-none overflow-auto max-h-[600px]">
                 <MarkdownContent content={fileContent} />
@@ -205,9 +193,7 @@ export function AgentOutputDisplay({
 // ── Metrics header ──────────────────────────────────────────────────────────
 
 function MetricsHeader({ agentOutput }: { agentOutput: AgentOutputData }) {
-  const confidencePct = agentOutput.confidence !== null
-    ? Math.round(agentOutput.confidence * 100)
-    : null;
+  const confidencePct = agentOutput.confidence !== null ? Math.round(agentOutput.confidence * 100) : null;
 
   const hasAnyMetric =
     confidencePct !== null ||
@@ -228,12 +214,18 @@ function MetricsHeader({ agentOutput }: { agentOutput: AgentOutputData }) {
             <span className="inline-flex items-center gap-1">
               <Gauge className="h-3 w-3" />
               <span>Confidence:</span>
-              <span className={cn(
-                'font-medium',
-                confidencePct >= 80 ? 'text-green-600 dark:text-green-400' :
-                confidencePct >= 50 ? 'text-amber-600 dark:text-amber-400' :
-                'text-red-600 dark:text-red-400',
-              )}>{confidencePct}%</span>
+              <span
+                className={cn(
+                  'font-medium',
+                  confidencePct >= 80
+                    ? 'text-green-600 dark:text-green-400'
+                    : confidencePct >= 50
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-red-600 dark:text-red-400',
+                )}
+              >
+                {confidencePct}%
+              </span>
             </span>
           )}
           {agentOutput.model && (
@@ -274,11 +266,7 @@ function MetricsHeader({ agentOutput }: { agentOutput: AgentOutputData }) {
 
 // ── Generated files (git changedFiles) ──────────────────────────────────────
 
-function GeneratedFiles({
-  git,
-}: {
-  git: NonNullable<AgentOutputData['gitMetadata']>;
-}) {
+function GeneratedFiles({ git }: { git: NonNullable<AgentOutputData['gitMetadata']> }) {
   const browsable = isBrowsableRepoUrl(git.repoUrl);
   const files = git.changedFiles;
   const collapsedByDefault = files.length > 5;
@@ -320,9 +308,7 @@ function GeneratedFiles({
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-xs font-mono text-muted-foreground">
-                    {file}
-                  </span>
+                  <span className="inline-flex items-center gap-1 text-xs font-mono text-muted-foreground">{file}</span>
                 )}
               </li>
             ))}
@@ -379,7 +365,9 @@ export function MarkdownContent({ content }: { content: string }) {
       elements.push(
         <ul key={keyCounter++}>
           {listItems.map((item, itemIndex) => (
-            <li key={itemIndex}><InlineMarkdown text={item} /></li>
+            <li key={itemIndex}>
+              <InlineMarkdown text={item} />
+            </li>
           ))}
         </ul>,
       );
@@ -396,7 +384,9 @@ export function MarkdownContent({ content }: { content: string }) {
       elements.push(
         <ol key={keyCounter++}>
           {listItems.map((item, itemIndex) => (
-            <li key={itemIndex}><InlineMarkdown text={item} /></li>
+            <li key={itemIndex}>
+              <InlineMarkdown text={item} />
+            </li>
           ))}
         </ol>,
       );
@@ -487,7 +477,10 @@ function MarkdownTable({ lines }: { lines: string[] }) {
   if (lines.length < 2) return null;
 
   const parseRow = (line: string): string[] =>
-    line.split('|').slice(1, -1).map((cell) => cell.trim());
+    line
+      .split('|')
+      .slice(1, -1)
+      .map((cell) => cell.trim());
 
   const headers = parseRow(lines[0]);
   // Skip separator line (index 1)
@@ -499,7 +492,9 @@ function MarkdownTable({ lines }: { lines: string[] }) {
         <thead>
           <tr>
             {headers.map((header, headerIndex) => (
-              <th key={headerIndex}><InlineMarkdown text={header} /></th>
+              <th key={headerIndex}>
+                <InlineMarkdown text={header} />
+              </th>
             ))}
           </tr>
         </thead>
@@ -509,7 +504,9 @@ function MarkdownTable({ lines }: { lines: string[] }) {
             return (
               <tr key={rowIndex}>
                 {cells.map((cell, cellIndex) => (
-                  <td key={cellIndex}><InlineMarkdown text={cell} /></td>
+                  <td key={cellIndex}>
+                    <InlineMarkdown text={cell} />
+                  </td>
                 ))}
               </tr>
             );
@@ -532,12 +529,10 @@ const SHORT_STRING_CHAR_THRESHOLD = 80;
 function looksLikeMarkdown(value: string): boolean {
   return (
     value.includes('\n\n') &&
-    (
-      /(^|\n)#{1,6}\s/.test(value) ||
+    (/(^|\n)#{1,6}\s/.test(value) ||
       /\*\*[^*]+\*\*/.test(value) ||
       /(^|\n)\s*-\s\[[ x]\]\s/.test(value) ||
-      /^\s*#\s/.test(value)
-    )
+      /^\s*#\s/.test(value))
   );
 }
 
@@ -555,7 +550,11 @@ function looksLikeStructuredString(value: string): boolean {
 }
 
 function classifyEntry(key: string, value: unknown): EntryKind {
-  if (Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === 'object' && item !== null && !Array.isArray(item))) {
+  if (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((item) => typeof item === 'object' && item !== null && !Array.isArray(item))
+  ) {
     return 'object-array';
   }
   if (typeof value === 'string') {
@@ -571,9 +570,9 @@ function classifyEntry(key: string, value: unknown): EntryKind {
 
 const ENTRY_KIND_ORDER: Record<EntryKind, number> = {
   'object-array': 0,
-  'short': 1,
-  'markdown': 2,
-  'yaml': 3,
+  short: 1,
+  markdown: 2,
+  yaml: 3,
   'long-text': 4,
 };
 
@@ -652,11 +651,7 @@ function ObjectArrayBlock({ entryKey, value }: { entryKey: string; value: Record
       <dd className="text-sm">
         <div className="space-y-2">
           {value.map((item, index) =>
-            allRuleLike ? (
-              <RuleCard key={index} item={item} />
-            ) : (
-              <ObjectCard key={index} item={item} />
-            ),
+            allRuleLike ? <RuleCard key={index} item={item} /> : <ObjectCard key={index} item={item} />,
           )}
         </div>
       </dd>
@@ -716,8 +711,18 @@ function RuleCard({ item }: { item: Record<string, unknown> }) {
   );
 
   const meta: React.ReactNode[] = [];
-  if (variable) meta.push(<span key="variable" className="font-mono">{variable}</span>);
-  if (check) meta.push(<span key="check" className="font-mono">{check}</span>);
+  if (variable)
+    meta.push(
+      <span key="variable" className="font-mono">
+        {variable}
+      </span>,
+    );
+  if (check)
+    meta.push(
+      <span key="check" className="font-mono">
+        {check}
+      </span>,
+    );
 
   const sev = severity ? severityStyle(severity) : null;
 
@@ -740,9 +745,7 @@ function RuleCard({ item }: { item: Record<string, unknown> }) {
           )}
         </div>
       </div>
-      {message && (
-        <p className="mt-1.5 text-sm leading-normal break-words">{message}</p>
-      )}
+      {message && <p className="mt-1.5 text-sm leading-normal break-words">{message}</p>}
       {meta.length > 0 && (
         <div className="mt-1.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
           {meta.map((node, index) => (
@@ -781,12 +784,7 @@ function ObjectCard({ item }: { item: Record<string, unknown> }) {
 
   return (
     <div className="rounded-md border bg-muted/30 p-2">
-      <dl
-        className={cn(
-          'gap-y-1 text-xs',
-          allShort ? 'grid grid-cols-2 gap-x-3' : 'grid grid-cols-1',
-        )}
-      >
+      <dl className={cn('gap-y-1 text-xs', allShort ? 'grid grid-cols-2 gap-x-3' : 'grid grid-cols-1')}>
         {entries.map(([subKey, subValue]) => (
           <div key={subKey}>
             <dt className="text-muted-foreground font-medium mb-0.5">{formatKey(subKey)}</dt>
@@ -827,9 +825,7 @@ function CodeBlock({ entryKey, value }: { entryKey: string; value: string }) {
 
   return (
     <Collapsible.Root>
-      <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-        {formatKey(entryKey)}
-      </dt>
+      <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">{formatKey(entryKey)}</dt>
       <dd>
         <Collapsible.Trigger className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
           <ChevronDown className="h-3 w-3 transition-transform data-[state=closed]:-rotate-90" />
@@ -852,9 +848,7 @@ function LongTextBlock({ entryKey, value }: { entryKey: string; value: string })
 
   return (
     <Collapsible.Root>
-      <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-        {formatKey(entryKey)}
-      </dt>
+      <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">{formatKey(entryKey)}</dt>
       <dd>
         <Collapsible.Trigger className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
           <ChevronDown className="h-3 w-3 transition-transform data-[state=closed]:-rotate-90" />
@@ -889,12 +883,7 @@ function MetadataValue({ value }: { value: unknown }) {
     }
     if (/^https?:\/\//.test(trimmed)) {
       return (
-        <a
-          href={trimmed}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-primary hover:underline break-all"
-        >
+        <a href={trimmed} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
           {trimmed}
         </a>
       );
@@ -939,7 +928,9 @@ function MetadataValue({ value }: { value: unknown }) {
                 ))}
               </dl>
             ) : (
-              <span className="text-xs"><MetadataValue value={item} /></span>
+              <span className="text-xs">
+                <MetadataValue value={item} />
+              </span>
             )}
           </div>
         ))}

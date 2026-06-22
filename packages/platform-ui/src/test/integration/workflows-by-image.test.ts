@@ -7,10 +7,7 @@ const fake = vi.hoisted(() => {
 
   const services = {
     namespaceRepo: {
-      getNamespacesByUser: async (_uid: string) => [
-        { handle: 'acme' },
-        { handle: 'beta' },
-      ],
+      getNamespacesByUser: async (_uid: string) => [{ handle: 'acme' }, { handle: 'beta' }],
       getMembershipsForUser: async (_uid: string) => [
         { handle: 'acme', role: 'member' as const },
         { handle: 'beta', role: 'member' as const },
@@ -77,10 +74,9 @@ function makeWorkflow(
 }
 
 function req(image: string): NextRequest {
-  return new NextRequest(
-    `http://localhost/api/workflow-definitions/by-image?image=${encodeURIComponent(image)}`,
-    { headers: { Authorization: 'Bearer valid-token' } },
-  );
+  return new NextRequest(`http://localhost/api/workflow-definitions/by-image?image=${encodeURIComponent(image)}`, {
+    headers: { Authorization: 'Bearer valid-token' },
+  });
 }
 
 describe('GET /api/workflow-definitions/by-image', () => {
@@ -112,9 +108,7 @@ describe('GET /api/workflow-definitions/by-image', () => {
   });
 
   it('normalizes tagless image to :latest for matching', async () => {
-    fake.definitions.push(
-      makeWorkflow({ name: 'wf-c', namespace: 'acme', version: 1 }, ['myimage:latest']),
-    );
+    fake.definitions.push(makeWorkflow({ name: 'wf-c', namespace: 'acme', version: 1 }, ['myimage:latest']));
 
     const res = await GET(req('myimage'));
     const body = await res.json();
@@ -124,9 +118,7 @@ describe('GET /api/workflow-definitions/by-image', () => {
   });
 
   it('normalizes tagless workflow image ref to :latest', async () => {
-    fake.definitions.push(
-      makeWorkflow({ name: 'wf-d', namespace: 'acme', version: 1 }, ['myimage']),
-    );
+    fake.definitions.push(makeWorkflow({ name: 'wf-d', namespace: 'acme', version: 1 }, ['myimage']));
 
     const res = await GET(req('myimage:latest'));
     const body = await res.json();
@@ -178,10 +170,7 @@ describe('GET /api/workflow-definitions/by-image', () => {
 
   it('returns matching step ids in response', async () => {
     fake.definitions.push(
-      makeWorkflow(
-        { name: 'wf-f', namespace: 'acme', version: 1 },
-        ['target:v1', 'other:v2', 'target:v1'],
-      ),
+      makeWorkflow({ name: 'wf-f', namespace: 'acme', version: 1 }, ['target:v1', 'other:v2', 'target:v1']),
     );
 
     const res = await GET(req('target:v1'));
@@ -191,9 +180,7 @@ describe('GET /api/workflow-definitions/by-image', () => {
   });
 
   it('returns 401 without auth header', async () => {
-    const res = await GET(
-      new NextRequest('http://localhost/api/workflow-definitions/by-image?image=x:y'),
-    );
+    const res = await GET(new NextRequest('http://localhost/api/workflow-definitions/by-image?image=x:y'));
     expect(res.status).toBe(401);
   });
 });

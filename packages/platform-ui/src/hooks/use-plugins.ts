@@ -43,12 +43,13 @@ export function usePlugins() {
     }
 
     fetchPlugins();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filterByRole = useCallback(
-    (role: 'executor' | 'reviewer') =>
-      plugins.filter((p) => p.metadata?.roles?.includes(role)),
+    (role: 'executor' | 'reviewer') => plugins.filter((p) => p.metadata?.roles?.includes(role)),
     [plugins],
   );
 

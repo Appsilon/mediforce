@@ -34,9 +34,7 @@ describe('hasSecretTemplate', () => {
   });
 
   it('detects the marker even if only one of many values has it', () => {
-    expect(
-      hasSecretTemplate({ region: 'eu', TOKEN: 'Bearer {{SECRET:GH_TOKEN}}' }),
-    ).toBe(true);
+    expect(hasSecretTemplate({ region: 'eu', TOKEN: 'Bearer {{SECRET:GH_TOKEN}}' })).toBe(true);
   });
 });
 

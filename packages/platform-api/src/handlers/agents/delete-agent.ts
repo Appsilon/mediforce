@@ -2,10 +2,7 @@ import type { DeleteAgentInput, DeleteAgentOutput } from '../../contract/agents'
 import type { CallerScope } from '../../repositories/index';
 import { actorFromCaller, loadOr404 } from '../_helpers';
 
-export async function deleteAgent(
-  input: DeleteAgentInput,
-  scope: CallerScope,
-): Promise<DeleteAgentOutput> {
+export async function deleteAgent(input: DeleteAgentInput, scope: CallerScope): Promise<DeleteAgentOutput> {
   // Load first so the audit snapshot can reference the pre-delete shape;
   // wrapper's `delete` will also enforce the namespace-write gate.
   const existing = await loadOr404(scope.agentDefinitions.getById(input.id), 'Agent not found');

@@ -14,10 +14,7 @@ export interface GetModelDeps {
  * its `models/` siblings keep the legacy `(input, deps)` shape — the only
  * exception to the uniform handler contract in §3.
  */
-export async function getModel(
-  input: GetModelInput,
-  deps: GetModelDeps,
-): Promise<GetModelOutput> {
+export async function getModel(input: GetModelInput, deps: GetModelDeps): Promise<GetModelOutput> {
   const model = await deps.modelRegistryRepo.getById(input.id);
   if (!model) {
     throw new NotFoundError(`Model '${input.id}' not found in registry`);

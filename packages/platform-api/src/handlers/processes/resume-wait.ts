@@ -12,10 +12,7 @@ interface WaitMetadata {
   condition?: string;
 }
 
-export async function resumeWait(
-  input: ResumeWaitInput,
-  scope: CallerScope,
-): Promise<ResumeWaitOutput> {
+export async function resumeWait(input: ResumeWaitInput, scope: CallerScope): Promise<ResumeWaitOutput> {
   const run = await loadOr404(scope.runs.getById(input.runId), 'Run not found');
 
   if (run.status !== 'paused' || run.pauseReason !== 'waiting_for_timer') {
@@ -27,10 +24,7 @@ export async function resumeWait(
 
   const waitMeta = (run.variables as Record<string, unknown>).__wait as WaitMetadata | undefined;
   if (!waitMeta?.resumeAt) {
-    throw new PreconditionFailedError(
-      'Run is paused for timer but missing __wait metadata',
-      { runId: input.runId },
-    );
+    throw new PreconditionFailedError('Run is paused for timer but missing __wait metadata', { runId: input.runId });
   }
 
   const now = new Date();
@@ -53,12 +47,12 @@ export async function resumeWait(
     return { resumed: false, resumeAt: waitMeta.resumeAt };
   }
 
-  const waitedSeconds = Math.round(
-    (now.getTime() - new Date(waitMeta.pausedAt).getTime()) / 1000,
-  );
+  const waitedSeconds = Math.round((now.getTime() - new Date(waitMeta.pausedAt).getTime()) / 1000);
   const resumeReason = conditionMet
     ? 'condition_met'
-    : waitMeta.mode === 'deadline' ? 'deadline_reached' : 'duration_elapsed';
+    : waitMeta.mode === 'deadline'
+      ? 'deadline_reached'
+      : 'duration_elapsed';
   const waitOutput = { resumeReason, waitedSeconds, resolvedAt: now.toISOString() };
 
   const { __wait: _, ...cleanVars } = run.variables as Record<string, unknown>;

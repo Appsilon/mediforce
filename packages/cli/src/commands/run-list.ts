@@ -49,9 +49,7 @@ export const runListCommand = defineCommand({
       const icon = STATUS_ICONS[run.status] ?? '?';
       const age = formatAge(run.createdAt);
       const isTerminal = run.status === 'completed' || run.status === 'failed';
-      const costLabel = run.totalCostUsd != null
-        ? `  $${run.totalCostUsd.toFixed(4)}${isTerminal ? '' : '+'}`
-        : '';
+      const costLabel = run.totalCostUsd != null ? `  $${run.totalCostUsd.toFixed(4)}${isTerminal ? '' : '+'}` : '';
       const dryLabel = run.dryRun ? ' [DRY RUN]' : '';
       output.stdout(
         `${icon} ${run.status.padEnd(10)} ${run.id}  ${run.definitionName} v${run.definitionVersion}${costLabel}${dryLabel}  ${age}`,

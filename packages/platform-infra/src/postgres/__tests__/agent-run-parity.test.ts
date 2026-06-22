@@ -5,11 +5,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  InMemoryAgentRunRepository,
-  buildAgentRun,
-  buildAgentOutputEnvelope,
-} from '@mediforce/platform-core';
+import { InMemoryAgentRunRepository, buildAgentRun, buildAgentOutputEnvelope } from '@mediforce/platform-core';
 import type {
   AgentRun,
   AgentRunRepository,
@@ -55,29 +51,60 @@ class StubProcessInstanceRepository implements ProcessInstanceRepository {
   }
 
   // Methods unused by the parity contract — throw if accidentally hit.
-  async create(): Promise<ProcessInstance> { throw new Error('stub'); }
-  async getByIdInNamespaces(): Promise<ProcessInstance | null> { throw new Error('stub'); }
-  async listAll(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async listInNamespaces(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async listDefinitionNames(): Promise<never> { throw new Error('stub'); }
-  async summarizeRunsByWorkflow(): Promise<never> { throw new Error('stub'); }
-  async getByStatusAll(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async getByStatusInNamespaces(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async update(): Promise<void> { throw new Error('stub'); }
-  async getByDefinition(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async getLastCompletedByDefinitionName(): Promise<ProcessInstance | null> { throw new Error('stub'); }
-  async addStepExecution(): Promise<never> { throw new Error('stub'); }
-  async getStepExecutions(): Promise<never[]> { throw new Error('stub'); }
-  async getLatestStepExecution(): Promise<null> { throw new Error('stub'); }
-  async updateStepExecution(): Promise<void> { throw new Error('stub'); }
-  async getIdsByDefinitionName(): Promise<string[]> { throw new Error('stub'); }
-  async setDeletedByDefinitionName(): Promise<void> { throw new Error('stub'); }
+  async create(): Promise<ProcessInstance> {
+    throw new Error('stub');
+  }
+  async getByIdInNamespaces(): Promise<ProcessInstance | null> {
+    throw new Error('stub');
+  }
+  async listAll(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async listInNamespaces(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async listDefinitionNames(): Promise<never> {
+    throw new Error('stub');
+  }
+  async summarizeRunsByWorkflow(): Promise<never> {
+    throw new Error('stub');
+  }
+  async getByStatusAll(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async getByStatusInNamespaces(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async update(): Promise<void> {
+    throw new Error('stub');
+  }
+  async getByDefinition(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async getLastCompletedByDefinitionName(): Promise<ProcessInstance | null> {
+    throw new Error('stub');
+  }
+  async addStepExecution(): Promise<never> {
+    throw new Error('stub');
+  }
+  async getStepExecutions(): Promise<never[]> {
+    throw new Error('stub');
+  }
+  async getLatestStepExecution(): Promise<null> {
+    throw new Error('stub');
+  }
+  async updateStepExecution(): Promise<void> {
+    throw new Error('stub');
+  }
+  async getIdsByDefinitionName(): Promise<string[]> {
+    throw new Error('stub');
+  }
+  async setDeletedByDefinitionName(): Promise<void> {
+    throw new Error('stub');
+  }
 }
 
-function runFor(
-  instanceId: string,
-  overrides: Partial<AgentRun> = {},
-): AgentRun {
+function runFor(instanceId: string, overrides: Partial<AgentRun> = {}): AgentRun {
   return buildAgentRun({
     id: randomUUID(),
     processInstanceId: instanceId,
@@ -308,7 +335,9 @@ describe.skipIf(skipPg)('PostgresAgentRunRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sql);

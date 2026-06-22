@@ -1,14 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  InMemoryAuditRepository,
-  InMemoryToolCatalogRepository,
-} from '@mediforce/platform-core/testing';
+import { InMemoryAuditRepository, InMemoryToolCatalogRepository } from '@mediforce/platform-core/testing';
 import { updateToolCatalogEntry } from '../update-entry';
 import { ForbiddenError, NotFoundError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { adminRoles, memberRoles, sampleEntry } from './fixtures';
 
 describe('updateToolCatalogEntry handler', () => {
@@ -49,10 +43,7 @@ describe('updateToolCatalogEntry handler', () => {
     });
 
     await expect(
-      updateToolCatalogEntry(
-        { namespace: 'alpha', id: 'missing', description: 'x' },
-        scope,
-      ),
+      updateToolCatalogEntry({ namespace: 'alpha', id: 'missing', description: 'x' }, scope),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -64,10 +55,7 @@ describe('updateToolCatalogEntry handler', () => {
     });
 
     await expect(
-      updateToolCatalogEntry(
-        { namespace: 'alpha', id: 'tealflow-mcp', description: 'x' },
-        scope,
-      ),
+      updateToolCatalogEntry({ namespace: 'alpha', id: 'tealflow-mcp', description: 'x' }, scope),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

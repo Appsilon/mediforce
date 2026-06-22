@@ -6,12 +6,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { InMemoryProcessInstanceRepository } from '@mediforce/platform-core';
-import type {
-  AgentEvent,
-  ProcessInstance,
-  ProcessInstanceRepository,
-  StepExecution,
-} from '@mediforce/platform-core';
+import type { AgentEvent, ProcessInstance, ProcessInstanceRepository, StepExecution } from '@mediforce/platform-core';
 import { PostgresProcessInstanceRepository } from '../repositories/process-instance-repository';
 import { PostgresNamespaceRepository } from '../repositories/namespace-repository';
 import * as schema from '../schema/index';
@@ -22,10 +17,7 @@ const MIGRATIONS_DIR = resolve(__dirname, '..', 'migrations');
 const DATABASE_URL = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const skipPg = !DATABASE_URL;
 
-function instanceFor(
-  namespace: string,
-  overrides: Partial<ProcessInstance> = {},
-): ProcessInstance {
+function instanceFor(namespace: string, overrides: Partial<ProcessInstance> = {}): ProcessInstance {
   const now = '2026-05-27T00:00:00.000Z';
   return {
     id: `inst-${randomUUID()}`,
@@ -50,10 +42,7 @@ function instanceFor(
   };
 }
 
-function stepExecutionFor(
-  instanceId: string,
-  overrides: Partial<StepExecution> = {},
-): StepExecution {
+function stepExecutionFor(instanceId: string, overrides: Partial<StepExecution> = {}): StepExecution {
   return {
     id: `exec-${randomUUID()}`,
     instanceId,
@@ -135,9 +124,7 @@ function contract(
       await registerWorkspace('ws-1');
       const a = await repo.create(instanceFor('ws-1', { status: 'running' }));
       await repo.create(instanceFor('ws-1', { status: 'completed' }));
-      const tombstoned = await repo.create(
-        instanceFor('ws-1', { status: 'running' }),
-      );
+      const tombstoned = await repo.create(instanceFor('ws-1', { status: 'running' }));
       await repo.update(tombstoned.id, { deleted: true });
 
       const running = await repo.listAll({ status: 'running', limit: 50 });
@@ -183,10 +170,7 @@ function contract(
       const beta = await repo.create(instanceFor('ws-beta'));
 
       // Caller is a member of both, but page-scopes to alpha.
-      const scoped = await repo.listInNamespaces(
-        ['ws-alpha', 'ws-beta'],
-        { namespace: 'ws-alpha', limit: 50 },
-      );
+      const scoped = await repo.listInNamespaces(['ws-alpha', 'ws-beta'], { namespace: 'ws-alpha', limit: 50 });
       const ids = scoped.map((r) => r.id);
       expect(ids).toContain(alpha.id);
       expect(ids).not.toContain(beta.id);
@@ -250,9 +234,7 @@ function contract(
       );
       await repo.update(tombstoned.id, { deleted: true });
 
-      const last = await repo.getLastCompletedByDefinitionName(
-        'supply-chain-review',
-      );
+      const last = await repo.getLastCompletedByDefinitionName('supply-chain-review');
       expect(last?.id).toBe(newer.id);
       // older + tombstoned must not bubble up
       expect(last?.id).not.toBe(older.id);
@@ -288,10 +270,7 @@ function contract(
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');
       const inst = await repo.create(instanceFor('ws-1'));
-      const exec = await repo.addStepExecution(
-        inst.id,
-        stepExecutionFor(inst.id, { status: 'running', output: null }),
-      );
+      const exec = await repo.addStepExecution(inst.id, stepExecutionFor(inst.id, { status: 'running', output: null }));
 
       await repo.updateStepExecution(inst.id, exec.id, {
         status: 'completed',
@@ -329,15 +308,9 @@ function contract(
     it('getByDefinition filters by name + version', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');
-      const a = await repo.create(
-        instanceFor('ws-1', { definitionName: 'd1', definitionVersion: '1.0.0' }),
-      );
-      await repo.create(
-        instanceFor('ws-1', { definitionName: 'd1', definitionVersion: '2.0.0' }),
-      );
-      await repo.create(
-        instanceFor('ws-1', { definitionName: 'd2', definitionVersion: '1.0.0' }),
-      );
+      const a = await repo.create(instanceFor('ws-1', { definitionName: 'd1', definitionVersion: '1.0.0' }));
+      await repo.create(instanceFor('ws-1', { definitionName: 'd1', definitionVersion: '2.0.0' }));
+      await repo.create(instanceFor('ws-1', { definitionName: 'd2', definitionVersion: '1.0.0' }));
 
       const rows = await repo.getByDefinition('d1', '1.0.0');
       expect(rows.map((r) => r.id)).toEqual([a.id]);
@@ -365,29 +338,17 @@ function contract(
         }),
       );
       // Tombstoned + archived runs must be excluded from every count.
-      const deleted = await repo.create(
-        instanceFor('ws-sum', { status: 'running' }),
-      );
+      const deleted = await repo.create(instanceFor('ws-sum', { status: 'running' }));
       await repo.update(deleted.id, { deleted: true });
-      const archived = await repo.create(
-        instanceFor('ws-sum', { status: 'running' }),
-      );
+      const archived = await repo.create(instanceFor('ws-sum', { status: 'running' }));
       await repo.update(archived.id, { archived: true });
 
-      const open = await repo.summarizeRunsByWorkflow(
-        'ws-sum',
-        'supply-chain-review',
-        false,
-      );
+      const open = await repo.summarizeRunsByWorkflow('ws-sum', 'supply-chain-review', false);
       expect(open.active).toBe(2);
       expect(open.total).toBe(2);
       expect(open.latest.map((r) => r.id)).not.toContain(completed.id);
 
-      const all = await repo.summarizeRunsByWorkflow(
-        'ws-sum',
-        'supply-chain-review',
-        true,
-      );
+      const all = await repo.summarizeRunsByWorkflow('ws-sum', 'supply-chain-review', true);
       expect(all.active).toBe(2);
       expect(all.total).toBe(3);
       // latest ordered createdAt desc, capped at 3 — newest is the completed run.
@@ -431,7 +392,9 @@ describe.skipIf(skipPg)('PostgresProcessInstanceRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sqlText = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sqlText);
@@ -548,10 +511,7 @@ describe.skipIf(skipPg)('PostgresProcessInstanceRepository (parity)', () => {
     await repo.addStepExecution(inst.id, stepExecutionFor(inst.id));
 
     // Hard delete the parent — both subtables must cascade.
-    await testClient.unsafe(
-      `DELETE FROM "${schemaName}"."process_instances" WHERE id = $1`,
-      [inst.id],
-    );
+    await testClient.unsafe(`DELETE FROM "${schemaName}"."process_instances" WHERE id = $1`, [inst.id]);
     const events = await repo.getAgentEvents(inst.id);
     const execs = await repo.getStepExecutions(inst.id);
     expect(events).toEqual([]);

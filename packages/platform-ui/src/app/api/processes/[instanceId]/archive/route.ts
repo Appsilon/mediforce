@@ -13,12 +13,7 @@ interface RouteContext {
  * Soft-archives or unarchives a run. Blocked on active runs
  * (running/created/waiting-for-human). Entity echo per ADR-0005 §5.
  */
-export const POST = createRouteAdapter<
-  typeof ArchiveRunInputSchema,
-  ArchiveRunInput,
-  unknown,
-  RouteContext
->(
+export const POST = createRouteAdapter<typeof ArchiveRunInputSchema, ArchiveRunInput, unknown, RouteContext>(
   ArchiveRunInputSchema,
   async (req, ctx) => ({
     runId: (await ctx.params).instanceId,

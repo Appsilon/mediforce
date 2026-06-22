@@ -19,7 +19,13 @@ beforeEach(() => {
 describe('listImages', () => {
   it('parses docker images NDJSON output', async () => {
     const stdout = [
-      JSON.stringify({ Repository: 'mediforce/agent', Tag: 'latest', ID: 'abc123', Size: '1.2GB', CreatedSince: '2 days ago' }),
+      JSON.stringify({
+        Repository: 'mediforce/agent',
+        Tag: 'latest',
+        ID: 'abc123',
+        Size: '1.2GB',
+        CreatedSince: '2 days ago',
+      }),
       JSON.stringify({ Repository: 'node', Tag: '20-slim', ID: 'def456', Size: '200MB', CreatedSince: '3 weeks ago' }),
     ].join('\n');
     (mockExecFile as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ stdout, stderr: '' });

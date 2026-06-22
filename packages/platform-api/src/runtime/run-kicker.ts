@@ -31,9 +31,7 @@ export interface HttpSelfFetchRunKickerConfig {
 }
 
 // Getters so env reads happen at call time, not module-load time.
-export function createHttpSelfFetchRunKicker(
-  config: HttpSelfFetchRunKickerConfig,
-): RunKicker {
+export function createHttpSelfFetchRunKicker(config: HttpSelfFetchRunKickerConfig): RunKicker {
   const fetchImpl = config.fetch ?? globalThis.fetch;
   return {
     async kick(instanceId, opts) {

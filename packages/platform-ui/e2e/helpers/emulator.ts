@@ -12,19 +12,12 @@ export async function clearEmulators() {
   });
 }
 
-export async function createTestUser(
-  email: string,
-  password: string,
-  displayName: string,
-): Promise<string> {
-  const signUpRes = await fetch(
-    `${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=${API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, displayName, returnSecureToken: true }),
-    },
-  );
+export async function createTestUser(email: string, password: string, displayName: string): Promise<string> {
+  const signUpRes = await fetch(`${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=${API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, displayName, returnSecureToken: true }),
+  });
 
   if (signUpRes.ok) {
     const data = await signUpRes.json();
@@ -51,10 +44,7 @@ export async function createTestUser(
  * `apiKey`-kind shared with most other journeys) — for example to exercise
  * the 404 anti-enumeration path that api-key callers bypass.
  */
-export async function signInAndGetIdToken(
-  email: string,
-  password: string,
-): Promise<string> {
+export async function signInAndGetIdToken(email: string, password: string): Promise<string> {
   const res = await fetch(
     `${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`,
     {
@@ -79,25 +69,21 @@ export async function signInAndGetIdToken(
 export async function deleteAuthUser(email: string): Promise<void> {
   const localId = await getUserIdByEmail(email);
   if (localId === null) return;
-  const res = await fetch(
-    `${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/accounts:delete?key=${API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ localId }),
-      signal: AbortSignal.timeout(5000),
-    },
-  );
+  const res = await fetch(`${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/accounts:delete?key=${API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ localId }),
+    signal: AbortSignal.timeout(5000),
+  });
   if (!res.ok) {
     throw new Error(`Failed to delete auth user ${email}: ${await res.text()}`);
   }
 }
 
 export async function getUserIdByEmail(email: string): Promise<string | null> {
-  const res = await fetch(
-    `${AUTH_EMULATOR}/emulator/v1/projects/${PROJECT_ID}/accounts`,
-    { signal: AbortSignal.timeout(5000) },
-  );
+  const res = await fetch(`${AUTH_EMULATOR}/emulator/v1/projects/${PROJECT_ID}/accounts`, {
+    signal: AbortSignal.timeout(5000),
+  });
   if (!res.ok) return null;
   const data = (await res.json()) as { userInfo?: Array<{ localId: string; email?: string }> };
   const user = data.userInfo?.find((u) => u.email === email);

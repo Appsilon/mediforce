@@ -161,10 +161,7 @@ describe('buildMessages', () => {
 
   it('skips orphan tool turns at the end (in-progress current request)', () => {
     const session = makeSession({
-      turns: [
-        humanTurn('Run the tool', 't1'),
-        toolTurn('svr__do_it', 'ok', { id: 't2' }),
-      ],
+      turns: [humanTurn('Run the tool', 't1'), toolTurn('svr__do_it', 'ok', { id: 't2' })],
     });
 
     const messages = buildMessages(session);

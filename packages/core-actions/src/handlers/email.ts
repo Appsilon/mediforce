@@ -75,9 +75,7 @@ function enforceRateLimit(
     minuteTimestamps.shift();
   }
   if (minuteTimestamps.length >= limits.perMinute) {
-    throw new Error(
-      `Email rate limit exceeded: ${limits.perMinute} emails per minute`,
-    );
+    throw new Error(`Email rate limit exceeded: ${limits.perMinute} emails per minute`);
   }
 
   runCounts.set(processInstanceId, currentRunCount + 1);
@@ -105,30 +103,23 @@ interface ResolvedEmailConfig {
   html?: string;
 }
 
-function interpolateConfig(
-  config: EmailActionConfig,
-  sources: InterpolationSources,
-): ResolvedEmailConfig {
+function interpolateConfig(config: EmailActionConfig, sources: InterpolationSources): ResolvedEmailConfig {
   const interpolatedTo = interpolate(config.to, sources);
-  const to: string[] = Array.isArray(interpolatedTo)
-    ? interpolatedTo.map(String)
-    : [String(interpolatedTo)];
+  const to: string[] = Array.isArray(interpolatedTo) ? interpolatedTo.map(String) : [String(interpolatedTo)];
 
   const subject = String(interpolate(config.subject, sources));
   const body = String(interpolate(config.body, sources));
 
-  const cc = config.cc
-    ? (interpolate(config.cc, sources) as string[]).map(String)
-    : undefined;
-  const bcc = config.bcc
-    ? (interpolate(config.bcc, sources) as string[]).map(String)
-    : undefined;
+  const cc = config.cc ? (interpolate(config.cc, sources) as string[]).map(String) : undefined;
+  const bcc = config.bcc ? (interpolate(config.bcc, sources) as string[]).map(String) : undefined;
   const from = config.from ? String(interpolate(config.from, sources)) : undefined;
   const replyTo = config.replyTo ? String(interpolate(config.replyTo, sources)) : undefined;
   const html = config.html ? String(interpolate(config.html, sources)) : undefined;
 
   return {
-    to, subject, body,
+    to,
+    subject,
+    body,
     ...(cc ? { cc } : {}),
     ...(bcc ? { bcc } : {}),
     ...(from ? { from } : {}),

@@ -72,10 +72,7 @@ export function ensureTerminalConnected(
   );
 
   if (orphans.length > 0) {
-    resultTransitions = [
-      ...resultTransitions,
-      ...orphans.map((s) => ({ from: s.id, to: terminalId })),
-    ];
+    resultTransitions = [...resultTransitions, ...orphans.map((s) => ({ from: s.id, to: terminalId }))];
   }
 
   return { steps: resultSteps, transitions: resultTransitions };

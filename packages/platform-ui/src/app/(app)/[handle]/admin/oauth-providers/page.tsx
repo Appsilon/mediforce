@@ -89,7 +89,8 @@ export default function AdminOAuthProvidersPage() {
   const clearSelectionQuery = useCallback(() => {
     const qs = new URLSearchParams(search.toString());
     qs.delete('id');
-    const url = qs.toString() !== '' ? `/${handle}/admin/oauth-providers?${qs.toString()}` : `/${handle}/admin/oauth-providers`;
+    const url =
+      qs.toString() !== '' ? `/${handle}/admin/oauth-providers?${qs.toString()}` : `/${handle}/admin/oauth-providers`;
     router.replace(url);
   }, [handle, router, search]);
 
@@ -133,11 +134,7 @@ export default function AdminOAuthProvidersPage() {
     return agents.reduce((count, agent) => {
       const bindings = agent.mcpServers ?? {};
       for (const binding of Object.values(bindings)) {
-        if (
-          binding.type === 'http' &&
-          binding.auth?.type === 'oauth' &&
-          binding.auth.provider === deleteTarget.id
-        ) {
+        if (binding.type === 'http' && binding.auth?.type === 'oauth' && binding.auth.provider === deleteTarget.id) {
           return count + 1;
         }
       }
@@ -232,11 +229,7 @@ export default function AdminOAuthProvidersPage() {
                 Loading…
               </div>
             ) : (
-              <ProviderList
-                providers={providers}
-                selectedId={selectedId}
-                onSelect={handleSelect}
-              />
+              <ProviderList providers={providers} selectedId={selectedId} onSelect={handleSelect} />
             )}
           </aside>
 

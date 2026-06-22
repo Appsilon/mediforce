@@ -44,9 +44,7 @@ describe('mediforce.workflows.register', () => {
     const wd = buildWorkflowDefinition();
     const body = omitServerFields(wd);
 
-    await expect(
-      mediforce.workflows.register(body, { namespace: '' }),
-    ).rejects.toThrow(/namespace.*required/i);
+    await expect(mediforce.workflows.register(body, { namespace: '' })).rejects.toThrow(/namespace.*required/i);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -65,17 +63,13 @@ describe('mediforce.workflows.register', () => {
   });
 
   it('throws ApiError on non-2xx', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Validation failed' }, 400),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Validation failed' }, 400));
 
     const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
     const wd = buildWorkflowDefinition();
     const body = omitServerFields(wd);
 
-    const error = await mediforce.workflows
-      .register(body, { namespace: 'Appsilon' })
-      .catch((err) => err);
+    const error = await mediforce.workflows.register(body, { namespace: 'Appsilon' }).catch((err) => err);
 
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(400);
@@ -110,9 +104,7 @@ describe('mediforce.workflows.list', () => {
     expect(result.definitions).toHaveLength(1);
     expect(result.definitions[0]?.name).toBe('wf');
     expect(result.definitions[0]?.latestVersion).toBe(2);
-    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
-      'http://localhost/api/workflow-definitions',
-    );
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://localhost/api/workflow-definitions');
   });
 
   it('rejects when the server returns a malformed payload', async () => {

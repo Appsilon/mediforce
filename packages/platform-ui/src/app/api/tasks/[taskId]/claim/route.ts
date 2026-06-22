@@ -21,12 +21,7 @@ interface RouteContext {
  *   - Response no longer echoes the bare task; it returns the entity
  *     envelope `{ task: HumanTask }`.
  */
-export const POST = createRouteAdapter<
-  typeof ClaimTaskInputSchema,
-  ClaimTaskInput,
-  unknown,
-  RouteContext
->(
+export const POST = createRouteAdapter<typeof ClaimTaskInputSchema, ClaimTaskInput, unknown, RouteContext>(
   ClaimTaskInputSchema,
   async (_req, ctx) => ({ taskId: (await ctx.params).taskId }),
   claimTask,

@@ -1,8 +1,5 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
-import {
-  getAgentOAuthToken,
-  deleteAgentOAuthToken,
-} from '@mediforce/platform-api/handlers';
+import { getAgentOAuthToken, deleteAgentOAuthToken } from '@mediforce/platform-api/handlers';
 import {
   GetAgentOAuthTokenInputSchema,
   DeleteAgentOAuthTokenInputSchema,

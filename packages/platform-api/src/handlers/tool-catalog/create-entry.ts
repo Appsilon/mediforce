@@ -2,10 +2,7 @@ import { ToolCatalogEntrySchema } from '@mediforce/platform-core';
 import { assertCallerIsNamespaceAdmin } from '../../auth';
 import { HandlerError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
-import type {
-  CreateToolCatalogEntryInputApi,
-  CreateToolCatalogEntryOutput,
-} from '../../contract/tool-catalog';
+import type { CreateToolCatalogEntryInputApi, CreateToolCatalogEntryOutput } from '../../contract/tool-catalog';
 import { actorFromCaller } from '../_helpers';
 import { slugifyCommand } from './_helpers';
 
@@ -23,27 +20,17 @@ export async function createToolCatalogEntry(
         ? slugifyCommand(rest.command)
         : '';
   if (derivedId === '') {
-    throw new HandlerError(
-      'validation',
-      'Unable to derive id: supply `id` or a non-empty `command`.',
-    );
+    throw new HandlerError('validation', 'Unable to derive id: supply `id` or a non-empty `command`.');
   }
 
   const parsed = ToolCatalogEntrySchema.safeParse({ ...rest, id: derivedId });
   if (!parsed.success) {
-    throw new HandlerError(
-      'validation',
-      parsed.error.issues[0]?.message ?? 'Invalid input',
-      parsed.error.issues,
-    );
+    throw new HandlerError('validation', parsed.error.issues[0]?.message ?? 'Invalid input', parsed.error.issues);
   }
 
   const existing = await scope.toolCatalog.getById(namespace, derivedId);
   if (existing !== null) {
-    throw new HandlerError(
-      'conflict',
-      `Tool catalog entry "${derivedId}" already exists in namespace "${namespace}".`,
-    );
+    throw new HandlerError('conflict', `Tool catalog entry "${derivedId}" already exists in namespace "${namespace}".`);
   }
 
   const entry = await scope.toolCatalog.upsert(namespace, parsed.data);

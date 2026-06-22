@@ -9,12 +9,7 @@ interface UserProfileLinkProps {
   children?: React.ReactNode;
 }
 
-export function UserProfileLink({
-  displayName,
-  personalHandle,
-  className,
-  children,
-}: UserProfileLinkProps) {
+export function UserProfileLink({ displayName, personalHandle, className, children }: UserProfileLinkProps) {
   const content = children ?? displayName;
 
   if (personalHandle === undefined) {

@@ -14,9 +14,7 @@
       "type": "manual"
     }
   ],
-  "roles": [
-    "community-lead"
-  ],
+  "roles": ["community-lead"],
   "env": {
     "DEEPSEEK_API_KEY": "{{DEEPSEEK_API_KEY}}"
   },
@@ -26,9 +24,7 @@
       "name": "Select Time Period",
       "type": "creation",
       "executor": "human",
-      "allowedRoles": [
-        "community-lead"
-      ],
+      "allowedRoles": ["community-lead"],
       "description": "Choose how far back to scan for changes",
       "params": [
         {
@@ -75,9 +71,7 @@
       "name": "Review Ranking",
       "type": "review",
       "executor": "human",
-      "allowedRoles": [
-        "community-lead"
-      ],
+      "allowedRoles": ["community-lead"],
       "description": "Human reviews and adjusts the ranking",
       "verdicts": {
         "approve": {
@@ -109,9 +103,7 @@
       "name": "Review Posts",
       "type": "review",
       "executor": "human",
-      "allowedRoles": [
-        "community-lead"
-      ],
+      "allowedRoles": ["community-lead"],
       "description": "Human approves or revises the drafted posts",
       "verdicts": {
         "approve": {

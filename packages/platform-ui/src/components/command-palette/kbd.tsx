@@ -30,19 +30,13 @@ export function Kbd({
   );
 }
 
-export function KbdRow({
-  keys,
-  className,
-  size,
-}: {
-  keys: string[];
-  className?: string;
-  size?: KbdSize;
-}) {
+export function KbdRow({ keys, className, size }: { keys: string[]; className?: string; size?: KbdSize }) {
   return (
     <span className={cn('inline-flex items-center gap-1', className)}>
       {keys.map((key, index) => (
-        <Kbd key={`${key}-${index}`} size={size}>{key}</Kbd>
+        <Kbd key={`${key}-${index}`} size={size}>
+          {key}
+        </Kbd>
       ))}
     </span>
   );

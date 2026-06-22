@@ -40,14 +40,13 @@ interface AgentEntry {
   visibility?: 'public' | 'private';
 }
 
-
-
 function getAgentIcon(agentId: string): { Icon: LucideIcon; colorClass: string; bgClass: string } {
   const id = agentId.toLowerCase();
   if (id.includes('claude')) return { Icon: Bot, colorClass: 'text-violet-500', bgClass: 'bg-violet-500/10' };
   if (id.includes('opencode')) return { Icon: Cpu, colorClass: 'text-blue-500', bgClass: 'bg-blue-500/10' };
   if (id.includes('script')) return { Icon: Terminal, colorClass: 'text-slate-500', bgClass: 'bg-slate-500/10' };
-  if (id.includes('risk') || id.includes('driver') || id.includes('supply')) return { Icon: BarChart3, colorClass: 'text-emerald-500', bgClass: 'bg-emerald-500/10' };
+  if (id.includes('risk') || id.includes('driver') || id.includes('supply'))
+    return { Icon: BarChart3, colorClass: 'text-emerald-500', bgClass: 'bg-emerald-500/10' };
   return { Icon: Bot, colorClass: 'text-primary', bgClass: 'bg-primary/10' };
 }
 
@@ -97,10 +96,7 @@ function AgentCard({ agent, handle }: { agent: AgentEntry; handle: string }) {
               </span>
             )}
           </div>
-          <p
-            ref={descRef}
-            className={cn('mt-1 text-sm text-muted-foreground', !expanded && 'line-clamp-2')}
-          >
+          <p ref={descRef} className={cn('mt-1 text-sm text-muted-foreground', !expanded && 'line-clamp-2')}>
             {meta.description}
           </p>
           {(isClamped || expanded) && (
@@ -233,9 +229,7 @@ function AgentCatalog({ handle }: { handle: string }) {
         // For plugins not covered by a definition, include them as-is.
         // For plugins that have a matching definition, the definition entry (with Configure button) wins.
         const coveredRuntimeIds = new Set(definitionByRuntimeId.keys());
-        const uncoveredPlugins = (pluginsData.plugins ?? []).filter(
-          (p) => !coveredRuntimeIds.has(p.name),
-        );
+        const uncoveredPlugins = (pluginsData.plugins ?? []).filter((p) => !coveredRuntimeIds.has(p.name));
         setAgents([...definitionByRuntimeId.values(), ...uncoveredPlugins]);
       })
       .catch((err) => {
@@ -339,9 +333,7 @@ export default function AgentsPage() {
     <div className="p-6 space-y-4">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-muted-foreground">
-            Available AI agents for building workflows
-          </p>
+          <p className="text-sm text-muted-foreground">Available AI agents for building workflows</p>
         </div>
         <Link
           href={`/${handle}/agents/new`}
@@ -382,7 +374,9 @@ export default function AgentsPage() {
               onChange={(e) => setProcessFilter(e.target.value || null)}
               className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
             >
-              <option key="__all" value="">All Workflows</option>
+              <option key="__all" value="">
+                All Workflows
+              </option>
               {processNames.map((name) => (
                 <option key={name} value={name}>
                   {name}
@@ -395,7 +389,9 @@ export default function AgentsPage() {
               onChange={(e) => setStatusFilter(e.target.value || null)}
               className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
             >
-              <option key="__all" value="">All Statuses</option>
+              <option key="__all" value="">
+                All Statuses
+              </option>
               {ALL_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {status.replace(/_/g, ' ')}
@@ -407,16 +403,12 @@ export default function AgentsPage() {
               {loading
                 ? '\u2026'
                 : processFilter || statusFilter
-                ? `${filteredRuns.length} of ${runs.length} runs`
-                : `${runs.length} runs`}
+                  ? `${filteredRuns.length} of ${runs.length} runs`
+                  : `${runs.length} runs`}
             </span>
           </div>
 
-          <AgentRunListTable
-            runs={filteredRuns}
-            loading={loading}
-            processNameMap={processNameMap}
-          />
+          <AgentRunListTable runs={filteredRuns} loading={loading} processNameMap={processNameMap} />
         </Tabs.Content>
       </Tabs.Root>
     </div>

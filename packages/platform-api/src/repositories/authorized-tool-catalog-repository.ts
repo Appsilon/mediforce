@@ -1,7 +1,4 @@
-import type {
-  ToolCatalogEntry,
-  ToolCatalogRepository,
-} from '@mediforce/platform-core';
+import type { ToolCatalogEntry, ToolCatalogRepository } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
 import { AuthorizedScope } from './authorized-repository';
 

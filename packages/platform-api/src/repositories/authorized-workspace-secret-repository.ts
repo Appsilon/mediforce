@@ -1,8 +1,5 @@
 import type { CallerIdentity } from '../auth';
-import type {
-  NamespaceSecretsRepository,
-  WorkflowSecretsRepository,
-} from '@mediforce/platform-core';
+import type { NamespaceSecretsRepository, WorkflowSecretsRepository } from '@mediforce/platform-core';
 import { AuthorizedScope } from './authorized-repository';
 
 /**
@@ -33,10 +30,7 @@ export class AuthorizedWorkspaceSecretRepository extends AuthorizedScope {
    * Returns `{}` for callers without namespace access (anti-enumeration —
    * matches `getSecrets`).
    */
-  getRuntimeSecrets = async (
-    namespace: string,
-    workflowName: string,
-  ): Promise<Record<string, string>> => {
+  getRuntimeSecrets = async (namespace: string, workflowName: string): Promise<Record<string, string>> => {
     if (!this.canSeeNamespace(namespace)) return {};
     const [ns, wf] = await Promise.all([
       this.raw.getSecrets(namespace),

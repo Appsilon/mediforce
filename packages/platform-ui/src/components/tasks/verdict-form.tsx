@@ -72,9 +72,7 @@ export function VerdictButtons({
   isVerdictBlocked?: (key: string) => boolean;
   onVerdict: (cfg: TaskVerdict) => void;
 }) {
-  const sorted = [...verdicts].sort((a, b) =>
-    a.intent === 'success' ? 1 : b.intent === 'success' ? -1 : 0,
-  );
+  const sorted = [...verdicts].sort((a, b) => (a.intent === 'success' ? 1 : b.intent === 'success' ? -1 : 0));
 
   return (
     <div className="flex flex-col gap-2">
@@ -95,9 +93,11 @@ export function VerdictButtons({
                 isDisabled && 'opacity-50 cursor-not-allowed',
               )}
             >
-              {isSubmittingThis
-                ? <Loader2 className="h-4 w-4 animate-spin" />
-                : <IntentIcon intent={cfg.intent} className="h-4 w-4" />}
+              {isSubmittingThis ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <IntentIcon intent={cfg.intent} className="h-4 w-4" />
+              )}
               {cfg.label}
             </button>
             {paramBlocked && outerBlockedHint && (
@@ -119,13 +119,7 @@ export function VerdictButtons({
  * When `verdicts` is absent (older tasks created before the field existed),
  * falls back to the legacy approve/revise UI.
  */
-export function VerdictForm({
-  taskId,
-  disabled,
-  remainingTaskCount,
-  verdicts,
-  onCompleted,
-}: VerdictFormProps) {
+export function VerdictForm({ taskId, disabled, remainingTaskCount, verdicts, onCompleted }: VerdictFormProps) {
   const resolved = verdicts && verdicts.length > 0 ? verdicts : LEGACY_VERDICTS;
   const [comment, setComment] = React.useState('');
   const [submitting, setSubmitting] = React.useState<string | null>(null);
@@ -184,9 +178,7 @@ export function VerdictForm({
         )}
       />
 
-      {error && (
-        <p className="text-sm text-destructive">{error}</p>
-      )}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <VerdictButtons
         verdicts={resolved}
@@ -196,11 +188,7 @@ export function VerdictForm({
         onVerdict={handleSubmit}
       />
 
-      {disabled && (
-        <p className="text-xs text-muted-foreground">
-          Review the step output before submitting a verdict.
-        </p>
-      )}
+      {disabled && <p className="text-xs text-muted-foreground">Review the step output before submitting a verdict.</p>}
     </div>
   );
 }
@@ -228,9 +216,7 @@ export function VerdictConfirmation({
       <div className={cn('rounded-lg border p-4', styles.card)}>
         <div className="flex items-center gap-2">
           <IntentIcon intent={data.intent} className={cn('h-5 w-5', styles.iconColor)} />
-          <span className={cn('font-medium text-sm', styles.text)}>
-            Submitted: {data.label}
-          </span>
+          <span className={cn('font-medium text-sm', styles.text)}>Submitted: {data.label}</span>
         </div>
 
         {params && params.length > 0 && paramValues && (
@@ -249,14 +235,10 @@ export function VerdictConfirmation({
         )}
 
         {data.comment && (
-          <blockquote className={cn('mt-3 border-l-2 pl-3 text-sm', styles.blockquote)}>
-            {data.comment}
-          </blockquote>
+          <blockquote className={cn('mt-3 border-l-2 pl-3 text-sm', styles.blockquote)}>{data.comment}</blockquote>
         )}
 
-        <p className={cn('mt-2 text-xs', styles.timestamp)}>
-          {format(new Date(data.timestamp), 'MMM d, yyyy HH:mm')}
-        </p>
+        <p className={cn('mt-2 text-xs', styles.timestamp)}>{format(new Date(data.timestamp), 'MMM d, yyyy HH:mm')}</p>
       </div>
 
       <RemainingTasksFooter remainingTaskCount={remainingTaskCount} />
@@ -295,9 +277,13 @@ export function VerdictConfirmationReadOnly({
     );
   }
 
-  const cfg = verdicts?.find((v) => v.key === verdict)
-    ?? LEGACY_VERDICTS.find((v) => v.key === verdict)
-    ?? { key: verdict, label: verdict, intent: 'neutral' as Intent, requiresComment: false };
+  const cfg = verdicts?.find((v) => v.key === verdict) ??
+    LEGACY_VERDICTS.find((v) => v.key === verdict) ?? {
+      key: verdict,
+      label: verdict,
+      intent: 'neutral' as Intent,
+      requiresComment: false,
+    };
 
   return (
     <VerdictConfirmation

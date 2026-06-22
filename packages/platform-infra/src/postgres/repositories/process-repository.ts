@@ -10,10 +10,7 @@ import {
   type WorkflowDefinitionListResult,
 } from '@mediforce/platform-core';
 import type { Database } from '../client';
-import {
-  workflowDefinitions,
-  workflowMeta,
-} from '../schema/workflow-definition';
+import { workflowDefinitions, workflowMeta } from '../schema/workflow-definition';
 import { processInstances } from '../schema/process-instance';
 
 /**
@@ -42,11 +39,7 @@ import { processInstances } from '../schema/process-instance';
 export class PostgresProcessRepository implements ProcessRepository {
   constructor(private readonly db: Database) {}
 
-  async getWorkflowDefinition(
-    namespace: string,
-    name: string,
-    version: number,
-  ): Promise<WorkflowDefinition | null> {
+  async getWorkflowDefinition(namespace: string, name: string, version: number): Promise<WorkflowDefinition | null> {
     const rows = await this.db
       .select()
       .from(workflowDefinitions)
@@ -83,10 +76,7 @@ export class PostgresProcessRepository implements ProcessRepository {
       )
       .limit(1);
     if (existing.length > 0) {
-      throw new WorkflowDefinitionVersionAlreadyExistsError(
-        parsed.name,
-        parsed.version,
-      );
+      throw new WorkflowDefinitionVersionAlreadyExistsError(parsed.name, parsed.version);
     }
     await this.db.insert(workflowDefinitions).values({
       workspace: parsed.namespace,
@@ -115,9 +105,7 @@ export class PostgresProcessRepository implements ProcessRepository {
     });
   }
 
-  async listAllWorkflowDefinitions(
-    includeArchived: boolean,
-  ): Promise<WorkflowDefinitionListResult> {
+  async listAllWorkflowDefinitions(includeArchived: boolean): Promise<WorkflowDefinitionListResult> {
     return this.fetchAndGroup(includeArchived, () => true);
   }
 
@@ -171,25 +159,16 @@ export class PostgresProcessRepository implements ProcessRepository {
     return { definitions: groups.filter(predicate) };
   }
 
-  async getDefaultWorkflowVersion(
-    namespace: string,
-    name: string,
-  ): Promise<number | null> {
+  async getDefaultWorkflowVersion(namespace: string, name: string): Promise<number | null> {
     const rows = await this.db
       .select({ defaultVersion: workflowMeta.defaultVersion })
       .from(workflowMeta)
-      .where(
-        and(eq(workflowMeta.workspace, namespace), eq(workflowMeta.name, name)),
-      )
+      .where(and(eq(workflowMeta.workspace, namespace), eq(workflowMeta.name, name)))
       .limit(1);
     return rows[0]?.defaultVersion ?? null;
   }
 
-  async setDefaultWorkflowVersion(
-    namespace: string,
-    name: string,
-    version: number,
-  ): Promise<void> {
+  async setDefaultWorkflowVersion(namespace: string, name: string, version: number): Promise<void> {
     await this.db
       .insert(workflowMeta)
       .values({
@@ -203,19 +182,11 @@ export class PostgresProcessRepository implements ProcessRepository {
       });
   }
 
-  async listWorkflowVersions(
-    namespace: string,
-    name: string,
-  ): Promise<WorkflowDefinition[]> {
+  async listWorkflowVersions(namespace: string, name: string): Promise<WorkflowDefinition[]> {
     const rows = await this.db
       .select()
       .from(workflowDefinitions)
-      .where(
-        and(
-          eq(workflowDefinitions.workspace, namespace),
-          eq(workflowDefinitions.name, name),
-        ),
-      )
+      .where(and(eq(workflowDefinitions.workspace, namespace), eq(workflowDefinitions.name, name)))
       .orderBy(asc(workflowDefinitions.version));
     return rows.map((row) => {
       const parsed = WorkflowDefinitionSchema.safeParse(toDefinition(row));
@@ -230,46 +201,24 @@ export class PostgresProcessRepository implements ProcessRepository {
     });
   }
 
-  async getLatestWorkflowVersion(
-    namespace: string,
-    name: string,
-  ): Promise<number> {
+  async getLatestWorkflowVersion(namespace: string, name: string): Promise<number> {
     const rows = await this.db
       .select({ version: workflowDefinitions.version })
       .from(workflowDefinitions)
-      .where(
-        and(
-          eq(workflowDefinitions.workspace, namespace),
-          eq(workflowDefinitions.name, name),
-        ),
-      )
+      .where(and(eq(workflowDefinitions.workspace, namespace), eq(workflowDefinitions.name, name)))
       .orderBy(desc(workflowDefinitions.version))
       .limit(1);
     return rows[0]?.version ?? 0;
   }
 
-  async setProcessArchived(
-    name: string,
-    namespace: string,
-    archived: boolean,
-  ): Promise<void> {
+  async setProcessArchived(name: string, namespace: string, archived: boolean): Promise<void> {
     await this.db
       .update(workflowDefinitions)
       .set({ archivedAt: archived ? new Date() : null })
-      .where(
-        and(
-          eq(workflowDefinitions.name, name),
-          eq(workflowDefinitions.workspace, namespace),
-        ),
-      );
+      .where(and(eq(workflowDefinitions.name, name), eq(workflowDefinitions.workspace, namespace)));
   }
 
-  async setVersionArchived(
-    namespace: string,
-    name: string,
-    version: number,
-    archived: boolean,
-  ): Promise<void> {
+  async setVersionArchived(namespace: string, name: string, version: number, archived: boolean): Promise<void> {
     const rows = await this.db
       .select({ id: workflowDefinitions.id })
       .from(workflowDefinitions)
@@ -290,20 +239,11 @@ export class PostgresProcessRepository implements ProcessRepository {
       .where(eq(workflowDefinitions.id, rows[0].id));
   }
 
-  async setWorkflowVisibility(
-    name: string,
-    namespace: string,
-    visibility: 'public' | 'private',
-  ): Promise<void> {
+  async setWorkflowVisibility(name: string, namespace: string, visibility: 'public' | 'private'): Promise<void> {
     const rows = await this.db
       .select({ id: workflowDefinitions.id })
       .from(workflowDefinitions)
-      .where(
-        and(
-          eq(workflowDefinitions.name, name),
-          eq(workflowDefinitions.workspace, namespace),
-        ),
-      );
+      .where(and(eq(workflowDefinitions.name, name), eq(workflowDefinitions.workspace, namespace)));
     if (rows.length === 0) {
       throw new Error(`Workflow '${name}' not found`);
     }
@@ -318,33 +258,19 @@ export class PostgresProcessRepository implements ProcessRepository {
       );
   }
 
-  async setWorkflowDeleted(
-    namespace: string,
-    name: string,
-    deleted: boolean,
-  ): Promise<void> {
+  async setWorkflowDeleted(namespace: string, name: string, deleted: boolean): Promise<void> {
     await this.db
       .update(workflowDefinitions)
       .set({ deletedAt: deleted ? new Date() : null })
-      .where(
-        and(
-          eq(workflowDefinitions.name, name),
-          eq(workflowDefinitions.workspace, namespace),
-        ),
-      );
+      .where(and(eq(workflowDefinitions.name, name), eq(workflowDefinitions.workspace, namespace)));
     // Mirror Firestore: also touch the meta doc if it exists.
     await this.db
       .update(workflowMeta)
       .set({ updatedAt: new Date() })
-      .where(
-        and(eq(workflowMeta.workspace, namespace), eq(workflowMeta.name, name)),
-      );
+      .where(and(eq(workflowMeta.workspace, namespace), eq(workflowMeta.name, name)));
   }
 
-  async isWorkflowNameDeleted(
-    namespace: string,
-    name: string,
-  ): Promise<boolean> {
+  async isWorkflowNameDeleted(namespace: string, name: string): Promise<boolean> {
     // Firestore semantics: any version with deleted=true marks the name
     // as deleted. Mirrored here with deleted_at IS NOT NULL.
     const rows = await this.db
@@ -361,36 +287,19 @@ export class PostgresProcessRepository implements ProcessRepository {
     return rows.length > 0;
   }
 
-  async countInstancesByDefinitionName(
-    namespace: string,
-    name: string,
-  ): Promise<number> {
+  async countInstancesByDefinitionName(namespace: string, name: string): Promise<number> {
     const rows = await this.db
       .select({ id: processInstances.id })
       .from(processInstances)
-      .where(
-        and(
-          eq(processInstances.workspace, namespace),
-          eq(processInstances.definitionName, name),
-        ),
-      );
+      .where(and(eq(processInstances.workspace, namespace), eq(processInstances.definitionName, name)));
     return rows.length;
   }
 
-  async transferWorkflowNamespace(
-    sourceNamespace: string,
-    name: string,
-    targetNamespace: string,
-  ): Promise<void> {
+  async transferWorkflowNamespace(sourceNamespace: string, name: string, targetNamespace: string): Promise<void> {
     const moved = await this.db
       .update(workflowDefinitions)
       .set({ workspace: targetNamespace })
-      .where(
-        and(
-          eq(workflowDefinitions.name, name),
-          eq(workflowDefinitions.workspace, sourceNamespace),
-        ),
-      )
+      .where(and(eq(workflowDefinitions.name, name), eq(workflowDefinitions.workspace, sourceNamespace)))
       .returning({ id: workflowDefinitions.id });
     if (moved.length === 0) {
       throw new Error(`Workflow '${name}' not found in namespace '${sourceNamespace}'`);
@@ -398,9 +307,7 @@ export class PostgresProcessRepository implements ProcessRepository {
   }
 }
 
-function toDefinition(
-  row: typeof workflowDefinitions.$inferSelect,
-): WorkflowDefinition {
+function toDefinition(row: typeof workflowDefinitions.$inferSelect): WorkflowDefinition {
   return compact({
     namespace: row.workspace,
     name: row.name,

@@ -11,9 +11,7 @@ import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
 
-function sanitize(
-  entry: AgentOAuthToken & { serverName: string },
-) {
+function sanitize(entry: AgentOAuthToken & { serverName: string }) {
   const { serverName, accessToken: _omitAccess, refreshToken: _omitRefresh, ...rest } = entry;
   const publicSlice = PublicAgentOAuthTokenSchema.parse(rest);
   return { ...publicSlice, serverName };

@@ -71,9 +71,7 @@ describe('run get command', () => {
   });
 
   it('exits 1 with structured error JSON on 404', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Run not found' }, 404),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Run not found' }, 404));
     const output = captureOutput();
     const code = await runGetCommand({
       argv: ['nope', '--json'],

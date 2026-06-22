@@ -6,7 +6,12 @@ import { createQueryWrapper } from '@/test/react-query';
 
 const listMock = vi.fn<(...args: unknown[]) => Promise<{ tasks: HumanTask[] }>>();
 class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { tasks: { list: listMock } },
@@ -34,10 +39,7 @@ describe('useActiveTaskForInstance', () => {
 
   it('returns the first non-deleted actionable task for the instance', async () => {
     listMock.mockResolvedValue({
-      tasks: [
-        buildHumanTask({ id: 't-stale', deleted: true }),
-        buildHumanTask({ id: 't-live' }),
-      ],
+      tasks: [buildHumanTask({ id: 't-stale', deleted: true }), buildHumanTask({ id: 't-live' })],
     });
     const { wrapper } = createQueryWrapper();
     const { result } = renderHook(() => useActiveTaskForInstance('inst-a'), { wrapper });
@@ -74,17 +76,20 @@ describe('useActiveTaskForInstance', () => {
   it('switches in-flight requests when instanceId changes without leaking stale data', async () => {
     let resolveFirst: ((value: { tasks: HumanTask[] }) => void) | null = null;
     listMock.mockImplementationOnce(
-      () => new Promise((resolve) => { resolveFirst = resolve; }),
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
     );
     listMock.mockResolvedValueOnce({
       tasks: [buildHumanTask({ id: 't-b', processInstanceId: 'inst-b' })],
     });
 
     const { wrapper } = createQueryWrapper();
-    const { result, rerender } = renderHook(
-      ({ id }: { id: string | null }) => useActiveTaskForInstance(id),
-      { wrapper, initialProps: { id: 'inst-a' as string | null } },
-    );
+    const { result, rerender } = renderHook(({ id }: { id: string | null }) => useActiveTaskForInstance(id), {
+      wrapper,
+      initialProps: { id: 'inst-a' as string | null },
+    });
 
     rerender({ id: 'inst-b' });
     await waitFor(() => expect(result.current.task?.id).toBe('t-b'));

@@ -2,7 +2,13 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
-import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
+import {
+  flattenResolvedMcpToLegacy,
+  resolveMcpForStep,
+  validateWorkflowEnv,
+  validateWorkflowModels,
+  validatePluginRequiredEnv,
+} from '@mediforce/agent-runtime';
 import { checkRetiredModels } from '@mediforce/platform-api/handlers';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
@@ -92,7 +98,11 @@ export async function POST(
     if (!workflowDefinition) {
       const latestVersion = await processRepo.getLatestWorkflowVersion(runNamespace, initialInstance.definitionName);
       if (latestVersion > 0) {
-        workflowDefinition = await processRepo.getWorkflowDefinition(runNamespace, initialInstance.definitionName, latestVersion);
+        workflowDefinition = await processRepo.getWorkflowDefinition(
+          runNamespace,
+          initialInstance.definitionName,
+          latestVersion,
+        );
       }
     }
     if (!workflowDefinition) {
@@ -114,10 +124,7 @@ export async function POST(
     const workflowSecrets = { ...namespaceSecrets, ...perWorkflowSecrets };
     {
       const missingEnv = validateWorkflowEnv(workflowDefinition, workflowSecrets);
-      const missingActionSecrets = validateActionSecrets(
-        workflowDefinition.steps,
-        workflowSecrets,
-      );
+      const missingActionSecrets = validateActionSecrets(workflowDefinition.steps, workflowSecrets);
 
       // Check plugin-required env vars (implicit agent needs like ANTHROPIC_API_KEY)
       const { pluginRegistry } = getPlatformServices();
@@ -127,19 +134,16 @@ export async function POST(
           pluginRequiredEnvMap.set(name, metadata.requiredEnv);
         }
       }
-      const missingPluginEnv = validatePluginRequiredEnv(
-        workflowDefinition, pluginRequiredEnvMap, workflowSecrets,
-      );
+      const missingPluginEnv = validatePluginRequiredEnv(workflowDefinition, pluginRequiredEnvMap, workflowSecrets);
       const pluginEnvAsMissing = missingPluginEnv.flatMap((m) => {
-        const bestGroup = m.groups.reduce((a, b) => a.missing.length <= b.missing.length ? a : b);
+        const bestGroup = m.groups.reduce((a, b) => (a.missing.length <= b.missing.length ? a : b));
         return bestGroup.missing.map((key) => ({
           secretName: key,
           template: `{{${key}}}`,
           steps: m.steps,
-          hint: `Required by ${m.pluginName}` +
-            (m.groups.length > 1
-              ? `. Alternatives: ${m.groups.map((g) => g.keys.join(' + ')).join(' or ')}`
-              : ''),
+          hint:
+            `Required by ${m.pluginName}` +
+            (m.groups.length > 1 ? `. Alternatives: ${m.groups.map((g) => g.keys.join(' + ')).join(' or ')}` : ''),
         }));
       });
 
@@ -187,10 +191,7 @@ export async function POST(
         });
         releaseRunLock(instanceId);
         runLockAcquired = false;
-        return NextResponse.json(
-          { error: message, unknownModels, instanceId },
-          { status: 422 },
-        );
+        return NextResponse.json({ error: message, unknownModels, instanceId }, { status: 422 });
       }
 
       const retired = checkRetiredModels(workflowDefinition, allModels);
@@ -204,16 +205,12 @@ export async function POST(
         });
         releaseRunLock(instanceId);
         runLockAcquired = false;
-        return NextResponse.json(
-          { error: retired.message, retiredModels: retired.refs, instanceId },
-          { status: 422 },
-        );
+        return NextResponse.json({ error: retired.message, retiredModels: retired.refs, instanceId }, { status: 422 });
       }
     }
 
-    const appContext: Record<string, unknown> = body.appContext
-      ?? (initialInstance.triggerPayload as Record<string, unknown>)
-      ?? {};
+    const appContext: Record<string, unknown> =
+      body.appContext ?? (initialInstance.triggerPayload as Record<string, unknown>) ?? {};
     const triggeredBy = body.triggeredBy;
 
     // Return 202 immediately — long-running execution happens in after().
@@ -224,18 +221,12 @@ export async function POST(
       let stepsExecuted = 0;
       let lastActiveStepId: string | null = null;
       try {
-        const agentStepCount = workflowDefinition.steps.filter(
-          (s) => s.executor === 'agent',
-        ).length;
-        const scriptStepCount = workflowDefinition.steps.filter(
-          (s) => s.executor === 'script',
-        ).length;
+        const agentStepCount = workflowDefinition.steps.filter((s) => s.executor === 'agent').length;
+        const scriptStepCount = workflowDefinition.steps.filter((s) => s.executor === 'script').length;
         const stepCountParts: string[] = [];
         if (agentStepCount > 0) stepCountParts.push(`${agentStepCount} agent step(s)`);
         if (scriptStepCount > 0) stepCountParts.push(`${scriptStepCount} script step(s)`);
-        const stepCountDescription = stepCountParts.length > 0
-          ? stepCountParts.join(', ')
-          : '0 step(s)';
+        const stepCountDescription = stepCountParts.length > 0 ? stepCountParts.join(', ') : '0 step(s)';
         await auditRepo.append({
           actorId: 'auto-runner',
           actorType: 'system',
@@ -243,7 +234,12 @@ export async function POST(
           action: 'process.run.started',
           description: `Auto-runner started for '${initialInstance.definitionName}' (workflow) — ${stepCountDescription} to execute`,
           timestamp: new Date().toISOString(),
-          inputSnapshot: { definitionName: initialInstance.definitionName, definitionVersion: initialInstance.definitionVersion, appContext, triggeredBy: triggeredBy ?? 'auto-runner' },
+          inputSnapshot: {
+            definitionName: initialInstance.definitionName,
+            definitionVersion: initialInstance.definitionVersion,
+            appContext,
+            triggeredBy: triggeredBy ?? 'auto-runner',
+          },
           outputSnapshot: {},
           basis: 'Auto-run triggered after workflow start',
           entityType: 'processInstance',
@@ -264,7 +260,9 @@ export async function POST(
           lastActiveStepId = instance.currentStepId;
 
           if (isStuckLoop(instance.currentStepId, loopTracker)) {
-            console.error(`[auto-runner] Safety guard: step '${instance.currentStepId}' looped ${MAX_SAME_STEP_ITERATIONS} times — aborting instance ${instanceId}`);
+            console.error(
+              `[auto-runner] Safety guard: step '${instance.currentStepId}' looped ${MAX_SAME_STEP_ITERATIONS} times — aborting instance ${instanceId}`,
+            );
             await instanceRepo.update(instanceId, {
               status: 'failed',
               error: `Auto-runner stuck: step '${instance.currentStepId}' looped ${MAX_SAME_STEP_ITERATIONS} times`,
@@ -292,7 +290,9 @@ export async function POST(
             (t) => t.stepId === instance.currentStepId && (t.status === 'pending' || t.status === 'claimed'),
           );
           if (hasPendingTask) {
-            console.log(`[auto-runner] Duplicate guard: pending task already exists for step '${instance.currentStepId}' on instance '${instanceId}' — pausing`);
+            console.log(
+              `[auto-runner] Duplicate guard: pending task already exists for step '${instance.currentStepId}' on instance '${instanceId}' — pausing`,
+            );
             if (instance.status === 'running') {
               await instanceRepo.update(instanceId, {
                 status: 'paused',
@@ -311,7 +311,9 @@ export async function POST(
               (s) => s.stepId === instance.currentStepId && s.status === 'active',
             );
             if (hasActiveSession) {
-              console.log(`[auto-runner] Duplicate guard: active cowork session already exists for step '${instance.currentStepId}' on instance '${instanceId}' — pausing`);
+              console.log(
+                `[auto-runner] Duplicate guard: active cowork session already exists for step '${instance.currentStepId}' on instance '${instanceId}' — pausing`,
+              );
               if (instance.status === 'running') {
                 await instanceRepo.update(instanceId, {
                   status: 'paused',
@@ -333,22 +335,23 @@ export async function POST(
               toolCatalogRepo,
               namespace: workflowDefinition.namespace,
             });
-            const sessionMcpServers = resolvedMcp !== null
-              ? flattenResolvedMcpToLegacy(resolvedMcp)
-              : (currentStep.cowork?.mcpServers ?? null);
+            const sessionMcpServers =
+              resolvedMcp !== null ? flattenResolvedMcpToLegacy(resolvedMcp) : (currentStep.cowork?.mcpServers ?? null);
 
             const agentType = currentStep.cowork?.agent ?? 'chat';
-            const model = agentType === 'voice-realtime'
-              ? (currentStep.cowork?.voiceRealtime?.model ?? 'gpt-4o-realtime-preview')
-              : (currentStep.cowork?.chat?.model ?? null);
-            const voiceConfig = agentType === 'voice-realtime'
-              ? {
-                  voice: currentStep.cowork?.voiceRealtime?.voice ?? 'alloy',
-                  synthesisModel: currentStep.cowork?.voiceRealtime?.synthesisModel ?? 'anthropic/claude-sonnet-4',
-                  maxDurationSeconds: currentStep.cowork?.voiceRealtime?.maxDurationSeconds ?? 600,
-                  idleTimeoutSeconds: currentStep.cowork?.voiceRealtime?.idleTimeoutSeconds ?? 60,
-                }
-              : null;
+            const model =
+              agentType === 'voice-realtime'
+                ? (currentStep.cowork?.voiceRealtime?.model ?? 'gpt-4o-realtime-preview')
+                : (currentStep.cowork?.chat?.model ?? null);
+            const voiceConfig =
+              agentType === 'voice-realtime'
+                ? {
+                    voice: currentStep.cowork?.voiceRealtime?.voice ?? 'alloy',
+                    synthesisModel: currentStep.cowork?.voiceRealtime?.synthesisModel ?? 'anthropic/claude-sonnet-4',
+                    maxDurationSeconds: currentStep.cowork?.voiceRealtime?.maxDurationSeconds ?? 600,
+                    idleTimeoutSeconds: currentStep.cowork?.voiceRealtime?.idleTimeoutSeconds ?? 60,
+                  }
+                : null;
 
             await coworkSessionRepo.create({
               id: sessionId,
@@ -379,7 +382,12 @@ export async function POST(
               action: 'cowork.session.created',
               description: `Cowork session created for step '${instance.currentStepId}'`,
               timestamp: now,
-              inputSnapshot: { sessionId, stepId: instance.currentStepId, agent: agentType, assignedRole: currentStep.allowedRoles?.[0] ?? 'unassigned' },
+              inputSnapshot: {
+                sessionId,
+                stepId: instance.currentStepId,
+                agent: agentType,
+                assignedRole: currentStep.allowedRoles?.[0] ?? 'unassigned',
+              },
               outputSnapshot: {},
               basis: 'Cowork executor step reached in auto-runner loop',
               entityType: 'coworkSession',
@@ -401,15 +409,15 @@ export async function POST(
             const taskId = crypto.randomUUID();
 
             // For selection review steps, pass options from the previous step's output
-            const previousStepId = workflowDefinition.transitions.find(
-              (t) => t.to === instance.currentStepId,
-            )?.from ?? null;
-            const previousOutput = previousStepId
-              ? (instance.variables?.[previousStepId] ?? null)
-              : null;
-            const options = currentStep.selection && previousOutput && Array.isArray((previousOutput as Record<string, unknown>).options)
-              ? (previousOutput as Record<string, unknown>).options as Array<Record<string, unknown>>
-              : undefined;
+            const previousStepId =
+              workflowDefinition.transitions.find((t) => t.to === instance.currentStepId)?.from ?? null;
+            const previousOutput = previousStepId ? (instance.variables?.[previousStepId] ?? null) : null;
+            const options =
+              currentStep.selection &&
+              previousOutput &&
+              Array.isArray((previousOutput as Record<string, unknown>).options)
+                ? ((previousOutput as Record<string, unknown>).options as Array<Record<string, unknown>>)
+                : undefined;
 
             // Pre-assignment: when the step declares `assignedTo`, interpolate it
             // against the run's sources and pin the task to that user (status
@@ -467,7 +475,13 @@ export async function POST(
               action: 'task.created',
               description: `Human task created for step '${instance.currentStepId}' (reason: human_executor)`,
               timestamp: now,
-              inputSnapshot: { taskId, stepId: instance.currentStepId, reason: 'human_executor', assignedRole: currentStep.allowedRoles?.[0] ?? 'unassigned', assignedUserId },
+              inputSnapshot: {
+                taskId,
+                stepId: instance.currentStepId,
+                reason: 'human_executor',
+                assignedRole: currentStep.allowedRoles?.[0] ?? 'unassigned',
+                assignedUserId,
+              },
               outputSnapshot: {},
               basis: 'Human executor step reached in auto-runner loop',
               entityType: 'humanTask',
@@ -500,20 +514,23 @@ export async function POST(
             if (currentStep.action.kind === 'wait') {
               const preResolved = instance.variables[instance.currentStepId] as Record<string, unknown> | undefined;
               if (preResolved?.resumeReason) {
-                console.log(`[auto-runner] Wait step '${instance.currentStepId}' already resolved (${preResolved.resumeReason}) — advancing`);
+                console.log(
+                  `[auto-runner] Wait step '${instance.currentStepId}' already resolved (${preResolved.resumeReason}) — advancing`,
+                );
                 await engine.advanceStep(instanceId, preResolved, { id: 'auto-runner', role: 'system' });
                 stepsExecuted++;
                 continue;
               }
             }
 
-            console.log(`[auto-runner] Executing action step '${instance.currentStepId}' (kind: ${currentStep.action.kind}) on instance '${instanceId}'`);
+            console.log(
+              `[auto-runner] Executing action step '${instance.currentStepId}' (kind: ${currentStep.action.kind}) on instance '${instanceId}'`,
+            );
 
-            const previousStepId = workflowDefinition.transitions.find(
-              (t) => t.to === instance.currentStepId,
-            )?.from ?? null;
+            const previousStepId =
+              workflowDefinition.transitions.find((t) => t.to === instance.currentStepId)?.from ?? null;
             const previousStepOutput = previousStepId
-              ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
+              ? ((instance.variables[previousStepId] as Record<string, unknown>) ?? {})
               : {};
             const stepInput = { ...previousStepOutput, steps: instance.variables };
 
@@ -522,8 +539,9 @@ export async function POST(
             // Iteration count = number of prior executions of this same step on
             // this instance. Lets revise loops surface as iter 1, 2, 3 in audit
             // and UI rather than every execution showing as iter 0.
-            const priorExecutionsForStep = (await instanceRepo.getStepExecutions(instanceId))
-              .filter((e) => e.stepId === instance.currentStepId).length;
+            const priorExecutionsForStep = (await instanceRepo.getStepExecutions(instanceId)).filter(
+              (e) => e.stepId === instance.currentStepId,
+            ).length;
             await instanceRepo.addStepExecution(instanceId, {
               id: executionId,
               instanceId,
@@ -593,7 +611,7 @@ export async function POST(
                   if (afterWrite?.pauseReason !== 'waiting_for_timer') {
                     console.error(
                       `[auto-runner] Wait sentinel write lost for '${instanceId}': ` +
-                      `pauseReason=${afterWrite?.pauseReason} — escalating to failed`,
+                        `pauseReason=${afterWrite?.pauseReason} — escalating to failed`,
                     );
                     await instanceRepo.update(instanceId, {
                       status: 'failed',
@@ -616,11 +634,7 @@ export async function POST(
                 completedAt: new Date().toISOString(),
               });
 
-              await engine.advanceStep(
-                instanceId,
-                output,
-                { id: 'auto-runner', role: 'system' },
-              );
+              await engine.advanceStep(instanceId, output, { id: 'auto-runner', role: 'system' });
 
               stepsExecuted++;
               continue;
@@ -654,11 +668,7 @@ export async function POST(
                   processDefinitionVersion: initialInstance.definitionVersion,
                 });
                 // Advance with an empty output envelope so transitions can fire normally.
-                await engine.advanceStep(
-                  instanceId,
-                  {},
-                  { id: 'auto-runner', role: 'system' },
-                );
+                await engine.advanceStep(instanceId, {}, { id: 'auto-runner', role: 'system' });
                 stepsExecuted++;
                 continue;
               }
@@ -674,13 +684,14 @@ export async function POST(
           }
 
           if (currentStep.executor === 'agent' || currentStep.executor === 'script') {
-            console.log(`[auto-runner] Executing workflow agent step '${instance.currentStepId}' on instance '${instanceId}' (iteration ${stepsExecuted})`);
+            console.log(
+              `[auto-runner] Executing workflow agent step '${instance.currentStepId}' on instance '${instanceId}' (iteration ${stepsExecuted})`,
+            );
 
-            const previousStepId = workflowDefinition.transitions.find(
-              (t) => t.to === instance.currentStepId,
-            )?.from ?? null;
+            const previousStepId =
+              workflowDefinition.transitions.find((t) => t.to === instance.currentStepId)?.from ?? null;
             const previousStepOutput = previousStepId
-              ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
+              ? ((instance.variables[previousStepId] as Record<string, unknown>) ?? {})
               : {};
             const stepInput = { ...previousStepOutput, steps: instance.variables };
 
@@ -688,8 +699,9 @@ export async function POST(
             // Iteration count = number of prior executions of this same step on
             // this instance. Lets revise loops surface as iter 1, 2, 3 in audit
             // and UI rather than every execution showing as iter 0.
-            const priorExecutionsForStep = (await instanceRepo.getStepExecutions(instanceId))
-              .filter((e) => e.stepId === instance.currentStepId).length;
+            const priorExecutionsForStep = (await instanceRepo.getStepExecutions(instanceId)).filter(
+              (e) => e.stepId === instance.currentStepId,
+            ).length;
             await instanceRepo.addStepExecution(instanceId, {
               id: executionId,
               instanceId,
@@ -784,10 +796,7 @@ export async function POST(
       }
     });
 
-    return NextResponse.json(
-      { instanceId, status: 'running', message: 'Auto-runner started' },
-      { status: 202 },
-    );
+    return NextResponse.json({ instanceId, status: 'running', message: 'Auto-runner started' }, { status: 202 });
   } catch (err) {
     if (runLockAcquired) {
       releaseRunLock(instanceId);

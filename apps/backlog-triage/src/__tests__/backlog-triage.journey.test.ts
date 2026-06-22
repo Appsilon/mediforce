@@ -14,9 +14,7 @@ import { WorkflowEngine } from '@mediforce/workflow-engine';
 const appDir = resolve(import.meta.dirname, '../..');
 
 function loadWorkflowDefinition(): WorkflowDefinition {
-  const raw = JSON.parse(
-    readFileSync(resolve(appDir, 'src/backlog-triage.wd.json'), 'utf8'),
-  );
+  const raw = JSON.parse(readFileSync(resolve(appDir, 'src/backlog-triage.wd.json'), 'utf8'));
   const parsed = WorkflowDefinitionSchema.safeParse({ ...raw, version: 1 });
   if (!parsed.success) {
     throw new Error(`WD invalid: ${parsed.error.message}`);
@@ -27,9 +25,30 @@ function loadWorkflowDefinition(): WorkflowDefinition {
 const triagerActor = { id: 'user-1', role: 'triager' } as const;
 
 const fakeIssues = [
-  { id: '101', label: '#101 Fix login bug', sublabel: 'bug', href: 'https://github.com/owner/repo/issues/101', badges: ['bug'], raw: { issueNumber: 101, title: 'Fix login bug', body: '...', labels: ['bug'] } },
-  { id: '102', label: '#102 Add CSV export', sublabel: 'enhancement', href: 'https://github.com/owner/repo/issues/102', badges: ['enhancement'], raw: { issueNumber: 102, title: 'Add CSV export', body: '...', labels: ['enhancement'] } },
-  { id: '103', label: '#103 Spike: refactor auth', sublabel: 'tech-debt', href: 'https://github.com/owner/repo/issues/103', badges: ['tech-debt'], raw: { issueNumber: 103, title: 'Spike: refactor auth', body: '...', labels: ['tech-debt'] } },
+  {
+    id: '101',
+    label: '#101 Fix login bug',
+    sublabel: 'bug',
+    href: 'https://github.com/owner/repo/issues/101',
+    badges: ['bug'],
+    raw: { issueNumber: 101, title: 'Fix login bug', body: '...', labels: ['bug'] },
+  },
+  {
+    id: '102',
+    label: '#102 Add CSV export',
+    sublabel: 'enhancement',
+    href: 'https://github.com/owner/repo/issues/102',
+    badges: ['enhancement'],
+    raw: { issueNumber: 102, title: 'Add CSV export', body: '...', labels: ['enhancement'] },
+  },
+  {
+    id: '103',
+    label: '#103 Spike: refactor auth',
+    sublabel: 'tech-debt',
+    href: 'https://github.com/owner/repo/issues/103',
+    badges: ['tech-debt'],
+    raw: { issueNumber: 103, title: 'Spike: refactor auth', body: '...', labels: ['tech-debt'] },
+  },
 ];
 
 const enrichedIssues = fakeIssues.map((issue, idx) => ({
@@ -55,28 +74,19 @@ describe('backlog-triage journey', () => {
       instanceRepo = new InMemoryProcessInstanceRepository();
       auditRepo = new InMemoryAuditRepository();
       humanTaskRepo = new InMemoryHumanTaskRepository();
-      engine = new WorkflowEngine(
-        processRepo, instanceRepo, auditRepo,
-        undefined, undefined, undefined,
-        humanTaskRepo,
-      );
+      engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo, undefined, undefined, undefined, humanTaskRepo);
       wd = loadWorkflowDefinition();
       await processRepo.saveWorkflowDefinition(wd);
     });
 
     it('drives the WD from fetch → check-tags (pass) → propose → assign → dispatch → report', async () => {
-      const instance = await engine.createInstance(
-        'appsilon', 'backlog-triage', 1, 'user-1', 'manual',
-        { repo: 'owner/repo' },
-      );
+      const instance = await engine.createInstance('appsilon', 'backlog-triage', 1, 'user-1', 'manual', {
+        repo: 'owner/repo',
+      });
       await engine.startInstance(instance.id);
 
       // fetch-backlog → check-tags
-      await engine.advanceStep(
-        instance.id,
-        { options: fakeIssues, repo: 'owner/repo' },
-        triagerActor,
-      );
+      await engine.advanceStep(instance.id, { options: fakeIssues, repo: 'owner/repo' }, triagerActor);
       let state = await instanceRepo.getById(instance.id);
       expect(state?.currentStepId).toBe('check-tags');
 
@@ -90,11 +100,7 @@ describe('backlog-triage journey', () => {
       expect(state?.currentStepId).toBe('propose-assignments');
 
       // propose-assignments → assign (human, creates task)
-      await engine.advanceStep(
-        instance.id,
-        { options: enrichedIssues, repo: 'owner/repo' },
-        triagerActor,
-      );
+      await engine.advanceStep(instance.id, { options: enrichedIssues, repo: 'owner/repo' }, triagerActor);
       state = await instanceRepo.getById(instance.id);
       expect(state?.currentStepId).toBe('assign');
       expect(state?.status).toBe('paused');
@@ -112,8 +118,21 @@ describe('backlog-triage journey', () => {
       expect(assignees.some((a) => a.id === 'fullstack-on-issue' && a.kind === 'agent')).toBe(true);
 
       const assignments = [
-        { itemId: '101', assigneeId: 'filip', assigneeKind: 'human', priority: 'P0', note: 'auto', raw: { issueNumber: 101 } },
-        { itemId: '102', assigneeId: 'fullstack-on-issue', assigneeKind: 'agent', priority: 'P2', raw: { issueNumber: 102 } },
+        {
+          itemId: '101',
+          assigneeId: 'filip',
+          assigneeKind: 'human',
+          priority: 'P0',
+          note: 'auto',
+          raw: { issueNumber: 101 },
+        },
+        {
+          itemId: '102',
+          assigneeId: 'fullstack-on-issue',
+          assigneeKind: 'agent',
+          priority: 'P2',
+          raw: { issueNumber: 102 },
+        },
       ];
       await instanceRepo.update(instance.id, { status: 'running', pauseReason: null });
       await engine.advanceStep(instance.id, { assignments }, triagerActor);
@@ -137,13 +156,16 @@ describe('backlog-triage journey', () => {
     });
 
     it('engine carries the assignments output forward to the dispatch step variables', async () => {
-      const instance = await engine.createInstance(
-        'appsilon', 'backlog-triage', 1, 'user-1', 'manual',
-        { repo: 'owner/repo' },
-      );
+      const instance = await engine.createInstance('appsilon', 'backlog-triage', 1, 'user-1', 'manual', {
+        repo: 'owner/repo',
+      });
       await engine.startInstance(instance.id);
       await engine.advanceStep(instance.id, { options: fakeIssues, repo: 'owner/repo' }, triagerActor);
-      await engine.advanceStep(instance.id, { needsTagging: false, options: fakeIssues, repo: 'owner/repo' }, triagerActor);
+      await engine.advanceStep(
+        instance.id,
+        { needsTagging: false, options: fakeIssues, repo: 'owner/repo' },
+        triagerActor,
+      );
       await engine.advanceStep(instance.id, { options: enrichedIssues, repo: 'owner/repo' }, triagerActor);
 
       const assignments = [
@@ -157,10 +179,9 @@ describe('backlog-triage journey', () => {
     });
 
     it('routes needsTagging=true → tag-issues (table-editor) → apply-tags → loops to fetch-backlog', async () => {
-      const instance = await engine.createInstance(
-        'appsilon', 'backlog-triage', 1, 'user-1', 'manual',
-        { repo: 'owner/repo' },
-      );
+      const instance = await engine.createInstance('appsilon', 'backlog-triage', 1, 'user-1', 'manual', {
+        repo: 'owner/repo',
+      });
       await engine.startInstance(instance.id);
 
       // fetch-backlog → check-tags
@@ -253,16 +274,20 @@ describe('backlog-triage journey', () => {
         await fn(
           () => JSON.stringify(inputJson),
           captureWrite,
-          { env, exit: (code: number) => { throw new ScriptExit(code); } },
+          {
+            env,
+            exit: (code: number) => {
+              throw new ScriptExit(code);
+            },
+          },
           mockFetch,
         );
       } catch (err) {
         if (err instanceof ScriptExit) exitCode = err.code;
         else throw err;
       }
-      const result = files['result.json'] !== undefined
-        ? (JSON.parse(files['result.json']) as Record<string, unknown>)
-        : {};
+      const result =
+        files['result.json'] !== undefined ? (JSON.parse(files['result.json']) as Record<string, unknown>) : {};
       return { result, exitCode, files };
     }
 
@@ -283,8 +308,18 @@ describe('backlog-triage journey', () => {
           repo: 'owner/repo',
           options: [
             { id: '101', label: '#101 No labels', href: 'https://github.com/owner/repo/issues/101', badges: [] },
-            { id: '102', label: '#102 Has bug label', href: 'https://github.com/owner/repo/issues/102', badges: ['bug'] },
-            { id: '103', label: '#103 Random tag', href: 'https://github.com/owner/repo/issues/103', badges: ['triage'] },
+            {
+              id: '102',
+              label: '#102 Has bug label',
+              href: 'https://github.com/owner/repo/issues/102',
+              badges: ['bug'],
+            },
+            {
+              id: '103',
+              label: '#103 Random tag',
+              href: 'https://github.com/owner/repo/issues/103',
+              badges: ['triage'],
+            },
           ],
         },
         {},
@@ -299,9 +334,21 @@ describe('backlog-triage journey', () => {
     it('fetch-backlog GETs the repo issues endpoint with the auth header', async () => {
       const step = wd.steps.find((s) => s.id === 'fetch-backlog')!;
       const script = step.script!.inlineScript!;
-      mockFetch.mockResolvedValue(new Response(JSON.stringify([
-        { number: 101, title: 'A', body: 'b', labels: [{ name: 'bug' }], html_url: 'https://github.com/owner/repo/issues/101', assignee: null },
-      ]), { status: 200, headers: { 'content-type': 'application/json' } }));
+      mockFetch.mockResolvedValue(
+        new Response(
+          JSON.stringify([
+            {
+              number: 101,
+              title: 'A',
+              body: 'b',
+              labels: [{ name: 'bug' }],
+              html_url: 'https://github.com/owner/repo/issues/101',
+              assignee: null,
+            },
+          ]),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
 
       const result = await runInlineScript(
         script,
@@ -331,10 +378,16 @@ describe('backlog-triage journey', () => {
           ? { number: 1000 + k, title: `Issue ${k}`, labels: [], html_url: `https://gh/${k}`, assignee: null }
           : { number: 2000 + k, title: `PR ${k}`, pull_request: {}, labels: [], html_url: `https://gh/pr${k}` },
       );
-      const page2 = [{ number: 3001, title: 'Oldest in window', labels: [], html_url: 'https://gh/3001', assignee: null }];
+      const page2 = [
+        { number: 3001, title: 'Oldest in window', labels: [], html_url: 'https://gh/3001', assignee: null },
+      ];
       mockFetch
-        .mockResolvedValueOnce(new Response(JSON.stringify(page1), { status: 200, headers: { 'content-type': 'application/json' } }))
-        .mockResolvedValueOnce(new Response(JSON.stringify(page2), { status: 200, headers: { 'content-type': 'application/json' } }));
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(page1), { status: 200, headers: { 'content-type': 'application/json' } }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(page2), { status: 200, headers: { 'content-type': 'application/json' } }),
+        );
 
       const result = await runInlineScript(script, { repo: 'owner/repo', limit: 70 }, { GITHUB_TOKEN: 'ghp_xxx' });
 
@@ -354,7 +407,12 @@ describe('backlog-triage journey', () => {
       mockFetch
         .mockResolvedValueOnce(new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } })) // GitHub POST /labels
         .mockResolvedValueOnce(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })) // GitHub POST /assignees
-        .mockResolvedValueOnce(new Response(JSON.stringify({ instanceId: 'run-abc', status: 'running' }), { status: 200, headers: { 'content-type': 'application/json' } })); // Mediforce POST
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ instanceId: 'run-abc', status: 'running' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        ); // Mediforce POST
 
       const result = await runInlineScript(
         script,
@@ -362,7 +420,13 @@ describe('backlog-triage journey', () => {
           repo: 'owner/repo',
           assignments: [
             { itemId: '101', assigneeId: 'filip', assigneeKind: 'human', priority: 'P0', raw: { issueNumber: 101 } },
-            { itemId: '102', assigneeId: 'fullstack-on-issue', assigneeKind: 'agent', priority: 'P2', raw: { issueNumber: 102 } },
+            {
+              itemId: '102',
+              assigneeId: 'fullstack-on-issue',
+              assigneeKind: 'agent',
+              priority: 'P2',
+              raw: { issueNumber: 102 },
+            },
           ],
         },
         {
@@ -396,7 +460,12 @@ describe('backlog-triage journey', () => {
 
       expect(result.humanAssignments).toEqual([{ issueNumber: 101, assignee: 'filip', priority: 'P0' }]);
       expect(result.agentRuns).toEqual([
-        { issueNumber: 102, workflowId: 'fullstack-on-issue', runId: 'run-abc', url: 'https://mediforce.test/runs/run-abc' },
+        {
+          issueNumber: 102,
+          workflowId: 'fullstack-on-issue',
+          runId: 'run-abc',
+          url: 'https://mediforce.test/runs/run-abc',
+        },
       ]);
       expect(result.errors).toEqual([]);
     });
@@ -420,7 +489,12 @@ describe('backlog-triage journey', () => {
       const script = step.script!.inlineScript!;
       mockFetch
         .mockResolvedValueOnce(new Response('not found', { status: 404, headers: { 'content-type': 'text/plain' } })) // GitHub POST /labels fails — script skips /assignees for this row
-        .mockResolvedValueOnce(new Response(JSON.stringify({ instanceId: 'run-zzz', status: 'running' }), { status: 200, headers: { 'content-type': 'application/json' } }));
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ instanceId: 'run-zzz', status: 'running' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        );
 
       const result = await runInlineScript(
         script,
@@ -428,7 +502,13 @@ describe('backlog-triage journey', () => {
           repo: 'owner/repo',
           assignments: [
             { itemId: '101', assigneeId: 'filip', assigneeKind: 'human', priority: 'P0', raw: { issueNumber: 101 } },
-            { itemId: '102', assigneeId: 'fullstack-on-issue', assigneeKind: 'agent', priority: 'P2', raw: { issueNumber: 102 } },
+            {
+              itemId: '102',
+              assigneeId: 'fullstack-on-issue',
+              assigneeKind: 'agent',
+              priority: 'P2',
+              raw: { issueNumber: 102 },
+            },
           ],
         },
         {
@@ -479,7 +559,12 @@ describe('backlog-triage journey', () => {
       const step = wd.steps.find((s) => s.id === 'apply-tags')!;
       const script = step.script!.inlineScript!;
       mockFetch
-        .mockResolvedValueOnce(new Response('{"message":"already_exists"}', { status: 422, headers: { 'content-type': 'application/json' } })) // create 'security' → exists
+        .mockResolvedValueOnce(
+          new Response('{"message":"already_exists"}', {
+            status: 422,
+            headers: { 'content-type': 'application/json' },
+          }),
+        ) // create 'security' → exists
         .mockResolvedValueOnce(new Response('{}', { status: 201, headers: { 'content-type': 'application/json' } })) // create 'priority/P0'
         .mockResolvedValueOnce(new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } })); // apply
 
@@ -529,7 +614,9 @@ describe('backlog-triage journey', () => {
       const step = wd.steps.find((s) => s.id === 'apply-tags')!;
       const script = step.script!.inlineScript!;
       // The create POST fails 403 → add-labels never attempted → the only row errors → total failure.
-      mockFetch.mockResolvedValueOnce(new Response('forbidden', { status: 403, headers: { 'content-type': 'text/plain' } }));
+      mockFetch.mockResolvedValueOnce(
+        new Response('forbidden', { status: 403, headers: { 'content-type': 'text/plain' } }),
+      );
 
       const { result, exitCode, files } = await runInlineScriptFull(
         script,

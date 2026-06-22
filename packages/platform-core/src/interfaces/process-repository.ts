@@ -58,9 +58,5 @@ export interface ProcessRepository {
    * `AuthorizedWorkflowDefinitionRepository` wrapper can gate on each (caller
    * must own source AND target).
    */
-  transferWorkflowNamespace(
-    sourceNamespace: string,
-    name: string,
-    targetNamespace: string,
-  ): Promise<void>;
+  transferWorkflowNamespace(sourceNamespace: string, name: string, targetNamespace: string): Promise<void>;
 }

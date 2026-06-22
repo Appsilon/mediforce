@@ -2,10 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryOAuthProviderRepository } from '@mediforce/platform-core/testing';
 import { listOAuthProviders } from '../list-providers';
 import { ForbiddenError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { adminRoles, memberRoles, sampleProviderInput } from './fixtures';
 
 describe('listOAuthProviders handler', () => {
@@ -51,9 +48,7 @@ describe('listOAuthProviders handler', () => {
       caller: userCaller('u-member', ['alpha'], memberRoles),
     });
 
-    await expect(
-      listOAuthProviders({ namespace: 'alpha' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(listOAuthProviders({ namespace: 'alpha' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it('throws ForbiddenError for a non-member caller', async () => {
@@ -62,8 +57,6 @@ describe('listOAuthProviders handler', () => {
       caller: userCaller('u-other', ['beta']),
     });
 
-    await expect(
-      listOAuthProviders({ namespace: 'alpha' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(listOAuthProviders({ namespace: 'alpha' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

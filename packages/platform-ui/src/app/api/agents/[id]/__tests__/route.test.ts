@@ -81,13 +81,8 @@ describe('PUT /api/agents/:id', () => {
 
     expect(res.status).toBe(200);
     expect(json.agent.name).toBe('Agent One Renamed');
-    expect(mockAgentUpdate).toHaveBeenCalledWith(
-      'agent-1',
-      expect.objectContaining({ name: 'Agent One Renamed' }),
-    );
-    expect(mockAuditAppend).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'agent.updated' }),
-    );
+    expect(mockAgentUpdate).toHaveBeenCalledWith('agent-1', expect.objectContaining({ name: 'Agent One Renamed' }));
+    expect(mockAuditAppend).toHaveBeenCalledWith(expect.objectContaining({ action: 'agent.updated' }));
   });
 
   it('[AUTHZ] non-member sees 404 (anti-enum) — never reveals the agent exists', async () => {
@@ -123,9 +118,7 @@ describe('DELETE /api/agents/:id', () => {
     expect(res.status).toBe(200);
     expect(json).toEqual({ success: true });
     expect(mockAgentDelete).toHaveBeenCalledWith('agent-1');
-    expect(mockAuditAppend).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'agent.deleted' }),
-    );
+    expect(mockAuditAppend).toHaveBeenCalledWith(expect.objectContaining({ action: 'agent.deleted' }));
   });
 
   it('[ERROR] returns 404 when agent does not exist', async () => {

@@ -18,8 +18,7 @@ export async function POST(
   if (!Array.isArray(path) || path.length < 3) {
     return NextResponse.json(
       {
-        error:
-          'Webhook URL must be /api/triggers/webhook/<namespace>/<workflowName>/<triggerSuffix>',
+        error: 'Webhook URL must be /api/triggers/webhook/<namespace>/<workflowName>/<triggerSuffix>',
       },
       { status: 400 },
     );
@@ -75,13 +74,10 @@ export async function POST(
   // misconfiguration immediately instead of returning 202 + dead instance.
   const apiKey = process.env.PLATFORM_API_KEY;
   if (!apiKey || apiKey.length === 0) {
-    console.error(
-      `[webhook] PLATFORM_API_KEY missing — cannot kick auto-runner for run ${result.runId}`,
-    );
+    console.error(`[webhook] PLATFORM_API_KEY missing — cannot kick auto-runner for run ${result.runId}`);
     return NextResponse.json(
       {
-        error:
-          'Server is misconfigured: PLATFORM_API_KEY is not set. Webhook accepted but workflow cannot start.',
+        error: 'Server is misconfigured: PLATFORM_API_KEY is not set. Webhook accepted but workflow cannot start.',
         runId: result.runId,
       },
       { status: 500 },
@@ -100,8 +96,5 @@ export async function POST(
     console.error(`[webhook] Failed to kick auto-runner for ${result.runId}:`, err);
   });
 
-  return NextResponse.json(
-    { runId: result.runId, statusUrl: result.statusUrl },
-    { status: 202 },
-  );
+  return NextResponse.json({ runId: result.runId, statusUrl: result.statusUrl }, { status: 202 });
 }

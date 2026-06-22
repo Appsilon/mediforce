@@ -48,32 +48,40 @@ describe('InMemoryProcessRepository', () => {
     });
 
     it('[DATA] isolates latest versions by namespace', async () => {
-      await repo.saveWorkflowDefinition(buildWorkflowDefinition({
-        namespace: 'tenant-a',
-        name: 'shared',
-        version: 1,
-      }));
-      await repo.saveWorkflowDefinition(buildWorkflowDefinition({
-        namespace: 'tenant-b',
-        name: 'shared',
-        version: 5,
-      }));
+      await repo.saveWorkflowDefinition(
+        buildWorkflowDefinition({
+          namespace: 'tenant-a',
+          name: 'shared',
+          version: 1,
+        }),
+      );
+      await repo.saveWorkflowDefinition(
+        buildWorkflowDefinition({
+          namespace: 'tenant-b',
+          name: 'shared',
+          version: 5,
+        }),
+      );
 
       await expect(repo.getLatestWorkflowVersion('tenant-a', 'shared')).resolves.toBe(1);
       await expect(repo.getLatestWorkflowVersion('tenant-b', 'shared')).resolves.toBe(5);
     });
 
     it('[DATA] isolates default versions and list groups by namespace', async () => {
-      await repo.saveWorkflowDefinition(buildWorkflowDefinition({
-        namespace: 'tenant-a',
-        name: 'shared',
-        version: 1,
-      }));
-      await repo.saveWorkflowDefinition(buildWorkflowDefinition({
-        namespace: 'tenant-b',
-        name: 'shared',
-        version: 5,
-      }));
+      await repo.saveWorkflowDefinition(
+        buildWorkflowDefinition({
+          namespace: 'tenant-a',
+          name: 'shared',
+          version: 1,
+        }),
+      );
+      await repo.saveWorkflowDefinition(
+        buildWorkflowDefinition({
+          namespace: 'tenant-b',
+          name: 'shared',
+          version: 5,
+        }),
+      );
       await repo.setDefaultWorkflowVersion('tenant-a', 'shared', 1);
       await repo.setDefaultWorkflowVersion('tenant-b', 'shared', 5);
 

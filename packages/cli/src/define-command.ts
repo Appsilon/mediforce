@@ -63,13 +63,11 @@ interface DefineCommandBaseOptions<TArgs extends ArgsDef> {
   args: TArgs;
 }
 
-export interface DefineCommandOptions<TArgs extends ArgsDef>
-  extends DefineCommandBaseOptions<TArgs> {
+export interface DefineCommandOptions<TArgs extends ArgsDef> extends DefineCommandBaseOptions<TArgs> {
   run: (ctx: RunContext<TArgs>) => Promise<number | void>;
 }
 
-export interface DefineMaybeClientCommandOptions<TArgs extends ArgsDef>
-  extends DefineCommandBaseOptions<TArgs> {
+export interface DefineMaybeClientCommandOptions<TArgs extends ArgsDef> extends DefineCommandBaseOptions<TArgs> {
   /** Skip resolveConfig + Mediforce client for dry-run paths. */
   skipClientWhen: (args: ParsedArgs<TArgs>) => boolean;
   run: (ctx: MaybeClientRunContext<TArgs>) => Promise<number | void>;
@@ -87,12 +85,8 @@ const COMMON_ARGS = {
 
 type WithCommonArgs<T extends ArgsDef> = T & typeof COMMON_ARGS;
 
-export function defineCommand<TArgs extends ArgsDef>(
-  options: DefineMaybeClientCommandOptions<TArgs>,
-): CommandFn;
-export function defineCommand<TArgs extends ArgsDef>(
-  options: DefineCommandOptions<TArgs>,
-): CommandFn;
+export function defineCommand<TArgs extends ArgsDef>(options: DefineMaybeClientCommandOptions<TArgs>): CommandFn;
+export function defineCommand<TArgs extends ArgsDef>(options: DefineCommandOptions<TArgs>): CommandFn;
 export function defineCommand<TArgs extends ArgsDef>(
   options: DefineCommandOptions<TArgs> | DefineMaybeClientCommandOptions<TArgs>,
 ): CommandFn {
@@ -100,8 +94,7 @@ export function defineCommand<TArgs extends ArgsDef>(
   const positionalCount = Object.values(options.args).filter(
     (def) => def !== null && typeof def === 'object' && 'type' in def && def.type === 'positional',
   ).length;
-  const skipClientWhen =
-    'skipClientWhen' in options ? options.skipClientWhen : undefined;
+  const skipClientWhen = 'skipClientWhen' in options ? options.skipClientWhen : undefined;
 
   const cmd: CommandDef<WithCommonArgs<TArgs>> = cittyDefineCommand({
     meta: { name: options.name, description: options.description },
@@ -135,11 +128,7 @@ export function defineCommand<TArgs extends ArgsDef>(
 
     const extras = parsedArgs._.slice(positionalCount);
     if (extras.length > 0) {
-      printError(
-        input.output,
-        { error: `Unexpected positional arguments: ${extras.join(' ')}` },
-        jsonMode,
-      );
+      printError(input.output, { error: `Unexpected positional arguments: ${extras.join(' ')}` }, jsonMode);
       input.output.stderr('');
       input.output.stderr(await renderUsageFor());
       return 2;
@@ -153,8 +142,7 @@ export function defineCommand<TArgs extends ArgsDef>(
     if (!skipClient) {
       try {
         config = resolveConfig({
-          flagBaseUrl:
-            typeof parsedArgs['base-url'] === 'string' ? parsedArgs['base-url'] : undefined,
+          flagBaseUrl: typeof parsedArgs['base-url'] === 'string' ? parsedArgs['base-url'] : undefined,
           env: input.env,
         });
       } catch (err) {
@@ -180,11 +168,7 @@ export function defineCommand<TArgs extends ArgsDef>(
       const result = await (options.run as (ctx: MaybeClientRunContext<TArgs>) => Promise<number | void>)(ctx);
       return typeof result === 'number' ? result : 0;
     } catch (err) {
-      printError(
-        input.output,
-        formatCliError(err, { baseUrl: config?.baseUrl, jsonMode }),
-        jsonMode,
-      );
+      printError(input.output, formatCliError(err, { baseUrl: config?.baseUrl, jsonMode }), jsonMode);
       return 1;
     }
   };

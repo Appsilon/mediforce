@@ -1,10 +1,7 @@
 import { PreconditionFailedError } from '../../errors';
 import { actorFromCaller, loadOr404 } from '../_helpers';
 import type { CallerScope } from '../../repositories/index';
-import type {
-  FinalizeCoworkSessionInput,
-  FinalizeCoworkSessionOutput,
-} from '../../contract/cowork';
+import type { FinalizeCoworkSessionInput, FinalizeCoworkSessionOutput } from '../../contract/cowork';
 import { validateOutputSchema } from '@mediforce/agent-runtime';
 import type { OutputSchemaShape } from '@mediforce/platform-core';
 
@@ -29,10 +26,10 @@ export async function finalizeCoworkSession(
   );
 
   if (session.status !== 'active') {
-    throw new PreconditionFailedError(
-      `Cannot finalize a ${session.status} session`,
-      { sessionId: input.sessionId, status: session.status },
-    );
+    throw new PreconditionFailedError(`Cannot finalize a ${session.status} session`, {
+      sessionId: input.sessionId,
+      status: session.status,
+    });
   }
 
   const instance = await loadOr404(
@@ -41,25 +38,19 @@ export async function finalizeCoworkSession(
   );
 
   if (instance.status !== 'paused') {
-    throw new PreconditionFailedError(
-      `Process instance is '${instance.status}', expected 'paused'`,
-      { instanceId: session.processInstanceId, status: instance.status },
-    );
+    throw new PreconditionFailedError(`Process instance is '${instance.status}', expected 'paused'`, {
+      instanceId: session.processInstanceId,
+      status: instance.status,
+    });
   }
 
   const actor = actorFromCaller(scope);
   const now = new Date().toISOString();
 
   if (session.outputSchema) {
-    const error = validateOutputSchema(
-      input.artifact,
-      session.outputSchema as OutputSchemaShape,
-    );
+    const error = validateOutputSchema(input.artifact, session.outputSchema as OutputSchemaShape);
     if (error !== null) {
-      throw new PreconditionFailedError(
-        `Artifact validation failed: ${error}`,
-        { sessionId: input.sessionId, error },
-      );
+      throw new PreconditionFailedError(`Artifact validation failed: ${error}`, { sessionId: input.sessionId, error });
     }
   }
 

@@ -47,9 +47,7 @@ function DisplayPopover({
           className="z-50 w-48 rounded-lg border bg-popover p-1 shadow-md animate-in fade-in-0 zoom-in-95"
         >
           <div className="px-2 py-1.5">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Group by
-            </span>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Group by</span>
           </div>
           {GROUP_FIELDS.map((field) => {
             const isActive = activeFields.has(field.value);
@@ -76,9 +74,7 @@ function DisplayPopover({
 
 export default function TasksPage() {
   const { firebaseUser } = useAuth();
-  const [groupByFields, setGroupByFields] = React.useState<Set<GroupByField>>(
-    () => new Set<GroupByField>(),
-  );
+  const [groupByFields, setGroupByFields] = React.useState<Set<GroupByField>>(() => new Set<GroupByField>());
 
   const toggleField = React.useCallback((field: GroupByField) => {
     setGroupByFields((prev) => {
@@ -135,8 +131,7 @@ export default function TasksPage() {
           <p className="text-sm text-muted-foreground mt-0.5">
             {role ? (
               <>
-                Tasks assigned to role:{' '}
-                <span className="font-medium text-foreground">{role}</span>
+                Tasks assigned to role: <span className="font-medium text-foreground">{role}</span>
               </>
             ) : (
               'All tasks'

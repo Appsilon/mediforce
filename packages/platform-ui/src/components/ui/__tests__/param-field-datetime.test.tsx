@@ -5,13 +5,7 @@ import { ParamField } from '../param-field';
 describe('ParamField datetime type', () => {
   it('onChange emits a UTC ISO string representing the same instant as the entered local time', () => {
     const onChange = vi.fn();
-    render(
-      <ParamField
-        param={{ name: 'scheduled_at', type: 'datetime' }}
-        value=""
-        onChange={onChange}
-      />,
-    );
+    render(<ParamField param={{ name: 'scheduled_at', type: 'datetime' }} value="" onChange={onChange} />);
 
     const input = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '2026-06-18T11:15' } });
@@ -28,13 +22,7 @@ describe('ParamField datetime type', () => {
 
   it('displays a stored UTC ISO string as the local equivalent (round-trip)', () => {
     const stored = '2026-06-18T09:00:00.000Z';
-    render(
-      <ParamField
-        param={{ name: 'scheduled_at', type: 'datetime' }}
-        value={stored}
-        onChange={vi.fn()}
-      />,
-    );
+    render(<ParamField param={{ name: 'scheduled_at', type: 'datetime' }} value={stored} onChange={vi.fn()} />);
 
     const input = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
     // The input value (no TZ) parsed as local time must represent the same instant

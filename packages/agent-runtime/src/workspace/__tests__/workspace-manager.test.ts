@@ -12,9 +12,13 @@ import { createTestRepo, type TestRepo } from '../../plugins/__tests__/helpers/c
 import type { WorkflowWorkspace } from '@mediforce/platform-core';
 
 function listBareBranches(bareRepoPath: string): string[] {
-  const out = execFileSync('git', ['--git-dir', bareRepoPath, 'for-each-ref', '--format=%(refname:short)', 'refs/heads/'], {
-    encoding: 'utf-8',
-  });
+  const out = execFileSync(
+    'git',
+    ['--git-dir', bareRepoPath, 'for-each-ref', '--format=%(refname:short)', 'refs/heads/'],
+    {
+      encoding: 'utf-8',
+    },
+  );
   return out.trim().split('\n').filter(Boolean);
 }
 
@@ -51,10 +55,17 @@ describe('WorkspaceManager', () => {
         expect(result.remoteUrl).toBe(remote.repoPath);
         // The remote's tip is reachable via a remote-tracking ref. We use
         // init+fetch (multi-remote model), not git clone --bare.
-        const remoteRefs = execFileSync('git', [
-          '--git-dir', result.path, 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/remotes/',
-        ], { encoding: 'utf-8' }).trim().split('\n').filter(Boolean);
-        const mainRef = remoteRefs.find((line) => line.endsWith('/main ' + remote.commitSha) || line.includes('/main '));
+        const remoteRefs = execFileSync(
+          'git',
+          ['--git-dir', result.path, 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/remotes/'],
+          { encoding: 'utf-8' },
+        )
+          .trim()
+          .split('\n')
+          .filter(Boolean);
+        const mainRef = remoteRefs.find(
+          (line) => line.endsWith('/main ' + remote.commitSha) || line.includes('/main '),
+        );
         expect(mainRef).toBeDefined();
         expect(mainRef!.endsWith(remote.commitSha)).toBe(true);
       } finally {
@@ -79,7 +90,10 @@ describe('WorkspaceManager', () => {
       expect(ws.branch).toBe('run/run-001');
       expect(ws.startCommit).toMatch(/^[a-f0-9]{40}$/);
 
-      const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: ws.path, encoding: 'utf-8' }).trim();
+      const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: ws.path,
+        encoding: 'utf-8',
+      }).trim();
       expect(branch).toBe('run/run-001');
 
       const email = execFileSync('git', ['config', 'user.email'], { cwd: ws.path, encoding: 'utf-8' }).trim();
@@ -129,7 +143,8 @@ describe('WorkspaceManager', () => {
 
       // The run branch has one commit beyond the seed, with a "no changes" subject.
       const subjects = execFileSync('git', ['log', '--format=%s', '-n', '2'], { cwd: ws.path, encoding: 'utf-8' })
-        .trim().split('\n');
+        .trim()
+        .split('\n');
       expect(subjects[0]).toBe('◆ No-op — no changes');
       expect(subjects[1]).toBe('◇ Initialize workspace repository');
     });
@@ -298,7 +313,8 @@ describe('WorkspaceManager', () => {
       const ws = await manager.createRunWorkspace(wd, 'run-seed-msg');
 
       const msg = execFileSync('git', ['log', '-1', '--format=%B', ws.startCommit], {
-        cwd: ws.path, encoding: 'utf-8',
+        cwd: ws.path,
+        encoding: 'utf-8',
       });
       expect(msg.split('\n')[0]).toBe('◇ Initialize workspace repository');
       expect(msg).toMatch(/Baseline secret-guard patterns/);
@@ -334,7 +350,8 @@ describe('WorkspaceManager', () => {
       await writeFile(join(ws.path, 'final.md'), 'done');
 
       await manager.commitStep(ws, {
-        stepId: 'finish', stepName: 'Finish',
+        stepId: 'finish',
+        stepName: 'Finish',
         isTerminal: true,
       });
 
@@ -348,13 +365,16 @@ describe('WorkspaceManager', () => {
       await writeFile(join(ws.path, 'partial.log'), 'partial output');
 
       await manager.commitStep(ws, {
-        stepId: 'doomed', stepName: 'Doomed step',
+        stepId: 'doomed',
+        stepName: 'Doomed step',
         status: 'failed',
         error: 'Docker container failed (exit code 1): package xyz not found',
       });
 
       const body = execFileSync('git', ['log', '-1', '--format=%B'], { cwd: ws.path, encoding: 'utf-8' });
-      expect(body.split('\n')[0]).toMatch(/^✗ Doomed step — failed: Docker container failed \(exit code 1\): package xyz not found$/);
+      expect(body.split('\n')[0]).toMatch(
+        /^✗ Doomed step — failed: Docker container failed \(exit code 1\): package xyz not found$/,
+      );
       expect(body).toMatch(/Step-Status: failed/);
       expect(body).toMatch(/package xyz not found/);
       expect(body).toMatch(/\+partial\.log/);
@@ -413,9 +433,14 @@ describe('formatStepCommitMessage (pure function)', () => {
   const ws = { branch: 'run/abc-123', startCommit: 'a'.repeat(40) };
 
   it('◆ marker + step name + delta for a success with staged entries', () => {
-    const msg = formatStepCommitMessage(ws, {
-      stepId: 'gen', stepName: 'Generate',
-    }, [{ status: 'A', path: 'out.txt' }]);
+    const msg = formatStepCommitMessage(
+      ws,
+      {
+        stepId: 'gen',
+        stepName: 'Generate',
+      },
+      [{ status: 'A', path: 'out.txt' }],
+    );
     expect(msg.split('\n')[0]).toBe('◆ Generate → +out.txt');
   });
 
@@ -425,27 +450,45 @@ describe('formatStepCommitMessage (pure function)', () => {
   });
 
   it('✓ marker when isTerminal', () => {
-    const msg = formatStepCommitMessage(ws, {
-      stepId: 'fin', stepName: 'Final', isTerminal: true,
-    }, [{ status: 'A', path: 'x' }]);
+    const msg = formatStepCommitMessage(
+      ws,
+      {
+        stepId: 'fin',
+        stepName: 'Final',
+        isTerminal: true,
+      },
+      [{ status: 'A', path: 'x' }],
+    );
     expect(msg.split('\n')[0]).toBe('✓ Final → +x');
   });
 
   it('✗ marker for failed, with truncated error on subject', () => {
     const long = 'A'.repeat(200);
-    const msg = formatStepCommitMessage(ws, {
-      stepId: 'bad', stepName: 'Bad', status: 'failed', error: long,
-    }, [{ status: 'A', path: 'p.log' }]);
+    const msg = formatStepCommitMessage(
+      ws,
+      {
+        stepId: 'bad',
+        stepName: 'Bad',
+        status: 'failed',
+        error: long,
+      },
+      [{ status: 'A', path: 'p.log' }],
+    );
     const subject = msg.split('\n')[0];
     expect(subject.startsWith('✗ Bad — failed: ')).toBe(true);
     expect(subject.length).toBeLessThanOrEqual(120);
   });
 
   it('uses reasoningSummary on subject when available, delta goes in body', () => {
-    const msg = formatStepCommitMessage(ws, {
-      stepId: 'sum', stepName: 'Sum',
-      reasoningSummary: 'Joined 3 tables and wrote report.',
-    }, [{ status: 'A', path: 'report.md' }]);
+    const msg = formatStepCommitMessage(
+      ws,
+      {
+        stepId: 'sum',
+        stepName: 'Sum',
+        reasoningSummary: 'Joined 3 tables and wrote report.',
+      },
+      [{ status: 'A', path: 'report.md' }],
+    );
     expect(msg.split('\n')[0]).toBe('◆ Sum — Joined 3 tables and wrote report.');
     expect(msg).toMatch(/\+report\.md/);
   });

@@ -11,6 +11,6 @@ import type { BulkRunInput } from '@mediforce/platform-api/contract';
  */
 export const POST = createRouteAdapter<typeof BulkRunInputSchema, BulkRunInput>(
   BulkRunInputSchema,
-  async (req) => (await req.json().catch(() => ({}))),
+  async (req) => await req.json().catch(() => ({})),
   bulkArchiveRuns,
 );

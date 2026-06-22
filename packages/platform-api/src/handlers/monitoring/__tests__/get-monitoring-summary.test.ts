@@ -20,15 +20,9 @@ describe('getMonitoringSummary handler', () => {
   });
 
   it('aggregates runs and tasks scoped to a single workspace', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-1', namespace: 'team-alpha', status: 'running' }),
-    );
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-2', namespace: 'team-alpha', status: 'paused' }),
-    );
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-3', namespace: 'team-beta', status: 'running' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-1', namespace: 'team-alpha', status: 'running' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-2', namespace: 'team-alpha', status: 'paused' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-3', namespace: 'team-beta', status: 'running' }));
     await humanTaskRepo.create(
       buildHumanTask({ id: 't1', processInstanceId: 'inst-1', assignedRole: 'reviewer', status: 'pending' }),
     );

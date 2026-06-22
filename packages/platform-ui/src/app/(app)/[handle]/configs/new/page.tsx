@@ -13,7 +13,9 @@ export default function NewConfigPage() {
     <div className="p-6 text-center text-sm text-muted-foreground">
       <p>Process configurations are now embedded in workflow definitions.</p>
       <p className="mt-2">
-        <Link href={`/${handle}`} className="underline">Back to catalog</Link>
+        <Link href={`/${handle}`} className="underline">
+          Back to catalog
+        </Link>
       </p>
     </div>
   );

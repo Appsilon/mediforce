@@ -47,13 +47,37 @@ export interface FoundationModel {
 }
 
 export const FOUNDATION_MODELS: FoundationModel[] = [
-  { id: 'anthropic/claude-opus-4-5',  name: 'Claude Opus 4.5',  provider: 'Anthropic', Logo: AnthropicLogo, logoColor: '#D97757' },
-  { id: 'anthropic/claude-sonnet-4',  name: 'Claude Sonnet 4',  provider: 'Anthropic', Logo: AnthropicLogo, logoColor: '#D97757' },
-  { id: 'anthropic/claude-haiku-4-5', name: 'Claude Haiku 4.5', provider: 'Anthropic', Logo: AnthropicLogo, logoColor: '#D97757' },
-  { id: 'openai/gpt-4o',              name: 'GPT-4o',            provider: 'OpenAI',    Logo: OpenAILogo,    logoColor: '#10a37f' },
-  { id: 'openai/gpt-4o-mini',         name: 'GPT-4o mini',       provider: 'OpenAI',    Logo: OpenAILogo,    logoColor: '#10a37f' },
-  { id: 'google/gemini-2.5-pro',      name: 'Gemini 2.5 Pro',    provider: 'Google',    Logo: GeminiLogo,    logoColor: '#4285F4' },
-  { id: 'deepseek/deepseek-chat',     name: 'DeepSeek Chat',     provider: 'DeepSeek',  Logo: DeepSeekLogo,  logoColor: '#4D6BFE' },
+  {
+    id: 'anthropic/claude-opus-4-5',
+    name: 'Claude Opus 4.5',
+    provider: 'Anthropic',
+    Logo: AnthropicLogo,
+    logoColor: '#D97757',
+  },
+  {
+    id: 'anthropic/claude-sonnet-4',
+    name: 'Claude Sonnet 4',
+    provider: 'Anthropic',
+    Logo: AnthropicLogo,
+    logoColor: '#D97757',
+  },
+  {
+    id: 'anthropic/claude-haiku-4-5',
+    name: 'Claude Haiku 4.5',
+    provider: 'Anthropic',
+    Logo: AnthropicLogo,
+    logoColor: '#D97757',
+  },
+  { id: 'openai/gpt-4o', name: 'GPT-4o', provider: 'OpenAI', Logo: OpenAILogo, logoColor: '#10a37f' },
+  { id: 'openai/gpt-4o-mini', name: 'GPT-4o mini', provider: 'OpenAI', Logo: OpenAILogo, logoColor: '#10a37f' },
+  { id: 'google/gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'Google', Logo: GeminiLogo, logoColor: '#4285F4' },
+  {
+    id: 'deepseek/deepseek-chat',
+    name: 'DeepSeek Chat',
+    provider: 'DeepSeek',
+    Logo: DeepSeekLogo,
+    logoColor: '#4D6BFE',
+  },
 ];
 
 export function getModelDisplayName(modelId: string): string {

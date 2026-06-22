@@ -117,9 +117,7 @@ describe('POST /api/users/resend-invite', () => {
 
   it('[AUTH] unauthenticated request → 401', async () => {
     const { NextResponse } = await import('next/server');
-    mockResolveCallerIdentity.mockResolvedValueOnce(
-      NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-    );
+    mockResolveCallerIdentity.mockResolvedValueOnce(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
 
     const res = await POST(makePostRequest(validBody));
 

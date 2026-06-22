@@ -43,9 +43,7 @@ function CollapsibleSection({
         <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform data-[state=open]:rotate-180" />
       </Collapsible.Trigger>
       <Collapsible.Content>
-        <div className="border-t px-4 py-4">
-          {children}
-        </div>
+        <div className="border-t px-4 py-4">{children}</div>
       </Collapsible.Content>
     </Collapsible.Root>
   );
@@ -58,9 +56,7 @@ function CollapsibleItem({ label, children }: { label: string; children: React.R
         <ChevronDown className="h-3 w-3 transition-transform data-[state=open]:rotate-180" />
         {label}
       </Collapsible.Trigger>
-      <Collapsible.Content className="mt-1 mb-2">
-        {children}
-      </Collapsible.Content>
+      <Collapsible.Content className="mt-1 mb-2">{children}</Collapsible.Content>
     </Collapsible.Root>
   );
 }
@@ -75,12 +71,8 @@ function formatDuration(start: string, end: string | null): string {
 /** Render a record as flat key-value table rows (primitives) + collapsible JSON (objects/arrays) */
 function LightFormattedData({ data }: { data: Record<string, unknown> }) {
   const entries = Object.entries(data);
-  const flatEntries = entries.filter(
-    ([, v]) => v === null || typeof v !== 'object',
-  );
-  const nestedEntries = entries.filter(
-    ([, v]) => v !== null && typeof v === 'object',
-  );
+  const flatEntries = entries.filter(([, v]) => v === null || typeof v !== 'object');
+  const nestedEntries = entries.filter(([, v]) => v !== null && typeof v === 'object');
 
   return (
     <div className="space-y-3">
@@ -92,9 +84,7 @@ function LightFormattedData({ data }: { data: Record<string, unknown> }) {
                 <td className="py-1.5 pr-4 font-medium text-muted-foreground text-xs whitespace-nowrap align-top">
                   {key}
                 </td>
-                <td className="py-1.5 text-xs font-mono text-foreground">
-                  {String(value)}
-                </td>
+                <td className="py-1.5 text-xs font-mono text-foreground">{String(value)}</td>
               </tr>
             ))}
           </tbody>
@@ -102,9 +92,7 @@ function LightFormattedData({ data }: { data: Record<string, unknown> }) {
       )}
       {nestedEntries.map(([key, value]) => (
         <CollapsibleItem key={key} label={key}>
-          <pre className="rounded bg-muted p-3 text-xs overflow-auto max-h-48">
-            {JSON.stringify(value, null, 2)}
-          </pre>
+          <pre className="rounded bg-muted p-3 text-xs overflow-auto max-h-48">{JSON.stringify(value, null, 2)}</pre>
         </CollapsibleItem>
       ))}
     </div>
@@ -126,7 +114,10 @@ export function AgentRunDetail({
   return (
     <div className="p-6 space-y-6 max-w-3xl">
       {/* Back */}
-      <Link href={`/${handle}/agents`} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+      <Link
+        href={`/${handle}/agents`}
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
         <ArrowLeft className="h-4 w-4" />
         Back to Agent Oversight
       </Link>
@@ -136,25 +127,56 @@ export function AgentRunDetail({
         <div className="flex items-start gap-3">
           <div className="flex-1">
             <h1 className="text-2xl font-headline font-semibold font-mono">{run.pluginId}</h1>
-            <p className="text-sm text-muted-foreground">
-              {processInstance?.definitionName ?? 'Unknown Workflow'}
-            </p>
+            <p className="text-sm text-muted-foreground">{processInstance?.definitionName ?? 'Unknown Workflow'}</p>
           </div>
-          <span className={cn('shrink-0 mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium', STATUS_STYLES[run.status] ?? STATUS_STYLES.completed)}>
+          <span
+            className={cn(
+              'shrink-0 mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium',
+              STATUS_STYLES[run.status] ?? STATUS_STYLES.completed,
+            )}
+          >
             {run.status.replace(/_/g, ' ')}
           </span>
         </div>
 
         {/* Metadata row */}
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
-          <span className="inline-flex items-center gap-1">Autonomy: <AutonomyBadge level={run.autonomyLevel} showLabel /></span>
-          {run.executorType && <span>Executor: <span className="text-foreground font-medium">{run.executorType}</span></span>}
-          {run.reviewerType && <span>Reviewer: <span className="text-foreground font-medium">{run.reviewerType}</span></span>}
-          <span>Workflow: <Link href={`/${handle}/workflows/${run.processInstanceId}`} className="text-primary hover:underline font-mono text-xs">{run.processInstanceId.slice(0, 12)}...</Link></span>
-          <span>Step: <span className="text-foreground font-medium">{formatStepName(run.stepId)}</span></span>
-          <span>Duration: <span className="text-foreground">{formatDuration(run.startedAt, run.completedAt)}</span></span>
-          <span>Started: <span className="text-foreground">{format(new Date(run.startedAt), 'MMM d, yyyy HH:mm:ss')}</span></span>
-          {envelope?.model && <span>Model: <span className="text-foreground font-mono text-xs">{envelope.model}</span></span>}
+          <span className="inline-flex items-center gap-1">
+            Autonomy: <AutonomyBadge level={run.autonomyLevel} showLabel />
+          </span>
+          {run.executorType && (
+            <span>
+              Executor: <span className="text-foreground font-medium">{run.executorType}</span>
+            </span>
+          )}
+          {run.reviewerType && (
+            <span>
+              Reviewer: <span className="text-foreground font-medium">{run.reviewerType}</span>
+            </span>
+          )}
+          <span>
+            Workflow:{' '}
+            <Link
+              href={`/${handle}/workflows/${run.processInstanceId}`}
+              className="text-primary hover:underline font-mono text-xs"
+            >
+              {run.processInstanceId.slice(0, 12)}...
+            </Link>
+          </span>
+          <span>
+            Step: <span className="text-foreground font-medium">{formatStepName(run.stepId)}</span>
+          </span>
+          <span>
+            Duration: <span className="text-foreground">{formatDuration(run.startedAt, run.completedAt)}</span>
+          </span>
+          <span>
+            Started: <span className="text-foreground">{format(new Date(run.startedAt), 'MMM d, yyyy HH:mm:ss')}</span>
+          </span>
+          {envelope?.model && (
+            <span>
+              Model: <span className="text-foreground font-mono text-xs">{envelope.model}</span>
+            </span>
+          )}
         </div>
 
         {/* Confidence -- always visible in header */}
@@ -165,9 +187,7 @@ export function AgentRunDetail({
               <ConfidenceBadge confidence={envelope.confidence} rationale={envelope.confidence_rationale} showLabel />
             </div>
             {envelope.confidence_rationale && (
-              <p className="text-xs text-muted-foreground italic pl-0.5">
-                {envelope.confidence_rationale}
-              </p>
+              <p className="text-xs text-muted-foreground italic pl-0.5">{envelope.confidence_rationale}</p>
             )}
           </div>
         )}
@@ -212,7 +232,11 @@ export function AgentRunDetail({
         <CollapsibleSection
           title="Reasoning"
           defaultOpen={true}
-          badge={envelope ? <ConfidenceBadge confidence={envelope.confidence} rationale={envelope.confidence_rationale} /> : undefined}
+          badge={
+            envelope ? (
+              <ConfidenceBadge confidence={envelope.confidence} rationale={envelope.confidence_rationale} />
+            ) : undefined
+          }
         >
           {envelope?.reasoning_summary ? (
             <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">

@@ -44,10 +44,7 @@ export function RetryStepButton({ instanceId, stepId }: RetryStepButtonProps) {
   }
 
   const busy = status === 'submitting' || status === 'success';
-  const label =
-    status === 'submitting' ? 'Starting…'
-    : status === 'success' ? 'Started'
-    : 'Run again this step';
+  const label = status === 'submitting' ? 'Starting…' : status === 'success' ? 'Started' : 'Run again this step';
 
   return (
     <div className="inline-flex items-center gap-2">
@@ -59,14 +56,16 @@ export function RetryStepButton({ instanceId, stepId }: RetryStepButtonProps) {
         className={cn(
           'inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium shadow-sm',
           'bg-background hover:bg-muted disabled:cursor-not-allowed',
-          status === 'success' && 'border-emerald-500/60 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+          status === 'success' &&
+            'border-emerald-500/60 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
           busy && status !== 'success' && 'bg-muted',
         )}
       >
-        {status === 'success'
-          ? <Check className="h-3.5 w-3.5" />
-          : <RotateCw className={cn('h-3.5 w-3.5', busy && 'animate-spin')} />
-        }
+        {status === 'success' ? (
+          <Check className="h-3.5 w-3.5" />
+        ) : (
+          <RotateCw className={cn('h-3.5 w-3.5', busy && 'animate-spin')} />
+        )}
         {label}
       </button>
       {error !== null && (

@@ -30,9 +30,7 @@ export function resolveApiKey(env: Record<string, string | undefined>): string {
   if (typeof fromPlatform === 'string' && fromPlatform.length > 0) {
     return fromPlatform;
   }
-  throw new Error(
-    'mediforce: missing API key. Set MEDIFORCE_API_KEY (or PLATFORM_API_KEY).',
-  );
+  throw new Error('mediforce: missing API key. Set MEDIFORCE_API_KEY (or PLATFORM_API_KEY).');
 }
 
 export function resolveBaseUrl(input: ResolveConfigInput): string {

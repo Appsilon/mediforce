@@ -5,9 +5,7 @@ import { buildHumanTask } from '@mediforce/platform-core/testing';
 import type { HumanTask } from '@mediforce/platform-core';
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
-  ),
+  default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
 }));
 
 vi.mock('@/lib/mediforce', () => ({
@@ -25,15 +23,21 @@ import type { ColumnSpec } from '../table-editor-view';
 
 const completeMock = vi.mocked(mediforce.tasks.complete);
 
-function buildAvatarTask(overrides: {
-  items?: Record<string, unknown>[];
-  columns?: ColumnSpec[];
-  status?: HumanTask['status'];
-} = {}): HumanTask {
+function buildAvatarTask(
+  overrides: { items?: Record<string, unknown>[]; columns?: ColumnSpec[]; status?: HumanTask['status'] } = {},
+): HumanTask {
   const columns: ColumnSpec[] = overrides.columns ?? [
     { id: 'avatar', kind: 'avatar', label: 'Photo', field: 'photoUrl', fallbackField: 'name' },
     { id: 'name-col', kind: 'static', label: 'Name', field: 'name' },
-    { id: 'role', kind: 'single-select', label: 'Role', options: [{ id: 'dev', label: 'Dev' }, { id: 'pm', label: 'PM' }] },
+    {
+      id: 'role',
+      kind: 'single-select',
+      label: 'Role',
+      options: [
+        { id: 'dev', label: 'Dev' },
+        { id: 'pm', label: 'PM' },
+      ],
+    },
   ];
   const items = overrides.items ?? [
     { id: 'u1', label: 'Alice', name: 'Alice Wonderland', photoUrl: 'https://example.com/alice.jpg' },
@@ -98,33 +102,45 @@ describe('AvatarCell rendering via TableEditorView', () => {
   });
 
   it('renders initials div when URL field is undefined', () => {
-    render(<TableEditorView task={buildAvatarTask({
-      items: [{ id: 'u4', label: 'Dana', name: 'Dana Scully' }],
-    })} />);
+    render(
+      <TableEditorView
+        task={buildAvatarTask({
+          items: [{ id: 'u4', label: 'Dana', name: 'Dana Scully' }],
+        })}
+      />,
+    );
 
     expect(screen.getByText('DS')).toBeInTheDocument();
   });
 
   it('renders "?" when no URL and no fallback field', () => {
-    render(<TableEditorView task={buildAvatarTask({
-      columns: [
-        { id: 'avatar', kind: 'avatar', label: 'Photo', field: 'photoUrl' },
-        { id: 'role', kind: 'single-select', label: 'Role', options: [{ id: 'dev', label: 'Dev' }] },
-      ],
-      items: [{ id: 'u5', label: 'Unknown' }],
-    })} />);
+    render(
+      <TableEditorView
+        task={buildAvatarTask({
+          columns: [
+            { id: 'avatar', kind: 'avatar', label: 'Photo', field: 'photoUrl' },
+            { id: 'role', kind: 'single-select', label: 'Role', options: [{ id: 'dev', label: 'Dev' }] },
+          ],
+          items: [{ id: 'u5', label: 'Unknown' }],
+        })}
+      />,
+    );
 
     expect(screen.getByText('?')).toBeInTheDocument();
   });
 
   it('applies custom size to the avatar', () => {
-    render(<TableEditorView task={buildAvatarTask({
-      columns: [
-        { id: 'avatar', kind: 'avatar', label: 'Photo', field: 'photoUrl', fallbackField: 'name', size: 48 },
-        { id: 'role', kind: 'single-select', label: 'Role', options: [{ id: 'dev', label: 'Dev' }] },
-      ],
-      items: [{ id: 'u6', label: 'Fox', name: 'Fox Mulder', photoUrl: 'https://example.com/fox.jpg' }],
-    })} />);
+    render(
+      <TableEditorView
+        task={buildAvatarTask({
+          columns: [
+            { id: 'avatar', kind: 'avatar', label: 'Photo', field: 'photoUrl', fallbackField: 'name', size: 48 },
+            { id: 'role', kind: 'single-select', label: 'Role', options: [{ id: 'dev', label: 'Dev' }] },
+          ],
+          items: [{ id: 'u6', label: 'Fox', name: 'Fox Mulder', photoUrl: 'https://example.com/fox.jpg' }],
+        })}
+      />,
+    );
 
     const img = screen.getByRole('img', { name: 'Fox Mulder' });
     expect(img).toHaveAttribute('width', '48');
@@ -132,13 +148,17 @@ describe('AvatarCell rendering via TableEditorView', () => {
   });
 
   it('applies custom size to the initials fallback div', () => {
-    render(<TableEditorView task={buildAvatarTask({
-      columns: [
-        { id: 'avatar', kind: 'avatar', label: 'Photo', field: 'photoUrl', fallbackField: 'name', size: 64 },
-        { id: 'role', kind: 'single-select', label: 'Role', options: [{ id: 'dev', label: 'Dev' }] },
-      ],
-      items: [{ id: 'u7', label: 'Walter', name: 'Walter Skinner' }],
-    })} />);
+    render(
+      <TableEditorView
+        task={buildAvatarTask({
+          columns: [
+            { id: 'avatar', kind: 'avatar', label: 'Photo', field: 'photoUrl', fallbackField: 'name', size: 64 },
+            { id: 'role', kind: 'single-select', label: 'Role', options: [{ id: 'dev', label: 'Dev' }] },
+          ],
+          items: [{ id: 'u7', label: 'Walter', name: 'Walter Skinner' }],
+        })}
+      />,
+    );
 
     const initialsDiv = screen.getByText('WS');
     expect(initialsDiv).toHaveStyle({ width: '64px', height: '64px' });
@@ -150,15 +170,21 @@ describe('AvatarCell rendering via TableEditorView', () => {
 describe('Avatar column excluded from output', () => {
   it('avatar column values do not appear in submitted rows', async () => {
     const user = userEvent.setup();
-    render(<TableEditorView task={buildAvatarTask({
-      items: [{ id: 'u1', label: 'Alice', name: 'Alice Wonderland', photoUrl: 'https://example.com/alice.jpg' }],
-    })} />);
+    render(
+      <TableEditorView
+        task={buildAvatarTask({
+          items: [{ id: 'u1', label: 'Alice', name: 'Alice Wonderland', photoUrl: 'https://example.com/alice.jpg' }],
+        })}
+      />,
+    );
 
     await user.selectOptions(screen.getByLabelText(/role/i), 'dev');
     await user.click(screen.getByRole('button', { name: /save/i }));
 
     expect(completeMock).toHaveBeenCalledTimes(1);
-    const payload = completeMock.mock.calls[0][0] as { payload: { rows: { itemId: string; values: Record<string, unknown> }[] } };
+    const payload = completeMock.mock.calls[0][0] as {
+      payload: { rows: { itemId: string; values: Record<string, unknown> }[] };
+    };
     const row = payload.payload.rows[0];
     expect(row.values).toEqual({ role: 'dev' });
     expect(row.values).not.toHaveProperty('avatar');

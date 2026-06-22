@@ -19,9 +19,7 @@ import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../tes
  */
 class RecordingAuditRepo extends InMemoryAuditRepository {
   readonly appendedNamespaces: (string | undefined)[] = [];
-  override async append(
-    event: Omit<AuditEvent, 'serverTimestamp'>,
-  ): Promise<AuditEvent> {
+  override async append(event: Omit<AuditEvent, 'serverTimestamp'>): Promise<AuditEvent> {
     this.appendedNamespaces.push(event.namespace);
     return super.append(event);
   }
@@ -92,16 +90,16 @@ describe('updateNamespace handler', () => {
 
   it('admins may edit (not just owners)', async () => {
     const scope = createTestScope({ namespaceRepo, auditRepo, caller: adminCaller });
-    await expect(
-      updateNamespace({ handle: HANDLE, displayName: 'Edited' }, scope),
-    ).resolves.toMatchObject({ namespace: { displayName: 'Edited' } });
+    await expect(updateNamespace({ handle: HANDLE, displayName: 'Edited' }, scope)).resolves.toMatchObject({
+      namespace: { displayName: 'Edited' },
+    });
   });
 
   it('rejects non-admin members with ForbiddenError', async () => {
     const scope = createTestScope({ namespaceRepo, auditRepo, caller: memberCaller });
-    await expect(
-      updateNamespace({ handle: HANDLE, displayName: 'Nope' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(updateNamespace({ handle: HANDLE, displayName: 'Nope' }, scope)).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
     expect(namespaceRepo.namespaces.get(HANDLE)?.displayName).toBe('Acme Co.');
   });
 
@@ -111,9 +109,7 @@ describe('updateNamespace handler', () => {
       auditRepo,
       caller: userCaller('uid-owner', ['unknown'], new Map([['unknown', 'owner']])),
     });
-    await expect(
-      updateNamespace({ handle: 'unknown', displayName: 'X' }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(updateNamespace({ handle: 'unknown', displayName: 'X' }, scope)).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('emits namespace.updated with the input snapshot', async () => {
@@ -262,9 +258,7 @@ describe('leaveNamespace handler', () => {
 
   it('owner cannot leave — precondition_failed', async () => {
     const scope = createTestScope({ namespaceRepo, auditRepo, caller: ownerCaller });
-    await expect(leaveNamespace({ handle: HANDLE }, scope)).rejects.toBeInstanceOf(
-      PreconditionFailedError,
-    );
+    await expect(leaveNamespace({ handle: HANDLE }, scope)).rejects.toBeInstanceOf(PreconditionFailedError);
     expect(namespaceRepo.members.get(HANDLE)?.map((m) => m.uid)).toContain('uid-owner');
   });
 
@@ -287,9 +281,7 @@ describe('leaveNamespace handler', () => {
       auditRepo,
       caller: userCaller('uid-marek', ['marek'], new Map([['marek', 'owner']])),
     });
-    await expect(leaveNamespace({ handle: 'marek' }, scope)).rejects.toBeInstanceOf(
-      PreconditionFailedError,
-    );
+    await expect(leaveNamespace({ handle: 'marek' }, scope)).rejects.toBeInstanceOf(PreconditionFailedError);
   });
 
   it('not-found namespace surfaces as NotFoundError', async () => {
@@ -345,24 +337,24 @@ describe('removeNamespaceMember handler', () => {
 
   it('member role cannot remove anyone', async () => {
     const scope = createTestScope({ namespaceRepo, auditRepo, caller: memberCaller });
-    await expect(
-      removeNamespaceMember({ handle: HANDLE, uid: 'uid-owner' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(removeNamespaceMember({ handle: HANDLE, uid: 'uid-owner' }, scope)).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
   });
 
   it('cannot remove the workspace owner', async () => {
     const scope = createTestScope({ namespaceRepo, auditRepo, caller: adminCaller });
-    await expect(
-      removeNamespaceMember({ handle: HANDLE, uid: 'uid-owner' }, scope),
-    ).rejects.toBeInstanceOf(PreconditionFailedError);
+    await expect(removeNamespaceMember({ handle: HANDLE, uid: 'uid-owner' }, scope)).rejects.toBeInstanceOf(
+      PreconditionFailedError,
+    );
     expect(namespaceRepo.members.get(HANDLE)?.map((m) => m.uid)).toContain('uid-owner');
   });
 
   it('unknown member surfaces as NotFoundError', async () => {
     const scope = createTestScope({ namespaceRepo, auditRepo, caller: ownerCaller });
-    await expect(
-      removeNamespaceMember({ handle: HANDLE, uid: 'uid-ghost' }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(removeNamespaceMember({ handle: HANDLE, uid: 'uid-ghost' }, scope)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
   });
 
   it('emits namespace.member_removed on success', async () => {
@@ -391,10 +383,7 @@ describe('updateNamespaceMemberRole handler', () => {
 
   it('owner promotes a member to admin; returns entity-echo', async () => {
     const scope = createTestScope({ namespaceRepo, auditRepo, caller: ownerCaller });
-    const result = await updateNamespaceMemberRole(
-      { handle: HANDLE, uid: 'uid-member', role: 'admin' },
-      scope,
-    );
+    const result = await updateNamespaceMemberRole({ handle: HANDLE, uid: 'uid-member', role: 'admin' }, scope);
     expect(result.member.role).toBe('admin');
     expect(namespaceRepo.members.get(HANDLE)?.find((m) => m.uid === 'uid-member')?.role).toBe('admin');
   });

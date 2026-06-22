@@ -210,8 +210,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     instanceRepo,
     processRepo: overrides.processRepo ?? new InMemoryProcessRepository(),
     auditRepo: overrides.auditRepo ?? new InMemoryAuditRepository(instanceRepo),
-    agentEventRepo:
-      overrides.agentEventRepo ?? new InMemoryAgentEventRepository(instanceRepo),
+    agentEventRepo: overrides.agentEventRepo ?? new InMemoryAgentEventRepository(instanceRepo),
     agentRunRepo: overrides.agentRunRepo ?? new InMemoryAgentRunRepository(instanceRepo),
     humanTaskRepo: overrides.humanTaskRepo ?? new InMemoryHumanTaskRepository(instanceRepo),
     handoffRepo: overrides.handoffRepo ?? new InMemoryHandoffRepository(instanceRepo),

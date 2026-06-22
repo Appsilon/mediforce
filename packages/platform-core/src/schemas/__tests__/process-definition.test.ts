@@ -377,9 +377,7 @@ describe('ProcessDefinitionSchema', () => {
         { id: 'complete', name: 'Complete', type: 'terminal' },
         { id: 'closed', name: 'Closed', type: 'terminal' },
       ],
-      transitions: [
-        { from: 'collect-data', to: 'review', when: 'data-complete' },
-      ],
+      transitions: [{ from: 'collect-data', to: 'review', when: 'data-complete' }],
       triggers: [
         { type: 'manual', name: 'Start Supply Chain Review' },
         {

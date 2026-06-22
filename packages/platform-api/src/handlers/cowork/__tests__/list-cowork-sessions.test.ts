@@ -18,18 +18,12 @@ describe('listCoworkSessions handler', () => {
     instanceRepo = new InMemoryProcessInstanceRepository();
     coworkSessionRepo = new InMemoryCoworkSessionRepository(instanceRepo);
 
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }),
-    );
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-b', namespace: 'team-beta' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-b', namespace: 'team-beta' }));
   });
 
   it('returns all sessions for api-key callers when no filters', async () => {
-    await coworkSessionRepo.create(
-      buildCoworkSession({ id: 'sess-1', processInstanceId: 'inst-a', status: 'active' }),
-    );
+    await coworkSessionRepo.create(buildCoworkSession({ id: 'sess-1', processInstanceId: 'inst-a', status: 'active' }));
     await coworkSessionRepo.create(
       buildCoworkSession({ id: 'sess-2', processInstanceId: 'inst-a', status: 'finalized' }),
     );
@@ -80,12 +74,8 @@ describe('listCoworkSessions handler', () => {
   });
 
   it('user callers only see sessions whose parent run is in their namespaces', async () => {
-    await coworkSessionRepo.create(
-      buildCoworkSession({ id: 'sess-mine', processInstanceId: 'inst-a' }),
-    );
-    await coworkSessionRepo.create(
-      buildCoworkSession({ id: 'sess-foreign', processInstanceId: 'inst-b' }),
-    );
+    await coworkSessionRepo.create(buildCoworkSession({ id: 'sess-mine', processInstanceId: 'inst-a' }));
+    await coworkSessionRepo.create(buildCoworkSession({ id: 'sess-foreign', processInstanceId: 'inst-b' }));
 
     const scope = createTestScope({
       coworkSessionRepo,
@@ -143,10 +133,7 @@ describe('listCoworkSessions handler', () => {
     );
 
     const scope = createTestScope({ coworkSessionRepo, instanceRepo });
-    const result = await listCoworkSessions(
-      { role: 'analyst', status: ['active'] },
-      scope,
-    );
+    const result = await listCoworkSessions({ role: 'analyst', status: ['active'] }, scope);
 
     expect(result.sessions.map((s) => s.id)).toEqual(['sess-active']);
   });

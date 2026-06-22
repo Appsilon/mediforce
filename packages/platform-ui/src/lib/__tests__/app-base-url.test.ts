@@ -123,9 +123,7 @@ describe('buildOAuthCallbackUrl', () => {
 
   it('builds canonical callback URL from env origin', () => {
     process.env.APP_BASE_URL = 'https://staging.mediforce.ai';
-    expect(buildOAuthCallbackUrl(request, 'github')).toBe(
-      'https://staging.mediforce.ai/api/oauth/github/callback',
-    );
+    expect(buildOAuthCallbackUrl(request, 'github')).toBe('https://staging.mediforce.ai/api/oauth/github/callback');
   });
 
   it('encodes provider slug', () => {

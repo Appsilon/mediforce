@@ -13,12 +13,7 @@ interface RouteContext {
  * Returns the cowork session including conversation history and current
  * artifact. Missing/cross-workspace sessions 404 via `scope.coworkSessions`.
  */
-export const GET = createRouteAdapter<
-  typeof GetCoworkSessionInputSchema,
-  GetCoworkSessionInput,
-  unknown,
-  RouteContext
->(
+export const GET = createRouteAdapter<typeof GetCoworkSessionInputSchema, GetCoworkSessionInput, unknown, RouteContext>(
   GetCoworkSessionInputSchema,
   async (_req, ctx) => ({ sessionId: (await ctx.params).sessionId }),
   getByIdAdapter(

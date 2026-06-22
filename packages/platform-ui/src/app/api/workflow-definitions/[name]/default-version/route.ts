@@ -1,9 +1,6 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { setDefaultWorkflowVersion } from '@mediforce/platform-api/handlers';
-import {
-  SetDefaultVersionInputSchema,
-  type SetDefaultVersionInput,
-} from '@mediforce/platform-api/contract';
+import { SetDefaultVersionInputSchema, type SetDefaultVersionInput } from '@mediforce/platform-api/contract';
 
 interface RouteContext {
   params: Promise<{ name: string }>;

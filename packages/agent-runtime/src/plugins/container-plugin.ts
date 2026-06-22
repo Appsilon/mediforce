@@ -58,7 +58,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
-import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
+import type {
+  StepExecutorPlugin,
+  AgentContext,
+  WorkflowAgentContext,
+  EmitFn,
+} from '../interfaces/step-executor-plugin';
 import type { AgentConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import { writeFile } from 'node:fs/promises';
 import type { GitMetadata } from '@mediforce/platform-core';
@@ -146,8 +151,8 @@ export function resolveRepoToken(
   resolvedEnv?: Record<string, string>,
 ): string | undefined {
   // Step-level repoAuth takes priority
-  const authKey = buildConfig.repoAuth
-    ?? (isWorkflowAgentContext(context) ? context.workflowDefinition.repo?.auth : undefined);
+  const authKey =
+    buildConfig.repoAuth ?? (isWorkflowAgentContext(context) ? context.workflowDefinition.repo?.auth : undefined);
   if (!authKey || !resolvedEnv) return undefined;
   return resolvedEnv[authKey];
 }
@@ -279,17 +284,13 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
     const name = isWorkflowAgentContext(this.context)
       ? this.context.workflowDefinition.name
       : this.context.config.processName;
-    const namespace = isWorkflowAgentContext(this.context)
-      ? this.context.workflowDefinition.namespace
-      : undefined;
+    const namespace = isWorkflowAgentContext(this.context) ? this.context.workflowDefinition.namespace : undefined;
 
     if (!this.workspaceManager) {
       this.workspaceManager = this.createWorkspaceManager();
     }
 
-    const remoteToken = workspaceConfig.remoteAuth
-      ? this.resolvedEnv.vars[workspaceConfig.remoteAuth]
-      : undefined;
+    const remoteToken = workspaceConfig.remoteAuth ? this.resolvedEnv.vars[workspaceConfig.remoteAuth] : undefined;
 
     this.runWorkspaceHandle = await this.workspaceManager.createRunWorkspace(
       { name, namespace, workspace: workspaceConfig },
@@ -393,7 +394,13 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
     workflowSecrets?: Record<string, string>,
     namespaceSecretKeys?: ReadonlySet<string>,
   ): void {
-    this.resolvedEnv = resolveStepEnv(definitionEnv, stepEnv, workflowSecrets, this.metadata.requiredEnv, namespaceSecretKeys);
+    this.resolvedEnv = resolveStepEnv(
+      definitionEnv,
+      stepEnv,
+      workflowSecrets,
+      this.metadata.requiredEnv,
+      namespaceSecretKeys,
+    );
   }
 
   /**
@@ -426,7 +433,10 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
       const deployKeyPath = prepareDeployKeyPath();
       const execOpts = {
         stdio: 'pipe' as const,
-        env: { ...process.env, GIT_SSH_COMMAND: `ssh -i ${deployKeyPath} -o StrictHostKeyChecking=no -o IdentitiesOnly=yes` },
+        env: {
+          ...process.env,
+          GIT_SSH_COMMAND: `ssh -i ${deployKeyPath} -o StrictHostKeyChecking=no -o IdentitiesOnly=yes`,
+        },
       };
 
       execSync(`git init "${cloneDir}"`, execOpts);
@@ -436,9 +446,7 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
 
       const sourceDir = join(cloneDir, skillsDir);
       if (!existsSync(sourceDir)) {
-        throw new Error(
-          `Skills directory "${skillsDir}" not found in repo ${repoUrl}@${commit.slice(0, 8)}`,
-        );
+        throw new Error(`Skills directory "${skillsDir}" not found in repo ${repoUrl}@${commit.slice(0, 8)}`);
       }
 
       mkdirSync(SKILLS_CACHE_DIR, { recursive: true });

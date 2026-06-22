@@ -45,16 +45,8 @@ vi.mock('next/server', async (importOriginal) => {
     },
   };
 });
-import {
-  ActionRegistry,
-  httpActionHandler,
-  reshapeActionHandler,
-} from '@mediforce/core-actions';
-import {
-  ManualTrigger,
-  WebhookRouter,
-  WorkflowEngine,
-} from '@mediforce/workflow-engine';
+import { ActionRegistry, httpActionHandler, reshapeActionHandler } from '@mediforce/core-actions';
+import { ManualTrigger, WebhookRouter, WorkflowEngine } from '@mediforce/workflow-engine';
 import {
   InMemoryAuditRepository,
   InMemoryCoworkSessionRepository,
@@ -98,7 +90,13 @@ const FAKE_OWM_FORECAST = {
 
 const FAKE_PUSHOVER_SUCCESS = { status: 1, request: 'pushover-req-123' };
 // ntfy returns a JSON receipt with the published message metadata.
-const FAKE_NTFY_RECEIPT = { id: 'ntfy-msg-456', time: 1745740800, expires: 1745912400, event: 'message', topic: 'examples-test' };
+const FAKE_NTFY_RECEIPT = {
+  id: 'ntfy-msg-456',
+  time: 1745740800,
+  expires: 1745912400,
+  event: 'message',
+  topic: 'examples-test',
+};
 
 // ---- Wiring: in-memory services + handler glue -----------------------------
 
@@ -226,9 +224,7 @@ beforeEach(async () => {
   const raw = JSON.parse(readFileSync(TEMPLATE_PATH, 'utf8'));
   const parsed = parseWorkflowTemplate(raw);
   if (!parsed.success) {
-    throw new Error(
-      `Template parse failed: ${parsed.error.issues.map((iss) => iss.message).join(', ')}`,
-    );
+    throw new Error(`Template parse failed: ${parsed.error.issues.map((iss) => iss.message).join(', ')}`);
   }
   const definition: WorkflowDefinition = {
     ...parsed.data,
@@ -262,14 +258,11 @@ describe('daily-weather: fetch → reshape → push×2 → terminal', () => {
     // e2e tests. The route handler uses the mocked platform-services +
     // workflow-secrets, so secrets interpolation runs against the test's
     // canned bag.
-    const runReq = new NextRequest(
-      `http://localhost/api/processes/${runId}/run`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ triggeredBy: 'daily-weather-test' }),
-      },
-    );
+    const runReq = new NextRequest(`http://localhost/api/processes/${runId}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ triggeredBy: 'daily-weather-test' }),
+    });
     await runPost(runReq, { params: Promise.resolve({ instanceId: runId }) });
     // Flush captured `after()` callbacks — handler returns 202 immediately
     // and queues the loop in after(); we run it now to drive execution.
@@ -281,10 +274,7 @@ describe('daily-weather: fetch → reshape → push×2 → terminal', () => {
     let polledStatus = 'unknown';
     let polledFinalOutput: unknown = null;
     while (Date.now() < deadline) {
-      const pollReq = new NextRequest(
-        `http://localhost/api/runs/${runId}`,
-        { method: 'GET' },
-      );
+      const pollReq = new NextRequest(`http://localhost/api/runs/${runId}`, { method: 'GET' });
       const pollRes = await runsGet(pollReq, { params: Promise.resolve({ runId }) });
       const pollJson = (await pollRes.json()) as { status: string; finalOutput: unknown };
       polledStatus = pollJson.status;

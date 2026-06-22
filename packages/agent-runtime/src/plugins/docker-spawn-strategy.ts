@@ -231,9 +231,13 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
     let inputFiles: Record<string, string> = {};
     try {
       inputFiles = await encodeFilePayload(request.outputDir);
-      console.log(`[queued-strategy] Collected ${Object.keys(inputFiles).length} input file(s) from ${request.outputDir}: ${Object.keys(inputFiles).join(', ')}`);
+      console.log(
+        `[queued-strategy] Collected ${Object.keys(inputFiles).length} input file(s) from ${request.outputDir}: ${Object.keys(inputFiles).join(', ')}`,
+      );
     } catch (err) {
-      console.warn(`[queued-strategy] Could not read outputDir '${request.outputDir}': ${err instanceof Error ? err.message : err}`);
+      console.warn(
+        `[queued-strategy] Could not read outputDir '${request.outputDir}': ${err instanceof Error ? err.message : err}`,
+      );
     }
 
     const result = await enqueueDockerJob({

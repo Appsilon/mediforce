@@ -130,7 +130,10 @@ export function NewTicketView({ ctx }: CommandViewProps) {
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => ({}));
         const message =
-          typeof body === 'object' && body !== null && 'error' in body && typeof (body as { error: unknown }).error === 'string'
+          typeof body === 'object' &&
+          body !== null &&
+          'error' in body &&
+          typeof (body as { error: unknown }).error === 'string'
             ? (body as { error: string }).error
             : `Failed to create ticket (${response.status})`;
         setError(message);
@@ -180,7 +183,9 @@ export function NewTicketView({ ctx }: CommandViewProps) {
       </div>
 
       <div>
-        <label htmlFor="ticket-title" className="sr-only">Title</label>
+        <label htmlFor="ticket-title" className="sr-only">
+          Title
+        </label>
         <input
           id="ticket-title"
           ref={titleRef}
@@ -227,7 +232,9 @@ export function NewTicketView({ ctx }: CommandViewProps) {
       )}
 
       <div>
-        <label htmlFor="ticket-description" className="sr-only">Description</label>
+        <label htmlFor="ticket-description" className="sr-only">
+          Description
+        </label>
         <textarea
           id="ticket-description"
           value={description}
@@ -240,7 +247,10 @@ export function NewTicketView({ ctx }: CommandViewProps) {
       </div>
 
       {error !== null && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="ticket-error">
+        <div
+          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+          data-testid="ticket-error"
+        >
           {error}
         </div>
       )}

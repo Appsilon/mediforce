@@ -23,16 +23,14 @@ function loadBuiltinCatalog(): Record<string, ToolCatalogEntry[]> {
   const raw = JSON.parse(readFileSync(SEED_PATH, 'utf-8')) as Record<string, unknown[]>;
   const result: Record<string, ToolCatalogEntry[]> = {};
   for (const [namespace, entries] of Object.entries(raw)) {
-    result[namespace] = entries.map(entry => ToolCatalogEntrySchema.parse(entry));
+    result[namespace] = entries.map((entry) => ToolCatalogEntrySchema.parse(entry));
   }
   return result;
 }
 
 const BUILTIN_CATALOG = loadBuiltinCatalog();
 
-export async function seedBuiltinToolCatalog(
-  repo: ToolCatalogRepository,
-): Promise<void> {
+export async function seedBuiltinToolCatalog(repo: ToolCatalogRepository): Promise<void> {
   const tasks: Promise<unknown>[] = [];
   for (const [namespace, entries] of Object.entries(BUILTIN_CATALOG)) {
     for (const entry of entries) {

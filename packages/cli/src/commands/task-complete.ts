@@ -31,7 +31,11 @@ export const taskCompleteCommand = defineCommand({
         try {
           raw = await readFile(args['payload-file'], 'utf-8');
         } catch (err) {
-          printError(output, { error: `Cannot read --payload-file '${args['payload-file']}': ${String(err)}` }, jsonMode);
+          printError(
+            output,
+            { error: `Cannot read --payload-file '${args['payload-file']}': ${String(err)}` },
+            jsonMode,
+          );
           return 2;
         }
       }

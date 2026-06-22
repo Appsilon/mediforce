@@ -31,14 +31,15 @@ export function AgentEscalatedBanner({ instanceId, stepId }: AgentEscalatedBanne
     try {
       await mediforce.runs.retryStep({ runId: instanceId, stepId });
     } catch (err) {
-      const message =
-        err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Retry failed';
+      const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Retry failed';
       setRetryError(message);
       setRetryStatus('error');
       return;
     }
     setRetryStatus('success');
-    startTransition(() => { router.refresh(); });
+    startTransition(() => {
+      router.refresh();
+    });
   }
 
   async function handleCancel() {
@@ -47,13 +48,14 @@ export function AgentEscalatedBanner({ instanceId, stepId }: AgentEscalatedBanne
     try {
       await cancelMutation.mutateAsync({ runId: instanceId });
     } catch (err) {
-      const message =
-        err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Cancel failed';
+      const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Cancel failed';
       setCancelError(message);
       setCancelStatus('idle');
       return;
     }
-    startTransition(() => { router.refresh(); });
+    startTransition(() => {
+      router.refresh();
+    });
   }
 
   const retryBusy = retryStatus === 'submitting' || retryStatus === 'success';
@@ -63,8 +65,8 @@ export function AgentEscalatedBanner({ instanceId, stepId }: AgentEscalatedBanne
   return (
     <div className="rounded-md border border-border bg-card px-4 py-4 space-y-3">
       <p className="text-sm text-foreground">
-        The agent step failed and needs your decision. You can fix the underlying issue and retry
-        the step, or cancel this run.
+        The agent step failed and needs your decision. You can fix the underlying issue and retry the step, or cancel
+        this run.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <button
@@ -78,10 +80,11 @@ export function AgentEscalatedBanner({ instanceId, stepId }: AgentEscalatedBanne
             retryStatus === 'success' && 'bg-emerald-600 hover:bg-emerald-600',
           )}
         >
-          {retryStatus === 'success'
-            ? <Check className="h-3.5 w-3.5" />
-            : <RotateCw className={cn('h-3.5 w-3.5', retryStatus === 'submitting' && 'animate-spin')} />
-          }
+          {retryStatus === 'success' ? (
+            <Check className="h-3.5 w-3.5" />
+          ) : (
+            <RotateCw className={cn('h-3.5 w-3.5', retryStatus === 'submitting' && 'animate-spin')} />
+          )}
           {retryStatus === 'submitting' ? 'Starting…' : retryStatus === 'success' ? 'Started' : 'Fixed, try again'}
         </button>
         <button
@@ -98,12 +101,8 @@ export function AgentEscalatedBanner({ instanceId, stepId }: AgentEscalatedBanne
           {cancelBusy ? 'Cancelling…' : 'Cancel this run'}
         </button>
       </div>
-      {retryError !== null && (
-        <p className="text-xs text-destructive">{retryError}</p>
-      )}
-      {cancelError !== null && (
-        <p className="text-xs text-destructive">{cancelError}</p>
-      )}
+      {retryError !== null && <p className="text-xs text-destructive">{retryError}</p>}
+      {cancelError !== null && <p className="text-xs text-destructive">{cancelError}</p>}
     </div>
   );
 }

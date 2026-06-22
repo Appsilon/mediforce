@@ -4,8 +4,24 @@ import * as React from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, FileBarChart, Archive, ArchiveRestore, ScrollText, X, GitBranch } from 'lucide-react';
-import type { ProcessInstance, StepExecution, AuditEvent, Step, WorkflowStep, WorkflowDefinition } from '@mediforce/platform-core';
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileBarChart,
+  Archive,
+  ArchiveRestore,
+  ScrollText,
+  X,
+  GitBranch,
+} from 'lucide-react';
+import type {
+  ProcessInstance,
+  StepExecution,
+  AuditEvent,
+  Step,
+  WorkflowStep,
+  WorkflowDefinition,
+} from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
 import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
@@ -29,7 +45,12 @@ import { getWorkflowStatus } from '@/lib/workflow-status';
 
 const WorkflowDiagram = dynamic(
   () => import('@/components/workflows/workflow-diagram').then((m) => ({ default: m.WorkflowDiagram })),
-  { ssr: false, loading: () => <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Loading diagram…</div> },
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Loading diagram…</div>
+    ),
+  },
 );
 
 export interface AgentEventItem {
@@ -69,40 +90,38 @@ export function ProcessDetail({
 }) {
   const handle = useHandleFromPath();
   const wfStatus = getWorkflowStatus(instance);
-  const needsHumanTaskAction = wfStatus.rawReason === 'waiting_for_human' || wfStatus.rawReason === 'awaiting_agent_approval';
-  const { task: blockingTask } = useActiveTaskForInstance(
-    needsHumanTaskAction ? instance.id : null,
-  );
+  const needsHumanTaskAction =
+    wfStatus.rawReason === 'waiting_for_human' || wfStatus.rawReason === 'awaiting_agent_approval';
+  const { task: blockingTask } = useActiveTaskForInstance(needsHumanTaskAction ? instance.id : null);
   const needsCowork = wfStatus.rawReason === 'cowork_in_progress';
-  const { session: coworkSession } = useActiveCoworkSession(
-    needsCowork ? instance.id : null,
-  );
+  const { session: coworkSession } = useActiveCoworkSession(needsCowork ? instance.id : null);
 
   // Probe the source run of a carry-over chain so the banner can render an
   // "archived" variant (plain text, no link) when the source has been deleted
   // or tombstoned. Optimistic (linked) while loading to avoid flicker on the
   // common case where the source is still alive.
-  const { data: sourceInstance, loading: sourceLoading } = useProcessInstance(
-    instance.previousRunSourceId ?? null,
-  );
+  const { data: sourceInstance, loading: sourceLoading } = useProcessInstance(instance.previousRunSourceId ?? null);
   const sourceArchived =
-    instance.previousRunSourceId !== undefined
-    && sourceLoading === false
-    && (sourceInstance === null || sourceInstance.deleted === true);
+    instance.previousRunSourceId !== undefined &&
+    sourceLoading === false &&
+    (sourceInstance === null || sourceInstance.deleted === true);
 
   const agentLogFiles = React.useMemo(() => {
     const logEvents = agentEvents.filter(
-      (e) => e.type === 'status' && typeof e.payload === 'string' && (e.payload as string).startsWith('agent activity log:'),
+      (e) =>
+        e.type === 'status' && typeof e.payload === 'string' && (e.payload as string).startsWith('agent activity log:'),
     );
     const stepExecutorMap = new Map(definitionSteps.map((s) => [s.id, (s as unknown as WorkflowStep).executor]));
-    const unsorted = logEvents.map((e) => {
-      const fullPath = (e.payload as string).replace('agent activity log: ', '');
-      return {
-        stepId: e.stepId,
-        file: fullPath.split('/').pop() ?? '',
-        executor: stepExecutorMap.get(e.stepId) ?? 'agent',
-      };
-    }).filter((entry) => entry.file.length > 0);
+    const unsorted = logEvents
+      .map((e) => {
+        const fullPath = (e.payload as string).replace('agent activity log: ', '');
+        return {
+          stepId: e.stepId,
+          file: fullPath.split('/').pop() ?? '',
+          executor: stepExecutorMap.get(e.stepId) ?? 'agent',
+        };
+      })
+      .filter((entry) => entry.file.length > 0);
 
     const stepOrder = new Map(definitionSteps.map((s, i) => [s.id, i]));
     return unsorted.sort((a, b) => (stepOrder.get(a.stepId) ?? 0) - (stepOrder.get(b.stepId) ?? 0));
@@ -138,7 +157,10 @@ export function ProcessDetail({
   const [cancelError, setCancelError] = React.useState<string | null>(null);
 
   const canCancel = wfStatus.displayStatus === 'in_progress' || wfStatus.displayStatus === 'waiting_for_human';
-  const canArchive = wfStatus.displayStatus === 'completed' || wfStatus.displayStatus === 'error' || wfStatus.displayStatus === 'cancelled';
+  const canArchive =
+    wfStatus.displayStatus === 'completed' ||
+    wfStatus.displayStatus === 'error' ||
+    wfStatus.displayStatus === 'cancelled';
   const [archiving, setArchiving] = React.useState(false);
 
   const archiveMutation = useArchiveRun();
@@ -160,8 +182,7 @@ export function ProcessDetail({
       await cancelMutation.mutateAsync({ runId: instance.id });
       setCancelStep(0);
     } catch (err) {
-      const message =
-        err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Cancel failed';
+      const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Cancel failed';
       setCancelError(message);
       setCancelStep(1);
     }
@@ -169,9 +190,7 @@ export function ProcessDetail({
 
   const runDurationMs = React.useMemo(() => {
     const start = new Date(instance.createdAt).getTime();
-    const end = instance.updatedAt
-      ? new Date(instance.updatedAt).getTime()
-      : Date.now();
+    const end = instance.updatedAt ? new Date(instance.updatedAt).getTime() : Date.now();
     return end - start;
   }, [instance.createdAt, instance.updatedAt]);
 
@@ -217,9 +236,17 @@ export function ProcessDetail({
                 title={instance.archived === true ? 'Unarchive run' : 'Archive run'}
                 className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shrink-0 disabled:opacity-50"
               >
-                {instance.archived === true
-                  ? <><ArchiveRestore className="h-3.5 w-3.5" />Unarchive</>
-                  : <><Archive className="h-3.5 w-3.5" />Archive</>}
+                {instance.archived === true ? (
+                  <>
+                    <ArchiveRestore className="h-3.5 w-3.5" />
+                    Unarchive
+                  </>
+                ) : (
+                  <>
+                    <Archive className="h-3.5 w-3.5" />
+                    Archive
+                  </>
+                )}
               </button>
             )}
             {canCancel && cancelStep === 0 && (
@@ -241,7 +268,10 @@ export function ProcessDetail({
                   Confirm cancel
                 </button>
                 <button
-                  onClick={() => { setCancelStep(0); setCancelError(null); }}
+                  onClick={() => {
+                    setCancelStep(0);
+                    setCancelError(null);
+                  }}
                   className="rounded-md border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted transition-colors"
                 >
                   Keep running
@@ -251,9 +281,7 @@ export function ProcessDetail({
             {canCancel && cancelStep === 2 && (
               <span className="text-xs text-muted-foreground shrink-0">Cancelling...</span>
             )}
-            {cancelError && (
-              <span className="text-xs text-destructive shrink-0">{cancelError}</span>
-            )}
+            {cancelError && <span className="text-xs text-destructive shrink-0">{cancelError}</span>}
             <button
               onClick={() => {
                 if (logsOpen) {
@@ -293,24 +321,49 @@ export function ProcessDetail({
 
           {/* Metadata row */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground items-center">
-            <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} error={instance.error} dryRun={instance.dryRun} />
+            <ProcessStatusBadge
+              status={instance.status}
+              pauseReason={instance.pauseReason}
+              error={instance.error}
+              dryRun={instance.dryRun}
+            />
             {instance.archived === true && (
               <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                 <Archive className="h-3 w-3" />
                 Archived
               </span>
             )}
-            <span>Definition: <span className="font-mono text-foreground">v{instance.definitionVersion}</span></span>
+            <span>
+              Definition: <span className="font-mono text-foreground">v{instance.definitionVersion}</span>
+            </span>
             {instance.configName && (
-              <span>Config: <span className="font-mono text-foreground">{instance.configName} v{instance.configVersion}</span></span>
+              <span>
+                Config:{' '}
+                <span className="font-mono text-foreground">
+                  {instance.configName} v{instance.configVersion}
+                </span>
+              </span>
             )}
-            <span title={instance.id}>ID: <span className="font-mono text-foreground text-xs">{instance.id.slice(0, 8)}</span></span>
-            <span>Created: <span className="text-foreground">{format(new Date(instance.createdAt), 'MMM d, yyyy HH:mm')}</span></span>
+            <span title={instance.id}>
+              ID: <span className="font-mono text-foreground text-xs">{instance.id.slice(0, 8)}</span>
+            </span>
+            <span>
+              Created:{' '}
+              <span className="text-foreground">{format(new Date(instance.createdAt), 'MMM d, yyyy HH:mm')}</span>
+            </span>
             {wfStatus.displayStatus !== 'in_progress' && (
-              <span>Duration: <span className="text-foreground">{formatDuration(runDurationMs)}</span></span>
+              <span>
+                Duration: <span className="text-foreground">{formatDuration(runDurationMs)}</span>
+              </span>
             )}
             {totalCostUsd != null && (
-              <span>Cost: <span className={isTerminal ? 'text-foreground' : 'text-amber-600 dark:text-amber-400'}>{formatCostUsd(totalCostUsd)}{isTerminal ? '' : '+'}</span></span>
+              <span>
+                Cost:{' '}
+                <span className={isTerminal ? 'text-foreground' : 'text-amber-600 dark:text-amber-400'}>
+                  {formatCostUsd(totalCostUsd)}
+                  {isTerminal ? '' : '+'}
+                </span>
+              </span>
             )}
             {instance.status === 'completed' && (
               <Link
@@ -328,7 +381,9 @@ export function ProcessDetail({
               <div className="text-sm">
                 <span className="font-medium">Waiting for your input</span>
                 <span className="text-muted-foreground ml-1.5">
-                  — {definitionSteps.find((s) => s.id === blockingTask.stepId)?.name ?? formatStepName(blockingTask.stepId)}
+                  —{' '}
+                  {definitionSteps.find((s) => s.id === blockingTask.stepId)?.name ??
+                    formatStepName(blockingTask.stepId)}
                 </span>
               </div>
               <Link
@@ -344,7 +399,9 @@ export function ProcessDetail({
               <div className="text-sm">
                 <span className="font-medium">Ready to collaborate</span>
                 <span className="text-muted-foreground ml-1.5">
-                  — {definitionSteps.find((s) => s.id === coworkSession.stepId)?.name ?? formatStepName(coworkSession.stepId)}
+                  —{' '}
+                  {definitionSteps.find((s) => s.id === coworkSession.stepId)?.name ??
+                    formatStepName(coworkSession.stepId)}
                 </span>
               </div>
               <Link
@@ -397,11 +454,7 @@ export function ProcessDetail({
         )}
 
         {/* Output Files — hidden until the run has at least one */}
-        <RunOutputFilesPanel
-          runId={instance.id}
-          files={outputFiles}
-          definitionSteps={definitionSteps}
-        />
+        <RunOutputFilesPanel runId={instance.id} files={outputFiles} definitionSteps={definitionSteps} />
 
         {/* Step Status Panel */}
         {definitionSteps.length > 0 && (
@@ -436,10 +489,11 @@ export function ProcessDetail({
           className="w-10 shrink-0 flex flex-col items-center justify-center hover:bg-muted/50 transition-colors"
           title={logsOpen ? 'Collapse panel' : 'Expand panel'}
         >
-          {logsOpen
-            ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            : <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-          }
+          {logsOpen ? (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+          )}
         </button>
 
         {/* Log content — fades in/out with the panel */}
@@ -483,9 +537,7 @@ export function ProcessDetail({
           </div>
 
           <div className={cn('flex-1 min-h-0 overflow-y-auto', rightTab !== 'diagram' && 'hidden')}>
-            {definition && rightTab === 'diagram' && (
-              <WorkflowDiagram definition={definition} className="w-full" />
-            )}
+            {definition && rightTab === 'diagram' && <WorkflowDiagram definition={definition} className="w-full" />}
           </div>
         </div>
       </div>

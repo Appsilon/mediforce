@@ -25,7 +25,9 @@ export const modelGetCommand = defineCommand({
     output.stdout(`Modality:    ${m.modality}`);
     output.stdout(`Tools:       ${m.supportsTools ? 'yes' : 'no'}`);
     output.stdout(`Vision:      ${m.supportsVision ? 'yes' : 'no'}`);
-    output.stdout(`Pricing:     in=$${(m.pricing.input * 1_000_000).toFixed(2)}/M  out=$${(m.pricing.output * 1_000_000).toFixed(2)}/M`);
+    output.stdout(
+      `Pricing:     in=$${(m.pricing.input * 1_000_000).toFixed(2)}/M  out=$${(m.pricing.output * 1_000_000).toFixed(2)}/M`,
+    );
     output.stdout(`Source:      ${m.source}`);
     output.stdout(`Last synced: ${m.lastSyncedAt}`);
     return 0;

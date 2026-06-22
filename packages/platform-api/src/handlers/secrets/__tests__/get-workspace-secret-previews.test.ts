@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getWorkspaceSecretPreviews } from '../get-workspace-secret-previews';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { buildNamespaceSecretsRepo } from './fakes';
 
 describe('getWorkspaceSecretPreviews handler', () => {

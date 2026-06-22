@@ -85,7 +85,8 @@ function CommandList({ ctx, onSelect }: { ctx: CommandContext; onSelect: (comman
     if (normalizedQuery === '') return commands;
     return commands.filter((command) => {
       if (command.title.toLowerCase().includes(normalizedQuery)) return true;
-      if (typeof command.description === 'string' && command.description.toLowerCase().includes(normalizedQuery)) return true;
+      if (typeof command.description === 'string' && command.description.toLowerCase().includes(normalizedQuery))
+        return true;
       if (command.keywords !== undefined) {
         for (const keyword of command.keywords) {
           if (keyword.toLowerCase().includes(normalizedQuery)) return true;
@@ -195,24 +196,23 @@ function CommandList({ ctx, onSelect }: { ctx: CommandContext; onSelect: (comman
 
       <div className="flex items-center justify-between border-t px-4 py-2 text-[11px] text-muted-foreground">
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1"><CornerDownLeft className="h-3 w-3" /> select</span>
-          <span className="flex items-center gap-1"><Kbd>↑</Kbd><Kbd>↓</Kbd> navigate</span>
+          <span className="flex items-center gap-1">
+            <CornerDownLeft className="h-3 w-3" /> select
+          </span>
+          <span className="flex items-center gap-1">
+            <Kbd>↑</Kbd>
+            <Kbd>↓</Kbd> navigate
+          </span>
         </div>
-        <span className="flex items-center gap-1"><Kbd>Esc</Kbd> close</span>
+        <span className="flex items-center gap-1">
+          <Kbd>Esc</Kbd> close
+        </span>
       </div>
     </div>
   );
 }
 
-function CommandView({
-  command,
-  ctx,
-  onBack,
-}: {
-  command: Command;
-  ctx: CommandContext;
-  onBack: () => void;
-}) {
+function CommandView({ command, ctx, onBack }: { command: Command; ctx: CommandContext; onBack: () => void }) {
   if (!('view' in command) || command.view === undefined) {
     return null;
   }

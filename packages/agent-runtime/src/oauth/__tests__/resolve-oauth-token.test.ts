@@ -41,12 +41,15 @@ function token(overrides: Partial<AgentOAuthToken> = {}): AgentOAuthToken {
 function mockFetch(response: Partial<Response> & { jsonBody?: unknown; textBody?: string }): typeof fetch {
   const ok = response.ok ?? true;
   const status = response.status ?? (ok ? 200 : 500);
-  return vi.fn(async () => ({
-    ok,
-    status,
-    json: async () => response.jsonBody ?? {},
-    text: async () => response.textBody ?? '',
-  } as unknown as Response));
+  return vi.fn(
+    async () =>
+      ({
+        ok,
+        status,
+        json: async () => response.jsonBody ?? {},
+        text: async () => response.textBody ?? '',
+      }) as unknown as Response,
+  );
 }
 
 describe('resolveOAuthToken', () => {

@@ -10,11 +10,7 @@ interface SandboxedHtmlIframeProps {
   title?: string;
 }
 
-export function SandboxedHtmlIframe({
-  html,
-  result = null,
-  title = 'HTML preview',
-}: SandboxedHtmlIframeProps) {
+export function SandboxedHtmlIframe({ html, result = null, title = 'HTML preview' }: SandboxedHtmlIframeProps) {
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = React.useState(300);
   const { resolvedTheme } = useTheme();
@@ -22,11 +18,7 @@ export function SandboxedHtmlIframe({
 
   React.useEffect(() => {
     const handler = (event: MessageEvent) => {
-      if (
-        isIframeResizeMessage(event.data) &&
-        iframeRef.current &&
-        event.source === iframeRef.current.contentWindow
-      ) {
+      if (isIframeResizeMessage(event.data) && iframeRef.current && event.source === iframeRef.current.contentWindow) {
         setHeight((prev) => {
           const next = clampIframeHeight(event.data.height);
           return next > 0 ? next : prev;

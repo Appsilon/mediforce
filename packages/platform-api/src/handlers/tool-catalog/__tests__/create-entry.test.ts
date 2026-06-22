@@ -1,14 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  InMemoryAuditRepository,
-  InMemoryToolCatalogRepository,
-} from '@mediforce/platform-core/testing';
+import { InMemoryAuditRepository, InMemoryToolCatalogRepository } from '@mediforce/platform-core/testing';
 import { createToolCatalogEntry } from '../create-entry';
 import { ForbiddenError, HandlerError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { adminRoles, memberRoles, ownerRoles, sampleEntry } from './fixtures';
 
 describe('createToolCatalogEntry handler', () => {
@@ -27,10 +21,7 @@ describe('createToolCatalogEntry handler', () => {
       caller: userCaller('u-admin', ['alpha'], adminRoles),
     });
 
-    const result = await createToolCatalogEntry(
-      { namespace: 'alpha', ...sampleEntry },
-      scope,
-    );
+    const result = await createToolCatalogEntry({ namespace: 'alpha', ...sampleEntry }, scope);
 
     expect(result.entry.id).toBe('tealflow-mcp');
     expect(await repo.getById('alpha', 'tealflow-mcp')).not.toBeNull();
@@ -48,10 +39,7 @@ describe('createToolCatalogEntry handler', () => {
       caller: userCaller('u-owner', ['alpha'], ownerRoles),
     });
 
-    const result = await createToolCatalogEntry(
-      { namespace: 'alpha', ...sampleEntry },
-      scope,
-    );
+    const result = await createToolCatalogEntry({ namespace: 'alpha', ...sampleEntry }, scope);
 
     expect(result.entry.id).toBe('tealflow-mcp');
   });
@@ -59,10 +47,7 @@ describe('createToolCatalogEntry handler', () => {
   it('creates an entry for an api-key caller', async () => {
     const scope = createTestScope({ toolCatalogRepo: repo, auditRepo });
 
-    const result = await createToolCatalogEntry(
-      { namespace: 'alpha', ...sampleEntry },
-      scope,
-    );
+    const result = await createToolCatalogEntry({ namespace: 'alpha', ...sampleEntry }, scope);
 
     expect(result.entry.id).toBe('tealflow-mcp');
     const events = await auditRepo.getByEntity('toolCatalogEntry', 'tealflow-mcp');
@@ -83,9 +68,9 @@ describe('createToolCatalogEntry handler', () => {
   it('throws validation HandlerError when id absent and command empty', async () => {
     const scope = createTestScope({ toolCatalogRepo: repo, auditRepo });
 
-    await expect(
-      createToolCatalogEntry({ namespace: 'alpha', command: '/' }, scope),
-    ).rejects.toMatchObject({ code: 'validation' });
+    await expect(createToolCatalogEntry({ namespace: 'alpha', command: '/' }, scope)).rejects.toMatchObject({
+      code: 'validation',
+    });
   });
 
   it('throws ForbiddenError for a member-role caller (bug fix)', async () => {
@@ -95,9 +80,9 @@ describe('createToolCatalogEntry handler', () => {
       caller: userCaller('u-member', ['alpha'], memberRoles),
     });
 
-    await expect(
-      createToolCatalogEntry({ namespace: 'alpha', ...sampleEntry }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(createToolCatalogEntry({ namespace: 'alpha', ...sampleEntry }, scope)).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
 
     expect(await repo.getById('alpha', 'tealflow-mcp')).toBeNull();
   });
@@ -110,10 +95,7 @@ describe('createToolCatalogEntry handler', () => {
       caller: userCaller('u-admin', ['alpha'], adminRoles),
     });
 
-    const promise = createToolCatalogEntry(
-      { namespace: 'alpha', ...sampleEntry },
-      scope,
-    );
+    const promise = createToolCatalogEntry({ namespace: 'alpha', ...sampleEntry }, scope);
 
     await expect(promise).rejects.toBeInstanceOf(HandlerError);
     await expect(promise).rejects.toMatchObject({ code: 'conflict' });

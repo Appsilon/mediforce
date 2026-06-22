@@ -109,9 +109,8 @@ export async function startMockOAuthServer(): Promise<MockOAuthServerHandle> {
         const now = Date.now();
         const payload = {
           access_token: `mock-access-${now}`,
-          refresh_token: grant === 'refresh_token'
-            ? (body.refresh_token ?? `mock-refresh-${now}`)
-            : `mock-refresh-${now}`,
+          refresh_token:
+            grant === 'refresh_token' ? (body.refresh_token ?? `mock-refresh-${now}`) : `mock-refresh-${now}`,
           token_type: 'Bearer',
           expires_in: 3600,
           scope: 'repo read:user',

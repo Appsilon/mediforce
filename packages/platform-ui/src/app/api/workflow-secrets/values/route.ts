@@ -18,10 +18,7 @@ import {
  * Non-member callers hit `assertNamespaceAccess` and get a `ForbiddenError`,
  * which the adapter maps to 403.
  */
-export const GET = createRouteAdapter<
-  typeof GetWorkflowSecretsFullInputSchema,
-  GetWorkflowSecretsFullInput
->(
+export const GET = createRouteAdapter<typeof GetWorkflowSecretsFullInputSchema, GetWorkflowSecretsFullInput>(
   GetWorkflowSecretsFullInputSchema,
   (req) => {
     const params = req.nextUrl.searchParams;
@@ -40,10 +37,7 @@ export const GET = createRouteAdapter<
  * the body get removed. The wrapper's `setSecrets` throws `ForbiddenError`
  * for non-members; the adapter maps that to 403.
  */
-export const PUT = createRouteAdapter<
-  typeof SaveWorkflowSecretsInputSchema,
-  SaveWorkflowSecretsInput
->(
+export const PUT = createRouteAdapter<typeof SaveWorkflowSecretsInputSchema, SaveWorkflowSecretsInput>(
   SaveWorkflowSecretsInputSchema,
   async (req) => {
     const params = req.nextUrl.searchParams;

@@ -1,8 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import {
-  NamespaceSecretsSchema,
-  type NamespaceSecretsRepository,
-} from '@mediforce/platform-core';
+import { NamespaceSecretsSchema, type NamespaceSecretsRepository } from '@mediforce/platform-core';
 import type { Database } from '../client';
 import { namespaceSecrets } from '../schema/namespace-secret';
 import { encrypt, decrypt } from '../../crypto/secrets-cipher';
@@ -23,10 +20,7 @@ export class PostgresNamespaceSecretsRepository implements NamespaceSecretsRepos
   constructor(private readonly db: Database) {}
 
   async getSecrets(namespace: string): Promise<Record<string, string>> {
-    const rows = await this.db
-      .select()
-      .from(namespaceSecrets)
-      .where(eq(namespaceSecrets.workspace, namespace));
+    const rows = await this.db.select().from(namespaceSecrets).where(eq(namespaceSecrets.workspace, namespace));
     const result: Record<string, string> = {};
     for (const row of rows) {
       try {
@@ -99,11 +93,6 @@ export class PostgresNamespaceSecretsRepository implements NamespaceSecretsRepos
   async deleteSecret(namespace: string, key: string): Promise<void> {
     await this.db
       .delete(namespaceSecrets)
-      .where(
-        and(
-          eq(namespaceSecrets.workspace, namespace),
-          eq(namespaceSecrets.key, key),
-        ),
-      );
+      .where(and(eq(namespaceSecrets.workspace, namespace), eq(namespaceSecrets.key, key)));
   }
 }

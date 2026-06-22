@@ -1,8 +1,5 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
-import {
-  upsertAgentMcpBinding,
-  deleteAgentMcpBinding,
-} from '@mediforce/platform-api/handlers';
+import { upsertAgentMcpBinding, deleteAgentMcpBinding } from '@mediforce/platform-api/handlers';
 import {
   UpsertAgentMcpBindingInputSchema,
   DeleteAgentMcpBindingInputSchema,

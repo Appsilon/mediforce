@@ -1,7 +1,4 @@
-import type {
-  HandoffEntity,
-  HandoffRepository,
-} from '@mediforce/platform-core';
+import type { HandoffEntity, HandoffRepository } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
 import { ForbiddenError } from '../errors';
 import { AuthorizedScope } from './authorized-repository';
@@ -49,11 +46,7 @@ export class AuthorizedHandoffRepository extends AuthorizedScope {
     return this.raw.acknowledge(entityId, userId);
   };
 
-  resolve = async (
-    entityId: string,
-    userId: string,
-    resolution: Record<string, unknown>,
-  ): Promise<HandoffEntity> => {
+  resolve = async (entityId: string, userId: string, resolution: Record<string, unknown>): Promise<HandoffEntity> => {
     await this.assertCanMutate(entityId);
     return this.raw.resolve(entityId, userId, resolution);
   };

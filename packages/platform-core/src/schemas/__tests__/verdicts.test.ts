@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  buildTaskVerdicts,
-  defaultRequiresComment,
-  defaultVerdictIntent,
-  defaultVerdictLabel,
-} from '../verdicts';
+import { buildTaskVerdicts, defaultRequiresComment, defaultVerdictIntent, defaultVerdictLabel } from '../verdicts';
 
 describe('defaultVerdictLabel', () => {
   it('returns "Approve" for approve', () => {
@@ -97,9 +92,6 @@ describe('buildTaskVerdicts', () => {
 
   it('defaults a custom (non approve/revise) key with only target to neutral intent + no comment required', () => {
     const out = buildTaskVerdicts({ escalate: { target: 'oncall' } });
-    expect(out).toEqual([
-      { key: 'escalate', label: 'Escalate', intent: 'neutral', requiresComment: false },
-    ]);
+    expect(out).toEqual([{ key: 'escalate', label: 'Escalate', intent: 'neutral', requiresComment: false }]);
   });
 });
-

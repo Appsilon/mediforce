@@ -72,10 +72,7 @@ export async function resolveCallerIdentity(
  * via `assertNamespaceAccess` instead — the route adapter handles the HTTP
  * mapping. This helper is kept for routes that still have inline handlers.
  */
-export function requireNamespaceAccess(
-  caller: CallerIdentity,
-  namespace: string | undefined,
-): NextResponse | null {
+export function requireNamespaceAccess(caller: CallerIdentity, namespace: string | undefined): NextResponse | null {
   if (caller.isSystemActor) return null;
   if (!namespace) {
     return NextResponse.json({ error: 'Resource has no namespace' }, { status: 403 });
@@ -90,10 +87,7 @@ export function requireNamespaceAccess(
  *
  * NEW handlers should call `filterByCaller` from @mediforce/platform-api/auth.
  */
-export function filterByNamespace<T extends { namespace?: string }>(
-  caller: CallerIdentity,
-  items: T[],
-): T[] {
+export function filterByNamespace<T extends { namespace?: string }>(caller: CallerIdentity, items: T[]): T[] {
   if (caller.isSystemActor) return items;
   return items.filter((item) => typeof item.namespace === 'string' && caller.namespaces.has(item.namespace));
 }

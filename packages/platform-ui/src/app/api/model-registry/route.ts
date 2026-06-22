@@ -20,9 +20,6 @@ export async function GET(request: Request): Promise<NextResponse> {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Failed to list models' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed to list models' }, { status: 500 });
   }
 }

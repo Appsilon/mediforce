@@ -12,10 +12,7 @@ describe('calculateEstimatedCost', () => {
   });
 
   it('returns 0 when tokens are 0', () => {
-    const result = calculateEstimatedCost(
-      { inputTokens: 0, outputTokens: 0 },
-      { input: 0.000003, output: 0.000015 },
-    );
+    const result = calculateEstimatedCost({ inputTokens: 0, outputTokens: 0 }, { input: 0.000003, output: 0.000015 });
     expect(result).toBe(0);
   });
 

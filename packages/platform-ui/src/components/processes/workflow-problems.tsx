@@ -71,9 +71,7 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
   function formatForCopy(): string {
     const lines: string[] = [`Workflow problems for @${handle} (${warnings.length} total):`, ''];
     for (const warning of warnings) {
-      const label = warning.workflowTitle
-        ? `${warning.workflowTitle} (${warning.workflowName})`
-        : warning.workflowName;
+      const label = warning.workflowTitle ? `${warning.workflowTitle} (${warning.workflowName})` : warning.workflowName;
       lines.push(`- [${label}] ${warning.message}`);
       lines.push(`  Steps: ${warning.stepNames.join(', ')}`);
       lines.push(`  Actions: ${warning.actions.map((a) => `${a.label}: ${a.href}`).join(', ')}`);
@@ -120,16 +118,13 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
           const showName = warning.workflowTitle && warning.workflowTitle !== warning.workflowName;
           return (
             <li key={`${warning.workflowName}-${warning.category}-${warning.resource}`} className="text-sm">
-              <span className="font-medium text-foreground">
-                {warning.workflowTitle || warning.workflowName}
-              </span>
+              <span className="font-medium text-foreground">{warning.workflowTitle || warning.workflowName}</span>
               {showName && (
-                <span className="text-xs text-muted-foreground ml-1 font-mono">
-                  ({warning.workflowName})
-                </span>
+                <span className="text-xs text-muted-foreground ml-1 font-mono">({warning.workflowName})</span>
               )}
               <span className="text-muted-foreground">
-                {' — '}{warning.message}
+                {' — '}
+                {warning.message}
               </span>
               {canAdmin && warning.category === 'missing-image' && (
                 <Link

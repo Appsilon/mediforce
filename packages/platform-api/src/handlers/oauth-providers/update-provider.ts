@@ -1,10 +1,7 @@
 import { assertCallerIsNamespaceAdmin } from '../../auth';
 import { NotFoundError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
-import type {
-  UpdateOAuthProviderInputApi,
-  UpdateOAuthProviderOutput,
-} from '../../contract/oauth-providers';
+import type { UpdateOAuthProviderInputApi, UpdateOAuthProviderOutput } from '../../contract/oauth-providers';
 import { actorFromCaller } from '../_helpers';
 import { toPublicProvider } from './_helpers';
 

@@ -4,7 +4,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { WorkflowStep, McpServerConfig } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
-import { FieldRow, FieldGroup, Section, inputBase, inputBaseMono, selectBase, textareaBase } from './step-editor-fields';
+import {
+  FieldRow,
+  FieldGroup,
+  Section,
+  inputBase,
+  inputBaseMono,
+  selectBase,
+  textareaBase,
+} from './step-editor-fields';
 
 const VOICE_OPTIONS = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const;
 
@@ -14,17 +22,19 @@ const rs = selectBase;
 const rt = textareaBase;
 
 const TIP = {
-  model:              'LLM model for the cowork session. For voice, use a realtime-capable model (e.g. gpt-4o-realtime-preview).',
-  voice:              'Voice used for text-to-speech in voice sessions (alloy, echo, fable, onyx, nova, shimmer).',
-  synthesisModel:     'Model used to synthesise spoken responses. Can differ from the main reasoning model.',
-  maxDuration:        'Maximum session duration in seconds. The session auto-ends when this limit is reached.',
-  idleTimeout:        'Seconds of silence before the session auto-ends. Prevents orphaned open sessions.',
-  systemPrompt:       'Instructions for the AI collaborator in the shared workspace. Sets its goal and behaviour for this step.',
-  outputSchema:       'JSON Schema describing the structured artifact both parties are working toward. Guides the AI\'s output format.',
-  mcpName:            'Unique identifier for this MCP server binding.',
-  mcpCommand:         'Command to launch the MCP server process (stdio transport).',
-  mcpUrl:             'URL of the MCP server (HTTP/SSE transport).',
-  mcpAllowedTools:    'Tools the agent may use from this server, comma-separated. Leave empty to allow all tools.',
+  model: 'LLM model for the cowork session. For voice, use a realtime-capable model (e.g. gpt-4o-realtime-preview).',
+  voice: 'Voice used for text-to-speech in voice sessions (alloy, echo, fable, onyx, nova, shimmer).',
+  synthesisModel: 'Model used to synthesise spoken responses. Can differ from the main reasoning model.',
+  maxDuration: 'Maximum session duration in seconds. The session auto-ends when this limit is reached.',
+  idleTimeout: 'Seconds of silence before the session auto-ends. Prevents orphaned open sessions.',
+  systemPrompt:
+    'Instructions for the AI collaborator in the shared workspace. Sets its goal and behaviour for this step.',
+  outputSchema:
+    "JSON Schema describing the structured artifact both parties are working toward. Guides the AI's output format.",
+  mcpName: 'Unique identifier for this MCP server binding.',
+  mcpCommand: 'Command to launch the MCP server process (stdio transport).',
+  mcpUrl: 'URL of the MCP server (HTTP/SSE transport).',
+  mcpAllowedTools: 'Tools the agent may use from this server, comma-separated. Leave empty to allow all tools.',
 };
 
 export function CoworkSection({
@@ -64,11 +74,13 @@ export function CoworkSection({
         {(['chat', 'voice-realtime'] as const).map((mode) => (
           <button
             key={mode}
-            onClick={() => patchCowork({
-              agent: mode,
-              chat: mode === 'chat' ? (cowork.chat ?? {}) : undefined,
-              voiceRealtime: mode === 'voice-realtime' ? (cowork.voiceRealtime ?? {}) : undefined,
-            })}
+            onClick={() =>
+              patchCowork({
+                agent: mode,
+                chat: mode === 'chat' ? (cowork.chat ?? {}) : undefined,
+                voiceRealtime: mode === 'voice-realtime' ? (cowork.voiceRealtime ?? {}) : undefined,
+              })
+            }
             className={cn(
               'flex-1 rounded-md px-2 py-1.5 text-xs font-medium capitalize transition-all',
               cowork.agent === mode
@@ -86,9 +98,10 @@ export function CoworkSection({
         <FieldRow label={isVoice ? 'voiceRealtime.model' : 'chat.model'} tooltip={TIP.model}>
           <input
             value={isVoice ? (cowork.voiceRealtime?.model ?? '') : (cowork.chat?.model ?? '')}
-            onChange={(e) => isVoice
-              ? patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, model: e.target.value || undefined } })
-              : patchCowork({ chat: { ...cowork.chat, model: e.target.value || undefined } })
+            onChange={(e) =>
+              isVoice
+                ? patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, model: e.target.value || undefined } })
+                : patchCowork({ chat: { ...cowork.chat, model: e.target.value || undefined } })
             }
             className={ri}
           />
@@ -99,18 +112,28 @@ export function CoworkSection({
             <FieldRow label="voiceRealtime.voice" tooltip={TIP.voice}>
               <select
                 value={cowork.voiceRealtime?.voice ?? ''}
-                onChange={(e) => patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, voice: e.target.value || undefined } })}
+                onChange={(e) =>
+                  patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, voice: e.target.value || undefined } })
+                }
                 className={rs}
               >
                 <option value="">Default</option>
-                {VOICE_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+                {VOICE_OPTIONS.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
               </select>
             </FieldRow>
 
             <FieldRow label="voiceRealtime.synthesisModel" tooltip={TIP.synthesisModel}>
               <input
                 value={cowork.voiceRealtime?.synthesisModel ?? ''}
-                onChange={(e) => patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, synthesisModel: e.target.value || undefined } })}
+                onChange={(e) =>
+                  patchCowork({
+                    voiceRealtime: { ...cowork.voiceRealtime, synthesisModel: e.target.value || undefined },
+                  })
+                }
                 className={ri}
               />
             </FieldRow>
@@ -119,7 +142,14 @@ export function CoworkSection({
               <input
                 type="number"
                 value={cowork.voiceRealtime?.maxDurationSeconds ?? ''}
-                onChange={(e) => patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, maxDurationSeconds: e.target.value ? Number(e.target.value) : undefined } })}
+                onChange={(e) =>
+                  patchCowork({
+                    voiceRealtime: {
+                      ...cowork.voiceRealtime,
+                      maxDurationSeconds: e.target.value ? Number(e.target.value) : undefined,
+                    },
+                  })
+                }
                 className={ri}
               />
             </FieldRow>
@@ -128,7 +158,14 @@ export function CoworkSection({
               <input
                 type="number"
                 value={cowork.voiceRealtime?.idleTimeoutSeconds ?? ''}
-                onChange={(e) => patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, idleTimeoutSeconds: e.target.value ? Number(e.target.value) : undefined } })}
+                onChange={(e) =>
+                  patchCowork({
+                    voiceRealtime: {
+                      ...cowork.voiceRealtime,
+                      idleTimeoutSeconds: e.target.value ? Number(e.target.value) : undefined,
+                    },
+                  })
+                }
                 className={ri}
               />
             </FieldRow>
@@ -212,9 +249,7 @@ function McpServerEntry({
   onChange: (patch: Partial<McpServerConfig>) => void;
   onRemove: () => void;
 }) {
-  const [transportMode, setTransportMode] = useState<'command' | 'url'>(
-    server.url !== undefined ? 'url' : 'command',
-  );
+  const [transportMode, setTransportMode] = useState<'command' | 'url'>(server.url !== undefined ? 'url' : 'command');
 
   const toggleTransport = () => {
     if (transportMode === 'command') {
@@ -277,7 +312,15 @@ function McpServerEntry({
           value={server.allowedTools?.join(', ') ?? ''}
           onChange={(e) => {
             const raw = e.target.value;
-            onChange({ allowedTools: raw.trim() === '' ? undefined : raw.split(',').map((t) => t.trim()).filter(Boolean) });
+            onChange({
+              allowedTools:
+                raw.trim() === ''
+                  ? undefined
+                  : raw
+                      .split(',')
+                      .map((t) => t.trim())
+                      .filter(Boolean),
+            });
           }}
           className={ri}
         />
@@ -297,7 +340,7 @@ function CoworkOutputSchemaEditor({
   value: Record<string, unknown> | undefined;
   onChange: (schema: Record<string, unknown> | undefined) => void;
 }) {
-  const [draft, setDraft] = useState(() => value !== undefined ? JSON.stringify(value, null, 2) : '');
+  const [draft, setDraft] = useState(() => (value !== undefined ? JSON.stringify(value, null, 2) : ''));
   const [error, setError] = useState<string | null>(null);
 
   const valueRef = useRef(value);
@@ -310,9 +353,17 @@ function CoworkOutputSchemaEditor({
   }, [value]);
 
   const handleBlur = () => {
-    if (draft.trim() === '') { onChange(undefined); setError(null); return; }
-    try { onChange(JSON.parse(draft)); setError(null); }
-    catch { setError('Invalid JSON'); }
+    if (draft.trim() === '') {
+      onChange(undefined);
+      setError(null);
+      return;
+    }
+    try {
+      onChange(JSON.parse(draft));
+      setError(null);
+    } catch {
+      setError('Invalid JSON');
+    }
   };
 
   return (
@@ -323,10 +374,7 @@ function CoworkOutputSchemaEditor({
         onBlur={handleBlur}
         rows={5}
         placeholder={'{\n  "type": "object",\n  "required": [],\n  "properties": {}\n}'}
-        className={cn(
-          rt, 'font-mono text-[11px]',
-          error ? 'border-destructive ring-1 ring-destructive' : '',
-        )}
+        className={cn(rt, 'font-mono text-[11px]', error ? 'border-destructive ring-1 ring-destructive' : '')}
       />
       {error && <p className="text-[10px] text-destructive mt-0.5">{error}</p>}
     </div>

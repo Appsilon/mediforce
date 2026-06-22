@@ -2,10 +2,7 @@ import type { CreateAgentInput, CreateAgentOutput } from '../../contract/agents'
 import type { CallerScope } from '../../repositories/index';
 import { actorFromCaller } from '../_helpers';
 
-export async function createAgent(
-  input: CreateAgentInput,
-  scope: CallerScope,
-): Promise<CreateAgentOutput> {
+export async function createAgent(input: CreateAgentInput, scope: CallerScope): Promise<CreateAgentOutput> {
   const agent = await scope.agentDefinitions.create(input);
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({

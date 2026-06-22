@@ -1,7 +1,4 @@
-import type {
-  AuditEvent,
-  AuditRepository,
-} from '@mediforce/platform-core';
+import type { AuditEvent, AuditRepository } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
 import { AuthorizedScope } from './authorized-repository';
 

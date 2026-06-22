@@ -55,9 +55,7 @@ function SelectField({
 }) {
   return (
     <div className="space-y-1">
-      <label className="text-xs font-medium text-muted-foreground">
-        {label}
-      </label>
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
       <Select.Root value={value} onValueChange={onValueChange} disabled={disabled}>
         <Select.Trigger
           className={cn(
@@ -193,19 +191,8 @@ function detectScriptMode(agentConfig?: AgentConfig): 'inline' | 'container' {
   return 'inline'; // default for new script steps
 }
 
-export function StepConfigCard({
-  step,
-  config,
-  onChange,
-  errors,
-  readOnly,
-  plugins,
-  onBlur,
-}: StepConfigCardProps) {
-  const updateField = <K extends keyof StepConfig>(
-    key: K,
-    value: StepConfig[K],
-  ) => {
+export function StepConfigCard({ step, config, onChange, errors, readOnly, plugins, onBlur }: StepConfigCardProps) {
+  const updateField = <K extends keyof StepConfig>(key: K, value: StepConfig[K]) => {
     const updated = { ...config, [key]: value };
 
     // Auto-set plugin for script executor; clear for non-agent types
@@ -224,21 +211,16 @@ export function StepConfigCard({
     onChange(updated);
   };
 
-  const fieldErrors = (fieldName: string): string[] =>
-    errors.get(`${step.id}.${fieldName}`) ?? [];
+  const fieldErrors = (fieldName: string): string[] => errors.get(`${step.id}.${fieldName}`) ?? [];
 
   const executorPlugin = plugins.find((p) => p.name === config.plugin);
-  const reviewerPlugin = plugins.find(
-    (p) => p.name === config.reviewerPlugin,
-  );
+  const reviewerPlugin = plugins.find((p) => p.name === config.reviewerPlugin);
 
   return (
     <Accordion.Item value={step.id} className="border rounded-lg mb-2">
       <Accordion.Trigger className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors [&[data-state=open]>svg]:rotate-180">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-xs text-muted-foreground">
-            {step.id}
-          </span>
+          <span className="font-mono text-xs text-muted-foreground">{step.id}</span>
           <span>{step.name}</span>
           <span className="text-xs text-muted-foreground">({step.type})</span>
         </div>
@@ -252,9 +234,7 @@ export function StepConfigCard({
             <SelectField
               label="Executor Type"
               value={config.executorType}
-              onValueChange={(v) =>
-                updateField('executorType', v as StepConfig['executorType'])
-              }
+              onValueChange={(v) => updateField('executorType', v as StepConfig['executorType'])}
               options={executorTypeOptions}
               disabled={readOnly}
               hasError={fieldErrors('executorType').length > 0}
@@ -262,9 +242,7 @@ export function StepConfigCard({
             <SelectField
               label="Autonomy Level"
               value={config.autonomyLevel ?? 'L4'}
-              onValueChange={(v) =>
-                updateField('autonomyLevel', v as StepConfig['autonomyLevel'])
-              }
+              onValueChange={(v) => updateField('autonomyLevel', v as StepConfig['autonomyLevel'])}
               options={autonomyLevelOptions}
               disabled={readOnly}
             />
@@ -273,9 +251,7 @@ export function StepConfigCard({
           {/* Plugin combobox - slides in when executorType is 'agent' (script always uses script-container) */}
           {config.executorType === 'agent' && (
             <div className="animate-in slide-in-from-top-2 duration-200 space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">
-                Executor Plugin
-              </label>
+              <label className="text-xs font-medium text-muted-foreground">Executor Plugin</label>
               <PluginCombobox
                 plugins={plugins}
                 value={config.plugin}
@@ -284,13 +260,9 @@ export function StepConfigCard({
                 disabled={readOnly}
               />
               {fieldErrors('plugin').length > 0 && (
-                <p className="text-xs text-destructive">
-                  {fieldErrors('plugin')[0]}
-                </p>
+                <p className="text-xs text-destructive">{fieldErrors('plugin')[0]}</p>
               )}
-              {executorPlugin && (
-                <PluginPreviewCard plugin={executorPlugin} />
-              )}
+              {executorPlugin && <PluginPreviewCard plugin={executorPlugin} />}
             </div>
           )}
 
@@ -298,9 +270,7 @@ export function StepConfigCard({
           <SelectField
             label="Reviewer Type"
             value={config.reviewerType ?? 'none'}
-            onValueChange={(v) =>
-              updateField('reviewerType', v as StepConfig['reviewerType'])
-            }
+            onValueChange={(v) => updateField('reviewerType', v as StepConfig['reviewerType'])}
             options={reviewerTypeOptions}
             disabled={readOnly}
           />
@@ -308,9 +278,7 @@ export function StepConfigCard({
           {/* Reviewer plugin combobox */}
           {config.reviewerType === 'agent' && (
             <div className="animate-in slide-in-from-top-2 duration-200 space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">
-                Reviewer Plugin
-              </label>
+              <label className="text-xs font-medium text-muted-foreground">Reviewer Plugin</label>
               <PluginCombobox
                 plugins={plugins}
                 value={config.reviewerPlugin}
@@ -319,22 +287,16 @@ export function StepConfigCard({
                 disabled={readOnly}
               />
               {fieldErrors('reviewerPlugin').length > 0 && (
-                <p className="text-xs text-destructive">
-                  {fieldErrors('reviewerPlugin')[0]}
-                </p>
+                <p className="text-xs text-destructive">{fieldErrors('reviewerPlugin')[0]}</p>
               )}
-              {reviewerPlugin && (
-                <PluginPreviewCard plugin={reviewerPlugin} />
-              )}
+              {reviewerPlugin && <PluginPreviewCard plugin={reviewerPlugin} />}
             </div>
           )}
 
           {/* Agent Config section — visible for agent executor with existing agentConfig */}
           {config.executorType === 'agent' && config.agentConfig && (
             <div className="animate-in slide-in-from-top-2 duration-200 space-y-3">
-              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Agent Config
-              </h4>
+              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Agent Config</h4>
               <div className="grid grid-cols-2 gap-4">
                 {config.agentConfig.skill && (
                   <div className="space-y-1">
@@ -435,11 +397,16 @@ export function StepConfigCard({
                   </h5>
                   <div className="space-y-1.5">
                     {config.agentConfig.mcpServers.map((server) => (
-                      <div key={server.name} className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
+                      <div
+                        key={server.name}
+                        className="flex items-center justify-between rounded-md border bg-background px-3 py-2"
+                      >
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium">{server.name}</span>
                           {server.description && (
-                            <span className="text-xs text-muted-foreground truncate max-w-[200px]">{server.description}</span>
+                            <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                              {server.description}
+                            </span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
@@ -504,9 +471,7 @@ export function StepConfigCard({
                     disabled={readOnly}
                   />
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Script
-                    </label>
+                    <label className="text-xs font-medium text-muted-foreground">Script</label>
                     <LazyScriptEditor
                       value={config.agentConfig?.inlineScript ?? ''}
                       runtime={(config.agentConfig?.runtime as 'javascript' | 'python' | 'r' | 'bash') ?? 'python'}
@@ -657,9 +622,7 @@ export function StepConfigCard({
             </summary>
             <div className="mt-3 grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Confidence Threshold
-                </label>
+                <label className="text-xs font-medium text-muted-foreground">Confidence Threshold</label>
                 <input
                   type="number"
                   min={0}
@@ -667,10 +630,7 @@ export function StepConfigCard({
                   step={0.1}
                   value={config.confidenceThreshold ?? ''}
                   onChange={(e) =>
-                    updateField(
-                      'confidenceThreshold',
-                      e.target.value ? Number(e.target.value) : undefined,
-                    )
+                    updateField('confidenceThreshold', e.target.value ? Number(e.target.value) : undefined)
                   }
                   disabled={readOnly}
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -681,30 +641,18 @@ export function StepConfigCard({
               <SelectField
                 label="Fallback Behavior"
                 value={config.fallbackBehavior ?? 'escalate_to_human'}
-                onValueChange={(v) =>
-                  updateField(
-                    'fallbackBehavior',
-                    v as StepConfig['fallbackBehavior'],
-                  )
-                }
+                onValueChange={(v) => updateField('fallbackBehavior', v as StepConfig['fallbackBehavior'])}
                 options={fallbackBehaviorOptions}
                 disabled={readOnly}
               />
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Timeout (minutes)
-                </label>
+                <label className="text-xs font-medium text-muted-foreground">Timeout (minutes)</label>
                 <input
                   type="number"
                   min={0}
                   value={config.timeoutMinutes ?? ''}
-                  onChange={(e) =>
-                    updateField(
-                      'timeoutMinutes',
-                      e.target.value ? Number(e.target.value) : undefined,
-                    )
-                  }
+                  onChange={(e) => updateField('timeoutMinutes', e.target.value ? Number(e.target.value) : undefined)}
                   disabled={readOnly}
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="e.g. 30"
@@ -712,15 +660,11 @@ export function StepConfigCard({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Model
-                </label>
+                <label className="text-xs font-medium text-muted-foreground">Model</label>
                 <input
                   type="text"
                   value={config.model ?? ''}
-                  onChange={(e) =>
-                    updateField('model', e.target.value || undefined)
-                  }
+                  onChange={(e) => updateField('model', e.target.value || undefined)}
                   disabled={readOnly}
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="e.g. anthropic/claude-sonnet-4"

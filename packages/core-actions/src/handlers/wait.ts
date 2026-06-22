@@ -23,22 +23,14 @@ export function isWaitSentinel(output: Record<string, unknown>): output is WaitS
   const w = output.__wait;
   if (w === null || typeof w !== 'object') return false;
   const r = w as Record<string, unknown>;
-  return (
-    typeof r.stepId === 'string' &&
-    typeof r.resumeAt === 'string' &&
-    typeof r.pausedAt === 'string'
-  );
+  return typeof r.stepId === 'string' && typeof r.resumeAt === 'string' && typeof r.pausedAt === 'string';
 }
 
 export const waitActionHandler: WaitActionHandler = async (config, ctx) => {
   const now = new Date();
   const sources = ctx.sources;
-  const resolvedDeadline = config.deadline
-    ? String(interpolate(config.deadline, sources))
-    : undefined;
-  const resolvedCondition = config.condition
-    ? String(interpolate(config.condition, sources))
-    : undefined;
+  const resolvedDeadline = config.deadline ? String(interpolate(config.deadline, sources)) : undefined;
+  const resolvedCondition = config.condition ? String(interpolate(config.condition, sources)) : undefined;
 
   if (config.duration) {
     const { seconds = 0, minutes = 0, hours = 0 } = config.duration;

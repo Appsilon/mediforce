@@ -14,10 +14,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const url = new URL(request.url);
   const imageParam = url.searchParams.get('image');
   if (!imageParam) {
-    return NextResponse.json(
-      { error: 'Missing required query parameter: image' },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'Missing required query parameter: image' }, { status: 400 });
   }
 
   const needle = normalizeImage(imageParam);

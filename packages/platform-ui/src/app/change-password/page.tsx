@@ -92,12 +92,16 @@ export default function ChangePasswordPage() {
         </div>
 
         {error !== null && (
-          <p className="text-sm text-destructive text-center" role="alert">{error}</p>
+          <p className="text-sm text-destructive text-center" role="alert">
+            {error}
+          </p>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label htmlFor="newPassword" className="text-sm font-medium">New password</label>
+            <label htmlFor="newPassword" className="text-sm font-medium">
+              New password
+            </label>
             <input
               id="newPassword"
               type="password"
@@ -110,7 +114,9 @@ export default function ChangePasswordPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="confirmPassword" className="text-sm font-medium">Confirm password</label>
+            <label htmlFor="confirmPassword" className="text-sm font-medium">
+              Confirm password
+            </label>
             <input
               id="confirmPassword"
               type="password"

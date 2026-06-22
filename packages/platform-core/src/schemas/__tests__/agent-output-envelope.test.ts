@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  StepOutputEnvelopeSchema,
-  AgentOutputEnvelopeSchema,
-  AnnotationSchema,
-} from '../agent-output-envelope';
+import { StepOutputEnvelopeSchema, AgentOutputEnvelopeSchema, AnnotationSchema } from '../agent-output-envelope';
 
 const validAnnotation = {
   id: 'ann-1',

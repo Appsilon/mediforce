@@ -52,9 +52,7 @@ async function mintState(overrides: Partial<OAuthStatePayload> = {}): Promise<st
 }
 
 function makeCallbackRequest(providerSlug: string, search: Record<string, string>): NextRequest {
-  const url = new URL(
-    `http://localhost/api/oauth/${providerSlug}/callback`,
-  );
+  const url = new URL(`http://localhost/api/oauth/${providerSlug}/callback`);
   for (const [k, v] of Object.entries(search)) {
     url.searchParams.set(k, v);
   }
@@ -115,10 +113,9 @@ describe('GET /api/oauth/:provider/callback', () => {
     fetchMock.mockResolvedValueOnce(tokenExchangeResponse());
     fetchMock.mockResolvedValueOnce(userInfoResponse());
 
-    const res = await GET(
-      makeCallbackRequest('github', { code: 'dummy-code', state }),
-      { params: makeParams('github') },
-    );
+    const res = await GET(makeCallbackRequest('github', { code: 'dummy-code', state }), {
+      params: makeParams('github'),
+    });
 
     expect(res.status).toBe(302);
     const location = res.headers.get('Location');
@@ -149,9 +146,7 @@ describe('GET /api/oauth/:provider/callback', () => {
     // Userinfo fetch
     const [userInfoUrl, userInfoInit] = fetchMock.mock.calls[1] as [string, RequestInit];
     expect(userInfoUrl).toBe('https://api.github.com/user');
-    expect((userInfoInit.headers as Record<string, string>).Authorization).toBe(
-      'Bearer gho_accesstoken',
-    );
+    expect((userInfoInit.headers as Record<string, string>).Authorization).toBe('Bearer gho_accesstoken');
 
     // Token persisted
     expect(mockTokenPut).toHaveBeenCalledTimes(1);
@@ -182,17 +177,9 @@ describe('GET /api/oauth/:provider/callback', () => {
     fetchMock.mockResolvedValueOnce(tokenExchangeResponse());
     fetchMock.mockResolvedValueOnce(userInfoResponse());
 
-    await GET(
-      makeCallbackRequest('github', { code: 'c', state }),
-      { params: makeParams('github') },
-    );
+    await GET(makeCallbackRequest('github', { code: 'c', state }), { params: makeParams('github') });
 
-    const [, , , persisted] = mockTokenPut.mock.calls[0] as [
-      string,
-      string,
-      string,
-      AgentOAuthToken,
-    ];
+    const [, , , persisted] = mockTokenPut.mock.calls[0] as [string, string, string, AgentOAuthToken];
     expect(persisted.connectedBy).toBe('firebase-uid-xyz');
   });
 
@@ -201,24 +188,16 @@ describe('GET /api/oauth/:provider/callback', () => {
     mockProviderGet.mockResolvedValue(providerConfig);
     mockTokenPut.mockResolvedValue(undefined);
     fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ access_token: 'gho_token' }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
+      new Response(JSON.stringify({ access_token: 'gho_token' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
     );
     fetchMock.mockResolvedValueOnce(userInfoResponse());
 
-    await GET(
-      makeCallbackRequest('github', { code: 'c', state }),
-      { params: makeParams('github') },
-    );
+    await GET(makeCallbackRequest('github', { code: 'c', state }), { params: makeParams('github') });
 
-    const [, , , persisted] = mockTokenPut.mock.calls[0] as [
-      string,
-      string,
-      string,
-      AgentOAuthToken,
-    ];
+    const [, , , persisted] = mockTokenPut.mock.calls[0] as [string, string, string, AgentOAuthToken];
     expect(persisted.scope).toBe('repo read:user');
     expect(persisted.refreshToken).toBeUndefined();
     expect(persisted.expiresAt).toBeUndefined();
@@ -230,34 +209,23 @@ describe('GET /api/oauth/:provider/callback', () => {
     mockTokenPut.mockResolvedValue(undefined);
     fetchMock.mockResolvedValueOnce(tokenExchangeResponse());
     fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ sub: 'google-sub-123', email: 'user@example.com' }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
+      new Response(JSON.stringify({ sub: 'google-sub-123', email: 'user@example.com' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
     );
 
-    const res = await GET(
-      makeCallbackRequest('google', { code: 'c', state }),
-      { params: makeParams('google') },
-    );
+    const res = await GET(makeCallbackRequest('google', { code: 'c', state }), { params: makeParams('google') });
     expect(res.status).toBe(302);
 
-    const [, , , persisted] = mockTokenPut.mock.calls[0] as [
-      string,
-      string,
-      string,
-      AgentOAuthToken,
-    ];
+    const [, , , persisted] = mockTokenPut.mock.calls[0] as [string, string, string, AgentOAuthToken];
     expect(persisted.providerUserId).toBe('google-sub-123');
     expect(persisted.accountLogin).toBe('user@example.com');
   });
 
   it('[ERROR] redirect to error page when code param missing', async () => {
     const state = await mintState();
-    const res = await GET(
-      makeCallbackRequest('github', { state }),
-      { params: makeParams('github') },
-    );
+    const res = await GET(makeCallbackRequest('github', { state }), { params: makeParams('github') });
     expect(res.status).toBe(302);
     const location = res.headers.get('Location') ?? '';
     expect(location).toContain('oauthError=');
@@ -267,10 +235,7 @@ describe('GET /api/oauth/:provider/callback', () => {
   });
 
   it('[ERROR] redirect to error page when state missing', async () => {
-    const res = await GET(
-      makeCallbackRequest('github', { code: 'dummy' }),
-      { params: makeParams('github') },
-    );
+    const res = await GET(makeCallbackRequest('github', { code: 'dummy' }), { params: makeParams('github') });
     expect(res.status).toBe(302);
     const location = res.headers.get('Location') ?? '';
     expect(location).toContain('missing-code-or-state');
@@ -285,10 +250,7 @@ describe('GET /api/oauth/:provider/callback', () => {
     delete process.env.OAUTH_STATE_SECRET;
     try {
       const state = await mintState();
-      const res = await GET(
-        makeCallbackRequest('github', { code: 'c', state }),
-        { params: makeParams('github') },
-      );
+      const res = await GET(makeCallbackRequest('github', { code: 'c', state }), { params: makeParams('github') });
       expect(res.status).toBe(302);
       const location = res.headers.get('Location') ?? '';
       expect(location).toContain('server-misconfigured');
@@ -306,14 +268,10 @@ describe('GET /api/oauth/:provider/callback', () => {
     // replacing with 'A' (value 0) is a no-op and verification passes silently.
     const dot = state.indexOf('.');
     const firstSigChar = state[dot + 1] ?? 'A';
-    const tampered =
-      state.slice(0, dot + 1) +
-      (firstSigChar === 'A' ? 'B' : 'A') +
-      state.slice(dot + 2);
-    const res = await GET(
-      makeCallbackRequest('github', { code: 'c', state: tampered }),
-      { params: makeParams('github') },
-    );
+    const tampered = state.slice(0, dot + 1) + (firstSigChar === 'A' ? 'B' : 'A') + state.slice(dot + 2);
+    const res = await GET(makeCallbackRequest('github', { code: 'c', state: tampered }), {
+      params: makeParams('github'),
+    });
     expect(res.status).toBe(302);
     const location = res.headers.get('Location') ?? '';
     expect(location).toContain('oauthError=invalid-state');
@@ -325,10 +283,7 @@ describe('GET /api/oauth/:provider/callback', () => {
     const elevenMinAgo = Date.now() - 11 * 60_000;
     const state = await mintState({ ts: elevenMinAgo });
 
-    const res = await GET(
-      makeCallbackRequest('github', { code: 'c', state }),
-      { params: makeParams('github') },
-    );
+    const res = await GET(makeCallbackRequest('github', { code: 'c', state }), { params: makeParams('github') });
     expect(res.status).toBe(302);
     const location = res.headers.get('Location') ?? '';
     expect(location).toContain('oauthError=invalid-state');
@@ -337,10 +292,7 @@ describe('GET /api/oauth/:provider/callback', () => {
 
   it('[ERROR] provider slug mismatch with state.providerId returns provider-mismatch redirect', async () => {
     const state = await mintState({ providerId: 'github' });
-    const res = await GET(
-      makeCallbackRequest('google', { code: 'c', state }),
-      { params: makeParams('google') },
-    );
+    const res = await GET(makeCallbackRequest('google', { code: 'c', state }), { params: makeParams('google') });
     expect(res.status).toBe(302);
     const location = res.headers.get('Location') ?? '';
     expect(location).toContain('oauthError=provider-mismatch');
@@ -351,10 +303,7 @@ describe('GET /api/oauth/:provider/callback', () => {
     const state = await mintState();
     mockProviderGet.mockResolvedValue(null);
 
-    const res = await GET(
-      makeCallbackRequest('github', { code: 'c', state }),
-      { params: makeParams('github') },
-    );
+    const res = await GET(makeCallbackRequest('github', { code: 'c', state }), { params: makeParams('github') });
     expect(res.status).toBe(302);
     const location = res.headers.get('Location') ?? '';
     expect(location).toContain('oauthError=provider-gone');
@@ -367,10 +316,7 @@ describe('GET /api/oauth/:provider/callback', () => {
     mockProviderGet.mockResolvedValue(providerConfig);
     fetchMock.mockResolvedValueOnce(new Response('forbidden', { status: 403 }));
 
-    const res = await GET(
-      makeCallbackRequest('github', { code: 'c', state }),
-      { params: makeParams('github') },
-    );
+    const res = await GET(makeCallbackRequest('github', { code: 'c', state }), { params: makeParams('github') });
     expect(res.status).toBe(302);
     const location = res.headers.get('Location') ?? '';
     expect(location).toContain('oauthError=code-exchange-failed');
@@ -381,16 +327,13 @@ describe('GET /api/oauth/:provider/callback', () => {
     const state = await mintState();
     mockProviderGet.mockResolvedValue(providerConfig);
     fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ error: 'bad_verification_code', error_description: 'nope' }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
+      new Response(JSON.stringify({ error: 'bad_verification_code', error_description: 'nope' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
     );
 
-    const res = await GET(
-      makeCallbackRequest('github', { code: 'c', state }),
-      { params: makeParams('github') },
-    );
+    const res = await GET(makeCallbackRequest('github', { code: 'c', state }), { params: makeParams('github') });
     expect(res.status).toBe(302);
     const location = res.headers.get('Location') ?? '';
     expect(location).toContain('oauthError=code-exchange-rejected');
@@ -401,16 +344,13 @@ describe('GET /api/oauth/:provider/callback', () => {
     const state = await mintState();
     mockProviderGet.mockResolvedValue(providerConfig);
     fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ token_type: 'bearer' }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
+      new Response(JSON.stringify({ token_type: 'bearer' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
     );
 
-    const res = await GET(
-      makeCallbackRequest('github', { code: 'c', state }),
-      { params: makeParams('github') },
-    );
+    const res = await GET(makeCallbackRequest('github', { code: 'c', state }), { params: makeParams('github') });
     expect(res.status).toBe(302);
     const location = res.headers.get('Location') ?? '';
     expect(location).toContain('oauthError=code-exchange-missing-token');
@@ -423,10 +363,7 @@ describe('GET /api/oauth/:provider/callback', () => {
     fetchMock.mockResolvedValueOnce(tokenExchangeResponse());
     fetchMock.mockResolvedValueOnce(new Response('forbidden', { status: 403 }));
 
-    const res = await GET(
-      makeCallbackRequest('github', { code: 'c', state }),
-      { params: makeParams('github') },
-    );
+    const res = await GET(makeCallbackRequest('github', { code: 'c', state }), { params: makeParams('github') });
     expect(res.status).toBe(302);
     const location = res.headers.get('Location') ?? '';
     expect(location).toContain('oauthError=userinfo-fetch-failed');
@@ -438,16 +375,13 @@ describe('GET /api/oauth/:provider/callback', () => {
     mockProviderGet.mockResolvedValue(providerConfig);
     fetchMock.mockResolvedValueOnce(tokenExchangeResponse());
     fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ unrelated: 'fields' }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
+      new Response(JSON.stringify({ unrelated: 'fields' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
     );
 
-    const res = await GET(
-      makeCallbackRequest('github', { code: 'c', state }),
-      { params: makeParams('github') },
-    );
+    const res = await GET(makeCallbackRequest('github', { code: 'c', state }), { params: makeParams('github') });
     expect(res.status).toBe(302);
     const location = res.headers.get('Location') ?? '';
     expect(location).toContain('oauthError=userinfo-fetch-failed');

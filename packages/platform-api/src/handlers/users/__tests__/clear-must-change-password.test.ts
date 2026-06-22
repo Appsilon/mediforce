@@ -6,10 +6,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import { clearMustChangePassword } from '../clear-must-change-password';
 import { ForbiddenError, PreconditionFailedError, ValidationError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('clearMustChangePassword handler', () => {
   let userProfileRepo: InMemoryUserProfileRepository;
@@ -57,9 +54,7 @@ describe('clearMustChangePassword handler', () => {
       caller: userCaller('uid-marek', []),
     });
 
-    await expect(
-      clearMustChangePassword({ uid: 'uid-other' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(clearMustChangePassword({ uid: 'uid-other' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it('apiKey caller must pass uid explicitly', async () => {
@@ -76,9 +71,7 @@ describe('clearMustChangePassword handler', () => {
 
   it('rejects when the user has no namespace to attribute the audit event to', async () => {
     const scope = createTestScope({ userProfileRepo, auditRepo, namespaceRepo });
-    await expect(
-      clearMustChangePassword({ uid: 'uid-orphan' }, scope),
-    ).rejects.toBeInstanceOf(PreconditionFailedError);
+    await expect(clearMustChangePassword({ uid: 'uid-orphan' }, scope)).rejects.toBeInstanceOf(PreconditionFailedError);
   });
 
   it('emits user.password_change_acknowledged with the user as the entity', async () => {

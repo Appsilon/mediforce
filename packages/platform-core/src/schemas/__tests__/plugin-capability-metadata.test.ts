@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  PluginCapabilityMetadataSchema,
-  PluginRoleSchema,
-} from '../plugin-capability-metadata';
+import { PluginCapabilityMetadataSchema, PluginRoleSchema } from '../plugin-capability-metadata';
 
 const validMetadata = {
   name: 'Vendor Compliance Analyzer',
@@ -46,15 +43,11 @@ describe('PluginCapabilityMetadataSchema', () => {
   });
 
   it('[ERROR] throws on empty roles array', () => {
-    expect(() =>
-      PluginCapabilityMetadataSchema.parse({ ...validMetadata, roles: [] }),
-    ).toThrow();
+    expect(() => PluginCapabilityMetadataSchema.parse({ ...validMetadata, roles: [] })).toThrow();
   });
 
   it('[ERROR] throws on invalid role in roles array', () => {
-    expect(() =>
-      PluginCapabilityMetadataSchema.parse({ ...validMetadata, roles: ['admin'] }),
-    ).toThrow();
+    expect(() => PluginCapabilityMetadataSchema.parse({ ...validMetadata, roles: ['admin'] })).toThrow();
   });
 
   it('[ERROR] throws on missing name', () => {

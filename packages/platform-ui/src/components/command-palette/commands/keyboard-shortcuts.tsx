@@ -48,10 +48,7 @@ export function KeyboardShortcutsView(_props: CommandViewProps) {
           </div>
           <ul className="flex flex-col">
             {entries.map((entry) => (
-              <li
-                key={`${entry.section}-${entry.label}`}
-                className="flex items-center justify-between py-1.5 text-sm"
-              >
+              <li key={`${entry.section}-${entry.label}`} className="flex items-center justify-between py-1.5 text-sm">
                 <span className="text-foreground">{entry.label}</span>
                 <KbdRow keys={entry.display} />
               </li>

@@ -12,9 +12,7 @@ export function validateEnv(existsSync: (path: string) => boolean): void {
   if (!isEmulatorMode) {
     const apiKey = process.env.PLATFORM_API_KEY;
     if (typeof apiKey !== 'string' || apiKey.length === 0) {
-      errors.push(
-        'PLATFORM_API_KEY is not set. Required for API authentication (middleware X-Api-Key check).',
-      );
+      errors.push('PLATFORM_API_KEY is not set. Required for API authentication (middleware X-Api-Key check).');
     }
   }
 
@@ -23,8 +21,8 @@ export function validateEnv(existsSync: (path: string) => boolean): void {
     const secretsKey = process.env.SECRETS_ENCRYPTION_KEY;
     if (typeof secretsKey !== 'string' || secretsKey.length === 0) {
       errors.push(
-        'SECRETS_ENCRYPTION_KEY is not set. '
-        + 'Set it to a 64-character hex string (see .env.example or run scripts/bootstrap-server.py).',
+        'SECRETS_ENCRYPTION_KEY is not set. ' +
+          'Set it to a 64-character hex string (see .env.example or run scripts/bootstrap-server.py).',
       );
     } else if (!/^[0-9a-fA-F]{64}$/.test(secretsKey)) {
       errors.push(
@@ -38,13 +36,11 @@ export function validateEnv(existsSync: (path: string) => boolean): void {
     const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
     if (typeof credPath !== 'string' || credPath.length === 0) {
       errors.push(
-        'GOOGLE_APPLICATION_CREDENTIALS is not set. '
-        + 'Point it to your Firebase service account JSON file (e.g. /run/secrets/firebase-sa.json).',
+        'GOOGLE_APPLICATION_CREDENTIALS is not set. ' +
+          'Point it to your Firebase service account JSON file (e.g. /run/secrets/firebase-sa.json).',
       );
     } else if (!existsSync(credPath)) {
-      errors.push(
-        `GOOGLE_APPLICATION_CREDENTIALS points to "${credPath}" but the file does not exist.`,
-      );
+      errors.push(`GOOGLE_APPLICATION_CREDENTIALS points to "${credPath}" but the file does not exist.`);
     }
   }
 
@@ -55,8 +51,8 @@ export function validateEnv(existsSync: (path: string) => boolean): void {
   const dbUrl = process.env.DATABASE_URL;
   if (typeof dbUrl !== 'string' || dbUrl.length === 0) {
     errors.push(
-      'DATABASE_URL is required. Set DATABASE_URL to a Postgres connection string '
-      + '(e.g. postgresql://mediforce:mediforce@localhost:5432/mediforce).',
+      'DATABASE_URL is required. Set DATABASE_URL to a Postgres connection string ' +
+        '(e.g. postgresql://mediforce:mediforce@localhost:5432/mediforce).',
     );
   }
 
@@ -64,16 +60,12 @@ export function validateEnv(existsSync: (path: string) => boolean): void {
   if (process.env.MEDIFORCE_DISABLE_EMAIL !== 'true') {
     const mailgunVars = ['MAILGUN_API_KEY', 'MAILGUN_DOMAIN', 'MAILGUN_FROM_EMAIL'] as const;
     const smtpVars = ['SMTP_HOST', 'SMTP_FROM_EMAIL'] as const;
-    const hasMailgun = mailgunVars.every(
-      (v) => typeof process.env[v] === 'string' && process.env[v] !== '',
-    );
-    const hasSmtp = smtpVars.every(
-      (v) => typeof process.env[v] === 'string' && process.env[v] !== '',
-    );
+    const hasMailgun = mailgunVars.every((v) => typeof process.env[v] === 'string' && process.env[v] !== '');
+    const hasSmtp = smtpVars.every((v) => typeof process.env[v] === 'string' && process.env[v] !== '');
     if (!hasMailgun && !hasSmtp) {
       errors.push(
-        'Email is enabled but no email provider is configured. '
-        + 'Set MAILGUN_* or SMTP_* env vars, or set MEDIFORCE_DISABLE_EMAIL=true to start without email.',
+        'Email is enabled but no email provider is configured. ' +
+          'Set MAILGUN_* or SMTP_* env vars, or set MEDIFORCE_DISABLE_EMAIL=true to start without email.',
       );
     }
   }

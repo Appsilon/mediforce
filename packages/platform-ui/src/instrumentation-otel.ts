@@ -39,8 +39,7 @@ class MediforceScopeSpanProcessor implements SpanProcessor {
 export async function initOpenTelemetry(): Promise<void> {
   // Opt-in: no endpoint, no tracing. Phoenix dev default:
   // OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:6006
-  if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT === undefined
-    || process.env.OTEL_EXPORTER_OTLP_ENDPOINT === '') {
+  if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT === undefined || process.env.OTEL_EXPORTER_OTLP_ENDPOINT === '') {
     return;
   }
 
@@ -58,14 +57,10 @@ export async function initOpenTelemetry(): Promise<void> {
     resource: resourceFromAttributes({
       'service.name': process.env.OTEL_SERVICE_NAME ?? 'mediforce-platform',
     }),
-    spanProcessors: [
-      exportAllScopes ? batchProcessor : new MediforceScopeSpanProcessor(batchProcessor),
-    ],
+    spanProcessors: [exportAllScopes ? batchProcessor : new MediforceScopeSpanProcessor(batchProcessor)],
   });
 
   provider.register();
 
-  console.log(
-    `[otel] trace export enabled → ${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}`,
-  );
+  console.log(`[otel] trace export enabled → ${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}`);
 }

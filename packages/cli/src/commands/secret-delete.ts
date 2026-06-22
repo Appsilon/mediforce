@@ -3,8 +3,7 @@ import { printJson } from '../output';
 
 export const secretDeleteCommand = defineCommand({
   name: 'mediforce secret delete',
-  description:
-    'Delete a single secret. Without --workflow, deletes a workspace-level secret.',
+  description: 'Delete a single secret. Without --workflow, deletes a workspace-level secret.',
   args: {
     namespace: { type: 'string', required: true, description: 'Namespace handle' },
     key: { type: 'string', required: true, description: 'Secret key name to delete' },
@@ -19,9 +18,10 @@ export const secretDeleteCommand = defineCommand({
     if (jsonMode) {
       printJson(output, { ok: true });
     } else {
-      const scope = args.workflow !== undefined
-        ? `workflow "${args.workflow}" in namespace "${args.namespace}"`
-        : `namespace "${args.namespace}"`;
+      const scope =
+        args.workflow !== undefined
+          ? `workflow "${args.workflow}" in namespace "${args.namespace}"`
+          : `namespace "${args.namespace}"`;
       output.stdout(`Secret "${args.key}" deleted from ${scope}.`);
     }
     return 0;

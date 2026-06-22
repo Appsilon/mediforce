@@ -34,12 +34,7 @@ interface InlineScriptEditorProps {
   readOnly?: boolean;
 }
 
-export function InlineScriptEditor({
-  value,
-  runtime,
-  onChange,
-  readOnly = false,
-}: InlineScriptEditorProps) {
+export function InlineScriptEditor({ value, runtime, onChange, readOnly = false }: InlineScriptEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -90,14 +85,11 @@ export function InlineScriptEditor({
 
   return (
     <div className="space-y-1">
-      <div
-        ref={containerRef}
-        className="rounded-md border overflow-hidden [&_.cm-editor]:outline-none"
-      />
+      <div ref={containerRef} className="rounded-md border overflow-hidden [&_.cm-editor]:outline-none" />
       {showWarning && (
         <p className="text-xs text-amber-600">
-          Script is {Math.round(value.length / 1000)}KB — consider moving to a
-          file in the app&apos;s scripts/ directory for easier testing and version control.
+          Script is {Math.round(value.length / 1000)}KB — consider moving to a file in the app&apos;s scripts/ directory
+          for easier testing and version control.
         </p>
       )}
     </div>

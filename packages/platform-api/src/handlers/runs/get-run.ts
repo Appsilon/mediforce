@@ -15,10 +15,7 @@ import type { InstanceStatus } from '@mediforce/platform-core';
  * one round-trip. Best-effort: a missing or invisible definition collapses
  * to `null`.
  */
-export async function getRun(
-  input: GetRunInput,
-  scope: CallerScope,
-): Promise<GetRunOutput> {
+export async function getRun(input: GetRunInput, scope: CallerScope): Promise<GetRunOutput> {
   const run = await scope.runs.getById(input.runId);
   if (run === null) {
     throw new NotFoundError(`Run ${input.runId} not found`);
@@ -40,11 +37,7 @@ export async function getRun(
   };
 }
 
-async function resolveFinalOutput(
-  status: InstanceStatus,
-  runId: string,
-  scope: CallerScope,
-): Promise<unknown> {
+async function resolveFinalOutput(status: InstanceStatus, runId: string, scope: CallerScope): Promise<unknown> {
   if (status !== 'completed' && status !== 'failed') return null;
   const executions = await scope.runs.getStepExecutions(runId);
   // Why: walk in reverse insertion order — repository preserves execution
@@ -65,10 +58,6 @@ async function resolveDefinitionNamespace(
 ): Promise<string | null> {
   const versionNumber = Number(run.definitionVersion);
   if (!Number.isInteger(versionNumber) || versionNumber <= 0) return null;
-  const def = await scope.workflowDefinitions.get(
-    run.namespace ?? '',
-    run.definitionName,
-    versionNumber,
-  );
+  const def = await scope.workflowDefinitions.get(run.namespace ?? '', run.definitionName, versionNumber);
   return def?.namespace ?? null;
 }

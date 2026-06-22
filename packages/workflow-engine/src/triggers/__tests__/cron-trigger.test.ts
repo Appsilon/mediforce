@@ -25,14 +25,9 @@ describe('CronTrigger', () => {
 
     expect(result).toEqual({ instanceId: 'inst-123', status: 'created' });
 
-    expect(engine.createInstance).toHaveBeenCalledWith(
-      'test',
-      'community-digest',
-      1,
-      'cron-heartbeat',
-      'cron',
-      { schedule: '0 9 * * 1' },
-    );
+    expect(engine.createInstance).toHaveBeenCalledWith('test', 'community-digest', 1, 'cron-heartbeat', 'cron', {
+      schedule: '0 9 * * 1',
+    });
 
     expect(engine.startInstance).toHaveBeenCalledWith('inst-123');
   });

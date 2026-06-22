@@ -17,14 +17,9 @@ export const workflowListCommand = defineCommand({
     }
     output.stdout(`Found ${String(result.definitions.length)} workflow(s):`);
     for (const group of result.definitions) {
-      const defaultLabel =
-        group.defaultVersion === null
-          ? 'no default'
-          : `default: v${String(group.defaultVersion)}`;
+      const defaultLabel = group.defaultVersion === null ? 'no default' : `default: v${String(group.defaultVersion)}`;
       const visibility = group.definition?.visibility ?? 'private';
-      output.stdout(
-        `  ${group.name}  latest: v${String(group.latestVersion)}  (${defaultLabel})  [${visibility}]`,
-      );
+      output.stdout(`  ${group.name}  latest: v${String(group.latestVersion)}  (${defaultLabel})  [${visibility}]`);
     }
     return 0;
   },

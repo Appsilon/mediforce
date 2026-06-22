@@ -7,9 +7,7 @@ import { formatStepName } from '@/lib/format';
 // ActionItem — unified wrapper for things that appear in the task queue
 // ---------------------------------------------------------------------------
 
-export type ActionItem =
-  | { kind: 'task'; data: HumanTask }
-  | { kind: 'cowork'; data: CoworkSession };
+export type ActionItem = { kind: 'task'; data: HumanTask } | { kind: 'cowork'; data: CoworkSession };
 
 /** Common accessors so rendering code doesn't need to discriminate everywhere. */
 export function getItemId(item: ActionItem): string {

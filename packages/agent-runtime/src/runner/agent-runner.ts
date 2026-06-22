@@ -15,11 +15,7 @@ import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext } from '../
 import type { AgentEventLog } from './agent-event-log';
 import { FallbackHandler } from './fallback-handler';
 import { PluginRunner } from './plugin-runner';
-import {
-  annotateAgentRunSpan,
-  withAgentRunSpan,
-  type OpenTelemetryTracingOptions,
-} from './tracing';
+import { annotateAgentRunSpan, withAgentRunSpan, type OpenTelemetryTracingOptions } from './tracing';
 
 export interface AgentRunResult {
   status: AgentRunStatus;
@@ -58,8 +54,7 @@ export class AgentRunner {
       appliedToWorkflow: result.appliedToWorkflow,
       fallbackReason: result.fallbackReason,
       envelopeModel,
-      capturedResult:
-        this.tracingOptions.captureContent === true ? result.envelope?.result : undefined,
+      capturedResult: this.tracingOptions.captureContent === true ? result.envelope?.result : undefined,
     });
     if (this.agentRunRepository) {
       await this.agentRunRepository.create({
@@ -83,10 +78,7 @@ export class AgentRunner {
    * or step.script / step.databricks (deterministic plugins), plus
    * step.autonomyLevel / step.plugin; timeout via resolveStepTimeoutMinutes.
    */
-  async runWithWorkflowStep(
-    plugin: StepExecutorPlugin,
-    context: WorkflowAgentContext,
-  ): Promise<AgentRunResult> {
+  async runWithWorkflowStep(plugin: StepExecutorPlugin, context: WorkflowAgentContext): Promise<AgentRunResult> {
     const startedAt = Date.now();
     const { processInstanceId, stepId, autonomyLevel } = context;
     const runId = randomUUID();
@@ -109,9 +101,7 @@ export class AgentRunner {
       }
 
       const timeoutMs = resolveStepTimeoutMinutes(context.step) * 60_000;
-      const { resultPayload, timedOut, errorMessage } = await this.pluginRunner.execute(
-        plugin, context, timeoutMs,
-      );
+      const { resultPayload, timedOut, errorMessage } = await this.pluginRunner.execute(plugin, context, timeoutMs);
 
       let fallbackReason: 'timeout' | 'low_confidence' | 'error' | null = null;
       let envelope: AgentOutputEnvelope | null = null;
@@ -144,9 +134,19 @@ export class AgentRunner {
           envelope,
         );
         const duration_ms = Date.now() - startedAt;
-        await this.appendAuditEventFromWorkflowStep(context, envelope, fallbackResult.status, duration_ms, errorMessage);
+        await this.appendAuditEventFromWorkflowStep(
+          context,
+          envelope,
+          fallbackResult.status,
+          duration_ms,
+          errorMessage,
+        );
         await this.recordTerminalRun(
-          span, runId, context, startedAt, { ...fallbackResult, errorMessage },
+          span,
+          runId,
+          context,
+          startedAt,
+          { ...fallbackResult, errorMessage },
           fallbackResult.envelope?.model ?? envelope?.model ?? null,
         );
         return { ...fallbackResult, errorMessage };
@@ -155,10 +155,7 @@ export class AgentRunner {
       const result = await this.applyAutonomyBehaviorForWorkflowStep(autonomyLevel, envelope!, context);
       const duration_ms = Date.now() - startedAt;
       await this.appendAuditEventFromWorkflowStep(context, envelope!, result.status, duration_ms);
-      await this.recordTerminalRun(
-        span, runId, context, startedAt, result,
-        result.envelope?.model ?? envelope!.model,
-      );
+      await this.recordTerminalRun(span, runId, context, startedAt, result, result.envelope?.model ?? envelope!.model);
       return result;
     });
   }
@@ -167,11 +164,7 @@ export class AgentRunner {
    * @deprecated Use runWithWorkflowStep instead. This method relies on the legacy
    * StepConfig model which is being replaced by WorkflowStep.
    */
-  async run(
-    plugin: StepExecutorPlugin,
-    context: AgentContext,
-    stepConfig: StepConfig,
-  ): Promise<AgentRunResult> {
+  async run(plugin: StepExecutorPlugin, context: AgentContext, stepConfig: StepConfig): Promise<AgentRunResult> {
     const startedAt = Date.now();
     const { processInstanceId, stepId, autonomyLevel } = context;
     const runId = randomUUID();
@@ -193,9 +186,7 @@ export class AgentRunner {
     }
 
     const timeoutMs = (stepConfig.timeoutMinutes ?? 30) * 60_000;
-    const { resultPayload, timedOut, errorMessage } = await this.pluginRunner.execute(
-      plugin, context, timeoutMs,
-    );
+    const { resultPayload, timedOut, errorMessage } = await this.pluginRunner.execute(plugin, context, timeoutMs);
 
     let fallbackReason: 'timeout' | 'low_confidence' | 'error' | null = null;
     let envelope: AgentOutputEnvelope | null = null;
@@ -322,11 +313,12 @@ export class AgentRunner {
   ): Promise<void> {
     const pluginId = context.step.plugin ?? context.stepId;
     const isScript = context.step.executor === 'script';
-    const reviewerType = context.autonomyLevel === 'L4'
-      ? 'none'
-      : context.autonomyLevel === 'L3'
-        ? (context.step.review?.type ?? 'human')
-        : 'none';
+    const reviewerType =
+      context.autonomyLevel === 'L4'
+        ? 'none'
+        : context.autonomyLevel === 'L3'
+          ? (context.step.review?.type ?? 'human')
+          : 'none';
 
     await this.auditRepository.append({
       actorId: `${isScript ? 'script' : 'agent'}:${pluginId}`,
@@ -445,11 +437,12 @@ export class AgentRunner {
     duration_ms: number,
     errorMessage: string | null = null,
   ): Promise<void> {
-    const reviewerType = context.autonomyLevel === 'L4'
-      ? 'none'
-      : context.autonomyLevel === 'L3'
-        ? (stepConfig.reviewerType ?? 'human')
-        : 'none';
+    const reviewerType =
+      context.autonomyLevel === 'L4'
+        ? 'none'
+        : context.autonomyLevel === 'L3'
+          ? (stepConfig.reviewerType ?? 'human')
+          : 'none';
 
     await this.auditRepository.append({
       actorId: `agent:${stepConfig.plugin ?? context.stepId}`,

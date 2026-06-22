@@ -11,14 +11,8 @@ export const sampleProviderInput: CreateOAuthProviderInput = {
   scopes: ['repo', 'read:user'],
 };
 
-export const adminRoles = new Map<string, 'owner' | 'admin' | 'member'>([
-  ['alpha', 'admin'],
-]);
+export const adminRoles = new Map<string, 'owner' | 'admin' | 'member'>([['alpha', 'admin']]);
 
-export const ownerRoles = new Map<string, 'owner' | 'admin' | 'member'>([
-  ['alpha', 'owner'],
-]);
+export const ownerRoles = new Map<string, 'owner' | 'admin' | 'member'>([['alpha', 'owner']]);
 
-export const memberRoles = new Map<string, 'owner' | 'admin' | 'member'>([
-  ['alpha', 'member'],
-]);
+export const memberRoles = new Map<string, 'owner' | 'admin' | 'member'>([['alpha', 'member']]);

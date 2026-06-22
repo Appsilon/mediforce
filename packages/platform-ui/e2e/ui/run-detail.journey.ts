@@ -73,7 +73,9 @@ test.describe('Run Detail Journey', () => {
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-workflow-run-1`);
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
 
-    const wfHistoryPanel = page.locator('.bg-card').filter({ has: page.locator('h3', { hasText: 'Execution History' }) });
+    const wfHistoryPanel = page
+      .locator('.bg-card')
+      .filter({ has: page.locator('h3', { hasText: 'Execution History' }) });
     await expect(wfHistoryPanel.locator('ol > li').first()).toBeVisible({ timeout: 10_000 });
 
     // Virtual row shows the current step name and WD-sourced autonomy badge (narrative-summary → L3)

@@ -62,7 +62,13 @@ describe('runPreflightChecks', () => {
 
   it('Configure build source falls back to workflow page when version unknown', () => {
     const wd = makeDefinition({ image: 'bad:v1' });
-    const result = runPreflightChecks(wd, { handle: 'acme', workflowName: 'my-wf', dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
+    const result = runPreflightChecks(wd, {
+      handle: 'acme',
+      workflowName: 'my-wf',
+      dockerImages: IMAGES,
+      dockerAvailable: true,
+      secretKeys: [],
+    });
     const action = result[0].actions.find((a) => a.label === 'Configure build source');
     expect(action?.href).toBe('/acme/workflows/my-wf');
   });
@@ -94,7 +100,12 @@ describe('runPreflightChecks', () => {
 
   it('no warning when secret is configured', () => {
     const wd = makeDefinition({ env: { API_KEY: '{{MY_SECRET}}' } });
-    const result = runPreflightChecks(wd, { ...BASE_CTX, dockerImages: IMAGES, dockerAvailable: true, secretKeys: ['MY_SECRET'] });
+    const result = runPreflightChecks(wd, {
+      ...BASE_CTX,
+      dockerImages: IMAGES,
+      dockerAvailable: true,
+      secretKeys: ['MY_SECRET'],
+    });
     expect(result.filter((w) => w.category === 'missing-secret')).toEqual([]);
   });
 

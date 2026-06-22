@@ -113,10 +113,7 @@ describe('workflow register command', () => {
     expect(Array.isArray(issues)).toBe(true);
     expect(
       issues.some(
-        (issue) =>
-          Array.isArray(issue.path) &&
-          issue.path[0] === 'inputForNextRun' &&
-          issue.path[2] === 'stepId',
+        (issue) => Array.isArray(issue.path) && issue.path[0] === 'inputForNextRun' && issue.path[2] === 'stepId',
       ),
     ).toBe(true);
   });
@@ -127,14 +124,7 @@ describe('workflow register command', () => {
       .mockResolvedValue(jsonResponse({ success: true, name: 'sample-wf', version: 1 }, 201));
     const output = captureOutput();
     const code = await workflowRegisterCommand({
-      argv: [
-        '--file',
-        wdFile,
-        '--namespace',
-        'Appsilon',
-        '--base-url',
-        'http://localhost:9999',
-      ],
+      argv: ['--file', wdFile, '--namespace', 'Appsilon', '--base-url', 'http://localhost:9999'],
       env: { MEDIFORCE_API_KEY: 'secret' },
       output,
     });
@@ -163,9 +153,7 @@ describe('workflow register command', () => {
   });
 
   it('exits 1 with API-error JSON shape on non-2xx', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Validation failed' }, 400),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Validation failed' }, 400));
     const output = captureOutput();
     const code = await workflowRegisterCommand({
       argv: ['--file', wdFile, '--namespace', 'Appsilon', '--json'],
@@ -186,9 +174,7 @@ describe('workflow register command', () => {
     const imgFile = path.join(tempDir, 'img-workflow.json');
     await writeFile(imgFile, JSON.stringify(body), 'utf-8');
 
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ success: true, name: 'img-wf', version: 1 }, 201),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ success: true, name: 'img-wf', version: 1 }, 201));
 
     const output = captureOutput();
     const code = await workflowRegisterCommand({

@@ -25,10 +25,7 @@ describe('waitActionHandler', () => {
 
   describe('duration mode', () => {
     it('returns __wait sentinel with correct resumeAt for hours', async () => {
-      const output = await waitActionHandler(
-        { duration: { hours: 2 } },
-        baseCtx,
-      );
+      const output = await waitActionHandler({ duration: { hours: 2 } }, baseCtx);
 
       expect(isWaitSentinel(output)).toBe(true);
       const sentinel = output as unknown as WaitSentinel;
@@ -40,10 +37,7 @@ describe('waitActionHandler', () => {
     });
 
     it('computes resumeAt from mixed duration fields', async () => {
-      const output = await waitActionHandler(
-        { duration: { hours: 1, minutes: 30, seconds: 45 } },
-        baseCtx,
-      );
+      const output = await waitActionHandler({ duration: { hours: 1, minutes: 30, seconds: 45 } }, baseCtx);
 
       const sentinel = output as unknown as WaitSentinel;
       const expected = new Date('2026-06-01T12:00:00.000Z');
@@ -64,10 +58,7 @@ describe('waitActionHandler', () => {
 
   describe('deadline mode', () => {
     it('returns __wait sentinel for future deadline', async () => {
-      const output = await waitActionHandler(
-        { deadline: '2026-06-02T00:00:00.000Z' },
-        baseCtx,
-      );
+      const output = await waitActionHandler({ deadline: '2026-06-02T00:00:00.000Z' }, baseCtx);
 
       expect(isWaitSentinel(output)).toBe(true);
       const sentinel = output as unknown as WaitSentinel;
@@ -76,10 +67,7 @@ describe('waitActionHandler', () => {
     });
 
     it('returns immediate result for past deadline', async () => {
-      const output = await waitActionHandler(
-        { deadline: '2026-05-31T00:00:00.000Z' },
-        baseCtx,
-      );
+      const output = await waitActionHandler({ deadline: '2026-05-31T00:00:00.000Z' }, baseCtx);
 
       expect(isWaitSentinel(output)).toBe(false);
       expect(output).toEqual({
@@ -90,19 +78,16 @@ describe('waitActionHandler', () => {
     });
 
     it('returns immediate result for deadline equal to now', async () => {
-      const output = await waitActionHandler(
-        { deadline: '2026-06-01T12:00:00.000Z' },
-        baseCtx,
-      );
+      const output = await waitActionHandler({ deadline: '2026-06-01T12:00:00.000Z' }, baseCtx);
 
       expect(isWaitSentinel(output)).toBe(false);
       expect(output).toMatchObject({ resumeReason: 'deadline_reached', waitedSeconds: 0 });
     });
 
     it('throws on invalid deadline string', async () => {
-      await expect(
-        waitActionHandler({ deadline: 'not-a-date' }, baseCtx),
-      ).rejects.toThrow("Invalid deadline: 'not-a-date'");
+      await expect(waitActionHandler({ deadline: 'not-a-date' }, baseCtx)).rejects.toThrow(
+        "Invalid deadline: 'not-a-date'",
+      );
     });
 
     it('includes condition in sentinel for future deadline', async () => {
@@ -119,9 +104,11 @@ describe('waitActionHandler', () => {
 
 describe('isWaitSentinel', () => {
   it('returns true for valid sentinel', () => {
-    expect(isWaitSentinel({
-      __wait: { stepId: 's1', resumeAt: '2026-06-01T00:00:00Z', pausedAt: '2026-06-01T00:00:00Z' },
-    })).toBe(true);
+    expect(
+      isWaitSentinel({
+        __wait: { stepId: 's1', resumeAt: '2026-06-01T00:00:00Z', pausedAt: '2026-06-01T00:00:00Z' },
+      }),
+    ).toBe(true);
   });
 
   it('returns false for regular output', () => {

@@ -115,10 +115,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[tickets] GitHub API error:', response.status, errorText);
-      return NextResponse.json(
-        { error: `GitHub API returned ${response.status}` },
-        { status: 502 },
-      );
+      return NextResponse.json({ error: `GitHub API returned ${response.status}` }, { status: 502 });
     }
 
     const data = (await response.json()) as { number: number; html_url: string };

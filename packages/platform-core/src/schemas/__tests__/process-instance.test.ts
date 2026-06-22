@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  ProcessInstanceSchema,
-  InstanceStatusSchema,
-  RunNameEntrySchema,
-} from '../process-instance';
+import { ProcessInstanceSchema, InstanceStatusSchema, RunNameEntrySchema } from '../process-instance';
 
 const validInstance = {
   id: 'pi-001',
@@ -101,7 +97,7 @@ describe('ProcessInstanceSchema', () => {
       ...validInstance,
       variables: {
         'collect-data': { patientId: 'P-001', labResults: [1, 2, 3] },
-        'review': { verdict: 'approved' },
+        review: { verdict: 'approved' },
       },
     };
     const result = ProcessInstanceSchema.safeParse(withVars);

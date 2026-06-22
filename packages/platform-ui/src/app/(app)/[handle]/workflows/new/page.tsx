@@ -8,7 +8,12 @@ import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { mediforce, ApiError } from '@/lib/mediforce';
-import { parseStepErrors, validateSteps, mergeVerdictTransitions, toastRegistrationWarnings } from '@/lib/workflow-save-utils';
+import {
+  parseStepErrors,
+  validateSteps,
+  mergeVerdictTransitions,
+  toastRegistrationWarnings,
+} from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
@@ -57,7 +62,10 @@ type SaveState =
   | { status: 'error'; message: string };
 
 function toWorkflowId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 export default function NewWorkflowPage() {
@@ -79,81 +87,86 @@ export default function NewWorkflowPage() {
   const currentTransitionsRef = useRef<WorkflowDefinition['transitions']>(TEMPLATE_TRANSITIONS);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => { if (redirectTimerRef.current !== null) clearTimeout(redirectTimerRef.current); }, []);
-
-  const handleCanvasChange = useCallback(
-    (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => {
-      currentStepsRef.current = steps;
-      currentTransitionsRef.current = transitions;
+  useEffect(
+    () => () => {
+      if (redirectTimerRef.current !== null) clearTimeout(redirectTimerRef.current);
     },
     [],
   );
 
+  const handleCanvasChange = useCallback((steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => {
+    currentStepsRef.current = steps;
+    currentTransitionsRef.current = transitions;
+  }, []);
+
   // Auto-select first namespace when namespaces load
   const effectiveNamespace = namespace || namespaces[0]?.handle || '';
 
-  const handleSave = useCallback(async (versionTitle: string) => {
-    const steps = currentStepsRef.current;
-    const transitions = currentTransitionsRef.current;
-    const workflowId = toWorkflowId(workflowName);
-    if (!workflowId) {
+  const handleSave = useCallback(
+    async (versionTitle: string) => {
+      const steps = currentStepsRef.current;
+      const transitions = currentTransitionsRef.current;
+      const workflowId = toWorkflowId(workflowName);
+      if (!workflowId) {
+        setDialogOpen(false);
+        setSaveState({ status: 'error', message: 'Workflow name is required.' });
+        return;
+      }
+      if (!description.trim()) {
+        setDialogOpen(false);
+        setSaveState({ status: 'error', message: 'Description is required.' });
+        return;
+      }
+
+      const validationError = validateSteps(steps);
+      if (validationError !== null) {
+        setDialogOpen(false);
+        setSaveState({ status: 'error', message: validationError });
+        return;
+      }
+
       setDialogOpen(false);
-      setSaveState({ status: 'error', message: 'Workflow name is required.' });
-      return;
-    }
-    if (!description.trim()) {
-      setDialogOpen(false);
-      setSaveState({ status: 'error', message: 'Description is required.' });
-      return;
-    }
+      setStepErrors({});
+      setSaveState({ status: 'saving' });
 
-    const validationError = validateSteps(steps);
-    if (validationError !== null) {
-      setDialogOpen(false);
-      setSaveState({ status: 'error', message: validationError });
-      return;
-    }
+      const mergedTransitions = mergeVerdictTransitions(steps, transitions);
 
-    setDialogOpen(false);
-    setStepErrors({});
-    setSaveState({ status: 'saving' });
-
-    const mergedTransitions = mergeVerdictTransitions(steps, transitions);
-
-    try {
-      const result = await mediforce.workflows.register(
-        {
-          name: workflowId,
-          title: versionTitle || undefined,
-          description: description.trim() || undefined,
-          steps,
-          transitions: mergedTransitions,
-          triggers: [{ type: 'manual', name: 'start' }],
-        },
-        { namespace: effectiveNamespace },
-      );
-      setSaveState({ status: 'saved', name: result.name });
-      toastRegistrationWarnings(result.warnings, toast);
-      redirectTimerRef.current = setTimeout(() => {
-        router.push(`/${handle}/workflows/${encodeURIComponent(result.name)}/definitions/${result.version}`);
-      }, 500);
-    } catch (err) {
-      const issues = err instanceof ApiError && Array.isArray(err.details)
-        ? (err.details as Array<{ path: (string | number)[]; message: string }>)
-        : [];
-      const parsed = parseStepErrors(issues, steps);
-      setStepErrors(parsed);
-      const message = err instanceof ApiError ? err.message
-        : err instanceof Error ? err.message : 'Unknown error';
-      setSaveState({
-        status: 'error',
-        message: Object.keys(parsed).length > 0
-          ? 'Some steps have errors — check the highlighted steps in the diagram.'
-          : message,
-      });
-    }
-  }, [workflowName, effectiveNamespace, description, handle, router]);
-
+      try {
+        const result = await mediforce.workflows.register(
+          {
+            name: workflowId,
+            title: versionTitle || undefined,
+            description: description.trim() || undefined,
+            steps,
+            transitions: mergedTransitions,
+            triggers: [{ type: 'manual', name: 'start' }],
+          },
+          { namespace: effectiveNamespace },
+        );
+        setSaveState({ status: 'saved', name: result.name });
+        toastRegistrationWarnings(result.warnings, toast);
+        redirectTimerRef.current = setTimeout(() => {
+          router.push(`/${handle}/workflows/${encodeURIComponent(result.name)}/definitions/${result.version}`);
+        }, 500);
+      } catch (err) {
+        const issues =
+          err instanceof ApiError && Array.isArray(err.details)
+            ? (err.details as Array<{ path: (string | number)[]; message: string }>)
+            : [];
+        const parsed = parseStepErrors(issues, steps);
+        setStepErrors(parsed);
+        const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Unknown error';
+        setSaveState({
+          status: 'error',
+          message:
+            Object.keys(parsed).length > 0
+              ? 'Some steps have errors — check the highlighted steps in the diagram.'
+              : message,
+        });
+      }
+    },
+    [workflowName, effectiveNamespace, description, handle, router],
+  );
 
   const yamlFields: Record<string, unknown> = {
     name: toWorkflowId(workflowName) || 'my-workflow',
@@ -196,7 +209,9 @@ export default function NewWorkflowPage() {
                   <option value="">Loading…</option>
                 ) : (
                   namespaces.map((ns) => (
-                    <option key={ns.handle} value={ns.handle}>{ns.handle}</option>
+                    <option key={ns.handle} value={ns.handle}>
+                      {ns.handle}
+                    </option>
                   ))
                 )}
               </select>
@@ -214,9 +229,7 @@ export default function NewWorkflowPage() {
           {/* Right: save controls */}
           <div className="flex items-center gap-2 shrink-0 pt-0.5">
             {saveState.status === 'saved' && (
-              <span className="text-sm text-green-600 dark:text-green-400 font-medium">
-                Created — redirecting…
-              </span>
+              <span className="text-sm text-green-600 dark:text-green-400 font-medium">Created — redirecting…</span>
             )}
             {saveState.status === 'error' && (
               <span className="text-sm text-red-600 dark:text-red-400 max-w-xs truncate" title={saveState.message}>
@@ -227,9 +240,11 @@ export default function NewWorkflowPage() {
               onClick={() => setDialogOpen(true)}
               disabled={!canPublish}
               title={
-                !toWorkflowId(workflowName) ? 'Enter a workflow name to publish' :
-                !description.trim() ? 'Add a description to publish' :
-                undefined
+                !toWorkflowId(workflowName)
+                  ? 'Enter a workflow name to publish'
+                  : !description.trim()
+                    ? 'Add a description to publish'
+                    : undefined
               }
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',

@@ -29,13 +29,10 @@ function base64urlDecode(value: string): Uint8Array {
 async function hmacSha256(secret: string, message: string): Promise<Uint8Array> {
   const keyBytes = new TextEncoder().encode(secret);
   const messageBytes = new TextEncoder().encode(message);
-  const key = await crypto.subtle.importKey(
-    'raw',
-    keyBytes,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign', 'verify'],
-  );
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, [
+    'sign',
+    'verify',
+  ]);
   const signature = await crypto.subtle.sign('HMAC', key, messageBytes);
   return new Uint8Array(signature);
 }
@@ -70,10 +67,7 @@ export interface OAuthStatePayload {
 
 /** Sign a state payload. Caller supplies timestamp + nonce so tests can be
  *  deterministic; wrappers in the API layer generate fresh ones per request. */
-export async function signState(
-  payload: OAuthStatePayload,
-  secret: string,
-): Promise<string> {
+export async function signState(payload: OAuthStatePayload, secret: string): Promise<string> {
   const payloadJson = JSON.stringify(payload);
   const encodedPayload = base64urlEncode(new TextEncoder().encode(payloadJson));
   const signature = await hmacSha256(secret, encodedPayload);
@@ -170,10 +164,7 @@ export async function generatePkcePair(): Promise<PkcePair> {
   const verifierBytes = new Uint8Array(32);
   crypto.getRandomValues(verifierBytes);
   const codeVerifier = base64urlEncode(verifierBytes);
-  const digestBuffer = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(codeVerifier),
-  );
+  const digestBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier));
   const codeChallenge = base64urlEncode(new Uint8Array(digestBuffer));
   return { codeVerifier, codeChallenge };
 }

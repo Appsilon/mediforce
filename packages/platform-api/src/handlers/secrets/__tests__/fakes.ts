@@ -1,7 +1,4 @@
-import type {
-  NamespaceSecretsRepository,
-  WorkflowSecretsRepository,
-} from '@mediforce/platform-core';
+import type { NamespaceSecretsRepository, WorkflowSecretsRepository } from '@mediforce/platform-core';
 
 /**
  * Minimal in-memory `NamespaceSecretsRepository` for handler tests. Reads off
@@ -42,9 +39,7 @@ export function buildNamespaceSecretsRepo(
 export function buildWorkflowSecretsRepo(
   seed: Record<string, Record<string, Record<string, string>>> = {},
 ): WorkflowSecretsRepository {
-  const store: Record<string, Record<string, Record<string, string>>> = JSON.parse(
-    JSON.stringify(seed),
-  );
+  const store: Record<string, Record<string, Record<string, string>>> = JSON.parse(JSON.stringify(seed));
   return {
     async getSecrets(namespace, workflow) {
       return { ...((store[namespace] ?? {})[workflow] ?? {}) };

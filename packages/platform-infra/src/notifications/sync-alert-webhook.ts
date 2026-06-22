@@ -75,9 +75,7 @@ export async function sendSyncFailureWebhook(
  * Sends a test webhook notification.
  * Returns { ok: true } on success, { ok: false, error } on failure.
  */
-export async function sendTestWebhook(
-  settingsRepo: PlatformSettingsRepository,
-): Promise<TestWebhookResult> {
+export async function sendTestWebhook(settingsRepo: PlatformSettingsRepository): Promise<TestWebhookResult> {
   const [url, type] = await Promise.all([
     settingsRepo.get('alert.webhook.url'),
     settingsRepo.get('alert.webhook.type'),

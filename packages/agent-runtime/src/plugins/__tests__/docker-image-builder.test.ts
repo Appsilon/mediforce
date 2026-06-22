@@ -12,12 +12,7 @@ vi.mock('node:fs/promises', () => ({
 
 import { execSync, spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
-import {
-  imageExistsLocally,
-  getImageBuildCommit,
-  buildImageFromRepo,
-  ensureImage,
-} from '../docker-image-builder';
+import { imageExistsLocally, getImageBuildCommit, buildImageFromRepo, ensureImage } from '../docker-image-builder';
 
 const execSyncMock = vi.mocked(execSync);
 const mkdtempMock = vi.mocked(mkdtemp);
@@ -34,10 +29,7 @@ describe('imageExistsLocally', () => {
     execSyncMock.mockReturnValueOnce(Buffer.from(''));
     const result = await imageExistsLocally('my-image:latest');
     expect(result).toBe(true);
-    expect(execSyncMock).toHaveBeenCalledWith(
-      expect.stringContaining('docker image inspect'),
-      expect.anything(),
-    );
+    expect(execSyncMock).toHaveBeenCalledWith(expect.stringContaining('docker image inspect'), expect.anything());
   });
 
   it('returns false when docker image inspect fails', async () => {
@@ -91,11 +83,12 @@ describe('buildImageFromRepo', () => {
     expect(calls.some((cmd) => cmd.includes('checkout FETCH_HEAD'))).toBe(true);
 
     // Should docker build with label
-    expect(calls.some((cmd) =>
-      cmd.includes('docker build') &&
-      cmd.includes('test-image') &&
-      cmd.includes('mediforce.build.commit=abc123'),
-    )).toBe(true);
+    expect(
+      calls.some(
+        (cmd) =>
+          cmd.includes('docker build') && cmd.includes('test-image') && cmd.includes('mediforce.build.commit=abc123'),
+      ),
+    ).toBe(true);
 
     // Should cleanup temp dir
     expect(rmMock).toHaveBeenCalledWith('/tmp/mediforce-build-abc', { recursive: true, force: true });
@@ -112,9 +105,7 @@ describe('buildImageFromRepo', () => {
     });
 
     const calls = execSyncMock.mock.calls.map(([cmd]) => String(cmd));
-    expect(calls.some((cmd) =>
-      cmd.includes('docker build') && cmd.includes('container/Dockerfile'),
-    )).toBe(true);
+    expect(calls.some((cmd) => cmd.includes('docker build') && cmd.includes('container/Dockerfile'))).toBe(true);
   });
 
   it('defaults to Dockerfile in repo root', async () => {
@@ -213,9 +204,7 @@ describe('ensureImage', () => {
       throw new Error('No such image');
     });
 
-    await expect(
-      ensureImage({ image: 'test-image' }),
-    ).rejects.toThrow(/not found locally.*no repo.*commit/i);
+    await expect(ensureImage({ image: 'test-image' })).rejects.toThrow(/not found locally.*no repo.*commit/i);
   });
 
   it('succeeds when image exists and no repo+commit (no stale check possible)', async () => {

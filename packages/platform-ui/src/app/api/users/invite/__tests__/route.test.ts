@@ -118,10 +118,7 @@ describe('POST /api/users/invite', () => {
       isExisting: false,
     });
     expect(mockCreateInvitedUser).toHaveBeenCalledWith('newbie@example.test', undefined);
-    expect(mockAddMember).toHaveBeenCalledWith(
-      'alpha',
-      expect.objectContaining({ uid: 'uid-new', role: 'member' }),
-    );
+    expect(mockAddMember).toHaveBeenCalledWith('alpha', expect.objectContaining({ uid: 'uid-new', role: 'member' }));
     expect(mockSendInviteEmail).toHaveBeenCalled();
   });
 
@@ -152,9 +149,7 @@ describe('POST /api/users/invite', () => {
     // The route adapter checks `callerOrResponse instanceof NextResponse`, so
     // return a NextResponse-shaped object from the mock.
     const { NextResponse } = await import('next/server');
-    mockResolveCallerIdentity.mockResolvedValueOnce(
-      NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-    );
+    mockResolveCallerIdentity.mockResolvedValueOnce(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
 
     const res = await POST(makePostRequest(validBody));
 

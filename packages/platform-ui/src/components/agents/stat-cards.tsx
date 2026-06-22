@@ -51,10 +51,7 @@ export function StatCards({ runs, loading }: StatCardsProps) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
       {stats.map((stat) => (
-        <div
-          key={stat.label}
-          className={`rounded-lg border bg-card p-4 border-l-4 ${stat.borderColor}`}
-        >
+        <div key={stat.label} className={`rounded-lg border bg-card p-4 border-l-4 ${stat.borderColor}`}>
           <p className="text-xs text-muted-foreground">{stat.label}</p>
           <p className="text-2xl font-semibold mt-1">{stat.value}</p>
         </div>

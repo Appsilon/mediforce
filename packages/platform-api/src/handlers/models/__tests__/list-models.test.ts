@@ -30,7 +30,9 @@ describe('listModels handler', () => {
   beforeEach(async () => {
     repo = new InMemoryModelRegistryRepository();
     await repo.upsert(makeEntry({ id: 'anthropic/claude-sonnet-4', contextLength: 200000, supportsVision: true }));
-    await repo.upsert(makeEntry({ id: 'deepseek/deepseek-chat', provider: 'deepseek', contextLength: 64000, supportsTools: false }));
+    await repo.upsert(
+      makeEntry({ id: 'deepseek/deepseek-chat', provider: 'deepseek', contextLength: 64000, supportsTools: false }),
+    );
     await repo.upsert(makeEntry({ id: 'openai/gpt-4o', provider: 'openai', supportsVision: true }));
   });
 

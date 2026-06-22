@@ -1,12 +1,6 @@
 import { z } from 'zod';
 
-export const InstanceStatusSchema = z.enum([
-  'created',
-  'running',
-  'paused',
-  'completed',
-  'failed',
-]);
+export const InstanceStatusSchema = z.enum(['created', 'running', 'paused', 'completed', 'failed']);
 
 export const ProcessInstanceSchema = z.object({
   id: z.string().min(1),

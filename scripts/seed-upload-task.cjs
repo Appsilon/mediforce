@@ -55,7 +55,7 @@ function request(method, urlPath, body) {
     };
     const req = https.request(options, (res) => {
       let data = '';
-      res.on('data', (chunk) => data += chunk);
+      res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
         if (res.statusCode >= 400) {
           reject(new Error(`HTTP ${res.statusCode}: ${data}`));

@@ -18,9 +18,7 @@ test.describe('WD.workspace API journey', () => {
     const wd = {
       name: uniqueName,
       description: 'API journey test — workspace round-trip',
-      steps: [
-        { id: 'noop', name: 'No-op Human Step', type: 'creation', executor: 'human' },
-      ],
+      steps: [{ id: 'noop', name: 'No-op Human Step', type: 'creation', executor: 'human' }],
       transitions: [],
       triggers: [{ type: 'manual', name: 'start' }],
       workspace: {
@@ -29,10 +27,10 @@ test.describe('WD.workspace API journey', () => {
       },
     };
 
-    const createRes = await request.post(
-      `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
-      { headers: authHeaders, data: wd },
-    );
+    const createRes = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
+      headers: authHeaders,
+      data: wd,
+    });
     expect(createRes.status(), await createRes.text()).toBe(201);
     const created = await createRes.json();
     expect(created.name).toBe(uniqueName);
@@ -57,17 +55,15 @@ test.describe('WD.workspace API journey', () => {
     const wd = {
       name: uniqueName,
       description: 'API journey test — no workspace configured',
-      steps: [
-        { id: 'noop', name: 'No-op', type: 'creation', executor: 'human' },
-      ],
+      steps: [{ id: 'noop', name: 'No-op', type: 'creation', executor: 'human' }],
       transitions: [],
       triggers: [{ type: 'manual', name: 'start' }],
     };
 
-    const createRes = await request.post(
-      `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
-      { headers: authHeaders, data: wd },
-    );
+    const createRes = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
+      headers: authHeaders,
+      data: wd,
+    });
     expect(createRes.status()).toBe(201);
 
     const listRes = await request.get('/api/workflow-definitions', { headers: authHeaders });

@@ -25,7 +25,11 @@ function createMockChild(): ChildProcess {
   Object.assign(child, {
     stdout: new Readable({ read() {} }),
     stderr: new Readable({ read() {} }),
-    stdin: new Writable({ write(_chunk, _enc, cb) { cb(); } }),
+    stdin: new Writable({
+      write(_chunk, _enc, cb) {
+        cb();
+      },
+    }),
     pid: 12345,
     killed: false,
     kill: vi.fn(),
@@ -130,9 +134,7 @@ describe('ScriptContainerPlugin', () => {
           processName: 'protocol-to-tfl',
           configName: 'default',
           configVersion: 'v1',
-          stepConfigs: [
-            { stepId: 'run-script', executorType: 'script', plugin: 'script-container' },
-          ],
+          stepConfigs: [{ stepId: 'run-script', executorType: 'script', plugin: 'script-container' }],
         } satisfies ProcessConfig,
       });
       await expect(plugin.initialize(context)).rejects.toThrow(/no script config/i);
@@ -252,7 +254,9 @@ describe('ScriptContainerPlugin', () => {
       const assistantTexts = events
         .filter((e) => e.type === 'assistant')
         .map((e) => (JSON.parse(e.payload as string) as { text: string }).text);
-      expect(assistantTexts.some((t) => t.includes('result.json error: Missing MEDIFORCE_RUN_NAMESPACE env var'))).toBe(true);
+      expect(assistantTexts.some((t) => t.includes('result.json error: Missing MEDIFORCE_RUN_NAMESPACE env var'))).toBe(
+        true,
+      );
     });
 
     it('[DATA] inlineScript mode writes script file and invokes it via runtime cmd', async () => {
@@ -326,9 +330,7 @@ describe('ScriptContainerPlugin', () => {
       const imageIdx = dockerArgs.indexOf('debian:bookworm-slim');
       // These are the mangled tokens — the quotes are left in, shell operators
       // are passed as argv. The bash process will see a nonsense command.
-      expect(dockerArgs.slice(imageIdx + 1)).toEqual([
-        'bash', '-c', '"echo', 'hi', '&&', 'echo', 'bye"',
-      ]);
+      expect(dockerArgs.slice(imageIdx + 1)).toEqual(['bash', '-c', '"echo', 'hi', '&&', 'echo', 'bye"']);
     });
 
     it('[DATA] passes correct docker args including volume mount and command', async () => {
@@ -344,9 +346,12 @@ describe('ScriptContainerPlugin', () => {
       expect(spawnMock).toHaveBeenCalledWith(
         'docker',
         expect.arrayContaining([
-          'run', '--rm',
-          '--memory', '8g',
-          '--cpus', '2',
+          'run',
+          '--rm',
+          '--memory',
+          '8g',
+          '--cpus',
+          '2',
           'mediforce-r:latest',
           'Rscript',
           '/scripts/analyze.R',
@@ -601,9 +606,7 @@ describe('ScriptContainerPlugin', () => {
   });
 
   describe('presentation', () => {
-    async function runWithPresentationFiles(
-      filesToWrite: Record<string, string>,
-    ): Promise<{ events: EmitPayload[] }> {
+    async function runWithPresentationFiles(filesToWrite: Record<string, string>): Promise<{ events: EmitPayload[] }> {
       const context = buildMockContext();
       await plugin.initialize(context);
 

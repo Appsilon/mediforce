@@ -1,9 +1,6 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { getDockerInfo } from '@mediforce/platform-api/handlers';
-import {
-  GetDockerInfoInputSchema,
-  type GetDockerInfoInput,
-} from '@mediforce/platform-api/contract';
+import { GetDockerInfoInputSchema, type GetDockerInfoInput } from '@mediforce/platform-api/contract';
 
 /**
  * GET /api/system/docker-info

@@ -23,10 +23,7 @@ export interface CoworkSessionRepository {
 
   /** Find the most recent active cowork session for a process instance, or null. */
   findMostRecentActive(instanceId: string): Promise<CoworkSession | null>;
-  findMostRecentActiveInNamespaces(
-    instanceId: string,
-    allowed: readonly string[],
-  ): Promise<CoworkSession | null>;
+  findMostRecentActiveInNamespaces(instanceId: string, allowed: readonly string[]): Promise<CoworkSession | null>;
 
   addTurn(sessionId: string, turn: ConversationTurn): Promise<CoworkSession>;
   /**
@@ -36,10 +33,7 @@ export interface CoworkSessionRepository {
    */
   updateTurn(sessionId: string, turnId: string, patch: Partial<ConversationTurn>): Promise<CoworkSession>;
   updateArtifact(sessionId: string, artifact: Record<string, unknown>): Promise<CoworkSession>;
-  updateValidationResult(
-    sessionId: string,
-    result: { valid: boolean; errors: string[] },
-  ): Promise<CoworkSession>;
+  updateValidationResult(sessionId: string, result: { valid: boolean; errors: string[] }): Promise<CoworkSession>;
   updatePresentation(sessionId: string, html: string): Promise<CoworkSession>;
   finalize(sessionId: string, artifact: Record<string, unknown>): Promise<CoworkSession>;
   abandon(sessionId: string): Promise<CoworkSession>;

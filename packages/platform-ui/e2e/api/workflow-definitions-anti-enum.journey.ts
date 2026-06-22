@@ -32,7 +32,7 @@ test.describe('GET /api/workflow-definitions/[name] — visibility 404', () => {
       { headers: apiKeyHeaders() },
     );
     expect(res.status(), await res.text()).toBe(200);
-    const body = await res.json() as { definition: { name: string; namespace: string; visibility?: string } };
+    const body = (await res.json()) as { definition: { name: string; namespace: string; visibility?: string } };
     expect(body.definition.name).toBe(SEEDED_PRIVATE_WD);
     expect(body.definition.namespace).toBe(TEST_ORG_HANDLE);
   });
@@ -43,7 +43,7 @@ test.describe('GET /api/workflow-definitions/[name] — visibility 404', () => {
       { headers: bearerHeaders(callers.outsider) },
     );
     expect(res.status()).toBe(404);
-    const body = await res.json() as { error: { code: string; message: string } };
+    const body = (await res.json()) as { error: { code: string; message: string } };
     expect(body.error.code).toBe('not_found');
     expect(body.error.message).toMatch(/not found/i);
   });

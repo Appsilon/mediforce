@@ -8,10 +8,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import { listAgentEvents } from '../list-agent-events';
 import { NotFoundError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('listAgentEvents handler', () => {
   let agentEventRepo: InMemoryAgentEventRepository;
@@ -21,9 +18,7 @@ describe('listAgentEvents handler', () => {
     resetFactorySequence();
     instanceRepo = new InMemoryProcessInstanceRepository();
     agentEventRepo = new InMemoryAgentEventRepository(instanceRepo);
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }));
     // Seed two steps' worth of events out of sequence order to prove the
     // sort. Append `seq=1` before `seq=0` so insertion order can't accidentally
     // satisfy the assertion.
@@ -67,10 +62,7 @@ describe('listAgentEvents handler', () => {
 
   it('returns events for one step sorted by sequence ASC', async () => {
     const scope = createTestScope({ agentEventRepo, instanceRepo });
-    const result = await listAgentEvents(
-      { instanceId: 'inst-a', stepId: 'step-1' },
-      scope,
-    );
+    const result = await listAgentEvents({ instanceId: 'inst-a', stepId: 'step-1' }, scope);
     // step-1 was seeded with seq=1 first, then seq=0 — sort by sequence.
     expect(result.events.map((e) => e.sequence)).toEqual([0, 1]);
     expect(result.events.map((e) => e.id)).toEqual(['evt-a0', 'evt-a1']);
@@ -88,10 +80,7 @@ describe('listAgentEvents handler', () => {
 
   it('returns only events with sequence > afterSequence (incremental poll)', async () => {
     const scope = createTestScope({ agentEventRepo, instanceRepo });
-    const result = await listAgentEvents(
-      { instanceId: 'inst-a', afterSequence: 0 },
-      scope,
-    );
+    const result = await listAgentEvents({ instanceId: 'inst-a', afterSequence: 0 }, scope);
     // Seeded sequences across the instance: 1, 0, 0 → only seq=1 survives.
     expect(result.events.map((e) => e.sequence)).toEqual([1]);
     expect(result.events.map((e) => e.id)).toEqual(['evt-a1']);
@@ -105,20 +94,14 @@ describe('listAgentEvents handler', () => {
 
   it('scopes afterSequence to a single step', async () => {
     const scope = createTestScope({ agentEventRepo, instanceRepo });
-    const result = await listAgentEvents(
-      { instanceId: 'inst-a', stepId: 'step-1', afterSequence: 0 },
-      scope,
-    );
+    const result = await listAgentEvents({ instanceId: 'inst-a', stepId: 'step-1', afterSequence: 0 }, scope);
     // step-1 holds seq 0 and 1; cursor at 0 leaves only seq=1.
     expect(result.events.map((e) => e.id)).toEqual(['evt-a1']);
   });
 
   it('returns an empty delta when afterSequence is past the latest event', async () => {
     const scope = createTestScope({ agentEventRepo, instanceRepo });
-    const result = await listAgentEvents(
-      { instanceId: 'inst-a', afterSequence: 99 },
-      scope,
-    );
+    const result = await listAgentEvents({ instanceId: 'inst-a', afterSequence: 99 }, scope);
     expect(result.events).toEqual([]);
   });
 
@@ -128,18 +111,13 @@ describe('listAgentEvents handler', () => {
       instanceRepo,
       caller: userCaller('u-1', ['team-alpha']),
     });
-    const result = await listAgentEvents(
-      { instanceId: 'inst-a', afterSequence: 0 },
-      scope,
-    );
+    const result = await listAgentEvents({ instanceId: 'inst-a', afterSequence: 0 }, scope);
     expect(result.events.map((e) => e.id)).toEqual(['evt-a1']);
   });
 
   it('throws NotFoundError when the instance does not exist', async () => {
     const scope = createTestScope({ agentEventRepo, instanceRepo });
-    await expect(
-      listAgentEvents({ instanceId: 'inst-missing' }, scope),
-    ).rejects.toThrow(NotFoundError);
+    await expect(listAgentEvents({ instanceId: 'inst-missing' }, scope)).rejects.toThrow(NotFoundError);
   });
 
   it('throws NotFoundError (not ForbiddenError) for cross-namespace user callers (anti-enumeration)', async () => {
@@ -148,8 +126,6 @@ describe('listAgentEvents handler', () => {
       instanceRepo,
       caller: userCaller('u-2', ['team-beta']),
     });
-    await expect(
-      listAgentEvents({ instanceId: 'inst-a' }, scope),
-    ).rejects.toThrow(NotFoundError);
+    await expect(listAgentEvents({ instanceId: 'inst-a' }, scope)).rejects.toThrow(NotFoundError);
   });
 });

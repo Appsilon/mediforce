@@ -24,7 +24,11 @@ function mkAuditEvent(action: string, description: string, timestamp: string) {
   };
 }
 
-function mkExecution(stepId: string, status: string, opts: { error?: string; verdict?: string; startedAt?: string; completedAt?: string } = {}) {
+function mkExecution(
+  stepId: string,
+  status: string,
+  opts: { error?: string; verdict?: string; startedAt?: string; completedAt?: string } = {},
+) {
   return {
     id: `exec-${stepId}`,
     instanceId: 'run-1',
@@ -57,10 +61,12 @@ const SAMPLE_STEPS = {
       status: 'completed' as const,
       input: null,
       output: null,
-      executions: [mkExecution('step-review', 'completed', {
-        startedAt: '2026-06-01T10:00:00.000Z',
-        completedAt: '2026-06-01T10:00:05.000Z',
-      })],
+      executions: [
+        mkExecution('step-review', 'completed', {
+          startedAt: '2026-06-01T10:00:00.000Z',
+          completedAt: '2026-06-01T10:00:05.000Z',
+        }),
+      ],
     },
     {
       stepId: 'step-approve',
@@ -70,12 +76,14 @@ const SAMPLE_STEPS = {
       status: 'completed' as const,
       input: null,
       output: null,
-      executions: [mkExecution('step-approve', 'failed', {
-        startedAt: '2026-06-01T10:00:06.000Z',
-        completedAt: '2026-06-01T10:00:08.000Z',
-        error: 'rejected by reviewer',
-        verdict: 'reject',
-      })],
+      executions: [
+        mkExecution('step-approve', 'failed', {
+          startedAt: '2026-06-01T10:00:06.000Z',
+          completedAt: '2026-06-01T10:00:08.000Z',
+          error: 'rejected by reviewer',
+          verdict: 'reject',
+        }),
+      ],
     },
   ],
 };

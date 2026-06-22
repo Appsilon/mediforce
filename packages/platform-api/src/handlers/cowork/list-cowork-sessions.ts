@@ -1,9 +1,6 @@
 import type { CoworkSessionStatus } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index';
-import type {
-  ListCoworkSessionsInput,
-  ListCoworkSessionsOutput,
-} from '../../contract/cowork';
+import type { ListCoworkSessionsInput, ListCoworkSessionsOutput } from '../../contract/cowork';
 
 /**
  * List cowork sessions visible to the caller. Workspace gating is enforced by
@@ -20,8 +17,7 @@ export async function listCoworkSessions(
   scope: CallerScope,
 ): Promise<ListCoworkSessionsOutput> {
   const base = await scope.coworkSessions.list({ role: input.role });
-  const statusSet =
-    input.status !== undefined ? new Set<CoworkSessionStatus>(input.status) : null;
+  const statusSet = input.status !== undefined ? new Set<CoworkSessionStatus>(input.status) : null;
   const sessions = statusSet === null ? base : base.filter((s) => statusSet.has(s.status));
   return { sessions };
 }

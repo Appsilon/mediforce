@@ -116,13 +116,7 @@ interface ProviderFormProps {
   submitError?: string | null;
 }
 
-export function ProviderForm({
-  provider,
-  preset,
-  onSubmit,
-  onDelete,
-  submitError,
-}: ProviderFormProps) {
+export function ProviderForm({ provider, preset, onSubmit, onDelete, submitError }: ProviderFormProps) {
   const isEditing = provider !== null;
   const defaultValues = useMemo<ProviderFormValues>(() => {
     if (provider !== null) return valuesFromProvider(provider);

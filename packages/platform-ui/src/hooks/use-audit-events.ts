@@ -26,7 +26,7 @@ export function useAuditEvents(processInstanceId: string | null): {
   const qc = useQueryClient();
   const enabled = processInstanceId !== null && processInstanceId.length > 0;
   const query = useQuery({
-    queryKey: enabled ? queryKeys.audit(processInstanceId) : ['audit', '__noop__'] as const,
+    queryKey: enabled ? queryKeys.audit(processInstanceId) : (['audit', '__noop__'] as const),
     queryFn: async () => {
       const result = await mediforce.processes.listAuditEvents({ instanceId: processInstanceId as string });
       return result.events;

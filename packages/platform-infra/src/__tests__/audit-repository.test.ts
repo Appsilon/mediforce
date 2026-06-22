@@ -96,15 +96,9 @@ describe('InMemoryAuditRepository', () => {
 
   describe('getByEntity', () => {
     it('returns events matching entityType and entityId', async () => {
-      await repo.append(
-        createTestEvent({ entityType: 'case', entityId: 'case-1' }),
-      );
-      await repo.append(
-        createTestEvent({ entityType: 'case', entityId: 'case-2' }),
-      );
-      await repo.append(
-        createTestEvent({ entityType: 'case', entityId: 'case-1' }),
-      );
+      await repo.append(createTestEvent({ entityType: 'case', entityId: 'case-1' }));
+      await repo.append(createTestEvent({ entityType: 'case', entityId: 'case-2' }));
+      await repo.append(createTestEvent({ entityType: 'case', entityId: 'case-1' }));
 
       const results = await repo.getByEntity('case', 'case-1');
       expect(results).toHaveLength(2);
@@ -115,9 +109,7 @@ describe('InMemoryAuditRepository', () => {
     });
 
     it('returns empty array for no matches', async () => {
-      await repo.append(
-        createTestEvent({ entityType: 'case', entityId: 'case-1' }),
-      );
+      await repo.append(createTestEvent({ entityType: 'case', entityId: 'case-1' }));
 
       const results = await repo.getByEntity('case', 'nonexistent');
       expect(results).toHaveLength(0);
@@ -155,15 +147,9 @@ describe('InMemoryAuditRepository', () => {
 
   describe('getByProcess', () => {
     it('returns events with matching processInstanceId', async () => {
-      await repo.append(
-        createTestEvent({ processInstanceId: 'proc-1' }),
-      );
-      await repo.append(
-        createTestEvent({ processInstanceId: 'proc-2' }),
-      );
-      await repo.append(
-        createTestEvent({ processInstanceId: 'proc-1' }),
-      );
+      await repo.append(createTestEvent({ processInstanceId: 'proc-1' }));
+      await repo.append(createTestEvent({ processInstanceId: 'proc-2' }));
+      await repo.append(createTestEvent({ processInstanceId: 'proc-1' }));
 
       const results = await repo.getByProcess('proc-1');
       expect(results).toHaveLength(2);
@@ -173,9 +159,7 @@ describe('InMemoryAuditRepository', () => {
     });
 
     it('returns empty array when no events match', async () => {
-      await repo.append(
-        createTestEvent({ processInstanceId: 'proc-1' }),
-      );
+      await repo.append(createTestEvent({ processInstanceId: 'proc-1' }));
 
       const results = await repo.getByProcess('nonexistent');
       expect(results).toHaveLength(0);

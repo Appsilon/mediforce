@@ -36,10 +36,7 @@ export type ActionOutput = Record<string, unknown>;
 /** Signature for an action handler. The handler reads its discriminated
  *  config from `action`, performs the side-effect (HTTP, wait, etc.) and
  *  returns the structured output. Throw on failure. */
-export type ActionHandler<TConfig> = (
-  config: TConfig,
-  ctx: ActionContext,
-) => Promise<ActionOutput>;
+export type ActionHandler<TConfig> = (config: TConfig, ctx: ActionContext) => Promise<ActionOutput>;
 
 /** Narrowed handler types — used by the registry to dispatch by `kind`.
  *  Add new kinds here as more handlers are introduced. */

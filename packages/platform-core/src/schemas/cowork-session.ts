@@ -52,11 +52,7 @@ export const ToolTurnSchema = z.object({
   toolCallId: z.string().optional(),
 });
 
-export const ConversationTurnSchema = z.discriminatedUnion('role', [
-  HumanTurnSchema,
-  AgentTurnSchema,
-  ToolTurnSchema,
-]);
+export const ConversationTurnSchema = z.discriminatedUnion('role', [HumanTurnSchema, AgentTurnSchema, ToolTurnSchema]);
 
 export type ConversationTurn = z.infer<typeof ConversationTurnSchema>;
 export type HumanTurn = z.infer<typeof HumanTurnSchema>;
@@ -68,9 +64,9 @@ export type ToolTurn = z.infer<typeof ToolTurnSchema>;
 // ---------------------------------------------------------------------------
 
 export const CoworkSessionStatusSchema = z.enum([
-  'active',       // conversation in progress
-  'finalized',    // artifact accepted, workflow advanced
-  'abandoned',    // session abandoned
+  'active', // conversation in progress
+  'finalized', // artifact accepted, workflow advanced
+  'abandoned', // session abandoned
 ]);
 
 export const CoworkAgentSchema = z.enum(['chat', 'voice-realtime']);
@@ -101,10 +97,13 @@ export const CoworkSessionSchema = z.object({
   voiceConfig: CoworkVoiceConfigSchema.nullable().default(null),
   artifact: z.record(z.string(), z.unknown()).nullable(),
   /** Validation result from the last update_artifact call */
-  validationResult: z.object({
-    valid: z.boolean(),
-    errors: z.array(z.string()),
-  }).nullable().default(null),
+  validationResult: z
+    .object({
+      valid: z.boolean(),
+      errors: z.array(z.string()),
+    })
+    .nullable()
+    .default(null),
   /** HTML presentation produced by the agent via update_presentation */
   presentation: z.string().nullable().default(null),
   /** MCP servers available during this cowork session */

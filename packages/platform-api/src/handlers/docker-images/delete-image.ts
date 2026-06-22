@@ -2,10 +2,7 @@ import { assertCallerCanAdminDockerImages } from '../../auth';
 import { emitAudit } from '../../audit-helpers';
 import { PreconditionFailedError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
-import type {
-  DeleteDockerImageInput,
-  DeleteDockerImageOutput,
-} from '../../contract/docker-images';
+import type { DeleteDockerImageInput, DeleteDockerImageOutput } from '../../contract/docker-images';
 
 export async function deleteDockerImage(
   input: DeleteDockerImageInput,
@@ -15,9 +12,7 @@ export async function deleteDockerImage(
 
   const deleter = scope.system.dockerImages;
   if (deleter === null) {
-    throw new PreconditionFailedError(
-      'Docker image deletion is not configured in this deployment',
-    );
+    throw new PreconditionFailedError('Docker image deletion is not configured in this deployment');
   }
 
   const result = await deleter.delete(input.imageId);

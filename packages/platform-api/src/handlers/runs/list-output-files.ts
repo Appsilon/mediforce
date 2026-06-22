@@ -1,10 +1,7 @@
 import { WorkspaceReader, type OutputFileEntry } from '@mediforce/agent-runtime';
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
-import type {
-  ListRunOutputFilesInput,
-  ListRunOutputFilesOutput,
-} from '../../contract/runs';
+import type { ListRunOutputFilesInput, ListRunOutputFilesOutput } from '../../contract/runs';
 
 /**
  * List the Output Files of one run — artifacts the runtime committed under
@@ -23,10 +20,7 @@ export async function listRunOutputFiles(
   input: ListRunOutputFilesInput,
   scope: CallerScope,
   workspaceReader: {
-    listOutputFiles: (
-      workflow: { name: string; namespace?: string },
-      runId: string,
-    ) => Promise<OutputFileEntry[]>;
+    listOutputFiles: (workflow: { name: string; namespace?: string }, runId: string) => Promise<OutputFileEntry[]>;
   } = new WorkspaceReader(),
 ): Promise<ListRunOutputFilesOutput> {
   const run = await scope.runs.getById(input.runId);

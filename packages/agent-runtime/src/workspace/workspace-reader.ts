@@ -103,11 +103,11 @@ export class WorkspaceReader {
     assertOutputFilePath(path);
     const bareRepoPath = bareRepoPathFor(this.dataDir, workflow);
     try {
-      const { stdout } = await execFileAsync(
-        'git',
-        ['cat-file', 'blob', `${runBranchName(runId)}:${path}`],
-        { cwd: bareRepoPath, encoding: 'buffer', maxBuffer: gitMaxBuffer() },
-      );
+      const { stdout } = await execFileAsync('git', ['cat-file', 'blob', `${runBranchName(runId)}:${path}`], {
+        cwd: bareRepoPath,
+        encoding: 'buffer',
+        maxBuffer: gitMaxBuffer(),
+      });
       return stdout;
     } catch {
       return null;

@@ -35,9 +35,7 @@ import { coworkSessions, coworkTurns } from '../schema/cowork-session';
  * Validation matches the Firestore + in-memory backends: parse on every
  * read AND every write.
  */
-export class PostgresCoworkSessionRepository
-  implements CoworkSessionRepository
-{
+export class PostgresCoworkSessionRepository implements CoworkSessionRepository {
   constructor(
     private readonly db: Database,
     private readonly parents: ProcessInstanceRepository,
@@ -86,11 +84,7 @@ export class PostgresCoworkSessionRepository
   }
 
   async getById(sessionId: string): Promise<CoworkSession | null> {
-    const rows = await this.db
-      .select()
-      .from(coworkSessions)
-      .where(eq(coworkSessions.id, sessionId))
-      .limit(1);
+    const rows = await this.db.select().from(coworkSessions).where(eq(coworkSessions.id, sessionId)).limit(1);
     const row = rows[0];
     if (!row) return null;
     const turnRows = await this.db
@@ -101,20 +95,12 @@ export class PostgresCoworkSessionRepository
     return CoworkSessionSchema.parse(toSession(row, turnRows));
   }
 
-  async getByIdInNamespaces(
-    sessionId: string,
-    allowed: readonly string[],
-  ): Promise<CoworkSession | null> {
+  async getByIdInNamespaces(sessionId: string, allowed: readonly string[]): Promise<CoworkSession | null> {
     if (allowed.length === 0) return null;
     const rows = await this.db
       .select()
       .from(coworkSessions)
-      .where(
-        and(
-          eq(coworkSessions.id, sessionId),
-          inArray(coworkSessions.workspace, [...allowed]),
-        ),
-      )
+      .where(and(eq(coworkSessions.id, sessionId), inArray(coworkSessions.workspace, [...allowed])))
       .limit(1);
     const row = rows[0];
     if (!row) return null;
@@ -140,16 +126,11 @@ export class PostgresCoworkSessionRepository
       .where(inArray(coworkTurns.sessionId, ids))
       .orderBy(asc(coworkTurns.sessionId), asc(coworkTurns.idx));
     const turnsBySession = groupBySession(turnRows);
-    return rows.map((r) =>
-      CoworkSessionSchema.parse(toSession(r, turnsBySession.get(r.id) ?? [])),
-    );
+    return rows.map((r) => CoworkSessionSchema.parse(toSession(r, turnsBySession.get(r.id) ?? [])));
   }
 
   async listAll(): Promise<CoworkSession[]> {
-    const rows = await this.db
-      .select()
-      .from(coworkSessions)
-      .orderBy(desc(coworkSessions.createdAt));
+    const rows = await this.db.select().from(coworkSessions).orderBy(desc(coworkSessions.createdAt));
     return this.rehydrate(rows);
   }
 
@@ -172,27 +153,17 @@ export class PostgresCoworkSessionRepository
     return this.rehydrate(rows);
   }
 
-  async listByRoleInNamespaces(
-    role: string,
-    allowed: readonly string[],
-  ): Promise<CoworkSession[]> {
+  async listByRoleInNamespaces(role: string, allowed: readonly string[]): Promise<CoworkSession[]> {
     if (allowed.length === 0) return [];
     const rows = await this.db
       .select()
       .from(coworkSessions)
-      .where(
-        and(
-          eq(coworkSessions.assignedRole, role),
-          inArray(coworkSessions.workspace, [...allowed]),
-        ),
-      )
+      .where(and(eq(coworkSessions.assignedRole, role), inArray(coworkSessions.workspace, [...allowed])))
       .orderBy(desc(coworkSessions.createdAt));
     return this.rehydrate(rows);
   }
 
-  private async rehydrate(
-    rows: (typeof coworkSessions.$inferSelect)[],
-  ): Promise<CoworkSession[]> {
+  private async rehydrate(rows: (typeof coworkSessions.$inferSelect)[]): Promise<CoworkSession[]> {
     if (rows.length === 0) return [];
     const ids = rows.map((r) => r.id);
     const turnRows = await this.db
@@ -201,21 +172,14 @@ export class PostgresCoworkSessionRepository
       .where(inArray(coworkTurns.sessionId, ids))
       .orderBy(asc(coworkTurns.sessionId), asc(coworkTurns.idx));
     const turnsBySession = groupBySession(turnRows);
-    return rows.map((r) =>
-      CoworkSessionSchema.parse(toSession(r, turnsBySession.get(r.id) ?? [])),
-    );
+    return rows.map((r) => CoworkSessionSchema.parse(toSession(r, turnsBySession.get(r.id) ?? [])));
   }
 
   async findMostRecentActive(instanceId: string): Promise<CoworkSession | null> {
     const rows = await this.db
       .select()
       .from(coworkSessions)
-      .where(
-        and(
-          eq(coworkSessions.processInstanceId, instanceId),
-          eq(coworkSessions.status, 'active'),
-        ),
-      )
+      .where(and(eq(coworkSessions.processInstanceId, instanceId), eq(coworkSessions.status, 'active')))
       .orderBy(desc(coworkSessions.createdAt))
       .limit(1);
     const row = rows[0];
@@ -273,19 +237,12 @@ export class PostgresCoworkSessionRepository
       const nextIdx = Number(maxRows[0]?.next ?? 0);
       await tx.insert(coworkTurns).values(turnToRow(sessionId, nextIdx, parsedTurn));
       // Touch the parent session so the trigger refreshes updated_at.
-      await tx
-        .update(coworkSessions)
-        .set({ updatedAt: new Date() })
-        .where(eq(coworkSessions.id, sessionId));
+      await tx.update(coworkSessions).set({ updatedAt: new Date() }).where(eq(coworkSessions.id, sessionId));
     });
     return (await this.getById(sessionId))!;
   }
 
-  async updateTurn(
-    sessionId: string,
-    turnId: string,
-    patch: Partial<ConversationTurn>,
-  ): Promise<CoworkSession> {
+  async updateTurn(sessionId: string, turnId: string, patch: Partial<ConversationTurn>): Promise<CoworkSession> {
     await this.db.transaction(async (tx) => {
       const existing = await tx
         .select()
@@ -321,18 +278,12 @@ export class PostgresCoworkSessionRepository
           .set(merged)
           .where(and(eq(coworkTurns.sessionId, sessionId), eq(coworkTurns.id, turnId)));
       }
-      await tx
-        .update(coworkSessions)
-        .set({ updatedAt: new Date() })
-        .where(eq(coworkSessions.id, sessionId));
+      await tx.update(coworkSessions).set({ updatedAt: new Date() }).where(eq(coworkSessions.id, sessionId));
     });
     return (await this.getById(sessionId))!;
   }
 
-  async updateArtifact(
-    sessionId: string,
-    artifact: Record<string, unknown>,
-  ): Promise<CoworkSession> {
+  async updateArtifact(sessionId: string, artifact: Record<string, unknown>): Promise<CoworkSession> {
     const [row] = await this.db
       .update(coworkSessions)
       .set({ artifact })
@@ -365,10 +316,7 @@ export class PostgresCoworkSessionRepository
     return (await this.getById(sessionId))!;
   }
 
-  async finalize(
-    sessionId: string,
-    artifact: Record<string, unknown>,
-  ): Promise<CoworkSession> {
+  async finalize(sessionId: string, artifact: Record<string, unknown>): Promise<CoworkSession> {
     const [row] = await this.db
       .update(coworkSessions)
       .set({
@@ -393,11 +341,7 @@ export class PostgresCoworkSessionRepository
   }
 }
 
-function turnToRow(
-  sessionId: string,
-  idx: number,
-  turn: ConversationTurn,
-): typeof coworkTurns.$inferInsert {
+function turnToRow(sessionId: string, idx: number, turn: ConversationTurn): typeof coworkTurns.$inferInsert {
   const base = {
     id: turn.id,
     sessionId,
@@ -471,9 +415,7 @@ function toTurn(row: typeof coworkTurns.$inferSelect): ConversationTurn {
   };
 }
 
-function groupBySession(
-  rows: (typeof coworkTurns.$inferSelect)[],
-): Map<string, (typeof coworkTurns.$inferSelect)[]> {
+function groupBySession(rows: (typeof coworkTurns.$inferSelect)[]): Map<string, (typeof coworkTurns.$inferSelect)[]> {
   const map = new Map<string, (typeof coworkTurns.$inferSelect)[]>();
   for (const row of rows) {
     const list = map.get(row.sessionId) ?? [];

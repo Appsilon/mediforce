@@ -129,7 +129,10 @@ describe('DatabricksJobPlugin', () => {
         stepInput: {},
         autonomyLevel: 'L4',
         config: {
-          processName: 'x', configName: 'default', configVersion: 'v1', stepConfigs: [],
+          processName: 'x',
+          configName: 'default',
+          configVersion: 'v1',
+          stepConfigs: [],
         } satisfies ProcessConfig,
         llm: { complete: vi.fn() },
         getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
@@ -206,13 +209,15 @@ describe('DatabricksJobPlugin', () => {
         runStates: [runState('TERMINATED', { termination_details: { code: 'SUCCESS' } })],
       });
       plugin = new DatabricksJobPlugin({ fetchImpl, sleepImpl: instantSleep });
-      await plugin.initialize(buildContext({
-        step: buildStep({
-          jobId: 123,
-          notebookParams: { batch_id: '${steps.prepare.batchId}', static: 'fixed' },
+      await plugin.initialize(
+        buildContext({
+          step: buildStep({
+            jobId: 123,
+            notebookParams: { batch_id: '${steps.prepare.batchId}', static: 'fixed' },
+          }),
+          stepInput: { steps: { prepare: { batchId: 'B-42' } } },
         }),
-        stepInput: { steps: { prepare: { batchId: 'B-42' } } },
-      }));
+      );
 
       const { emit } = buildEmitSpy();
       await plugin.run(emit);
@@ -225,9 +230,11 @@ describe('DatabricksJobPlugin', () => {
 
     it('[ERROR] failed run rejects with state, message, and run page URL — no result event', async () => {
       const { fetchImpl } = buildFetchMock({
-        runStates: [runState('TERMINATED', {
-          termination_details: { code: 'FAILED', message: 'notebook exception' },
-        })],
+        runStates: [
+          runState('TERMINATED', {
+            termination_details: { code: 'FAILED', message: 'notebook exception' },
+          }),
+        ],
       });
       plugin = new DatabricksJobPlugin({ fetchImpl, sleepImpl: instantSleep });
       await plugin.initialize(buildContext());
@@ -244,11 +251,13 @@ describe('DatabricksJobPlugin', () => {
 
     it('[ERROR] multi-task job rejects with a single-task-only message', async () => {
       const { fetchImpl } = buildFetchMock({
-        runStates: [jsonResponse({
-          run_id: 777,
-          tasks: [{ run_id: 888 }, { run_id: 889 }],
-          status: { state: 'TERMINATED', termination_details: { code: 'SUCCESS' } },
-        })],
+        runStates: [
+          jsonResponse({
+            run_id: 777,
+            tasks: [{ run_id: 888 }, { run_id: 889 }],
+            status: { state: 'TERMINATED', termination_details: { code: 'SUCCESS' } },
+          }),
+        ],
       });
       plugin = new DatabricksJobPlugin({ fetchImpl, sleepImpl: instantSleep });
       await plugin.initialize(buildContext());
@@ -262,9 +271,11 @@ describe('DatabricksJobPlugin', () => {
       plugin = new DatabricksJobPlugin({ fetchImpl, sleepImpl: instantSleep });
       // timeoutMinutes small enough that the deadline (minus the 5s cancel
       // buffer) is already in the past on the first poll iteration.
-      await plugin.initialize(buildContext({
-        step: buildStep({ jobId: 123, timeoutMinutes: 0.0001 }),
-      }));
+      await plugin.initialize(
+        buildContext({
+          step: buildStep({ jobId: 123, timeoutMinutes: 0.0001 }),
+        }),
+      );
 
       const { emit } = buildEmitSpy();
       await expect(plugin.run(emit)).rejects.toThrow(/exceeded the step timeout/);

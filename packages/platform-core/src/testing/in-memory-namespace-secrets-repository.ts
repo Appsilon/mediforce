@@ -1,7 +1,4 @@
-import {
-  NamespaceSecretsSchema,
-  type NamespaceSecretsRepository,
-} from '../index';
+import { NamespaceSecretsSchema, type NamespaceSecretsRepository } from '../index';
 
 /**
  * In-memory NamespaceSecretsRepository for L2 parity tests.

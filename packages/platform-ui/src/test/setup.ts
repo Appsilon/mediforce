@@ -10,10 +10,18 @@ Object.defineProperty(globalThis, 'localStorage', {
   writable: true,
   value: {
     getItem: (key: string) => _localStore[key] ?? null,
-    setItem: (key: string, value: string) => { _localStore[key] = String(value); },
-    removeItem: (key: string) => { delete _localStore[key]; },
-    clear: () => { for (const k in _localStore) delete _localStore[k]; },
-    get length() { return Object.keys(_localStore).length; },
+    setItem: (key: string, value: string) => {
+      _localStore[key] = String(value);
+    },
+    removeItem: (key: string) => {
+      delete _localStore[key];
+    },
+    clear: () => {
+      for (const k in _localStore) delete _localStore[k];
+    },
+    get length() {
+      return Object.keys(_localStore).length;
+    },
     key: (index: number) => Object.keys(_localStore)[index] ?? null,
   } as Storage,
 });

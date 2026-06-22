@@ -8,16 +8,9 @@ import {
   type ResolvedStdioMcpServer,
   type ResolvedHttpMcpServer,
 } from '../resolve-effective-mcp';
-import type {
-  AgentMcpBindingMap,
-  StepMcpRestriction,
-  ToolCatalogEntry,
-} from '../../schemas/agent-mcp-binding';
+import type { AgentMcpBindingMap, StepMcpRestriction, ToolCatalogEntry } from '../../schemas/agent-mcp-binding';
 import type { AgentDefinition } from '../../schemas/agent-definition';
-import {
-  WorkflowStepSchema,
-  type WorkflowStep,
-} from '../../schemas/workflow-definition';
+import { WorkflowStepSchema, type WorkflowStep } from '../../schemas/workflow-definition';
 
 function makeAgent(mcpServers?: AgentMcpBindingMap): AgentDefinition {
   return {
@@ -48,7 +41,7 @@ function makeStep(mcpRestrictions?: StepMcpRestriction): WorkflowStep {
 }
 
 function makeCatalog(entries: ToolCatalogEntry[]): Map<string, ToolCatalogEntry> {
-  return new Map(entries.map(entry => [entry.id, entry]));
+  return new Map(entries.map((entry) => [entry.id, entry]));
 }
 
 function asStdio(server: ResolvedMcpServer | undefined): ResolvedStdioMcpServer {
@@ -260,9 +253,7 @@ describe('resolveEffectiveMcp', () => {
         github: { type: 'stdio', catalogId: 'gh' },
       });
       const step = makeStep({ github: { denyTools: ['delete_repo'] } });
-      expect(() => resolveEffectiveMcp(agent, step, catalog)).toThrow(
-        DenyToolsWithoutAllowedToolsError,
-      );
+      expect(() => resolveEffectiveMcp(agent, step, catalog)).toThrow(DenyToolsWithoutAllowedToolsError);
     });
 
     it('DenyToolsWithoutAllowedToolsError exposes serverName and denyTools', () => {
@@ -310,9 +301,7 @@ describe('resolveEffectiveMcp', () => {
       const agent = makeAgent({
         ghost: { type: 'stdio', catalogId: 'not-in-catalog' },
       });
-      expect(() => resolveEffectiveMcp(agent, makeStep(), new Map())).toThrow(
-        CatalogEntryNotFoundError,
-      );
+      expect(() => resolveEffectiveMcp(agent, makeStep(), new Map())).toThrow(CatalogEntryNotFoundError);
     });
 
     it('CatalogEntryNotFoundError exposes serverName and catalogId', () => {
@@ -346,9 +335,7 @@ describe('resolveEffectiveMcp', () => {
       const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
       const agent = makeAgent({ github: { type: 'stdio', catalogId: 'gh' } });
       const step = makeStep({ githuub: { disable: true } });
-      expect(() => resolveEffectiveMcp(agent, step, catalog)).toThrow(
-        UnknownRestrictionTargetError,
-      );
+      expect(() => resolveEffectiveMcp(agent, step, catalog)).toThrow(UnknownRestrictionTargetError);
     });
 
     it('UnknownRestrictionTargetError exposes serverName and knownServerNames', () => {
@@ -375,9 +362,7 @@ describe('resolveEffectiveMcp', () => {
 
     it('throws even when the agent has no mcpServers at all', () => {
       const step = makeStep({ github: { disable: true } });
-      expect(() => resolveEffectiveMcp(makeAgent(), step, new Map())).toThrow(
-        UnknownRestrictionTargetError,
-      );
+      expect(() => resolveEffectiveMcp(makeAgent(), step, new Map())).toThrow(UnknownRestrictionTargetError);
     });
 
     it('throws before any catalog lookup', () => {
@@ -387,9 +372,7 @@ describe('resolveEffectiveMcp', () => {
         ghost: { type: 'stdio', catalogId: 'not-in-catalog' },
       });
       const step = makeStep({ typo: { disable: true } });
-      expect(() => resolveEffectiveMcp(agent, step, new Map())).toThrow(
-        UnknownRestrictionTargetError,
-      );
+      expect(() => resolveEffectiveMcp(agent, step, new Map())).toThrow(UnknownRestrictionTargetError);
     });
   });
 

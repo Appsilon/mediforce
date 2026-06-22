@@ -28,10 +28,7 @@ import { actorFromCaller } from '../_helpers';
  * deployment isn't wired for Firebase Auth — surface clearly rather than
  * 500).
  */
-export async function inviteUser(
-  input: InviteUserInput,
-  scope: CallerScope,
-): Promise<InviteUserOutput> {
+export async function inviteUser(input: InviteUserInput, scope: CallerScope): Promise<InviteUserOutput> {
   assertCallerIsNamespaceAdmin(scope.caller, input.namespaceHandle);
 
   const invite = scope.system.inviteService;
@@ -41,14 +38,9 @@ export async function inviteUser(
 
   const email = input.email.trim().toLowerCase();
   const displayName =
-    typeof input.displayName === 'string' && input.displayName.trim() !== ''
-      ? input.displayName.trim()
-      : undefined;
+    typeof input.displayName === 'string' && input.displayName.trim() !== '' ? input.displayName.trim() : undefined;
 
-  const { uid, temporaryPassword, isExisting } = await invite.createInvitedUser(
-    email,
-    displayName,
-  );
+  const { uid, temporaryPassword, isExisting } = await invite.createInvitedUser(email, displayName);
 
   await scope.workspaces.addMember(input.namespaceHandle, {
     uid,

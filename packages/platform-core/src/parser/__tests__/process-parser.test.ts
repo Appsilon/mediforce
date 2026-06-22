@@ -52,9 +52,7 @@ describe('parseProcessDefinition', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const reviewStep = result.data.steps.find(
-        (s) => s.type === 'review',
-      );
+      const reviewStep = result.data.steps.find((s) => s.type === 'review');
       expect(reviewStep).toBeDefined();
       expect(reviewStep!.verdicts).toEqual({
         approve: { target: 'approved' },
@@ -71,12 +69,7 @@ describe('parseProcessDefinition', () => {
       if (!result.success) return;
 
       const stepIds = result.data.steps.map((s) => s.id);
-      expect(stepIds).toEqual([
-        'collect-data',
-        'review',
-        'complete',
-        'closed',
-      ]);
+      expect(stepIds).toEqual(['collect-data', 'review', 'complete', 'closed']);
     });
 
     it('when conditions are strings (not resolved at parse time)', () => {
@@ -86,9 +79,7 @@ describe('parseProcessDefinition', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const conditionalTransition = result.data.transitions.find(
-        (t) => t.when !== undefined,
-      );
+      const conditionalTransition = result.data.transitions.find((t) => t.when !== undefined);
       expect(conditionalTransition).toBeDefined();
       expect(typeof conditionalTransition!.when).toBe('string');
       expect(conditionalTransition!.when).toBe('output.dataComplete == true');

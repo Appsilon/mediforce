@@ -23,10 +23,7 @@ export default function RunReportPage() {
     handle,
     Number.isNaN(runVersion) ? null : runVersion,
   );
-  const definitionSteps = useMemo(
-    () => runDefinition?.steps ?? [],
-    [runDefinition],
-  );
+  const definitionSteps = useMemo(() => runDefinition?.steps ?? [], [runDefinition]);
 
   if (instanceLoading) {
     return (
@@ -39,18 +36,12 @@ export default function RunReportPage() {
   }
 
   if (!instance) {
-    return (
-      <div className="p-6 text-center text-sm text-muted-foreground">
-        Run not found.
-      </div>
-    );
+    return <div className="p-6 text-center text-sm text-muted-foreground">Run not found.</div>;
   }
 
   if (instance.status !== 'completed') {
     return (
-      <div className="p-6 text-center text-sm text-muted-foreground">
-        Report is only available for completed runs.
-      </div>
+      <div className="p-6 text-center text-sm text-muted-foreground">Report is only available for completed runs.</div>
     );
   }
 

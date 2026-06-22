@@ -46,15 +46,11 @@ export function PluginPreviewCard({ plugin }: PluginPreviewCardProps) {
       <p className="text-xs text-muted-foreground">{meta.description}</p>
       <div className="grid grid-cols-2 gap-2 pt-1">
         <div>
-          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            Input
-          </span>
+          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Input</span>
           <p className="text-xs">{meta.inputDescription}</p>
         </div>
         <div>
-          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            Output
-          </span>
+          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Output</span>
           <p className="text-xs">{meta.outputDescription}</p>
         </div>
       </div>

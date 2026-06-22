@@ -15,11 +15,7 @@ import type { BulkRunOutput } from '@mediforce/platform-api/contract';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 import { formatCostUsd } from '@/lib/format';
 import { useToast } from '@/components/command-palette/toast-provider';
-import {
-  useArchiveRun,
-  useBulkArchiveRuns,
-  useBulkCancelRuns,
-} from '@/hooks/use-run-mutations';
+import { useArchiveRun, useBulkArchiveRuns, useBulkCancelRuns } from '@/hooks/use-run-mutations';
 
 interface RunsTableProps {
   runs: ProcessInstance[];
@@ -40,7 +36,10 @@ function isCancellable(run: ProcessInstance): boolean {
 
 function isArchivable(run: ProcessInstance): boolean {
   const { displayStatus } = getWorkflowStatus(run);
-  return (displayStatus === 'completed' || displayStatus === 'error' || displayStatus === 'cancelled') && run.archived !== true;
+  return (
+    (displayStatus === 'completed' || displayStatus === 'error' || displayStatus === 'cancelled') &&
+    run.archived !== true
+  );
 }
 
 export function RunsTable({
@@ -111,8 +110,7 @@ export function RunsTable({
     try {
       await archiveMutation.mutateAsync({ runId: run.id, archived: newArchived });
     } catch (err) {
-      const message = err instanceof ApiError ? err.message
-        : err instanceof Error ? err.message : 'Archive failed';
+      const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Archive failed';
       toast({ title: 'Archive failed', description: message, variant: 'error' });
     } finally {
       setArchivingIds((prev) => {
@@ -144,8 +142,7 @@ export function RunsTable({
       });
       reportBulkResult(result, 'cancel');
     } catch (err) {
-      const message = err instanceof ApiError ? err.message
-        : err instanceof Error ? err.message : 'Bulk cancel failed';
+      const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Bulk cancel failed';
       toast({ title: 'Bulk cancel failed', description: message, variant: 'error' });
     }
   }
@@ -157,15 +154,15 @@ export function RunsTable({
       });
       reportBulkResult(result, 'archive');
     } catch (err) {
-      const message = err instanceof ApiError ? err.message
-        : err instanceof Error ? err.message : 'Bulk archive failed';
+      const message =
+        err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Bulk archive failed';
       toast({ title: 'Bulk archive failed', description: message, variant: 'error' });
     }
   }
 
-  const effectiveRunHref = runHref ?? ((run: ProcessInstance) =>
-    `/${handle}/workflows/${encodeURIComponent(run.definitionName)}/runs/${run.id}`
-  );
+  const effectiveRunHref =
+    runHref ??
+    ((run: ProcessInstance) => `/${handle}/workflows/${encodeURIComponent(run.definitionName)}/runs/${run.id}`);
 
   const dataHeaders = [
     ...(showProcess ? ['Workflow'] : []),
@@ -191,11 +188,7 @@ export function RunsTable({
   }
 
   if (runs.length === 0) {
-    return (
-      <div className="text-center py-16 text-sm text-muted-foreground">
-        {emptyMessage}
-      </div>
-    );
+    return <div className="text-center py-16 text-sm text-muted-foreground">{emptyMessage}</div>;
   }
 
   const anyBulkBusy = bulkCancelling || bulkArchiving;
@@ -204,10 +197,11 @@ export function RunsTable({
     <div className="rounded-md border overflow-clip">
       {/* Bulk action toolbar — visible only when rows are selected */}
       {selectedIds.size > 0 && (
-        <div ref={toolbarRef} className="sticky top-0 z-20 flex items-center gap-3 px-4 py-2 bg-background border-b text-sm">
-          <span className="text-xs text-muted-foreground font-medium">
-            {selectedIds.size} selected
-          </span>
+        <div
+          ref={toolbarRef}
+          className="sticky top-0 z-20 flex items-center gap-3 px-4 py-2 bg-background border-b text-sm"
+        >
+          <span className="text-xs text-muted-foreground font-medium">{selectedIds.size} selected</span>
           <button
             onClick={handleBulkCancel}
             disabled={cancellableSelected.length === 0 || anyBulkBusy}
@@ -289,20 +283,25 @@ export function RunsTable({
                     </Link>
                   </td>
                 )}
-                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                  {run.id.slice(0, 8)}&hellip;
-                </td>
+                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{run.id.slice(0, 8)}&hellip;</td>
                 <td className="px-4 py-3 font-mono text-xs">
                   <span title="Definition version">v{run.definitionVersion}</span>
                   {run.configName && (
                     <span className="text-muted-foreground">
                       {' / '}
-                      <span title="Config">{run.configName} v{run.configVersion}</span>
+                      <span title="Config">
+                        {run.configName} v{run.configVersion}
+                      </span>
                     </span>
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <ProcessStatusBadge status={run.status} pauseReason={run.pauseReason} error={run.error} dryRun={run.dryRun} />
+                  <ProcessStatusBadge
+                    status={run.status}
+                    pauseReason={run.pauseReason}
+                    error={run.error}
+                    dryRun={run.dryRun}
+                  />
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {run.parentInstanceId && run.parentDefinitionName ? (
@@ -317,7 +316,9 @@ export function RunsTable({
                       displayName={userProfiles.get(run.createdBy)?.displayName ?? run.createdBy}
                       personalHandle={userProfiles.get(run.createdBy)?.personalHandle}
                     />
-                  ) : '—'}
+                  ) : (
+                    '—'
+                  )}
                 </td>
                 <td className="px-4 py-3 text-xs">
                   {run.currentStepId ? (
@@ -334,10 +335,14 @@ export function RunsTable({
                         {run.currentStepId}
                       </span>
                     )
-                  ) : <span className="text-muted-foreground">—</span>}
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">
-                  {run.totalCostUsd != null ? `${formatCostUsd(run.totalCostUsd)}${run.status !== 'completed' && run.status !== 'failed' ? '+' : ''}` : '—'}
+                  {run.totalCostUsd != null
+                    ? `${formatCostUsd(run.totalCostUsd)}${run.status !== 'completed' && run.status !== 'failed' ? '+' : ''}`
+                    : '—'}
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(run.createdAt), { addSuffix: true })}
@@ -356,9 +361,7 @@ export function RunsTable({
                         title={isArchived ? 'Unarchive run' : 'Archive run'}
                         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                       >
-                        {isArchived
-                          ? <ArchiveRestore className="h-3.5 w-3.5" />
-                          : <Archive className="h-3.5 w-3.5" />}
+                        {isArchived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
                       </button>
                     );
                   })()}

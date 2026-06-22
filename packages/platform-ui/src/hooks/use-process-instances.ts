@@ -96,17 +96,16 @@ export function useProcessInstance(instanceId: string | null) {
     },
   });
 
-  const err = enabled ? (query.error as Error | null) ?? null : null;
+  const err = enabled ? ((query.error as Error | null) ?? null) : null;
   const notFound = err instanceof ApiError && err.status === 404;
 
   // `isPending` (no data yet) keeps the skeleton on while the query is
   // running its first fetch; gated by `enabled` so a deliberate `null` id
   // surfaces `loading: false` (caller knows it isn't asking for anything).
   return {
-    data: notFound ? null : query.data ?? null,
+    data: notFound ? null : (query.data ?? null),
     loading: enabled && query.isPending,
     error: notFound ? null : err,
     notFound,
   };
 }
-

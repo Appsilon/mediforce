@@ -8,10 +8,7 @@ import {
 } from '@mediforce/platform-api/contract';
 import type { NextRequest } from 'next/server';
 
-const GetConfigQuerySchema = z.union([
-  GetConfigByPrefixInputSchema,
-  GetConfigInputSchema,
-]);
+const GetConfigQuerySchema = z.union([GetConfigByPrefixInputSchema, GetConfigInputSchema]);
 
 export const GET = createRouteAdapter(
   GetConfigQuerySchema,
@@ -26,8 +23,4 @@ export const GET = createRouteAdapter(
   },
 );
 
-export const PUT = createRouteAdapter(
-  SetConfigInputSchema,
-  async (req: NextRequest) => req.json(),
-  setConfig,
-);
+export const PUT = createRouteAdapter(SetConfigInputSchema, async (req: NextRequest) => req.json(), setConfig);

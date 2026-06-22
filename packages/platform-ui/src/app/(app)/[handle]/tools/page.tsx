@@ -24,12 +24,7 @@ import { apiFetch } from '@/lib/api-fetch';
 import { mediforce } from '@/lib/mediforce';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useAuth } from '@/contexts/auth-context';
-import {
-  collectHttpBindings,
-  countStdioUsage,
-  hasSecretTemplate,
-  type HttpBindingRow,
-} from './tool-inventory';
+import { collectHttpBindings, countStdioUsage, hasSecretTemplate, type HttpBindingRow } from './tool-inventory';
 
 function getStdioIcon(id: string): typeof Database {
   const icons: Record<string, typeof Database> = {
@@ -122,11 +117,12 @@ function HttpCard({ binding, handle }: { binding: HttpBindingRow; handle: string
   } catch {
     // leave full string if URL parse fails
   }
-  const badge = binding.allowedTools && binding.allowedTools.length > 0
-    ? { label: 'Tool allowlist', color: 'text-blue-600 dark:text-blue-400', Icon: Shield }
-    : binding.hasSecretHeaders
-      ? { label: 'Secrets required', color: 'text-blue-600 dark:text-blue-400', Icon: Shield }
-      : { label: 'Open access', color: 'text-amber-600 dark:text-amber-400', Icon: ShieldAlert };
+  const badge =
+    binding.allowedTools && binding.allowedTools.length > 0
+      ? { label: 'Tool allowlist', color: 'text-blue-600 dark:text-blue-400', Icon: Shield }
+      : binding.hasSecretHeaders
+        ? { label: 'Secrets required', color: 'text-blue-600 dark:text-blue-400', Icon: Shield }
+        : { label: 'Open access', color: 'text-amber-600 dark:text-amber-400', Icon: ShieldAlert };
   const BadgeIcon = badge.Icon;
   return (
     <Link
@@ -138,7 +134,9 @@ function HttpCard({ binding, handle }: { binding: HttpBindingRow; handle: string
           <Globe className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-base font-mono group-hover:text-primary transition-colors">{binding.name}</h3>
+          <h3 className="font-semibold text-base font-mono group-hover:text-primary transition-colors">
+            {binding.name}
+          </h3>
           <p className="mt-1 text-xs text-muted-foreground font-mono truncate">{host}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Bound to <span className="font-medium">{binding.agentName}</span>
@@ -201,10 +199,7 @@ export default function ToolsPage() {
     const q = query.trim().toLowerCase();
     if (q === '') return entries;
     return entries.filter(
-      (entry) =>
-        matchesQuery(entry.id, q) ||
-        matchesQuery(entry.description, q) ||
-        matchesQuery(entry.command, q),
+      (entry) => matchesQuery(entry.id, q) || matchesQuery(entry.description, q) || matchesQuery(entry.command, q),
     );
   }, [entries, query]);
 
@@ -213,10 +208,7 @@ export default function ToolsPage() {
     const q = query.trim().toLowerCase();
     if (q === '') return allHttpBindings;
     return allHttpBindings.filter(
-      (row) =>
-        matchesQuery(row.name, q) ||
-        matchesQuery(row.url, q) ||
-        matchesQuery(row.agentName, q),
+      (row) => matchesQuery(row.name, q) || matchesQuery(row.url, q) || matchesQuery(row.agentName, q),
     );
   }, [allHttpBindings, query]);
 

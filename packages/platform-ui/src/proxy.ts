@@ -3,9 +3,7 @@ import { jwtVerify, createRemoteJWKSet, decodeJwt, type JWTPayload } from 'jose'
 
 const LOCALHOST_RE = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? '';
-const HOSTED_APP_RE = PROJECT_ID
-  ? new RegExp(`^https://[\\w-]+--${PROJECT_ID}\\.[\\w.-]+\\.hosted\\.app$`)
-  : null;
+const HOSTED_APP_RE = PROJECT_ID ? new RegExp(`^https://[\\w-]+--${PROJECT_ID}\\.[\\w.-]+\\.hosted\\.app$`) : null;
 const PRODUCTION_ORIGINS = (process.env.ALLOWED_ORIGINS ?? '')
   .split(',')
   .map((s) => s.trim())
@@ -33,9 +31,11 @@ function getJwks(): ReturnType<typeof createRemoteJWKSet> {
 }
 
 function isOriginAllowed(origin: string): boolean {
-  return LOCALHOST_RE.test(origin)
-    || PRODUCTION_ORIGINS.includes(origin)
-    || (HOSTED_APP_RE !== null && HOSTED_APP_RE.test(origin));
+  return (
+    LOCALHOST_RE.test(origin) ||
+    PRODUCTION_ORIGINS.includes(origin) ||
+    (HOSTED_APP_RE !== null && HOSTED_APP_RE.test(origin))
+  );
 }
 
 function hasValidApiKey(req: NextRequest): boolean {

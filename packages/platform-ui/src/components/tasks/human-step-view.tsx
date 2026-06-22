@@ -45,13 +45,7 @@ interface HumanStepViewProps {
  * horizontal space, so they render in the right work area instead of the
  * left rail; those bodies embed their own context, hence no TaskContextPanel.
  */
-export function HumanStepView({
-  task,
-  access,
-  processInstance,
-  agentOutput,
-  executionPanel,
-}: HumanStepViewProps) {
+export function HumanStepView({ task, access, processInstance, agentOutput, executionPanel }: HumanStepViewProps) {
   const handle = useHandleFromPath();
   const userNames = useUserDisplayNames(handle);
   const personalHandles = usePersonalHandles(handle);
@@ -65,10 +59,7 @@ export function HumanStepView({
   const readOnly = access.kind === 'claimed-by-other' || access.kind === 'role-mismatch';
 
   const body = (
-    <fieldset
-      disabled={readOnly}
-      className={cn('min-w-0', readOnly && 'opacity-60 pointer-events-none')}
-    >
+    <fieldset disabled={readOnly} className={cn('min-w-0', readOnly && 'opacity-60 pointer-events-none')}>
       <BodyComponent task={task} remainingTaskCount={remainingTaskCount} />
     </fieldset>
   );
@@ -78,9 +69,7 @@ export function HumanStepView({
       {/* Left rail — sticky so decisions stay visible while scrolling artifacts */}
       <div className="space-y-4 lg:sticky lg:top-6">
         <div className="flex items-start gap-3">
-          <h2 className="text-2xl font-headline font-semibold flex-1">
-            {getTaskDisplayTitle(task, processInstance)}
-          </h2>
+          <h2 className="text-2xl font-headline font-semibold flex-1">{getTaskDisplayTitle(task, processInstance)}</h2>
           <span
             className={cn(
               'shrink-0 mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium capitalize',
@@ -93,7 +82,13 @@ export function HumanStepView({
 
         {readOnly && <AccessBanner access={access} userNames={userNames} personalHandles={personalHandles} />}
 
-        <TaskMetadataCard task={task} processInstance={processInstance} handle={handle} userNames={userNames} personalHandles={personalHandles} />
+        <TaskMetadataCard
+          task={task}
+          processInstance={processInstance}
+          handle={handle}
+          userNames={userNames}
+          personalHandles={personalHandles}
+        />
 
         {!bodyIsWide && body}
 
@@ -104,18 +99,9 @@ export function HumanStepView({
 
       {/* Right work area — long artifacts scroll here */}
       <div className="space-y-6 min-w-0">
-        <AgentOutputSection
-          task={task}
-          processInstance={processInstance}
-          agentOutput={agentOutput}
-        />
+        <AgentOutputSection task={task} processInstance={processInstance} agentOutput={agentOutput} />
 
-        {!bodyIsWide && (
-          <TaskContextPanel
-            processInstanceId={task.processInstanceId}
-            stepId={task.stepId}
-          />
-        )}
+        {!bodyIsWide && <TaskContextPanel processInstanceId={task.processInstanceId} stepId={task.stepId} />}
 
         {bodyIsWide && body}
 
@@ -182,9 +168,7 @@ function TaskMetadataCard({
     <div className="rounded-lg border p-4 grid grid-cols-2 gap-4 text-sm">
       {processInstance && (
         <div>
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            Workflow
-          </div>
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Workflow</div>
           <Link
             href={routes.workflow(handle, processInstance.definitionName)}
             className="text-primary hover:underline text-xs"
@@ -194,28 +178,16 @@ function TaskMetadataCard({
         </div>
       )}
       <div>
-        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-          Role
-        </div>
+        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Role</div>
         <div>{task.assignedRole}</div>
       </div>
       <div>
-        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-          Deadline
-        </div>
-        <div>
-          {task.deadline ? (
-            format(new Date(task.deadline), 'MMM d, yyyy HH:mm')
-          ) : (
-            <span>&mdash;</span>
-          )}
-        </div>
+        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Deadline</div>
+        <div>{task.deadline ? format(new Date(task.deadline), 'MMM d, yyyy HH:mm') : <span>&mdash;</span>}</div>
       </div>
       {task.assignedUserId && (
         <div>
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            Assigned To
-          </div>
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Assigned To</div>
           <div>
             <UserProfileLink
               displayName={userNames.get(task.assignedUserId) ?? task.assignedUserId}
@@ -226,9 +198,7 @@ function TaskMetadataCard({
       )}
       {task.completedAt && (
         <div>
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            Completed At
-          </div>
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Completed At</div>
           <div>{format(new Date(task.completedAt), 'MMM d, yyyy HH:mm')}</div>
         </div>
       )}
@@ -258,11 +228,5 @@ function AgentOutputSection({
     );
   }
 
-  return (
-    <AgentOutputReviewPanel
-      agentOutput={agentOutput}
-      stepId={task.stepId}
-      instanceId={task.processInstanceId}
-    />
-  );
+  return <AgentOutputReviewPanel agentOutput={agentOutput} stepId={task.stepId} instanceId={task.processInstanceId} />;
 }

@@ -1,7 +1,4 @@
-import type {
-  AgentEvent,
-  AgentEventRepository,
-} from '@mediforce/platform-core';
+import type { AgentEvent, AgentEventRepository } from '@mediforce/platform-core';
 import type { PostgresProcessInstanceRepository } from './process-instance-repository';
 
 /**
@@ -21,19 +18,12 @@ import type { PostgresProcessInstanceRepository } from './process-instance-repos
 export class PostgresAgentEventRepository implements AgentEventRepository {
   constructor(private readonly parents: PostgresProcessInstanceRepository) {}
 
-  async listByInstance(
-    instanceId: string,
-    afterSequence?: number,
-  ): Promise<AgentEvent[]> {
+  async listByInstance(instanceId: string, afterSequence?: number): Promise<AgentEvent[]> {
     const events = await this.parents.getAgentEvents(instanceId);
     return filterAfterSequence(events, afterSequence);
   }
 
-  async listByStep(
-    instanceId: string,
-    stepId: string,
-    afterSequence?: number,
-  ): Promise<AgentEvent[]> {
+  async listByStep(instanceId: string, stepId: string, afterSequence?: number): Promise<AgentEvent[]> {
     const events = await this.parents.getAgentEvents(instanceId, stepId);
     return filterAfterSequence(events, afterSequence);
   }
@@ -57,19 +47,13 @@ export class PostgresAgentEventRepository implements AgentEventRepository {
     return this.listByStep(instanceId, stepId, afterSequence);
   }
 
-  private async isInScope(
-    instanceId: string,
-    allowed: readonly string[],
-  ): Promise<boolean> {
+  private async isInScope(instanceId: string, allowed: readonly string[]): Promise<boolean> {
     const parent = await this.parents.getByIdInNamespaces(instanceId, allowed);
     return parent !== null;
   }
 }
 
-function filterAfterSequence(
-  events: AgentEvent[],
-  afterSequence: number | undefined,
-): AgentEvent[] {
+function filterAfterSequence(events: AgentEvent[], afterSequence: number | undefined): AgentEvent[] {
   if (afterSequence === undefined) return events;
   return events.filter((event) => event.sequence > afterSequence);
 }

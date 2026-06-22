@@ -86,7 +86,10 @@ export function MissingEnvBanner({
         {missing.map((m) => (
           <div key={m.secretName} className="space-y-1">
             <div className="flex items-center gap-3">
-              <label className="font-mono text-xs text-amber-800 dark:text-amber-300 w-52 shrink-0 truncate" title={m.secretName}>
+              <label
+                className="font-mono text-xs text-amber-800 dark:text-amber-300 w-52 shrink-0 truncate"
+                title={m.secretName}
+              >
                 {m.secretName}
               </label>
               <input

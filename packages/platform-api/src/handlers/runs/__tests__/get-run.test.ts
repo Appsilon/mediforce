@@ -39,9 +39,7 @@ describe('getRun handler', () => {
       'r1',
       buildStepExecution({ id: 'e2', instanceId: 'r1', stepId: 's2', output: { final: 42 } }),
     );
-    await processRepo.saveWorkflowDefinition(
-      buildWorkflowDefinition({ namespace: 'alpha', name: 'wf', version: 1 }),
-    );
+    await processRepo.saveWorkflowDefinition(buildWorkflowDefinition({ namespace: 'alpha', name: 'wf', version: 1 }));
 
     const scope = createTestScope({ instanceRepo, processRepo });
     const result = await getRun({ runId: 'r1' }, scope);
@@ -54,9 +52,7 @@ describe('getRun handler', () => {
   });
 
   it('returns null finalOutput while the run is still active', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'r1', namespace: 'alpha', status: 'running' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'r1', namespace: 'alpha', status: 'running' }));
     await instanceRepo.addStepExecution(
       'r1',
       buildStepExecution({ id: 'e1', instanceId: 'r1', output: { done: true } }),
@@ -69,9 +65,7 @@ describe('getRun handler', () => {
   });
 
   it('skips later steps without output and picks the most recent completed one with output', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'r1', namespace: 'alpha', status: 'failed' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'r1', namespace: 'alpha', status: 'failed' }));
     await instanceRepo.addStepExecution(
       'r1',
       buildStepExecution({ id: 'e1', instanceId: 'r1', stepId: 's1', status: 'completed', output: { picked: true } }),

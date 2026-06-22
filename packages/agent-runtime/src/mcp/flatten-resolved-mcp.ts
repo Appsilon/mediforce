@@ -6,9 +6,7 @@ import type { McpServerConfig, ResolvedMcpConfig } from '@mediforce/platform-cor
  *  config, becomes the `name` field.
  *
  *  Returns an empty array when the resolved config has no servers. */
-export function flattenResolvedMcpToLegacy(
-  resolved: ResolvedMcpConfig,
-): McpServerConfig[] {
+export function flattenResolvedMcpToLegacy(resolved: ResolvedMcpConfig): McpServerConfig[] {
   return Object.entries(resolved.servers).map(([name, server]) => {
     if (server.type === 'stdio') {
       return {

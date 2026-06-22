@@ -15,11 +15,7 @@ import {
   type RunNameEntry,
 } from '@mediforce/platform-core';
 import type { Database } from '../client';
-import {
-  processInstances,
-  stepExecutions,
-  agentEvents,
-} from '../schema/process-instance';
+import { processInstances, stepExecutions, agentEvents } from '../schema/process-instance';
 
 const ACTIVE_STATUSES: readonly InstanceStatus[] = ['running', 'created', 'paused'];
 const NON_TERMINAL_STATUSES: readonly InstanceStatus[] = ['running', 'created', 'paused'];
@@ -57,17 +53,14 @@ const NON_TERMINAL_STATUSES: readonly InstanceStatus[] = ['running', 'created', 
  * Validation parses on every read AND every write (ADR-0001 Implementation
  * pattern 2).
  */
-export class PostgresProcessInstanceRepository
-  implements ProcessInstanceRepository
-{
+export class PostgresProcessInstanceRepository implements ProcessInstanceRepository {
   constructor(private readonly db: Database) {}
 
   async create(instance: ProcessInstance): Promise<ProcessInstance> {
     const parsed = ProcessInstanceSchema.parse(instance);
     if (typeof parsed.namespace !== 'string') {
       throw new Error(
-        'PostgresProcessInstanceRepository.create: ProcessInstance.namespace ' +
-          `is required (id=${parsed.id}).`,
+        'PostgresProcessInstanceRepository.create: ProcessInstance.namespace ' + `is required (id=${parsed.id}).`,
       );
     }
     const [row] = await this.db
@@ -87,8 +80,7 @@ export class PostgresProcessInstanceRepository
         assignedRoles: parsed.assignedRoles,
         previousRun: parsed.previousRun ?? null,
         previousRunSourceId: parsed.previousRunSourceId ?? null,
-        totalCostUsd:
-          parsed.totalCostUsd !== undefined ? String(parsed.totalCostUsd) : null,
+        totalCostUsd: parsed.totalCostUsd !== undefined ? String(parsed.totalCostUsd) : null,
         createdBy: parsed.createdBy,
         dryRun: parsed.dryRun === true,
         archivedAt: parsed.archived === true ? new Date() : null,
@@ -101,11 +93,7 @@ export class PostgresProcessInstanceRepository
   }
 
   async getById(instanceId: string): Promise<ProcessInstance | null> {
-    const rows = await this.db
-      .select()
-      .from(processInstances)
-      .where(eq(processInstances.id, instanceId))
-      .limit(1);
+    const rows = await this.db.select().from(processInstances).where(eq(processInstances.id, instanceId)).limit(1);
     const row = rows[0];
     return row ? toInstance(row) : null;
   }
@@ -119,20 +107,12 @@ export class PostgresProcessInstanceRepository
     return rows[0]?.workspace ?? null;
   }
 
-  async getByIdInNamespaces(
-    instanceId: string,
-    allowed: readonly string[],
-  ): Promise<ProcessInstance | null> {
+  async getByIdInNamespaces(instanceId: string, allowed: readonly string[]): Promise<ProcessInstance | null> {
     if (allowed.length === 0) return null;
     const rows = await this.db
       .select()
       .from(processInstances)
-      .where(
-        and(
-          eq(processInstances.id, instanceId),
-          inArray(processInstances.workspace, [...allowed]),
-        ),
-      )
+      .where(and(eq(processInstances.id, instanceId), inArray(processInstances.workspace, [...allowed])))
       .limit(1);
     const row = rows[0];
     return row ? toInstance(row) : null;
@@ -161,15 +141,9 @@ export class PostgresProcessInstanceRepository
     return rows.map((r) => toInstance(r));
   }
 
-  async listInNamespaces(
-    allowed: readonly string[],
-    options: ListInstancesOptions,
-  ): Promise<ProcessInstance[]> {
+  async listInNamespaces(allowed: readonly string[], options: ListInstancesOptions): Promise<ProcessInstance[]> {
     if (allowed.length === 0) return [];
-    const conditions = [
-      isNull(processInstances.deletedAt),
-      inArray(processInstances.workspace, [...allowed]),
-    ];
+    const conditions = [isNull(processInstances.deletedAt), inArray(processInstances.workspace, [...allowed])];
     if (options.definitionName !== undefined) {
       conditions.push(eq(processInstances.definitionName, options.definitionName));
     }
@@ -198,12 +172,7 @@ export class PostgresProcessInstanceRepository
         definitionName: processInstances.definitionName,
       })
       .from(processInstances)
-      .where(
-        and(
-          eq(processInstances.workspace, namespace),
-          isNull(processInstances.deletedAt),
-        ),
-      );
+      .where(and(eq(processInstances.workspace, namespace), isNull(processInstances.deletedAt)));
     return rows.map((r) => RunNameEntrySchema.parse(r));
   }
 
@@ -216,28 +185,17 @@ export class PostgresProcessInstanceRepository
     return rows.map((r) => toInstance(r));
   }
 
-  async getByStatusInNamespaces(
-    status: InstanceStatus,
-    allowed: readonly string[],
-  ): Promise<ProcessInstance[]> {
+  async getByStatusInNamespaces(status: InstanceStatus, allowed: readonly string[]): Promise<ProcessInstance[]> {
     if (allowed.length === 0) return [];
     const rows = await this.db
       .select()
       .from(processInstances)
-      .where(
-        and(
-          eq(processInstances.status, status),
-          inArray(processInstances.workspace, [...allowed]),
-        ),
-      )
+      .where(and(eq(processInstances.status, status), inArray(processInstances.workspace, [...allowed])))
       .orderBy(desc(processInstances.createdAt));
     return rows.map((r) => toInstance(r));
   }
 
-  async update(
-    instanceId: string,
-    updates: Partial<ProcessInstance>,
-  ): Promise<void> {
+  async update(instanceId: string, updates: Partial<ProcessInstance>): Promise<void> {
     const set: Record<string, unknown> = {};
     if (updates.status !== undefined) set.status = updates.status;
     if (updates.currentStepId !== undefined) set.currentStepId = updates.currentStepId;
@@ -260,31 +218,18 @@ export class PostgresProcessInstanceRepository
       set.deletedAt = updates.deleted ? new Date() : null;
     }
     if (Object.keys(set).length === 0) return;
-    await this.db
-      .update(processInstances)
-      .set(set)
-      .where(eq(processInstances.id, instanceId));
+    await this.db.update(processInstances).set(set).where(eq(processInstances.id, instanceId));
   }
 
-  async getByDefinition(
-    name: string,
-    version: string,
-  ): Promise<ProcessInstance[]> {
+  async getByDefinition(name: string, version: string): Promise<ProcessInstance[]> {
     const rows = await this.db
       .select()
       .from(processInstances)
-      .where(
-        and(
-          eq(processInstances.definitionName, name),
-          eq(processInstances.definitionVersion, version),
-        ),
-      );
+      .where(and(eq(processInstances.definitionName, name), eq(processInstances.definitionVersion, version)));
     return rows.map((r) => toInstance(r));
   }
 
-  async getLastCompletedByDefinitionName(
-    name: string,
-  ): Promise<ProcessInstance | null> {
+  async getLastCompletedByDefinitionName(name: string): Promise<ProcessInstance | null> {
     // Mirrors the Firestore query shape: filter on `deleted_at IS NULL`
     // (the Postgres analogue of `deleted === false`) so tombstoned runs
     // never shadow a valid predecessor.
@@ -304,10 +249,7 @@ export class PostgresProcessInstanceRepository
     return row ? toInstance(row) : null;
   }
 
-  async addStepExecution(
-    instanceId: string,
-    execution: StepExecution,
-  ): Promise<StepExecution> {
+  async addStepExecution(instanceId: string, execution: StepExecution): Promise<StepExecution> {
     const parsed = StepExecutionSchema.parse(execution);
     const [row] = await this.db
       .insert(stepExecutions)
@@ -338,35 +280,21 @@ export class PostgresProcessInstanceRepository
       .from(stepExecutions)
       .where(eq(stepExecutions.processInstanceId, instanceId))
       .orderBy(asc(stepExecutions.startedAt));
-    return rows.map((r) =>
-      toStepExecution(r, instanceId),
-    );
+    return rows.map((r) => toStepExecution(r, instanceId));
   }
 
-  async getLatestStepExecution(
-    instanceId: string,
-    stepId: string,
-  ): Promise<StepExecution | null> {
+  async getLatestStepExecution(instanceId: string, stepId: string): Promise<StepExecution | null> {
     const rows = await this.db
       .select()
       .from(stepExecutions)
-      .where(
-        and(
-          eq(stepExecutions.processInstanceId, instanceId),
-          eq(stepExecutions.stepId, stepId),
-        ),
-      )
+      .where(and(eq(stepExecutions.processInstanceId, instanceId), eq(stepExecutions.stepId, stepId)))
       .orderBy(desc(stepExecutions.startedAt))
       .limit(1);
     const row = rows[0];
     return row ? toStepExecution(row, instanceId) : null;
   }
 
-  async updateStepExecution(
-    instanceId: string,
-    executionId: string,
-    updates: Partial<StepExecution>,
-  ): Promise<void> {
+  async updateStepExecution(instanceId: string, executionId: string, updates: Partial<StepExecution>): Promise<void> {
     const set: Record<string, unknown> = {};
     if (updates.status !== undefined) set.status = updates.status;
     if (updates.input !== undefined) set.input = updates.input;
@@ -390,12 +318,7 @@ export class PostgresProcessInstanceRepository
     await this.db
       .update(stepExecutions)
       .set(set)
-      .where(
-        and(
-          eq(stepExecutions.processInstanceId, instanceId),
-          eq(stepExecutions.id, executionId),
-        ),
-      );
+      .where(and(eq(stepExecutions.processInstanceId, instanceId), eq(stepExecutions.id, executionId)));
   }
 
   async getIdsByDefinitionName(name: string): Promise<string[]> {
@@ -406,10 +329,7 @@ export class PostgresProcessInstanceRepository
     return rows.map((r) => r.id);
   }
 
-  async setDeletedByDefinitionName(
-    name: string,
-    deleted: boolean,
-  ): Promise<void> {
+  async setDeletedByDefinitionName(name: string, deleted: boolean): Promise<void> {
     await this.db
       .update(processInstances)
       .set({ deletedAt: deleted ? new Date() : null })
@@ -437,10 +357,7 @@ export class PostgresProcessInstanceRepository
     const totalWhere = includeCompleted
       ? base
       : and(base, inArray(processInstances.status, [...NON_TERMINAL_STATUSES]));
-    const [totalRow] = await this.db
-      .select({ value: count() })
-      .from(processInstances)
-      .where(totalWhere);
+    const [totalRow] = await this.db.select({ value: count() }).from(processInstances).where(totalWhere);
     const total = Number(totalRow?.value ?? 0);
 
     const latestRows = await this.db
@@ -449,9 +366,7 @@ export class PostgresProcessInstanceRepository
       .where(totalWhere)
       .orderBy(desc(processInstances.createdAt))
       .limit(3);
-    const latest = latestRows.map((r) =>
-      toInstance(r),
-    );
+    const latest = latestRows.map((r) => toInstance(r));
 
     return { total, active, latest };
   }
@@ -483,10 +398,7 @@ export class PostgresProcessInstanceRepository
    * Read agent events for an instance, optionally narrowed to a step.
    * Ordered by `sequence` to match the in-memory cache.
    */
-  async getAgentEvents(
-    instanceId: string,
-    stepId?: string,
-  ): Promise<AgentEvent[]> {
+  async getAgentEvents(instanceId: string, stepId?: string): Promise<AgentEvent[]> {
     const conditions = [eq(agentEvents.processInstanceId, instanceId)];
     if (stepId !== undefined) {
       conditions.push(eq(agentEvents.stepId, stepId));
@@ -519,20 +431,14 @@ function toInstance(row: typeof processInstances.$inferSelect): ProcessInstance 
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     createdBy: row.createdBy ?? '',
-    previousRun:
-      row.previousRun !== null
-        ? (row.previousRun as Record<string, unknown>)
-        : undefined,
+    previousRun: row.previousRun !== null ? (row.previousRun as Record<string, unknown>) : undefined,
     previousRunSourceId: row.previousRunSourceId ?? undefined,
     totalCostUsd: row.totalCostUsd !== null ? Number(row.totalCostUsd) : undefined,
     dryRun: row.dryRun === true,
   });
 }
 
-function toStepExecution(
-  row: typeof stepExecutions.$inferSelect,
-  instanceId: string,
-): StepExecution {
+function toStepExecution(row: typeof stepExecutions.$inferSelect, instanceId: string): StepExecution {
   return parseRow(StepExecutionSchema, {
     id: row.id,
     instanceId,
@@ -544,9 +450,7 @@ function toStepExecution(
     gateResult: row.gateResult as StepExecution['gateResult'],
     error: row.error,
     executedBy: row.executedBy ?? '',
-    startedAt: row.startedAt
-      ? row.startedAt.toISOString()
-      : new Date(0).toISOString(),
+    startedAt: row.startedAt ? row.startedAt.toISOString() : new Date(0).toISOString(),
     completedAt: row.completedAt ? row.completedAt.toISOString() : null,
     iterationNumber: row.iterationNumber,
     reviewVerdicts: row.reviewVerdicts ?? undefined,
@@ -554,10 +458,7 @@ function toStepExecution(
   });
 }
 
-function toAgentEvent(
-  row: typeof agentEvents.$inferSelect,
-  instanceId: string,
-): AgentEvent {
+function toAgentEvent(row: typeof agentEvents.$inferSelect, instanceId: string): AgentEvent {
   return {
     id: row.id,
     processInstanceId: instanceId,
@@ -568,4 +469,3 @@ function toAgentEvent(
     timestamp: row.timestamp.toISOString(),
   };
 }
-

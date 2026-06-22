@@ -19,11 +19,7 @@ export interface OAuthProviderRepository {
 
   /** Patch an existing provider. Returns null if the id does not exist.
    *  Refreshes `updatedAt`. */
-  update(
-    namespace: string,
-    id: string,
-    patch: UpdateOAuthProviderInput,
-  ): Promise<OAuthProviderConfig | null>;
+  update(namespace: string, id: string, patch: UpdateOAuthProviderInput): Promise<OAuthProviderConfig | null>;
 
   /** Delete a provider. No-op if the id does not exist. Returns whether
    *  a document was actually removed. */

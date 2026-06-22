@@ -94,9 +94,7 @@ async function waitForStepResult(
 }
 
 test.describe('script-container dispatch — API E2E', () => {
-  test('inline script runs through the engine and its result.json becomes the step output', async ({
-    request,
-  }) => {
+  test('inline script runs through the engine and its result.json becomes the step output', async ({ request }) => {
     const wdName = `e2e-script-dispatch-${Date.now()}`;
 
     const wd = {
@@ -123,10 +121,10 @@ test.describe('script-container dispatch — API E2E', () => {
       triggers: [{ type: 'manual', name: 'Start' }],
     };
 
-    const createWdRes = await request.post(
-      `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
-      { headers: JSON_HEADERS, data: wd },
-    );
+    const createWdRes = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
+      headers: JSON_HEADERS,
+      data: wd,
+    });
     expect(createWdRes.status(), await createWdRes.text()).toBe(201);
 
     const instanceId = await startRun(request, wdName);
@@ -150,7 +148,9 @@ test.describe('databricks-job dispatch — API E2E', () => {
   test.beforeAll(async () => {
     mockDatabricks = createServer((req, res) => {
       let raw = '';
-      req.on('data', (chunk: Buffer) => { raw += chunk.toString(); });
+      req.on('data', (chunk: Buffer) => {
+        raw += chunk.toString();
+      });
       req.on('end', () => {
         seenRequests.push({
           method: req.method ?? '',
@@ -220,10 +220,10 @@ test.describe('databricks-job dispatch — API E2E', () => {
       triggers: [{ type: 'manual', name: 'Start' }],
     };
 
-    const createWdRes = await request.post(
-      `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
-      { headers: JSON_HEADERS, data: wd },
-    );
+    const createWdRes = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
+      headers: JSON_HEADERS,
+      data: wd,
+    });
     expect(createWdRes.status(), await createWdRes.text()).toBe(201);
 
     const secretsRes = await request.put(

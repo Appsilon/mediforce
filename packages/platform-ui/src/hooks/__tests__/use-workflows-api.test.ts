@@ -3,26 +3,28 @@ import { mapApiToDefinitionGroups, type ApiDefinitionItem } from '../use-workflo
 
 describe('mapApiToDefinitionGroups', () => {
   it('maps API response to DefinitionGroup shape', () => {
-    const items: ApiDefinitionItem[] = [{
-      name: 'test-workflow',
-      latestVersion: 2,
-      defaultVersion: 1,
-      definition: {
+    const items: ApiDefinitionItem[] = [
+      {
         name: 'test-workflow',
-        version: 2,
-        steps: [
-          { id: 'start', type: 'start' },
-          { id: 'process', type: 'agent' },
-          { id: 'end', type: 'terminal' },
-        ],
-        triggers: [{ type: 'manual', name: 'default' }],
-        title: 'Test Workflow',
-        description: 'A test',
-        namespace: 'acme',
-        visibility: 'public',
-        repo: { url: 'https://github.com/example/repo' },
+        latestVersion: 2,
+        defaultVersion: 1,
+        definition: {
+          name: 'test-workflow',
+          version: 2,
+          steps: [
+            { id: 'start', type: 'start' },
+            { id: 'process', type: 'agent' },
+            { id: 'end', type: 'terminal' },
+          ],
+          triggers: [{ type: 'manual', name: 'default' }],
+          title: 'Test Workflow',
+          description: 'A test',
+          namespace: 'acme',
+          visibility: 'public',
+          repo: { url: 'https://github.com/example/repo' },
+        },
       },
-    }];
+    ];
 
     const result = mapApiToDefinitionGroups(items);
 
@@ -32,13 +34,15 @@ describe('mapApiToDefinitionGroups', () => {
       title: 'Test Workflow',
       description: 'A test',
       latestVersion: '2',
-      versions: [{
-        version: '2',
-        stepCount: 3,
-        triggerCount: 1,
-        title: 'Test Workflow',
-        description: 'A test',
-      }],
+      versions: [
+        {
+          version: '2',
+          stepCount: 3,
+          triggerCount: 1,
+          title: 'Test Workflow',
+          description: 'A test',
+        },
+      ],
       stepCount: 3,
       hasManualTrigger: true,
       repo: { url: 'https://github.com/example/repo' },
@@ -83,30 +87,34 @@ describe('mapApiToDefinitionGroups', () => {
   });
 
   it('skips items with null definition', () => {
-    const items: ApiDefinitionItem[] = [{
-      name: 'broken',
-      latestVersion: 1,
-      defaultVersion: 1,
-      definition: null,
-    }];
+    const items: ApiDefinitionItem[] = [
+      {
+        name: 'broken',
+        latestVersion: 1,
+        defaultVersion: 1,
+        definition: null,
+      },
+    ];
 
     const result = mapApiToDefinitionGroups(items);
     expect(result).toHaveLength(0);
   });
 
   it('detects no manual trigger', () => {
-    const items: ApiDefinitionItem[] = [{
-      name: 'cron-only',
-      latestVersion: 1,
-      defaultVersion: 1,
-      definition: {
+    const items: ApiDefinitionItem[] = [
+      {
         name: 'cron-only',
-        version: 1,
-        steps: [{ id: 's1', type: 'start' }],
-        triggers: [{ type: 'cron', name: 'nightly' }],
-        namespace: 'ns',
+        latestVersion: 1,
+        defaultVersion: 1,
+        definition: {
+          name: 'cron-only',
+          version: 1,
+          steps: [{ id: 's1', type: 'start' }],
+          triggers: [{ type: 'cron', name: 'nightly' }],
+          namespace: 'ns',
+        },
       },
-    }];
+    ];
 
     const result = mapApiToDefinitionGroups(items);
     expect(result[0].hasManualTrigger).toBe(false);

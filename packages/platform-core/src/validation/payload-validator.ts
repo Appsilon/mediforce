@@ -99,7 +99,10 @@ function validateFieldType(
       if (options) {
         const invalid = value.filter((item) => typeof item !== 'string' || !options.includes(item));
         if (invalid.length > 0) {
-          return { field: name, message: `'${name}' contains invalid options: ${invalid.map(String).join(', ')}; allowed: ${options.join(', ')}` };
+          return {
+            field: name,
+            message: `'${name}' contains invalid options: ${invalid.map(String).join(', ')}; allowed: ${options.join(', ')}`,
+          };
         }
       }
       return null;

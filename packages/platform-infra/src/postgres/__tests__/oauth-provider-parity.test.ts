@@ -21,9 +21,7 @@ const MIGRATIONS_DIR = resolve(__dirname, '..', 'migrations');
 const DATABASE_URL = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const skipPg = !DATABASE_URL;
 
-function inputBase(
-  overrides: Partial<CreateOAuthProviderInput> = {},
-): CreateOAuthProviderInput {
+function inputBase(overrides: Partial<CreateOAuthProviderInput> = {}): CreateOAuthProviderInput {
   return {
     id: 'github',
     name: 'GitHub',
@@ -105,9 +103,7 @@ function contract(
 
     it('create throws ProviderAlreadyExistsError when id is taken', async () => {
       await repo.create('ws-1', inputBase());
-      await expect(repo.create('ws-1', inputBase())).rejects.toBeInstanceOf(
-        ProviderAlreadyExistsError,
-      );
+      await expect(repo.create('ws-1', inputBase())).rejects.toBeInstanceOf(ProviderAlreadyExistsError);
     });
 
     it('list returns providers sorted by id', async () => {
@@ -144,9 +140,7 @@ function contract(
       expect(updated?.name).toBe('Updated');
       expect(updated?.clientId).toBe(original.clientId);
       expect(updated?.scopes).toEqual(original.scopes);
-      expect(new Date(updated!.updatedAt).getTime()).toBeGreaterThan(
-        new Date(original.updatedAt).getTime(),
-      );
+      expect(new Date(updated!.updatedAt).getTime()).toBeGreaterThan(new Date(original.updatedAt).getTime());
     });
 
     it('delete returns true when present and false when not', async () => {
@@ -157,9 +151,7 @@ function contract(
     });
 
     it('rejects create with invalid payload (bad id slug)', async () => {
-      await expect(
-        repo.create('ws-1', inputBase({ id: 'BAD ID with spaces' })),
-      ).rejects.toThrow();
+      await expect(repo.create('ws-1', inputBase({ id: 'BAD ID with spaces' }))).rejects.toThrow();
     });
 
     it('rejects create with invalid payload (missing scopes)', async () => {
@@ -188,7 +180,9 @@ describe.skipIf(skipPg)('PostgresOAuthProviderRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sql);
@@ -243,8 +237,6 @@ describe.skipIf(skipPg)('PostgresOAuthProviderRepository (parity)', () => {
     const before = await repo.create('trig', inputBase());
     await new Promise((r) => setTimeout(r, 10));
     const after = await repo.update('trig', 'github', { name: 'Renamed' });
-    expect(new Date(after!.updatedAt).getTime()).toBeGreaterThan(
-      new Date(before.updatedAt).getTime(),
-    );
+    expect(new Date(after!.updatedAt).getTime()).toBeGreaterThan(new Date(before.updatedAt).getTime());
   });
 });

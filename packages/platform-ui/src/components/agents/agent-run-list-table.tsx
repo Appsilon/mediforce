@@ -13,11 +13,35 @@ import type { LucideIcon } from 'lucide-react';
 
 function getPluginDisplay(pluginId: string): { Icon: LucideIcon; colorClass: string; label: string } {
   const id = pluginId.toLowerCase();
-  if (id.includes('claude')) return { Icon: Bot, colorClass: 'text-violet-500', label: pluginId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) };
-  if (id.includes('opencode')) return { Icon: Cpu, colorClass: 'text-blue-500', label: pluginId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) };
-  if (id.includes('script')) return { Icon: Terminal, colorClass: 'text-slate-500', label: pluginId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) };
-  if (id.includes('risk') || id.includes('driver') || id.includes('supply')) return { Icon: BarChart3, colorClass: 'text-emerald-500', label: pluginId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) };
-  return { Icon: Bot, colorClass: 'text-primary', label: pluginId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) };
+  if (id.includes('claude'))
+    return {
+      Icon: Bot,
+      colorClass: 'text-violet-500',
+      label: pluginId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    };
+  if (id.includes('opencode'))
+    return {
+      Icon: Cpu,
+      colorClass: 'text-blue-500',
+      label: pluginId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    };
+  if (id.includes('script'))
+    return {
+      Icon: Terminal,
+      colorClass: 'text-slate-500',
+      label: pluginId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    };
+  if (id.includes('risk') || id.includes('driver') || id.includes('supply'))
+    return {
+      Icon: BarChart3,
+      colorClass: 'text-emerald-500',
+      label: pluginId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    };
+  return {
+    Icon: Bot,
+    colorClass: 'text-primary',
+    label: pluginId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+  };
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -66,30 +90,35 @@ export function AgentRunListTable({
         <thead className="bg-muted/50">
           <tr>
             {['Agent', 'Autonomy', 'Workflow', 'Status', 'Confidence', 'Model', 'Duration', 'Started'].map((h) => (
-              <th key={h} className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+              <th
+                key={h}
+                className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap"
+              >
                 {h}
               </th>
             ))}
           </tr>
         </thead>
         <tbody className="divide-y">
-          {loading
-            ? Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
-            : runs.length === 0
-            ? (
-              <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                  No agent runs yet. Agent runs appear here once the AgentRunner executes with a repository configured.
-                </td>
-              </tr>
-            )
-            : runs.map((run) => (
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
+          ) : runs.length === 0 ? (
+            <tr>
+              <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                No agent runs yet. Agent runs appear here once the AgentRunner executes with a repository configured.
+              </td>
+            </tr>
+          ) : (
+            runs.map((run) => (
               <tr key={run.id} className="hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3">
                   {(() => {
                     const { Icon, colorClass, label } = getPluginDisplay(run.pluginId);
                     return (
-                      <Link href={routes.agent(handle, run.id)} className="inline-flex items-center gap-1.5 font-medium text-xs hover:text-primary transition-colors">
+                      <Link
+                        href={routes.agent(handle, run.id)}
+                        className="inline-flex items-center gap-1.5 font-medium text-xs hover:text-primary transition-colors"
+                      >
                         <Icon className={cn('h-3.5 w-3.5 shrink-0', colorClass)} />
                         {label}
                       </Link>
@@ -100,21 +129,30 @@ export function AgentRunListTable({
                   <AutonomyBadge level={run.autonomyLevel} />
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/${handle}/workflows/${run.processInstanceId}`} className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                  <Link
+                    href={`/${handle}/workflows/${run.processInstanceId}`}
+                    className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                  >
                     {processNameMap?.get(run.processInstanceId) ?? `${run.processInstanceId.slice(0, 8)}...`}
                   </Link>
                 </td>
                 <td className="px-4 py-3">
-                  <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', STATUS_STYLES[run.status] ?? STATUS_STYLES.paused)}>
+                  <span
+                    className={cn(
+                      'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                      STATUS_STYLES[run.status] ?? STATUS_STYLES.paused,
+                    )}
+                  >
                     {run.status.replace(/_/g, ' ')}
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <ConfidenceBadge confidence={run.envelope?.confidence} rationale={run.envelope?.confidence_rationale} />
+                  <ConfidenceBadge
+                    confidence={run.envelope?.confidence}
+                    rationale={run.envelope?.confidence_rationale}
+                  />
                 </td>
-                <td className="px-4 py-3 text-xs text-muted-foreground">
-                  {run.envelope?.model ?? '—'}
-                </td>
+                <td className="px-4 py-3 text-xs text-muted-foreground">{run.envelope?.model ?? '—'}</td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {formatDuration(run.startedAt, run.completedAt)}
                 </td>
@@ -122,7 +160,8 @@ export function AgentRunListTable({
                   {format(new Date(run.startedAt), 'MMM d, HH:mm')}
                 </td>
               </tr>
-            ))}
+            ))
+          )}
         </tbody>
       </table>
     </div>

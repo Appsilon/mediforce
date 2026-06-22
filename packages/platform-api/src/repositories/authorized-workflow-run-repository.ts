@@ -32,9 +32,7 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
   }
 
   getById = async (id: string): Promise<ProcessInstance | null> =>
-    this.caller.isSystemActor
-      ? this.raw.getById(id)
-      : this.raw.getByIdInNamespaces(id, [...this.caller.namespaces]);
+    this.caller.isSystemActor ? this.raw.getById(id) : this.raw.getByIdInNamespaces(id, [...this.caller.namespaces]);
 
   list = async (options: ListInstancesOptions): Promise<ProcessInstance[]> =>
     this.caller.isSystemActor
@@ -59,9 +57,7 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
     const all = await this.raw.getByDefinition(name, version);
     if (this.caller.isSystemActor) return all;
     const allowed = this.caller.namespaces;
-    return all.filter(
-      (run) => typeof run.namespace === 'string' && allowed.has(run.namespace),
-    );
+    return all.filter((run) => typeof run.namespace === 'string' && allowed.has(run.namespace));
   };
 
   /** Step executions belong to the parent run; gating is on the parent. */

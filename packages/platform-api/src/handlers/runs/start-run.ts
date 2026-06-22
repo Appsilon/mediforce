@@ -5,34 +5,20 @@ import { ForbiddenError, NotFoundError, HandlerError } from '../../errors';
 
 // Engine's createInstance + startInstance emit instance.created /
 // instance.started; handler does NOT double-emit.
-export async function startRun(
-  input: StartRunInput,
-  scope: CallerScope,
-): Promise<StartRunOutput> {
+export async function startRun(input: StartRunInput, scope: CallerScope): Promise<StartRunOutput> {
   const requestNamespace = input.namespace ?? '';
   let version = input.definitionVersion;
   if (!version) {
-    const resolved = await scope.workflowDefinitions.getLatestVersion(
-      requestNamespace,
-      input.definitionName,
-    );
+    const resolved = await scope.workflowDefinitions.getLatestVersion(requestNamespace, input.definitionName);
     if (resolved === 0) {
-      throw new NotFoundError(
-        `No workflow definition found for '${input.definitionName}'`,
-      );
+      throw new NotFoundError(`No workflow definition found for '${input.definitionName}'`);
     }
     version = resolved;
   }
 
-  const definition = await scope.workflowDefinitions.get(
-    requestNamespace,
-    input.definitionName,
-    version,
-  );
+  const definition = await scope.workflowDefinitions.get(requestNamespace, input.definitionName, version);
   if (!definition) {
-    throw new NotFoundError(
-      `Workflow definition '${input.definitionName}' v${version} not found`,
-    );
+    throw new NotFoundError(`Workflow definition '${input.definitionName}' v${version} not found`);
   }
 
   if (!scope.caller.isSystemActor && definition.visibility !== 'public') {
@@ -66,10 +52,7 @@ export async function startRun(
 
   const created = await scope.runs.getById(result.instanceId);
   if (!created) {
-    throw new HandlerError(
-      'internal',
-      `Run '${result.instanceId}' not readable after creation`,
-    );
+    throw new HandlerError('internal', `Run '${result.instanceId}' not readable after creation`);
   }
   return { run: created };
 }

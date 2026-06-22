@@ -19,9 +19,7 @@ export class InMemoryAuthService implements AuthService {
 
   async requireAuth(): Promise<AuthUser> {
     if (!this.currentUser) {
-      throw new Error(
-        'Authentication required. No user is currently signed in.',
-      );
+      throw new Error('Authentication required. No user is currently signed in.');
     }
     return this.currentUser;
   }
@@ -30,9 +28,7 @@ export class InMemoryAuthService implements AuthService {
     const user = await this.requireAuth();
 
     if (!user.roles.includes(role)) {
-      throw new Error(
-        `Authorization failed. User does not have required role: ${role}`,
-      );
+      throw new Error(`Authorization failed. User does not have required role: ${role}`);
     }
 
     return user;

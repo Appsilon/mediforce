@@ -1,9 +1,6 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { listAgentOAuthTokens } from '@mediforce/platform-api/handlers';
-import {
-  ListAgentOAuthTokensInputSchema,
-  type ListAgentOAuthTokensInput,
-} from '@mediforce/platform-api/contract';
+import { ListAgentOAuthTokensInputSchema, type ListAgentOAuthTokensInput } from '@mediforce/platform-api/contract';
 
 interface RouteContext {
   params: Promise<{ id: string }>;

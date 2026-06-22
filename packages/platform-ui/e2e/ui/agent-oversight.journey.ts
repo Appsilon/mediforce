@@ -64,7 +64,9 @@ test.describe('Agent Oversight Journey', () => {
     await expect(page.getByText('Available AI agents for building workflows')).toBeVisible({ timeout: 10_000 });
     await click(page, page.getByRole('link', { name: 'New Agent', exact: true }));
     await page.waitForURL(`**/${TEST_ORG_HANDLE}/agents/new`, { timeout: 20_000 });
-    await expect(page.getByText('Register a new AI agent and configure its capabilities.')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Register a new AI agent and configure its capabilities.')).toBeVisible({
+      timeout: 10_000,
+    });
     await showStep(page);
 
     // Fill in agent details

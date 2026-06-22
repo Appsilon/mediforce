@@ -22,15 +22,9 @@ describe('listWorkflows handler', () => {
   });
 
   it('groups versions by name and resolves the latest version', async () => {
-    await processRepo.saveWorkflowDefinition(
-      buildWorkflowDefinition({ name: 'flow-a', version: 1 }),
-    );
-    await processRepo.saveWorkflowDefinition(
-      buildWorkflowDefinition({ name: 'flow-a', version: 2 }),
-    );
-    await processRepo.saveWorkflowDefinition(
-      buildWorkflowDefinition({ name: 'flow-b', version: 1 }),
-    );
+    await processRepo.saveWorkflowDefinition(buildWorkflowDefinition({ name: 'flow-a', version: 1 }));
+    await processRepo.saveWorkflowDefinition(buildWorkflowDefinition({ name: 'flow-a', version: 2 }));
+    await processRepo.saveWorkflowDefinition(buildWorkflowDefinition({ name: 'flow-b', version: 1 }));
 
     const scope = createTestScope({ processRepo });
     const result = await listWorkflows({ includeCompletedRuns: true }, scope);
@@ -42,15 +36,9 @@ describe('listWorkflows handler', () => {
   });
 
   it('returns latest version per name (newest version wins)', async () => {
-    await processRepo.saveWorkflowDefinition(
-      buildWorkflowDefinition({ name: 'flow-a', version: 1 }),
-    );
-    await processRepo.saveWorkflowDefinition(
-      buildWorkflowDefinition({ name: 'flow-a', version: 3 }),
-    );
-    await processRepo.saveWorkflowDefinition(
-      buildWorkflowDefinition({ name: 'flow-a', version: 2 }),
-    );
+    await processRepo.saveWorkflowDefinition(buildWorkflowDefinition({ name: 'flow-a', version: 1 }));
+    await processRepo.saveWorkflowDefinition(buildWorkflowDefinition({ name: 'flow-a', version: 3 }));
+    await processRepo.saveWorkflowDefinition(buildWorkflowDefinition({ name: 'flow-a', version: 2 }));
 
     const scope = createTestScope({ processRepo });
     const result = await listWorkflows({ includeCompletedRuns: true }, scope);
@@ -91,11 +79,7 @@ describe('listWorkflows handler', () => {
     it('api-key callers see every group regardless of visibility', async () => {
       const scope = createTestScope({ processRepo });
       const result = await listWorkflows({ includeCompletedRuns: true }, scope);
-      expect(result.definitions.map((d) => d.name).sort()).toEqual([
-        'alpha-private',
-        'beta-private',
-        'beta-public',
-      ]);
+      expect(result.definitions.map((d) => d.name).sort()).toEqual(['alpha-private', 'beta-private', 'beta-public']);
     });
 
     it('user callers see public + their-namespace workflows', async () => {
@@ -106,10 +90,7 @@ describe('listWorkflows handler', () => {
 
       const result = await listWorkflows({ includeCompletedRuns: true }, scope);
 
-      expect(result.definitions.map((d) => d.name).sort()).toEqual([
-        'alpha-private',
-        'beta-public',
-      ]);
+      expect(result.definitions.map((d) => d.name).sort()).toEqual(['alpha-private', 'beta-public']);
     });
 
     it('user callers without namespace overlap only see public workflows', async () => {
@@ -129,10 +110,7 @@ describe('listWorkflows handler', () => {
         caller: userCaller('u-1', ['team-alpha']),
       });
 
-      const result = await listWorkflows(
-        { namespace: 'team-beta', includeCompletedRuns: true },
-        scope,
-      );
+      const result = await listWorkflows({ namespace: 'team-beta', includeCompletedRuns: true }, scope);
 
       // team-alpha user can see team-beta's public workflow, scoped via filter.
       expect(result.definitions.map((d) => d.name)).toEqual(['beta-public']);
@@ -140,10 +118,7 @@ describe('listWorkflows handler', () => {
 
     it('namespace filter applies for api-key callers too', async () => {
       const scope = createTestScope({ processRepo });
-      const result = await listWorkflows(
-        { namespace: 'team-alpha', includeCompletedRuns: true },
-        scope,
-      );
+      const result = await listWorkflows({ namespace: 'team-alpha', includeCompletedRuns: true }, scope);
 
       expect(result.definitions.map((d) => d.name)).toEqual(['alpha-private']);
     });
@@ -160,9 +135,7 @@ describe('listWorkflows handler', () => {
     });
 
     const seedRun = (overrides: Parameters<typeof buildProcessInstance>[0]) =>
-      instanceRepo.create(
-        buildProcessInstance({ definitionName: 'flow-a', namespace: 'team-alpha', ...overrides }),
-      );
+      instanceRepo.create(buildProcessInstance({ definitionName: 'flow-a', namespace: 'team-alpha', ...overrides }));
 
     it('counts total + active and previews the 3 newest runs (includeCompletedRuns=true)', async () => {
       await seedRun({ status: 'running', createdAt: '2026-01-01T00:00:00.000Z' });
@@ -179,11 +152,7 @@ describe('listWorkflows handler', () => {
       expect(flowA?.runSummary.active).toBe(3);
       expect(flowA?.runSummary.latest).toHaveLength(3);
       // Newest-first by createdAt.
-      expect(flowA?.runSummary.latest.map((r) => r.status)).toEqual([
-        'failed',
-        'completed',
-        'paused',
-      ]);
+      expect(flowA?.runSummary.latest.map((r) => r.status)).toEqual(['failed', 'completed', 'paused']);
     });
 
     it('excludes terminal runs from total + latest when includeCompletedRuns=false', async () => {

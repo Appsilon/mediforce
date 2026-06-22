@@ -8,9 +8,7 @@ import {
 
 type TestTransition = { from: string; to: string; when?: string };
 
-function makeContext(
-  overrides: Partial<TransitionContext> = {},
-): TransitionContext {
+function makeContext(overrides: Partial<TransitionContext> = {}): TransitionContext {
   return {
     output: {},
     variables: {},
@@ -21,9 +19,7 @@ function makeContext(
 describe('resolveTransitions', () => {
   describe('unconditional (single transition, no when)', () => {
     it('single transition without when → always taken', () => {
-      const transitions: TestTransition[] = [
-        { from: 'a', to: 'b' },
-      ];
+      const transitions: TestTransition[] = [{ from: 'a', to: 'b' }];
       const result = resolveTransitions(transitions, makeContext());
       expect(result).toEqual([{ to: 'b', reason: 'Unconditional transition' }]);
     });
@@ -31,9 +27,7 @@ describe('resolveTransitions', () => {
 
   describe('conditional (when expressions)', () => {
     it('single transition with when that matches → taken', () => {
-      const transitions: TestTransition[] = [
-        { from: 'a', to: 'b', when: 'output.valid == true' },
-      ];
+      const transitions: TestTransition[] = [{ from: 'a', to: 'b', when: 'output.valid == true' }];
       const ctx = makeContext({ output: { valid: true } });
       const result = resolveTransitions(transitions, ctx);
       expect(result).toHaveLength(1);
@@ -41,13 +35,9 @@ describe('resolveTransitions', () => {
     });
 
     it('[ERROR] single transition with when that does not match → NoMatchingTransitionError', () => {
-      const transitions: TestTransition[] = [
-        { from: 'a', to: 'b', when: 'output.valid == true' },
-      ];
+      const transitions: TestTransition[] = [{ from: 'a', to: 'b', when: 'output.valid == true' }];
       const ctx = makeContext({ output: { valid: false } });
-      expect(() => resolveTransitions(transitions, ctx)).toThrow(
-        NoMatchingTransitionError,
-      );
+      expect(() => resolveTransitions(transitions, ctx)).toThrow(NoMatchingTransitionError);
     });
 
     it('two transitions with mutually exclusive when — first matches', () => {
@@ -57,9 +47,7 @@ describe('resolveTransitions', () => {
       ];
       const ctx = makeContext({ output: { valid: true } });
       const result = resolveTransitions(transitions, ctx);
-      expect(result).toEqual([
-        { to: 'b', reason: expect.stringContaining('output.valid == true') },
-      ]);
+      expect(result).toEqual([{ to: 'b', reason: expect.stringContaining('output.valid == true') }]);
     });
 
     it('two transitions with mutually exclusive when — second matches', () => {
@@ -69,15 +57,11 @@ describe('resolveTransitions', () => {
       ];
       const ctx = makeContext({ output: { valid: false } });
       const result = resolveTransitions(transitions, ctx);
-      expect(result).toEqual([
-        { to: 'c', reason: expect.stringContaining('output.valid == false') },
-      ]);
+      expect(result).toEqual([{ to: 'c', reason: expect.stringContaining('output.valid == false') }]);
     });
 
     it('when: "true" always matches', () => {
-      const transitions: TestTransition[] = [
-        { from: 'a', to: 'b', when: 'true' },
-      ];
+      const transitions: TestTransition[] = [{ from: 'a', to: 'b', when: 'true' }];
       const result = resolveTransitions(transitions, makeContext());
       expect(result).toHaveLength(1);
       expect(result[0].to).toBe('b');
@@ -148,9 +132,7 @@ describe('resolveTransitions', () => {
       ];
       const ctx = makeContext({ output: { type: 'basic' } });
       const result = resolveTransitions(transitions, ctx);
-      expect(result).toEqual([
-        { to: 'default', reason: 'Default (else) transition' },
-      ]);
+      expect(result).toEqual([{ to: 'default', reason: 'Default (else) transition' }]);
     });
 
     it('when: "else" NOT taken when another transition matches', () => {
@@ -171,9 +153,7 @@ describe('resolveTransitions', () => {
         { from: 'a', to: 'b' },
         { from: 'a', to: 'c', when: 'output.valid == true' },
       ];
-      expect(() => resolveTransitions(transitions, makeContext())).toThrow(
-        TransitionValidationError,
-      );
+      expect(() => resolveTransitions(transitions, makeContext())).toThrow(TransitionValidationError);
     });
 
     it('[ERROR] multiple transitions, none with when → TransitionValidationError', () => {
@@ -181,24 +161,16 @@ describe('resolveTransitions', () => {
         { from: 'a', to: 'b' },
         { from: 'a', to: 'c' },
       ];
-      expect(() => resolveTransitions(transitions, makeContext())).toThrow(
-        TransitionValidationError,
-      );
+      expect(() => resolveTransitions(transitions, makeContext())).toThrow(TransitionValidationError);
     });
 
     it('[ERROR] no transitions → NoMatchingTransitionError', () => {
-      expect(() => resolveTransitions([], makeContext())).toThrow(
-        NoMatchingTransitionError,
-      );
+      expect(() => resolveTransitions([], makeContext())).toThrow(NoMatchingTransitionError);
     });
 
     it('[ERROR] invalid when expression → TransitionValidationError', () => {
-      const transitions: TestTransition[] = [
-        { from: 'a', to: 'b', when: 'invalid $$ syntax' },
-      ];
-      expect(() => resolveTransitions(transitions, makeContext())).toThrow(
-        TransitionValidationError,
-      );
+      const transitions: TestTransition[] = [{ from: 'a', to: 'b', when: 'invalid $$ syntax' }];
+      expect(() => resolveTransitions(transitions, makeContext())).toThrow(TransitionValidationError);
     });
 
     it('[ERROR] no matching transitions and no else → NoMatchingTransitionError', () => {
@@ -207,9 +179,7 @@ describe('resolveTransitions', () => {
         { from: 'a', to: 'c', when: 'output.y == true' },
       ];
       const ctx = makeContext({ output: { x: false, y: false } });
-      expect(() => resolveTransitions(transitions, ctx)).toThrow(
-        NoMatchingTransitionError,
-      );
+      expect(() => resolveTransitions(transitions, ctx)).toThrow(NoMatchingTransitionError);
     });
   });
 });

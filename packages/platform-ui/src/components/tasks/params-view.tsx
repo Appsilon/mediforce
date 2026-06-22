@@ -7,11 +7,5 @@ import type { TaskBodyProps } from './task-body-registry';
 export function ParamsView({ task, remainingTaskCount }: TaskBodyProps) {
   if (task.status !== 'claimed' && task.status !== 'pending') return null;
 
-  return (
-    <ParamsForm
-      taskId={task.id}
-      params={task.params ?? []}
-      remainingTaskCount={remainingTaskCount}
-    />
-  );
+  return <ParamsForm taskId={task.id} params={task.params ?? []} remainingTaskCount={remainingTaskCount} />;
 }

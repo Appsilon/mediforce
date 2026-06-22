@@ -17,9 +17,5 @@ interface RouteContext {
 export const GET = createRouteAdapter<typeof GetAgentRunInputSchema, GetAgentRunInput, unknown, RouteContext>(
   GetAgentRunInputSchema,
   async (_req, ctx) => ({ agentRunId: (await ctx.params).agentRunId }),
-  getByIdAdapter(
-    (input, scope) => scope.agentRuns.getById(input.agentRunId),
-    'Agent run not found',
-    'run',
-  ),
+  getByIdAdapter((input, scope) => scope.agentRuns.getById(input.agentRunId), 'Agent run not found', 'run'),
 );

@@ -32,10 +32,7 @@ export class DcrError extends Error {
 
 /** POST the registration endpoint per RFC 7591. Returns the normalized
  *  response — throws `DcrError` on network or protocol failure. */
-export async function registerOAuthClient(
-  registrationEndpoint: string,
-  req: DcrRequest,
-): Promise<DcrResponse> {
+export async function registerOAuthClient(registrationEndpoint: string, req: DcrRequest): Promise<DcrResponse> {
   const body = {
     client_name: req.clientName,
     redirect_uris: req.redirectUris,
@@ -58,8 +55,7 @@ export async function registerOAuthClient(
 
   const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
   if (!res.ok) {
-    const errText =
-      json !== null && typeof json.error === 'string' ? json.error : `HTTP ${res.status}`;
+    const errText = json !== null && typeof json.error === 'string' ? json.error : `HTTP ${res.status}`;
     throw new DcrError(errText);
   }
   if (json === null || typeof json.client_id !== 'string') {
@@ -67,8 +63,7 @@ export async function registerOAuthClient(
   }
   const normalized: DcrResponse = { client_id: json.client_id };
   if (typeof json.client_secret === 'string') normalized.client_secret = json.client_secret;
-  if (typeof json.client_id_issued_at === 'number')
-    normalized.client_id_issued_at = json.client_id_issued_at;
+  if (typeof json.client_id_issued_at === 'number') normalized.client_id_issued_at = json.client_id_issued_at;
   if (typeof json.client_secret_expires_at === 'number')
     normalized.client_secret_expires_at = json.client_secret_expires_at;
   if (typeof json.token_endpoint_auth_method === 'string')
@@ -86,9 +81,7 @@ export async function registerOAuthClient(
  *  confidential client_secret_basic first (simpler), then client_secret_post,
  *  then public+PKCE. `undefined` means the AS didn't advertise — use the
  *  OAuth default (`client_secret_basic`). */
-export function pickAuthMethod(
-  supported: string[] | undefined,
-): 'client_secret_basic' | 'client_secret_post' | 'none' {
+export function pickAuthMethod(supported: string[] | undefined): 'client_secret_basic' | 'client_secret_post' | 'none' {
   if (supported === undefined || supported.length === 0) return 'client_secret_basic';
   if (supported.includes('client_secret_basic')) return 'client_secret_basic';
   if (supported.includes('client_secret_post')) return 'client_secret_post';

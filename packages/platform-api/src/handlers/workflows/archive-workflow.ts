@@ -16,14 +16,8 @@ interface ArchiveVersionScoped extends ArchiveVersionInput {
   namespace: string;
 }
 
-export async function archiveWorkflow(
-  input: ArchiveAllScoped,
-  scope: CallerScope,
-): Promise<ArchiveAllOutput> {
-  const latestVersion = await scope.workflowDefinitions.getLatestVersion(
-    input.namespace,
-    input.name,
-  );
+export async function archiveWorkflow(input: ArchiveAllScoped, scope: CallerScope): Promise<ArchiveAllOutput> {
+  const latestVersion = await scope.workflowDefinitions.getLatestVersion(input.namespace, input.name);
   if (latestVersion === 0) throw new NotFoundError(`Workflow '${input.name}' not found`);
 
   await scope.workflowDefinitions.setArchived(input.namespace, input.name, input.archived);
@@ -52,12 +46,7 @@ export async function archiveWorkflowVersion(
   // Wrapper throws raw error from infra layer when version is missing; surface
   // as NotFoundError for consistency with the legacy inline route.
   try {
-    await scope.workflowDefinitions.setVersionArchived(
-      input.namespace,
-      input.name,
-      input.version,
-      input.archived,
-    );
+    await scope.workflowDefinitions.setVersionArchived(input.namespace, input.name, input.version, input.archived);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     if (/not found/i.test(message)) throw new NotFoundError(message);

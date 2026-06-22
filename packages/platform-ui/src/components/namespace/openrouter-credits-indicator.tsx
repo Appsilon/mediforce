@@ -41,7 +41,9 @@ export function OpenRouterCreditsIndicator({ handle }: OpenRouterCreditsIndicato
       .catch(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [handle, firebaseUser?.uid]);
 
   function toggleVisibility() {
@@ -72,7 +74,18 @@ export function OpenRouterCreditsIndicator({ handle }: OpenRouterCreditsIndicato
               : 'border-border bg-card',
       )}
     >
-      <Wallet className={cn('h-4 w-4 shrink-0', hidden ? 'text-muted-foreground/50' : isExhausted ? 'text-red-600 dark:text-red-400' : isLow ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')} />
+      <Wallet
+        className={cn(
+          'h-4 w-4 shrink-0',
+          hidden
+            ? 'text-muted-foreground/50'
+            : isExhausted
+              ? 'text-red-600 dark:text-red-400'
+              : isLow
+                ? 'text-amber-600 dark:text-amber-400'
+                : 'text-muted-foreground',
+        )}
+      />
       <div className="flex items-center gap-1.5 text-sm min-w-0">
         <span className={cn('text-muted-foreground', hidden && 'text-muted-foreground/50')}>OpenRouter</span>
         {hidden ? (
@@ -91,11 +104,7 @@ export function OpenRouterCreditsIndicator({ handle }: OpenRouterCreditsIndicato
             >
               ${credits.remaining.toFixed(2)}
             </span>
-            {isLow && (
-              <span className="text-xs text-muted-foreground">
-                / ${credits.limit.toFixed(2)}
-              </span>
-            )}
+            {isLow && <span className="text-xs text-muted-foreground">/ ${credits.limit.toFixed(2)}</span>}
           </>
         )}
       </div>

@@ -1,8 +1,4 @@
-import {
-  evaluateExpression,
-  ExpressionError,
-  type ExpressionContext,
-} from '../expressions/expression-evaluator';
+import { evaluateExpression, ExpressionError, type ExpressionContext } from '../expressions/expression-evaluator';
 
 // Re-export the context type so callers don't need to import from expressions
 export type { ExpressionContext as TransitionContext };
@@ -44,23 +40,17 @@ export function resolveTransitions(
   context: ExpressionContext,
 ): ResolvedTransition[] {
   if (outgoingTransitions.length === 0) {
-    throw new NoMatchingTransitionError(
-      'No outgoing transitions from current step',
-    );
+    throw new NoMatchingTransitionError('No outgoing transitions from current step');
   }
 
   // Single transition without `when` → unconditional
   if (outgoingTransitions.length === 1 && !outgoingTransitions[0].when) {
-    return [
-      { to: outgoingTransitions[0].to, reason: 'Unconditional transition' },
-    ];
+    return [{ to: outgoingTransitions[0].to, reason: 'Unconditional transition' }];
   }
 
   // Multiple transitions → all must have `when`
   if (outgoingTransitions.length > 1) {
-    const missingWhen = outgoingTransitions.filter(
-      (transition) => !transition.when,
-    );
+    const missingWhen = outgoingTransitions.filter((transition) => !transition.when);
     if (missingWhen.length > 0) {
       throw new TransitionValidationError(
         `Multiple transitions require all to have 'when' conditions. ` +
@@ -70,12 +60,8 @@ export function resolveTransitions(
   }
 
   // Separate else transitions from normal ones
-  const elseTransitions = outgoingTransitions.filter(
-    (transition) => transition.when === 'else',
-  );
-  const normalTransitions = outgoingTransitions.filter(
-    (transition) => transition.when !== 'else',
-  );
+  const elseTransitions = outgoingTransitions.filter((transition) => transition.when === 'else');
+  const normalTransitions = outgoingTransitions.filter((transition) => transition.when !== 'else');
 
   // Evaluate all normal transitions — collect every match
   const matched: ResolvedTransition[] = [];
@@ -104,12 +90,8 @@ export function resolveTransitions(
   }
 
   if (matched.length === 0) {
-    const evaluated = normalTransitions
-      .map((transition) => transition.when)
-      .join(', ');
-    throw new NoMatchingTransitionError(
-      `No matching transition. Evaluated: ${evaluated}`,
-    );
+    const evaluated = normalTransitions.map((transition) => transition.when).join(', ');
+    throw new NoMatchingTransitionError(`No matching transition. Evaluated: ${evaluated}`);
   }
 
   return matched;

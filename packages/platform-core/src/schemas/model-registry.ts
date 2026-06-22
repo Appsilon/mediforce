@@ -45,10 +45,12 @@ export type UpdateModelRegistryEntryInput = z.infer<typeof UpdateModelRegistryEn
 export type ModelRegistryMeta = z.infer<typeof ModelRegistryMetaSchema>;
 
 export const UpdateRankingsInputSchema = z.object({
-  rankings: z.array(z.object({
-    id: z.string(),
-    requestCount: z.number(),
-  })),
+  rankings: z.array(
+    z.object({
+      id: z.string(),
+      requestCount: z.number(),
+    }),
+  ),
 });
 
 export type UpdateRankingsInput = z.infer<typeof UpdateRankingsInputSchema>;

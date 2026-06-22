@@ -3,9 +3,7 @@
   "namespace": "appsilon",
   "title": "Gather Perspective",
   "description": "Collects a single team member's perspective on a question posed by the product owner.",
-  "roles": [
-    "member"
-  ],
+  "roles": ["member"],
   "triggers": [
     {
       "name": "manual",
@@ -51,9 +49,7 @@
       "name": "Provide perspective",
       "type": "creation",
       "executor": "human",
-      "allowedRoles": [
-        "member"
-      ],
+      "allowedRoles": ["member"],
       "assignedTo": "${triggerPayload.email}",
       "description": "Team member provides their perspective on the PO's question.",
       "params": [

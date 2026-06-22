@@ -59,9 +59,7 @@ const coworkFirstDef: WorkflowDefinition = {
     },
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
   ],
-  transitions: [
-    { from: 'brainstorm', to: 'done' },
-  ],
+  transitions: [{ from: 'brainstorm', to: 'done' }],
   triggers: [{ type: 'manual', name: 'Start' }],
 };
 
@@ -362,13 +360,15 @@ describe('InMemoryCoworkSessionRepository', () => {
   });
 
   it('throws when accessing non-existent session', async () => {
-    await expect(coworkSessionRepo.addTurn('nonexistent', {
-      id: 'turn-1',
-      role: 'human',
-      content: 'Hello',
-      timestamp: '2026-01-15T10:00:00Z',
-      artifactDelta: null,
-    })).rejects.toThrow('CoworkSession not found');
+    await expect(
+      coworkSessionRepo.addTurn('nonexistent', {
+        id: 'turn-1',
+        role: 'human',
+        content: 'Hello',
+        timestamp: '2026-01-15T10:00:00Z',
+        artifactDelta: null,
+      }),
+    ).rejects.toThrow('CoworkSession not found');
   });
 });
 

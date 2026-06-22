@@ -101,10 +101,7 @@ describe('createEmailActionHandler', () => {
     const sendEmail = vi.fn().mockResolvedValue({ messageId: 'msg' });
     const handler = createEmailActionHandler(sendEmail);
 
-    await handler(
-      { to: 'a@x.com', subject: 's', body: 'b' },
-      baseCtx,
-    );
+    await handler({ to: 'a@x.com', subject: 's', body: 'b' }, baseCtx);
 
     const params = sendEmail.mock.calls[0][0];
     expect(params.cc).toBeUndefined();
@@ -121,9 +118,9 @@ describe('createEmailActionHandler', () => {
     await handler({ to: 'a@x.com', subject: 's', body: 'b' }, baseCtx);
     await handler({ to: 'b@x.com', subject: 's', body: 'b' }, baseCtx);
 
-    await expect(
-      handler({ to: 'c@x.com', subject: 's', body: 'b' }, baseCtx),
-    ).rejects.toThrow('Email rate limit exceeded: 2 emails per workflow run');
+    await expect(handler({ to: 'c@x.com', subject: 's', body: 'b' }, baseCtx)).rejects.toThrow(
+      'Email rate limit exceeded: 2 emails per workflow run',
+    );
   });
 
   it('per-run limit is scoped to processInstanceId', async () => {
@@ -132,14 +129,9 @@ describe('createEmailActionHandler', () => {
 
     await handler({ to: 'a@x.com', subject: 's', body: 'b' }, baseCtx);
 
-    await handler(
-      { to: 'b@x.com', subject: 's', body: 'b' },
-      { ...baseCtx, processInstanceId: 'inst-2' },
-    );
+    await handler({ to: 'b@x.com', subject: 's', body: 'b' }, { ...baseCtx, processInstanceId: 'inst-2' });
 
-    await expect(
-      handler({ to: 'c@x.com', subject: 's', body: 'b' }, baseCtx),
-    ).rejects.toThrow('rate limit');
+    await expect(handler({ to: 'c@x.com', subject: 's', body: 'b' }, baseCtx)).rejects.toThrow('rate limit');
   });
 
   it('enforces per-minute sliding window', async () => {
@@ -149,20 +141,16 @@ describe('createEmailActionHandler', () => {
     let now = 1000000;
     vi.spyOn(Date, 'now').mockImplementation(() => now);
 
-    await handler({ to: 'a@x.com', subject: 's', body: 'b' },
-      { ...baseCtx, processInstanceId: 'p-1' });
-    await handler({ to: 'b@x.com', subject: 's', body: 'b' },
-      { ...baseCtx, processInstanceId: 'p-2' });
+    await handler({ to: 'a@x.com', subject: 's', body: 'b' }, { ...baseCtx, processInstanceId: 'p-1' });
+    await handler({ to: 'b@x.com', subject: 's', body: 'b' }, { ...baseCtx, processInstanceId: 'p-2' });
 
     await expect(
-      handler({ to: 'c@x.com', subject: 's', body: 'b' },
-        { ...baseCtx, processInstanceId: 'p-3' }),
+      handler({ to: 'c@x.com', subject: 's', body: 'b' }, { ...baseCtx, processInstanceId: 'p-3' }),
     ).rejects.toThrow('Email rate limit exceeded: 2 emails per minute');
 
     // Advance past 60s window — should succeed again
     now += 61_000;
-    await handler({ to: 'd@x.com', subject: 's', body: 'b' },
-      { ...baseCtx, processInstanceId: 'p-4' });
+    await handler({ to: 'd@x.com', subject: 's', body: 'b' }, { ...baseCtx, processInstanceId: 'p-4' });
 
     expect(sendEmail).toHaveBeenCalledTimes(3);
     vi.restoreAllMocks();
@@ -172,8 +160,8 @@ describe('createEmailActionHandler', () => {
     const sendEmail = vi.fn().mockRejectedValue(new Error('Mailgun 403: forbidden'));
     const handler = createEmailActionHandler(sendEmail);
 
-    await expect(
-      handler({ to: 'a@x.com', subject: 's', body: 'b' }, baseCtx),
-    ).rejects.toThrow('Mailgun 403: forbidden');
+    await expect(handler({ to: 'a@x.com', subject: 's', body: 'b' }, baseCtx)).rejects.toThrow(
+      'Mailgun 403: forbidden',
+    );
   });
 });

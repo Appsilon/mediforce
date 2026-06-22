@@ -7,10 +7,7 @@ import { isRunActiveForArchive } from './_run-active';
 // Audit action `instance.archived` / `instance.unarchived` aligns with the
 // existing `instance.*` family. Active runs are blocked to mirror the legacy
 // Server Action's `displayStatus === 'in_progress' | 'waiting_for_human'` gate.
-export async function archiveRun(
-  input: ArchiveRunInput,
-  scope: CallerScope,
-): Promise<ArchiveRunOutput> {
+export async function archiveRun(input: ArchiveRunInput, scope: CallerScope): Promise<ArchiveRunOutput> {
   const run = await loadOr404(scope.runs.getById(input.runId), 'Run not found');
 
   if (isRunActiveForArchive(run)) {

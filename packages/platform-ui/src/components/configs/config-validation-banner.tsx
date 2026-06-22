@@ -7,10 +7,7 @@ interface ConfigValidationBannerProps {
   warnings: string[];
 }
 
-export function ConfigValidationBanner({
-  errors,
-  warnings,
-}: ConfigValidationBannerProps) {
+export function ConfigValidationBanner({ errors, warnings }: ConfigValidationBannerProps) {
   if (errors.length === 0 && warnings.length === 0) {
     return null;
   }
@@ -41,10 +38,7 @@ export function ConfigValidationBanner({
           </div>
           <ul className="space-y-0.5">
             {warnings.map((warning, i) => (
-              <li
-                key={i}
-                className="text-sm text-amber-700/90 dark:text-amber-400/90 pl-5"
-              >
+              <li key={i} className="text-sm text-amber-700/90 dark:text-amber-400/90 pl-5">
                 {warning}
               </li>
             ))}

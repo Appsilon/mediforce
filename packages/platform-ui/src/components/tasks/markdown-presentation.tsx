@@ -26,11 +26,7 @@ const MARKDOWN_COMPONENTS: Components = {
 export function MarkdownPresentation({ content }: { content: string }) {
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeSanitize]}
-        components={MARKDOWN_COMPONENTS}
-      >
+      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]} components={MARKDOWN_COMPONENTS}>
         {content}
       </ReactMarkdown>
     </div>

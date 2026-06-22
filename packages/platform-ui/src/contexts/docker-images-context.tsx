@@ -53,7 +53,10 @@ export function DockerImagesProvider({ children }: { children: ReactNode }) {
     cancelledRef.current = false;
     fetchDockerInfo();
     const interval = setInterval(fetchDockerInfo, REFRESH_INTERVAL_MS);
-    return () => { cancelledRef.current = true; clearInterval(interval); };
+    return () => {
+      cancelledRef.current = true;
+      clearInterval(interval);
+    };
   }, [fetchDockerInfo]);
 
   return (

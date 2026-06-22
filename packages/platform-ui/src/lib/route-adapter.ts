@@ -59,10 +59,7 @@ export interface RouteAdapterOptions {
   readonly successStatus?: number;
 }
 
-export type RouteHandler<Input, Output> = (
-  input: Input,
-  scope: CallerScope,
-) => Promise<Output>;
+export type RouteHandler<Input, Output> = (input: Input, scope: CallerScope) => Promise<Output>;
 
 export function createRouteAdapter<
   InputSchema extends z.ZodType,
@@ -95,11 +92,7 @@ export function createRouteAdapter<
     const parsed = inputSchema.safeParse(raw);
     if (!parsed.success) {
       return jsonErrorResponse(
-        new HandlerError(
-          'validation',
-          parsed.error.issues[0]?.message ?? 'Invalid input',
-          parsed.error.issues,
-        ),
+        new HandlerError('validation', parsed.error.issues[0]?.message ?? 'Invalid input', parsed.error.issues),
       );
     }
 
@@ -135,10 +128,7 @@ const prodRunKicker: RunKicker = createHttpSelfFetchRunKicker({
 // compose through `createRouteAdapter` but MUST run the identical auth +
 // scope pipeline. Everything JSON goes through the adapter — see module doc.
 export function defaultBuildScope(caller: CallerIdentity): CallerScope {
-  return createCallerScope(
-    { ...getPlatformServices(), runKicker: prodRunKicker },
-    caller,
-  );
+  return createCallerScope({ ...getPlatformServices(), runKicker: prodRunKicker }, caller);
 }
 
 export async function defaultResolveCaller(req: NextRequest): Promise<CallerIdentity | NextResponse> {

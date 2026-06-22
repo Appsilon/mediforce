@@ -29,11 +29,22 @@ export function defaultDataDir(): string {
 }
 
 export function bareRepoPathFor(dataDir: string, workflow: WorkflowIdentity): string {
-  return join(dataDir, 'bare-repos', sanitizeSegment(workflow.namespace ?? '_default'), `${sanitizeSegment(workflow.name)}.git`);
+  return join(
+    dataDir,
+    'bare-repos',
+    sanitizeSegment(workflow.namespace ?? '_default'),
+    `${sanitizeSegment(workflow.name)}.git`,
+  );
 }
 
 export function worktreePathFor(dataDir: string, workflow: WorkflowIdentity, runId: string): string {
-  return join(dataDir, 'worktrees', sanitizeSegment(workflow.namespace ?? '_default'), sanitizeSegment(workflow.name), sanitizeSegment(runId));
+  return join(
+    dataDir,
+    'worktrees',
+    sanitizeSegment(workflow.namespace ?? '_default'),
+    sanitizeSegment(workflow.name),
+    sanitizeSegment(runId),
+  );
 }
 
 export function runBranchName(runId: string): string {

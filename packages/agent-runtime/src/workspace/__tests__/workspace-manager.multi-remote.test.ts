@@ -35,10 +35,14 @@ function listRemotes(bareRepoPath: string): string[] {
 
 function listRefs(bareRepoPath: string, prefix: string): Array<{ ref: string; sha: string }> {
   const out = git(['for-each-ref', '--format=%(refname) %(objectname)', prefix], bareRepoPath);
-  return out.trim().split('\n').filter(Boolean).map((line) => {
-    const idx = line.lastIndexOf(' ');
-    return { ref: line.slice(0, idx), sha: line.slice(idx + 1) };
-  });
+  return out
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      const idx = line.lastIndexOf(' ');
+      return { ref: line.slice(0, idx), sha: line.slice(idx + 1) };
+    });
 }
 
 function expectedRemoteName(url: string): string {
@@ -129,8 +133,9 @@ describe('WorkspaceManager — multi-remote lifecycle', () => {
         // Remote registered + fetched.
         const remoteName = expectedRemoteName(remote.repoPath);
         expect(listRemotes(a.path)).toEqual([remoteName]);
-        const remoteMain = listRefs(a.path, `refs/remotes/${remoteName}/`)
-          .find((r) => r.ref === `refs/remotes/${remoteName}/main`);
+        const remoteMain = listRefs(a.path, `refs/remotes/${remoteName}/`).find(
+          (r) => r.ref === `refs/remotes/${remoteName}/main`,
+        );
         expect(remoteMain).toBeDefined();
         expect(remoteMain!.sha).toBe(remote.commitSha);
       } finally {
@@ -182,18 +187,15 @@ describe('WorkspaceManager — multi-remote lifecycle', () => {
         const remoteName = expectedRemoteName(remote.repoPath);
 
         // Push a new commit to the remote.
-        const newSha = addCommitToTestRepo(
-          remote.repoPath,
-          { 'extra.txt': 'second' },
-          'second commit',
-        );
+        const newSha = addCommitToTestRepo(remote.repoPath, { 'extra.txt': 'second' }, 'second commit');
 
         const second = await manager.ensureBareRepo(wd);
         expect(second.path).toBe(first.path);
         expect(listRemotes(second.path)).toEqual([remoteName]);
 
-        const tip = listRefs(second.path, `refs/remotes/${remoteName}/`)
-          .find((r) => r.ref === `refs/remotes/${remoteName}/main`);
+        const tip = listRefs(second.path, `refs/remotes/${remoteName}/`).find(
+          (r) => r.ref === `refs/remotes/${remoteName}/main`,
+        );
         expect(tip).toBeDefined();
         expect(tip!.sha).toBe(newSha);
       } finally {
@@ -238,7 +240,9 @@ describe('WorkspaceManager — multi-remote lifecycle', () => {
           execFileSync('git', ['add', '-A'], { cwd: workDir, stdio: 'pipe', env });
           execFileSync('git', ['commit', '-m', 'rewrite'], { cwd: workDir, stdio: 'pipe', env });
           execFileSync('git', ['push', '--force', 'origin', 'rebuilt:main'], {
-            cwd: workDir, stdio: 'pipe', env,
+            cwd: workDir,
+            stdio: 'pipe',
+            env,
           });
         } finally {
           await rm(workDir, { recursive: true, force: true }).catch(() => {});
@@ -250,8 +254,9 @@ describe('WorkspaceManager — multi-remote lifecycle', () => {
         // Re-call ensureBareRepo. Tip moves; original heritage stays.
         await manager.ensureBareRepo(wd);
 
-        const remoteMain = listRefs(first.path, `refs/remotes/${remoteName}/`)
-          .find((r) => r.ref === `refs/remotes/${remoteName}/main`);
+        const remoteMain = listRefs(first.path, `refs/remotes/${remoteName}/`).find(
+          (r) => r.ref === `refs/remotes/${remoteName}/main`,
+        );
         expect(remoteMain!.sha).toBe(newRemoteTip);
 
         const heritageB = listRefs(first.path, `refs/heritage/${remoteName}/`);
@@ -384,10 +389,7 @@ describe('WorkspaceManager — multi-remote lifecycle', () => {
 
         // Reachability: the run branch is descended from <remote>/main.
         const remoteName = expectedRemoteName(remote.repoPath);
-        const baseSha = git(
-          ['rev-parse', `refs/remotes/${remoteName}/main`],
-          ws.bareRepoPath,
-        ).trim();
+        const baseSha = git(['rev-parse', `refs/remotes/${remoteName}/main`], ws.bareRepoPath).trim();
         expect(baseSha).toBe(remote.commitSha);
 
         // The remote's content (Dockerfile) is checked out.
@@ -419,17 +421,15 @@ describe('WorkspaceManager — multi-remote lifecycle', () => {
           name: 'concurrent',
           workspace: { remote: remote.repoPath } as WorkflowWorkspace,
         };
-        const [a, b] = await Promise.all([
-          manager.ensureBareRepo(wd),
-          manager.ensureBareRepo(wd),
-        ]);
+        const [a, b] = await Promise.all([manager.ensureBareRepo(wd), manager.ensureBareRepo(wd)]);
         expect(a.path).toBe(b.path);
 
         const remoteName = expectedRemoteName(remote.repoPath);
         // Exactly one remote registered (no duplicate).
         expect(listRemotes(a.path)).toEqual([remoteName]);
-        const tip = listRefs(a.path, `refs/remotes/${remoteName}/`)
-          .find((r) => r.ref === `refs/remotes/${remoteName}/main`);
+        const tip = listRefs(a.path, `refs/remotes/${remoteName}/`).find(
+          (r) => r.ref === `refs/remotes/${remoteName}/main`,
+        );
         expect(tip).toBeDefined();
         expect(tip!.sha).toBe(remote.commitSha);
       } finally {
@@ -467,10 +467,7 @@ describe('WorkspaceManager — multi-remote lifecycle', () => {
         expect(listRemotes(b.path)).toEqual([remoteName]);
 
         // refs/remotes/<name>/main still points to the OLD tip (no fetch happened).
-        const remoteMainSha = git(
-          ['rev-parse', `refs/remotes/${remoteName}/main`],
-          b.path,
-        ).trim();
+        const remoteMainSha = git(['rev-parse', `refs/remotes/${remoteName}/main`], b.path).trim();
         expect(remoteMainSha).not.toBe(newTip);
 
         // No new heritage entries.

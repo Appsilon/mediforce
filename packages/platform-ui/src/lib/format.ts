@@ -19,9 +19,7 @@ export function formatCostUsd(cost: number): string {
 }
 
 export function formatStepName(stepId: string): string {
-  return stepId
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return stepId.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function deriveInitials(name: string): string {
@@ -32,10 +30,7 @@ export function deriveInitials(name: string): string {
   return ((first[0] ?? '') + last).toUpperCase();
 }
 
-export function computeWallClockDuration(
-  createdAt: string,
-  stepExecutions: StepExecution[],
-): number | null {
+export function computeWallClockDuration(createdAt: string, stepExecutions: StepExecution[]): number | null {
   let latestCompletedAt: number | null = null;
 
   for (const step of stepExecutions) {
@@ -54,9 +49,7 @@ export function computeWallClockDuration(
   return latestCompletedAt - new Date(createdAt).getTime();
 }
 
-export function computeActiveProcessingTime(
-  stepExecutions: StepExecution[],
-): number {
+export function computeActiveProcessingTime(stepExecutions: StepExecution[]): number {
   let total = 0;
 
   for (const step of stepExecutions) {

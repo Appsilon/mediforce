@@ -29,10 +29,7 @@ export class AuthorizedOAuthProviderRepository extends AuthorizedScope {
     return this.raw.get(namespace, id);
   };
 
-  create = async (
-    namespace: string,
-    input: CreateOAuthProviderInput,
-  ): Promise<OAuthProviderConfig> => {
+  create = async (namespace: string, input: CreateOAuthProviderInput): Promise<OAuthProviderConfig> => {
     this.assertNamespaceWrite(namespace);
     return this.raw.create(namespace, input);
   };

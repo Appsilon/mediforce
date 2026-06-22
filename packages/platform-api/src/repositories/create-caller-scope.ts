@@ -22,12 +22,7 @@ import type {
   UserProfileRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
-import type {
-  CronTrigger,
-  ManualTrigger,
-  WebhookRouter,
-  WorkflowEngine,
-} from '@mediforce/workflow-engine';
+import type { CronTrigger, ManualTrigger, WebhookRouter, WorkflowEngine } from '@mediforce/workflow-engine';
 import type { CallerIdentity } from '../auth';
 import type { RunKicker } from '../runtime/run-kicker';
 import type { DockerImagesService } from '../services/docker-images-service';
@@ -92,40 +87,22 @@ export interface CallerScopeServices {
  * request's resolved caller identity. The route adapter calls this once per
  * request; the resulting scope is the only data-access surface handlers see.
  */
-export function createCallerScope(
-  services: CallerScopeServices,
-  caller: CallerIdentity,
-): CallerScope {
+export function createCallerScope(services: CallerScopeServices, caller: CallerIdentity): CallerScope {
   return {
     caller,
 
     tasks: new AuthorizedHumanTaskRepository(caller, services.humanTaskRepo),
     runs: new AuthorizedWorkflowRunRepository(caller, services.instanceRepo),
-    workflowDefinitions: new AuthorizedWorkflowDefinitionRepository(
-      caller,
-      services.processRepo,
-    ),
-    agentDefinitions: new AuthorizedAgentDefinitionRepository(
-      caller,
-      services.agentDefinitionRepo,
-    ),
-    coworkSessions: new AuthorizedCoworkSessionRepository(
-      caller,
-      services.coworkSessionRepo,
-    ),
+    workflowDefinitions: new AuthorizedWorkflowDefinitionRepository(caller, services.processRepo),
+    agentDefinitions: new AuthorizedAgentDefinitionRepository(caller, services.agentDefinitionRepo),
+    coworkSessions: new AuthorizedCoworkSessionRepository(caller, services.coworkSessionRepo),
     agentRuns: new AuthorizedAgentRunRepository(caller, services.agentRunRepo),
     agentEvents: new AuthorizedAgentEventRepository(caller, services.agentEventRepo),
     auditEvents: new AuthorizedAuditEventRepository(caller, services.auditRepo),
     handoffs: new AuthorizedHandoffRepository(caller, services.handoffRepo),
     toolCatalog: new AuthorizedToolCatalogRepository(caller, services.toolCatalogRepo),
-    oauthProviders: new AuthorizedOAuthProviderRepository(
-      caller,
-      services.oauthProviderRepo,
-    ),
-    agentOAuthTokens: new AuthorizedAgentOAuthTokenRepository(
-      caller,
-      services.agentOAuthTokenRepo,
-    ),
+    oauthProviders: new AuthorizedOAuthProviderRepository(caller, services.oauthProviderRepo),
+    agentOAuthTokens: new AuthorizedAgentOAuthTokenRepository(caller, services.agentOAuthTokenRepo),
     workspaceSecrets: new AuthorizedWorkspaceSecretRepository(
       caller,
       services.namespaceSecretsRepo,

@@ -20,9 +20,7 @@
       "name": "Set message for next run",
       "type": "creation",
       "executor": "human",
-      "allowedRoles": [
-        "operator"
-      ],
+      "allowedRoles": ["operator"],
       "description": "Type a message in the form below. The next run of this workflow will see it as `previousRun.message`.",
       "params": [
         {

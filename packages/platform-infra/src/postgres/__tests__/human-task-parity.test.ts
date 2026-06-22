@@ -5,10 +5,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  InMemoryHumanTaskRepository,
-  buildHumanTask,
-} from '@mediforce/platform-core';
+import { InMemoryHumanTaskRepository, buildHumanTask } from '@mediforce/platform-core';
 import type {
   HumanTask,
   HumanTaskRepository,
@@ -54,29 +51,60 @@ class StubProcessInstanceRepository implements ProcessInstanceRepository {
   }
 
   // Methods unused by the parity contract — throw if accidentally hit.
-  async create(): Promise<ProcessInstance> { throw new Error('stub'); }
-  async getByIdInNamespaces(): Promise<ProcessInstance | null> { throw new Error('stub'); }
-  async listAll(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async listInNamespaces(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async listDefinitionNames(): Promise<never> { throw new Error('stub'); }
-  async summarizeRunsByWorkflow(): Promise<never> { throw new Error('stub'); }
-  async getByStatusAll(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async getByStatusInNamespaces(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async update(): Promise<void> { throw new Error('stub'); }
-  async getByDefinition(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async getLastCompletedByDefinitionName(): Promise<ProcessInstance | null> { throw new Error('stub'); }
-  async addStepExecution(): Promise<never> { throw new Error('stub'); }
-  async getStepExecutions(): Promise<never[]> { throw new Error('stub'); }
-  async getLatestStepExecution(): Promise<null> { throw new Error('stub'); }
-  async updateStepExecution(): Promise<void> { throw new Error('stub'); }
-  async getIdsByDefinitionName(): Promise<string[]> { throw new Error('stub'); }
-  async setDeletedByDefinitionName(): Promise<void> { throw new Error('stub'); }
+  async create(): Promise<ProcessInstance> {
+    throw new Error('stub');
+  }
+  async getByIdInNamespaces(): Promise<ProcessInstance | null> {
+    throw new Error('stub');
+  }
+  async listAll(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async listInNamespaces(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async listDefinitionNames(): Promise<never> {
+    throw new Error('stub');
+  }
+  async summarizeRunsByWorkflow(): Promise<never> {
+    throw new Error('stub');
+  }
+  async getByStatusAll(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async getByStatusInNamespaces(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async update(): Promise<void> {
+    throw new Error('stub');
+  }
+  async getByDefinition(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async getLastCompletedByDefinitionName(): Promise<ProcessInstance | null> {
+    throw new Error('stub');
+  }
+  async addStepExecution(): Promise<never> {
+    throw new Error('stub');
+  }
+  async getStepExecutions(): Promise<never[]> {
+    throw new Error('stub');
+  }
+  async getLatestStepExecution(): Promise<null> {
+    throw new Error('stub');
+  }
+  async updateStepExecution(): Promise<void> {
+    throw new Error('stub');
+  }
+  async getIdsByDefinitionName(): Promise<string[]> {
+    throw new Error('stub');
+  }
+  async setDeletedByDefinitionName(): Promise<void> {
+    throw new Error('stub');
+  }
 }
 
-function taskFor(
-  instanceId: string,
-  overrides: Partial<HumanTask> = {},
-): HumanTask {
+function taskFor(instanceId: string, overrides: Partial<HumanTask> = {}): HumanTask {
   return buildHumanTask({
     id: randomUUID(),
     processInstanceId: instanceId,
@@ -117,9 +145,7 @@ function contract(
         ui: { component: 'review-form' },
         params: [{ name: 'note', type: 'string', required: false }],
         options: [{ id: 'opt1', label: 'A' }],
-        verdicts: [
-          { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
-        ],
+        verdicts: [{ key: 'approve', label: 'Approve', intent: 'success', requiresComment: false }],
         selection: 2,
       });
       const created = await repo.create(task);
@@ -286,9 +312,7 @@ function contract(
       // Reversal clears the tombstone.
       await repo.setDeletedByInstanceIds([inst1], false);
       const restored = await repo.getByRoleAll('reviewer');
-      expect(restored.map((r) => r.id).sort()).toEqual(
-        [t1.id, t2.id, t3.id].sort(),
-      );
+      expect(restored.map((r) => r.id).sort()).toEqual([t1.id, t2.id, t3.id].sort());
     });
 
     it('setDeletedByInstanceIds no-ops on empty list', async () => {
@@ -356,7 +380,9 @@ describe.skipIf(skipPg)('PostgresHumanTaskRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sql);

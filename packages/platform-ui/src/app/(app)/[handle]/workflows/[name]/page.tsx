@@ -3,7 +3,24 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, Eye, EyeOff, Copy } from 'lucide-react';
+import {
+  ArrowLeft,
+  Layers,
+  GitBranch,
+  ExternalLink,
+  Archive,
+  ArchiveRestore,
+  MoreVertical,
+  Play,
+  Clock,
+  Zap,
+  Trash2,
+  ArrowRightLeft,
+  KeyRound,
+  Eye,
+  EyeOff,
+  Copy,
+} from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
@@ -23,7 +40,6 @@ import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useWorkflowDefinitionApi } from '@/hooks/use-workflows-api';
 import { WorkflowSecretsEditor } from '@/components/workflows/workflow-secrets-editor';
-
 
 export default function ProcessDefinitionPage() {
   const { name, handle } = useParams<{ name: string; handle: string }>();
@@ -73,7 +89,9 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
     return (
       <div className="p-6 text-center text-sm text-muted-foreground">
         Workflow &ldquo;{decodedName}&rdquo; not found.{' '}
-        <Link href={`/${handle}`} className="underline">Back to catalog</Link>
+        <Link href={`/${handle}`} className="underline">
+          Back to catalog
+        </Link>
       </div>
     );
   }
@@ -83,9 +101,7 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
       <div className="border-b px-6 py-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            {definition.description && (
-              <p className="text-sm text-muted-foreground mt-0.5">{definition.description}</p>
-            )}
+            {definition.description && <p className="text-sm text-muted-foreground mt-0.5">{definition.description}</p>}
             <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
               {definition.namespace && (
                 <>
@@ -135,12 +151,23 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
           decodedName={decodedName}
           namespaces={namespaces}
           copyTarget={copyTarget}
-          setCopyTarget={(v) => { setCopyTarget(v); setCopyError(''); }}
+          setCopyTarget={(v) => {
+            setCopyTarget(v);
+            setCopyError('');
+          }}
           copyName={copyName}
-          setCopyName={(v) => { setCopyName(v); setCopyError(''); }}
+          setCopyName={(v) => {
+            setCopyName(v);
+            setCopyError('');
+          }}
           copyError={copyError}
           copying={copying}
-          onCancel={() => { setCopyOpen(false); setCopyTarget(''); setCopyName(''); setCopyError(''); }}
+          onCancel={() => {
+            setCopyOpen(false);
+            setCopyTarget('');
+            setCopyName('');
+            setCopyError('');
+          }}
           onCopy={async () => {
             if (!copyTarget || !copyName.trim()) return;
             setCopying(true);
@@ -149,14 +176,11 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
               const qs = new URLSearchParams({ targetNamespace: copyTarget, namespace: handle });
               const body: Record<string, unknown> = {};
               if (copyName !== decodedName) body.targetName = copyName;
-              const res = await apiFetch(
-                `/api/workflow-definitions/${encodeURIComponent(decodedName)}/copy?${qs}`,
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(body),
-                },
-              );
+              const res = await apiFetch(`/api/workflow-definitions/${encodeURIComponent(decodedName)}/copy?${qs}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+              });
               if (res.ok) {
                 setCopyOpen(false);
                 router.push(`/${copyTarget}/workflows/${encodeURIComponent(copyName)}`);
@@ -235,9 +259,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
 
   const currentVisibility = visibilityOverride ?? latest?.visibility ?? 'private';
   const isPrivate = currentVisibility === 'private';
-  const hasManualTrigger = latest?.triggers?.some(
-    (trigger: { type: string }) => trigger.type === 'manual',
-  ) ?? false;
+  const hasManualTrigger = latest?.triggers?.some((trigger: { type: string }) => trigger.type === 'manual') ?? false;
 
   if (versionsLoading || authLoading) {
     return (
@@ -253,7 +275,9 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
     return (
       <div className="p-6 text-center text-sm text-muted-foreground">
         Workflow &ldquo;{decodedName}&rdquo; not found.{' '}
-        <Link href={`/${handle}`} className="underline">Back to catalog</Link>
+        <Link href={`/${handle}`} className="underline">
+          Back to catalog
+        </Link>
       </div>
     );
   }
@@ -276,11 +300,9 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 </span>
               )}
             </div>
-            {latest?.description && (
-              <p className="text-sm text-muted-foreground mt-0.5">{latest.description}</p>
-            )}
+            {latest?.description && <p className="text-sm text-muted-foreground mt-0.5">{latest.description}</p>}
             <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-              {(latest?.namespace) && (
+              {latest?.namespace && (
                 <>
                   <span className="flex items-center gap-1">
                     Owned by{' '}
@@ -317,9 +339,17 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
               <span>{runs.length} runs</span>
               {latest?.triggers?.map((trigger: { type: string; name: string; schedule?: string }) => (
                 <span key={trigger.name} className="inline-flex items-center gap-1">
-                  {trigger.type === 'cron' ? <Clock className="h-3 w-3" /> : trigger.type === 'manual' ? <Play className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
+                  {trigger.type === 'cron' ? (
+                    <Clock className="h-3 w-3" />
+                  ) : trigger.type === 'manual' ? (
+                    <Play className="h-3 w-3" />
+                  ) : (
+                    <Zap className="h-3 w-3" />
+                  )}
                   {trigger.type === 'cron' && trigger.schedule ? (
-                    <span className="bg-muted px-1.5 py-0.5 rounded" title={trigger.schedule}>Runs automatically · {formatCron(trigger.schedule)}</span>
+                    <span className="bg-muted px-1.5 py-0.5 rounded" title={trigger.schedule}>
+                      Runs automatically · {formatCron(trigger.schedule)}
+                    </span>
                   ) : (
                     <span>{trigger.name}</span>
                   )}
@@ -382,18 +412,22 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                     setMenuOpen(false);
                     setTogglingVisibility(true);
                     try {
-                      const res = await apiFetch(`/api/workflow-definitions/${encodeURIComponent(decodedName)}?namespace=${encodeURIComponent(handle)}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ visibility: newVisibility }),
-                      });
+                      const res = await apiFetch(
+                        `/api/workflow-definitions/${encodeURIComponent(decodedName)}?namespace=${encodeURIComponent(handle)}`,
+                        {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ visibility: newVisibility }),
+                        },
+                      );
                       if (res.ok) {
                         setVisibilityOverride(newVisibility);
                       } else {
                         const body = await res.json().catch(() => null);
-                        const msg = typeof body?.error === 'object' && body?.error !== null
-                          ? (body.error.message ?? 'Failed to update visibility')
-                          : (body?.error ?? 'Failed to update visibility');
+                        const msg =
+                          typeof body?.error === 'object' && body?.error !== null
+                            ? (body.error.message ?? 'Failed to update visibility')
+                            : (body?.error ?? 'Failed to update visibility');
                         alert(msg);
                       }
                     } finally {
@@ -408,9 +442,15 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                   )}
                 >
                   {isPrivate ? (
-                    <><Eye className="h-3.5 w-3.5" />Make public</>
+                    <>
+                      <Eye className="h-3.5 w-3.5" />
+                      Make public
+                    </>
                   ) : (
-                    <><EyeOff className="h-3.5 w-3.5" />Make private</>
+                    <>
+                      <EyeOff className="h-3.5 w-3.5" />
+                      Make private
+                    </>
                   )}
                 </button>
 
@@ -481,11 +521,16 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 tab === 'secrets' && 'flex items-center gap-1.5',
               )}
             >
-              {tab === 'runs'
-                ? `Runs${runs.length > 0 ? ` (${runs.length})` : ''}`
-                : tab === 'secrets'
-                  ? <><KeyRound className="h-3.5 w-3.5" />Secrets</>
-                  : 'Definitions'}
+              {tab === 'runs' ? (
+                `Runs${runs.length > 0 ? ` (${runs.length})` : ''}`
+              ) : tab === 'secrets' ? (
+                <>
+                  <KeyRound className="h-3.5 w-3.5" />
+                  Secrets
+                </>
+              ) : (
+                'Definitions'
+              )}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
@@ -502,9 +547,17 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                   : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
               )}
             >
-              {showArchivedRuns
-                ? <><EyeOff className="h-3.5 w-3.5" />Hide archived</>
-                : <><Eye className="h-3.5 w-3.5" />Show archived</>}
+              {showArchivedRuns ? (
+                <>
+                  <EyeOff className="h-3.5 w-3.5" />
+                  Hide archived
+                </>
+              ) : (
+                <>
+                  <Eye className="h-3.5 w-3.5" />
+                  Show archived
+                </>
+              )}
             </button>
             <StartRunButton
               workflowName={decodedName}
@@ -533,11 +586,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
         <Tabs.Content value="secrets" className="flex-1 p-6">
           <div className="max-w-2xl">
             {firebaseUser && (
-              <WorkflowSecretsEditor
-                namespace={handle}
-                workflowName={decodedName}
-                suggestedKeys={setupKeys}
-              />
+              <WorkflowSecretsEditor namespace={handle} workflowName={decodedName} suggestedKeys={setupKeys} />
             )}
           </div>
         </Tabs.Content>
@@ -557,15 +606,26 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
           decodedName={decodedName}
           namespaces={namespaces}
           copyTarget={copyTarget}
-          setCopyTarget={(v) => { setCopyTarget(v); setCopyError(''); }}
+          setCopyTarget={(v) => {
+            setCopyTarget(v);
+            setCopyError('');
+          }}
           copyName={copyName}
-          setCopyName={(v) => { setCopyName(v); setCopyError(''); }}
+          setCopyName={(v) => {
+            setCopyName(v);
+            setCopyError('');
+          }}
           copyError={copyError}
           copying={copying}
           versions={versions}
           copyVersion={copyVersion}
           setCopyVersion={setCopyVersion}
-          onCancel={() => { setCopyOpen(false); setCopyTarget(''); setCopyName(''); setCopyError(''); }}
+          onCancel={() => {
+            setCopyOpen(false);
+            setCopyTarget('');
+            setCopyName('');
+            setCopyError('');
+          }}
           onCopy={async () => {
             if (!copyTarget || !copyName.trim()) return;
             setCopying(true);
@@ -575,14 +635,11 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
               const body: Record<string, unknown> = {};
               if (copyName !== decodedName) body.targetName = copyName;
               if (copyVersion !== null) body.version = copyVersion;
-              const res = await apiFetch(
-                `/api/workflow-definitions/${encodeURIComponent(decodedName)}/copy?${qs}`,
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(body),
-                },
-              );
+              const res = await apiFetch(`/api/workflow-definitions/${encodeURIComponent(decodedName)}/copy?${qs}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+              });
               if (res.ok) {
                 setCopyOpen(false);
                 setCopyTarget('');
@@ -645,8 +702,8 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                     setTransferOpen(false);
                     router.push(`/${transferTarget}/workflows/${encodeURIComponent(decodedName)}`);
                   } catch (err) {
-                    const message = err instanceof ApiError ? err.message
-                      : err instanceof Error ? err.message : 'Unknown error';
+                    const message =
+                      err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Unknown error';
                     alert(`Failed to transfer workflow: ${message}`);
                   } finally {
                     setTransferring(false);
@@ -669,7 +726,11 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   );
 }
 
-function RepoLink({ definition }: { definition: { repo?: { url: string; branch?: string; directory?: string } } | null }) {
+function RepoLink({
+  definition,
+}: {
+  definition: { repo?: { url: string; branch?: string; directory?: string } } | null;
+}) {
   if (!definition?.repo) return null;
   const repo = definition.repo;
   let href = repo.url;
@@ -769,9 +830,7 @@ function CopyWorkflowDialog({
             copyError && 'border-destructive',
           )}
         />
-        {copyError && (
-          <p className="text-xs text-destructive mb-3">{copyError}</p>
-        )}
+        {copyError && <p className="text-xs text-destructive mb-3">{copyError}</p>}
         {versions && versions.length > 0 && setCopyVersion && (
           <>
             <label className="block text-sm font-medium mb-1">Version</label>
@@ -786,7 +845,8 @@ function CopyWorkflowDialog({
               <option value="">Latest</option>
               {versions.map((v) => (
                 <option key={v.version} value={v.version}>
-                  v{v.version}{v.title ? ` — ${v.title}` : ''}
+                  v{v.version}
+                  {v.title ? ` — ${v.title}` : ''}
                 </option>
               ))}
             </select>
