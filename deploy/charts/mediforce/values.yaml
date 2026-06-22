@@ -115,6 +115,25 @@ ui:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  # ============================================================
+  # UI ServiceAccount
+  #
+  # Off by default — the UI runs as the namespace's `default` SA
+  # (zero K8s API perms), which is correct for the docker / queued
+  # spawn modes where the worker pod owns the K8s API surface.
+  #
+  # Set `create: true` ONLY when SPAWN_MODE=kuber is enabled on the
+  # UI pod (i.e. the auto-runner / process /run endpoint creates
+  # Jobs directly via the K8s API). Toggling this on provisions:
+  #   - ServiceAccount  <fullname>-ui
+  #   - Role            <fullname>-ui-job-spawner  (batch/jobs CRUD + pods/log read)
+  #   - RoleBinding     <fullname>-ui-job-spawner
+  # `name` overrides the SA name; leave empty for the default
+  # "<fullname>-ui" derived name.
+  # ============================================================
+  serviceAccount:
+    create: false
+    name: ""
 
 # ---------------------------------------------------------------------------
 # Worker (BullMQ consumer, spawns K8s Jobs)

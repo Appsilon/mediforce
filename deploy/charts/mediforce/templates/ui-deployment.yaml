@@ -19,6 +19,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
+      {{- if and .Values.rbac.create .Values.ui.serviceAccount.create }}
+      serviceAccountName: {{ include "mediforce.uiServiceAccountName" . }}
+      {{- end }}
       containers:
         - name: ui
           image: "{{ include "mediforce.image" .Values.ui.image }}"
@@ -30,6 +33,10 @@ spec:
           env:
             - name: REDIS_URL
               value: "redis://{{ include "mediforce.fullname" . }}-redis:{{ .Values.redis.service.port }}"
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
             - name: DOMAIN
               value: {{ .Values.config.domain | quote }}
             - name: APP_BASE_URL
