@@ -28,6 +28,19 @@ describe('OpenRouterCreditsOutputSchema', () => {
       limit: 30,
       usage: 19.85,
       remaining: 10.15,
+      accountRemaining: 0.13,
+      effectiveRemaining: 0.13,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts available response without the optional account balance', () => {
+    const result = OpenRouterCreditsOutputSchema.safeParse({
+      available: true,
+      limit: 30,
+      usage: 19.85,
+      remaining: 10.15,
+      effectiveRemaining: 10.15,
     });
     expect(result.success).toBe(true);
   });
@@ -38,6 +51,7 @@ describe('OpenRouterCreditsOutputSchema', () => {
       limit: 0,
       usage: 0,
       remaining: 0,
+      effectiveRemaining: 0,
       error: 'OPENROUTER_API_KEY not configured',
     });
     expect(result.success).toBe(true);
