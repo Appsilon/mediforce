@@ -20,7 +20,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Pre-flight model validation: agent steps with unknown model IDs show an "Unknown model" warning (with Levenshtein-based "did you mean?" suggestions) in the start-run dialog before the run begins.
 - Start-run dialog: selecting a different workflow version from the dropdown no longer skips pre-flight checks — the dialog now waits for the new version's definition and validation to load before allowing start.
 - Extracted `normaliseModelId` to `platform-core` — was duplicated 5 times across 3 packages.
-- OpenRouter credits indicator now shows the effective spendable balance `min(key limit, account credits)` with a `(key limit / credits)` breakdown, instead of the key-limit ceiling alone which overstated available funds.
+- OpenRouter credits indicator and the start-run low-credit warning now use the effective spendable balance `min(key limit, account credits)` (indicator shows a `(key limit / credits)` breakdown), instead of the key-limit ceiling alone which overstated available funds.
 - Codex now mirrors Claude's repo-local skill and agent discovery layout via `.codex/skills/*` and `.codex/agents` symlinks, with `AGENTS.md` documenting how Codex should translate Claude-specific skill tool syntax.
 
 ### Removed
