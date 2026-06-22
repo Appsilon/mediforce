@@ -27,6 +27,23 @@ export {
 } from './tasks';
 
 export {
+  ListAttachmentsInputSchema,
+  ListAttachmentsOutputSchema,
+  UploadAttachmentInputSchema,
+  UploadAttachmentOutputSchema,
+  DeleteAttachmentInputSchema,
+  DeleteAttachmentOutputSchema,
+  GetAttachmentBlobInputSchema,
+  type ListAttachmentsInput,
+  type ListAttachmentsOutput,
+  type UploadAttachmentInput,
+  type UploadAttachmentOutput,
+  type DeleteAttachmentInput,
+  type DeleteAttachmentOutput,
+  type GetAttachmentBlobInput,
+} from './task-attachment';
+
+export {
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
   WorkflowDefinitionGroupSchema,

@@ -112,6 +112,13 @@ export {
 } from './human-task';
 
 export {
+  TaskAttachmentSchema,
+  NewTaskAttachmentSchema,
+  type TaskAttachment,
+  type NewTaskAttachment,
+} from './task-attachment';
+
+export {
   HandoffStatusSchema,
   HandoffEntitySchema,
   type HandoffStatus,

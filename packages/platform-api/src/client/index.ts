@@ -108,6 +108,16 @@ import {
   ClaimTaskOutputSchema,
   CompleteTaskInputSchema,
   CompleteTaskOutputSchema,
+  ListAttachmentsInputSchema,
+  ListAttachmentsOutputSchema,
+  UploadAttachmentOutputSchema,
+  DeleteAttachmentInputSchema,
+  DeleteAttachmentOutputSchema,
+  type ListAttachmentsInput,
+  type ListAttachmentsOutput,
+  type UploadAttachmentOutput,
+  type DeleteAttachmentInput,
+  type DeleteAttachmentOutput,
   CancelRunInputSchema,
   CancelRunOutputSchema,
   ResumeRunInputSchema,
@@ -463,6 +473,26 @@ export class Mediforce {
     get: (input: GetTaskInput) => Promise<GetTaskOutput>;
     claim: (input: ClaimTaskInput) => Promise<ClaimTaskOutput>;
     complete: (input: CompleteTaskInput) => Promise<CompleteTaskOutput>;
+    attachments: {
+      list: (input: ListAttachmentsInput) => Promise<ListAttachmentsOutput>;
+      upload: (input: {
+        taskId: string;
+        name: string;
+        contentType: string;
+        content: Uint8Array;
+      }) => Promise<UploadAttachmentOutput>;
+      delete: (input: DeleteAttachmentInput) => Promise<DeleteAttachmentOutput>;
+    };
+  };
+
+  /**
+   * Attachment blob helper. `blobUrl(id)` is the authenticated streaming URL
+   * for an attachment's bytes — point an `<a download>` / `<img src>` at it;
+   * the browser sends the session cookie. Server-to-server callers fetch it
+   * via `request` with the configured auth header.
+   */
+  readonly attachments: {
+    blobUrl: (attachmentId: string) => string;
   };
 
   readonly processes: {
@@ -720,6 +750,51 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.complete');
         return CompleteTaskOutputSchema.parse(body);
+      },
+      attachments: {
+        list: async (input) => {
+          const validated = ListAttachmentsInputSchema.parse(input);
+          const res = await this.request(
+            `/api/tasks/${encodeURIComponent(validated.taskId)}/attachments`,
+          );
+          const body = await parseJsonOrThrow(res, 'mediforce.tasks.attachments.list');
+          return ListAttachmentsOutputSchema.parse(body);
+        },
+        upload: async (input) => {
+          // multipart/form-data — let fetch set the boundary Content-Type.
+          const form = new FormData();
+          // `BlobPart` requires a Uint8Array backed by a plain ArrayBuffer; TS
+          // widens the input's buffer to `ArrayBufferLike`. The bytes are always
+          // a real ArrayBuffer here, so narrow it for the Blob constructor.
+          const blobPart = input.content as unknown as BlobPart;
+          form.append(
+            'file',
+            new Blob([blobPart], { type: input.contentType }),
+            input.name,
+          );
+          const res = await this.request(
+            `/api/tasks/${encodeURIComponent(input.taskId)}/attachments`,
+            { method: 'POST', body: form },
+          );
+          const body = await parseJsonOrThrow(res, 'mediforce.tasks.attachments.upload');
+          return UploadAttachmentOutputSchema.parse(body);
+        },
+        delete: async (input) => {
+          const validated = DeleteAttachmentInputSchema.parse(input);
+          const res = await this.request(
+            `/api/attachments/${encodeURIComponent(validated.attachmentId)}`,
+            { method: 'DELETE' },
+          );
+          const body = await parseJsonOrThrow(res, 'mediforce.tasks.attachments.delete');
+          return DeleteAttachmentOutputSchema.parse(body);
+        },
+      },
+    };
+
+    this.attachments = {
+      blobUrl: (attachmentId) => {
+        const base = this.clientConfig.baseUrl ?? '';
+        return `${base}/api/attachments/${encodeURIComponent(attachmentId)}/blob`;
       },
     };
 

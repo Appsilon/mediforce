@@ -28,6 +28,7 @@ export { PostgresCronTriggerStateRepository } from './postgres/repositories/cron
 export { PostgresAgentRunRepository } from './postgres/repositories/agent-run-repository';
 export { PostgresAgentEventRepository } from './postgres/repositories/agent-event-repository';
 export { PostgresHumanTaskRepository } from './postgres/repositories/human-task-repository';
+export { PostgresTaskAttachmentRepository } from './postgres/repositories/task-attachment-repository';
 export { PostgresHandoffRepository } from './postgres/repositories/handoff-repository';
 export { PostgresCoworkSessionRepository } from './postgres/repositories/cowork-session-repository';
 export { PostgresProcessInstanceRepository } from './postgres/repositories/process-instance-repository';
@@ -41,6 +42,9 @@ export { PostgresPlatformSettingsRepository } from './postgres/repositories/plat
 export { createPostgresClient, getSharedPostgresClient } from './postgres/client';
 export type { Database } from './postgres/client';
 export { PostgresAgentEventLog } from './postgres/agent-event-log';
+
+// Blob storage (ADR-0003 task attachments).
+export { FilesystemBlobStore } from './storage/filesystem-blob-store';
 
 // Crypto + sync
 export { validateSecretsKey } from './crypto/secrets-cipher';
