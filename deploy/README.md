@@ -77,3 +77,18 @@ when sourcing the Terraform module or check out the tag before
 `deploy/` lives under the same CI as the rest of the repo, but the deploy
 workflows (`deploy-staging`, `deploy-production`) ignore changes scoped to
 `deploy/**` to avoid auto-deploys on infra-only commits.
+
+## Spawn strategies
+
+The `worker.env` block sets `SPAWN_MODE`, which controls how the worker
+orchestrates agent step execution: `docker` spawns containers via the Docker
+socket (default), while `kuber` spawns transient Kubernetes Jobs (KubernetesJobSpawnStrategy, KJSS).
+
+The KJSS mode (local-08a) is currently limited to agents that emit results
+to stdout; agents producing files (shared workspace) will require a future
+KJSS enhancement (local-08b). To activate KJSS, set `worker.env[0].value=kuber`
+via Helm `--set` or `extra_values`. Tune KJSS behavior via the `worker.spawn.kuber`
+block in [`charts/mediforce/values.yaml`](charts/mediforce/values.yaml)
+(namespace, ServiceAccount, imagePullSecrets, default resource requests/limits).
+Implementers can reference the KJSS class at
+[`packages/agent-runtime/src/plugins/kubernetes-job-spawn-strategy.ts`](../packages/agent-runtime/src/plugins/kubernetes-job-spawn-strategy.ts).

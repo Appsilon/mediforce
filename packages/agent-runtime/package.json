@@ -11,8 +11,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@opentelemetry/api": "^1.9.1",
+    "@kubernetes/client-node": "^1.4.0",
     "@mediforce/platform-core": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
     "firebase-admin": "^14.0.0"
   },
   "optionalDependencies": {
