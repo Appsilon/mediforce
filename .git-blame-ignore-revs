@@ -1,0 +1,5 @@
+# Bulk reformatting commits — ignored by 'git blame'.
+# Enable locally with: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: format entire codebase with Biome
+dd6b18e34826c396a1fbcc4bd73daaa707cc65ef
