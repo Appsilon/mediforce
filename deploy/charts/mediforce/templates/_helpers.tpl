@@ -85,3 +85,12 @@ Worker ServiceAccount name (used by both the ServiceAccount template and the Dep
 {{- define "mediforce.workerServiceAccountName" -}}
 {{- default (printf "%s-worker" (include "mediforce.fullname" .)) .Values.rbac.serviceAccountName -}}
 {{- end -}}
+
+{{/*
+UI ServiceAccount name. Returns the explicit override when set, otherwise
+"<fullname>-ui". Used by the UI Deployment, ServiceAccount, Role, and
+RoleBinding templates so the four resources cannot drift apart.
+*/}}
+{{- define "mediforce.uiServiceAccountName" -}}
+{{- default (printf "%s-ui" (include "mediforce.fullname" .)) .Values.ui.serviceAccount.name -}}
+{{- end -}}
