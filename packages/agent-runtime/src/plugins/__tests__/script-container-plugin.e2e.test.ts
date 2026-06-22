@@ -1,5 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { execSync } from 'node:child_process';
+
+const originalAllowLocal = process.env.ALLOW_LOCAL_AGENTS;
+beforeEach(() => { delete process.env.ALLOW_LOCAL_AGENTS; });
+afterEach(() => {
+  if (originalAllowLocal === undefined) delete process.env.ALLOW_LOCAL_AGENTS;
+  else process.env.ALLOW_LOCAL_AGENTS = originalAllowLocal;
+});
 import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/step-executor-plugin';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { ScriptContainerPlugin } from '../script-container-plugin';
