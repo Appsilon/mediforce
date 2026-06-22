@@ -32,7 +32,7 @@ test.describe('GET /api/cowork/* — API E2E', () => {
       headers: apiKeyHeaders(),
     });
     expect(res.status(), await res.text()).toBe(200);
-    const session = await res.json() as {
+    const session = (await res.json()) as {
       id: string;
       processInstanceId: string;
       status: string;
@@ -58,7 +58,7 @@ test.describe('GET /api/cowork/* — API E2E', () => {
       headers: apiKeyHeaders(),
     });
     expect(res.status(), await res.text()).toBe(200);
-    const session = await res.json() as { id: string; processInstanceId: string };
+    const session = (await res.json()) as { id: string; processInstanceId: string };
     expect(session.id).toBe(SESSION_ID);
     expect(session.processInstanceId).toBe(INSTANCE_ID);
   });
@@ -75,7 +75,7 @@ test.describe('GET /api/cowork/* — API E2E', () => {
       headers: apiKeyHeaders(),
     });
     expect(res.status()).toBe(404);
-    const body = await res.json() as { error: { code: string; message: string } };
+    const body = (await res.json()) as { error: { code: string; message: string } };
     expect(body.error.code).toBe('not_found');
     expect(body.error.message).toMatch(/no active cowork session/i);
   });

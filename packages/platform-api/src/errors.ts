@@ -29,10 +29,7 @@ export const TypedApiErrorEnvelopeSchema = z.object({
 export const LegacyApiErrorEnvelopeSchema = z.object({
   error: z.string(),
 });
-export const ApiErrorEnvelopeSchema = z.union([
-  TypedApiErrorEnvelopeSchema,
-  LegacyApiErrorEnvelopeSchema,
-]);
+export const ApiErrorEnvelopeSchema = z.union([TypedApiErrorEnvelopeSchema, LegacyApiErrorEnvelopeSchema]);
 
 // ADR-0005 typed errors (PR1.1-alt: single hierarchy). `HandlerError`
 // is the only throwable; subclasses give type-narrowed throw sites and

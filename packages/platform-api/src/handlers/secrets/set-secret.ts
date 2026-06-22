@@ -7,17 +7,9 @@ import type { SetSecretInput, SetSecretOutput } from '../../contract/secrets';
  * (`assertNamespaceWrite`) throws `ForbiddenError` for non-members — the
  * adapter maps that to 403, so this handler never pre-checks.
  */
-export async function setSecret(
-  input: SetSecretInput,
-  scope: CallerScope,
-): Promise<SetSecretOutput> {
+export async function setSecret(input: SetSecretInput, scope: CallerScope): Promise<SetSecretOutput> {
   if (input.workflow !== undefined) {
-    await scope.workflowSecrets.upsertSecret(
-      input.namespace,
-      input.workflow,
-      input.key,
-      input.value,
-    );
+    await scope.workflowSecrets.upsertSecret(input.namespace, input.workflow, input.key, input.value);
   } else {
     await scope.workspaceSecrets.upsertSecret(input.namespace, input.key, input.value);
   }

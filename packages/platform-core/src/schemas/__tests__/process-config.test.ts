@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  ProcessConfigSchema,
-  StepConfigSchema,
-  ReviewConstraintsSchema,
-} from '../process-config';
+import { ProcessConfigSchema, StepConfigSchema, ReviewConstraintsSchema } from '../process-config';
 
 const validStepConfig = {
   stepId: 'review-step',
@@ -109,11 +105,7 @@ describe('StepConfigSchema', () => {
   });
 
   it('should accept all valid fallback behaviors', () => {
-    for (const behavior of [
-      'escalate_to_human',
-      'continue_with_flag',
-      'pause',
-    ]) {
+    for (const behavior of ['escalate_to_human', 'continue_with_flag', 'pause']) {
       const result = StepConfigSchema.safeParse({
         stepId: 'step-1',
         executorType: 'human',

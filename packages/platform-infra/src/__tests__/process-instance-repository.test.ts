@@ -1,13 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryProcessInstanceRepository } from '@mediforce/platform-core';
-import type {
-  ProcessInstance,
-  StepExecution,
-} from '@mediforce/platform-core';
+import type { ProcessInstance, StepExecution } from '@mediforce/platform-core';
 
-function createTestInstance(
-  overrides: Partial<ProcessInstance> = {},
-): ProcessInstance {
+function createTestInstance(overrides: Partial<ProcessInstance> = {}): ProcessInstance {
   return {
     id: 'inst-001',
     definitionName: 'supply-chain-review',
@@ -32,9 +27,7 @@ function createTestInstance(
   };
 }
 
-function createTestStepExecution(
-  overrides: Partial<StepExecution> = {},
-): StepExecution {
+function createTestStepExecution(overrides: Partial<StepExecution> = {}): StepExecution {
   return {
     id: 'exec-001',
     instanceId: 'inst-001',
@@ -197,10 +190,7 @@ describe('InMemoryProcessInstanceRepository (contract tests)', () => {
       const instance = createTestInstance();
       await repo.create(instance);
 
-      const result = await repo.getLatestStepExecution(
-        instance.id,
-        'nonexistent-step',
-      );
+      const result = await repo.getLatestStepExecution(instance.id, 'nonexistent-step');
       expect(result).toBeNull();
     });
 
@@ -237,10 +227,7 @@ describe('InMemoryProcessInstanceRepository (contract tests)', () => {
       expect(latest!.iterationNumber).toBe(2);
 
       // Verify it doesn't return the intake step
-      const intakeLatest = await repo.getLatestStepExecution(
-        instance.id,
-        'intake',
-      );
+      const intakeLatest = await repo.getLatestStepExecution(instance.id, 'intake');
       expect(intakeLatest).not.toBeNull();
       expect(intakeLatest!.id).toBe('exec-intake');
     });

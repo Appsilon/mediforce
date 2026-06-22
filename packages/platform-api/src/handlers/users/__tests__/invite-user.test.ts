@@ -80,13 +80,9 @@ describe('inviteUser handler', () => {
       emailSent: true,
       isExisting: false,
     });
-    expect(notifier.sendInviteEmailCalls).toEqual([
-      { toEmail: 'newbie@example.test', temporaryPassword: 'Mf-XYZ' },
-    ]);
+    expect(notifier.sendInviteEmailCalls).toEqual([{ toEmail: 'newbie@example.test', temporaryPassword: 'Mf-XYZ' }]);
     expect(notifier.sendWorkspaceCalls).toHaveLength(0);
-    expect(namespaceRepo.members.get('alpha')).toEqual([
-      expect.objectContaining({ uid: 'uid-new', role: 'member' }),
-    ]);
+    expect(namespaceRepo.members.get('alpha')).toEqual([expect.objectContaining({ uid: 'uid-new', role: 'member' })]);
     expect(namespaceRepo.userOrganizations.get('uid-new')).toEqual(['alpha']);
   });
 
@@ -104,15 +100,9 @@ describe('inviteUser handler', () => {
       inviteNotificationService: notifier,
     });
 
-    await inviteUser(
-      { ...baseInput, email: '  NewBie@Example.TEST  ', displayName: '  Newbie  ' },
-      scope,
-    );
+    await inviteUser({ ...baseInput, email: '  NewBie@Example.TEST  ', displayName: '  Newbie  ' }, scope);
 
-    expect(inviteService.createInvitedUser).toHaveBeenCalledWith(
-      'newbie@example.test',
-      'Newbie',
-    );
+    expect(inviteService.createInvitedUser).toHaveBeenCalledWith('newbie@example.test', 'Newbie');
     expect(namespaceRepo.members.get('alpha')?.[0]).toMatchObject({
       uid: 'uid-new',
       displayName: 'Newbie',
@@ -193,9 +183,7 @@ describe('inviteUser handler', () => {
       inviteService: null,
     });
 
-    await expect(inviteUser(baseInput, scope)).rejects.toBeInstanceOf(
-      PreconditionFailedError,
-    );
+    await expect(inviteUser(baseInput, scope)).rejects.toBeInstanceOf(PreconditionFailedError);
   });
 
   it('sends the workspace-notification email for an existing user', async () => {

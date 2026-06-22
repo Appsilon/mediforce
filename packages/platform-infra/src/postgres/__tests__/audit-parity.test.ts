@@ -5,15 +5,8 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  InMemoryAuditRepository,
-} from '@mediforce/platform-core';
-import type {
-  AuditEvent,
-  AuditRepository,
-  ProcessInstance,
-  ProcessInstanceRepository,
-} from '@mediforce/platform-core';
+import { InMemoryAuditRepository } from '@mediforce/platform-core';
+import type { AuditEvent, AuditRepository, ProcessInstance, ProcessInstanceRepository } from '@mediforce/platform-core';
 import { PostgresAuditRepository } from '../repositories/audit-repository';
 import { PostgresNamespaceRepository } from '../repositories/namespace-repository';
 import * as schema from '../schema/index';
@@ -53,28 +46,60 @@ class StubProcessInstanceRepository implements ProcessInstanceRepository {
   }
 
   // Methods unused by the parity contract — throw if accidentally hit.
-  async create(): Promise<ProcessInstance> { throw new Error('stub'); }
-  async getByIdInNamespaces(): Promise<ProcessInstance | null> { throw new Error('stub'); }
-  async listAll(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async listInNamespaces(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async listDefinitionNames(): Promise<never> { throw new Error('stub'); }
-  async summarizeRunsByWorkflow(): Promise<never> { throw new Error('stub'); }
-  async getByStatusAll(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async getByStatusInNamespaces(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async update(): Promise<void> { throw new Error('stub'); }
-  async getByDefinition(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async getLastCompletedByDefinitionName(): Promise<ProcessInstance | null> { throw new Error('stub'); }
-  async addStepExecution(): Promise<never> { throw new Error('stub'); }
-  async getStepExecutions(): Promise<never[]> { throw new Error('stub'); }
-  async getLatestStepExecution(): Promise<null> { throw new Error('stub'); }
-  async updateStepExecution(): Promise<void> { throw new Error('stub'); }
-  async getIdsByDefinitionName(): Promise<string[]> { throw new Error('stub'); }
-  async setDeletedByDefinitionName(): Promise<void> { throw new Error('stub'); }
+  async create(): Promise<ProcessInstance> {
+    throw new Error('stub');
+  }
+  async getByIdInNamespaces(): Promise<ProcessInstance | null> {
+    throw new Error('stub');
+  }
+  async listAll(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async listInNamespaces(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async listDefinitionNames(): Promise<never> {
+    throw new Error('stub');
+  }
+  async summarizeRunsByWorkflow(): Promise<never> {
+    throw new Error('stub');
+  }
+  async getByStatusAll(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async getByStatusInNamespaces(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async update(): Promise<void> {
+    throw new Error('stub');
+  }
+  async getByDefinition(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async getLastCompletedByDefinitionName(): Promise<ProcessInstance | null> {
+    throw new Error('stub');
+  }
+  async addStepExecution(): Promise<never> {
+    throw new Error('stub');
+  }
+  async getStepExecutions(): Promise<never[]> {
+    throw new Error('stub');
+  }
+  async getLatestStepExecution(): Promise<null> {
+    throw new Error('stub');
+  }
+  async updateStepExecution(): Promise<void> {
+    throw new Error('stub');
+  }
+  async getIdsByDefinitionName(): Promise<string[]> {
+    throw new Error('stub');
+  }
+  async setDeletedByDefinitionName(): Promise<void> {
+    throw new Error('stub');
+  }
 }
 
-function eventBase(
-  overrides: Partial<Omit<AuditEvent, 'serverTimestamp'>> = {},
-): Omit<AuditEvent, 'serverTimestamp'> {
+function eventBase(overrides: Partial<Omit<AuditEvent, 'serverTimestamp'>> = {}): Omit<AuditEvent, 'serverTimestamp'> {
   return {
     actorId: 'user-1',
     actorType: 'user',
@@ -128,30 +153,38 @@ function contract(
     it('getByEntity returns matching events in DESC order by timestamp', async () => {
       const instanceId = randomUUID();
       await registerInstance(instanceId, 'ws-1');
-      await repo.append(eventBase({
-        processInstanceId: instanceId,
-        entityType: 'case',
-        entityId: 'case-1',
-        timestamp: '2026-01-01T08:00:00.000Z',
-      }));
-      await repo.append(eventBase({
-        processInstanceId: instanceId,
-        entityType: 'case',
-        entityId: 'case-1',
-        timestamp: '2026-01-01T12:00:00.000Z',
-      }));
-      await repo.append(eventBase({
-        processInstanceId: instanceId,
-        entityType: 'case',
-        entityId: 'case-1',
-        timestamp: '2026-01-01T10:00:00.000Z',
-      }));
+      await repo.append(
+        eventBase({
+          processInstanceId: instanceId,
+          entityType: 'case',
+          entityId: 'case-1',
+          timestamp: '2026-01-01T08:00:00.000Z',
+        }),
+      );
+      await repo.append(
+        eventBase({
+          processInstanceId: instanceId,
+          entityType: 'case',
+          entityId: 'case-1',
+          timestamp: '2026-01-01T12:00:00.000Z',
+        }),
+      );
+      await repo.append(
+        eventBase({
+          processInstanceId: instanceId,
+          entityType: 'case',
+          entityId: 'case-1',
+          timestamp: '2026-01-01T10:00:00.000Z',
+        }),
+      );
       // Sibling entity should not leak in.
-      await repo.append(eventBase({
-        processInstanceId: instanceId,
-        entityType: 'case',
-        entityId: 'case-2',
-      }));
+      await repo.append(
+        eventBase({
+          processInstanceId: instanceId,
+          entityType: 'case',
+          entityId: 'case-2',
+        }),
+      );
 
       const results = await repo.getByEntity('case', 'case-1');
       expect(results).toHaveLength(3);
@@ -167,25 +200,28 @@ function contract(
       const otherId = randomUUID();
       await registerInstance(instanceId, 'ws-1');
       await registerInstance(otherId, 'ws-1');
-      await repo.append(eventBase({
-        processInstanceId: instanceId,
-        timestamp: '2026-01-01T12:00:00.000Z',
-      }));
-      await repo.append(eventBase({
-        processInstanceId: instanceId,
-        timestamp: '2026-01-01T08:00:00.000Z',
-      }));
-      await repo.append(eventBase({
-        processInstanceId: otherId,
-        timestamp: '2026-01-01T09:00:00.000Z',
-      }));
+      await repo.append(
+        eventBase({
+          processInstanceId: instanceId,
+          timestamp: '2026-01-01T12:00:00.000Z',
+        }),
+      );
+      await repo.append(
+        eventBase({
+          processInstanceId: instanceId,
+          timestamp: '2026-01-01T08:00:00.000Z',
+        }),
+      );
+      await repo.append(
+        eventBase({
+          processInstanceId: otherId,
+          timestamp: '2026-01-01T09:00:00.000Z',
+        }),
+      );
 
       const results = await repo.getByProcess(instanceId);
       expect(results).toHaveLength(2);
-      expect(results.map((e) => e.timestamp)).toEqual([
-        '2026-01-01T08:00:00.000Z',
-        '2026-01-01T12:00:00.000Z',
-      ]);
+      expect(results.map((e) => e.timestamp)).toEqual(['2026-01-01T08:00:00.000Z', '2026-01-01T12:00:00.000Z']);
     });
 
     it('getByProcessInNamespaces returns nothing when workspace not in allowed', async () => {
@@ -212,17 +248,21 @@ function contract(
         '2026-01-01T10:00:00.000Z',
         '2026-01-01T11:00:00.000Z',
       ]) {
-        await repo.append(eventBase({
-          processInstanceId: instanceId,
-          actorId: 'user-A',
-          timestamp: ts,
-        }));
+        await repo.append(
+          eventBase({
+            processInstanceId: instanceId,
+            actorId: 'user-A',
+            timestamp: ts,
+          }),
+        );
       }
       // Different actor — should be excluded.
-      await repo.append(eventBase({
-        processInstanceId: instanceId,
-        actorId: 'user-B',
-      }));
+      await repo.append(
+        eventBase({
+          processInstanceId: instanceId,
+          actorId: 'user-B',
+        }),
+      );
 
       const limited = await repo.getByActor('user-A', { limit: 2 });
       expect(limited).toHaveLength(2);
@@ -290,7 +330,9 @@ describe.skipIf(skipPg)('PostgresAuditRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sql);

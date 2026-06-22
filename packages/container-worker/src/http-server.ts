@@ -1,9 +1,7 @@
 import { createServer, type Server } from 'node:http';
 import { listImages, getDiskUsage, removeImage } from './docker-info';
 
-const WORKER_HTTP_PORT = process.env.WORKER_HTTP_PORT !== undefined
-  ? Number(process.env.WORKER_HTTP_PORT)
-  : 3001;
+const WORKER_HTTP_PORT = process.env.WORKER_HTTP_PORT !== undefined ? Number(process.env.WORKER_HTTP_PORT) : 3001;
 
 function jsonResponse(res: import('node:http').ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { 'Content-Type': 'application/json' });

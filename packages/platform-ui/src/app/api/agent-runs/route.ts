@@ -1,9 +1,6 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { listAgentRuns } from '@mediforce/platform-api/handlers';
-import {
-  ListAgentRunsInputSchema,
-  type ListAgentRunsInput,
-} from '@mediforce/platform-api/contract';
+import { ListAgentRunsInputSchema, type ListAgentRunsInput } from '@mediforce/platform-api/contract';
 
 /**
  * GET /api/agent-runs

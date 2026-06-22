@@ -7,9 +7,7 @@ describe('workflow-designer', () => {
   const appDir = resolve(import.meta.dirname, '../..');
 
   function loadDefinition() {
-    const raw = JSON.parse(
-      readFileSync(resolve(appDir, 'src/workflow-designer.wd.json'), 'utf8'),
-    );
+    const raw = JSON.parse(readFileSync(resolve(appDir, 'src/workflow-designer.wd.json'), 'utf8'));
     return WorkflowDefinitionSchema.safeParse({ ...raw, version: 1 });
   }
 
@@ -31,7 +29,7 @@ describe('workflow-designer', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const terminals = result.data.steps.filter(s => s.type === 'terminal');
+      const terminals = result.data.steps.filter((s) => s.type === 'terminal');
       expect(terminals).toHaveLength(1);
       expect(terminals[0].id).toBe('done');
     });
@@ -41,7 +39,7 @@ describe('workflow-designer', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const nonTerminal = result.data.steps.filter(s => s.type !== 'terminal');
+      const nonTerminal = result.data.steps.filter((s) => s.type !== 'terminal');
       for (const step of nonTerminal) {
         expect(step.executor).toBeDefined();
         expect(['human', 'agent', 'script', 'cowork']).toContain(step.executor);
@@ -53,7 +51,7 @@ describe('workflow-designer', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const stepIds = new Set(result.data.steps.map(s => s.id));
+      const stepIds = new Set(result.data.steps.map((s) => s.id));
       for (const transition of result.data.transitions) {
         expect(stepIds.has(transition.from)).toBe(true);
         expect(stepIds.has(transition.to)).toBe(true);
@@ -65,8 +63,8 @@ describe('workflow-designer', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const stepIds = new Set(result.data.steps.map(s => s.id));
-      const reviewSteps = result.data.steps.filter(s => s.verdicts);
+      const stepIds = new Set(result.data.steps.map((s) => s.id));
+      const reviewSteps = result.data.steps.filter((s) => s.verdicts);
       expect(reviewSteps.length).toBeGreaterThan(0);
 
       for (const step of reviewSteps) {
@@ -81,7 +79,7 @@ describe('workflow-designer', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const scriptSteps = result.data.steps.filter(s => s.executor === 'script');
+      const scriptSteps = result.data.steps.filter((s) => s.executor === 'script');
       expect(scriptSteps.length).toBeGreaterThan(0);
 
       for (const step of scriptSteps) {
@@ -96,7 +94,7 @@ describe('workflow-designer', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const coworkSteps = result.data.steps.filter(s => s.executor === 'cowork');
+      const coworkSteps = result.data.steps.filter((s) => s.executor === 'cowork');
       expect(coworkSteps).toHaveLength(1);
       expect(coworkSteps[0].id).toBe('design');
       expect(coworkSteps[0].cowork).toBeDefined();
@@ -109,10 +107,10 @@ describe('workflow-designer', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const transitions = result.data.transitions.filter(t => t.from === 'choose-mode');
+      const transitions = result.data.transitions.filter((t) => t.from === 'choose-mode');
       expect(transitions).toHaveLength(2);
 
-      const targets = transitions.map(t => t.to).sort();
+      const targets = transitions.map((t) => t.to).sort();
       expect(targets).toEqual(['design', 'fetch-workflows']);
     });
   });

@@ -46,32 +46,42 @@ function YamlCodeEditor({ value, onChange }: { value: string; onChange: (v: stri
           '&': { fontSize: '11px', height: 'auto' },
           '.cm-scroller': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', overflow: 'visible' },
           '.cm-content': { padding: '8px 0' },
-          '.cm-gutters': { borderRight: '1px solid var(--border)', background: 'transparent', color: 'hsl(var(--muted-foreground))', fontSize: '10px' },
+          '.cm-gutters': {
+            borderRight: '1px solid var(--border)',
+            background: 'transparent',
+            color: 'hsl(var(--muted-foreground))',
+            fontSize: '10px',
+          },
           '.cm-activeLineGutter': { background: 'transparent' },
           // Syntax token colours (using CSS vars so they adapt to light/dark)
-          '.cm-tok-key':     { color: 'hsl(var(--primary))', fontWeight: '500' },
-          '.cm-tok-string':  { color: 'hsl(var(--color-status-warn))' },
-          '.cm-tok-number':  { color: 'hsl(38 75% 45%)' },
-          '.cm-tok-bool':    { color: 'hsl(var(--color-status-ok))' },
-          '.cm-tok-null':    { color: 'hsl(var(--muted-foreground))' },
+          '.cm-tok-key': { color: 'hsl(var(--primary))', fontWeight: '500' },
+          '.cm-tok-string': { color: 'hsl(var(--color-status-warn))' },
+          '.cm-tok-number': { color: 'hsl(38 75% 45%)' },
+          '.cm-tok-bool': { color: 'hsl(var(--color-status-ok))' },
+          '.cm-tok-null': { color: 'hsl(var(--muted-foreground))' },
           '.cm-tok-comment': { color: 'hsl(var(--muted-foreground))', fontStyle: 'italic' },
-          '.cm-tok-punct':   { color: 'hsl(var(--muted-foreground) / 0.6)' },
+          '.cm-tok-punct': { color: 'hsl(var(--muted-foreground) / 0.6)' },
         }),
-        syntaxHighlighting(HighlightStyle.define([
-          { tag: tags.propertyName,              class: 'cm-tok-key' },
-          { tag: tags.string,                    class: 'cm-tok-string' },
-          { tag: tags.number,                    class: 'cm-tok-number' },
-          { tag: [tags.bool, tags.atom],         class: 'cm-tok-bool' },
-          { tag: tags.null,                      class: 'cm-tok-null' },
-          { tag: tags.comment,                   class: 'cm-tok-comment' },
-          { tag: [tags.separator, tags.bracket], class: 'cm-tok-punct' },
-        ])),
+        syntaxHighlighting(
+          HighlightStyle.define([
+            { tag: tags.propertyName, class: 'cm-tok-key' },
+            { tag: tags.string, class: 'cm-tok-string' },
+            { tag: tags.number, class: 'cm-tok-number' },
+            { tag: [tags.bool, tags.atom], class: 'cm-tok-bool' },
+            { tag: tags.null, class: 'cm-tok-null' },
+            { tag: tags.comment, class: 'cm-tok-comment' },
+            { tag: [tags.separator, tags.bracket], class: 'cm-tok-punct' },
+          ]),
+        ),
       ],
     });
 
     const view = new EditorView({ state, parent: containerRef.current });
     viewRef.current = view;
-    return () => { view.destroy(); viewRef.current = null; };
+    return () => {
+      view.destroy();
+      viewRef.current = null;
+    };
     // init-only: value is synced via the second useEffect below
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -149,10 +159,16 @@ export function WorkflowEditorCanvas({
   // ── State ──────────────────────────────────────────────────────────────────
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
   const [rightPanelView, setRightPanelView] = useState<'yaml' | 'secrets'>('yaml');
-  const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>(() => structuredClone(initialTransitions));
+  const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>(() =>
+    structuredClone(initialTransitions),
+  );
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
-  const [editHistory, setEditHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
-  const [redoHistory, setRedoHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
+  const [editHistory, setEditHistory] = useState<
+    Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>
+  >([]);
+  const [redoHistory, setRedoHistory] = useState<
+    Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>
+  >([]);
   const [yamlDraft, setYamlDraft] = useState('');
   const [yamlError, setYamlError] = useState<string | null>(null);
   // Tracks the last value we pushed into yamlDraft from the diagram,
@@ -162,7 +178,10 @@ export function WorkflowEditorCanvas({
   const selectedStep = editedSteps.find((s) => s.id === selectedStepId) ?? null;
 
   // ── Move eligibility (all steps, used by diagram hover buttons) ─────────────
-  const { canMoveUp: canMoveUpSet, canMoveDown: canMoveDownSet } = computeMoveEligibility(editedSteps, editedTransitions);
+  const { canMoveUp: canMoveUpSet, canMoveDown: canMoveDownSet } = computeMoveEligibility(
+    editedSteps,
+    editedTransitions,
+  );
 
   // ── Docker image warnings ─────────────────────────────────────────────────
   const { images: dockerImages, isAvailable: dockerAvailable } = useDockerImages();
@@ -184,8 +203,12 @@ export function WorkflowEditorCanvas({
   // addStep, removeStep, moveStep, etc.).
   const editedStepsRef = useRef(editedSteps);
   const editedTransitionsRef = useRef(editedTransitions);
-  useEffect(() => { editedStepsRef.current = editedSteps; }, [editedSteps]);
-  useEffect(() => { editedTransitionsRef.current = editedTransitions; }, [editedTransitions]);
+  useEffect(() => {
+    editedStepsRef.current = editedSteps;
+  }, [editedSteps]);
+  useEffect(() => {
+    editedTransitionsRef.current = editedTransitions;
+  }, [editedTransitions]);
 
   const saveSnapshot = useCallback(() => {
     setEditHistory((prev) => [...prev, { steps: editedStepsRef.current, transitions: editedTransitionsRef.current }]);
@@ -265,16 +288,13 @@ export function WorkflowEditorCanvas({
       setYamlDraft(yamlPreviewForSync);
       lastSyncedYamlRef.current = yamlPreviewForSync;
     }
-  // yamlDraft intentionally omitted — we only want to run this when the diagram changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // yamlDraft intentionally omitted — we only want to run this when the diagram changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [yamlPreviewForSync]);
-
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const updateStep = useCallback((stepId: string, patch: Partial<WorkflowStep>) => {
-    setEditedSteps((prev) =>
-      prev.map((s) => (s.id === stepId ? { ...s, ...patch } : s)),
-    );
+    setEditedSteps((prev) => prev.map((s) => (s.id === stepId ? { ...s, ...patch } : s)));
     if (patch.id && patch.id !== stepId) {
       const newId = patch.id;
       setEditedTransitions((prev) =>
@@ -300,151 +320,158 @@ export function WorkflowEditorCanvas({
     }
   }, []);
 
-  const addStep = useCallback((type: WorkflowStep['type'], executor: WorkflowStep['executor'], insertAfterId: string | null = null) => {
-    const terminalStep = editedSteps.find((s) => s.type === 'terminal');
+  const addStep = useCallback(
+    (type: WorkflowStep['type'], executor: WorkflowStep['executor'], insertAfterId: string | null = null) => {
+      const terminalStep = editedSteps.find((s) => s.type === 'terminal');
 
-    // Only one terminal allowed
-    if (type === 'terminal' && terminalStep) return;
+      // Only one terminal allowed
+      if (type === 'terminal' && terminalStep) return;
 
-    saveSnapshot();
-    const stepNum = editedSteps.length + 1;
-    const newId = `new-step-${stepNum}`;
-    const newStep: WorkflowStep = {
-      id: newId,
-      name: `New Step ${stepNum}`,
-      type,
-      executor,
-      ...(executor === 'agent' ? { plugin: 'opencode-agent', autonomyLevel: 'L2' } : {}),
-      ...(executor === 'script' ? { plugin: 'script-container' } : {}),
-      ...(executor === 'cowork' ? { cowork: { agent: 'chat' as const } } : {}),
-    };
+      saveSnapshot();
+      const stepNum = editedSteps.length + 1;
+      const newId = `new-step-${stepNum}`;
+      const newStep: WorkflowStep = {
+        id: newId,
+        name: `New Step ${stepNum}`,
+        type,
+        executor,
+        ...(executor === 'agent' ? { plugin: 'opencode-agent', autonomyLevel: 'L2' } : {}),
+        ...(executor === 'script' ? { plugin: 'script-container' } : {}),
+        ...(executor === 'cowork' ? { cowork: { agent: 'chat' as const } } : {}),
+      };
 
-    // When inserting via an edge button, insertAfterId is set explicitly.
-    // Otherwise fall back to the currently selected step.
-    const resolvedInsertAfterId = insertAfterId ?? selectedStepId;
+      // When inserting via an edge button, insertAfterId is set explicitly.
+      // Otherwise fall back to the currently selected step.
+      const resolvedInsertAfterId = insertAfterId ?? selectedStepId;
 
-    if (!terminalStep || type === 'terminal') {
-      // No terminal yet (or we're adding the terminal itself): append at end
-      const lastId = editedSteps[editedSteps.length - 1]?.id;
-      setEditedSteps((prev) => [...prev, newStep]);
-      setEditedTransitions((prev) => lastId ? [...prev, { from: lastId, to: newId }] : prev);
-    } else if (resolvedInsertAfterId && resolvedInsertAfterId !== terminalStep.id) {
-      // Insert after the target step
-      const insertIdx = editedSteps.findIndex((s) => s.id === resolvedInsertAfterId);
-      setEditedSteps((prev) => {
-        const next = [...prev];
-        next.splice(insertIdx + 1, 0, newStep);
-        return next;
-      });
-      setEditedTransitions((prev) => {
-        // Edges from resolvedInsertAfterId → their targets now go through newStep
-        const outgoing = prev.filter((t) => t.from === resolvedInsertAfterId);
-        const others = prev.filter((t) => t.from !== resolvedInsertAfterId);
-        const rewired = outgoing.map((t) => ({ from: newId, to: t.to }));
-        return [...others, { from: resolvedInsertAfterId, to: newId }, ...rewired];
-      });
-    } else {
-      // No step selected: insert immediately before the terminal step
-      const terminalIdx = editedSteps.findIndex((s) => s.id === terminalStep.id);
-      setEditedSteps((prev) => {
-        const next = [...prev];
-        next.splice(terminalIdx, 0, newStep);
-        return next;
-      });
-      setEditedTransitions((prev) => {
-        // Redirect all edges that previously pointed at terminal → now point at newStep
-        const rewired = prev.map((t) =>
-          t.to === terminalStep.id ? { ...t, to: newId } : t,
-        );
-        return [...rewired, { from: newId, to: terminalStep.id }];
-      });
-    }
-
-    // Only auto-select the new step when not inserting via an edge button
-    // (edge button should leave the right panel unchanged).
-    if (insertAfterId === null) {
-      setSelectedStepId(newId);
-    }
-  }, [editedSteps, selectedStepId, saveSnapshot]);
-
-  const removeStep = useCallback((stepId: string) => {
-    saveSnapshot();
-    setEditedSteps((prev) => prev.filter((s) => s.id !== stepId));
-    setEditedTransitions((prev) => {
-      const incoming = prev.filter((t) => t.to === stepId);
-      const outgoing = prev.filter((t) => t.from === stepId);
-      const unrelated = prev.filter((t) => t.from !== stepId && t.to !== stepId);
-      const rewired = incoming.flatMap((inc) =>
-        outgoing.map((out) => ({ from: inc.from, to: out.to })),
-      );
-      return [...unrelated, ...rewired];
-    });
-    if (selectedStepId === stepId) setSelectedStepId(null);
-  }, [selectedStepId, saveSnapshot]);
-
-  const moveStep = useCallback((stepId: string, direction: 'up' | 'down') => {
-    saveSnapshot();
-    setEditedTransitions((prev) => {
-      if (direction === 'up') {
-        const incoming = prev.filter((t) => t.to === stepId);
-        if (incoming.length !== 1) return prev;
-        const pred = incoming[0].from;
-        const predIncoming = prev.filter((t) => t.to === pred);
-        const predOutgoing = prev.filter((t) => t.from === pred);
-        if (predOutgoing.length !== 1) return prev;
-        const stepOutgoing = prev.filter((t) => t.from === stepId);
-        const toRemove = new Set([
-          ...predIncoming.map((t) => `${t.from}|${t.to}`),
-          `${pred}|${stepId}`,
-          ...stepOutgoing.map((t) => `${t.from}|${t.to}`),
-        ]);
-        return [
-          ...prev.filter((t) => !toRemove.has(`${t.from}|${t.to}`)),
-          ...predIncoming.map((t) => ({ from: t.from, to: stepId })),
-          { from: stepId, to: pred },
-          ...stepOutgoing.map((t) => ({ from: pred, to: t.to })),
-        ];
+      if (!terminalStep || type === 'terminal') {
+        // No terminal yet (or we're adding the terminal itself): append at end
+        const lastId = editedSteps[editedSteps.length - 1]?.id;
+        setEditedSteps((prev) => [...prev, newStep]);
+        setEditedTransitions((prev) => (lastId ? [...prev, { from: lastId, to: newId }] : prev));
+      } else if (resolvedInsertAfterId && resolvedInsertAfterId !== terminalStep.id) {
+        // Insert after the target step
+        const insertIdx = editedSteps.findIndex((s) => s.id === resolvedInsertAfterId);
+        setEditedSteps((prev) => {
+          const next = [...prev];
+          next.splice(insertIdx + 1, 0, newStep);
+          return next;
+        });
+        setEditedTransitions((prev) => {
+          // Edges from resolvedInsertAfterId → their targets now go through newStep
+          const outgoing = prev.filter((t) => t.from === resolvedInsertAfterId);
+          const others = prev.filter((t) => t.from !== resolvedInsertAfterId);
+          const rewired = outgoing.map((t) => ({ from: newId, to: t.to }));
+          return [...others, { from: resolvedInsertAfterId, to: newId }, ...rewired];
+        });
       } else {
+        // No step selected: insert immediately before the terminal step
+        const terminalIdx = editedSteps.findIndex((s) => s.id === terminalStep.id);
+        setEditedSteps((prev) => {
+          const next = [...prev];
+          next.splice(terminalIdx, 0, newStep);
+          return next;
+        });
+        setEditedTransitions((prev) => {
+          // Redirect all edges that previously pointed at terminal → now point at newStep
+          const rewired = prev.map((t) => (t.to === terminalStep.id ? { ...t, to: newId } : t));
+          return [...rewired, { from: newId, to: terminalStep.id }];
+        });
+      }
+
+      // Only auto-select the new step when not inserting via an edge button
+      // (edge button should leave the right panel unchanged).
+      if (insertAfterId === null) {
+        setSelectedStepId(newId);
+      }
+    },
+    [editedSteps, selectedStepId, saveSnapshot],
+  );
+
+  const removeStep = useCallback(
+    (stepId: string) => {
+      saveSnapshot();
+      setEditedSteps((prev) => prev.filter((s) => s.id !== stepId));
+      setEditedTransitions((prev) => {
+        const incoming = prev.filter((t) => t.to === stepId);
         const outgoing = prev.filter((t) => t.from === stepId);
-        if (outgoing.length !== 1) return prev;
-        const succ = outgoing[0].to;
-        const succIncoming = prev.filter((t) => t.to === succ);
-        if (succIncoming.length !== 1) return prev;
-        const succOutgoing = prev.filter((t) => t.from === succ);
-        const stepIncoming = prev.filter((t) => t.to === stepId);
-        const toRemove = new Set([
-          ...stepIncoming.map((t) => `${t.from}|${t.to}`),
-          `${stepId}|${succ}`,
-          ...succOutgoing.map((t) => `${t.from}|${t.to}`),
-        ]);
-        return [
-          ...prev.filter((t) => !toRemove.has(`${t.from}|${t.to}`)),
-          ...stepIncoming.map((t) => ({ from: t.from, to: succ })),
-          { from: succ, to: stepId },
-          ...succOutgoing.map((t) => ({ from: stepId, to: t.to })),
-        ];
-      }
-    });
-    setEditedSteps((prev) => {
-      const idx = prev.findIndex((s) => s.id === stepId);
-      if (idx === -1) return prev;
-      const next = [...prev];
-      if (direction === 'up' && idx > 0) {
-        [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-      } else if (direction === 'down' && idx < next.length - 1) {
-        [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-      }
-      return next;
-    });
-  }, [saveSnapshot]);
+        const unrelated = prev.filter((t) => t.from !== stepId && t.to !== stepId);
+        const rewired = incoming.flatMap((inc) => outgoing.map((out) => ({ from: inc.from, to: out.to })));
+        return [...unrelated, ...rewired];
+      });
+      if (selectedStepId === stepId) setSelectedStepId(null);
+    },
+    [selectedStepId, saveSnapshot],
+  );
+
+  const moveStep = useCallback(
+    (stepId: string, direction: 'up' | 'down') => {
+      saveSnapshot();
+      setEditedTransitions((prev) => {
+        if (direction === 'up') {
+          const incoming = prev.filter((t) => t.to === stepId);
+          if (incoming.length !== 1) return prev;
+          const pred = incoming[0].from;
+          const predIncoming = prev.filter((t) => t.to === pred);
+          const predOutgoing = prev.filter((t) => t.from === pred);
+          if (predOutgoing.length !== 1) return prev;
+          const stepOutgoing = prev.filter((t) => t.from === stepId);
+          const toRemove = new Set([
+            ...predIncoming.map((t) => `${t.from}|${t.to}`),
+            `${pred}|${stepId}`,
+            ...stepOutgoing.map((t) => `${t.from}|${t.to}`),
+          ]);
+          return [
+            ...prev.filter((t) => !toRemove.has(`${t.from}|${t.to}`)),
+            ...predIncoming.map((t) => ({ from: t.from, to: stepId })),
+            { from: stepId, to: pred },
+            ...stepOutgoing.map((t) => ({ from: pred, to: t.to })),
+          ];
+        } else {
+          const outgoing = prev.filter((t) => t.from === stepId);
+          if (outgoing.length !== 1) return prev;
+          const succ = outgoing[0].to;
+          const succIncoming = prev.filter((t) => t.to === succ);
+          if (succIncoming.length !== 1) return prev;
+          const succOutgoing = prev.filter((t) => t.from === succ);
+          const stepIncoming = prev.filter((t) => t.to === stepId);
+          const toRemove = new Set([
+            ...stepIncoming.map((t) => `${t.from}|${t.to}`),
+            `${stepId}|${succ}`,
+            ...succOutgoing.map((t) => `${t.from}|${t.to}`),
+          ]);
+          return [
+            ...prev.filter((t) => !toRemove.has(`${t.from}|${t.to}`)),
+            ...stepIncoming.map((t) => ({ from: t.from, to: succ })),
+            { from: succ, to: stepId },
+            ...succOutgoing.map((t) => ({ from: stepId, to: t.to })),
+          ];
+        }
+      });
+      setEditedSteps((prev) => {
+        const idx = prev.findIndex((s) => s.id === stepId);
+        if (idx === -1) return prev;
+        const next = [...prev];
+        if (direction === 'up' && idx > 0) {
+          [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+        } else if (direction === 'down' && idx < next.length - 1) {
+          [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+        }
+        return next;
+      });
+    },
+    [saveSnapshot],
+  );
 
   // ── Diagram definition ─────────────────────────────────────────────────────
-  const diagramDefinition = useMemo(() => ({
-    steps: editedSteps,
-    transitions: editedTransitions,
-  }) as WorkflowDefinition, [editedSteps, editedTransitions]);
-
-
+  const diagramDefinition = useMemo(
+    () =>
+      ({
+        steps: editedSteps,
+        transitions: editedTransitions,
+      }) as WorkflowDefinition,
+    [editedSteps, editedTransitions],
+  );
 
   const savePanel = renderSavePanel?.(editedSteps, editedTransitions, discardChanges) ?? null;
 
@@ -476,10 +503,8 @@ export function WorkflowEditorCanvas({
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-1 flex-col min-h-0">
-
       {/* ── Unified sticky toolbar ── */}
       <div className="shrink-0 border-b px-4 py-2 flex items-center gap-1.5 flex-wrap bg-background">
-
         {/* Left: undo/redo + panel tabs */}
         <button
           onClick={undoEdit}
@@ -487,7 +512,9 @@ export function WorkflowEditorCanvas({
           title="Undo last change (Ctrl+Z)"
           className={cn(
             'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
-            editHistory.length > 0 ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
+            editHistory.length > 0
+              ? 'hover:bg-muted text-foreground'
+              : 'opacity-40 cursor-not-allowed text-muted-foreground',
           )}
         >
           <Undo2 className="h-3.5 w-3.5" />
@@ -500,7 +527,9 @@ export function WorkflowEditorCanvas({
           title="Redo last change (Ctrl+Shift+Z)"
           className={cn(
             'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
-            redoHistory.length > 0 ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
+            redoHistory.length > 0
+              ? 'hover:bg-muted text-foreground'
+              : 'opacity-40 cursor-not-allowed text-muted-foreground',
           )}
         >
           <Redo2 className="h-3.5 w-3.5" />
@@ -536,12 +565,21 @@ export function WorkflowEditorCanvas({
             <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40 ml-0.5" />
           </button>
           <span className="pointer-events-none absolute top-full left-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
-            <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
+            <p>
+              Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every
+              step, transition, and configuration.
+            </p>
             <p>You can author workflows three ways:</p>
             <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-              <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
-              <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
-              <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
+              <li>
+                Use the <strong className="text-foreground">visual editor</strong> on the left
+              </li>
+              <li>
+                Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow
+              </li>
+              <li>
+                Write directly in the <strong className="text-foreground">code editor</strong> below
+              </li>
             </ul>
           </span>
         </span>
@@ -549,9 +587,7 @@ export function WorkflowEditorCanvas({
         {/* Apply YAML — only visible when YAML panel is active and no step is selected */}
         {!selectedStepId && rightPanelView === 'yaml' && (
           <div className="ml-auto flex items-center gap-2">
-            {yamlError && (
-              <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>
-            )}
+            {yamlError && <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>}
             <button
               onClick={applyYaml}
               className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border hover:bg-muted text-foreground transition-colors"
@@ -561,11 +597,11 @@ export function WorkflowEditorCanvas({
             </button>
           </div>
         )}
-      </div>{/* end unified toolbar */}
+      </div>
+      {/* end unified toolbar */}
 
       {/* ── Two-column content area ── */}
       <div className="flex flex-1 min-h-0">
-
         {/* Diagram column */}
         <div className="flex-1 overflow-y-auto p-6 pt-4">
           <WorkflowDiagram
@@ -576,7 +612,10 @@ export function WorkflowEditorCanvas({
             onNodeMoveUp={(stepId) => moveStep(stepId, 'up')}
             onNodeMoveDown={(stepId) => moveStep(stepId, 'down')}
             onEdgeAdd={(fromStepId, type, executor) => addStep(type, executor, fromStepId)}
-            onPaneClick={() => { setSelectedStepId(null); setRightPanelView('yaml'); }}
+            onPaneClick={() => {
+              setSelectedStepId(null);
+              setRightPanelView('yaml');
+            }}
             selectedStepId={selectedStepId}
             errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
             warningStepIds={warningStepIds}
@@ -609,43 +648,38 @@ export function WorkflowEditorCanvas({
                 />
               </div>
             </>
-            ) : rightPanelView === 'secrets' ? (
-              <div className="p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold">Secrets</h2>
-                  <button
-                    onClick={() => setRightPanelView('yaml')}
-                    className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                {namespace && workflowName ? (
-                  <WorkflowSecretsEditor
-                    namespace={namespace}
-                    workflowName={workflowName}
-                  />
-                ) : (
-                  <p className="text-sm text-muted-foreground">Save the workflow first to manage secrets.</p>
-                )}
+          ) : rightPanelView === 'secrets' ? (
+            <div className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold">Secrets</h2>
+                <button
+                  onClick={() => setRightPanelView('yaml')}
+                  className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-            ) : (
-              <div className="p-4 space-y-4">
-                <YamlCodeEditor
-                  value={yamlDraft}
-                  onChange={(v) => { setYamlDraft(v); setYamlError(null); }}
-                />
-                {savePanel && (
-                  <div className="border-t pt-4">
-                    {savePanel}
-                  </div>
-                )}
-              </div>
-            )}
+              {namespace && workflowName ? (
+                <WorkflowSecretsEditor namespace={namespace} workflowName={workflowName} />
+              ) : (
+                <p className="text-sm text-muted-foreground">Save the workflow first to manage secrets.</p>
+              )}
+            </div>
+          ) : (
+            <div className="p-4 space-y-4">
+              <YamlCodeEditor
+                value={yamlDraft}
+                onChange={(v) => {
+                  setYamlDraft(v);
+                  setYamlError(null);
+                }}
+              />
+              {savePanel && <div className="border-t pt-4">{savePanel}</div>}
+            </div>
+          )}
         </div>
-
-      </div>{/* end two-column */}
+      </div>
+      {/* end two-column */}
     </div>
   );
 }
-

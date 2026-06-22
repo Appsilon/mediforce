@@ -31,9 +31,7 @@ export interface TaskVerdict {
 
 /** Build the verdicts payload attached to a HumanTask: strip target, fill defaults.
  *  Returned as an ordered array (NOT a Record) so button order matches the WD. */
-export function buildTaskVerdicts(
-  stepVerdicts: Record<string, Verdict> | undefined,
-): TaskVerdict[] | undefined {
+export function buildTaskVerdicts(stepVerdicts: Record<string, Verdict> | undefined): TaskVerdict[] | undefined {
   if (!stepVerdicts || Object.keys(stepVerdicts).length === 0) return undefined;
   return Object.entries(stepVerdicts).map(([key, cfg]) => ({
     key,
@@ -42,4 +40,3 @@ export function buildTaskVerdicts(
     requiresComment: cfg.requiresComment ?? defaultRequiresComment(key),
   }));
 }
-

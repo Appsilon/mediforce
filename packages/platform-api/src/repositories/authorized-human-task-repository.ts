@@ -1,7 +1,4 @@
-import type {
-  HumanTask,
-  HumanTaskRepository,
-} from '@mediforce/platform-core';
+import type { HumanTask, HumanTaskRepository } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
 import { ForbiddenError } from '../errors';
 import { AuthorizedScope } from './authorized-repository';
@@ -46,9 +43,7 @@ export class AuthorizedHumanTaskRepository extends AuthorizedScope {
    * tasks whose parent run belongs to one of their namespaces.
    */
   listForCaller = async (): Promise<HumanTask[]> =>
-    this.caller.isSystemActor
-      ? this.raw.listAll()
-      : this.raw.listInNamespaces([...this.caller.namespaces]);
+    this.caller.isSystemActor ? this.raw.listAll() : this.raw.listInNamespaces([...this.caller.namespaces]);
 
   claim = async (taskId: string, userId: string): Promise<HumanTask> => {
     await this.assertCanMutate(taskId);

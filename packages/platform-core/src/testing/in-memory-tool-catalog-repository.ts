@@ -1,7 +1,4 @@
-import {
-  ToolCatalogEntrySchema,
-  type ToolCatalogEntry,
-} from '../schemas/agent-mcp-binding';
+import { ToolCatalogEntrySchema, type ToolCatalogEntry } from '../schemas/agent-mcp-binding';
 import type { ToolCatalogRepository } from '../interfaces/tool-catalog-repository';
 
 /** In-memory double for ToolCatalogRepository. Stores entries keyed by
@@ -21,9 +18,7 @@ export class InMemoryToolCatalogRepository implements ToolCatalogRepository {
 
   async list(namespace: string): Promise<ToolCatalogEntry[]> {
     const prefix = `${namespace}/`;
-    return [...this.entries.entries()]
-      .filter(([k]) => k.startsWith(prefix))
-      .map(([, entry]) => ({ ...entry }));
+    return [...this.entries.entries()].filter(([k]) => k.startsWith(prefix)).map(([, entry]) => ({ ...entry }));
   }
 
   async upsert(namespace: string, entry: ToolCatalogEntry): Promise<ToolCatalogEntry> {

@@ -2,10 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryAuditRepository, InMemoryOAuthProviderRepository } from '@mediforce/platform-core/testing';
 import { updateOAuthProvider } from '../update-provider';
 import { ForbiddenError, NotFoundError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { adminRoles, memberRoles, sampleProviderInput } from './fixtures';
 
 describe('updateOAuthProvider handler', () => {
@@ -25,10 +22,7 @@ describe('updateOAuthProvider handler', () => {
       caller: userCaller('u-admin', ['alpha'], adminRoles),
     });
 
-    const result = await updateOAuthProvider(
-      { namespace: 'alpha', id: 'github', name: 'GitHub Enterprise' },
-      scope,
-    );
+    const result = await updateOAuthProvider({ namespace: 'alpha', id: 'github', name: 'GitHub Enterprise' }, scope);
 
     expect(result.provider.name).toBe('GitHub Enterprise');
     expect(result.provider).not.toHaveProperty('clientSecret');
@@ -41,12 +35,9 @@ describe('updateOAuthProvider handler', () => {
   it('throws NotFoundError when the provider does not exist', async () => {
     const scope = createTestScope({ oauthProviderRepo: repo, auditRepo });
 
-    await expect(
-      updateOAuthProvider(
-        { namespace: 'alpha', id: 'missing', name: 'X' },
-        scope,
-      ),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(updateOAuthProvider({ namespace: 'alpha', id: 'missing', name: 'X' }, scope)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
   });
 
   it('throws ForbiddenError for a member-role caller', async () => {
@@ -56,11 +47,8 @@ describe('updateOAuthProvider handler', () => {
       caller: userCaller('u-member', ['alpha'], memberRoles),
     });
 
-    await expect(
-      updateOAuthProvider(
-        { namespace: 'alpha', id: 'github', name: 'X' },
-        scope,
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(updateOAuthProvider({ namespace: 'alpha', id: 'github', name: 'X' }, scope)).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
   });
 });

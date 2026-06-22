@@ -22,9 +22,7 @@ describe('secret delete command', () => {
   });
 
   it('deletes secret and prints confirmation', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ ok: true }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ ok: true }));
     const output = captureOutput();
     const code = await secretDeleteCommand({
       argv: [...BASE_ARGV, '--base-url', 'http://test:9000'],
@@ -64,9 +62,7 @@ describe('secret delete command', () => {
   });
 
   it('exits 1 on API error', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Not found' }, 404),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Not found' }, 404));
     const output = captureOutput();
     const code = await secretDeleteCommand({
       argv: [...BASE_ARGV, '--json'],
@@ -79,9 +75,7 @@ describe('secret delete command', () => {
   });
 
   it('deletes namespace-level secret when --workflow omitted', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ ok: true }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ ok: true }));
     const output = captureOutput();
     const code = await secretDeleteCommand({
       argv: ['--namespace', 'ns-1', '--key', 'OLD_KEY'],

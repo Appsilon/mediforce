@@ -82,17 +82,15 @@ describe('callOpenRouter', () => {
       maxTokens: 1024,
     });
 
-    const body = JSON.parse(
-      (fetchSpy.mock.calls[0]![1] as RequestInit).body as string,
-    ) as Record<string, unknown>;
+    const body = JSON.parse((fetchSpy.mock.calls[0]![1] as RequestInit).body as string) as Record<string, unknown>;
     expect(body.temperature).toBe(0.3);
     expect(body.max_tokens).toBe(1024);
   });
 
   it('returns empty content + empty toolCalls when the model omits them', async () => {
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ choices: [{ message: {} }] }), { status: 200 }),
-    );
+    fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: {} }] }), { status: 200 }));
 
     const result = await callOpenRouter({
       model: 'model-x',
@@ -104,9 +102,7 @@ describe('callOpenRouter', () => {
   });
 
   it('throws when the model API returns non-OK', async () => {
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('boom', { status: 500 }),
-    );
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('boom', { status: 500 }));
 
     await expect(
       callOpenRouter({

@@ -1,16 +1,9 @@
-import type {
-  ProcessInstanceRepository,
-  StepConfig,
-  AgentEvent,
-  AgentOutputEnvelope,
-} from '@mediforce/platform-core';
+import type { ProcessInstanceRepository, StepConfig, AgentEvent, AgentOutputEnvelope } from '@mediforce/platform-core';
 import type { AgentContext, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
 import type { AgentRunResult } from './agent-runner';
 
 export class FallbackHandler {
-  constructor(
-    private readonly instanceRepository: ProcessInstanceRepository,
-  ) {}
+  constructor(private readonly instanceRepository: ProcessInstanceRepository) {}
 
   async handleWithWorkflowStep(
     reason: 'timeout' | 'low_confidence' | 'error',

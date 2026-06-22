@@ -3,7 +3,21 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText, FileCode, Paperclip } from 'lucide-react';
+import {
+  CheckCircle2,
+  Clock,
+  XCircle,
+  Circle,
+  Pause,
+  User,
+  Bot,
+  Cog,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  FileCode,
+  Paperclip,
+} from 'lucide-react';
 import type { ProcessInstance, StepExecution, Step, HumanTask } from '@mediforce/platform-core';
 import type { RunOutputFileEntry } from '@mediforce/platform-api/contract';
 import { AutonomyBadge } from '../agents/autonomy-badge';
@@ -41,7 +55,14 @@ interface StepConfigInfo {
   fallbackBehavior?: string;
   timeoutMinutes?: number;
   reviewerType?: string;
-  agentConfig?: { skill?: string; prompt?: string; model?: string; skillsDir?: string; runtime?: string; mcpServers?: Array<{ name: string }> };
+  agentConfig?: {
+    skill?: string;
+    prompt?: string;
+    model?: string;
+    skillsDir?: string;
+    runtime?: string;
+    mcpServers?: Array<{ name: string }>;
+  };
 }
 
 interface StepStatusPanelProps {
@@ -79,14 +100,11 @@ function buildHistory(
   instance: ProcessInstance,
   definitionSteps: Step[],
 ): HistoryItem[] {
-  const sorted = [...stepExecutions].sort(
-    (a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime(),
-  );
+  const sorted = [...stepExecutions].sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
 
   const items: HistoryItem[] = sorted.map((execution) => {
     const step = definitionSteps.find((s) => s.id === execution.stepId) ?? null;
-    const isCurrent =
-      execution.stepId === instance.currentStepId && ACTIVE_STATUSES.has(execution.status);
+    const isCurrent = execution.stepId === instance.currentStepId && ACTIVE_STATUSES.has(execution.status);
     return { kind: 'executed', execution, step, isCurrent };
   });
 
@@ -108,10 +126,8 @@ function getExecEffectiveStatus(exec: StepExecution, instance: ProcessInstance):
   if (exec.status === 'completed') return 'completed';
   if (exec.status === 'failed') return 'failed';
   if (exec.status === 'running' || exec.status === 'pending') {
-    if (
-      instance.currentStepId === exec.stepId &&
-      getWorkflowStatus(instance).displayStatus === 'waiting_for_human'
-    ) return 'waiting';
+    if (instance.currentStepId === exec.stepId && getWorkflowStatus(instance).displayStatus === 'waiting_for_human')
+      return 'waiting';
     return 'running';
   }
   if (exec.status === 'escalated' || exec.status === 'paused') return 'waiting';
@@ -231,7 +247,13 @@ function VirtualRowMeta({
   );
 }
 
-function ExecutedBy({ executedBy = '', executorType, plugin, autonomyLevel, runtime }: {
+function ExecutedBy({
+  executedBy = '',
+  executorType,
+  plugin,
+  autonomyLevel,
+  runtime,
+}: {
   executedBy?: string;
   executorType?: string;
   plugin?: string;
@@ -284,27 +306,23 @@ function ExecutedBy({ executedBy = '', executorType, plugin, autonomyLevel, runt
 }
 
 function StepProgress({ stepId, agentEvents }: { stepId: string; agentEvents: AgentEventItem[] }) {
-  const stepEvents = agentEvents
-    .filter((e) => e.stepId === stepId)
-    .sort((a, b) => a.sequence - b.sequence);
+  const stepEvents = agentEvents.filter((e) => e.stepId === stepId).sort((a, b) => a.sequence - b.sequence);
 
   const statusEvents = stepEvents.filter(
     (e) => e.type === 'status' && !String(e.payload).startsWith('agent activity log:'),
   );
-  const latestStatus = statusEvents.length > 0
-    ? String(statusEvents[statusEvents.length - 1]!.payload)
-    : null;
+  const latestStatus = statusEvents.length > 0 ? String(statusEvents[statusEvents.length - 1]!.payload) : null;
 
   const progressEvents = stepEvents.filter((e) => e.type === 'progress');
-  const latestProgress = progressEvents.length > 0
-    ? (progressEvents[progressEvents.length - 1] as AgentEventItem & { payload: ProgressPayload }).payload
-    : null;
+  const latestProgress =
+    progressEvents.length > 0
+      ? (progressEvents[progressEvents.length - 1] as AgentEventItem & { payload: ProgressPayload }).payload
+      : null;
 
   if (!latestStatus && !latestProgress) return null;
 
-  const pct = latestProgress && latestProgress.total > 0
-    ? Math.round((latestProgress.current / latestProgress.total) * 100)
-    : 0;
+  const pct =
+    latestProgress && latestProgress.total > 0 ? Math.round((latestProgress.current / latestProgress.total) * 100) : 0;
 
   return (
     <div className="mt-1.5 space-y-1">
@@ -313,7 +331,9 @@ function StepProgress({ stepId, agentEvents }: { stepId: string; agentEvents: Ag
         <>
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{latestProgress.label ?? `${latestProgress.current} of ${latestProgress.total}`}</span>
-            <span>{latestProgress.current}/{latestProgress.total} · {pct}%</span>
+            <span>
+              {latestProgress.current}/{latestProgress.total} · {pct}%
+            </span>
           </div>
           <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
             <div className="h-full rounded-full bg-blue-500 transition-all duration-500" style={{ width: `${pct}%` }} />
@@ -348,7 +368,8 @@ function StepConfigDetail({
     entries.push({ label: 'Confidence threshold', value: `${config.confidenceThreshold}` });
   if (config.fallbackBehavior) entries.push({ label: 'Fallback', value: config.fallbackBehavior.replace(/_/g, ' ') });
   if (config.timeoutMinutes) entries.push({ label: 'Timeout', value: `${config.timeoutMinutes} min` });
-  if (config.reviewerType && config.reviewerType !== 'none') entries.push({ label: 'Reviewer', value: config.reviewerType });
+  if (config.reviewerType && config.reviewerType !== 'none')
+    entries.push({ label: 'Reviewer', value: config.reviewerType });
   if (config.agentConfig?.mcpServers?.length)
     entries.push({ label: 'MCP Tools', value: config.agentConfig.mcpServers.map((s) => s.name).join(', ') });
 
@@ -368,18 +389,27 @@ function StepConfigDetail({
       )}
       {assembledPrompt && (
         <details className="text-xs">
-          <summary className="text-muted-foreground cursor-pointer hover:text-foreground font-medium">View Full Prompt</summary>
-          <pre className="mt-1 rounded bg-muted p-2 whitespace-pre-wrap break-words max-h-96 overflow-auto text-xs leading-relaxed">{assembledPrompt}</pre>
+          <summary className="text-muted-foreground cursor-pointer hover:text-foreground font-medium">
+            View Full Prompt
+          </summary>
+          <pre className="mt-1 rounded bg-muted p-2 whitespace-pre-wrap break-words max-h-96 overflow-auto text-xs leading-relaxed">
+            {assembledPrompt}
+          </pre>
         </details>
       )}
       {!assembledPrompt && config.agentConfig?.prompt && (
         <details className="text-xs">
           <summary className="text-muted-foreground cursor-pointer hover:text-foreground">Prompt</summary>
-          <pre className="mt-1 rounded bg-muted p-2 whitespace-pre-wrap break-words max-h-40 overflow-auto text-xs">{config.agentConfig.prompt}</pre>
+          <pre className="mt-1 rounded bg-muted p-2 whitespace-pre-wrap break-words max-h-40 overflow-auto text-xs">
+            {config.agentConfig.prompt}
+          </pre>
         </details>
       )}
       {hasAgentLog && onAgentLogClick && (
-        <button onClick={() => onAgentLogClick(stepId)} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+        <button
+          onClick={() => onAgentLogClick(stepId)}
+          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+        >
           <FileText className="h-3 w-3" />
           View Agent Log
         </button>
@@ -415,9 +445,12 @@ function ElapsedTimer({ startedAt }: { startedAt: string }) {
 
 function getLeftBorderClass(status: EffectiveStatus): string {
   switch (status) {
-    case 'running': return 'border-l-4 border-blue-500';
-    case 'waiting': return 'border-l-4 border-amber-500';
-    default: return 'border-l-4 border-transparent';
+    case 'running':
+      return 'border-l-4 border-blue-500';
+    case 'waiting':
+      return 'border-l-4 border-amber-500';
+    default:
+      return 'border-l-4 border-transparent';
   }
 }
 
@@ -472,9 +505,14 @@ export function StepStatusPanel({
           if (item.kind === 'virtual') {
             const status = getVirtualEffectiveStatus(instance);
             return (
-              <li key={`virtual-${item.stepId}`} className={cn('flex gap-3 py-2 pl-3 rounded-md', getLeftBorderClass(status))}>
+              <li
+                key={`virtual-${item.stepId}`}
+                className={cn('flex gap-3 py-2 pl-3 rounded-md', getLeftBorderClass(status))}
+              >
                 <div className="flex flex-col items-center">
-                  <div className="mt-0.5"><StatusIcon status={status} /></div>
+                  <div className="mt-0.5">
+                    <StatusIcon status={status} />
+                  </div>
                   {!isLast && <div className="mt-1 w-px flex-1 bg-border min-h-[16px]" />}
                 </div>
                 <div className="pb-1 min-w-0 flex-1">
@@ -490,17 +528,15 @@ export function StepStatusPanel({
                     ) : (
                       <span className="text-sm font-medium">{item.step?.name ?? item.stepId}</span>
                     )}
-                    {item.step && <TypeBadge type={item.step.type} executorType={stepConfigMap?.get(item.stepId)?.executorType} />}
+                    {item.step && (
+                      <TypeBadge type={item.step.type} executorType={stepConfigMap?.get(item.stepId)?.executorType} />
+                    )}
                     <StatusLabel status={status} />
                     {wfStatus.isRetryable && instance.currentStepId === item.stepId && (
                       <RetryStepButton instanceId={instance.id} stepId={item.stepId} />
                     )}
                   </div>
-                  <VirtualRowMeta
-                    stepId={item.stepId}
-                    currentTask={currentTask}
-                    stepConfigMap={stepConfigMap}
-                  />
+                  <VirtualRowMeta stepId={item.stepId} currentTask={currentTask} stepConfigMap={stepConfigMap} />
                 </div>
               </li>
             );
@@ -524,9 +560,10 @@ export function StepStatusPanel({
           // For review steps: show the verdict that was actually taken.
           const verdicts = step?.verdicts;
           const takenVerdict = execution.status === 'completed' ? execution.verdict : undefined;
-          const takenVerdictTarget = takenVerdict && verdicts
-            ? Object.entries(verdicts).find(([k]) => k === takenVerdict)?.[1]?.target
-            : undefined;
+          const takenVerdictTarget =
+            takenVerdict && verdicts
+              ? Object.entries(verdicts).find(([k]) => k === takenVerdict)?.[1]?.target
+              : undefined;
           const takenVerdictTargetName = takenVerdictTarget
             ? (definitionSteps.find((s) => s.id === takenVerdictTarget)?.name ?? takenVerdictTarget)
             : undefined;
@@ -546,7 +583,9 @@ export function StepStatusPanel({
               }}
             >
               <div className="flex flex-col items-center">
-                <div className="mt-0.5"><StatusIcon status={status} /></div>
+                <div className="mt-0.5">
+                  <StatusIcon status={status} />
+                </div>
                 {!isLast && <div className="mt-1 w-px flex-1 bg-border min-h-[16px]" />}
               </div>
 
@@ -563,12 +602,7 @@ export function StepStatusPanel({
                   ) : (
                     <span className="text-sm font-medium">{step?.name ?? stepId}</span>
                   )}
-                  {step && (
-                    <TypeBadge
-                      type={step.type}
-                      executorType={stepConfig?.executorType}
-                    />
-                  )}
+                  {step && <TypeBadge type={step.type} executorType={stepConfig?.executorType} />}
                   {stepConfig?.executorType === 'agent' && stepConfig.autonomyLevel && (
                     <AutonomyBadge level={stepConfig.autonomyLevel} />
                   )}
@@ -586,13 +620,13 @@ export function StepStatusPanel({
                       {stepOutputFiles.length}
                     </button>
                   )}
-                  {hasConfig && (isExpanded
-                    ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                    : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                  )}
-                  {wfStatus.isRetryable && isCurrent && (
-                    <RetryStepButton instanceId={instance.id} stepId={stepId} />
-                  )}
+                  {hasConfig &&
+                    (isExpanded ? (
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                    ))}
+                  {wfStatus.isRetryable && isCurrent && <RetryStepButton instanceId={instance.id} stepId={stepId} />}
                 </div>
 
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -617,7 +651,9 @@ export function StepStatusPanel({
                       </span>
                       <span className="text-muted-foreground/40">·</span>
                       <span className="text-xs text-muted-foreground">
-                        {formatDuration(new Date(execution.completedAt).getTime() - new Date(execution.startedAt).getTime())}
+                        {formatDuration(
+                          new Date(execution.completedAt).getTime() - new Date(execution.startedAt).getTime(),
+                        )}
                       </span>
                       {execution.agentOutput?.estimatedCostUsd != null && (
                         <>

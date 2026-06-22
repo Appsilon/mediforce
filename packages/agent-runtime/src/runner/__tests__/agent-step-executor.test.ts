@@ -280,8 +280,11 @@ describe('AgentStepExecutor', () => {
 
     await executor.execute(mockPlugin, makeContext(), services, meta);
 
-    expect(mockInstanceRepo.update).toHaveBeenCalledWith('inst-001', expect.objectContaining({
-      variables: { 'analyze-data': { summary: 'analysis complete' } },
-    }));
+    expect(mockInstanceRepo.update).toHaveBeenCalledWith(
+      'inst-001',
+      expect.objectContaining({
+        variables: { 'analyze-data': { summary: 'analysis complete' } },
+      }),
+    );
   });
 });

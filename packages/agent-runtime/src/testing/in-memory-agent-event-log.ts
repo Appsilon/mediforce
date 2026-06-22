@@ -10,17 +10,13 @@ export class InMemoryAgentEventLog implements AgentEventLog {
       id: crypto.randomUUID(),
       processInstanceId: instanceId,
       stepId,
-      sequence: this.events.filter(
-        (e) => e.processInstanceId === instanceId && e.stepId === stepId,
-      ).length,
+      sequence: this.events.filter((e) => e.processInstanceId === instanceId && e.stepId === stepId).length,
       ...event,
     });
   }
 
   getEvents(instanceId: string, stepId: string): AgentEvent[] {
-    return this.events.filter(
-      (e) => e.processInstanceId === instanceId && e.stepId === stepId,
-    );
+    return this.events.filter((e) => e.processInstanceId === instanceId && e.stepId === stepId);
   }
 
   getPartialWork(instanceId: string, stepId: string): AgentEvent[] {

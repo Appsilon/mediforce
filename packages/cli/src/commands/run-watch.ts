@@ -37,9 +37,10 @@ export const runWatchCommand = defineCommand({
           if (seenSteps.has(key)) continue;
           seenSteps.add(key);
 
-          const duration = exec.startedAt && exec.completedAt
-            ? ` (${Math.round((new Date(exec.completedAt).getTime() - new Date(exec.startedAt).getTime()) / 1000)}s)`
-            : '';
+          const duration =
+            exec.startedAt && exec.completedAt
+              ? ` (${Math.round((new Date(exec.completedAt).getTime() - new Date(exec.startedAt).getTime()) / 1000)}s)`
+              : '';
 
           if (jsonMode) {
             printJson(output, { type: 'step', stepId: step.stepId, status: exec.status, duration });

@@ -85,7 +85,8 @@ export default function AdminToolCatalogPage() {
   const handleNew = useCallback(() => {
     const qs = new URLSearchParams(search.toString());
     qs.delete('id');
-    const url = qs.toString() !== '' ? `/${handle}/admin/tool-catalog?${qs.toString()}` : `/${handle}/admin/tool-catalog`;
+    const url =
+      qs.toString() !== '' ? `/${handle}/admin/tool-catalog?${qs.toString()}` : `/${handle}/admin/tool-catalog`;
     router.replace(url);
     setMode({ kind: 'create' });
     setFormError(null);
@@ -133,7 +134,8 @@ export default function AdminToolCatalogPage() {
     // immediately; failures surface as a page-level listError via refresh().
     const qs = new URLSearchParams(search.toString());
     qs.delete('id');
-    const url = qs.toString() !== '' ? `/${handle}/admin/tool-catalog?${qs.toString()}` : `/${handle}/admin/tool-catalog`;
+    const url =
+      qs.toString() !== '' ? `/${handle}/admin/tool-catalog?${qs.toString()}` : `/${handle}/admin/tool-catalog`;
     router.replace(url);
     setMode({ kind: 'idle' });
     setDeleteTarget(null);
@@ -171,9 +173,7 @@ export default function AdminToolCatalogPage() {
           </Link>
           <div className="flex-1">
             <h1 className="text-xl font-semibold">Tool catalog</h1>
-            <p className="text-sm text-muted-foreground">
-              Curated stdio MCP servers available to agents in @{handle}.
-            </p>
+            <p className="text-sm text-muted-foreground">Curated stdio MCP servers available to agents in @{handle}.</p>
           </div>
           <button
             type="button"

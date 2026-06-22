@@ -31,7 +31,13 @@ export interface StepExecutorAuditRepo {
 }
 
 export interface StepExecutorInstanceRepo {
-  getById(id: string): Promise<{ status: string; currentStepId: string | null; definitionVersion: string; variables: Record<string, unknown>; totalCostUsd?: number } | null>;
+  getById(id: string): Promise<{
+    status: string;
+    currentStepId: string | null;
+    definitionVersion: string;
+    variables: Record<string, unknown>;
+    totalCostUsd?: number;
+  } | null>;
   update(id: string, data: Record<string, unknown>): Promise<unknown>;
   updateStepExecution(instanceId: string, executionId: string, data: Record<string, unknown>): Promise<unknown>;
   getStepExecutions(instanceId: string): Promise<Array<{ stepId: string; output: unknown }>>;

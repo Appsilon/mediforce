@@ -20,11 +20,7 @@ export interface AgentEventRepository {
    * Events for one (instance, step), sorted by sequence ASC. With
    * `afterSequence`, returns only events with `sequence > afterSequence`.
    */
-  listByStep(
-    instanceId: string,
-    stepId: string,
-    afterSequence?: number,
-  ): Promise<AgentEvent[]>;
+  listByStep(instanceId: string, stepId: string, afterSequence?: number): Promise<AgentEvent[]>;
   /** Events scoped to a parent run in `allowed` namespaces. Out-of-scope → []. */
   listByInstanceInNamespaces(
     instanceId: string,

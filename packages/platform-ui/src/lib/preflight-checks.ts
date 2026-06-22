@@ -22,8 +22,7 @@ export interface OpenRouterCreditsInfo {
 }
 
 const LOW_CREDITS_THRESHOLD = 0.5;
-const DOCKER_TUTORIAL_URL =
-  'https://github.com/Appsilon/mediforce/blob/main/docs/how-to/docker-image-setup.md';
+const DOCKER_TUTORIAL_URL = 'https://github.com/Appsilon/mediforce/blob/main/docs/how-to/docker-image-setup.md';
 const OPENROUTER_CREDITS_URL = 'https://openrouter.ai/settings/credits';
 
 export function runPreflightChecks(
@@ -57,24 +56,27 @@ export function runPreflightChecks(
 
     if (options.dockerAvailable && options.dockerImages) {
       const image = containerConfig?.image;
-      const hasBuildSource = typeof containerConfig?.repo === 'string' && containerConfig.repo.length > 0
-        && typeof containerConfig?.commit === 'string' && containerConfig.commit.length > 0;
+      const hasBuildSource =
+        typeof containerConfig?.repo === 'string' &&
+        containerConfig.repo.length > 0 &&
+        typeof containerConfig?.commit === 'string' &&
+        containerConfig.commit.length > 0;
       if (typeof image === 'string' && image.length > 0 && !hasBuildSource) {
         const [repo, tag = 'latest'] = image.split(':');
         const found = options.dockerImages.some((img) => img.repository === repo && img.tag === tag);
         if (!found) {
           const existing = imageMap.get(image);
-          if (existing) { existing.push(step.name); }
-          else { imageMap.set(image, [step.name]); }
+          if (existing) {
+            existing.push(step.name);
+          } else {
+            imageMap.set(image, [step.name]);
+          }
         }
       }
     }
 
     if (options.secretKeys || options.namespaceSecretKeys) {
-      const allKeys = [
-        ...(options.secretKeys ?? []),
-        ...(options.namespaceSecretKeys ?? []),
-      ];
+      const allKeys = [...(options.secretKeys ?? []), ...(options.namespaceSecretKeys ?? [])];
       const env = { ...definition.env, ...step.env };
       for (const [varName, value] of Object.entries(env)) {
         const match = TEMPLATE_RE.exec(value);
@@ -82,8 +84,11 @@ export function runPreflightChecks(
         const key = match[1];
         if (!allKeys.includes(key)) {
           const existing = secretMap.get(key);
-          if (existing) { existing.stepNames.push(step.name); }
-          else { secretMap.set(key, { stepNames: [step.name], envVar: varName }); }
+          if (existing) {
+            existing.stepNames.push(step.name);
+          } else {
+            secretMap.set(key, { stepNames: [step.name], envVar: varName });
+          }
         }
       }
     }
@@ -96,9 +101,10 @@ export function runPreflightChecks(
     const actions: PreflightAction[] = [
       {
         label: 'Configure build source',
-        href: options.version !== undefined
-          ? `/${options.handle}/workflows/${encodedName}/definitions/${options.version}`
-          : `/${options.handle}/workflows/${encodedName}`,
+        href:
+          options.version !== undefined
+            ? `/${options.handle}/workflows/${encodedName}/definitions/${options.version}`
+            : `/${options.handle}/workflows/${encodedName}`,
       },
       {
         label: 'Build manually',
@@ -133,21 +139,18 @@ export function runPreflightChecks(
   }
 
   if (options.openRouterCredits?.available && options.openRouterCredits.remaining <= LOW_CREDITS_THRESHOLD) {
-    const agentSteps = steps
-      .filter((s) => s.executor === 'agent')
-      .map((s) => s.name);
+    const agentSteps = steps.filter((s) => s.executor === 'agent').map((s) => s.name);
     if (agentSteps.length > 0) {
       const remaining = options.openRouterCredits.remaining;
       warnings.push({
         category: 'low-credits',
         resource: 'OPENROUTER_API_KEY',
         stepNames: agentSteps,
-        message: remaining <= 0
-          ? 'OpenRouter credits exhausted ($0.00 remaining)'
-          : `OpenRouter credits low ($${remaining.toFixed(2)} remaining)`,
-        actions: [
-          { label: 'Top up credits', href: OPENROUTER_CREDITS_URL },
-        ],
+        message:
+          remaining <= 0
+            ? 'OpenRouter credits exhausted ($0.00 remaining)'
+            : `OpenRouter credits low ($${remaining.toFixed(2)} remaining)`,
+        actions: [{ label: 'Top up credits', href: OPENROUTER_CREDITS_URL }],
       });
     }
   }
@@ -160,8 +163,11 @@ export function runPreflightChecks(
       if (typeof raw === 'string' && raw.length > 0) {
         const normalised = normaliseModelId(raw);
         const existing = modelStepMap.get(normalised);
-        if (existing) { existing.push(step.name); }
-        else { modelStepMap.set(normalised, [step.name]); }
+        if (existing) {
+          existing.push(step.name);
+        } else {
+          modelStepMap.set(normalised, [step.name]);
+        }
       }
     }
     for (const entry of options.modelValidation.unknown) {
@@ -179,9 +185,10 @@ export function runPreflightChecks(
         actions: [
           {
             label: 'Edit workflow',
-            href: options.version !== undefined
-              ? `/${options.handle}/workflows/${encodedName}/definitions/${options.version}`
-              : `/${options.handle}/workflows/${encodedName}`,
+            href:
+              options.version !== undefined
+                ? `/${options.handle}/workflows/${encodedName}/definitions/${options.version}`
+                : `/${options.handle}/workflows/${encodedName}`,
           },
         ],
       });

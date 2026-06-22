@@ -14,10 +14,7 @@ const REFERENCE_OUTPUT_PATH = resolve(
   'apps/protocol-to-tfl/data/outputs/cdiscpilot01-outputs/cdiscpilot01-trial-metadata.json',
 );
 
-const SKILLS_DIR = resolve(
-  PROJECT_ROOT,
-  'apps/protocol-to-tfl/plugins/protocol-to-tfl/skills',
-);
+const SKILLS_DIR = resolve(PROJECT_ROOT, 'apps/protocol-to-tfl/plugins/protocol-to-tfl/skills');
 
 const PROCESS_CONFIG: ProcessConfig = {
   processName: 'protocol-to-tfl',
@@ -59,7 +56,13 @@ class StubClaudeCodeAgentPlugin extends ClaudeCodeAgentPlugin {
   protected override async spawnDockerContainer(
     _prompt: string,
     _options?: { model?: string },
-  ): Promise<{ cliOutput: string; gitMetadata: null; presentation: null; outputDir: string; injectedEnvVars: string[] }> {
+  ): Promise<{
+    cliOutput: string;
+    gitMetadata: null;
+    presentation: null;
+    outputDir: string;
+    injectedEnvVars: string[];
+  }> {
     const cliOutput = await readFile(this.stubOutputPath, 'utf-8');
     return { cliOutput, gitMetadata: null, presentation: null, outputDir: '/tmp/stub-output', injectedEnvVars: [] };
   }

@@ -5,9 +5,7 @@ import type { HumanTask } from '@mediforce/platform-core';
 import { buildHumanTask } from '@mediforce/platform-core/testing';
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
-  ),
+  default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
 }));
 
 vi.mock('@/lib/mediforce', () => ({
@@ -23,13 +21,15 @@ import { AssignmentTableView } from '../assignment-table-view';
 
 const completeMock = vi.mocked(mediforce.tasks.complete);
 
-function buildAssignmentTask(overrides: {
-  items?: Record<string, unknown>[];
-  assignees?: Record<string, unknown>[];
-  config?: Record<string, unknown>;
-  status?: HumanTask['status'];
-  completionData?: HumanTask['completionData'];
-} = {}): HumanTask {
+function buildAssignmentTask(
+  overrides: {
+    items?: Record<string, unknown>[];
+    assignees?: Record<string, unknown>[];
+    config?: Record<string, unknown>;
+    status?: HumanTask['status'];
+    completionData?: HumanTask['completionData'];
+  } = {},
+): HumanTask {
   const items = overrides.items ?? [
     { id: '101', label: '#101 Fix login bug', sublabel: 'bug', raw: { issueNumber: 101 } },
     { id: '102', label: '#102 Add CSV export', sublabel: 'enhancement', raw: { issueNumber: 102 } },
@@ -71,13 +71,15 @@ describe('AssignmentTableView', () => {
 
   it('[RENDER] surfaces existing labels and current assignee from item fields', () => {
     const task = buildAssignmentTask({
-      items: [{
-        id: '110',
-        label: '#110 Triage me',
-        badges: ['bug', 'ux'],
-        currentAssignee: 'marek',
-        raw: { issueNumber: 110 },
-      }],
+      items: [
+        {
+          id: '110',
+          label: '#110 Triage me',
+          badges: ['bug', 'ux'],
+          currentAssignee: 'marek',
+          raw: { issueNumber: 110 },
+        },
+      ],
     });
     render(<AssignmentTableView task={task} />);
 
@@ -92,18 +94,22 @@ describe('AssignmentTableView', () => {
 
     const dropdowns = screen.getAllByLabelText(/assignee/i);
     expect(dropdowns).toHaveLength(2);
-    const firstRowOptions = within(dropdowns[0]).getAllByRole('option').map((o) => o.textContent);
+    const firstRowOptions = within(dropdowns[0])
+      .getAllByRole('option')
+      .map((o) => o.textContent);
     expect(firstRowOptions).toEqual(expect.arrayContaining(['Filip', 'Marek', 'Fullstack agent']));
   });
 
   it('[RENDER] pre-fills assignee, priority, and note from suggestion', () => {
     const task = buildAssignmentTask({
-      items: [{
-        id: '201',
-        label: '#201 Refactor auth',
-        suggestion: { assigneeId: 'filip', priority: 'P1', note: 'Owns the auth module' },
-        raw: { issueNumber: 201 },
-      }],
+      items: [
+        {
+          id: '201',
+          label: '#201 Refactor auth',
+          suggestion: { assigneeId: 'filip', priority: 'P1', note: 'Owns the auth module' },
+          raw: { issueNumber: 201 },
+        },
+      ],
     });
     render(<AssignmentTableView task={task} />);
 
@@ -114,12 +120,14 @@ describe('AssignmentTableView', () => {
 
   it('[RENDER] shows warning chip when suggestion assigneeId not in allowlist', () => {
     const task = buildAssignmentTask({
-      items: [{
-        id: '301',
-        label: '#301 Add feature',
-        suggestion: { assigneeId: 'ghost', priority: 'P2' },
-        raw: { issueNumber: 301 },
-      }],
+      items: [
+        {
+          id: '301',
+          label: '#301 Add feature',
+          suggestion: { assigneeId: 'ghost', priority: 'P2' },
+          raw: { issueNumber: 301 },
+        },
+      ],
     });
     render(<AssignmentTableView task={task} />);
 
@@ -187,8 +195,18 @@ describe('AssignmentTableView', () => {
     const user = userEvent.setup();
     const task = buildAssignmentTask({
       items: [
-        { id: '501', label: '#501 Keep', suggestion: { assigneeId: 'filip', priority: 'P2' }, raw: { issueNumber: 501 } },
-        { id: '502', label: '#502 Skip', suggestion: { assigneeId: 'marek', priority: 'P2' }, raw: { issueNumber: 502 } },
+        {
+          id: '501',
+          label: '#501 Keep',
+          suggestion: { assigneeId: 'filip', priority: 'P2' },
+          raw: { issueNumber: 501 },
+        },
+        {
+          id: '502',
+          label: '#502 Skip',
+          suggestion: { assigneeId: 'marek', priority: 'P2' },
+          raw: { issueNumber: 502 },
+        },
       ],
     });
     render(<AssignmentTableView task={task} />);
@@ -209,9 +227,7 @@ describe('AssignmentTableView', () => {
     const task = buildAssignmentTask({
       status: 'completed',
       completionData: {
-        assignments: [
-          { itemId: '601', assigneeId: 'filip', assigneeKind: 'human', priority: 'P0' },
-        ],
+        assignments: [{ itemId: '601', assigneeId: 'filip', assigneeKind: 'human', priority: 'P0' }],
         completedBy: 'user-1',
         completedAt: '2026-05-22T10:00:00.000Z',
       },

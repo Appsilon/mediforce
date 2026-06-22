@@ -4,9 +4,7 @@
   "title": "Team Pulse",
   "description": "Product owner gathers time-boxed perspectives from team members, synthesizes with LLM, and optionally launches backlog triage with insights.",
   "preamble": "## Domain Context\nSoftware team sprint planning. A product owner poses a question to the team, collects time-boxed perspectives from each member via child workflows, then synthesizes responses with an LLM. The synthesis surfaces themes, agreements, and tensions to inform prioritization. Optionally launches backlog triage seeded with the pulse insights.",
-  "roles": [
-    "product-owner"
-  ],
+  "roles": ["product-owner"],
   "triggers": [
     {
       "name": "manual",
@@ -70,9 +68,7 @@
       "name": "Select team members",
       "type": "creation",
       "executor": "human",
-      "allowedRoles": [
-        "product-owner"
-      ],
+      "allowedRoles": ["product-owner"],
       "description": "Product owner selects which team members to include in this pulse.",
       "ui": {
         "component": "table-editor",
@@ -205,9 +201,7 @@
       "name": "Decide triage",
       "type": "decision",
       "executor": "human",
-      "allowedRoles": [
-        "product-owner"
-      ],
+      "allowedRoles": ["product-owner"],
       "description": "Review the synthesis and decide whether to launch backlog triage with these insights.",
       "verdicts": {
         "launch_triage": {

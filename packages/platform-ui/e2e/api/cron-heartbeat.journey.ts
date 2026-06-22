@@ -14,20 +14,21 @@ const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
 const AUTH_HEADERS = { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' };
 
 async function deleteWorkflowDefinition(
-  request: { delete: (url: string, opts?: object) => Promise<{ ok: boolean }>, get: (url: string, opts?: object) => Promise<{ ok: boolean, json: () => Promise<unknown> }> },
+  request: {
+    delete: (url: string, opts?: object) => Promise<{ ok: boolean }>;
+    get: (url: string, opts?: object) => Promise<{ ok: boolean; json: () => Promise<unknown> }>;
+  },
   name: string,
 ): Promise<void> {
   const countRes = await request.get(
     `/api/workflow-definitions/${encodeURIComponent(name)}/run-count?namespace=${TEST_ORG_HANDLE}`,
     { headers: AUTH_HEADERS },
   );
-  const expectedRunCount = countRes.ok
-    ? ((await countRes.json()) as { count: number }).count
-    : 0;
-  await request.delete(
-    `/api/workflow-definitions/${encodeURIComponent(name)}?namespace=${TEST_ORG_HANDLE}`,
-    { headers: AUTH_HEADERS, data: { expectedRunCount } },
-  );
+  const expectedRunCount = countRes.ok ? ((await countRes.json()) as { count: number }).count : 0;
+  await request.delete(`/api/workflow-definitions/${encodeURIComponent(name)}?namespace=${TEST_ORG_HANDLE}`, {
+    headers: AUTH_HEADERS,
+    data: { expectedRunCount },
+  });
 }
 
 test.describe('POST /api/cron/heartbeat — API E2E', () => {
@@ -49,9 +50,7 @@ test.describe('POST /api/cron/heartbeat — API E2E', () => {
     expect(Array.isArray(body.skipped)).toBe(true);
   });
 
-  test('back-to-back heartbeats skip with "Not due" and do not re-fire', async ({
-    request,
-  }) => {
+  test('back-to-back heartbeats skip with "Not due" and do not re-fire', async ({ request }) => {
     const wdName = `e2e-cron-${Date.now()}`;
     const cronWd = {
       name: wdName,
@@ -63,13 +62,10 @@ test.describe('POST /api/cron/heartbeat — API E2E', () => {
       transitions: [{ from: 'noop', to: 'done' }],
       triggers: [{ type: 'cron', name: 'every-15m', schedule: '*/15 * * * *' }],
     };
-    const createWdRes = await request.post(
-      `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
-      {
-        headers: AUTH_HEADERS,
-        data: cronWd,
-      },
-    );
+    const createWdRes = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
+      headers: AUTH_HEADERS,
+      data: cronWd,
+    });
     expect(createWdRes.status()).toBe(201);
 
     try {
@@ -88,9 +84,7 @@ test.describe('POST /api/cron/heartbeat — API E2E', () => {
         triggered: Array<{ definitionName: string }>;
         skipped: Array<{ definitionName: string; triggerName: string; reason: string }>;
       };
-      const ourSkip = body.skipped.find(
-        (s) => s.definitionName === wdName && s.triggerName === 'every-15m',
-      );
+      const ourSkip = body.skipped.find((s) => s.definitionName === wdName && s.triggerName === 'every-15m');
       expect(ourSkip?.reason).toBe('Not due');
       const ourFire = body.triggered.find((t) => t.definitionName === wdName);
       expect(ourFire).toBeUndefined();

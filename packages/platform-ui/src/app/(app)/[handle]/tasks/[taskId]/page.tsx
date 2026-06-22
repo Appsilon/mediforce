@@ -27,18 +27,12 @@ export default function TaskRedirectPage() {
 
   React.useEffect(() => {
     if (task && instance) {
-      router.replace(
-        routes.workflowRunStep(handle, instance.definitionName, task.processInstanceId, task.stepId),
-      );
+      router.replace(routes.workflowRunStep(handle, instance.definitionName, task.processInstanceId, task.stepId));
     }
   }, [task, instance, handle, router]);
 
   if (notFound) {
-    return (
-      <div className="p-6 text-center text-sm text-muted-foreground">
-        Task not found.
-      </div>
-    );
+    return <div className="p-6 text-center text-sm text-muted-foreground">Task not found.</div>;
   }
 
   if (error && !loading) {
@@ -51,11 +45,7 @@ export default function TaskRedirectPage() {
   }
 
   if (!loading && task && !instanceLoading && (instanceNotFound || instanceError)) {
-    return (
-      <div className="p-6 text-center text-sm text-muted-foreground">
-        Unable to locate this task&apos;s run.
-      </div>
-    );
+    return <div className="p-6 text-center text-sm text-muted-foreground">Unable to locate this task&apos;s run.</div>;
   }
 
   return (

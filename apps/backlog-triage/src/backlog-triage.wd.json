@@ -9,9 +9,7 @@
     "PLATFORM_API_KEY": "{{PLATFORM_API_KEY}}",
     "APP_BASE_URL": "{{APP_BASE_URL}}"
   },
-  "roles": [
-    "triager"
-  ],
+  "roles": ["triager"],
   "triggers": [
     {
       "name": "manual",
@@ -85,9 +83,7 @@
       "name": "Tag issues",
       "type": "creation",
       "executor": "human",
-      "allowedRoles": [
-        "triager"
-      ],
+      "allowedRoles": ["triager"],
       "description": "Reviewer picks a category (and a priority hint) for each untagged issue in a table, then submits. The next step applies the labels on GitHub via the API and the workflow loops back to re-fetch and re-check — no GitHub round-trip for the reviewer.",
       "ui": {
         "component": "table-editor",
@@ -204,9 +200,7 @@
       "name": "Assign",
       "type": "creation",
       "executor": "human",
-      "allowedRoles": [
-        "triager"
-      ],
+      "allowedRoles": ["triager"],
       "description": "Human triager reviews each suggestion, edits assignee/priority/note as needed, and confirms.",
       "ui": {
         "component": "assignment-table",
@@ -242,12 +236,7 @@
               "kind": "agent"
             }
           ],
-          "priorities": [
-            "P0",
-            "P1",
-            "P2",
-            "P3"
-          ],
+          "priorities": ["P0", "P1", "P2", "P3"],
           "defaultPriority": "P2",
           "allowSkip": true,
           "submitLabel": "Dispatch",

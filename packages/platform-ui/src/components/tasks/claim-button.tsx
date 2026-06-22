@@ -45,9 +45,7 @@ export function ClaimButton({
       await qc.cancelQueries({ queryKey: queryKeys.tasks.all() });
 
       const { restore } = snapshotCache(qc, [detailKey]);
-      qc.setQueryData<HumanTask | undefined>(detailKey, (old) =>
-        old ? { ...old, status: 'claimed' } : old,
-      );
+      qc.setQueryData<HumanTask | undefined>(detailKey, (old) => (old ? { ...old, status: 'claimed' } : old));
       return { restore };
     },
     onSuccess: (data) => {
@@ -97,9 +95,7 @@ export function ClaimButton({
         {pending && <Loader2 className="h-4 w-4 animate-spin" />}
         {pending ? 'Claiming...' : 'Claim Task'}
       </button>
-      {error && (
-        <p className="text-xs text-destructive">{error}</p>
-      )}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

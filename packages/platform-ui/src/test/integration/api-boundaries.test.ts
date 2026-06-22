@@ -24,13 +24,7 @@ import { join, relative, resolve, sep } from 'node:path';
 const PLATFORM_UI_ROOT = resolve(__dirname, '..', '..', '..');
 const MONOREPO_ROOT = resolve(PLATFORM_UI_ROOT, '..', '..');
 const UI_SRC = join(PLATFORM_UI_ROOT, 'src');
-const API_HANDLERS = join(
-  MONOREPO_ROOT,
-  'packages',
-  'platform-api',
-  'src',
-  'handlers',
-);
+const API_HANDLERS = join(MONOREPO_ROOT, 'packages', 'platform-api', 'src', 'handlers');
 
 // Files allowed to import handlers from @mediforce/platform-api — they form
 // the thin HTTP adapter layer between Next.js and pure handlers.
@@ -65,10 +59,7 @@ function walkSourceFiles(dir: string): string[] {
     const stat = statSync(full);
     if (stat.isDirectory()) {
       out.push(...walkSourceFiles(full));
-    } else if (
-      (full.endsWith('.ts') || full.endsWith('.tsx')) &&
-      !isTestFile(full)
-    ) {
+    } else if ((full.endsWith('.ts') || full.endsWith('.tsx')) && !isTestFile(full)) {
       out.push(full);
     }
   }
@@ -171,64 +162,44 @@ describe('platform-api boundary conventions', () => {
 
 describe('FORBIDDEN_IMPORT regex self-test', () => {
   it('matches static handler subpath import', () => {
-    expect(
-      FORBIDDEN_IMPORT.test(`import { x } from '@mediforce/platform-api/handlers'`),
-    ).toBe(true);
+    expect(FORBIDDEN_IMPORT.test(`import { x } from '@mediforce/platform-api/handlers'`)).toBe(true);
   });
 
   it('matches bare-package import (double quotes)', () => {
-    expect(
-      FORBIDDEN_IMPORT.test(`import { x } from "@mediforce/platform-api"`),
-    ).toBe(true);
+    expect(FORBIDDEN_IMPORT.test(`import { x } from "@mediforce/platform-api"`)).toBe(true);
   });
 
   it('matches deep handler subpath import', () => {
-    expect(
-      FORBIDDEN_IMPORT.test(
-        `import { listTasks } from '@mediforce/platform-api/handlers/tasks/list-tasks'`,
-      ),
-    ).toBe(true);
+    expect(FORBIDDEN_IMPORT.test(`import { listTasks } from '@mediforce/platform-api/handlers/tasks/list-tasks'`)).toBe(
+      true,
+    );
   });
 
   it('matches dynamic import of handlers', () => {
-    expect(
-      FORBIDDEN_IMPORT.test(`const m = await import('@mediforce/platform-api/handlers');`),
-    ).toBe(true);
+    expect(FORBIDDEN_IMPORT.test(`const m = await import('@mediforce/platform-api/handlers');`)).toBe(true);
   });
 
   it('matches re-export from handlers', () => {
-    expect(
-      FORBIDDEN_IMPORT.test(`export { x } from '@mediforce/platform-api/handlers'`),
-    ).toBe(true);
+    expect(FORBIDDEN_IMPORT.test(`export { x } from '@mediforce/platform-api/handlers'`)).toBe(true);
   });
 
   it('matches type-only import from handlers', () => {
-    expect(
-      FORBIDDEN_IMPORT.test(`import type { X } from '@mediforce/platform-api/handlers'`),
-    ).toBe(true);
+    expect(FORBIDDEN_IMPORT.test(`import type { X } from '@mediforce/platform-api/handlers'`)).toBe(true);
   });
 
   it('does not match allowed /client subpath', () => {
-    expect(
-      FORBIDDEN_IMPORT.test(`import { c } from '@mediforce/platform-api/client'`),
-    ).toBe(false);
+    expect(FORBIDDEN_IMPORT.test(`import { c } from '@mediforce/platform-api/client'`)).toBe(false);
   });
 
   it('does not match allowed /contract subpath', () => {
-    expect(
-      FORBIDDEN_IMPORT.test(`import { c } from '@mediforce/platform-api/contract'`),
-    ).toBe(false);
+    expect(FORBIDDEN_IMPORT.test(`import { c } from '@mediforce/platform-api/contract'`)).toBe(false);
   });
 
   it('does not match allowed /services subpath', () => {
-    expect(
-      FORBIDDEN_IMPORT.test(`import { c } from '@mediforce/platform-api/services'`),
-    ).toBe(false);
+    expect(FORBIDDEN_IMPORT.test(`import { c } from '@mediforce/platform-api/services'`)).toBe(false);
   });
 
   it('does not match bare string literal outside import context', () => {
-    expect(
-      FORBIDDEN_IMPORT.test(`const x = '@mediforce/platform-api/handlers'`),
-    ).toBe(false);
+    expect(FORBIDDEN_IMPORT.test(`const x = '@mediforce/platform-api/handlers'`)).toBe(false);
   });
 });

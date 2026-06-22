@@ -5,7 +5,10 @@ import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../tes
 import { getMe } from '../get-me';
 import { ForbiddenError, ValidationError } from '../../../errors';
 
-function directoryWith(uid: string, metadata: { email: string | null; displayName: string | null }): UserDirectoryService {
+function directoryWith(
+  uid: string,
+  metadata: { email: string | null; displayName: string | null },
+): UserDirectoryService {
   return {
     async getUsersByRole() {
       return [];
@@ -62,7 +65,12 @@ describe('getMe handler', () => {
 
     const result = await getMe({}, scope);
 
-    expect(result.user).toEqual({ uid: 'uid-1', email: 'alice@example.test', displayName: 'Alice', mustChangePassword: false });
+    expect(result.user).toEqual({
+      uid: 'uid-1',
+      email: 'alice@example.test',
+      displayName: 'Alice',
+      mustChangePassword: false,
+    });
     expect(result.namespaces).toHaveLength(1);
     expect(result.namespaces[0]).toMatchObject({
       handle: 'alice',

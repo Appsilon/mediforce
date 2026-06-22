@@ -1,15 +1,9 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import type {
-  NamespaceSecretsRepository,
-  WorkflowSecretsRepository,
-} from '@mediforce/platform-core';
+import type { NamespaceSecretsRepository, WorkflowSecretsRepository } from '@mediforce/platform-core';
 import { setSecret } from '../set-secret';
 import { ForbiddenError } from '../../../errors';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
-import {
-  buildNamespaceSecretsRepo,
-  buildWorkflowSecretsRepo,
-} from './fakes';
+import { buildNamespaceSecretsRepo, buildWorkflowSecretsRepo } from './fakes';
 
 describe('setSecret handler', () => {
   let workspaceSecretsRepo: NamespaceSecretsRepository;
@@ -26,10 +20,7 @@ describe('setSecret handler', () => {
       secretsRepo: workflowSecretsRepo,
     });
 
-    const result = await setSecret(
-      { namespace: 'alpha', key: 'OPENROUTER_API_KEY', value: 'sk-1' },
-      scope,
-    );
+    const result = await setSecret({ namespace: 'alpha', key: 'OPENROUTER_API_KEY', value: 'sk-1' }, scope);
 
     expect(result).toEqual({ ok: true });
     expect(await workspaceSecretsRepo.getSecrets('alpha')).toEqual({ OPENROUTER_API_KEY: 'sk-1' });
@@ -53,10 +44,7 @@ describe('setSecret handler', () => {
       secretsRepo: workflowSecretsRepo,
     });
 
-    await setSecret(
-      { namespace: 'alpha', workflow: 'wf-1', key: 'DB_URL', value: 'postgres://...' },
-      scope,
-    );
+    await setSecret({ namespace: 'alpha', workflow: 'wf-1', key: 'DB_URL', value: 'postgres://...' }, scope);
 
     expect(await workflowSecretsRepo.getSecrets('alpha', 'wf-1')).toEqual({ DB_URL: 'postgres://...' });
     expect(await workspaceSecretsRepo.getSecrets('alpha')).toEqual({});
@@ -69,9 +57,7 @@ describe('setSecret handler', () => {
       caller: userCaller('u-2', ['beta']),
     });
 
-    await expect(
-      setSecret({ namespace: 'alpha', key: 'X', value: 'y' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(setSecret({ namespace: 'alpha', key: 'X', value: 'y' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
     await expect(
       setSecret({ namespace: 'alpha', workflow: 'wf-1', key: 'X', value: 'y' }, scope),
     ).rejects.toBeInstanceOf(ForbiddenError);

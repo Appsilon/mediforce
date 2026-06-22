@@ -5,11 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type {
-  Namespace,
-  NamespaceMember,
-  NamespaceRepository,
-} from '@mediforce/platform-core';
+import type { Namespace, NamespaceMember, NamespaceRepository } from '@mediforce/platform-core';
 import { InMemoryNamespaceRepository } from '@mediforce/platform-core/testing';
 import { PostgresNamespaceRepository } from '../repositories/namespace-repository';
 import * as schema from '../schema/index';
@@ -119,9 +115,7 @@ function contract(name: string, factory: () => Promise<NamespaceRepository>) {
       await repo.addMember('appsilon', memberBase({ uid: 'user-1' }));
       await repo.removeMemberWithOrganizations('appsilon', 'user-1');
       expect(await repo.getMember('appsilon', 'user-1')).toBeNull();
-      await expect(
-        repo.removeMemberWithOrganizations('appsilon', 'user-1'),
-      ).resolves.toBeUndefined();
+      await expect(repo.removeMemberWithOrganizations('appsilon', 'user-1')).resolves.toBeUndefined();
     });
 
     it('setMemberRole updates an existing member; no-op when absent', async () => {
@@ -129,9 +123,7 @@ function contract(name: string, factory: () => Promise<NamespaceRepository>) {
       await repo.addMember('appsilon', memberBase({ uid: 'user-1', role: 'member' }));
       await repo.setMemberRole('appsilon', 'user-1', 'admin');
       expect((await repo.getMember('appsilon', 'user-1'))?.role).toBe('admin');
-      await expect(
-        repo.setMemberRole('appsilon', 'ghost', 'owner'),
-      ).resolves.toBeUndefined();
+      await expect(repo.setMemberRole('appsilon', 'ghost', 'owner')).resolves.toBeUndefined();
       expect(await repo.getMember('appsilon', 'ghost')).toBeNull();
     });
 
@@ -166,11 +158,13 @@ function contract(name: string, factory: () => Promise<NamespaceRepository>) {
     });
 
     it('getUserNamespaces returns only organizations the user is a member of (not personal)', async () => {
-      await repo.createNamespace(nsBase({
-        handle: 'personal-ns',
-        type: 'personal',
-        linkedUserId: 'user-1',
-      }));
+      await repo.createNamespace(
+        nsBase({
+          handle: 'personal-ns',
+          type: 'personal',
+          linkedUserId: 'user-1',
+        }),
+      );
       await repo.createNamespace(nsBase({ handle: 'org-a', displayName: 'Org A' }));
       await repo.createNamespace(nsBase({ handle: 'org-b', displayName: 'Org B' }));
       await repo.addMember('org-a', memberBase({ uid: 'user-1' }));
@@ -181,17 +175,21 @@ function contract(name: string, factory: () => Promise<NamespaceRepository>) {
     });
 
     it('getNamespacesByUser returns personal UNION organizations, deduplicated', async () => {
-      await repo.createNamespace(nsBase({
-        handle: 'personal-ns',
-        type: 'personal',
-        linkedUserId: 'user-1',
-      }));
+      await repo.createNamespace(
+        nsBase({
+          handle: 'personal-ns',
+          type: 'personal',
+          linkedUserId: 'user-1',
+        }),
+      );
       await repo.createNamespace(nsBase({ handle: 'org-a', displayName: 'Org A' }));
-      await repo.createNamespace(nsBase({
-        handle: 'org-b',
-        displayName: 'Org B',
-        linkedUserId: 'user-1', // intentionally also linked — dedup should kick in
-      }));
+      await repo.createNamespace(
+        nsBase({
+          handle: 'org-b',
+          displayName: 'Org B',
+          linkedUserId: 'user-1', // intentionally also linked — dedup should kick in
+        }),
+      );
       await repo.addMember('org-a', memberBase({ uid: 'user-1' }));
       await repo.addMember('org-b', memberBase({ uid: 'user-1' }));
 
@@ -226,7 +224,9 @@ describe.skipIf(skipPg)('PostgresNamespaceRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sql);
@@ -245,9 +245,7 @@ describe.skipIf(skipPg)('PostgresNamespaceRepository (parity)', () => {
     const db = drizzle(testClient, { schema });
     // Order matters: members first (FK → workspaces.handle ON DELETE CASCADE
     // means TRUNCATE workspaces would also wipe members, but explicit is clearer).
-    await testClient.unsafe(
-      `TRUNCATE TABLE "${schemaName}"."workspace_members", "${schemaName}"."workspaces" CASCADE`,
-    );
+    await testClient.unsafe(`TRUNCATE TABLE "${schemaName}"."workspace_members", "${schemaName}"."workspaces" CASCADE`);
     return new PostgresNamespaceRepository(db);
   });
 
@@ -256,9 +254,7 @@ describe.skipIf(skipPg)('PostgresNamespaceRepository (parity)', () => {
   // exposed through the repo interface). Without this guard, a follow-up PR
   // that drops the trigger from its migration goes unnoticed.
   it('set_updated_at trigger advances updated_at on UPDATE of workspaces', async () => {
-    await testClient.unsafe(
-      `TRUNCATE TABLE "${schemaName}"."workspace_members", "${schemaName}"."workspaces" CASCADE`,
-    );
+    await testClient.unsafe(`TRUNCATE TABLE "${schemaName}"."workspace_members", "${schemaName}"."workspaces" CASCADE`);
     const db = drizzle(testClient, { schema });
     const repo = new PostgresNamespaceRepository(db);
     await repo.createNamespace(nsBase({ handle: 'trig' }));
@@ -270,7 +266,6 @@ describe.skipIf(skipPg)('PostgresNamespaceRepository (parity)', () => {
     const [after] = await testClient<{ updated_at: string }[]>`
       SELECT updated_at::text FROM workspaces WHERE handle = 'trig'
     `;
-    expect(new Date(after.updated_at).getTime())
-      .toBeGreaterThan(new Date(before.updated_at).getTime());
+    expect(new Date(after.updated_at).getTime()).toBeGreaterThan(new Date(before.updated_at).getTime());
   });
 });

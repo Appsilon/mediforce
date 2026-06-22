@@ -18,7 +18,7 @@ test.describe('POST /api/tasks/[taskId]/claim — API E2E', () => {
       headers: apiKeyHeaders(),
     });
     expect(res.status(), await res.text()).toBe(403);
-    const body = await res.json() as { error: { code: string; message: string } };
+    const body = (await res.json()) as { error: { code: string; message: string } };
     expect(body.error.code).toBe('forbidden');
     expect(body.error.message).toMatch(/system actor|authenticated user/i);
   });
@@ -28,7 +28,7 @@ test.describe('POST /api/tasks/[taskId]/claim — API E2E', () => {
       headers: bearerHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
-    const body = await res.json() as { error: { code: string; message: string } };
+    const body = (await res.json()) as { error: { code: string; message: string } };
     expect(body.error.code).toBe('not_found');
   });
 
@@ -37,7 +37,7 @@ test.describe('POST /api/tasks/[taskId]/claim — API E2E', () => {
       headers: bearerHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
-    const body = await res.json() as { error: { code: string; message: string } };
+    const body = (await res.json()) as { error: { code: string; message: string } };
     expect(body.error.code).toBe('not_found');
   });
 
@@ -46,7 +46,7 @@ test.describe('POST /api/tasks/[taskId]/claim — API E2E', () => {
       headers: bearerHeaders(callers.member),
     });
     expect(res.status()).toBe(409);
-    const body = await res.json() as {
+    const body = (await res.json()) as {
       error: { code: string; message: string; details?: { taskId: string; currentStatus: string } };
     };
     expect(body.error.code).toBe('precondition_failed');
@@ -63,7 +63,7 @@ test.describe('POST /api/tasks/[taskId]/claim — API E2E', () => {
       headers: bearerHeaders(callers.member),
     });
     expect(res.status(), await res.text()).toBe(200);
-    const body = await res.json() as { task: { id: string; status: string; assignedUserId: string } };
+    const body = (await res.json()) as { task: { id: string; status: string; assignedUserId: string } };
     expect(body.task.id).toBe('task-pending-1');
     expect(body.task.status).toBe('claimed');
     expect(body.task.assignedUserId).toBe(callers.member.uid);

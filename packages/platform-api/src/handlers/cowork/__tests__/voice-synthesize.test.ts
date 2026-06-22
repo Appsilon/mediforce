@@ -6,16 +6,10 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import type {
-  NamespaceSecretsRepository,
-  WorkflowSecretsRepository,
-} from '@mediforce/platform-core';
+import type { NamespaceSecretsRepository, WorkflowSecretsRepository } from '@mediforce/platform-core';
 import { synthesizeVoiceArtifact } from '../voice-synthesize';
 import { HandlerError, NotFoundError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 function fixedNamespaceSecrets(values: Record<string, string>): NamespaceSecretsRepository {
   return {
@@ -112,10 +106,7 @@ describe('synthesizeVoiceArtifact handler', () => {
     });
 
     const transcript = 'User: Build it\nAgent: Done\nMore detail\nUser: ok';
-    const result = await synthesizeVoiceArtifact(
-      { sessionId: 'sess-voice', transcript },
-      scope,
-    );
+    const result = await synthesizeVoiceArtifact({ sessionId: 'sess-voice', transcript }, scope);
 
     expect(result.artifact).toEqual(synthesized);
 
@@ -146,9 +137,7 @@ describe('synthesizeVoiceArtifact handler', () => {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
-          choices: [
-            { message: { content: 'Here you go: {"name":"abc"}\nThanks.' } },
-          ],
+          choices: [{ message: { content: 'Here you go: {"name":"abc"}\nThanks.' } }],
         }),
         { status: 200 },
       ),
@@ -162,10 +151,7 @@ describe('synthesizeVoiceArtifact handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    const result = await synthesizeVoiceArtifact(
-      { sessionId: 'sess-voice', transcript: 'User: hi' },
-      scope,
-    );
+    const result = await synthesizeVoiceArtifact({ sessionId: 'sess-voice', transcript: 'User: hi' }, scope);
 
     expect(result.artifact).toEqual({ name: 'abc' });
   });
@@ -186,10 +172,9 @@ describe('synthesizeVoiceArtifact handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    const err = await synthesizeVoiceArtifact(
-      { sessionId: 'sess-voice', transcript: 'User: hi' },
-      scope,
-    ).catch((e) => e);
+    const err = await synthesizeVoiceArtifact({ sessionId: 'sess-voice', transcript: 'User: hi' }, scope).catch(
+      (e) => e,
+    );
     expect(err).toBeInstanceOf(HandlerError);
     expect((err as HandlerError).message).toMatch(/OPENROUTER_API_KEY/);
   });
@@ -212,10 +197,7 @@ describe('synthesizeVoiceArtifact handler', () => {
     });
 
     await expect(
-      synthesizeVoiceArtifact(
-        { sessionId: 'sess-voice', transcript: 'User: hi' },
-        scope,
-      ),
+      synthesizeVoiceArtifact({ sessionId: 'sess-voice', transcript: 'User: hi' }, scope),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

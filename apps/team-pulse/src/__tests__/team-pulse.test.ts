@@ -7,9 +7,7 @@ describe('team-pulse', () => {
   const appDir = resolve(import.meta.dirname, '../..');
 
   function loadDefinition() {
-    const raw = JSON.parse(
-      readFileSync(resolve(appDir, 'src/team-pulse.wd.json'), 'utf8'),
-    );
+    const raw = JSON.parse(readFileSync(resolve(appDir, 'src/team-pulse.wd.json'), 'utf8'));
     return WorkflowDefinitionSchema.safeParse({ ...raw, version: 1 });
   }
 
@@ -134,7 +132,10 @@ describe('team-pulse', () => {
     if (!result.success) return;
     const step = result.data.steps.find((s) => s.id === 'spawn_triage');
     expect(step?.executor).toBe('action');
-    const action = step?.action as { kind: string; config: { targets: { definitionName: string; payload?: Record<string, unknown> } } };
+    const action = step?.action as {
+      kind: string;
+      config: { targets: { definitionName: string; payload?: Record<string, unknown> } };
+    };
     expect(action.kind).toBe('spawn');
     expect(action.config.targets.definitionName).toBe('backlog-triage');
     expect(action.config.targets.payload?.pulseContext).toBeDefined();

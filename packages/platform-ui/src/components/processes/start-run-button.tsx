@@ -4,7 +4,18 @@ import * as React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Popover from '@radix-ui/react-popover';
 import { useRouter } from 'next/navigation';
-import { Play, FlaskConical, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRound, FileInput } from 'lucide-react';
+import {
+  Play,
+  FlaskConical,
+  ChevronDown,
+  Loader2,
+  Check,
+  AlertTriangle,
+  X,
+  CircleDot,
+  KeyRound,
+  FileInput,
+} from 'lucide-react';
 import { useWorkflowVersions, useWorkflowVersion } from '@/hooks/use-workflow-versions';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useAuth } from '@/contexts/auth-context';
@@ -111,7 +122,9 @@ export function StartRunButton({
         setLocalNsSecretKeys([]);
         setLocalSecretsLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [hasContext, handle, workflowName, uid]);
 
   const secretKeys = hasContext ? secretKeysCtx.getKeys(workflowName) : localSecretKeys;
@@ -125,19 +138,41 @@ export function StartRunButton({
       dockerAvailable,
       secretKeys,
       namespaceSecretKeys,
-      openRouterCredits: openRouterCredits.isLoading ? undefined : {
-        available: openRouterCredits.available,
-        remaining: openRouterCredits.remaining,
-      },
+      openRouterCredits: openRouterCredits.isLoading
+        ? undefined
+        : {
+            available: openRouterCredits.available,
+            remaining: openRouterCredits.remaining,
+          },
       handle,
       workflowName,
       version: preflightVersion ?? undefined,
       adminEmail: adminContact.email ?? undefined,
       modelValidation: modelValidation.isLoading ? undefined : { unknown: modelValidation.unknown },
     });
-  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining, handle, workflowName, adminContact.email, modelValidation.isLoading, modelValidation.unknown]);
+  }, [
+    effectiveDefinition,
+    dockerImages,
+    dockerAvailable,
+    secretKeys,
+    namespaceSecretKeys,
+    openRouterCredits.isLoading,
+    openRouterCredits.available,
+    openRouterCredits.remaining,
+    handle,
+    workflowName,
+    adminContact.email,
+    modelValidation.isLoading,
+    modelValidation.unknown,
+  ]);
 
-  const preflightLoading = definitionLoading || dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading || modelValidation.isLoading;
+  const preflightLoading =
+    definitionLoading ||
+    dockerLoading ||
+    secretKeysLoading ||
+    openRouterCredits.isLoading ||
+    adminContact.isLoading ||
+    modelValidation.isLoading;
   const hasWarnings = warnings.length > 0;
   const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
 
@@ -222,22 +257,24 @@ export function StartRunButton({
   const tooltip = preflightLoading ? 'Checking workflow readiness...' : (disabledReason ?? undefined);
 
   const errorBanner = error ? (
-    <p className="mt-1 text-xs text-destructive max-w-xs truncate" title={error}>{error}</p>
+    <p className="mt-1 text-xs text-destructive max-w-xs truncate" title={error}>
+      {error}
+    </p>
   ) : null;
 
   const buttonClasses = 'bg-primary text-primary-foreground hover:bg-primary/90';
 
-  const buttonIcon = starting || preflightLoading
-    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-    : <Play className="h-3.5 w-3.5" />;
+  const buttonIcon =
+    starting || preflightLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />;
 
   const buttonLabel = starting ? 'Starting...' : preflightLoading ? 'Checking...' : 'Start Run';
 
-  const warningBadge = hasWarnings && !isDisabled ? (
-    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">
-      {warnings.length}
-    </span>
-  ) : null;
+  const warningBadge =
+    hasWarnings && !isDisabled ? (
+      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">
+        {warnings.length}
+      </span>
+    ) : null;
 
   const startButtonLabel = hasWarnings ? 'Start anyway' : 'Start run';
 
@@ -281,46 +318,43 @@ export function StartRunButton({
                   </span>
                 </div>
               ) : (
-              <>
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-                  <span className="text-xs font-medium text-amber-800 dark:text-amber-300">
-                    {warnings.length} warning{warnings.length !== 1 ? 's' : ''}
-                  </span>
-                  {missingSecretKeys.length > 0 && (
-                    <button
-                      onClick={() => {
-                        setDialogOpen(false);
-                        const setup = encodeURIComponent(missingSecretKeys.join(','));
-                        const wf = encodeURIComponent(workflowName);
-                        router.push(`/${handle}/workflows/${wf}?tab=secrets&setup=${setup}`);
-                      }}
-                      className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                    >
-                      <KeyRound className="h-3 w-3" />
-                      Set secrets
-                    </button>
-                  )}
-                </div>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  <WarningGroup
-                    title="Missing Docker images"
-                    warnings={warnings.filter((w) => w.category === 'missing-image')}
-                  />
-                  <WarningGroup
-                    title="Missing secrets"
-                    warnings={warnings.filter((w) => w.category === 'missing-secret')}
-                  />
-                  <WarningGroup
-                    title="LLM credits"
-                    warnings={warnings.filter((w) => w.category === 'low-credits')}
-                  />
-                  <WarningGroup
-                    title="Unknown models"
-                    warnings={warnings.filter((w) => w.category === 'unknown-model')}
-                  />
-                </div>
-              </>
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                    <span className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                      {warnings.length} warning{warnings.length !== 1 ? 's' : ''}
+                    </span>
+                    {missingSecretKeys.length > 0 && (
+                      <button
+                        onClick={() => {
+                          setDialogOpen(false);
+                          const setup = encodeURIComponent(missingSecretKeys.join(','));
+                          const wf = encodeURIComponent(workflowName);
+                          router.push(`/${handle}/workflows/${wf}?tab=secrets&setup=${setup}`);
+                        }}
+                        className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      >
+                        <KeyRound className="h-3 w-3" />
+                        Set secrets
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    <WarningGroup
+                      title="Missing Docker images"
+                      warnings={warnings.filter((w) => w.category === 'missing-image')}
+                    />
+                    <WarningGroup
+                      title="Missing secrets"
+                      warnings={warnings.filter((w) => w.category === 'missing-secret')}
+                    />
+                    <WarningGroup title="LLM credits" warnings={warnings.filter((w) => w.category === 'low-credits')} />
+                    <WarningGroup
+                      title="Unknown models"
+                      warnings={warnings.filter((w) => w.category === 'unknown-model')}
+                    />
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -435,27 +469,29 @@ export function StartRunButton({
               sideOffset={4}
               className="z-50 min-w-[200px] max-h-60 overflow-y-auto rounded-md border bg-popover shadow-md animate-in fade-in-0 zoom-in-95"
             >
-              {definitions.filter((def) => def.archived !== true).map((def) => {
-                const isEffective = def.version === effectiveVersion;
-                return (
-                  <button
-                    key={def.version}
-                    onClick={() => handleStart(def.version)}
-                    className={cn(
-                      'flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors first:rounded-t-md last:rounded-b-md',
-                      isEffective && 'bg-muted/30 font-medium',
-                    )}
-                  >
-                    <Check className={cn('h-3.5 w-3.5 shrink-0', isEffective ? 'text-primary' : 'invisible')} />
-                    <VersionLabel version={def.version} title={def.title} variant="inline" />
-                    {isEffective && (
-                      <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400 ml-auto shrink-0">
-                        default
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+              {definitions
+                .filter((def) => def.archived !== true)
+                .map((def) => {
+                  const isEffective = def.version === effectiveVersion;
+                  return (
+                    <button
+                      key={def.version}
+                      onClick={() => handleStart(def.version)}
+                      className={cn(
+                        'flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors first:rounded-t-md last:rounded-b-md',
+                        isEffective && 'bg-muted/30 font-medium',
+                      )}
+                    >
+                      <Check className={cn('h-3.5 w-3.5 shrink-0', isEffective ? 'text-primary' : 'invisible')} />
+                      <VersionLabel version={def.version} title={def.title} variant="inline" />
+                      {isEffective && (
+                        <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400 ml-auto shrink-0">
+                          default
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
             </Popover.Content>
           </Popover.Portal>
         </Popover.Root>

@@ -29,14 +29,7 @@ const StepEntryTypeSchema = z.enum(['creation', 'review', 'decision', 'terminal'
 // Mirrors `WorkflowStep.executor` plus a `'unknown'` fallback the handler
 // emits when an instance's definition step lacks an executor (shouldn't
 // happen for new workflows, but legacy data may).
-export const StepExecutorTypeSchema = z.enum([
-  'human',
-  'agent',
-  'script',
-  'cowork',
-  'action',
-  'unknown',
-]);
+export const StepExecutorTypeSchema = z.enum(['human', 'agent', 'script', 'cowork', 'action', 'unknown']);
 export type StepExecutorType = z.infer<typeof StepExecutorTypeSchema>;
 
 export const GetProcessInputSchema = z.object({

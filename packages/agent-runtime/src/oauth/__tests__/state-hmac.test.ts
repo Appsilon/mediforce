@@ -68,9 +68,7 @@ describe('signState + verifyState', () => {
     const bogusPayload = JSON.stringify({ namespace: 'acme' });
     const encoded = Buffer.from(bogusPayload, 'utf-8').toString('base64url');
     const { createHmac } = await import('node:crypto');
-    const sig = createHmac('sha256', SECRET)
-      .update(encoded)
-      .digest('base64url');
+    const sig = createHmac('sha256', SECRET).update(encoded).digest('base64url');
     const crafted = `${encoded}.${sig}`;
     const verified = await verifyState(crafted, SECRET, 10 * 60_000, 1_700_000_000_000);
     expect(verified).toBeNull();

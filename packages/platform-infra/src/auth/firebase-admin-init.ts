@@ -14,9 +14,9 @@ function ensureAdminApp() {
     // against the expected Firebase project. In emulator mode the env var
     // might not be set, so keep the demo-mediforce fallback there.
     const projectId =
-      process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
-      ?? process.env.GOOGLE_CLOUD_PROJECT
-      ?? (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true' ? 'demo-mediforce' : undefined);
+      process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ??
+      process.env.GOOGLE_CLOUD_PROJECT ??
+      (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true' ? 'demo-mediforce' : undefined);
     initializeApp(projectId !== undefined ? { projectId } : {});
   }
   return getApp();

@@ -122,19 +122,27 @@ describe('assertCallerCanAdminDockerImages', () => {
 
   it('allows a user who is owner in any namespace', () => {
     expect(() =>
-      assertCallerCanAdminDockerImages(user([['ns-a', 'member'], ['ns-b', 'owner']])),
+      assertCallerCanAdminDockerImages(
+        user([
+          ['ns-a', 'member'],
+          ['ns-b', 'owner'],
+        ]),
+      ),
     ).not.toThrow();
   });
 
   it('allows a user who is admin in any namespace', () => {
-    expect(() =>
-      assertCallerCanAdminDockerImages(user([['ns-a', 'admin']])),
-    ).not.toThrow();
+    expect(() => assertCallerCanAdminDockerImages(user([['ns-a', 'admin']]))).not.toThrow();
   });
 
   it('rejects a user who is only member everywhere', () => {
     expect(() =>
-      assertCallerCanAdminDockerImages(user([['ns-a', 'member'], ['ns-b', 'member']])),
+      assertCallerCanAdminDockerImages(
+        user([
+          ['ns-a', 'member'],
+          ['ns-b', 'member'],
+        ]),
+      ),
     ).toThrow(ForbiddenError);
   });
 

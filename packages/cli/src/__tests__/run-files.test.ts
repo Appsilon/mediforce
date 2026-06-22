@@ -39,15 +39,11 @@ describe('run files command', () => {
     const output = captureOutput();
     const code = await runFilesCommand({ argv: [], env: BASE_ENV, output });
     expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(
-      /Missing required positional argument: RUNID/,
-    );
+    expect(output.stderrLines.join('\n')).toMatch(/Missing required positional argument: RUNID/);
   });
 
   it('GETs /api/runs/<runId>/files and prints files grouped by step', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(jsonResponse(TWO_STEP_LISTING));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(TWO_STEP_LISTING));
     const output = captureOutput();
     const code = await runFilesCommand({
       argv: ['run-1', '--base-url', 'http://localhost:5555'],
@@ -87,9 +83,7 @@ describe('run files command', () => {
   });
 
   it('exits 1 with structured error JSON on 404', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Run not found' }, 404),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Run not found' }, 404));
     const output = captureOutput();
     const code = await runFilesCommand({
       argv: ['nope', '--json'],

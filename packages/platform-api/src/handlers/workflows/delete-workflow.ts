@@ -1,7 +1,4 @@
-import type {
-  DeleteWorkflowInput,
-  DeleteWorkflowOutput,
-} from '../../contract/workflows';
+import type { DeleteWorkflowInput, DeleteWorkflowOutput } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
@@ -13,14 +10,8 @@ import { actorFromCaller } from '../_helpers';
  * who actually issued the deletion. Cascade covers the parent + all runs +
  * all human tasks, guarded by the `expectedRunCount` race check.
  */
-export async function deleteWorkflow(
-  input: DeleteWorkflowInput,
-  scope: CallerScope,
-): Promise<DeleteWorkflowOutput> {
-  const actualRunCount = await scope.workflowDefinitions.countInstancesByName(
-    input.namespace,
-    input.name,
-  );
+export async function deleteWorkflow(input: DeleteWorkflowInput, scope: CallerScope): Promise<DeleteWorkflowOutput> {
+  const actualRunCount = await scope.workflowDefinitions.countInstancesByName(input.namespace, input.name);
   if (actualRunCount !== input.expectedRunCount) {
     throw new ConflictError(
       `Run count changed (expected ${input.expectedRunCount}, found ${actualRunCount}). Please try again.`,

@@ -23,10 +23,7 @@ export interface NamespaceRepository {
    * `POST /api/namespaces` so a half-created workspace cannot leak into the
    * UI between the namespace doc and its owner member.
    */
-  createNamespaceWithOwner(input: {
-    namespace: Namespace;
-    ownerMember: NamespaceMember;
-  }): Promise<void>;
+  createNamespaceWithOwner(input: { namespace: Namespace; ownerMember: NamespaceMember }): Promise<void>;
   /**
    * Patch namespace fields. Undefined values are ignored — only
    * explicitly-provided keys are touched. Empty string for `bio` is the

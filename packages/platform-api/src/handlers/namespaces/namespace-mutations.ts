@@ -1,8 +1,5 @@
 import type { NamespaceUpdates } from '@mediforce/platform-core';
-import {
-  assertCallerIsNamespaceAdmin,
-  assertCallerIsNamespaceOwner,
-} from '../../auth';
+import { assertCallerIsNamespaceAdmin, assertCallerIsNamespaceOwner } from '../../auth';
 import { emitAudit } from '../../audit-helpers';
 import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
@@ -25,10 +22,7 @@ import type {
  * Two-state semantics: undefined leaves the field untouched, any string
  * overwrites it (empty string is the cleared state for `bio`).
  */
-export async function updateNamespace(
-  input: UpdateNamespaceInput,
-  scope: CallerScope,
-): Promise<UpdateNamespaceOutput> {
+export async function updateNamespace(input: UpdateNamespaceInput, scope: CallerScope): Promise<UpdateNamespaceOutput> {
   assertCallerIsNamespaceAdmin(scope.caller, input.handle);
 
   const existing = await scope.workspaces.getNamespace(input.handle);
@@ -60,10 +54,7 @@ export async function updateNamespace(
 }
 
 /** Owner-only cascade delete via `NamespaceRepository.deleteNamespaceCascade`. */
-export async function deleteNamespace(
-  input: DeleteNamespaceInput,
-  scope: CallerScope,
-): Promise<DeleteNamespaceOutput> {
+export async function deleteNamespace(input: DeleteNamespaceInput, scope: CallerScope): Promise<DeleteNamespaceOutput> {
   assertCallerIsNamespaceOwner(scope.caller, input.handle);
 
   const existing = await scope.workspaces.getNamespace(input.handle);
@@ -106,10 +97,7 @@ export async function deleteNamespace(
  * ownership-transfer flow yet; delete the workspace instead. The owner
  * guard also catches personal namespaces (linked user is always owner).
  */
-export async function leaveNamespace(
-  input: LeaveNamespaceInput,
-  scope: CallerScope,
-): Promise<LeaveNamespaceOutput> {
+export async function leaveNamespace(input: LeaveNamespaceInput, scope: CallerScope): Promise<LeaveNamespaceOutput> {
   if (scope.caller.kind !== 'user') {
     throw new ForbiddenError(
       'POST /api/namespaces/:handle/leave requires an authenticated user (no "self" for apiKey callers)',
@@ -207,10 +195,11 @@ export async function updateNamespaceMemberRole(
     throw new NotFoundError(`Member '${input.uid}' not in namespace '${input.handle}'`);
   }
   if (member.role === 'owner') {
-    throw new PreconditionFailedError(
-      'Cannot change the workspace owner’s role through this endpoint.',
-      { handle: input.handle, uid: input.uid, role: 'owner' },
-    );
+    throw new PreconditionFailedError('Cannot change the workspace owner’s role through this endpoint.', {
+      handle: input.handle,
+      uid: input.uid,
+      role: 'owner',
+    });
   }
 
   await scope.workspaces.setMemberRole(input.handle, input.uid, input.role);

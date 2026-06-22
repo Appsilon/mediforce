@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  ChatCoworkSessionInputSchema,
-  ChatCoworkSessionOutputSchema,
-} from '../cowork';
+import { ChatCoworkSessionInputSchema, ChatCoworkSessionOutputSchema } from '../cowork';
 
 const validSession = {
   id: 'sess-1',

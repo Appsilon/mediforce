@@ -60,13 +60,15 @@ export function NamespaceSecretsEditor({ namespace, userId: _userId }: Namespace
       .workspacePreviews({ namespace })
       .then(({ previews }: { previews: SecretPreview[] }) => {
         if (cancelled) return;
-        setRows(previews.map((p) => ({
-          key: p.key,
-          value: '',
-          preview: p.preview,
-          isNew: false,
-          changed: false,
-        })));
+        setRows(
+          previews.map((p) => ({
+            key: p.key,
+            value: '',
+            preview: p.preview,
+            isNew: false,
+            changed: false,
+          })),
+        );
         setLoading(false);
       })
       .catch((error) => {
@@ -74,7 +76,9 @@ export function NamespaceSecretsEditor({ namespace, userId: _userId }: Namespace
         console.error('Failed to load namespace secrets:', error);
         setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [namespace]);
 
   const handleSave = async () => {
@@ -84,9 +88,7 @@ export function NamespaceSecretsEditor({ namespace, userId: _userId }: Namespace
       const ops: Promise<unknown>[] = [];
       for (const row of rows) {
         if ((row.changed || row.isNew) && row.key.trim() !== '' && row.value !== '') {
-          ops.push(
-            mediforce.secrets.set({ namespace, key: row.key.trim(), value: row.value }),
-          );
+          ops.push(mediforce.secrets.set({ namespace, key: row.key.trim(), value: row.value }));
         }
       }
       for (const key of deletedKeys) {
@@ -94,25 +96,23 @@ export function NamespaceSecretsEditor({ namespace, userId: _userId }: Namespace
       }
       await Promise.all(ops);
 
-      setRows((prev) => prev
-        .filter((r) => r.key.trim() !== '' && (r.value !== '' || !r.isNew))
-        .map((r) => ({
-          ...r,
-          preview: r.changed || r.isNew ? maskLocally(r.value) : r.preview,
-          value: '',
-          isNew: false,
-          changed: false,
-        })),
+      setRows((prev) =>
+        prev
+          .filter((r) => r.key.trim() !== '' && (r.value !== '' || !r.isNew))
+          .map((r) => ({
+            ...r,
+            preview: r.changed || r.isNew ? maskLocally(r.value) : r.preview,
+            value: '',
+            isNew: false,
+            changed: false,
+          })),
       );
       setDeletedKeys([]);
       setSaveMessage('Secrets saved');
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (error) {
-      const message = error instanceof ApiError
-        ? error.message
-        : error instanceof Error
-          ? error.message
-          : 'Unknown error';
+      const message =
+        error instanceof ApiError ? error.message : error instanceof Error ? error.message : 'Unknown error';
       setSaveMessage(`Error: ${message}`);
       console.error('Failed to save namespace secrets:', error);
     } finally {
@@ -135,13 +135,15 @@ export function NamespaceSecretsEditor({ namespace, userId: _userId }: Namespace
   };
 
   const updateRow = (index: number, field: 'key' | 'value', newValue: string) => {
-    setRows((prev) => prev.map((row, idx) => {
-      if (idx !== index) return row;
-      const updated = { ...row, [field]: newValue };
-      if (field === 'value' && newValue !== '') updated.changed = true;
-      if (field === 'key' && row.isNew) updated.changed = true;
-      return updated;
-    }));
+    setRows((prev) =>
+      prev.map((row, idx) => {
+        if (idx !== index) return row;
+        const updated = { ...row, [field]: newValue };
+        if (field === 'value' && newValue !== '') updated.changed = true;
+        if (field === 'key' && row.isNew) updated.changed = true;
+        return updated;
+      }),
+    );
   };
 
   if (loading) {
@@ -159,8 +161,8 @@ export function NamespaceSecretsEditor({ namespace, userId: _userId }: Namespace
       <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30 p-3 text-sm text-blue-800 dark:text-blue-300">
         <Info className="h-4 w-4 mt-0.5 shrink-0" />
         <span>
-          Workspace secrets are shared across all workflows. Individual workflows can override
-          them with workflow-level secrets. Use{' '}
+          Workspace secrets are shared across all workflows. Individual workflows can override them with workflow-level
+          secrets. Use{' '}
           <code className="rounded bg-blue-100 dark:bg-blue-900/50 px-1 py-0.5 font-mono text-xs">{'{{KEY}}'}</code>{' '}
           syntax in step env vars. Secret values cannot be read back after saving.
         </span>
@@ -207,7 +209,8 @@ export function NamespaceSecretsEditor({ namespace, userId: _userId }: Namespace
       {bulkMode ? (
         <div className="space-y-2 rounded-md border p-3 bg-muted/30">
           <p className="text-xs text-muted-foreground">
-            Paste <code className="font-mono">.env</code> content — one <code className="font-mono">KEY=value</code> per line:
+            Paste <code className="font-mono">.env</code> content — one <code className="font-mono">KEY=value</code> per
+            line:
           </p>
           <textarea
             value={bulkText}
@@ -222,13 +225,12 @@ export function NamespaceSecretsEditor({ namespace, userId: _userId }: Namespace
           />
           {bulkPreview && (
             <p className="text-xs text-green-600 dark:text-green-400">
-              Detected {bulkPreview.length} variable{bulkPreview.length !== 1 ? 's' : ''}: {bulkPreview.map((p) => p.key).join(', ')}
+              Detected {bulkPreview.length} variable{bulkPreview.length !== 1 ? 's' : ''}:{' '}
+              {bulkPreview.map((p) => p.key).join(', ')}
             </p>
           )}
           {bulkText.trim() !== '' && !bulkPreview && (
-            <p className="text-xs text-destructive">
-              Could not parse — expected KEY=value format, one per line
-            </p>
+            <p className="text-xs text-destructive">Could not parse — expected KEY=value format, one per line</p>
           )}
           <div className="flex gap-2">
             <button
@@ -258,7 +260,11 @@ export function NamespaceSecretsEditor({ namespace, userId: _userId }: Namespace
             </button>
             <button
               type="button"
-              onClick={() => { setBulkMode(false); setBulkText(''); setBulkPreview(null); }}
+              onClick={() => {
+                setBulkMode(false);
+                setBulkText('');
+                setBulkPreview(null);
+              }}
               className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent transition-colors"
             >
               Cancel
@@ -301,7 +307,11 @@ export function NamespaceSecretsEditor({ namespace, userId: _userId }: Namespace
         )}
 
         {saveMessage && (
-          <span className={`text-sm ${saveMessage.startsWith('Error:') ? 'text-destructive' : 'text-green-600 dark:text-green-400'}`}>{saveMessage}</span>
+          <span
+            className={`text-sm ${saveMessage.startsWith('Error:') ? 'text-destructive' : 'text-green-600 dark:text-green-400'}`}
+          >
+            {saveMessage}
+          </span>
         )}
       </div>
     </div>

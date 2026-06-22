@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  ACTIONABLE_STATUSES,
-  ListTasksInputSchema,
-} from '../../../contract/tasks';
+import { ACTIONABLE_STATUSES, ListTasksInputSchema } from '../../../contract/tasks';
 
 /**
  * Contract-only tests: exercise the non-trivial bits of the Zod schema —
@@ -40,15 +37,11 @@ describe('ListTasksInputSchema — stepId / status narrowing', () => {
   // workspaces).
 
   it('accepts instanceId + stepId (next-step-card pattern)', () => {
-    expect(
-      ListTasksInputSchema.safeParse({ instanceId: 'inst-1', stepId: 'step-a' }).success,
-    ).toBe(true);
+    expect(ListTasksInputSchema.safeParse({ instanceId: 'inst-1', stepId: 'step-a' }).success).toBe(true);
   });
 
   it('accepts role + stepId (cross-instance step inspection)', () => {
-    expect(
-      ListTasksInputSchema.safeParse({ role: 'reviewer', stepId: 'step-a' }).success,
-    ).toBe(true);
+    expect(ListTasksInputSchema.safeParse({ role: 'reviewer', stepId: 'step-a' }).success).toBe(true);
   });
 
   it('accepts instanceId + stepId + status (full narrowing)', () => {
@@ -76,8 +69,6 @@ describe('ACTIONABLE_STATUSES', () => {
   });
 
   it('is accepted by the input schema as a status filter (catches enum drift)', () => {
-    expect(
-      ListTasksInputSchema.safeParse({ role: 'reviewer', status: ACTIONABLE_STATUSES }).success,
-    ).toBe(true);
+    expect(ListTasksInputSchema.safeParse({ role: 'reviewer', status: ACTIONABLE_STATUSES }).success).toBe(true);
   });
 });

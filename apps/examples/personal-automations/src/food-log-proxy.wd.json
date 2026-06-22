@@ -52,8 +52,5 @@
       "executor": "human"
     }
   ],
-  "transitions": [
-    { "from": "proxy", "to": "shape" },
-    { "from": "shape", "to": "done" }
-  ]
+  "transitions": [{ "from": "proxy", "to": "shape" }, { "from": "shape", "to": "done" }]
 }

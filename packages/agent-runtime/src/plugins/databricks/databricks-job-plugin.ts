@@ -6,7 +6,12 @@ import {
   type InterpolationSources,
   type PluginCapabilityMetadata,
 } from '@mediforce/platform-core';
-import type { AgentContext, StepExecutorPlugin, EmitFn, WorkflowAgentContext } from '../../interfaces/step-executor-plugin';
+import type {
+  AgentContext,
+  StepExecutorPlugin,
+  EmitFn,
+  WorkflowAgentContext,
+} from '../../interfaces/step-executor-plugin';
 import { isWorkflowAgentContext } from '../container-plugin';
 import { DatabricksClient, isTerminalLifecycle } from './databricks-client';
 
@@ -37,8 +42,10 @@ export class DatabricksJobPlugin implements StepExecutorPlugin {
   readonly metadata: PluginCapabilityMetadata = {
     name: 'Databricks Job',
     description: 'Triggers an existing Databricks job via REST and waits for its result — no LLM involved.',
-    inputDescription: 'step.databricks: jobId + optional notebookParams/jobParameters (values support ${steps.*} interpolation). Secrets: DATABRICKS_HOST, DATABRICKS_TOKEN.',
-    outputDescription: 'JSON object the notebook exits with (dbutils.notebook.exit) as the step result; { raw } when the output is not a JSON object.',
+    inputDescription:
+      'step.databricks: jobId + optional notebookParams/jobParameters (values support ${steps.*} interpolation). Secrets: DATABRICKS_HOST, DATABRICKS_TOKEN.',
+    outputDescription:
+      'JSON object the notebook exits with (dbutils.notebook.exit) as the step result; { raw } when the output is not a JSON object.',
     roles: ['executor'],
     requiredEnv: [['DATABRICKS_HOST', 'DATABRICKS_TOKEN']],
   };
@@ -51,20 +58,21 @@ export class DatabricksJobPlugin implements StepExecutorPlugin {
 
   constructor(init: DatabricksJobPluginInit = {}) {
     this.fetchImpl = init.fetchImpl;
-    this.sleep = init.sleepImpl
-      ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
+    this.sleep = init.sleepImpl ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
   async initialize(context: AgentContext | WorkflowAgentContext): Promise<void> {
     if (!isWorkflowAgentContext(context)) {
-      throw new Error('DatabricksJobPlugin requires the WorkflowDefinition model (legacy ProcessConfig is not supported)');
+      throw new Error(
+        'DatabricksJobPlugin requires the WorkflowDefinition model (legacy ProcessConfig is not supported)',
+      );
     }
     this.context = context;
 
     if (context.step.databricks === undefined) {
       throw new Error(
         `No databricks config found for step '${context.stepId}'. ` +
-        'DatabricksJobPlugin requires step.databricks with a jobId.',
+          'DatabricksJobPlugin requires step.databricks with a jobId.',
       );
     }
     this.config = DatabricksJobConfigSchema.parse(context.step.databricks);
@@ -74,8 +82,8 @@ export class DatabricksJobPlugin implements StepExecutorPlugin {
     if (host === undefined || token === undefined) {
       throw new Error(
         `Databricks credentials missing for step '${context.stepId}'. ` +
-        'Set DATABRICKS_HOST and DATABRICKS_TOKEN as namespace secrets ' +
-        '(workspace settings → Secrets) or in the workflow\'s Secrets panel.',
+          'Set DATABRICKS_HOST and DATABRICKS_TOKEN as namespace secrets ' +
+          "(workspace settings → Secrets) or in the workflow's Secrets panel.",
       );
     }
     this.client = new DatabricksClient({ host, token, fetchImpl: this.fetchImpl });
@@ -103,14 +111,14 @@ export class DatabricksJobPlugin implements StepExecutorPlugin {
     if (finalStatus.resultState !== 'SUCCESS') {
       throw new Error(
         `Databricks job ${jobId} run ${runId} ended ${finalStatus.resultState ?? finalStatus.lifecycle}` +
-        `${finalStatus.message !== null ? `: ${finalStatus.message}` : ''}` +
-        `${finalStatus.runPageUrl !== null ? ` (${finalStatus.runPageUrl})` : ''}`,
+          `${finalStatus.message !== null ? `: ${finalStatus.message}` : ''}` +
+          `${finalStatus.runPageUrl !== null ? ` (${finalStatus.runPageUrl})` : ''}`,
       );
     }
     if (finalStatus.taskRunIds.length > 1) {
       throw new Error(
         `Databricks job ${jobId} has ${finalStatus.taskRunIds.length} tasks — ` +
-        'databricks-job v1 supports single-task jobs only (the task output is the step result).',
+          'databricks-job v1 supports single-task jobs only (the task output is the step result).',
       );
     }
 
@@ -169,21 +177,14 @@ export class DatabricksJobPlugin implements StepExecutorPlugin {
     return { steps, variables: steps, triggerPayload: {}, secrets: {} };
   }
 
-  private async pollUntilTerminal(
-    emit: EmitFn,
-    runId: number,
-    startTime: number,
-    deadlineMs: number,
-  ) {
+  private async pollUntilTerminal(emit: EmitFn, runId: number, startTime: number, deadlineMs: number) {
     let lastLifecycle: string | null = null;
     let consecutiveFailures = 0;
 
     for (;;) {
       if (Date.now() - startTime > deadlineMs) {
         await this.client.cancelRun(runId).catch(() => undefined);
-        throw new Error(
-          `Databricks run ${runId} exceeded the step timeout — cancellation requested`,
-        );
+        throw new Error(`Databricks run ${runId} exceeded the step timeout — cancellation requested`);
       }
 
       try {
@@ -193,7 +194,8 @@ export class DatabricksJobPlugin implements StepExecutorPlugin {
           lastLifecycle = status.lifecycle;
           await emit({
             type: 'status',
-            payload: `Databricks run ${runId}: ${status.lifecycle}` +
+            payload:
+              `Databricks run ${runId}: ${status.lifecycle}` +
               (status.runPageUrl !== null ? ` (${status.runPageUrl})` : ''),
             timestamp: new Date().toISOString(),
           });

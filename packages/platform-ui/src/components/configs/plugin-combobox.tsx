@@ -26,22 +26,13 @@ interface PluginComboboxProps {
   disabled?: boolean;
 }
 
-export function PluginCombobox({
-  plugins,
-  value,
-  onChange,
-  role,
-  disabled,
-}: PluginComboboxProps) {
+export function PluginCombobox({ plugins, value, onChange, role, disabled }: PluginComboboxProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Filter by role first
-  const roleFiltered = useMemo(
-    () => plugins.filter((p) => p.metadata?.roles?.includes(role)),
-    [plugins, role],
-  );
+  const roleFiltered = useMemo(() => plugins.filter((p) => p.metadata?.roles?.includes(role)), [plugins, role]);
 
   // Then filter by search text
   const filtered = useMemo(() => {
@@ -54,10 +45,7 @@ export function PluginCombobox({
     );
   }, [roleFiltered, search]);
 
-  const selectedPlugin = useMemo(
-    () => plugins.find((p) => p.name === value),
-    [plugins, value],
-  );
+  const selectedPlugin = useMemo(() => plugins.find((p) => p.name === value), [plugins, value]);
 
   // Focus search input when popover opens
   useEffect(() => {
@@ -84,9 +72,7 @@ export function PluginCombobox({
             role="combobox"
           >
             <span className={cn(!selectedPlugin && 'text-muted-foreground')}>
-              {selectedPlugin
-                ? selectedPlugin.metadata?.name ?? selectedPlugin.name
-                : 'Select plugin...'}
+              {selectedPlugin ? (selectedPlugin.metadata?.name ?? selectedPlugin.name) : 'Select plugin...'}
             </span>
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-2" />
           </button>
@@ -111,9 +97,7 @@ export function PluginCombobox({
 
             <div className="max-h-48 overflow-y-auto">
               {filtered.length === 0 ? (
-                <div className="px-3 py-4 text-center text-sm text-muted-foreground">
-                  No plugins found
-                </div>
+                <div className="px-3 py-4 text-center text-sm text-muted-foreground">No plugins found</div>
               ) : (
                 filtered.map((plugin) => (
                   <button

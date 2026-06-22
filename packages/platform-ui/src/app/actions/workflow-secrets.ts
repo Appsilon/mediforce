@@ -10,5 +10,4 @@ import { getPlatformServices } from '@/lib/platform-services';
 export const getWorkflowSecretsForRuntime = async (
   namespace: string,
   workflowName: string,
-): Promise<Record<string, string>> =>
-  getPlatformServices().secretsRepo.getSecrets(namespace, workflowName);
+): Promise<Record<string, string>> => getPlatformServices().secretsRepo.getSecrets(namespace, workflowName);

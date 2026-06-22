@@ -6,11 +6,7 @@ import {
   InMemoryAuditRepository,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import {
-  WorkflowEngine,
-  WebhookTrigger,
-  WebhookPayloadValidationError,
-} from '../index';
+import { WorkflowEngine, WebhookTrigger, WebhookPayloadValidationError } from '../index';
 import type { WorkflowTriggerContext } from '../index';
 
 const webhookDef: WorkflowDefinition = {
@@ -56,20 +52,14 @@ describe('WebhookTrigger', () => {
     processRepo = new InMemoryProcessRepository();
     instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository();
-    engine = new WorkflowEngine(
-      processRepo,
-      instanceRepo,
-      auditRepo,
-    );
+    engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo);
     schemaRegistry = new Map();
     trigger = new WebhookTrigger(engine, schemaRegistry);
 
     await processRepo.saveWorkflowDefinition(webhookDef);
   });
 
-  function makeContext(
-    overrides: Partial<WorkflowTriggerContext> = {},
-  ): WorkflowTriggerContext {
+  function makeContext(overrides: Partial<WorkflowTriggerContext> = {}): WorkflowTriggerContext {
     return {
       namespace: 'test',
       definitionName: 'webhook-process',
@@ -111,15 +101,10 @@ describe('WebhookTrigger', () => {
       payload: { eventType: 123, wrong: 'field' },
     });
 
-    await expect(trigger.fireWorkflow(invalidContext)).rejects.toThrow(
-      WebhookPayloadValidationError,
-    );
+    await expect(trigger.fireWorkflow(invalidContext)).rejects.toThrow(WebhookPayloadValidationError);
 
     // Verify no instance was created
-    const allInstances = await instanceRepo.getByDefinition(
-      'webhook-process',
-      '1',
-    );
+    const allInstances = await instanceRepo.getByDefinition('webhook-process', '1');
     expect(allInstances).toHaveLength(0);
   });
 
@@ -146,9 +131,7 @@ describe('WebhookTrigger', () => {
 
     const emptyContext = makeContext({ payload: {} });
 
-    await expect(trigger.fireWorkflow(emptyContext)).rejects.toThrow(
-      WebhookPayloadValidationError,
-    );
+    await expect(trigger.fireWorkflow(emptyContext)).rejects.toThrow(WebhookPayloadValidationError);
   });
 
   it('fireWorkflow() creates instance with running status', async () => {

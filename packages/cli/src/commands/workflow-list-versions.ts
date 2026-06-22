@@ -34,12 +34,8 @@ export const workflowListVersionsCommand = defineCommand({
     }
 
     const defaultLabel =
-      result.defaultVersion === null
-        ? 'no default pinned'
-        : `default: v${String(result.defaultVersion)}`;
-    output.stdout(
-      `Found ${String(result.versions.length)} version(s) of '${args.name}' (${defaultLabel}):`,
-    );
+      result.defaultVersion === null ? 'no default pinned' : `default: v${String(result.defaultVersion)}`;
+    output.stdout(`Found ${String(result.versions.length)} version(s) of '${args.name}' (${defaultLabel}):`);
     for (const version of result.versions) {
       const flags = version.archived ? ' [archived]' : '';
       const title = version.title !== undefined ? `  "${version.title}"` : '';

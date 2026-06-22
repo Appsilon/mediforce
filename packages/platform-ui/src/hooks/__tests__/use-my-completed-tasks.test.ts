@@ -6,7 +6,12 @@ import { createQueryWrapper } from '@/test/react-query';
 
 const listMock = vi.fn<(...args: unknown[]) => Promise<{ tasks: HumanTask[] }>>();
 class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { tasks: { list: listMock } },

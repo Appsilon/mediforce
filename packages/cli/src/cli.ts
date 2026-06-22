@@ -258,7 +258,13 @@ function renderTopHelp(): string {
 }
 
 function renderBranchHelp(branch: string, def: BranchEntry): string {
-  const lines: string[] = [`Usage: mediforce ${branch} <subcommand> [options]`, '', def.description, '', 'Subcommands:'];
+  const lines: string[] = [
+    `Usage: mediforce ${branch} <subcommand> [options]`,
+    '',
+    def.description,
+    '',
+    'Subcommands:',
+  ];
   const width = Math.max(...Object.keys(def.leaves).map((n) => n.length));
   for (const [name, leaf] of Object.entries(def.leaves)) {
     lines.push(`  ${name.padEnd(width)}  ${leaf.description}`);

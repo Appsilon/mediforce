@@ -22,9 +22,7 @@ export function AssignmentMap({
 
   if (roleCounts.length === 0) {
     return (
-      <div className="text-sm text-muted-foreground py-4 text-center">
-        No open tasks — all task queues are empty.
-      </div>
+      <div className="text-sm text-muted-foreground py-4 text-center">No open tasks — all task queues are empty.</div>
     );
   }
 

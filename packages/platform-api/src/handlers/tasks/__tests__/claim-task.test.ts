@@ -8,16 +8,8 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { claimTask } from '../claim-task';
-import {
-  ForbiddenError,
-  HandlerError,
-  NotFoundError,
-  PreconditionFailedError,
-} from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { ForbiddenError, HandlerError, NotFoundError, PreconditionFailedError } from '../../../errors';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 /**
  * Handler tests for `claimTask`. Exercise the handler against real in-memory
@@ -177,9 +169,7 @@ describe('claimTask handler', () => {
       // apiKey (system actor) has no `uid`, so it has nothing to assign.
       // The old inline route silently fell back to a magic 'api-user' string —
       // we deliberately drop that for PR1.
-      await humanTaskRepo.create(
-        buildHumanTask({ id: 'task-1', processInstanceId: 'inst-a', status: 'pending' }),
-      );
+      await humanTaskRepo.create(buildHumanTask({ id: 'task-1', processInstanceId: 'inst-a', status: 'pending' }));
       const scope = createTestScope({
         humanTaskRepo,
         instanceRepo,

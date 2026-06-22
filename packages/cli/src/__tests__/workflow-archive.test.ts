@@ -88,9 +88,9 @@ describe('workflow archive command', () => {
   });
 
   it('archives specific version', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ success: true, name: 'my-wf', version: 3, archived: true }),
-    );
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse({ success: true, name: 'my-wf', version: 3, archived: true }));
     const output = captureOutput();
     const code = await workflowArchiveCommand({
       argv: [...BASE_ARGS, 'my-wf', '--version', '3'],
@@ -100,9 +100,7 @@ describe('workflow archive command', () => {
     expect(code).toBe(0);
     expect(output.stdoutLines.join('\n')).toContain('Archived my-wf v3');
     const url = fetchSpy.mock.calls[0]?.[0] as string;
-    expect(url).toBe(
-      'http://localhost:1234/api/workflow-definitions/my-wf/versions/3/archive?namespace=ns1',
-    );
+    expect(url).toBe('http://localhost:1234/api/workflow-definitions/my-wf/versions/3/archive?namespace=ns1');
     const init = fetchSpy.mock.calls[0]?.[1] as RequestInit;
     expect(JSON.parse(init.body as string)).toEqual({ archived: true });
   });
@@ -122,9 +120,9 @@ describe('workflow archive command', () => {
   });
 
   it('archives all versions with --all', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ success: true, name: 'my-wf', archived: true }),
-    );
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse({ success: true, name: 'my-wf', archived: true }));
     const output = captureOutput();
     const code = await workflowArchiveCommand({
       argv: [...BASE_ARGS, 'my-wf', '--all'],
@@ -134,15 +132,11 @@ describe('workflow archive command', () => {
     expect(code).toBe(0);
     expect(output.stdoutLines.join('\n')).toContain('Archived all versions of my-wf');
     const url = fetchSpy.mock.calls[0]?.[0] as string;
-    expect(url).toBe(
-      'http://localhost:1234/api/workflow-definitions/my-wf/archive?namespace=ns1',
-    );
+    expect(url).toBe('http://localhost:1234/api/workflow-definitions/my-wf/archive?namespace=ns1');
   });
 
   it('exits 1 with error on API 404', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Workflow not found' }, 404),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Workflow not found' }, 404));
     const output = captureOutput();
     const code = await workflowArchiveCommand({
       argv: [...BASE_ARGS, 'missing-wf', '--version', '1'],

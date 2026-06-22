@@ -25,11 +25,9 @@ export const queryKeys = {
     byInstance: (instanceId: string, filters?: { stepId?: string; status?: HumanTaskStatus[] }) =>
       ['tasks', { instanceId, ...filters }] as const,
     /** All tasks for a role, optionally narrowed by status. */
-    byRole: (role: string, filters?: { status?: HumanTaskStatus[] }) =>
-      ['tasks', { role, ...filters }] as const,
+    byRole: (role: string, filters?: { status?: HumanTaskStatus[] }) => ['tasks', { role, ...filters }] as const,
     /** Caller-scope axis: every task visible to the caller across roles + instances. */
-    forCaller: (filters?: { status?: HumanTaskStatus[] }) =>
-      ['tasks', { caller: 'me', ...filters }] as const,
+    forCaller: (filters?: { status?: HumanTaskStatus[] }) => ['tasks', { caller: 'me', ...filters }] as const,
   },
   task: (taskId: string) => ['task', taskId] as const,
 
@@ -39,10 +37,8 @@ export const queryKeys = {
      *  refresh display-name lookups in the next tick. */
     all: () => ['runs'] as const,
     /** Runs scoped to a workspace handle, optionally narrowed by workflow + status. */
-    byHandle: (
-      handle: string,
-      filters?: { workflow?: string; status?: InstanceStatus; limit?: number },
-    ) => ['runs', handle, { ...filters }] as const,
+    byHandle: (handle: string, filters?: { workflow?: string; status?: InstanceStatus; limit?: number }) =>
+      ['runs', handle, { ...filters }] as const,
     /** Workspace-scoped `id → definitionName` map. Lives under the `runs`
      *  prefix so mutation-driven invalidations refresh labels without per-site
      *  wiring; keyed by handle so two workspaces don't share a cache entry. */
@@ -60,8 +56,7 @@ export const queryKeys = {
     ['workflow', handle, name, version ?? 'latest'] as const,
 
   /** Version metadata list for a workflow in a namespace (workflows.versions). */
-  workflowVersions: (namespace: string, name: string) =>
-    ['workflow-versions', namespace, name] as const,
+  workflowVersions: (namespace: string, name: string) => ['workflow-versions', namespace, name] as const,
 
   /** Aggregate step-entry view for a process instance (processes.getSteps). */
   processSteps: (instanceId: string) => ['process-steps', instanceId] as const,
@@ -102,10 +97,8 @@ export const queryKeys = {
     /** Prefix matcher — `['agent-runs']` invalidates every list slice. */
     all: () => ['agent-runs'] as const,
     /** List slice — namespace + optional `runId`/`stepId` filters. */
-    list: (
-      handle: string | undefined,
-      filters?: { runId?: string; stepId?: string },
-    ) => ['agent-runs', handle ?? null, { ...filters }] as const,
+    list: (handle: string | undefined, filters?: { runId?: string; stepId?: string }) =>
+      ['agent-runs', handle ?? null, { ...filters }] as const,
   },
   /** Single agent-run detail key (singular `agent-run`). */
   agentRun: (agentRunId: string) => ['agent-run', agentRunId] as const,

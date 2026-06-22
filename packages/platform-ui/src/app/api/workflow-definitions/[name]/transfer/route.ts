@@ -1,9 +1,6 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { transferWorkflowNamespace } from '@mediforce/platform-api/handlers';
-import {
-  TransferWorkflowInputSchema,
-  type TransferWorkflowInput,
-} from '@mediforce/platform-api/contract';
+import { TransferWorkflowInputSchema, type TransferWorkflowInput } from '@mediforce/platform-api/contract';
 
 interface RouteContext {
   params: Promise<{ name: string }>;

@@ -18,9 +18,7 @@ export function CatalogList({ entries, selectedId, onSelect }: CatalogListProps)
           <Wrench className="h-5 w-5 text-muted-foreground" />
         </div>
         <p className="text-sm text-muted-foreground">No catalog entries yet.</p>
-        <p className="text-xs text-muted-foreground">
-          Add your first to enable stdio MCP servers for agents.
-        </p>
+        <p className="text-xs text-muted-foreground">Add your first to enable stdio MCP servers for agents.</p>
       </div>
     );
   }
@@ -34,17 +32,12 @@ export function CatalogList({ entries, selectedId, onSelect }: CatalogListProps)
             <button
               type="button"
               onClick={() => onSelect(entry.id)}
-              className={cn(
-                'w-full px-4 py-3 text-left transition-colors hover:bg-muted/40',
-                isSelected && 'bg-muted',
-              )}
+              className={cn('w-full px-4 py-3 text-left transition-colors hover:bg-muted/40', isSelected && 'bg-muted')}
             >
               <div className="font-mono text-sm font-medium">{entry.id}</div>
               <div className="mt-0.5 truncate text-xs text-muted-foreground">
                 <span className="font-mono">{entry.command}</span>
-                {(entry.args?.length ?? 0) > 0 && (
-                  <span className="ml-1 font-mono">{entry.args?.join(' ')}</span>
-                )}
+                {(entry.args?.length ?? 0) > 0 && <span className="ml-1 font-mono">{entry.args?.join(' ')}</span>}
               </div>
               {entry.description !== undefined && entry.description !== '' && (
                 <div className="mt-1 truncate text-xs text-muted-foreground">{entry.description}</div>

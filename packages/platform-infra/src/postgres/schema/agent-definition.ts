@@ -44,18 +44,12 @@ export const agents = pgTable(
     mcpServers: jsonb('mcp_servers'),
     namespace: text('namespace'),
     visibility: text('visibility').notNull().default('private'),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     // Hot list: visibility filter + namespace lookups for listVisibleTo.
     visibilityIdx: index('agents_visibility_idx').on(table.visibility),
-    namespaceIdx: index('agents_namespace_idx')
-      .on(table.namespace)
-      .where(sql`${table.namespace} is not null`),
+    namespaceIdx: index('agents_namespace_idx').on(table.namespace).where(sql`${table.namespace} is not null`),
   }),
 );

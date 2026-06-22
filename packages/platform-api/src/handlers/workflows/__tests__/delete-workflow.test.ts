@@ -7,10 +7,7 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { deleteWorkflow } from '../delete-workflow';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('deleteWorkflow handler', () => {
   let processRepo: InMemoryProcessRepository;
@@ -37,10 +34,7 @@ describe('deleteWorkflow handler', () => {
     );
     const scope = buildScope();
 
-    const result = await deleteWorkflow(
-      { name: 'flow-del', namespace: 'team-alpha', expectedRunCount: 0 },
-      scope,
-    );
+    const result = await deleteWorkflow({ name: 'flow-del', namespace: 'team-alpha', expectedRunCount: 0 }, scope);
 
     expect(result).toEqual({ success: true, deletedRuns: 0 });
     const isDeleted = await processRepo.isWorkflowNameDeleted('team-alpha', 'flow-del');

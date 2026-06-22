@@ -57,21 +57,17 @@ describe('interpolate', () => {
   });
 
   it('concatenates multi-placeholder templates as strings', () => {
-    expect(
-      interpolate('${variables.greeting}, ${triggerPayload.body.hello}!', sources),
-    ).toBe('hi, world!');
+    expect(interpolate('${variables.greeting}, ${triggerPayload.body.hello}!', sources)).toBe('hi, world!');
   });
 
   it('walks array index inside multi-placeholder', () => {
-    expect(
-      interpolate('first=${triggerPayload.body.items.0.id}', sources),
-    ).toBe('first=1');
+    expect(interpolate('first=${triggerPayload.body.items.0.id}', sources)).toBe('first=1');
   });
 
   it('JSON-stringifies non-string values inside multi-placeholder', () => {
-    expect(
-      interpolate('payload=${triggerPayload.body}', sources),
-    ).toBe('payload={"hello":"world","items":[{"id":1},{"id":2}]}');
+    expect(interpolate('payload=${triggerPayload.body}', sources)).toBe(
+      'payload={"hello":"world","items":[{"id":1},{"id":2}]}',
+    );
   });
 
   it('renders missing placeholders as empty string in concat', () => {
@@ -79,10 +75,7 @@ describe('interpolate', () => {
   });
 
   it('walks deep into objects and interpolates each leaf', () => {
-    const out = interpolate(
-      { url: '${triggerPayload.method}', token: '${steps.fetch.body.json.token}' },
-      sources,
-    );
+    const out = interpolate({ url: '${triggerPayload.method}', token: '${steps.fetch.body.json.token}' }, sources);
     expect(out).toEqual({ url: 'POST', token: 'abc' });
   });
 
@@ -107,9 +100,7 @@ describe('interpolate', () => {
   });
 
   it('embeds secrets in multi-placeholder strings', () => {
-    expect(
-      interpolate('Bearer ${secrets.PUSHOVER_TOKEN}', sources),
-    ).toBe('Bearer push-token-456');
+    expect(interpolate('Bearer ${secrets.PUSHOVER_TOKEN}', sources)).toBe('Bearer push-token-456');
   });
 
   it('renders unknown secret as empty string in concat', () => {

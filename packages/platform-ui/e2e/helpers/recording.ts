@@ -101,7 +101,9 @@ export async function setupRecording(page: Page, gifName?: string, testInfo?: Te
           c.style.top = '360px';
         }
       });
-    } catch { /* page might have navigated */ }
+    } catch {
+      /* page might have navigated */
+    }
   });
 }
 
@@ -119,7 +121,9 @@ function markContentReady(page: Page) {
   try {
     const existing = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
     fs.writeFileSync(metaPath, JSON.stringify({ ...existing, trimStart }));
-  } catch { /* first test in describe may not have meta yet */ }
+  } catch {
+    /* first test in describe may not have meta yet */
+  }
 }
 
 /**
@@ -135,20 +139,30 @@ export async function click(page: Page, locator: Locator) {
       const x = Math.round(box.x + box.width / 2);
       const y = Math.round(box.y + box.height / 2);
       // Move cursor — CSS transition handles the animation
-      await page.evaluate(({ x, y }) => {
-        const c = document.getElementById('e2e-cursor');
-        if (c) { c.style.display = 'block'; c.style.left = x + 'px'; c.style.top = y + 'px'; }
-      }, { x, y });
+      await page.evaluate(
+        ({ x, y }) => {
+          const c = document.getElementById('e2e-cursor');
+          if (c) {
+            c.style.display = 'block';
+            c.style.left = x + 'px';
+            c.style.top = y + 'px';
+          }
+        },
+        { x, y },
+      );
       await page.waitForTimeout(400); // wait for CSS transition to finish
       // Ripple at click position
-      await page.evaluate(({ x, y }) => {
-        const r = document.createElement('div');
-        r.className = 'e2e-ripple';
-        r.style.left = x + 'px';
-        r.style.top = y + 'px';
-        document.body.appendChild(r);
-        setTimeout(() => r.remove(), 600);
-      }, { x, y });
+      await page.evaluate(
+        ({ x, y }) => {
+          const r = document.createElement('div');
+          r.className = 'e2e-ripple';
+          r.style.left = x + 'px';
+          r.style.top = y + 'px';
+          document.body.appendChild(r);
+          setTimeout(() => r.remove(), 600);
+        },
+        { x, y },
+      );
     }
   }
   await locator.click();
@@ -217,7 +231,9 @@ export async function showCaption(page: Page, text: string, ms = 2500) {
       textAlign: 'center',
     });
     document.body.appendChild(el);
-    requestAnimationFrame(() => { el.style.opacity = '1'; });
+    requestAnimationFrame(() => {
+      el.style.opacity = '1';
+    });
   }, text);
 
   await page.waitForTimeout(ms);
@@ -233,10 +249,15 @@ export async function endRecording(page: Page) {
   await page.evaluate(() => {
     // Fade out caption
     const caption = document.getElementById('e2e-caption');
-    if (caption) { caption.style.opacity = '0'; }
+    if (caption) {
+      caption.style.opacity = '0';
+    }
     // Move cursor to center
     const c = document.getElementById('e2e-cursor');
-    if (c) { c.style.left = '640px'; c.style.top = '360px'; }
+    if (c) {
+      c.style.left = '640px';
+      c.style.top = '360px';
+    }
   });
   await page.waitForTimeout(500);
 }

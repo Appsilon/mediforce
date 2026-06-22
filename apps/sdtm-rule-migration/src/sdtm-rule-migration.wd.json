@@ -19,9 +19,7 @@
     "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
     "GITHUB_TOKEN": "{{GITHUB_TOKEN}}"
   },
-  "triggers": [
-    { "name": "manual", "type": "manual" }
-  ],
+  "triggers": [{ "name": "manual", "type": "manual" }],
   "triggerInput": [
     {
       "name": "ruleId",
@@ -83,7 +81,5 @@
       "description": "Workflow completed — either a draft PR was opened (status: verified|corrected) or no publish was needed (status: already_verified|not_found|invalid_input)."
     }
   ],
-  "transitions": [
-    { "from": "open-pr", "to": "done" }
-  ]
+  "transitions": [{ "from": "open-pr", "to": "done" }]
 }

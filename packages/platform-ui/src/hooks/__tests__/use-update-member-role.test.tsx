@@ -16,7 +16,12 @@ const updateMemberRoleMock = vi.hoisted(() =>
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { namespaces: { updateMemberRole: updateMemberRoleMock } },
   ApiError: class extends Error {
-    constructor(public status: number, message: string) { super(message); }
+    constructor(
+      public status: number,
+      message: string,
+    ) {
+      super(message);
+    }
   },
 }));
 
@@ -51,7 +56,10 @@ describe('useUpdateMemberRole optimistic update (state-transition template)', ()
   it('optimistically flips role; server entity-echo replaces it in onSuccess', async () => {
     let resolve!: (output: UpdateNamespaceMemberRoleOutput) => void;
     updateMemberRoleMock.mockImplementationOnce(
-      () => new Promise<UpdateNamespaceMemberRoleOutput>((r) => { resolve = r; }),
+      () =>
+        new Promise<UpdateNamespaceMemberRoleOutput>((r) => {
+          resolve = r;
+        }),
     );
     const { wrapper, qc } = makeWrapper();
     const { result } = renderHook(() => useUpdateMemberRole('acme'), { wrapper });

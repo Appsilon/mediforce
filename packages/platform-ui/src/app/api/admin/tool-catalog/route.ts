@@ -5,15 +5,9 @@ import {
   type CreateToolCatalogEntryInputApi,
   type ListToolCatalogEntriesInput,
 } from '@mediforce/platform-api/contract';
-import {
-  createToolCatalogEntry,
-  listToolCatalogEntries,
-} from '@mediforce/platform-api/handlers';
+import { createToolCatalogEntry, listToolCatalogEntries } from '@mediforce/platform-api/handlers';
 
-export const GET = createRouteAdapter<
-  typeof ListToolCatalogEntriesInputSchema,
-  ListToolCatalogEntriesInput
->(
+export const GET = createRouteAdapter<typeof ListToolCatalogEntriesInputSchema, ListToolCatalogEntriesInput>(
   ListToolCatalogEntriesInputSchema,
   (req) => ({
     namespace: new URL(req.url).searchParams.get('namespace') ?? '',
@@ -21,10 +15,7 @@ export const GET = createRouteAdapter<
   listToolCatalogEntries,
 );
 
-export const POST = createRouteAdapter<
-  typeof CreateToolCatalogEntryInputApiSchema,
-  CreateToolCatalogEntryInputApi
->(
+export const POST = createRouteAdapter<typeof CreateToolCatalogEntryInputApiSchema, CreateToolCatalogEntryInputApi>(
   CreateToolCatalogEntryInputApiSchema,
   async (req) => {
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;

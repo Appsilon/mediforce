@@ -32,19 +32,13 @@ describe('resolveTaskKind', () => {
     expect(resolveTaskKind(baseTask({ ui: { component: 'file-upload' } as never }))).toBe('upload');
   });
   it('assignment for assignment-table', () => {
-    expect(resolveTaskKind(baseTask({ ui: { component: 'assignment-table' } as never }))).toBe(
-      'assignment',
-    );
+    expect(resolveTaskKind(baseTask({ ui: { component: 'assignment-table' } as never }))).toBe('assignment');
   });
   it('rows for table-editor', () => {
     expect(resolveTaskKind(baseTask({ ui: { component: 'table-editor' } as never }))).toBe('rows');
   });
   it('params when task has params but no verdicts', () => {
-    expect(
-      resolveTaskKind(
-        baseTask({ params: [{ key: 'k', label: 'k', type: 'string' }] as never }),
-      ),
-    ).toBe('params');
+    expect(resolveTaskKind(baseTask({ params: [{ key: 'k', label: 'k', type: 'string' }] as never }))).toBe('params');
   });
   it('verdict-with-params when task has both params and verdicts', () => {
     expect(
@@ -98,13 +92,11 @@ describe('validatePayloadKindMatchesTask', () => {
 describe('validateVerdictPayload', () => {
   it('rejects verdict outside task.verdicts allowlist', () => {
     const task = baseTask({
-      verdicts: [
-        { key: 'approve', label: 'Approve', intent: 'positive' as never },
-      ] as never,
+      verdicts: [{ key: 'approve', label: 'Approve', intent: 'positive' as never }] as never,
     });
-    expect(() =>
-      validateVerdictPayload(task, { kind: 'verdict', verdict: 'reject' }),
-    ).toThrow(/verdict 'reject' not allowed/);
+    expect(() => validateVerdictPayload(task, { kind: 'verdict', verdict: 'reject' })).toThrow(
+      /verdict 'reject' not allowed/,
+    );
   });
 
   it('enforces requiresComment for verdicts that mandate one', () => {
@@ -118,9 +110,9 @@ describe('validateVerdictPayload', () => {
         },
       ] as never,
     });
-    expect(() =>
-      validateVerdictPayload(task, { kind: 'verdict', verdict: 'reject' }),
-    ).toThrow(/requires a non-empty comment/);
+    expect(() => validateVerdictPayload(task, { kind: 'verdict', verdict: 'reject' })).toThrow(
+      /requires a non-empty comment/,
+    );
     expect(() =>
       validateVerdictPayload(task, {
         kind: 'verdict',
@@ -247,12 +239,7 @@ describe('shapeCompletion — verdict variant', () => {
       } as never,
     });
     expect(() =>
-      shapeCompletion(
-        task,
-        { kind: 'verdict', verdict: 'approve' },
-        'user-1',
-        '2026-05-26T00:00:00.000Z',
-      ),
+      shapeCompletion(task, { kind: 'verdict', verdict: 'approve' }, 'user-1', '2026-05-26T00:00:00.000Z'),
     ).toThrow(/agent produced no output/);
   });
 });

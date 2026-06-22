@@ -23,7 +23,12 @@ function summary(version: number, overrides: Partial<WorkflowVersionSummary> = {
 const versionsMock = vi.fn<(...args: unknown[]) => Promise<VersionsResult>>();
 const getMock = vi.fn<(...args: unknown[]) => Promise<{ definition: WorkflowDefinition }>>();
 class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { workflows: { versions: versionsMock, get: getMock } },

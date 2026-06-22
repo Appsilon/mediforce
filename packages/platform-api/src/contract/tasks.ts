@@ -35,10 +35,9 @@ export const ListTasksInputSchema = z
     stepId: z.string().min(1).optional(),
     status: z.array(HumanTaskStatusSchema).min(1).optional(),
   })
-  .refine(
-    (val) => !(val.instanceId !== undefined && val.role !== undefined),
-    { message: '`instanceId` and `role` are mutually exclusive' },
-  );
+  .refine((val) => !(val.instanceId !== undefined && val.role !== undefined), {
+    message: '`instanceId` and `role` are mutually exclusive',
+  });
 
 export const ListTasksOutputSchema = z.object({
   tasks: z.array(HumanTaskSchema),

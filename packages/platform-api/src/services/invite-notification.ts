@@ -15,10 +15,7 @@ export interface InvitedUser {
 
 export interface InviteService {
   /** Idempotent on email collision — returns existing uid with empty password. */
-  createInvitedUser(
-    email: string,
-    displayName: string | undefined,
-  ): Promise<InvitedUser>;
+  createInvitedUser(email: string, displayName: string | undefined): Promise<InvitedUser>;
 
   /** Rotates password + re-flags `mustChangePassword`. Returns new plaintext. */
   resetInvitePassword(uid: string): Promise<string>;

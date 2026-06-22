@@ -3,7 +3,9 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Agent Escalated Recovery Journey', () => {
-  test('agent_escalated instance — Cancel this run flips status to Cancelled and removes the banner', async ({ page }, testInfo) => {
+  test('agent_escalated instance — Cancel this run flips status to Cancelled and removes the banner', async ({
+    page,
+  }, testInfo) => {
     await setupRecording(page, 'agent-escalated-cancel', testInfo);
 
     // proc-agent-escalated-cancel is seeded as:

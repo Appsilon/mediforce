@@ -50,16 +50,10 @@ export default function CoworkSessionPage() {
   }
 
   if (!session) {
-    return (
-      <div className="p-6 text-center text-sm text-muted-foreground">
-        Session not found.
-      </div>
-    );
+    return <div className="p-6 text-center text-sm text-muted-foreground">Session not found.</div>;
   }
 
-  const runHref = instance
-    ? routes.workflowRun(handle, instance.definitionName, instance.id)
-    : null;
+  const runHref = instance ? routes.workflowRun(handle, instance.definitionName, instance.id) : null;
 
   return (
     <div className="p-6 space-y-4">

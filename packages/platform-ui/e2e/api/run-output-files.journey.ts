@@ -63,10 +63,15 @@ async function seedOutputFiles(
     await git(['add', '-A'], workDir);
     await git(
       [
-        '-c', 'user.name=e2e',
-        '-c', 'user.email=e2e@example.com',
-        '-c', 'commit.gpgsign=false',
-        'commit', '-m', `Seed Output Files for ${runId}`,
+        '-c',
+        'user.name=e2e',
+        '-c',
+        'user.email=e2e@example.com',
+        '-c',
+        'commit.gpgsign=false',
+        'commit',
+        '-m',
+        `Seed Output Files for ${runId}`,
       ],
       workDir,
     );
@@ -126,10 +131,10 @@ test.describe('Run Output Files — API E2E', () => {
       transitions: [{ from: 'generate', to: 'done' }],
       triggers: [{ type: 'manual', name: 'Start' }],
     };
-    const createWdRes = await request.post(
-      `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
-      { headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' }, data: wd },
-    );
+    const createWdRes = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
+      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+      data: wd,
+    });
     expect(createWdRes.status(), await createWdRes.text()).toBe(201);
   }
 
@@ -213,10 +218,9 @@ test.describe('Run Output Files — API E2E', () => {
       `attachment; filename="report.csv"; filename*=UTF-8''report.csv`,
     );
 
-    const svgRes = await request.get(
-      `/api/runs/${runId}/files/.mediforce/output/generate/charts/plot.svg`,
-      { headers: AUTH_HEADERS },
-    );
+    const svgRes = await request.get(`/api/runs/${runId}/files/.mediforce/output/generate/charts/plot.svg`, {
+      headers: AUTH_HEADERS,
+    });
     expect(svgRes.status()).toBe(200);
     expect((await svgRes.body()).toString('utf-8')).toBe(svgContent);
     expect(svgRes.headers()['content-type']).toBe('image/svg+xml');
@@ -237,10 +241,9 @@ test.describe('Run Output Files — API E2E', () => {
     // -------- Path traversal / outside-root → rejected, never file content --------
     // `..` percent-encoded so the HTTP layer can't normalize it away before
     // the route sees it. Accept any 4xx rejection; assert no leak either way.
-    const traversalRes = await request.get(
-      `/api/runs/${runId}/files/.mediforce/output/%2E%2E/%2E%2E/secret`,
-      { headers: AUTH_HEADERS },
-    );
+    const traversalRes = await request.get(`/api/runs/${runId}/files/.mediforce/output/%2E%2E/%2E%2E/secret`, {
+      headers: AUTH_HEADERS,
+    });
     expect(traversalRes.status()).toBeGreaterThanOrEqual(400);
     expect(traversalRes.status()).toBeLessThan(500);
     expect(await traversalRes.text()).not.toContain('study,grade');

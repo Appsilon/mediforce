@@ -41,7 +41,10 @@ describe('renderWorkflowDiagram', () => {
         steps: [
           { id: 'draft', name: 'Draft', type: 'creation', executor: 'agent' },
           {
-            id: 'review', name: 'Review', type: 'review', executor: 'human',
+            id: 'review',
+            name: 'Review',
+            type: 'review',
+            executor: 'human',
             verdicts: { approve: { target: 'done' }, revise: { target: 'draft' } },
           },
           { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
@@ -59,9 +62,7 @@ describe('renderWorkflowDiagram', () => {
     const def = {
       definition: {
         ...minimalDef.definition,
-        triggerInput: [
-          { name: 'email', type: 'string', required: true, description: 'Target email' },
-        ],
+        triggerInput: [{ name: 'email', type: 'string', required: true, description: 'Target email' }],
       },
     };
     const html = renderWorkflowDiagram(def);

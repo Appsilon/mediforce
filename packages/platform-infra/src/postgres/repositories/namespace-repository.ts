@@ -27,11 +27,7 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
   constructor(private readonly db: Database) {}
 
   async getNamespace(handle: string): Promise<Namespace | null> {
-    const rows = await this.db
-      .select()
-      .from(workspaces)
-      .where(eq(workspaces.handle, handle))
-      .limit(1);
+    const rows = await this.db.select().from(workspaces).where(eq(workspaces.handle, handle)).limit(1);
     const row = rows[0];
     return row ? toNamespace(row) : null;
   }
@@ -50,10 +46,7 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
     });
   }
 
-  async createNamespaceWithOwner(input: {
-    namespace: Namespace;
-    ownerMember: NamespaceMember;
-  }): Promise<void> {
+  async createNamespaceWithOwner(input: { namespace: Namespace; ownerMember: NamespaceMember }): Promise<void> {
     const parsedNs = NamespaceSchema.parse(input.namespace);
     const parsedMember = NamespaceMemberSchema.parse(input.ownerMember);
     // Drizzle's transaction helper rolls back if the callback throws, giving
@@ -94,10 +87,7 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
   }
 
   async getNamespacesByUser(uid: string): Promise<Namespace[]> {
-    const personalRows = await this.db
-      .select()
-      .from(workspaces)
-      .where(eq(workspaces.linkedUserId, uid));
+    const personalRows = await this.db.select().from(workspaces).where(eq(workspaces.linkedUserId, uid));
     const personal = personalRows.map((r) => toNamespace(r));
 
     const organizations = await this.getUserNamespaces(uid);
@@ -140,12 +130,7 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
   async removeMember(handle: string, uid: string): Promise<void> {
     await this.db
       .delete(workspaceMembers)
-      .where(
-        and(
-          eq(workspaceMembers.workspace, handle),
-          eq(workspaceMembers.uid, uid),
-        ),
-      );
+      .where(and(eq(workspaceMembers.workspace, handle), eq(workspaceMembers.uid, uid)));
   }
 
   async removeMemberWithOrganizations(handle: string, uid: string): Promise<void> {
@@ -154,35 +139,19 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
     // Firestore-only mirror). Deleting the join-table row IS the org removal.
     await this.db
       .delete(workspaceMembers)
-      .where(
-        and(
-          eq(workspaceMembers.workspace, handle),
-          eq(workspaceMembers.uid, uid),
-        ),
-      );
+      .where(and(eq(workspaceMembers.workspace, handle), eq(workspaceMembers.uid, uid)));
   }
 
-  async setMemberRole(
-    handle: string,
-    uid: string,
-    role: NamespaceMember['role'],
-  ): Promise<void> {
+  async setMemberRole(handle: string, uid: string, role: NamespaceMember['role']): Promise<void> {
     await this.db
       .update(workspaceMembers)
       .set({ role })
-      .where(
-        and(
-          eq(workspaceMembers.workspace, handle),
-          eq(workspaceMembers.uid, uid),
-        ),
-      );
+      .where(and(eq(workspaceMembers.workspace, handle), eq(workspaceMembers.uid, uid)));
   }
 
   async deleteNamespaceCascade(handle: string): Promise<void> {
     await this.db.transaction(async (tx) => {
-      await tx
-        .delete(workspaceMembers)
-        .where(eq(workspaceMembers.workspace, handle));
+      await tx.delete(workspaceMembers).where(eq(workspaceMembers.workspace, handle));
       await tx.delete(workspaces).where(eq(workspaces.handle, handle));
     });
   }
@@ -191,22 +160,14 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
     const rows = await this.db
       .select()
       .from(workspaceMembers)
-      .where(
-        and(
-          eq(workspaceMembers.workspace, handle),
-          eq(workspaceMembers.uid, uid),
-        ),
-      )
+      .where(and(eq(workspaceMembers.workspace, handle), eq(workspaceMembers.uid, uid)))
       .limit(1);
     const row = rows[0];
     return row ? toMember(row) : null;
   }
 
   async getMembers(handle: string): Promise<NamespaceMember[]> {
-    const rows = await this.db
-      .select()
-      .from(workspaceMembers)
-      .where(eq(workspaceMembers.workspace, handle));
+    const rows = await this.db.select().from(workspaceMembers).where(eq(workspaceMembers.workspace, handle));
     return rows.map((r) => toMember(r));
   }
 
@@ -217,10 +178,7 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       .where(eq(workspaceMembers.uid, uid));
     const handles = memberRows.map((r) => r.workspace);
     if (handles.length === 0) return [];
-    const rows = await this.db
-      .select()
-      .from(workspaces)
-      .where(inArray(workspaces.handle, handles));
+    const rows = await this.db.select().from(workspaces).where(inArray(workspaces.handle, handles));
     return rows.map((r) => toNamespace(r));
   }
 

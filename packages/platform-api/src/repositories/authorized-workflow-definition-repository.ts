@@ -1,8 +1,4 @@
-import type {
-  ProcessRepository,
-  WorkflowDefinition,
-  WorkflowDefinitionGroup,
-} from '@mediforce/platform-core';
+import type { ProcessRepository, WorkflowDefinition, WorkflowDefinitionGroup } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
 import { AuthorizedScope } from './authorized-repository';
 
@@ -71,10 +67,7 @@ export class AuthorizedWorkflowDefinitionRepository extends AuthorizedScope {
   listGroups = async (includeArchived: boolean): Promise<WorkflowDefinitionGroup[]> => {
     const { definitions } = this.caller.isSystemActor
       ? await this.raw.listAllWorkflowDefinitions(includeArchived)
-      : await this.raw.listWorkflowDefinitionsVisibleTo(
-          [...this.caller.namespaces],
-          includeArchived,
-        );
+      : await this.raw.listWorkflowDefinitionsVisibleTo([...this.caller.namespaces], includeArchived);
     return definitions;
   };
 
@@ -88,30 +81,17 @@ export class AuthorizedWorkflowDefinitionRepository extends AuthorizedScope {
     await this.raw.setProcessArchived(name, namespace, archived);
   };
 
-  setVersionArchived = async (
-    namespace: string,
-    name: string,
-    version: number,
-    archived: boolean,
-  ): Promise<void> => {
+  setVersionArchived = async (namespace: string, name: string, version: number, archived: boolean): Promise<void> => {
     this.assertNamespaceWrite(namespace);
     await this.raw.setVersionArchived(namespace, name, version, archived);
   };
 
-  setVisibility = async (
-    namespace: string,
-    name: string,
-    visibility: 'public' | 'private',
-  ): Promise<void> => {
+  setVisibility = async (namespace: string, name: string, visibility: 'public' | 'private'): Promise<void> => {
     this.assertNamespaceWrite(namespace);
     await this.raw.setWorkflowVisibility(name, namespace, visibility);
   };
 
-  setDefaultVersion = async (
-    namespace: string,
-    name: string,
-    version: number,
-  ): Promise<void> => {
+  setDefaultVersion = async (namespace: string, name: string, version: number): Promise<void> => {
     this.assertNamespaceWrite(namespace);
     await this.raw.setDefaultWorkflowVersion(namespace, name, version);
   };
@@ -141,11 +121,7 @@ export class AuthorizedWorkflowDefinitionRepository extends AuthorizedScope {
    * `targetNamespace`. Caller must be a member of BOTH workspaces, matching the
    * membership-only stance applied everywhere else.
    */
-  transferNamespace = async (
-    name: string,
-    sourceNamespace: string,
-    targetNamespace: string,
-  ): Promise<void> => {
+  transferNamespace = async (name: string, sourceNamespace: string, targetNamespace: string): Promise<void> => {
     this.assertNamespaceWrite(sourceNamespace);
     this.assertNamespaceWrite(targetNamespace);
     await this.raw.transferWorkflowNamespace(sourceNamespace, name, targetNamespace);

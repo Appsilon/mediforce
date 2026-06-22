@@ -51,9 +51,7 @@ describe('citty defineCommand wrapper', () => {
   });
 
   it('exits 1 and emits a structured envelope when the API errors', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Widget not found' }, 404),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Widget not found' }, 404));
     const output = captureOutput();
     const code = await trivial({
       argv: ['w-1', '--json'],

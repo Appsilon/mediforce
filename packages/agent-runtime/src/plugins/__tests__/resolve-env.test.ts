@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { resolveStepEnv, validateWorkflowEnv, validateWorkflowModels, validateRetiredModels, validatePluginRequiredEnv, resolveValue } from '../resolve-env';
+import {
+  resolveStepEnv,
+  validateWorkflowEnv,
+  validateWorkflowModels,
+  validateRetiredModels,
+  validatePluginRequiredEnv,
+  resolveValue,
+} from '../resolve-env';
 
 describe('resolve-env', () => {
   // ---------------------------------------------------------------------------
@@ -13,26 +20,18 @@ describe('resolve-env', () => {
     });
 
     it('resolves {{TEMPLATE}} from workflow secrets', () => {
-      const result = resolveStepEnv(
-        undefined,
-        { API_KEY: '{{API_KEY}}' },
-        { API_KEY: 'secret-from-firestore' },
-      );
+      const result = resolveStepEnv(undefined, { API_KEY: '{{API_KEY}}' }, { API_KEY: 'secret-from-firestore' });
       expect(result.vars).toEqual({ API_KEY: 'secret-from-firestore' });
     });
 
     it('throws when template not in secrets (no process.env fallback)', () => {
-      expect(() => resolveStepEnv(undefined, { API_KEY: '{{API_KEY}}' })).toThrow(
-        /API_KEY.*not configured/,
-      );
+      expect(() => resolveStepEnv(undefined, { API_KEY: '{{API_KEY}}' })).toThrow(/API_KEY.*not configured/);
     });
 
     it('throws when workflow secret is empty string', () => {
-      expect(() => resolveStepEnv(
-        undefined,
-        { API_KEY: '{{API_KEY}}' },
-        { API_KEY: '' },
-      )).toThrow(/API_KEY.*not configured/);
+      expect(() => resolveStepEnv(undefined, { API_KEY: '{{API_KEY}}' }, { API_KEY: '' })).toThrow(
+        /API_KEY.*not configured/,
+      );
     });
 
     it('merges config-level and step-level env (step overrides config)', () => {
@@ -51,20 +50,15 @@ describe('resolve-env', () => {
     });
 
     it('injectedKeys contains all merged keys', () => {
-      const result = resolveStepEnv(
-        { A: 'x' },
-        { B: 'y', C: 'z' },
-      );
+      const result = resolveStepEnv({ A: 'x' }, { B: 'y', C: 'z' });
       expect(result.injectedKeys).toEqual(['A', 'B', 'C']);
     });
 
     it('auto-injects plugin required env from secrets when absent from step env', () => {
-      const result = resolveStepEnv(
-        undefined,
-        undefined,
-        { ANTHROPIC_API_KEY: 'sk-ant-xxx' },
-        [['ANTHROPIC_API_KEY'], ['OPENROUTER_API_KEY', 'ANTHROPIC_BASE_URL']],
-      );
+      const result = resolveStepEnv(undefined, undefined, { ANTHROPIC_API_KEY: 'sk-ant-xxx' }, [
+        ['ANTHROPIC_API_KEY'],
+        ['OPENROUTER_API_KEY', 'ANTHROPIC_BASE_URL'],
+      ]);
       expect(result.vars).toEqual({ ANTHROPIC_API_KEY: 'sk-ant-xxx' });
       expect(result.injectedKeys).toContain('ANTHROPIC_API_KEY');
     });
@@ -114,39 +108,25 @@ describe('resolve-env', () => {
     });
 
     it('tracks source as literal for non-template values', () => {
-      const result = resolveStepEnv(
-        undefined,
-        { NODE_ENV: 'production' },
-      );
+      const result = resolveStepEnv(undefined, { NODE_ENV: 'production' });
       expect(result.sources.NODE_ENV).toBe('literal');
     });
 
     it('tracks source as auto-injected for plugin-required env', () => {
-      const result = resolveStepEnv(
-        undefined,
-        undefined,
-        { ANTHROPIC_API_KEY: 'sk-ant-xxx' },
-        [['ANTHROPIC_API_KEY']],
-      );
+      const result = resolveStepEnv(undefined, undefined, { ANTHROPIC_API_KEY: 'sk-ant-xxx' }, [['ANTHROPIC_API_KEY']]);
       expect(result.sources.ANTHROPIC_API_KEY).toBe('auto-injected');
     });
 
     it('tracks source as secret (unspecified level) when namespaceSecretKeys not provided', () => {
-      const result = resolveStepEnv(
-        undefined,
-        { API_KEY: '{{API_KEY}}' },
-        { API_KEY: 'value' },
-      );
+      const result = resolveStepEnv(undefined, { API_KEY: '{{API_KEY}}' }, { API_KEY: 'value' });
       expect(result.sources.API_KEY).toBe('secret');
     });
 
     it('does not auto-inject when no group is satisfiable', () => {
-      const result = resolveStepEnv(
-        undefined,
-        undefined,
-        {},
-        [['ANTHROPIC_API_KEY'], ['OPENROUTER_API_KEY', 'ANTHROPIC_BASE_URL']],
-      );
+      const result = resolveStepEnv(undefined, undefined, {}, [
+        ['ANTHROPIC_API_KEY'],
+        ['OPENROUTER_API_KEY', 'ANTHROPIC_BASE_URL'],
+      ]);
       expect(result.vars).toEqual({});
     });
   });
@@ -207,10 +187,13 @@ describe('resolve-env', () => {
 
     it('merges config-level env with step-level env', () => {
       const secrets = { API_KEY: 'exists' };
-      const result = validateWorkflowEnv({
-        env: { API_KEY: '{{API_KEY}}', DB_URL: '{{DB_URL}}' },
-        steps: [{ id: 's1', name: 'Run', executor: 'agent' }],
-      }, secrets);
+      const result = validateWorkflowEnv(
+        {
+          env: { API_KEY: '{{API_KEY}}', DB_URL: '{{DB_URL}}' },
+          steps: [{ id: 's1', name: 'Run', executor: 'agent' }],
+        },
+        secrets,
+      );
       expect(result).toHaveLength(1);
       expect(result[0].secretName).toBe('DB_URL');
     });
@@ -296,9 +279,7 @@ describe('resolveValue', () => {
     });
 
     it('[ERROR] throws when secret value is empty string', () => {
-      expect(() => resolveValue('{{EMPTY_SECRET}}', { EMPTY_SECRET: '' })).toThrow(
-        /EMPTY_SECRET.*not configured/,
-      );
+      expect(() => resolveValue('{{EMPTY_SECRET}}', { EMPTY_SECRET: '' })).toThrow(/EMPTY_SECRET.*not configured/);
     });
   });
 
@@ -312,9 +293,7 @@ describe('resolveValue', () => {
     });
 
     it('[ERROR] throws when SECRET: form key not in secrets', () => {
-      expect(() => resolveValue('{{SECRET:NEVER_EXISTS_KEY}}')).toThrow(
-        /NEVER_EXISTS_KEY.*not configured/,
-      );
+      expect(() => resolveValue('{{SECRET:NEVER_EXISTS_KEY}}')).toThrow(/NEVER_EXISTS_KEY.*not configured/);
     });
   });
 
@@ -332,20 +311,22 @@ describe('resolveValue', () => {
     ]);
 
     it('returns empty array when no steps use retired models', () => {
-      const result = validateRetiredModels({
-        steps: [
-          { id: 's1', name: 'Step 1', executor: 'agent', agent: { model: 'anthropic/claude-sonnet-4' } },
-        ],
-      }, retiredMap);
+      const result = validateRetiredModels(
+        {
+          steps: [{ id: 's1', name: 'Step 1', executor: 'agent', agent: { model: 'anthropic/claude-sonnet-4' } }],
+        },
+        retiredMap,
+      );
       expect(result).toEqual([]);
     });
 
     it('returns retired model info when step uses a retired model', () => {
-      const result = validateRetiredModels({
-        steps: [
-          { id: 's1', name: 'Analyze', executor: 'agent', agent: { model: 'openai/gpt-4' } },
-        ],
-      }, retiredMap);
+      const result = validateRetiredModels(
+        {
+          steps: [{ id: 's1', name: 'Analyze', executor: 'agent', agent: { model: 'openai/gpt-4' } }],
+        },
+        retiredMap,
+      );
       expect(result).toHaveLength(1);
       expect(result[0].model).toBe('openai/gpt-4');
       expect(result[0].retiredAt).toBe('2026-01-15T00:00:00Z');
@@ -353,31 +334,38 @@ describe('resolveValue', () => {
     });
 
     it('ignores steps with no model set (model is optional)', () => {
-      const result = validateRetiredModels({
-        steps: [
-          { id: 's1', name: 'Agent', executor: 'agent', agent: {} },
-        ],
-      }, retiredMap);
+      const result = validateRetiredModels(
+        {
+          steps: [{ id: 's1', name: 'Agent', executor: 'agent', agent: {} }],
+        },
+        retiredMap,
+      );
       expect(result).toEqual([]);
     });
 
     it('ignores non-agent executor steps', () => {
-      const result = validateRetiredModels({
-        steps: [
-          { id: 's1', name: 'Human', executor: 'human' },
-          { id: 's2', name: 'Action', executor: 'action' },
-        ],
-      }, retiredMap);
+      const result = validateRetiredModels(
+        {
+          steps: [
+            { id: 's1', name: 'Human', executor: 'human' },
+            { id: 's2', name: 'Action', executor: 'action' },
+          ],
+        },
+        retiredMap,
+      );
       expect(result).toEqual([]);
     });
 
     it('groups multiple steps using the same retired model into one entry', () => {
-      const result = validateRetiredModels({
-        steps: [
-          { id: 's1', name: 'Step A', executor: 'agent', agent: { model: 'openai/gpt-4' } },
-          { id: 's2', name: 'Step B', executor: 'agent', agent: { model: 'openai/gpt-4' } },
-        ],
-      }, retiredMap);
+      const result = validateRetiredModels(
+        {
+          steps: [
+            { id: 's1', name: 'Step A', executor: 'agent', agent: { model: 'openai/gpt-4' } },
+            { id: 's2', name: 'Step B', executor: 'agent', agent: { model: 'openai/gpt-4' } },
+          ],
+        },
+        retiredMap,
+      );
       expect(result).toHaveLength(1);
       expect(result[0].model).toBe('openai/gpt-4');
       expect(result[0].steps).toHaveLength(2);
@@ -388,11 +376,12 @@ describe('resolveValue', () => {
     });
 
     it('normalises Firestore-encoded model IDs ("a__b" to "a/b") before lookup', () => {
-      const result = validateRetiredModels({
-        steps: [
-          { id: 's1', name: 'Encode Step', executor: 'agent', agent: { model: 'openai__gpt-4' } },
-        ],
-      }, retiredMap);
+      const result = validateRetiredModels(
+        {
+          steps: [{ id: 's1', name: 'Encode Step', executor: 'agent', agent: { model: 'openai__gpt-4' } }],
+        },
+        retiredMap,
+      );
       expect(result).toHaveLength(1);
       expect(result[0].model).toBe('openai/gpt-4');
       expect(result[0].retiredAt).toBe('2026-01-15T00:00:00Z');
@@ -407,7 +396,11 @@ describe('resolveValue', () => {
 
     it('returns empty when step env declares required key and secret exists', () => {
       const result = validatePluginRequiredEnv(
-        { steps: [{ id: 's1', name: 'Analyze', executor: 'agent', env: { ANTHROPIC_API_KEY: '{{ANTHROPIC_API_KEY}}' } }] },
+        {
+          steps: [
+            { id: 's1', name: 'Analyze', executor: 'agent', env: { ANTHROPIC_API_KEY: '{{ANTHROPIC_API_KEY}}' } },
+          ],
+        },
         pluginMap,
         { ANTHROPIC_API_KEY: 'sk-ant-xxx' },
       );
@@ -416,7 +409,16 @@ describe('resolveValue', () => {
 
     it('returns empty when alternative group is satisfied', () => {
       const result = validatePluginRequiredEnv(
-        { steps: [{ id: 's1', name: 'Analyze', executor: 'agent', env: { OPENROUTER_API_KEY: '{{OPENROUTER_API_KEY}}', ANTHROPIC_BASE_URL: 'https://openrouter.ai/api/v1' } }] },
+        {
+          steps: [
+            {
+              id: 's1',
+              name: 'Analyze',
+              executor: 'agent',
+              env: { OPENROUTER_API_KEY: '{{OPENROUTER_API_KEY}}', ANTHROPIC_BASE_URL: 'https://openrouter.ai/api/v1' },
+            },
+          ],
+        },
         pluginMap,
         { OPENROUTER_API_KEY: 'sk-or-xxx' },
       );
@@ -436,7 +438,11 @@ describe('resolveValue', () => {
 
     it('detects missing when env mapping exists but secret is absent', () => {
       const result = validatePluginRequiredEnv(
-        { steps: [{ id: 's1', name: 'Analyze', executor: 'agent', env: { ANTHROPIC_API_KEY: '{{ANTHROPIC_API_KEY}}' } }] },
+        {
+          steps: [
+            { id: 's1', name: 'Analyze', executor: 'agent', env: { ANTHROPIC_API_KEY: '{{ANTHROPIC_API_KEY}}' } },
+          ],
+        },
         pluginMap,
         {},
       );
@@ -523,53 +529,66 @@ describe('resolveValue', () => {
     const known = new Set(['deepseek/deepseek-chat', 'deepseek/deepseek-v4-flash:free', 'anthropic/claude-sonnet-4']);
 
     it('returns empty when all models exist', () => {
-      const result = validateWorkflowModels({
-        steps: [
-          { id: 's1', name: 'Step 1', executor: 'agent', agent: { model: 'deepseek/deepseek-chat' } },
-        ],
-      }, known);
+      const result = validateWorkflowModels(
+        {
+          steps: [{ id: 's1', name: 'Step 1', executor: 'agent', agent: { model: 'deepseek/deepseek-chat' } }],
+        },
+        known,
+      );
       expect(result).toEqual([]);
     });
 
     it('normalises __ to / before lookup', () => {
-      const result = validateWorkflowModels({
-        steps: [
-          { id: 's1', name: 'Step 1', executor: 'agent', agent: { model: 'deepseek__deepseek-v4-flash:free' } },
-        ],
-      }, known);
+      const result = validateWorkflowModels(
+        {
+          steps: [
+            { id: 's1', name: 'Step 1', executor: 'agent', agent: { model: 'deepseek__deepseek-v4-flash:free' } },
+          ],
+        },
+        known,
+      );
       expect(result).toEqual([]);
     });
 
     it('reports unknown models with affected steps', () => {
-      const result = validateWorkflowModels({
-        steps: [
-          { id: 's1', name: 'Collect', executor: 'agent', agent: { model: 'nonexistent/model' } },
-          { id: 's2', name: 'Process', executor: 'agent', agent: { model: 'deepseek/deepseek-chat' } },
-        ],
-      }, known);
+      const result = validateWorkflowModels(
+        {
+          steps: [
+            { id: 's1', name: 'Collect', executor: 'agent', agent: { model: 'nonexistent/model' } },
+            { id: 's2', name: 'Process', executor: 'agent', agent: { model: 'deepseek/deepseek-chat' } },
+          ],
+        },
+        known,
+      );
       expect(result).toHaveLength(1);
       expect(result[0].model).toBe('nonexistent/model');
       expect(result[0].steps).toEqual([{ stepId: 's1', stepName: 'Collect' }]);
     });
 
     it('skips non-agent steps and steps without model', () => {
-      const result = validateWorkflowModels({
-        steps: [
-          { id: 's1', name: 'Human', executor: 'human' },
-          { id: 's2', name: 'Agent', executor: 'agent', agent: {} },
-          { id: 's3', name: 'Action', executor: 'action' },
-        ],
-      }, known);
+      const result = validateWorkflowModels(
+        {
+          steps: [
+            { id: 's1', name: 'Human', executor: 'human' },
+            { id: 's2', name: 'Agent', executor: 'agent', agent: {} },
+            { id: 's3', name: 'Action', executor: 'action' },
+          ],
+        },
+        known,
+      );
       expect(result).toEqual([]);
     });
 
     it('groups multiple steps using the same unknown model', () => {
-      const result = validateWorkflowModels({
-        steps: [
-          { id: 's1', name: 'A', executor: 'agent', agent: { model: 'bad/model' } },
-          { id: 's2', name: 'B', executor: 'agent', agent: { model: 'bad/model' } },
-        ],
-      }, known);
+      const result = validateWorkflowModels(
+        {
+          steps: [
+            { id: 's1', name: 'A', executor: 'agent', agent: { model: 'bad/model' } },
+            { id: 's2', name: 'B', executor: 'agent', agent: { model: 'bad/model' } },
+          ],
+        },
+        known,
+      );
       expect(result).toHaveLength(1);
       expect(result[0].steps).toHaveLength(2);
     });

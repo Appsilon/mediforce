@@ -44,10 +44,7 @@ describe('validateStepGraph', () => {
     const definition = loadFixture('linear-process.yaml');
     const modified: ProcessDefinition = {
       ...definition,
-      transitions: [
-        ...definition.transitions,
-        { from: 'start', to: 'ghost-step' },
-      ],
+      transitions: [...definition.transitions, { from: 'start', to: 'ghost-step' }],
     };
     const result = validateStepGraph(modified);
     expect(result.valid).toBe(false);
@@ -58,10 +55,7 @@ describe('validateStepGraph', () => {
     const definition = loadFixture('linear-process.yaml');
     const modified: ProcessDefinition = {
       ...definition,
-      transitions: [
-        ...definition.transitions,
-        { from: 'phantom', to: 'done' },
-      ],
+      transitions: [...definition.transitions, { from: 'phantom', to: 'done' }],
     };
     const result = validateStepGraph(modified);
     expect(result.valid).toBe(false);

@@ -3,11 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FileUploadZone } from '../file-upload-zone';
 
-function createMockFile(
-  name: string,
-  size: number,
-  type: string,
-): File {
+function createMockFile(name: string, size: number, type: string): File {
   const file = new File(['x'.repeat(size)], name, { type });
   return file;
 }

@@ -18,7 +18,10 @@ import type { QueryClient, QueryKey } from '@tanstack/react-query';
  * the recurring bug in hand-rolled optimistic flows. Snapshotting in one
  * place eliminates that class of mistake.
  */
-export function snapshotCache(qc: QueryClient, keys: readonly QueryKey[]): {
+export function snapshotCache(
+  qc: QueryClient,
+  keys: readonly QueryKey[],
+): {
   restore: () => void;
 } {
   const entries = keys.map((key) => [key, qc.getQueryData(key)] as const);

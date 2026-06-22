@@ -15,8 +15,7 @@ import { snapshotCache } from '@/lib/optimistic';
 export function useCancelRun() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { runId: string; reason?: string }) =>
-      mediforce.runs.cancel(input),
+    mutationFn: (input: { runId: string; reason?: string }) => mediforce.runs.cancel(input),
     onMutate: async ({ runId }) => {
       const detailKey = queryKeys.run(runId);
       await qc.cancelQueries({ queryKey: detailKey });
@@ -48,17 +47,14 @@ export function useCancelRun() {
 export function useArchiveRun() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { runId: string; archived: boolean }) =>
-      mediforce.runs.archive(input),
+    mutationFn: (input: { runId: string; archived: boolean }) => mediforce.runs.archive(input),
     onMutate: async ({ runId, archived }) => {
       const detailKey = queryKeys.run(runId);
       await qc.cancelQueries({ queryKey: detailKey });
       await qc.cancelQueries({ queryKey: queryKeys.runs.all() });
 
       const { restore } = snapshotCache(qc, [detailKey]);
-      qc.setQueryData<ProcessInstance | undefined>(detailKey, (old) =>
-        old ? { ...old, archived } : old,
-      );
+      qc.setQueryData<ProcessInstance | undefined>(detailKey, (old) => (old ? { ...old, archived } : old));
       return { restore };
     },
     onSuccess: (data) => {
@@ -113,8 +109,7 @@ export function useBulkArchiveRuns() {
 export function useStartRun() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: Parameters<typeof mediforce.runs.start>[0]) =>
-      mediforce.runs.start(input),
+    mutationFn: (input: Parameters<typeof mediforce.runs.start>[0]) => mediforce.runs.start(input),
     onSuccess: (data) => {
       qc.setQueryData(queryKeys.run(data.run.id), data.run);
     },

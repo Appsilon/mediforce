@@ -29,10 +29,7 @@ export default function RunDetailPage() {
     handle,
     Number.isNaN(runVersion) ? null : runVersion,
   );
-  const definitionSteps = useMemo(
-    () => runDefinition?.steps ?? [],
-    [runDefinition],
-  );
+  const definitionSteps = useMemo(() => runDefinition?.steps ?? [], [runDefinition]);
 
   // Build step config map from WorkflowStep definitions embedded in WorkflowDefinition.
   const stepConfigMap = useMemo(() => {
@@ -65,7 +62,6 @@ export default function RunDetailPage() {
     return undefined;
   }, [definitionSteps]);
 
-
   if (instanceLoading) {
     return (
       <div className="p-6 space-y-4">
@@ -77,11 +73,7 @@ export default function RunDetailPage() {
   }
 
   if (!instance) {
-    return (
-      <div className="p-6 text-center text-sm text-muted-foreground">
-        Run not found.
-      </div>
-    );
+    return <div className="p-6 text-center text-sm text-muted-foreground">Run not found.</div>;
   }
 
   return (

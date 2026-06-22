@@ -1,9 +1,4 @@
-import type {
-  AgentRun,
-  AgentRunRepository,
-  ListAgentRunsOptions,
-  ListAgentRunsPage,
-} from '@mediforce/platform-core';
+import type { AgentRun, AgentRunRepository, ListAgentRunsOptions, ListAgentRunsPage } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
 import { AuthorizedScope } from './authorized-repository';
 
@@ -42,7 +37,6 @@ export class AuthorizedAgentRunRepository extends AuthorizedScope {
   // hit `raw.*` directly; the `caller` field stays on the class so a future
   // gating-restore is a one-file change.
   getById = async (runId: string): Promise<AgentRun | null> => this.raw.getById(runId);
-  getByInstanceId = async (instanceId: string): Promise<AgentRun[]> =>
-    this.raw.getByInstanceId(instanceId);
+  getByInstanceId = async (instanceId: string): Promise<AgentRun[]> => this.raw.getByInstanceId(instanceId);
   list = async (opts: ListAgentRunsOptions): Promise<ListAgentRunsPage> => this.raw.list(opts);
 }

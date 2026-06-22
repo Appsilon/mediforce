@@ -59,11 +59,7 @@ describe.skipIf(!dockerAvailable())('LocalDockerSpawnStrategy with lazy image bu
 
     try {
       const result = await strategy.spawn({
-        dockerArgs: [
-          'run', '--rm',
-          '-v', `${outputDir}:/output`,
-          image,
-        ],
+        dockerArgs: ['run', '--rm', '-v', `${outputDir}:/output`, image],
         stdinPayload: null,
         timeoutMs: 60_000,
         containerName: `mediforce-e2e-test-${Date.now()}`,

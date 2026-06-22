@@ -40,9 +40,7 @@ export function initializeFirebase(config: FirebaseConfig): FirebaseApp {
  */
 export function getFirebaseAuth(): Auth {
   if (!firebaseApp && getApps().length === 0) {
-    throw new Error(
-      'Firebase has not been initialized. Call initializeFirebase() first.',
-    );
+    throw new Error('Firebase has not been initialized. Call initializeFirebase() first.');
   }
 
   const app = firebaseApp ?? getApp();

@@ -20,20 +20,9 @@ import {
   ExternalLink,
   FileText,
 } from 'lucide-react';
-import type {
-  ProcessInstance,
-  StepExecution,
-  AuditEvent,
-  Step,
-  AgentOutputSnapshot,
-} from '@mediforce/platform-core';
+import type { ProcessInstance, StepExecution, AuditEvent, Step, AgentOutputSnapshot } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from '@/components/processes/process-status-badge';
-import {
-  formatDuration,
-  formatStepName,
-  computeWallClockDuration,
-  computeActiveProcessingTime,
-} from '@/lib/format';
+import { formatDuration, formatStepName, computeWallClockDuration, computeActiveProcessingTime } from '@/lib/format';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
 import { saveBlobToDevice } from '@/lib/save-blob';
 
@@ -107,13 +96,7 @@ function getStepDuration(step: StepExecution): number | null {
   return new Date(step.completedAt).getTime() - new Date(step.startedAt).getTime();
 }
 
-export function RunReport({
-  instance,
-  stepExecutions,
-  auditEvents,
-  definitionSteps,
-  runDetailHref,
-}: RunReportProps) {
+export function RunReport({ instance, stepExecutions, auditEvents, definitionSteps, runDetailHref }: RunReportProps) {
   const [detailLevel, setDetailLevel] = React.useState<DetailLevel>('brief');
 
   const runDate = format(new Date(instance.createdAt), 'yyyy-MM-dd');
@@ -122,22 +105,19 @@ export function RunReport({
   React.useEffect(() => {
     const title = `${slugifiedName}_${runDate}_${detailLevel}`;
     document.title = title;
-    return () => { document.title = 'Mediforce'; };
+    return () => {
+      document.title = 'Mediforce';
+    };
   }, [slugifiedName, runDate, detailLevel]);
 
   const sortedSteps = React.useMemo(
-    () => [...stepExecutions].sort(
-      (a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime(),
-    ),
+    () => [...stepExecutions].sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime()),
     [stepExecutions],
   );
 
   const wallClock = computeWallClockDuration(instance.createdAt, stepExecutions);
   const activeTime = computeActiveProcessingTime(stepExecutions);
-  const finalOutput = React.useMemo(
-    () => findFinalAgentOutput(stepExecutions),
-    [stepExecutions],
-  );
+  const finalOutput = React.useMemo(() => findFinalAgentOutput(stepExecutions), [stepExecutions]);
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
@@ -164,11 +144,7 @@ export function RunReport({
       </div>
 
       {/* Report Header */}
-      <ReportHeader
-        instance={instance}
-        wallClock={wallClock}
-        activeTime={activeTime}
-      />
+      <ReportHeader instance={instance} wallClock={wallClock} activeTime={activeTime} />
 
       {/* Step Timeline */}
       <section>
@@ -196,13 +172,7 @@ export function RunReport({
   );
 }
 
-function DetailLevelToggle({
-  value,
-  onChange,
-}: {
-  value: DetailLevel;
-  onChange: (level: DetailLevel) => void;
-}) {
+function DetailLevelToggle({ value, onChange }: { value: DetailLevel; onChange: (level: DetailLevel) => void }) {
   const levels: DetailLevel[] = ['brief', 'full'];
 
   return (
@@ -213,9 +183,7 @@ function DetailLevelToggle({
           onClick={() => onChange(level)}
           className={cn(
             'px-3 py-1.5 text-sm font-medium capitalize transition-colors',
-            value === level
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80',
+            value === level ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80',
           )}
         >
           {level}
@@ -237,35 +205,34 @@ function ReportHeader({
   return (
     <header className="space-y-4">
       <div className="flex items-start gap-4">
-        <Image
-          src="/logo.png"
-          alt="Mediforce"
-          width={40}
-          height={40}
-          loading="eager"
-        />
+        <Image src="/logo.png" alt="Mediforce" width={40} height={40} loading="eager" />
         <div className="flex-1 space-y-2">
-          <h1 className="text-2xl font-headline font-semibold">
-            {instance.definitionName} — Run Report
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Generated: {format(new Date(), 'MMMM d, yyyy')}
-          </p>
+          <h1 className="text-2xl font-headline font-semibold">{instance.definitionName} — Run Report</h1>
+          <p className="text-sm text-muted-foreground">Generated: {format(new Date(), 'MMMM d, yyyy')}</p>
         </div>
-        <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} error={instance.error} dryRun={instance.dryRun} />
+        <ProcessStatusBadge
+          status={instance.status}
+          pauseReason={instance.pauseReason}
+          error={instance.error}
+          dryRun={instance.dryRun}
+        />
       </div>
 
       <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
         {wallClock !== null && (
           <div className="flex items-center gap-1.5">
             <Clock className="h-3.5 w-3.5" />
-            <span>Wall-clock: <span className="text-foreground font-medium">{formatDuration(wallClock)}</span></span>
+            <span>
+              Wall-clock: <span className="text-foreground font-medium">{formatDuration(wallClock)}</span>
+            </span>
           </div>
         )}
         {activeTime > 0 && (
           <div className="flex items-center gap-1.5">
             <Timer className="h-3.5 w-3.5" />
-            <span>Active processing: <span className="text-foreground font-medium">{formatDuration(activeTime)}</span></span>
+            <span>
+              Active processing: <span className="text-foreground font-medium">{formatDuration(activeTime)}</span>
+            </span>
           </div>
         )}
       </div>
@@ -293,10 +260,11 @@ function StepCard({
   const isScript = hasAgentOutput && step.agentOutput?.model === 'script';
 
   const stepAuditEvents = React.useMemo(
-    () => auditEvents
-      .filter((event) => event.stepId === step.stepId)
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-      .slice(0, 5),
+    () =>
+      auditEvents
+        .filter((event) => event.stepId === step.stepId)
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+        .slice(0, 5),
     [auditEvents, step.stepId],
   );
 
@@ -310,38 +278,45 @@ function StepCard({
           </span>
           {STEP_STATUS_ICONS[step.status] ?? STEP_STATUS_ICONS.pending}
           <span className="font-medium flex-1">{stepName}</span>
-          {duration !== null && (
-            <span className="text-sm text-muted-foreground">{formatDuration(duration)}</span>
-          )}
-          <span className={cn(
-            'inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize',
-            STEP_STATUS_STYLES[step.status] ?? STEP_STATUS_STYLES.pending,
-          )}>
+          {duration !== null && <span className="text-sm text-muted-foreground">{formatDuration(duration)}</span>}
+          <span
+            className={cn(
+              'inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize',
+              STEP_STATUS_STYLES[step.status] ?? STEP_STATUS_STYLES.pending,
+            )}
+          >
             {step.status}
           </span>
         </div>
 
         {/* Metadata: confidence, model, executor type */}
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground pl-9">
-          {hasAgentOutput && !isScript && step.agentOutput?.confidence !== undefined && step.agentOutput.confidence !== null && (
-            <div className="flex items-center gap-1.5">
-              <Gauge className="h-3.5 w-3.5" />
-              <span className="text-muted-foreground">AI&nbsp;confidence:</span>
-              <span className={cn(
-                'font-medium',
-                Math.round(step.agentOutput.confidence * 100) >= 80
-                  ? 'text-green-600 dark:text-green-400'
-                  : Math.round(step.agentOutput.confidence * 100) >= 50
-                    ? 'text-amber-600 dark:text-amber-400'
-                    : 'text-red-600 dark:text-red-400',
-              )}>
-                {Math.round(step.agentOutput.confidence * 100)}%
-              </span>
-              {step.agentOutput.confidence_rationale && (
-                <span className="text-xs text-muted-foreground italic">— {step.agentOutput.confidence_rationale}</span>
-              )}
-            </div>
-          )}
+          {hasAgentOutput &&
+            !isScript &&
+            step.agentOutput?.confidence !== undefined &&
+            step.agentOutput.confidence !== null && (
+              <div className="flex items-center gap-1.5">
+                <Gauge className="h-3.5 w-3.5" />
+                <span className="text-muted-foreground">AI&nbsp;confidence:</span>
+                <span
+                  className={cn(
+                    'font-medium',
+                    Math.round(step.agentOutput.confidence * 100) >= 80
+                      ? 'text-green-600 dark:text-green-400'
+                      : Math.round(step.agentOutput.confidence * 100) >= 50
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-red-600 dark:text-red-400',
+                  )}
+                >
+                  {Math.round(step.agentOutput.confidence * 100)}%
+                </span>
+                {step.agentOutput.confidence_rationale && (
+                  <span className="text-xs text-muted-foreground italic">
+                    — {step.agentOutput.confidence_rationale}
+                  </span>
+                )}
+              </div>
+            )}
           {hasAgentOutput && !isScript && step.agentOutput?.model && (
             <div className="flex items-center gap-1.5">
               <span className="text-muted-foreground">Model:</span>
@@ -377,9 +352,7 @@ function StepCard({
           <div className="space-y-3 pl-9">
             {stepAuditEvents.length > 0 && (
               <div className="space-y-1">
-                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Audit Trail
-                </h4>
+                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Audit Trail</h4>
                 <ul className="space-y-0.5 text-xs">
                   {stepAuditEvents.map((event, i) => (
                     <li key={`${event.timestamp}-${event.actorId}-${i}`} className="flex gap-2 text-muted-foreground">
@@ -392,9 +365,7 @@ function StepCard({
               </div>
             )}
 
-            {Object.keys(step.input).length > 0 && (
-              <JsonPreview label="Input" value={step.input} />
-            )}
+            {Object.keys(step.input).length > 0 && <JsonPreview label="Input" value={step.input} />}
 
             {step.output !== null && Object.keys(step.output).length > 0 && (
               <JsonPreview label="Output" value={step.output} />
@@ -411,9 +382,7 @@ function JsonPreview({ label, value }: { label: string; value: unknown }) {
 
   return (
     <div>
-      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-        {label}
-      </h4>
+      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">{label}</h4>
       <pre className="rounded-md bg-muted p-3 text-xs font-mono overflow-auto max-h-[200px] whitespace-pre-wrap break-words">
         {text}
         {truncated && '\n...'}
@@ -447,10 +416,7 @@ function DeliverablesSection({
       { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} },
     );
     if (!response.ok) return;
-    saveBlobToDevice(
-      await response.blob(),
-      effectiveDeliverableFile.split('/').pop() ?? 'download',
-    );
+    saveBlobToDevice(await response.blob(), effectiveDeliverableFile.split('/').pop() ?? 'download');
   }
 
   return (
@@ -502,9 +468,7 @@ function DeliverablesSection({
                   </a>
                 </>
               ) : (
-                <span className="font-mono text-xs text-muted-foreground">
-                  {git.commitSha.slice(0, 7)}
-                </span>
+                <span className="font-mono text-xs text-muted-foreground">{git.commitSha.slice(0, 7)}</span>
               )}
             </div>
 
@@ -543,9 +507,7 @@ function DeliverablesSection({
 
         {!git && result !== null && Object.keys(result).length > 0 && (
           <div>
-            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-              Output
-            </h4>
+            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Output</h4>
             <pre className="rounded-md bg-muted p-3 text-xs font-mono overflow-auto max-h-[300px] whitespace-pre-wrap break-words">
               {JSON.stringify(result, null, 2)}
             </pre>

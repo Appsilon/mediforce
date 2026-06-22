@@ -7,10 +7,7 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { copyWorkflow } from '../copy-workflow';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { ConflictError, NotFoundError } from '../../../errors';
 
 describe('copyWorkflow handler', () => {

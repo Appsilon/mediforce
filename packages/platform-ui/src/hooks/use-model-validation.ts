@@ -12,9 +12,7 @@ interface ModelValidationResult {
   error: Error | null;
 }
 
-export function useModelValidation(
-  definition: WorkflowDefinition | null | undefined,
-): ModelValidationResult {
+export function useModelValidation(definition: WorkflowDefinition | null | undefined): ModelValidationResult {
   const [unknown, setUnknown] = React.useState<UnknownModelEntry[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<Error | null>(null);
@@ -47,7 +45,8 @@ export function useModelValidation(
     setIsLoading(true);
     setError(null);
 
-    mediforce.models.validate({ modelIds })
+    mediforce.models
+      .validate({ modelIds })
       .then((data) => {
         if (cancelled) return;
         setUnknown(data.unknown ?? []);
@@ -61,7 +60,9 @@ export function useModelValidation(
         setIsLoading(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [cacheKey, modelIds]);
 
   return { unknown, isLoading, error };

@@ -1,10 +1,7 @@
 import { NotFoundError } from '../errors';
 import type { CallerScope } from '../repositories/index';
 
-export async function loadOr404<T>(
-  lookup: Promise<T | null>,
-  notFoundMessage: string,
-): Promise<T> {
+export async function loadOr404<T>(lookup: Promise<T | null>, notFoundMessage: string): Promise<T> {
   const entity = await lookup;
   if (entity === null) throw new NotFoundError(notFoundMessage);
   return entity;
@@ -38,13 +35,8 @@ export function actorFromCaller(scope: CallerScope, role = 'operator'): Actor {
  * resolvable (apiKey caller with no personal namespace) so the caller can
  * decide how to proceed.
  */
-export async function resolvePersonalNamespace(
-  scope: CallerScope,
-  uid: string,
-): Promise<string | null> {
+export async function resolvePersonalNamespace(scope: CallerScope, uid: string): Promise<string | null> {
   const namespaces = await scope.workspaces.getNamespacesByUser(uid);
-  const personal = namespaces.find(
-    (n) => n.type === 'personal' && n.linkedUserId === uid,
-  );
+  const personal = namespaces.find((n) => n.type === 'personal' && n.linkedUserId === uid);
   return personal?.handle ?? namespaces[0]?.handle ?? null;
 }

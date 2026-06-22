@@ -75,19 +75,8 @@ describe('WorkflowEngine — RBAC enforcement', () => {
    * Helper: create + start an instance and return its id.
    */
   async function startFreshInstance(): Promise<string> {
-    const engine = new WorkflowEngine(
-      processRepo,
-      instanceRepo,
-      auditRepo,
-      rbacService,
-    );
-    const instance = await engine.createInstance('test',
-      'rbac-test-process',
-      1,
-      'system',
-      'manual',
-      {},
-    );
+    const engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo, rbacService);
+    const instance = await engine.createInstance('test', 'rbac-test-process', 1, 'system', 'manual', {});
     await engine.startInstance(instance.id);
     return instance.id;
   }
@@ -101,22 +90,11 @@ describe('WorkflowEngine — RBAC enforcement', () => {
       auditRepo,
       // rbacService intentionally omitted
     );
-    const instance = await engine.createInstance('test',
-      'rbac-test-process',
-      1,
-      'system',
-      'manual',
-      {},
-    );
+    const instance = await engine.createInstance('test', 'rbac-test-process', 1, 'system', 'manual', {});
     await engine.startInstance(instance.id);
 
     // Should succeed even without any user in auth service
-    const result = await engine.advanceStep(
-      instance.id,
-      {},
-      actor,
-      stepConfigWithRoles,
-    );
+    const result = await engine.advanceStep(instance.id, {}, actor, stepConfigWithRoles);
     expect(result.status).toBe('completed');
 
     // No access_denied audit event
@@ -160,19 +138,9 @@ describe('WorkflowEngine — RBAC enforcement', () => {
     });
 
     const instanceId = await startFreshInstance();
-    const engine = new WorkflowEngine(
-      processRepo,
-      instanceRepo,
-      auditRepo,
-      rbacService,
-    );
+    const engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo, rbacService);
 
-    const result = await engine.advanceStep(
-      instanceId,
-      {},
-      actor,
-      stepConfigWithRoles,
-    );
+    const result = await engine.advanceStep(instanceId, {}, actor, stepConfigWithRoles);
     expect(result.status).toBe('completed');
 
     // No access_denied audit event
@@ -192,16 +160,9 @@ describe('WorkflowEngine — RBAC enforcement', () => {
     });
 
     const instanceId = await startFreshInstance();
-    const engine = new WorkflowEngine(
-      processRepo,
-      instanceRepo,
-      auditRepo,
-      rbacService,
-    );
+    const engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo, rbacService);
 
-    await expect(
-      engine.advanceStep(instanceId, {}, actor, stepConfigWithRoles),
-    ).rejects.toThrow(RbacError);
+    await expect(engine.advanceStep(instanceId, {}, actor, stepConfigWithRoles)).rejects.toThrow(RbacError);
 
     // One access_denied audit event with correct fields
     const events = auditRepo.getAll();
@@ -227,17 +188,12 @@ describe('WorkflowEngine — RBAC enforcement', () => {
     authService.setCurrentUser(null);
 
     const instanceId = await startFreshInstance();
-    const engine = new WorkflowEngine(
-      processRepo,
-      instanceRepo,
-      auditRepo,
-      rbacService,
-    );
+    const engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo, rbacService);
 
     // Should throw (requireAuth throws "Authentication required")
-    await expect(
-      engine.advanceStep(instanceId, {}, actor, stepConfigWithRoles),
-    ).rejects.toThrow('Authentication required');
+    await expect(engine.advanceStep(instanceId, {}, actor, stepConfigWithRoles)).rejects.toThrow(
+      'Authentication required',
+    );
   });
 
   // --- Test 6: stepConfig not passed — RBAC check skipped ---

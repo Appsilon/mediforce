@@ -47,9 +47,7 @@ describe('agent get command', () => {
   });
 
   it('GETs /api/agents/<id> and prints human-readable output', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ agent: FAKE_AGENT }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ agent: FAKE_AGENT }));
     const output = captureOutput();
     const code = await agentGetCommand({
       argv: ['agent-1', '--base-url', 'http://localhost:5555'],
@@ -57,9 +55,7 @@ describe('agent get command', () => {
       output,
     });
     expect(code).toBe(0);
-    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
-      'http://localhost:5555/api/agents/agent-1',
-    );
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://localhost:5555/api/agents/agent-1');
     const text = output.stdoutLines.join('\n');
     expect(text).toMatch(/Agent agent-1/);
     expect(text).toMatch(/name:\s+SDTM Rule Author/);
@@ -70,9 +66,7 @@ describe('agent get command', () => {
 
   it('omits runtimeId line when absent', async () => {
     const { runtimeId: _, ...noOptionals } = FAKE_AGENT;
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ agent: noOptionals }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ agent: noOptionals }));
     const output = captureOutput();
     const code = await agentGetCommand({
       argv: ['agent-1'],
@@ -85,9 +79,7 @@ describe('agent get command', () => {
   });
 
   it('emits structured JSON when --json is set', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ agent: FAKE_AGENT }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ agent: FAKE_AGENT }));
     const output = captureOutput();
     const code = await agentGetCommand({
       argv: ['agent-1', '--json'],
@@ -100,9 +92,7 @@ describe('agent get command', () => {
   });
 
   it('exits 1 with structured error JSON on 404', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Not found' }, 404),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Not found' }, 404));
     const output = captureOutput();
     const code = await agentGetCommand({
       argv: ['nope', '--json'],

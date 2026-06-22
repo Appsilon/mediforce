@@ -77,13 +77,11 @@ export function createSpawnActionHandler(
         : {};
 
       try {
-        const version = target.definitionVersion
-          ?? await processRepo.getLatestWorkflowVersion(namespace, target.definitionName);
+        const version =
+          target.definitionVersion ?? (await processRepo.getLatestWorkflowVersion(namespace, target.definitionName));
 
         if (version === 0) {
-          throw new Error(
-            `workflow definition '${target.definitionName}' not found in namespace '${namespace}'`,
-          );
+          throw new Error(`workflow definition '${target.definitionName}' not found in namespace '${namespace}'`);
         }
 
         const result = await manualTrigger.fireWorkflow({
@@ -139,16 +137,11 @@ interface ExpandedTarget {
   item?: unknown;
 }
 
-function resolveTargets(
-  config: SpawnActionConfig,
-  sources: InterpolationSources,
-): ExpandedTarget[] {
+function resolveTargets(config: SpawnActionConfig, sources: InterpolationSources): ExpandedTarget[] {
   if (config.forEach) {
     const resolved = interpolate(config.forEach, sources);
     if (!Array.isArray(resolved)) {
-      throw new Error(
-        `forEach resolved to ${typeof resolved}, expected array`,
-      );
+      throw new Error(`forEach resolved to ${typeof resolved}, expected array`);
     }
     const template = Array.isArray(config.targets) ? config.targets[0] : config.targets;
     return resolved.map((item, index) => ({

@@ -146,14 +146,21 @@ describe('ClaudeCodeAgentPlugin ↔ WorkspaceManager integration', () => {
 
     const name = context.workflowDefinition.name;
     const bareRepoPath = join(dataDir, 'bare-repos', '_default', `${name}.git`);
-    const mainSha = execFileSync('git', ['--git-dir', bareRepoPath, 'rev-parse', 'refs/heads/main'], { encoding: 'utf-8' }).trim();
-    const runSha = execFileSync('git', ['--git-dir', bareRepoPath, 'rev-parse', `refs/heads/run/${context.processInstanceId}`], { encoding: 'utf-8' }).trim();
+    const mainSha = execFileSync('git', ['--git-dir', bareRepoPath, 'rev-parse', 'refs/heads/main'], {
+      encoding: 'utf-8',
+    }).trim();
+    const runSha = execFileSync(
+      'git',
+      ['--git-dir', bareRepoPath, 'rev-parse', `refs/heads/run/${context.processInstanceId}`],
+      { encoding: 'utf-8' },
+    ).trim();
 
     // The run branch advances even with no changes — full audit trail.
     expect(runSha).not.toBe(mainSha);
 
     const body = execFileSync(
-      'git', ['--git-dir', bareRepoPath, 'log', '-1', '--format=%B', `refs/heads/run/${context.processInstanceId}`],
+      'git',
+      ['--git-dir', bareRepoPath, 'log', '-1', '--format=%B', `refs/heads/run/${context.processInstanceId}`],
       { encoding: 'utf-8' },
     );
     expect(body.split('\n')[0]).toMatch(/— no changes$/);

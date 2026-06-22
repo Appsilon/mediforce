@@ -7,10 +7,7 @@ import type { GetNamespaceInput, GetNamespaceOutput } from '../../contract/names
  * non-members get the same 404 as a missing handle so namespace existence
  * does not leak to outsiders. apiKey callers bypass.
  */
-export async function getNamespace(
-  input: GetNamespaceInput,
-  scope: CallerScope,
-): Promise<GetNamespaceOutput> {
+export async function getNamespace(input: GetNamespaceInput, scope: CallerScope): Promise<GetNamespaceOutput> {
   const namespace = await scope.workspaces.getNamespace(input.handle);
   if (namespace === null) {
     throw new NotFoundError(`Namespace "${input.handle}" not found`);

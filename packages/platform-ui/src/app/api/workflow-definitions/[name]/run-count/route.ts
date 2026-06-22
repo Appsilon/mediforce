@@ -1,9 +1,6 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { getWorkflowRunCount } from '@mediforce/platform-api/handlers';
-import {
-  GetWorkflowRunCountInputSchema,
-  type GetWorkflowRunCountInput,
-} from '@mediforce/platform-api/contract';
+import { GetWorkflowRunCountInputSchema, type GetWorkflowRunCountInput } from '@mediforce/platform-api/contract';
 
 interface RouteContext {
   params: Promise<{ name: string }>;

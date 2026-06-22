@@ -20,10 +20,7 @@ export const workflowSetVisibilityCommand = defineCommand({
     // `required: true` on the enumArg — citty enforces at parse time.
     const visibility = args.visibility!;
     const namespace = args.namespace!;
-    const result = await mediforce.workflows.setVisibility(
-      { name: args.name, visibility },
-      { namespace },
-    );
+    const result = await mediforce.workflows.setVisibility({ name: args.name, visibility }, { namespace });
     if (jsonMode) {
       printJson(output, result);
     } else {

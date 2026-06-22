@@ -13,12 +13,7 @@ interface RouteContext {
  * Returns the full process instance. Missing or cross-workspace 404 via the
  * `scope.runs` wrapper.
  */
-export const GET = createRouteAdapter<
-  typeof GetProcessInputSchema,
-  GetProcessInput,
-  unknown,
-  RouteContext
->(
+export const GET = createRouteAdapter<typeof GetProcessInputSchema, GetProcessInput, unknown, RouteContext>(
   GetProcessInputSchema,
   async (_req, ctx) => ({ instanceId: (await ctx.params).instanceId }),
   getByIdAdapter(

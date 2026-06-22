@@ -10,24 +10,15 @@ import {
 } from '../index';
 import { RunNameEntrySchema, type RunNameEntry } from '../schemas/process-instance';
 
-const ACTIVE_STATUSES: ReadonlySet<InstanceStatus> = new Set([
-  'running',
-  'created',
-  'paused',
-]);
-const TERMINAL_STATUSES: ReadonlySet<InstanceStatus> = new Set([
-  'completed',
-  'failed',
-]);
+const ACTIVE_STATUSES: ReadonlySet<InstanceStatus> = new Set(['running', 'created', 'paused']);
+const TERMINAL_STATUSES: ReadonlySet<InstanceStatus> = new Set(['completed', 'failed']);
 
 /**
  * In-memory implementation of ProcessInstanceRepository for testing.
  * Uses Maps for instances and step execution subcollections.
  * Reusable by any package that needs test doubles for process instance operations.
  */
-export class InMemoryProcessInstanceRepository
-  implements ProcessInstanceRepository
-{
+export class InMemoryProcessInstanceRepository implements ProcessInstanceRepository {
   private instances = new Map<string, ProcessInstance>();
   private stepExecutions = new Map<string, StepExecution[]>();
 
@@ -42,10 +33,7 @@ export class InMemoryProcessInstanceRepository
     return instance ? { ...instance } : null;
   }
 
-  async getByIdInNamespaces(
-    instanceId: string,
-    allowed: readonly string[],
-  ): Promise<ProcessInstance | null> {
+  async getByIdInNamespaces(instanceId: string, allowed: readonly string[]): Promise<ProcessInstance | null> {
     const instance = this.instances.get(instanceId);
     if (!instance) return null;
     return allowed.includes(instance.namespace ?? '') ? { ...instance } : null;
@@ -54,15 +42,10 @@ export class InMemoryProcessInstanceRepository
   async getNamespaceById(instanceId: string): Promise<string | null> {
     const instance = this.instances.get(instanceId);
     if (!instance) return null;
-    return typeof instance.namespace === 'string' && instance.namespace.length > 0
-      ? instance.namespace
-      : null;
+    return typeof instance.namespace === 'string' && instance.namespace.length > 0 ? instance.namespace : null;
   }
 
-  async update(
-    instanceId: string,
-    updates: Partial<ProcessInstance>,
-  ): Promise<void> {
+  async update(instanceId: string, updates: Partial<ProcessInstance>): Promise<void> {
     const existing = this.instances.get(instanceId);
     if (!existing) {
       throw new Error(`ProcessInstance not found: ${instanceId}`);
@@ -74,13 +57,8 @@ export class InMemoryProcessInstanceRepository
     return this.applyListFilters([...this.instances.values()], options);
   }
 
-  async listInNamespaces(
-    allowed: readonly string[],
-    options: ListInstancesOptions,
-  ): Promise<ProcessInstance[]> {
-    const inScope = [...this.instances.values()].filter((i) =>
-      allowed.includes(i.namespace ?? ''),
-    );
+  async listInNamespaces(allowed: readonly string[], options: ListInstancesOptions): Promise<ProcessInstance[]> {
+    const inScope = [...this.instances.values()].filter((i) => allowed.includes(i.namespace ?? ''));
     return this.applyListFilters(inScope, options);
   }
 
@@ -90,10 +68,7 @@ export class InMemoryProcessInstanceRepository
       .map((i) => RunNameEntrySchema.parse({ id: i.id, definitionName: i.definitionName }));
   }
 
-  private applyListFilters(
-    rows: ProcessInstance[],
-    options: ListInstancesOptions,
-  ): ProcessInstance[] {
+  private applyListFilters(rows: ProcessInstance[], options: ListInstancesOptions): ProcessInstance[] {
     let results = rows.filter((i) => i.deleted !== true);
     if (options.namespace !== undefined) {
       results = results.filter((i) => i.namespace === options.namespace);
@@ -118,47 +93,29 @@ export class InMemoryProcessInstanceRepository
     return [...this.instances.values()].filter((i) => i.status === status);
   }
 
-  async getByStatusInNamespaces(
-    status: InstanceStatus,
-    allowed: readonly string[],
-  ): Promise<ProcessInstance[]> {
-    return [...this.instances.values()].filter(
-      (i) => i.status === status && allowed.includes(i.namespace ?? ''),
-    );
+  async getByStatusInNamespaces(status: InstanceStatus, allowed: readonly string[]): Promise<ProcessInstance[]> {
+    return [...this.instances.values()].filter((i) => i.status === status && allowed.includes(i.namespace ?? ''));
   }
 
-  async getByDefinition(
-    name: string,
-    version: string,
-  ): Promise<ProcessInstance[]> {
-    return [...this.instances.values()].filter(
-      (i) => i.definitionName === name && i.definitionVersion === version,
-    );
+  async getByDefinition(name: string, version: string): Promise<ProcessInstance[]> {
+    return [...this.instances.values()].filter((i) => i.definitionName === name && i.definitionVersion === version);
   }
 
-  async getLastCompletedByDefinitionName(
-    name: string,
-  ): Promise<ProcessInstance | null> {
+  async getLastCompletedByDefinitionName(name: string): Promise<ProcessInstance | null> {
     // Mirrors the Firestore query shape: `deleted === false` excludes both
     // tombstoned runs (explicitly `true`) and pre-feature docs where the
     // field is missing. The schema's default(false) means real in-memory
     // reads materialize `false` for missing, but we keep the check strict
     // here to match what Firestore does on its own index.
     const matching = [...this.instances.values()].filter(
-      (i) =>
-        i.definitionName === name &&
-        i.status === 'completed' &&
-        i.deleted === false,
+      (i) => i.definitionName === name && i.status === 'completed' && i.deleted === false,
     );
     if (matching.length === 0) return null;
     matching.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
     return { ...matching[0] };
   }
 
-  async addStepExecution(
-    instanceId: string,
-    execution: StepExecution,
-  ): Promise<StepExecution> {
+  async addStepExecution(instanceId: string, execution: StepExecution): Promise<StepExecution> {
     const parsed = StepExecutionSchema.parse(execution);
     const executions = this.stepExecutions.get(instanceId) ?? [];
     executions.push({ ...parsed });
@@ -168,17 +125,10 @@ export class InMemoryProcessInstanceRepository
 
   async getStepExecutions(instanceId: string): Promise<StepExecution[]> {
     const executions = this.stepExecutions.get(instanceId) ?? [];
-    return [...executions].sort(
-      (a, b) =>
-        new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime(),
-    );
+    return [...executions].sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
   }
 
-  async updateStepExecution(
-    instanceId: string,
-    executionId: string,
-    updates: Partial<StepExecution>,
-  ): Promise<void> {
+  async updateStepExecution(instanceId: string, executionId: string, updates: Partial<StepExecution>): Promise<void> {
     const executions = this.stepExecutions.get(instanceId) ?? [];
     const index = executions.findIndex((e) => e.id === executionId);
     if (index === -1) {
@@ -187,18 +137,14 @@ export class InMemoryProcessInstanceRepository
     executions[index] = { ...executions[index], ...updates };
   }
 
-  async getLatestStepExecution(
-    instanceId: string,
-    stepId: string,
-  ): Promise<StepExecution | null> {
+  async getLatestStepExecution(instanceId: string, stepId: string): Promise<StepExecution | null> {
     const executions = this.stepExecutions.get(instanceId) ?? [];
     const matching = executions.filter((e) => e.stepId === stepId);
     if (matching.length === 0) return null;
     return {
-      ...matching.sort(
-        (a, b) =>
-          new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime(),
-      )[matching.length - 1],
+      ...matching.sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime())[
+        matching.length - 1
+      ],
     };
   }
 
@@ -216,16 +162,10 @@ export class InMemoryProcessInstanceRepository
     includeCompleted: boolean,
   ): Promise<WorkflowRunSummaryResult> {
     const scoped = [...this.instances.values()].filter(
-      (i) =>
-        i.namespace === namespace &&
-        i.definitionName === name &&
-        i.deleted !== true &&
-        i.archived !== true,
+      (i) => i.namespace === namespace && i.definitionName === name && i.deleted !== true && i.archived !== true,
     );
     const active = scoped.filter((i) => ACTIVE_STATUSES.has(i.status)).length;
-    const counted = includeCompleted
-      ? scoped
-      : scoped.filter((i) => !TERMINAL_STATUSES.has(i.status));
+    const counted = includeCompleted ? scoped : scoped.filter((i) => !TERMINAL_STATUSES.has(i.status));
     const latest = [...counted]
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
       .slice(0, 3)

@@ -2,10 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
 import { deleteDockerImage } from '../delete-image';
 import { ForbiddenError, PreconditionFailedError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import type { DockerImagesService } from '../../../services/docker-images-service';
 import type { CallerIdentity } from '../../../auth';
 
@@ -51,11 +48,7 @@ describe('deleteDockerImage handler', () => {
     const scope = createTestScope({
       auditRepo,
       dockerImages: deleter,
-      caller: userCaller(
-        'u-owner',
-        ['alpha'],
-        new Map([['alpha', 'owner']]),
-      ),
+      caller: userCaller('u-owner', ['alpha'], new Map([['alpha', 'owner']])),
     });
 
     const result = await deleteDockerImage({ imageId: 'img-1' }, scope);
@@ -67,32 +60,20 @@ describe('deleteDockerImage handler', () => {
     const scope = createTestScope({
       auditRepo,
       dockerImages: deleter,
-      caller: userCaller(
-        'u-admin',
-        ['alpha'],
-        new Map([['alpha', 'admin']]),
-      ),
+      caller: userCaller('u-admin', ['alpha'], new Map([['alpha', 'admin']])),
     });
 
-    await expect(
-      deleteDockerImage({ imageId: 'img-1' }, scope),
-    ).resolves.toBeTruthy();
+    await expect(deleteDockerImage({ imageId: 'img-1' }, scope)).resolves.toBeTruthy();
   });
 
   it('[AUTHZ] user with only member role is forbidden', async () => {
     const scope = createTestScope({
       auditRepo,
       dockerImages: deleter,
-      caller: userCaller(
-        'u-member',
-        ['alpha'],
-        new Map([['alpha', 'member']]),
-      ),
+      caller: userCaller('u-member', ['alpha'], new Map([['alpha', 'member']])),
     });
 
-    await expect(
-      deleteDockerImage({ imageId: 'img-1' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(deleteDockerImage({ imageId: 'img-1' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
     expect(deleter.calls).toEqual([]);
   });
 
@@ -103,9 +84,7 @@ describe('deleteDockerImage handler', () => {
       caller: userCaller('u-none', []),
     });
 
-    await expect(
-      deleteDockerImage({ imageId: 'img-1' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(deleteDockerImage({ imageId: 'img-1' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it('[ERROR] PreconditionFailedError when deleter is not configured', async () => {
@@ -115,9 +94,7 @@ describe('deleteDockerImage handler', () => {
       caller: apiKeyCaller,
     });
 
-    await expect(
-      deleteDockerImage({ imageId: 'img-1' }, scope),
-    ).rejects.toBeInstanceOf(PreconditionFailedError);
+    await expect(deleteDockerImage({ imageId: 'img-1' }, scope)).rejects.toBeInstanceOf(PreconditionFailedError);
 
     const events = await auditRepo.getByEntity('dockerImage', 'img-1');
     expect(events).toHaveLength(0);

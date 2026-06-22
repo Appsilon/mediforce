@@ -8,10 +8,7 @@ import {
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { retryStep } from '../retry-step';
 import { NotFoundError, PreconditionFailedError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { noopRunKicker } from '../../../runtime/run-kicker';
 
 /**
@@ -28,10 +25,7 @@ interface EngineStubCall {
   readonly actor: { readonly id: string; readonly role: string };
 }
 
-function makeEngineStub(opts: {
-  readonly result?: ProcessInstance;
-  readonly throws?: Error;
-}) {
+function makeEngineStub(opts: { readonly result?: ProcessInstance; readonly throws?: Error }) {
   const calls: EngineStubCall[] = [];
   return {
     calls,
@@ -83,10 +77,7 @@ describe('retryStep handler', () => {
     });
     Object.assign(scope.system, { engine: engineStub });
 
-    const result = await retryStep(
-      { runId: 'inst-a', stepId: 'deploy' },
-      scope,
-    );
+    const result = await retryStep({ runId: 'inst-a', stepId: 'deploy' }, scope);
 
     expect(result.run.id).toBe('inst-a');
     expect(result.run.status).toBe('running');
@@ -112,9 +103,7 @@ describe('retryStep handler', () => {
       previousError: null,
     });
 
-    expect(kicker.kicks).toEqual([
-      { instanceId: 'inst-a', triggeredBy: 'u-1' },
-    ]);
+    expect(kicker.kicks).toEqual([{ instanceId: 'inst-a', triggeredBy: 'u-1' }]);
   });
 
   it('maps engine InvalidTransitionError to PreconditionFailedError (409)', async () => {
@@ -131,10 +120,7 @@ describe('retryStep handler', () => {
     });
     Object.assign(scope.system, { engine: engineStub });
 
-    const err = await retryStep(
-      { runId: 'inst-a', stepId: 'deploy' },
-      scope,
-    ).catch((e) => e);
+    const err = await retryStep({ runId: 'inst-a', stepId: 'deploy' }, scope).catch((e) => e);
 
     expect(err).toBeInstanceOf(PreconditionFailedError);
     expect((err as PreconditionFailedError).code).toBe('precondition_failed');
@@ -162,9 +148,7 @@ describe('retryStep handler', () => {
     });
     Object.assign(scope.system, { engine: engineStub });
 
-    await expect(
-      retryStep({ runId: 'inst-foreign', stepId: 'deploy' }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(retryStep({ runId: 'inst-foreign', stepId: 'deploy' }, scope)).rejects.toBeInstanceOf(NotFoundError);
 
     // Workspace gate trips before engine is invoked.
     expect(engineStub.calls).toHaveLength(0);

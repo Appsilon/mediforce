@@ -24,9 +24,15 @@ test.describe('Admin Tool Catalog Journey', () => {
 
     // args — useFieldArray. Add one argument: "-y" then "@example/mcp-server"
     await click(page, page.getByRole('button', { name: /add arg/i }).first());
-    await page.getByLabel(/args?\s*0|arg 1/i).first().fill('-y');
+    await page
+      .getByLabel(/args?\s*0|arg 1/i)
+      .first()
+      .fill('-y');
     await click(page, page.getByRole('button', { name: /add arg/i }).first());
-    await page.getByLabel(/args?\s*1|arg 2/i).first().fill('@example/mcp-server');
+    await page
+      .getByLabel(/args?\s*1|arg 2/i)
+      .first()
+      .fill('@example/mcp-server');
 
     await page.getByLabel(/description/i).fill('Test MCP server for the admin catalog journey.');
     await showStep(page);

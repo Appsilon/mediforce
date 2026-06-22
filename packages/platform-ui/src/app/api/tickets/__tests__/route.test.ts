@@ -29,9 +29,7 @@ const validBody = {
   title: 'Something is broken',
   description: '**Steps to reproduce:**\n1. Click here',
   type: 'bug' as const,
-  context: [
-    { label: 'Page', value: '/workflows/abc' },
-  ],
+  context: [{ label: 'Page', value: '/workflows/abc' }],
 };
 
 describe('POST /api/tickets', () => {
@@ -160,9 +158,7 @@ describe('POST /api/tickets', () => {
   describe('rate limiting', () => {
     beforeEach(() => {
       mockFetch.mockImplementation(() =>
-        Promise.resolve(
-          new Response(JSON.stringify({ number: 1, html_url: 'https://example.com' }), { status: 201 }),
-        ),
+        Promise.resolve(new Response(JSON.stringify({ number: 1, html_url: 'https://example.com' }), { status: 201 })),
       );
     });
 

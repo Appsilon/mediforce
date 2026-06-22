@@ -1,7 +1,4 @@
-import type {
-  SetDefaultVersionInput,
-  SetDefaultVersionOutput,
-} from '../../contract/workflows';
+import type { SetDefaultVersionInput, SetDefaultVersionOutput } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
 import { actorFromCaller, loadOr404 } from '../_helpers';
 
@@ -9,10 +6,7 @@ export async function setDefaultWorkflowVersion(
   input: SetDefaultVersionInput,
   scope: CallerScope,
 ): Promise<SetDefaultVersionOutput> {
-  const previousDefault = await scope.workflowDefinitions.getDefaultVersion(
-    input.namespace,
-    input.name,
-  );
+  const previousDefault = await scope.workflowDefinitions.getDefaultVersion(input.namespace, input.name);
 
   await loadOr404(
     scope.workflowDefinitions.get(input.namespace, input.name, input.version),

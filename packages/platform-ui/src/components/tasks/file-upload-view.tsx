@@ -29,76 +29,86 @@ export function FileUploadView({ task }: TaskBodyProps) {
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [uploading, setUploading] = React.useState(false);
   const [uploadProgress, setUploadProgress] = React.useState<UploadProgress>({
-    completed: 0, total: 0, bytes: 0, totalBytes: 0,
+    completed: 0,
+    total: 0,
+    bytes: 0,
+    totalBytes: 0,
   });
 
-  const handleFileUpload = React.useCallback(async (files: File[]) => {
-    setUploadError(null);
-    setUploading(true);
-
-    try {
-      const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
-      setUploadProgress({ completed: 0, total: files.length, bytes: 0, totalBytes });
-
-      const uploadedFiles: { name: string; size: number; type: string; storagePath: string; downloadUrl: string }[] = [];
-      let bytesCompletedPrevious = 0;
-
-      for (let index = 0; index < files.length; index++) {
-        const file = files[index];
-        const storagePath = `tasks/${task.id}/${crypto.randomUUID()}_${file.name}`;
-        const storageRef = ref(storage, storagePath);
-
-        const downloadUrl = await new Promise<string>((resolve, reject) => {
-          const uploadTask = uploadBytesResumable(storageRef, file, { contentType: file.type || 'application/octet-stream' });
-          uploadTask.on('state_changed',
-            (snapshot) => {
-              setUploadProgress((prev) => ({
-                ...prev,
-                bytes: bytesCompletedPrevious + snapshot.bytesTransferred,
-              }));
-            },
-            reject,
-            async () => {
-              try {
-                const url = await getDownloadURL(uploadTask.snapshot.ref);
-                resolve(url);
-              } catch (err) {
-                reject(err);
-              }
-            },
-          );
-        });
-
-        bytesCompletedPrevious += file.size;
-        setUploadProgress((prev) => ({ ...prev, completed: index + 1, bytes: bytesCompletedPrevious }));
-
-        uploadedFiles.push({
-          name: file.name,
-          size: file.size,
-          type: file.type || 'application/octet-stream',
-          storagePath,
-          downloadUrl,
-        });
-      }
+  const handleFileUpload = React.useCallback(
+    async (files: File[]) => {
+      setUploadError(null);
+      setUploading(true);
 
       try {
-        await mediforce.tasks.complete({
-          taskId: task.id,
-          payload: { kind: 'upload', attachments: uploadedFiles },
-        });
-        setUploadComplete(true);
+        const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+        setUploadProgress({ completed: 0, total: files.length, bytes: 0, totalBytes });
+
+        const uploadedFiles: { name: string; size: number; type: string; storagePath: string; downloadUrl: string }[] =
+          [];
+        let bytesCompletedPrevious = 0;
+
+        for (let index = 0; index < files.length; index++) {
+          const file = files[index];
+          const storagePath = `tasks/${task.id}/${crypto.randomUUID()}_${file.name}`;
+          const storageRef = ref(storage, storagePath);
+
+          const downloadUrl = await new Promise<string>((resolve, reject) => {
+            const uploadTask = uploadBytesResumable(storageRef, file, {
+              contentType: file.type || 'application/octet-stream',
+            });
+            uploadTask.on(
+              'state_changed',
+              (snapshot) => {
+                setUploadProgress((prev) => ({
+                  ...prev,
+                  bytes: bytesCompletedPrevious + snapshot.bytesTransferred,
+                }));
+              },
+              reject,
+              async () => {
+                try {
+                  const url = await getDownloadURL(uploadTask.snapshot.ref);
+                  resolve(url);
+                } catch (err) {
+                  reject(err);
+                }
+              },
+            );
+          });
+
+          bytesCompletedPrevious += file.size;
+          setUploadProgress((prev) => ({ ...prev, completed: index + 1, bytes: bytesCompletedPrevious }));
+
+          uploadedFiles.push({
+            name: file.name,
+            size: file.size,
+            type: file.type || 'application/octet-stream',
+            storagePath,
+            downloadUrl,
+          });
+        }
+
+        try {
+          await mediforce.tasks.complete({
+            taskId: task.id,
+            payload: { kind: 'upload', attachments: uploadedFiles },
+          });
+          setUploadComplete(true);
+        } catch (err) {
+          setUploadError(err instanceof Error ? err.message : 'Upload failed');
+        }
       } catch (err) {
-        setUploadError(err instanceof Error ? err.message : 'Upload failed');
+        const fileIndex = uploadProgress.completed;
+        const failedFileName = fileIndex < files.length ? files[fileIndex].name : 'unknown';
+        const baseMessage = err instanceof Error ? err.message : 'Upload to storage failed';
+        setUploadError(`Failed to upload "${failedFileName}": ${baseMessage}`);
+      } finally {
+        setUploading(false);
       }
-    } catch (err) {
-      const fileIndex = uploadProgress.completed;
-      const failedFileName = fileIndex < files.length ? files[fileIndex].name : 'unknown';
-      const baseMessage = err instanceof Error ? err.message : 'Upload to storage failed';
-      setUploadError(`Failed to upload "${failedFileName}": ${baseMessage}`);
-    } finally {
-      setUploading(false);
-    }
-  }, [task.id, uploadProgress.completed]);
+    },
+    [task.id, uploadProgress.completed],
+  );
 
   const isActionable = task.status === 'claimed' || task.status === 'pending';
   const isCompleted = task.status === 'completed';
@@ -117,7 +127,12 @@ export function FileUploadView({ task }: TaskBodyProps) {
             <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
               <div
                 className="h-full rounded-full bg-primary transition-all duration-300"
-                style={{ width: uploadProgress.totalBytes > 0 ? `${Math.round((uploadProgress.bytes / uploadProgress.totalBytes) * 100)}%` : '0%' }}
+                style={{
+                  width:
+                    uploadProgress.totalBytes > 0
+                      ? `${Math.round((uploadProgress.bytes / uploadProgress.totalBytes) * 100)}%`
+                      : '0%',
+                }}
               />
             </div>
             <p className="text-xs text-muted-foreground">
@@ -132,9 +147,7 @@ export function FileUploadView({ task }: TaskBodyProps) {
             onSubmit={handleFileUpload}
           />
         )}
-        {uploadError && (
-          <p className="text-sm text-destructive">{uploadError}</p>
-        )}
+        {uploadError && <p className="text-sm text-destructive">{uploadError}</p>}
       </>
     );
   }
@@ -142,9 +155,7 @@ export function FileUploadView({ task }: TaskBodyProps) {
   if (isActionable && uploadComplete) {
     return (
       <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:bg-green-900/20 dark:border-green-800">
-        <p className="text-sm font-medium text-green-800 dark:text-green-300">
-          Files uploaded successfully
-        </p>
+        <p className="text-sm font-medium text-green-800 dark:text-green-300">Files uploaded successfully</p>
       </div>
     );
   }
@@ -156,11 +167,7 @@ export function FileUploadView({ task }: TaskBodyProps) {
   return null;
 }
 
-function UploadConfirmationReadOnly({
-  completionData,
-}: {
-  completionData: Record<string, unknown>;
-}) {
+function UploadConfirmationReadOnly({ completionData }: { completionData: Record<string, unknown> }) {
   const handle = useHandleFromPath();
   interface UploadedFile {
     name?: string;
@@ -184,10 +191,7 @@ function UploadConfirmationReadOnly({
 
         <ul className="space-y-2">
           {files.map((file, index) => (
-            <li
-              key={index}
-              className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300"
-            >
+            <li key={index} className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300">
               <FileText className="h-4 w-4 shrink-0" />
               {file.downloadUrl ? (
                 <a

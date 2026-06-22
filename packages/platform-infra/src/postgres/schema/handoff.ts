@@ -1,11 +1,4 @@
-import {
-  pgTable,
-  text,
-  uuid,
-  jsonb,
-  timestamp,
-  index,
-} from 'drizzle-orm/pg-core';
+import { pgTable, text, uuid, jsonb, timestamp, index } from 'drizzle-orm/pg-core';
 import { workspaces } from './workspace';
 import { processInstances } from './process-instance';
 
@@ -61,12 +54,8 @@ export const handoffEntities = pgTable(
     resolution: jsonb('resolution'),
 
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     // Workspace-scoped inbox feed: most reads start here.
@@ -76,9 +65,6 @@ export const handoffEntities = pgTable(
       table.createdAt,
     ),
     // Role queue across all workspaces (system actor reads).
-    roleStatusIdx: index('handoff_entities_role_status_idx').on(
-      table.assignedRole,
-      table.status,
-    ),
+    roleStatusIdx: index('handoff_entities_role_status_idx').on(table.assignedRole, table.status),
   }),
 );

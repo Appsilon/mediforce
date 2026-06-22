@@ -38,17 +38,13 @@ describe('workflow list command', () => {
       output,
     });
     expect(code).toBe(0);
-    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
-      'http://localhost:1234/api/workflow-definitions',
-    );
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://localhost:1234/api/workflow-definitions');
     expect(output.stdoutLines.join('\n')).toMatch(/wf-a/);
     expect(output.stdoutLines.join('\n')).toMatch(/v3/);
   });
 
   it('reports an empty list with a helpful message', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ definitions: [] }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ definitions: [] }));
     const output = captureOutput();
     const code = await workflowListCommand({
       argv: [],
@@ -84,16 +80,12 @@ describe('workflow list command', () => {
     expect(code).toBe(0);
     const parsed: unknown = JSON.parse(output.stdoutLines.join('\n'));
     expect(parsed).toMatchObject({
-      definitions: [
-        { name: 'wf-a', latestVersion: 1 },
-      ],
+      definitions: [{ name: 'wf-a', latestVersion: 1 }],
     });
   });
 
   it('exits 1 with structured error on API failure', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'forbidden' }, 403),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'forbidden' }, 403));
     const output = captureOutput();
     const code = await workflowListCommand({
       argv: ['--json'],

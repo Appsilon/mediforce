@@ -9,10 +9,7 @@ describe('printKv', () => {
       ['status', 'claimed'],
       ['assignedUser', 'alice'],
     ]);
-    expect(output.stdoutLines).toEqual([
-      '  status:        claimed',
-      '  assignedUser:  alice',
-    ]);
+    expect(output.stdoutLines).toEqual(['  status:        claimed', '  assignedUser:  alice']);
   });
 
   it('renders null as the nullDisplay (default `(none)`)', () => {
@@ -21,10 +18,7 @@ describe('printKv', () => {
       ['status', 'cancelled'],
       ['reason', null],
     ]);
-    expect(output.stdoutLines).toEqual([
-      '  status:  cancelled',
-      '  reason:  (none)',
-    ]);
+    expect(output.stdoutLines).toEqual(['  status:  cancelled', '  reason:  (none)']);
   });
 
   it('skips undefined rows unless nullDisplay is set', () => {
@@ -36,13 +30,14 @@ describe('printKv', () => {
     expect(skipping.stdoutLines).toEqual(['  status:  done']);
 
     const showing = captureOutput();
-    printKv(showing, [
-      ['status', 'done'],
-      ['completed', undefined],
-    ], { nullDisplay: '(missing)' });
-    expect(showing.stdoutLines).toEqual([
-      '  status:     done',
-      '  completed:  (missing)',
-    ]);
+    printKv(
+      showing,
+      [
+        ['status', 'done'],
+        ['completed', undefined],
+      ],
+      { nullDisplay: '(missing)' },
+    );
+    expect(showing.stdoutLines).toEqual(['  status:     done', '  completed:  (missing)']);
   });
 });

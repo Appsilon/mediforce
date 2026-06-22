@@ -73,9 +73,7 @@ import { InMemoryNamespaceRepo, createTestScope } from '@mediforce/platform-api/
 
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 
-function loopbackFetch(
-  route: (req: NextRequest) => Promise<Response>,
-): typeof fetch {
+function loopbackFetch(route: (req: NextRequest) => Promise<Response>): typeof fetch {
   return async (input, init) => {
     const url = typeof input === 'string' ? input : input.toString();
     const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
@@ -156,15 +154,9 @@ describe('Mediforce client ↔ route-adapter ↔ listTasks (in-process)', () => 
   });
 
   it('round-trips a filtered list through the real adapter, handler and repo', async () => {
-    await humanTaskRepo.create(
-      buildHumanTask({ id: 't1', processInstanceId: 'inst-a', status: 'pending' }),
-    );
-    await humanTaskRepo.create(
-      buildHumanTask({ id: 't2', processInstanceId: 'inst-a', status: 'completed' }),
-    );
-    await humanTaskRepo.create(
-      buildHumanTask({ id: 't3', processInstanceId: 'inst-b', status: 'pending' }),
-    );
+    await humanTaskRepo.create(buildHumanTask({ id: 't1', processInstanceId: 'inst-a', status: 'pending' }));
+    await humanTaskRepo.create(buildHumanTask({ id: 't2', processInstanceId: 'inst-a', status: 'completed' }));
+    await humanTaskRepo.create(buildHumanTask({ id: 't3', processInstanceId: 'inst-b', status: 'pending' }));
 
     const result = await mediforce.tasks.list({
       instanceId: 'inst-a',
@@ -176,9 +168,7 @@ describe('Mediforce client ↔ route-adapter ↔ listTasks (in-process)', () => 
   });
 
   it('surfaces a 400 from the server when contracts drift (both filters set)', async () => {
-    const badRequest = new NextRequest(
-      'http://localhost/api/tasks?instanceId=foo&role=reviewer',
-    );
+    const badRequest = new NextRequest('http://localhost/api/tasks?instanceId=foo&role=reviewer');
     const response = await route(badRequest);
 
     expect(response.status).toBe(400);
@@ -208,19 +198,17 @@ describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => 
   beforeEach(async () => {
     instanceRepo = new InMemoryProcessInstanceRepository();
     humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }));
 
-    route = createRouteAdapter<typeof ClaimTaskInputSchema, { taskId: string }, { task: unknown }, { params: Promise<{ taskId: string }> }>(
-      ClaimTaskInputSchema,
-      async (_req, ctx) => ({ taskId: (await ctx.params).taskId }),
-      claimTask,
-      {
-        resolveCaller: async () => userCaller,
-        buildScope: (caller) => createTestScope({ caller, humanTaskRepo, instanceRepo }),
-      },
-    );
+    route = createRouteAdapter<
+      typeof ClaimTaskInputSchema,
+      { taskId: string },
+      { task: unknown },
+      { params: Promise<{ taskId: string }> }
+    >(ClaimTaskInputSchema, async (_req, ctx) => ({ taskId: (await ctx.params).taskId }), claimTask, {
+      resolveCaller: async () => userCaller,
+      buildScope: (caller) => createTestScope({ caller, humanTaskRepo, instanceRepo }),
+    });
 
     mediforce = new Mediforce({
       fetch: async (input, init) => {
@@ -271,9 +259,7 @@ describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => 
   });
 
   it('returns 404 (anti-enum) for a task in a workspace the caller does not belong to', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-foreign', namespace: 'team-beta' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-foreign', namespace: 'team-beta' }));
     await humanTaskRepo.create(
       buildHumanTask({
         id: 'task-foreign',
@@ -282,9 +268,7 @@ describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => 
       }),
     );
 
-    const err = await mediforce.tasks
-      .claim({ taskId: 'task-foreign' })
-      .catch((e: unknown) => e);
+    const err = await mediforce.tasks.claim({ taskId: 'task-foreign' }).catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).status).toBe(404);
@@ -299,10 +283,7 @@ describe('Mediforce client ↔ route-adapter ↔ cancelRun (in-process)', () => 
   let instanceRepo: InMemoryProcessInstanceRepository;
   let humanTaskRepo: InMemoryHumanTaskRepository;
   let mediforce: Mediforce;
-  let route: (
-    req: NextRequest,
-    ctx: { params: Promise<{ instanceId: string }> },
-  ) => Promise<Response>;
+  let route: (req: NextRequest, ctx: { params: Promise<{ instanceId: string }> }) => Promise<Response>;
   const userCaller: CallerIdentity = {
     kind: 'user',
     uid: 'u-cancel-test',
@@ -346,9 +327,7 @@ describe('Mediforce client ↔ route-adapter ↔ cancelRun (in-process)', () => 
   });
 
   it('round-trips cancel → returns the entity in `failed` state with the reason persisted', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'running' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'running' }));
 
     const result = await mediforce.runs.cancel({ runId: 'inst-a' });
 
@@ -358,13 +337,9 @@ describe('Mediforce client ↔ route-adapter ↔ cancelRun (in-process)', () => 
   });
 
   it('flows a typed `precondition_failed` envelope for an already-failed run', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'failed' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'failed' }));
 
-    const err = await mediforce.runs
-      .cancel({ runId: 'inst-a' })
-      .catch((e: unknown) => e);
+    const err = await mediforce.runs.cancel({ runId: 'inst-a' }).catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).status).toBe(409);
@@ -433,9 +408,7 @@ describe('Mediforce client ↔ route-adapter ↔ createNamespace (in-process)', 
       createdAt: '2026-01-01T00:00:00.000Z',
     });
 
-    const err = await mediforce.namespaces
-      .create({ handle: 'acme', displayName: 'Acme Co.' })
-      .catch((e: unknown) => e);
+    const err = await mediforce.namespaces.create({ handle: 'acme', displayName: 'Acme Co.' }).catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).status).toBe(409);
@@ -458,7 +431,12 @@ describe('Mediforce client ↔ route-adapter ↔ updateNamespace (in-process)', 
     });
     auditRepo = new InMemoryAuditRepository();
 
-    const route = createRouteAdapter<typeof UpdateNamespaceInputSchema, UpdateNamespaceInput, unknown, { params: Promise<{ handle: string }> }>(
+    const route = createRouteAdapter<
+      typeof UpdateNamespaceInputSchema,
+      UpdateNamespaceInput,
+      unknown,
+      { params: Promise<{ handle: string }> }
+    >(
       UpdateNamespaceInputSchema,
       async (req, ctx) => {
         const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -513,15 +491,15 @@ describe('Mediforce client ↔ route-adapter ↔ leaveNamespace (in-process)', (
   let auditRepo: InMemoryAuditRepository;
 
   function buildClient(caller: CallerIdentity): Mediforce {
-    const route = createRouteAdapter<typeof LeaveNamespaceInputSchema, LeaveNamespaceInput, unknown, { params: Promise<{ handle: string }> }>(
-      LeaveNamespaceInputSchema,
-      async (_req, ctx) => ({ handle: (await ctx.params).handle }),
-      leaveNamespace,
-      {
-        resolveCaller: async () => caller,
-        buildScope: (c) => createTestScope({ caller: c, namespaceRepo, auditRepo }),
-      },
-    );
+    const route = createRouteAdapter<
+      typeof LeaveNamespaceInputSchema,
+      LeaveNamespaceInput,
+      unknown,
+      { params: Promise<{ handle: string }> }
+    >(LeaveNamespaceInputSchema, async (_req, ctx) => ({ handle: (await ctx.params).handle }), leaveNamespace, {
+      resolveCaller: async () => caller,
+      buildScope: (c) => createTestScope({ caller: c, namespaceRepo, auditRepo }),
+    });
     return new Mediforce({
       fetch: loopbackFetchWithParams(route, (url) => {
         // path: /api/namespaces/<handle>/leave
@@ -583,15 +561,15 @@ describe('Mediforce client ↔ route-adapter ↔ deleteNamespace (in-process)', 
     namespaceRepo.userOrganizations.set('uid-member-b', ['acme']);
     auditRepo = new InMemoryAuditRepository();
 
-    route = createRouteAdapter<typeof DeleteNamespaceInputSchema, DeleteNamespaceInput, unknown, { params: Promise<{ handle: string }> }>(
-      DeleteNamespaceInputSchema,
-      async (_req, ctx) => ({ handle: (await ctx.params).handle }),
-      deleteNamespace,
-      {
-        resolveCaller: async () => userCaller('uid-owner', 'owner', 'acme'),
-        buildScope: (caller) => createTestScope({ caller, namespaceRepo, auditRepo }),
-      },
-    );
+    route = createRouteAdapter<
+      typeof DeleteNamespaceInputSchema,
+      DeleteNamespaceInput,
+      unknown,
+      { params: Promise<{ handle: string }> }
+    >(DeleteNamespaceInputSchema, async (_req, ctx) => ({ handle: (await ctx.params).handle }), deleteNamespace, {
+      resolveCaller: async () => userCaller('uid-owner', 'owner', 'acme'),
+      buildScope: (caller) => createTestScope({ caller, namespaceRepo, auditRepo }),
+    });
 
     mediforce = new Mediforce({
       fetch: loopbackFetchWithParams(
@@ -617,15 +595,15 @@ describe('Mediforce client ↔ route-adapter ↔ deleteNamespace (in-process)', 
   });
 
   it('non-owner caller gets 403 forbidden', async () => {
-    route = createRouteAdapter<typeof DeleteNamespaceInputSchema, DeleteNamespaceInput, unknown, { params: Promise<{ handle: string }> }>(
-      DeleteNamespaceInputSchema,
-      async (_req, ctx) => ({ handle: (await ctx.params).handle }),
-      deleteNamespace,
-      {
-        resolveCaller: async () => userCaller('uid-member-a', 'member', 'acme'),
-        buildScope: (caller) => createTestScope({ caller, namespaceRepo, auditRepo }),
-      },
-    );
+    route = createRouteAdapter<
+      typeof DeleteNamespaceInputSchema,
+      DeleteNamespaceInput,
+      unknown,
+      { params: Promise<{ handle: string }> }
+    >(DeleteNamespaceInputSchema, async (_req, ctx) => ({ handle: (await ctx.params).handle }), deleteNamespace, {
+      resolveCaller: async () => userCaller('uid-member-a', 'member', 'acme'),
+      buildScope: (caller) => createTestScope({ caller, namespaceRepo, auditRepo }),
+    });
 
     const err = await mediforce.namespaces.delete({ handle: 'acme' }).catch((e: unknown) => e);
 
@@ -640,7 +618,12 @@ describe('Mediforce client ↔ route-adapter ↔ removeNamespaceMember (in-proce
   let auditRepo: InMemoryAuditRepository;
 
   function buildClient(caller: CallerIdentity): Mediforce {
-    const route = createRouteAdapter<typeof RemoveNamespaceMemberInputSchema, RemoveNamespaceMemberInput, unknown, { params: Promise<{ handle: string; uid: string }> }>(
+    const route = createRouteAdapter<
+      typeof RemoveNamespaceMemberInputSchema,
+      RemoveNamespaceMemberInput,
+      unknown,
+      { params: Promise<{ handle: string; uid: string }> }
+    >(
       RemoveNamespaceMemberInputSchema,
       async (_req, ctx) => {
         const { handle, uid } = await ctx.params;
@@ -684,9 +667,7 @@ describe('Mediforce client ↔ route-adapter ↔ removeNamespaceMember (in-proce
   it('removing the workspace owner → 409 precondition_failed envelope', async () => {
     const client = buildClient(userCaller('uid-owner', 'owner', 'acme'));
 
-    const err = await client.namespaces
-      .removeMember({ handle: 'acme', uid: 'uid-owner' })
-      .catch((e: unknown) => e);
+    const err = await client.namespaces.removeMember({ handle: 'acme', uid: 'uid-owner' }).catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).status).toBe(409);
@@ -700,7 +681,12 @@ describe('Mediforce client ↔ route-adapter ↔ updateNamespaceMemberRole (in-p
   let auditRepo: InMemoryAuditRepository;
 
   function buildClient(caller: CallerIdentity): Mediforce {
-    const route = createRouteAdapter<typeof UpdateNamespaceMemberRoleInputSchema, UpdateNamespaceMemberRoleInput, unknown, { params: Promise<{ handle: string; uid: string }> }>(
+    const route = createRouteAdapter<
+      typeof UpdateNamespaceMemberRoleInputSchema,
+      UpdateNamespaceMemberRoleInput,
+      unknown,
+      { params: Promise<{ handle: string; uid: string }> }
+    >(
       UpdateNamespaceMemberRoleInputSchema,
       async (req, ctx) => {
         const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -798,8 +784,7 @@ describe('Mediforce client ↔ route-adapter ↔ clearMustChangePassword (in-pro
       clearMustChangePassword,
       {
         resolveCaller: async () => userCaller,
-        buildScope: (caller) =>
-          createTestScope({ caller, userProfileRepo, auditRepo, namespaceRepo }),
+        buildScope: (caller) => createTestScope({ caller, userProfileRepo, auditRepo, namespaceRepo }),
       },
     );
 
@@ -815,9 +800,7 @@ describe('Mediforce client ↔ route-adapter ↔ clearMustChangePassword (in-pro
   });
 
   it('rejects user caller passing a different uid → 403 forbidden', async () => {
-    const err = await mediforce.users
-      .clearMustChangePassword({ uid: 'uid-other' })
-      .catch((e: unknown) => e);
+    const err = await mediforce.users.clearMustChangePassword({ uid: 'uid-other' }).catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).status).toBe(403);
@@ -910,10 +893,7 @@ describe('Mediforce client ↔ route-adapter ↔ listAuditEvents (in-process)', 
   let humanTaskRepo: InMemoryHumanTaskRepository;
   let auditRepo: InMemoryAuditRepository;
   let mediforce: Mediforce;
-  let route: (
-    req: NextRequest,
-    ctx: { params: Promise<{ instanceId: string }> },
-  ) => Promise<Response>;
+  let route: (req: NextRequest, ctx: { params: Promise<{ instanceId: string }> }) => Promise<Response>;
   const userCaller: CallerIdentity = {
     kind: 'user',
     uid: 'u-audit-test',
@@ -926,9 +906,7 @@ describe('Mediforce client ↔ route-adapter ↔ listAuditEvents (in-process)', 
     instanceRepo = new InMemoryProcessInstanceRepository();
     humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
     auditRepo = new InMemoryAuditRepository(instanceRepo);
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'run-a', namespace: 'team-alpha' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'run-a', namespace: 'team-alpha' }));
     await auditRepo.append({
       actorId: 'system',
       actorType: 'system',
@@ -994,12 +972,8 @@ describe('Mediforce client ↔ route-adapter ↔ listAuditEvents (in-process)', 
   });
 
   it('returns 404 for a run in a workspace the caller does not belong to', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'run-foreign', namespace: 'team-beta' }),
-    );
-    const err = await mediforce.processes
-      .listAuditEvents({ instanceId: 'run-foreign' })
-      .catch((e: unknown) => e);
+    await instanceRepo.create(buildProcessInstance({ id: 'run-foreign', namespace: 'team-beta' }));
+    const err = await mediforce.processes.listAuditEvents({ instanceId: 'run-foreign' }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).status).toBe(404);
   });
@@ -1025,12 +999,8 @@ describe('Mediforce client ↔ route-adapter ↔ listTasks caller-scope (in-proc
   beforeEach(async () => {
     instanceRepo = new InMemoryProcessInstanceRepository();
     humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }),
-    );
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-b', namespace: 'team-beta' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-b', namespace: 'team-beta' }));
     await humanTaskRepo.create(
       buildHumanTask({ id: 't-alpha-1', processInstanceId: 'inst-a', assignedRole: 'reviewer', status: 'pending' }),
     );
@@ -1093,12 +1063,8 @@ describe('Mediforce client ↔ route-adapter ↔ listCoworkSessions (in-process)
   beforeEach(async () => {
     instanceRepo = new InMemoryProcessInstanceRepository();
     coworkSessionRepo = new InMemoryCoworkSessionRepository(instanceRepo);
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }),
-    );
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-b', namespace: 'team-beta' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-b', namespace: 'team-beta' }));
     await coworkSessionRepo.create(
       buildCoworkSession({
         id: 'sess-mine-analyst',
@@ -1137,8 +1103,7 @@ describe('Mediforce client ↔ route-adapter ↔ listCoworkSessions (in-process)
       listCoworkSessions,
       {
         resolveCaller: async () => callerScope,
-        buildScope: (caller) =>
-          createTestScope({ caller, coworkSessionRepo, instanceRepo }),
+        buildScope: (caller) => createTestScope({ caller, coworkSessionRepo, instanceRepo }),
       },
     );
 
@@ -1266,10 +1231,7 @@ describe('Mediforce client ↔ route-adapter ↔ agentEvents (in-process)', () =
   let instanceRepo: InMemoryProcessInstanceRepository;
   let agentEventRepo: InMemoryAgentEventRepository;
   let mediforce: Mediforce;
-  let route: (
-    req: NextRequest,
-    ctx: { params: Promise<{ instanceId: string }> },
-  ) => Promise<Response>;
+  let route: (req: NextRequest, ctx: { params: Promise<{ instanceId: string }> }) => Promise<Response>;
   const userCaller: CallerIdentity = {
     kind: 'user',
     uid: 'u-agent-events-test',
@@ -1281,9 +1243,7 @@ describe('Mediforce client ↔ route-adapter ↔ agentEvents (in-process)', () =
   beforeEach(async () => {
     instanceRepo = new InMemoryProcessInstanceRepository();
     agentEventRepo = new InMemoryAgentEventRepository(instanceRepo);
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'run-a', namespace: 'team-alpha' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'run-a', namespace: 'team-alpha' }));
     // Seed two steps, out of sequence to prove the sort.
     await agentEventRepo.append(
       buildAgentEvent({
@@ -1327,16 +1287,14 @@ describe('Mediforce client ↔ route-adapter ↔ agentEvents (in-process)', () =
       listAgentEvents,
       {
         resolveCaller: async () => userCaller,
-        buildScope: (caller) =>
-          createTestScope({ caller, instanceRepo, agentEventRepo }),
+        buildScope: (caller) => createTestScope({ caller, instanceRepo, agentEventRepo }),
       },
     );
 
     mediforce = new Mediforce({
       fetch: async (input, init) => {
         const url = typeof input === 'string' ? input : input.toString();
-        const instanceId =
-          url.match(/\/api\/processes\/([^/?]+)\/agent-events/)?.[1] ?? '';
+        const instanceId = url.match(/\/api\/processes\/([^/?]+)\/agent-events/)?.[1] ?? '';
         const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
         return route(new NextRequest(absolute, init), {
           params: Promise.resolve({ instanceId: decodeURIComponent(instanceId) }),
@@ -1362,12 +1320,8 @@ describe('Mediforce client ↔ route-adapter ↔ agentEvents (in-process)', () =
   });
 
   it('returns 404 for a run in a workspace the caller does not belong to', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'run-foreign', namespace: 'team-beta' }),
-    );
-    const err = await mediforce.processes
-      .agentEvents({ instanceId: 'run-foreign' })
-      .catch((e: unknown) => e);
+    await instanceRepo.create(buildProcessInstance({ id: 'run-foreign', namespace: 'team-beta' }));
+    const err = await mediforce.processes.agentEvents({ instanceId: 'run-foreign' }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).status).toBe(404);
   });

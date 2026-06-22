@@ -1,16 +1,10 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import type {
-  NamespaceSecretsRepository,
-  WorkflowSecretsRepository,
-} from '@mediforce/platform-core';
+import type { NamespaceSecretsRepository, WorkflowSecretsRepository } from '@mediforce/platform-core';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
 import { saveWorkflowSecrets } from '../save-workflow-secrets';
 import { ForbiddenError } from '../../../errors';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
-import {
-  buildNamespaceSecretsRepo,
-  buildWorkflowSecretsRepo,
-} from './fakes';
+import { buildNamespaceSecretsRepo, buildWorkflowSecretsRepo } from './fakes';
 
 describe('saveWorkflowSecrets handler', () => {
   let workspaceSecretsRepo: NamespaceSecretsRepository;
@@ -75,10 +69,7 @@ describe('saveWorkflowSecrets handler', () => {
       auditRepo,
     });
 
-    const result = await saveWorkflowSecrets(
-      { namespace: 'alpha', workflow: 'wf-1', secrets: {} },
-      scope,
-    );
+    const result = await saveWorkflowSecrets({ namespace: 'alpha', workflow: 'wf-1', secrets: {} }, scope);
 
     expect(result).toEqual({ ok: true, savedKeyCount: 0 });
     expect(await workflowSecretsRepo.getSecrets('alpha', 'wf-1')).toEqual({});
@@ -93,10 +84,7 @@ describe('saveWorkflowSecrets handler', () => {
     });
 
     await expect(
-      saveWorkflowSecrets(
-        { namespace: 'alpha', workflow: 'wf-1', secrets: { X: 'y' } },
-        scope,
-      ),
+      saveWorkflowSecrets({ namespace: 'alpha', workflow: 'wf-1', secrets: { X: 'y' } }, scope),
     ).rejects.toBeInstanceOf(ForbiddenError);
 
     // No write happened

@@ -7,10 +7,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import { resumeWait } from '../resume-wait';
 import { PreconditionFailedError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { noopRunKicker } from '../../../runtime/run-kicker';
 
 describe('resumeWait handler', () => {
@@ -46,7 +43,6 @@ describe('resumeWait handler', () => {
       runKicker: kicker,
       caller: userCaller('u-1', ['team-alpha']),
     });
-
 
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-01T13:00:00.000Z'));
@@ -90,7 +86,6 @@ describe('resumeWait handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-01T15:00:00.000Z'));
 
@@ -131,7 +126,6 @@ describe('resumeWait handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-01T13:00:00.000Z'));
 
@@ -171,7 +165,6 @@ describe('resumeWait handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
 
@@ -204,10 +197,7 @@ describe('resumeWait handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-
-    await expect(
-      resumeWait({ runId: 'inst-running' }, scope),
-    ).rejects.toBeInstanceOf(PreconditionFailedError);
+    await expect(resumeWait({ runId: 'inst-running' }, scope)).rejects.toBeInstanceOf(PreconditionFailedError);
   });
 
   it('throws PreconditionFailedError when paused but wrong reason', async () => {
@@ -226,9 +216,6 @@ describe('resumeWait handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-
-    await expect(
-      resumeWait({ runId: 'inst-human' }, scope),
-    ).rejects.toBeInstanceOf(PreconditionFailedError);
+    await expect(resumeWait({ runId: 'inst-human' }, scope)).rejects.toBeInstanceOf(PreconditionFailedError);
   });
 });

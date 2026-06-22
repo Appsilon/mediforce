@@ -7,9 +7,7 @@ export class WebhookPayloadValidationError extends Error {
 
 export class TriggerNotFoundError extends Error {
   constructor(triggerName: string, definitionName: string) {
-    super(
-      `Trigger "${triggerName}" not found in process definition "${definitionName}"`,
-    );
+    super(`Trigger "${triggerName}" not found in process definition "${definitionName}"`);
     this.name = 'TriggerNotFoundError';
   }
 }
@@ -21,9 +19,7 @@ export class TriggerNotFoundError extends Error {
  */
 export class ManualTriggerNotDeclaredError extends Error {
   constructor(definitionName: string, version: number) {
-    super(
-      `Workflow "${definitionName}" v${version} does not declare a manual trigger and cannot be started manually.`,
-    );
+    super(`Workflow "${definitionName}" v${version} does not declare a manual trigger and cannot be started manually.`);
     this.name = 'ManualTriggerNotDeclaredError';
   }
 }

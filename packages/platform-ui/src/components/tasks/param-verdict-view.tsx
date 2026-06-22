@@ -36,11 +36,7 @@ export function ParamVerdictView({ task, remainingTaskCount }: TaskBodyProps) {
   return null;
 }
 
-function isParamBlockedForVerdict(
-  verdictKey: string,
-  params: StepParam[],
-  values: Record<string, unknown>,
-): boolean {
+function isParamBlockedForVerdict(verdictKey: string, params: StepParam[], values: Record<string, unknown>): boolean {
   return params.some((p) => {
     const val = values[p.name];
     const missing = val === undefined || val === '';

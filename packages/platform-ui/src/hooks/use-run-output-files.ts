@@ -25,9 +25,7 @@ export function useRunOutputFiles(
   const isTerminal = instanceStatus !== undefined && TERMINAL_STATUSES.has(instanceStatus);
 
   const query = useQuery({
-    queryKey: enabled
-      ? queryKeys.runOutputFiles(runId)
-      : queryKeys.runOutputFiles('__noop__'),
+    queryKey: enabled ? queryKeys.runOutputFiles(runId) : queryKeys.runOutputFiles('__noop__'),
     queryFn: async () => {
       if (runId === null || runId === undefined) {
         throw new Error('unreachable: enabled gates this');

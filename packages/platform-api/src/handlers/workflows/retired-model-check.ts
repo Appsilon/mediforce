@@ -8,11 +8,7 @@ export function checkRetiredModels(
   workflowDefinition: Parameters<typeof validateRetiredModels>[0],
   allModels: ModelRegistryEntry[],
 ): { refs: RetiredModelRef[]; message: string } | null {
-  const retiredMap = new Map(
-    allModels
-      .filter((m) => m.retiredAt !== null)
-      .map((m) => [m.id, m.retiredAt!]),
-  );
+  const retiredMap = new Map(allModels.filter((m) => m.retiredAt !== null).map((m) => [m.id, m.retiredAt!]));
   const retiredRefs = validateRetiredModels(workflowDefinition, retiredMap);
   if (retiredRefs.length === 0) return null;
 

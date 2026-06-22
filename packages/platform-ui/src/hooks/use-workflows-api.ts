@@ -24,9 +24,7 @@ export interface ApiDefinitionItem {
   } | null;
 }
 
-export function mapApiToDefinitionGroups(
-  items: ApiDefinitionItem[],
-): DefinitionGroup[] {
+export function mapApiToDefinitionGroups(items: ApiDefinitionItem[]): DefinitionGroup[] {
   return items
     .filter((item) => item.definition !== null)
     .map((item) => {
@@ -36,13 +34,15 @@ export function mapApiToDefinitionGroups(
         title: def.title,
         description: def.description,
         latestVersion: String(def.version),
-        versions: [{
-          version: String(def.version),
-          stepCount: def.steps.length,
-          triggerCount: def.triggers.length,
-          title: def.title,
-          description: def.description,
-        }],
+        versions: [
+          {
+            version: String(def.version),
+            stepCount: def.steps.length,
+            triggerCount: def.triggers.length,
+            title: def.title,
+            description: def.description,
+          },
+        ],
         stepCount: def.steps.length,
         hasManualTrigger: def.triggers.some((t) => t.type === 'manual'),
         repo: def.repo,
@@ -94,13 +94,18 @@ export function useWorkflowDefinitionsApi(handle: string): {
         if (!cancelled) setLoading(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [handle]);
 
   return { definitions, loading, error };
 }
 
-export function useWorkflowDefinitionApi(namespace: string, name: string): {
+export function useWorkflowDefinitionApi(
+  namespace: string,
+  name: string,
+): {
   definition: ApiDefinitionItem['definition'];
   loading: boolean;
   error: Error | null;
@@ -138,7 +143,9 @@ export function useWorkflowDefinitionApi(namespace: string, name: string): {
         if (!cancelled) setLoading(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [namespace, name]);
 
   return { definition, loading, error };

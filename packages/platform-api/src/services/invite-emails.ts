@@ -98,10 +98,7 @@ export interface SendInviteEmailParams {
   senderName: string;
 }
 
-export async function sendInviteEmail(
-  params: SendInviteEmailParams,
-  sendEmail: SendEmailFn,
-): Promise<void> {
+export async function sendInviteEmail(params: SendInviteEmailParams, sendEmail: SendEmailFn): Promise<void> {
   const loginUrl = `${params.appUrl}/login`;
 
   const bodyHtml = `

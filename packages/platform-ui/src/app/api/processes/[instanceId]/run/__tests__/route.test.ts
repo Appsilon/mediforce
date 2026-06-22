@@ -10,7 +10,9 @@ vi.mock('next/server', async (importOriginal) => {
   const mod = await importOriginal<typeof import('next/server')>();
   return {
     ...mod,
-    after: (fn: () => Promise<void>) => { afterCallback = fn; },
+    after: (fn: () => Promise<void>) => {
+      afterCallback = fn;
+    },
   };
 });
 
@@ -217,10 +219,13 @@ describe('POST /api/processes/[instanceId]/run', () => {
       await afterCallback!();
 
       // Should fail the instance after detecting stuck loop
-      expect(mockInstanceUpdate).toHaveBeenCalledWith('inst-1', expect.objectContaining({
-        status: 'failed',
-        error: expect.stringContaining('looped'),
-      }));
+      expect(mockInstanceUpdate).toHaveBeenCalledWith(
+        'inst-1',
+        expect.objectContaining({
+          status: 'failed',
+          error: expect.stringContaining('looped'),
+        }),
+      );
       // Agent should have been called at most 2 times (first call doesn't count as stuck,
       // second call increments to 1, third call at count=2 would trigger, but isStuckLoop
       // is checked BEFORE execution so it runs 2 times then detects on 3rd check)
@@ -261,17 +266,22 @@ describe('POST /api/processes/[instanceId]/run', () => {
       // No agent step should have been called
       expect(mockExecuteAgentStep).not.toHaveBeenCalled();
       // Human task should have been created
-      expect(mockHumanTaskCreate).toHaveBeenCalledWith(expect.objectContaining({
-        stepId: 'fill-form',
-        assignedRole: 'operator',
-        status: 'pending',
-        creationReason: 'human_executor',
-      }));
+      expect(mockHumanTaskCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stepId: 'fill-form',
+          assignedRole: 'operator',
+          status: 'pending',
+          creationReason: 'human_executor',
+        }),
+      );
       // Instance should be paused
-      expect(mockInstanceUpdate).toHaveBeenCalledWith('inst-1', expect.objectContaining({
-        status: 'paused',
-        pauseReason: 'waiting_for_human',
-      }));
+      expect(mockInstanceUpdate).toHaveBeenCalledWith(
+        'inst-1',
+        expect.objectContaining({
+          status: 'paused',
+          pauseReason: 'waiting_for_human',
+        }),
+      );
     });
 
     it('[DATA] chained agent steps execute in sequence until human step', async () => {
@@ -295,22 +305,41 @@ describe('POST /api/processes/[instanceId]/run', () => {
         // Simulate step progression
         if (agentCallCount === 0) {
           return Promise.resolve({
-            id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
-            status: 'running', currentStepId: 'step-1', configName: undefined, variables: {}, triggerPayload: {},
+            id: 'inst-1',
+            namespace: 'test-ns',
+            definitionName: 'community-digest',
+            definitionVersion: '1',
+            status: 'running',
+            currentStepId: 'step-1',
+            configName: undefined,
+            variables: {},
+            triggerPayload: {},
           });
         }
         if (agentCallCount === 1) {
           return Promise.resolve({
-            id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
-            status: 'running', currentStepId: 'step-2', configName: undefined,
-            variables: { 'step-1': { result: 'ok' } }, triggerPayload: {},
+            id: 'inst-1',
+            namespace: 'test-ns',
+            definitionName: 'community-digest',
+            definitionVersion: '1',
+            status: 'running',
+            currentStepId: 'step-2',
+            configName: undefined,
+            variables: { 'step-1': { result: 'ok' } },
+            triggerPayload: {},
           });
         }
         // After step-2: paused at human-review
         return Promise.resolve({
-          id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
-          status: 'paused', currentStepId: 'human-review', configName: undefined,
-          variables: { 'step-1': { result: 'ok' }, 'step-2': { result: 'ok' } }, triggerPayload: {},
+          id: 'inst-1',
+          namespace: 'test-ns',
+          definitionName: 'community-digest',
+          definitionVersion: '1',
+          status: 'paused',
+          currentStepId: 'human-review',
+          configName: undefined,
+          variables: { 'step-1': { result: 'ok' }, 'step-2': { result: 'ok' } },
+          triggerPayload: {},
         });
       });
 
@@ -340,15 +369,20 @@ describe('POST /api/processes/[instanceId]/run', () => {
     it('[DATA] terminal step as first step — loop exits immediately', async () => {
       const terminalFirstWorkflow = {
         ...workflowDefinition,
-        steps: [
-          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
-        ],
+        steps: [{ id: 'done', name: 'Done', type: 'terminal', executor: 'human' }],
         transitions: [],
       };
 
       mockInstanceGetById.mockResolvedValue({
-        id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
-        status: 'running', currentStepId: 'done', configName: undefined, variables: {}, triggerPayload: {},
+        id: 'inst-1',
+        namespace: 'test-ns',
+        definitionName: 'community-digest',
+        definitionVersion: '1',
+        status: 'running',
+        currentStepId: 'done',
+        configName: undefined,
+        variables: {},
+        triggerPayload: {},
       });
       mockGetWorkflowDefinition.mockResolvedValue(terminalFirstWorkflow);
 
@@ -365,8 +399,15 @@ describe('POST /api/processes/[instanceId]/run', () => {
 
     it('[ERROR] unknown step ID fails the instance', async () => {
       mockInstanceGetById.mockResolvedValue({
-        id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
-        status: 'running', currentStepId: 'nonexistent-step', configName: undefined, variables: {}, triggerPayload: {},
+        id: 'inst-1',
+        namespace: 'test-ns',
+        definitionName: 'community-digest',
+        definitionVersion: '1',
+        status: 'running',
+        currentStepId: 'nonexistent-step',
+        configName: undefined,
+        variables: {},
+        triggerPayload: {},
       });
       mockGetWorkflowDefinition.mockResolvedValue(workflowDefinition);
 
@@ -375,10 +416,13 @@ describe('POST /api/processes/[instanceId]/run', () => {
       expect(afterCallback).not.toBeNull();
       await afterCallback!();
 
-      expect(mockInstanceUpdate).toHaveBeenCalledWith('inst-1', expect.objectContaining({
-        status: 'failed',
-        error: expect.stringContaining('Unknown step'),
-      }));
+      expect(mockInstanceUpdate).toHaveBeenCalledWith(
+        'inst-1',
+        expect.objectContaining({
+          status: 'failed',
+          error: expect.stringContaining('Unknown step'),
+        }),
+      );
     });
 
     it('[ERROR] unknown executor type fails the instance', async () => {
@@ -391,8 +435,15 @@ describe('POST /api/processes/[instanceId]/run', () => {
       };
 
       mockInstanceGetById.mockResolvedValue({
-        id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
-        status: 'running', currentStepId: 'gather-data', configName: undefined, variables: {}, triggerPayload: {},
+        id: 'inst-1',
+        namespace: 'test-ns',
+        definitionName: 'community-digest',
+        definitionVersion: '1',
+        status: 'running',
+        currentStepId: 'gather-data',
+        configName: undefined,
+        variables: {},
+        triggerPayload: {},
       });
       mockGetWorkflowDefinition.mockResolvedValue(badWorkflow);
 
@@ -401,21 +452,29 @@ describe('POST /api/processes/[instanceId]/run', () => {
       expect(afterCallback).not.toBeNull();
       await afterCallback!();
 
-      expect(mockInstanceUpdate).toHaveBeenCalledWith('inst-1', expect.objectContaining({
-        status: 'failed',
-        error: expect.stringContaining("Unknown executor 'robot'"),
-      }));
+      expect(mockInstanceUpdate).toHaveBeenCalledWith(
+        'inst-1',
+        expect.objectContaining({
+          status: 'failed',
+          error: expect.stringContaining("Unknown executor 'robot'"),
+        }),
+      );
     });
 
     it('[DATA] duplicate guard: skips if pending task already exists for step', async () => {
       mockInstanceGetById.mockResolvedValue({
-        id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
-        status: 'running', currentStepId: 'gather-data', configName: undefined, variables: {}, triggerPayload: {},
+        id: 'inst-1',
+        namespace: 'test-ns',
+        definitionName: 'community-digest',
+        definitionVersion: '1',
+        status: 'running',
+        currentStepId: 'gather-data',
+        configName: undefined,
+        variables: {},
+        triggerPayload: {},
       });
       mockGetWorkflowDefinition.mockResolvedValue(workflowDefinition);
-      mockHumanTaskGetByInstanceId.mockResolvedValue([
-        { stepId: 'gather-data', status: 'pending' },
-      ]);
+      mockHumanTaskGetByInstanceId.mockResolvedValue([{ stepId: 'gather-data', status: 'pending' }]);
 
       const res = await POST(makeRequest(), { params: makeParams('inst-1') });
       expect(res.status).toBe(202);
@@ -425,10 +484,13 @@ describe('POST /api/processes/[instanceId]/run', () => {
       // Should not execute the agent step
       expect(mockExecuteAgentStep).not.toHaveBeenCalled();
       // Should pause the instance
-      expect(mockInstanceUpdate).toHaveBeenCalledWith('inst-1', expect.objectContaining({
-        status: 'paused',
-        pauseReason: 'waiting_for_human',
-      }));
+      expect(mockInstanceUpdate).toHaveBeenCalledWith(
+        'inst-1',
+        expect.objectContaining({
+          status: 'paused',
+          pauseReason: 'waiting_for_human',
+        }),
+      );
     });
   });
 
@@ -472,15 +534,25 @@ describe('POST /api/processes/[instanceId]/run', () => {
         callCount++;
         if (callCount <= 2) {
           return Promise.resolve({
-            id: 'inst-1', namespace: 'test-ns', definitionName: 'team-pulse', definitionVersion: '1',
-            status: 'running', currentStepId: 'dispatch', configName: undefined,
+            id: 'inst-1',
+            namespace: 'test-ns',
+            definitionName: 'team-pulse',
+            definitionVersion: '1',
+            status: 'running',
+            currentStepId: 'dispatch',
+            configName: undefined,
             variables: { prepare: { teamMembers } },
             triggerPayload: {},
           });
         }
         return Promise.resolve({
-          id: 'inst-1', namespace: 'test-ns', definitionName: 'team-pulse', definitionVersion: '1',
-          status: 'completed', currentStepId: null, configName: undefined,
+          id: 'inst-1',
+          namespace: 'test-ns',
+          definitionName: 'team-pulse',
+          definitionVersion: '1',
+          status: 'completed',
+          currentStepId: null,
+          configName: undefined,
           variables: { prepare: { teamMembers }, dispatch: { spawnedCount: 3 } },
           triggerPayload: {},
         });
@@ -490,9 +562,27 @@ describe('POST /api/processes/[instanceId]/run', () => {
 
       const spawnOutput = {
         spawned: [
-          { instanceId: 'child-1', definitionName: 'gather-perspective', definitionVersion: 2, status: 'created', itemIndex: 0 },
-          { instanceId: 'child-2', definitionName: 'gather-perspective', definitionVersion: 2, status: 'created', itemIndex: 1 },
-          { instanceId: 'child-3', definitionName: 'gather-perspective', definitionVersion: 2, status: 'created', itemIndex: 2 },
+          {
+            instanceId: 'child-1',
+            definitionName: 'gather-perspective',
+            definitionVersion: 2,
+            status: 'created',
+            itemIndex: 0,
+          },
+          {
+            instanceId: 'child-2',
+            definitionName: 'gather-perspective',
+            definitionVersion: 2,
+            status: 'created',
+            itemIndex: 1,
+          },
+          {
+            instanceId: 'child-3',
+            definitionName: 'gather-perspective',
+            definitionVersion: 2,
+            status: 'created',
+            itemIndex: 2,
+          },
         ],
         errors: [],
         spawnedCount: 3,
@@ -564,8 +654,13 @@ describe('POST /api/processes/[instanceId]/run', () => {
 
     it('[DATA] wait sentinel pauses the instance without completing the step or advancing', async () => {
       mockInstanceGetById.mockResolvedValue({
-        id: 'inst-1', namespace: 'test-ns', definitionName: 'team-pulse', definitionVersion: '1',
-        status: 'running', currentStepId: 'pause', configName: undefined,
+        id: 'inst-1',
+        namespace: 'test-ns',
+        definitionName: 'team-pulse',
+        definitionVersion: '1',
+        status: 'running',
+        currentStepId: 'pause',
+        configName: undefined,
         variables: {},
         triggerPayload: {},
       });
@@ -618,7 +713,14 @@ describe('POST /api/processes/[instanceId]/run', () => {
     const assignedHumanWorkflow = {
       ...workflowDefinition,
       steps: [
-        { id: 'fill-form', name: 'Fill Form', type: 'creation', executor: 'human', allowedRoles: ['member'], assignedTo: '${triggerPayload.userId}' },
+        {
+          id: 'fill-form',
+          name: 'Fill Form',
+          type: 'creation',
+          executor: 'human',
+          allowedRoles: ['member'],
+          assignedTo: '${triggerPayload.userId}',
+        },
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'fill-form', to: 'done' }],
@@ -627,9 +729,15 @@ describe('POST /api/processes/[instanceId]/run', () => {
     it('[DATA] pre-assigns the task to the interpolated user (claimed + assignedUserId)', async () => {
       mockInstanceGetById.mockImplementation(() =>
         Promise.resolve({
-          id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
-          status: 'running', currentStepId: 'fill-form', configName: undefined,
-          variables: {}, triggerPayload: { userId: 'filip' },
+          id: 'inst-1',
+          namespace: 'test-ns',
+          definitionName: 'community-digest',
+          definitionVersion: '1',
+          status: 'running',
+          currentStepId: 'fill-form',
+          configName: undefined,
+          variables: {},
+          triggerPayload: { userId: 'filip' },
         }),
       );
       mockGetWorkflowDefinition.mockResolvedValue(assignedHumanWorkflow);
@@ -639,25 +747,36 @@ describe('POST /api/processes/[instanceId]/run', () => {
       expect(afterCallback).not.toBeNull();
       await afterCallback!();
 
-      expect(mockHumanTaskCreate).toHaveBeenCalledWith(expect.objectContaining({
-        stepId: 'fill-form',
-        assignedRole: 'member',
-        assignedUserId: 'filip',
-        status: 'claimed',
-        creationReason: 'human_executor',
-      }));
-      expect(mockInstanceUpdate).toHaveBeenCalledWith('inst-1', expect.objectContaining({
-        status: 'paused',
-        pauseReason: 'waiting_for_human',
-      }));
+      expect(mockHumanTaskCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stepId: 'fill-form',
+          assignedRole: 'member',
+          assignedUserId: 'filip',
+          status: 'claimed',
+          creationReason: 'human_executor',
+        }),
+      );
+      expect(mockInstanceUpdate).toHaveBeenCalledWith(
+        'inst-1',
+        expect.objectContaining({
+          status: 'paused',
+          pauseReason: 'waiting_for_human',
+        }),
+      );
     });
 
     it('[ERROR] fails the instance when assignedTo resolves to nothing', async () => {
       mockInstanceGetById.mockImplementation(() =>
         Promise.resolve({
-          id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
-          status: 'running', currentStepId: 'fill-form', configName: undefined,
-          variables: {}, triggerPayload: {},
+          id: 'inst-1',
+          namespace: 'test-ns',
+          definitionName: 'community-digest',
+          definitionVersion: '1',
+          status: 'running',
+          currentStepId: 'fill-form',
+          configName: undefined,
+          variables: {},
+          triggerPayload: {},
         }),
       );
       mockGetWorkflowDefinition.mockResolvedValue(assignedHumanWorkflow);
@@ -668,10 +787,13 @@ describe('POST /api/processes/[instanceId]/run', () => {
       await afterCallback!();
 
       expect(mockHumanTaskCreate).not.toHaveBeenCalled();
-      expect(mockInstanceUpdate).toHaveBeenCalledWith('inst-1', expect.objectContaining({
-        status: 'failed',
-        error: expect.stringContaining('assignedTo'),
-      }));
+      expect(mockInstanceUpdate).toHaveBeenCalledWith(
+        'inst-1',
+        expect.objectContaining({
+          status: 'failed',
+          error: expect.stringContaining('assignedTo'),
+        }),
+      );
     });
   });
 
@@ -686,7 +808,10 @@ describe('POST /api/processes/[instanceId]/run', () => {
 
     it('[ERROR] returns 409 when instance is not running', async () => {
       mockInstanceGetById.mockResolvedValue({
-        id: 'inst-1', namespace: 'test-ns', status: 'completed', configName: 'default',
+        id: 'inst-1',
+        namespace: 'test-ns',
+        status: 'completed',
+        configName: 'default',
       });
 
       const res = await POST(makeRequest(), { params: makeParams('inst-1') });

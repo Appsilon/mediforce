@@ -7,12 +7,7 @@ interface RouteContext {
   params: Promise<{ taskId: string }>;
 }
 
-export const POST = createRouteAdapter<
-  typeof CompleteTaskInputSchema,
-  CompleteTaskInput,
-  unknown,
-  RouteContext
->(
+export const POST = createRouteAdapter<typeof CompleteTaskInputSchema, CompleteTaskInput, unknown, RouteContext>(
   CompleteTaskInputSchema,
   async (req, ctx) => ({
     taskId: (await ctx.params).taskId,

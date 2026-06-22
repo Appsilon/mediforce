@@ -1,9 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import {
-  Loader2, CheckCircle, Lock, Check, Circle, AlertCircle, ChevronRight, ChevronDown,
-} from 'lucide-react';
+import { Loader2, CheckCircle, Lock, Check, Circle, AlertCircle, ChevronRight, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
@@ -16,7 +14,11 @@ function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
   if (typeof value === 'number') return <span className="text-emerald-600 dark:text-emerald-400">{value}</span>;
   if (typeof value === 'string') {
     if (value.length > 120) {
-      return <span className="text-amber-700 dark:text-amber-300" title={value}>&quot;{value.slice(0, 120)}…&quot;</span>;
+      return (
+        <span className="text-amber-700 dark:text-amber-300" title={value}>
+          &quot;{value.slice(0, 120)}…&quot;
+        </span>
+      );
     }
     return <span className="text-amber-700 dark:text-amber-300">&quot;{value}&quot;</span>;
   }
@@ -32,7 +34,10 @@ function JsonObject({ obj, depth }: { obj: Record<string, unknown>; depth: numbe
 
   return (
     <div>
-      <button onClick={() => setOpen(!open)} className="inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground">
+      <button
+        onClick={() => setOpen(!open)}
+        className="inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground"
+      >
         {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         <span className="text-xs">{`{${entries.length}}`}</span>
       </button>
@@ -57,7 +62,10 @@ function JsonArray({ items, depth }: { items: unknown[]; depth: number }) {
 
   return (
     <div>
-      <button onClick={() => setOpen(!open)} className="inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground">
+      <button
+        onClick={() => setOpen(!open)}
+        className="inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground"
+      >
         {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         <span className="text-xs">{`[${items.length}]`}</span>
       </button>
@@ -86,14 +94,13 @@ function getRequiredFields(outputSchema: Record<string, unknown> | null): string
   return [];
 }
 
-function checkRequiredFields(
-  artifact: Record<string, unknown> | null,
-  requiredFields: string[],
-): Map<string, boolean> {
+function checkRequiredFields(artifact: Record<string, unknown> | null, requiredFields: string[]): Map<string, boolean> {
   const result = new Map<string, boolean>();
   for (const field of requiredFields) {
     const value = artifact?.[field];
-    const present = value !== undefined && value !== null &&
+    const present =
+      value !== undefined &&
+      value !== null &&
       !(Array.isArray(value) && value.length === 0) &&
       !(typeof value === 'string' && value.trim().length === 0);
     result.set(field, present);
@@ -125,10 +132,7 @@ export function ArtifactPanel({
   finalized,
 }: ArtifactPanelProps) {
   const requiredFields = React.useMemo(() => getRequiredFields(outputSchema), [outputSchema]);
-  const fieldStatus = React.useMemo(
-    () => checkRequiredFields(artifact, requiredFields),
-    [artifact, requiredFields],
-  );
+  const fieldStatus = React.useMemo(() => checkRequiredFields(artifact, requiredFields), [artifact, requiredFields]);
   const fulfilledCount = [...fieldStatus.values()].filter(Boolean).length;
   const allFulfilled = requiredFields.length === 0 || fulfilledCount === requiredFields.length;
 
@@ -150,24 +154,28 @@ export function ArtifactPanel({
     if (presentation && activeTab === 'data') {
       setActiveTab('preview');
     }
-  // activeTab intentionally excluded — including it would snap the user back
-  // to preview every time they manually switch to the data tab.
+    // activeTab intentionally excluded — including it would snap the user back
+    // to preview every time they manually switch to the data tab.
   }, [presentation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className={cn(
-      'flex h-full flex-col rounded-lg border transition-colors',
-      finalized && 'border-green-300 dark:border-green-800',
-    )}>
+    <div
+      className={cn(
+        'flex h-full flex-col rounded-lg border transition-colors',
+        finalized && 'border-green-300 dark:border-green-800',
+      )}
+    >
       <div className="flex items-center justify-between border-b px-4 py-3">
         <h3 className="text-sm font-semibold">Artifact</h3>
         {artifact && (
-          <span className={cn(
-            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-            finalized
-              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-              : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-          )}>
+          <span
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+              finalized
+                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+            )}
+          >
             {finalized ? <Lock className="h-3 w-3" /> : <CheckCircle className="h-3 w-3" />}
             {finalized ? 'Finalized' : 'Draft'}
           </span>
@@ -179,10 +187,12 @@ export function ArtifactPanel({
         <div className="border-b px-4 py-2">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs text-muted-foreground">Required fields</span>
-            <span className={cn(
-              'text-xs font-mono',
-              allFulfilled ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground',
-            )}>
+            <span
+              className={cn(
+                'text-xs font-mono',
+                allFulfilled ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground',
+              )}
+            >
               {fulfilledCount}/{requiredFields.length}
             </span>
           </div>
@@ -210,10 +220,12 @@ export function ArtifactPanel({
 
       {/* Validation status */}
       {validationResult && !finalized && (
-        <div className={cn(
-          'border-b px-4 py-2',
-          validationResult.valid ? 'bg-green-50 dark:bg-green-950/20' : 'bg-red-50 dark:bg-red-950/20',
-        )}>
+        <div
+          className={cn(
+            'border-b px-4 py-2',
+            validationResult.valid ? 'bg-green-50 dark:bg-green-950/20' : 'bg-red-50 dark:bg-red-950/20',
+          )}
+        >
           <div className="flex items-center gap-1.5">
             {validationResult.valid ? (
               <>
@@ -296,7 +308,9 @@ export function ArtifactPanel({
         <div className="border-t p-4">
           <button
             onClick={onFinalize}
-            disabled={!artifact || !allFulfilled || finalizing || (validationResult !== null && !validationResult.valid)}
+            disabled={
+              !artifact || !allFulfilled || finalizing || (validationResult !== null && !validationResult.valid)
+            }
             className={cn(
               'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
               artifact && allFulfilled

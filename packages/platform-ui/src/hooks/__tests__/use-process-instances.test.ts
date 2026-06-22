@@ -14,7 +14,10 @@ vi.mock('@/lib/mediforce', () => ({
     processes: { get: getMock },
   },
   ApiError: class ApiError extends Error {
-    constructor(public status: number, message: string) {
+    constructor(
+      public status: number,
+      message: string,
+    ) {
       super(message);
     }
   },
@@ -36,10 +39,7 @@ describe('useProcessInstances — react-query backed', () => {
     });
     const { wrapper } = createQueryWrapper();
 
-    const { result } = renderHook(
-      () => useProcessInstances('all', undefined, false, 'appsilon'),
-      { wrapper },
-    );
+    const { result } = renderHook(() => useProcessInstances('all', undefined, false, 'appsilon'), { wrapper });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(listMock).toHaveBeenCalledWith(expect.objectContaining({ namespace: 'appsilon' }));
@@ -55,27 +55,18 @@ describe('useProcessInstances — react-query backed', () => {
     });
     const { wrapper } = createQueryWrapper();
 
-    const hidden = renderHook(
-      () => useProcessInstances('all', undefined, false, 'alpha'),
-      { wrapper },
-    );
+    const hidden = renderHook(() => useProcessInstances('all', undefined, false, 'alpha'), { wrapper });
     await waitFor(() => expect(hidden.result.current.loading).toBe(false));
     expect(hidden.result.current.data.map((r) => r.id)).toEqual(['live']);
 
-    const shown = renderHook(
-      () => useProcessInstances('all', undefined, true, 'alpha'),
-      { wrapper },
-    );
+    const shown = renderHook(() => useProcessInstances('all', undefined, true, 'alpha'), { wrapper });
     await waitFor(() => expect(shown.result.current.loading).toBe(false));
     expect(shown.result.current.data.map((r) => r.id).sort()).toEqual(['arch', 'live']);
   });
 
   it('is disabled when namespace is the empty string (avoids cross-workspace cache pollution)', () => {
     const { wrapper } = createQueryWrapper();
-    const { result } = renderHook(
-      () => useProcessInstances('all', undefined, false, ''),
-      { wrapper },
-    );
+    const { result } = renderHook(() => useProcessInstances('all', undefined, false, ''), { wrapper });
     expect(listMock).not.toHaveBeenCalled();
     // Reports loading=true so callers keep the skeleton on while the route
     // param is still resolving — prevents the "no runs" flash before the
@@ -88,10 +79,7 @@ describe('useProcessInstances — react-query backed', () => {
     listMock.mockResolvedValue({ runs: [] });
     const { wrapper } = createQueryWrapper();
 
-    renderHook(
-      () => useProcessInstances('running', undefined, false, 'alpha'),
-      { wrapper },
-    );
+    renderHook(() => useProcessInstances('running', undefined, false, 'alpha'), { wrapper });
 
     await waitFor(() => expect(listMock).toHaveBeenCalled());
     expect(listMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'running' }));

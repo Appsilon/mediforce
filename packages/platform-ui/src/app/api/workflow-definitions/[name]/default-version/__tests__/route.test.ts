@@ -34,14 +34,11 @@ import { POST } from '../route';
 const makeParams = (name: string) => Promise.resolve({ name });
 
 function makeRequest(name: string, body: unknown): NextRequest {
-  return new NextRequest(
-    `http://localhost/api/workflow-definitions/${encodeURIComponent(name)}/default-version`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    },
-  );
+  return new NextRequest(`http://localhost/api/workflow-definitions/${encodeURIComponent(name)}/default-version`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 const existingDefinition: WorkflowDefinition = {

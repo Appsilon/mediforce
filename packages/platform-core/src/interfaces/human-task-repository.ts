@@ -13,7 +13,7 @@ export interface HumanTaskRepository {
   /** Returns the task only if its parent run's namespace is in `allowed`. */
   getByIdInNamespaces(taskId: string, allowed: readonly string[]): Promise<HumanTask | null>;
 
-  getByRoleAll(role: string): Promise<HumanTask[]>;             // every task with this assignedRole (all statuses — caller must filter via `ACTIONABLE_STATUSES` or explicit list if it wants the "actionable" subset)
+  getByRoleAll(role: string): Promise<HumanTask[]>; // every task with this assignedRole (all statuses — caller must filter via `ACTIONABLE_STATUSES` or explicit list if it wants the "actionable" subset)
   getByRoleInNamespaces(role: string, allowed: readonly string[]): Promise<HumanTask[]>;
 
   getByInstanceId(instanceId: string): Promise<HumanTask[]>;
@@ -27,10 +27,7 @@ export interface HumanTaskRepository {
    * monitoring summary aggregation) collapse to a single repo call.
    */
   getByInstanceIdsAll(instanceIds: readonly string[]): Promise<HumanTask[]>;
-  getByInstanceIdsInNamespaces(
-    instanceIds: readonly string[],
-    allowed: readonly string[],
-  ): Promise<HumanTask[]>;
+  getByInstanceIdsInNamespaces(instanceIds: readonly string[], allowed: readonly string[]): Promise<HumanTask[]>;
 
   /** Every task in the store, irrespective of role or instance. */
   listAll(): Promise<HumanTask[]>;

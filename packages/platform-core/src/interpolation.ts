@@ -98,26 +98,19 @@ const PLACEHOLDER_RE = /\$\{([^}]+)\}/g;
  * (so `body: '${triggerPayload.body}'` returns the raw body object, not a
  * string). This matches n8n's "single expression returns the value" rule.
  */
-export function interpolate(
-  template: unknown,
-  sources: InterpolationSources,
-): unknown {
+export function interpolate(template: unknown, sources: InterpolationSources): unknown {
   if (typeof template !== 'string') return interpolateDeep(template, sources);
   return interpolateString(template, sources);
 }
 
-function interpolateString(
-  template: string,
-  sources: InterpolationSources,
-): unknown {
+function interpolateString(template: string, sources: InterpolationSources): unknown {
   PLACEHOLDER_RE.lastIndex = 0;
   const matches = [...template.matchAll(PLACEHOLDER_RE)];
   if (matches.length === 0) return template;
 
   if (matches.length === 1) {
     const match = matches[0];
-    const isOnlyPlaceholder =
-      match.index === 0 && match[0].length === template.length;
+    const isOnlyPlaceholder = match.index === 0 && match[0].length === template.length;
     if (isOnlyPlaceholder) {
       return resolvePath(match[1], sources);
     }
@@ -131,10 +124,7 @@ function interpolateString(
   });
 }
 
-function interpolateDeep(
-  value: unknown,
-  sources: InterpolationSources,
-): unknown {
+function interpolateDeep(value: unknown, sources: InterpolationSources): unknown {
   if (value === null || value === undefined) return value;
   if (Array.isArray(value)) {
     return value.map((item) => interpolate(item, sources));
@@ -170,9 +160,8 @@ function resolvePath(rawPath: string, sources: InterpolationSources): unknown {
   } else {
     // Bare identifiers fall through to triggerPayload for n8n-style ergonomics.
     // Deliberately NOT searching `secrets` here — secret access must be explicit.
-    resolved = getPath(sources.triggerPayload, path)
-      ?? getPath(sources.steps, path)
-      ?? getPath(sources.variables, path);
+    resolved =
+      getPath(sources.triggerPayload, path) ?? getPath(sources.steps, path) ?? getPath(sources.variables, path);
   }
   return resolved;
 }

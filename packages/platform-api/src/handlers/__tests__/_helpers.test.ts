@@ -15,9 +15,7 @@ describe('loadOr404', () => {
   });
 
   it('throws NotFoundError (HandlerError subclass) with the supplied message when the lookup yields null', async () => {
-    const err = await loadOr404(Promise.resolve(null as { id: string } | null), 'Task not found').catch(
-      (e) => e,
-    );
+    const err = await loadOr404(Promise.resolve(null as { id: string } | null), 'Task not found').catch((e) => e);
     expect(err).toBeInstanceOf(NotFoundError);
     expect(err).toBeInstanceOf(HandlerError);
     expect((err as NotFoundError).code).toBe('not_found');

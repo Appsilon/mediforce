@@ -33,10 +33,7 @@ function validEmulatorPayload(overrides: Record<string, unknown> = {}): Record<s
   };
 }
 
-function makeRequest(
-  path: string,
-  options: { method?: string; headers?: Record<string, string> } = {},
-): NextRequest {
+function makeRequest(path: string, options: { method?: string; headers?: Record<string, string> } = {}): NextRequest {
   return new NextRequest(`http://localhost${path}`, {
     method: options.method ?? 'GET',
     headers: options.headers ?? {},
@@ -66,18 +63,14 @@ describe('middleware auth guard', () => {
   });
 
   it('returns 401 when X-Api-Key is wrong', async () => {
-    const res = await proxy(
-      makeRequest('/api/workflow-definitions', { headers: { 'X-Api-Key': 'wrong-key' } }),
-    );
+    const res = await proxy(makeRequest('/api/workflow-definitions', { headers: { 'X-Api-Key': 'wrong-key' } }));
     expect(res.status).toBe(401);
     const body = await readJsonBody(res);
     expect(body).toEqual({ error: 'Unauthorized' });
   });
 
   it('passes through when X-Api-Key matches PLATFORM_API_KEY', async () => {
-    const res = await proxy(
-      makeRequest('/api/workflow-definitions', { headers: { 'X-Api-Key': 'test-secret-key' } }),
-    );
+    const res = await proxy(makeRequest('/api/workflow-definitions', { headers: { 'X-Api-Key': 'test-secret-key' } }));
     expect(res.status).not.toBe(401);
     const body = await readJsonBody(res);
     expect(body).not.toEqual({ error: 'Unauthorized' });
@@ -114,9 +107,7 @@ describe('middleware admin prefix', () => {
     // Both PLATFORM_API_KEY and PLATFORM_ADMIN_API_KEY mint the same apiKey
     // identity at this layer; per-endpoint admin role enforcement is in
     // `assertCallerIsNamespaceAdmin` (closes #218).
-    const res = await proxy(
-      makeRequest('/api/admin/tool-catalog', { headers: { 'X-Api-Key': 'test-secret-key' } }),
-    );
+    const res = await proxy(makeRequest('/api/admin/tool-catalog', { headers: { 'X-Api-Key': 'test-secret-key' } }));
     expect(res.status).not.toBe(401);
   });
 });
@@ -141,16 +132,12 @@ describe('middleware Firebase ID token (emulator mode)', () => {
 
   it('passes when Authorization: Bearer carries a valid emulator ID token', async () => {
     const token = buildEmulatorToken(validEmulatorPayload());
-    const res = await proxy(
-      makeRequest('/api/agents', { headers: { Authorization: `Bearer ${token}` } }),
-    );
+    const res = await proxy(makeRequest('/api/agents', { headers: { Authorization: `Bearer ${token}` } }));
     expect(res.status).not.toBe(401);
   });
 
   it('returns 401 when Bearer token is malformed (not a JWT)', async () => {
-    const res = await proxy(
-      makeRequest('/api/agents', { headers: { Authorization: 'Bearer not-a-jwt' } }),
-    );
+    const res = await proxy(makeRequest('/api/agents', { headers: { Authorization: 'Bearer not-a-jwt' } }));
     expect(res.status).toBe(401);
   });
 
@@ -158,25 +145,19 @@ describe('middleware Firebase ID token (emulator mode)', () => {
     const token = buildEmulatorToken(
       validEmulatorPayload({ exp: Math.floor(Date.now() / 1000) - 10, iat: Math.floor(Date.now() / 1000) - 3610 }),
     );
-    const res = await proxy(
-      makeRequest('/api/agents', { headers: { Authorization: `Bearer ${token}` } }),
-    );
+    const res = await proxy(makeRequest('/api/agents', { headers: { Authorization: `Bearer ${token}` } }));
     expect(res.status).toBe(401);
   });
 
   it('returns 401 when Bearer token aud does not match project', async () => {
     const token = buildEmulatorToken(validEmulatorPayload({ aud: 'other-project' }));
-    const res = await proxy(
-      makeRequest('/api/agents', { headers: { Authorization: `Bearer ${token}` } }),
-    );
+    const res = await proxy(makeRequest('/api/agents', { headers: { Authorization: `Bearer ${token}` } }));
     expect(res.status).toBe(401);
   });
 
   it('accepts X-Api-Key when present even if Authorization is missing', async () => {
     // Regression guard: adding Bearer support must not break server-to-server X-Api-Key auth
-    const res = await proxy(
-      makeRequest('/api/agents', { headers: { 'X-Api-Key': 'test-secret-key' } }),
-    );
+    const res = await proxy(makeRequest('/api/agents', { headers: { 'X-Api-Key': 'test-secret-key' } }));
     expect(res.status).not.toBe(401);
   });
 

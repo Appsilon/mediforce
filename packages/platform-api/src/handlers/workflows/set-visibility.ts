@@ -1,7 +1,4 @@
-import type {
-  SetVisibilityInput,
-  SetVisibilityOutput,
-} from '../../contract/workflows';
+import type { SetVisibilityInput, SetVisibilityOutput } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
@@ -10,14 +7,8 @@ interface ScopedInput extends SetVisibilityInput {
   namespace: string;
 }
 
-export async function setWorkflowVisibility(
-  input: ScopedInput,
-  scope: CallerScope,
-): Promise<SetVisibilityOutput> {
-  const latestVersion = await scope.workflowDefinitions.getLatestVersion(
-    input.namespace,
-    input.name,
-  );
+export async function setWorkflowVisibility(input: ScopedInput, scope: CallerScope): Promise<SetVisibilityOutput> {
+  const latestVersion = await scope.workflowDefinitions.getLatestVersion(input.namespace, input.name);
   if (latestVersion === 0) {
     throw new NotFoundError(`Workflow '${input.name}' not found`);
   }

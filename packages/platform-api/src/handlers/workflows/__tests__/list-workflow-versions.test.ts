@@ -1,8 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import {
-  InMemoryProcessRepository,
-  buildWorkflowDefinition,
-} from '@mediforce/platform-core/testing';
+import { InMemoryProcessRepository, buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { listWorkflowVersions } from '../list-workflow-versions';
 import { NotFoundError } from '../../../errors';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
@@ -27,10 +24,7 @@ describe('listWorkflowVersions handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    const result = await listWorkflowVersions(
-      { name: 'flow-a', namespace: 'team-alpha' },
-      scope,
-    );
+    const result = await listWorkflowVersions({ name: 'flow-a', namespace: 'team-alpha' }, scope);
 
     expect(result.versions.map((v) => v.version).sort()).toEqual([1, 2]);
     expect(result.defaultVersion).toBeNull();
@@ -58,10 +52,7 @@ describe('listWorkflowVersions handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    const result = await listWorkflowVersions(
-      { name: 'flow-a', namespace: 'team-alpha' },
-      scope,
-    );
+    const result = await listWorkflowVersions({ name: 'flow-a', namespace: 'team-alpha' }, scope);
 
     expect(result.defaultVersion).toBe(1);
   });
@@ -86,10 +77,7 @@ describe('listWorkflowVersions handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    const result = await listWorkflowVersions(
-      { name: 'flow-a', namespace: 'team-alpha' },
-      scope,
-    );
+    const result = await listWorkflowVersions({ name: 'flow-a', namespace: 'team-alpha' }, scope);
 
     const v1 = result.versions.find((v) => v.version === 1);
     const v2 = result.versions.find((v) => v.version === 2);
@@ -113,9 +101,9 @@ describe('listWorkflowVersions handler', () => {
       processRepo,
       caller: userCaller('u-1', ['team-alpha']),
     });
-    await expect(
-      listWorkflowVersions({ name: 'missing', namespace: 'team-alpha' }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(listWorkflowVersions({ name: 'missing', namespace: 'team-alpha' }, scope)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
   });
 
   it('throws NotFoundError when caller cannot see a private workflow in another namespace', async () => {
@@ -133,12 +121,9 @@ describe('listWorkflowVersions handler', () => {
       caller: userCaller('u-2', ['team-beta']),
     });
 
-    await expect(
-      listWorkflowVersions(
-        { name: 'flow-private', namespace: 'team-alpha' },
-        scope,
-      ),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(listWorkflowVersions({ name: 'flow-private', namespace: 'team-alpha' }, scope)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
   });
 
   it('returns every version of a public workflow to non-members', async () => {
@@ -164,10 +149,7 @@ describe('listWorkflowVersions handler', () => {
       caller: userCaller('u-2', ['team-beta']),
     });
 
-    const result = await listWorkflowVersions(
-      { name: 'flow-public', namespace: 'team-alpha' },
-      scope,
-    );
+    const result = await listWorkflowVersions({ name: 'flow-public', namespace: 'team-alpha' }, scope);
 
     expect(result.versions.map((v) => v.version).sort()).toEqual([1, 2]);
   });

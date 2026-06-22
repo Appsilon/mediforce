@@ -15,7 +15,7 @@ export async function POST(
 ): Promise<NextResponse> {
   try {
     const { instanceId } = await params;
-    const body = await req.json() as AdvanceStepBody;
+    const body = (await req.json()) as AdvanceStepBody;
 
     const { instanceRepo, processRepo, namespaceRepo } = getPlatformServices();
 
@@ -34,7 +34,11 @@ export async function POST(
     const latestVersion = isNaN(versionNum)
       ? await processRepo.getLatestWorkflowVersion(instance.namespace ?? '', instance.definitionName)
       : versionNum;
-    const definition = await processRepo.getWorkflowDefinition(instance.namespace ?? '', instance.definitionName, latestVersion);
+    const definition = await processRepo.getWorkflowDefinition(
+      instance.namespace ?? '',
+      instance.definitionName,
+      latestVersion,
+    );
     if (!definition) {
       return NextResponse.json({ error: 'Definition not found' }, { status: 404 });
     }
@@ -44,13 +48,7 @@ export async function POST(
       return NextResponse.json({ error: `Step '${body.stepId}' not found in definition` }, { status: 404 });
     }
 
-    const result = await executeAgentStep(
-      instanceId,
-      body.stepId,
-      workflowStep,
-      body.appContext,
-      body.triggeredBy,
-    );
+    const result = await executeAgentStep(instanceId, body.stepId, workflowStep, body.appContext, body.triggeredBy);
 
     return NextResponse.json(result);
   } catch (err) {

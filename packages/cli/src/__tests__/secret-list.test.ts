@@ -22,9 +22,7 @@ describe('secret list command', () => {
   });
 
   it('lists secret keys in human-readable format', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ keys: ['API_TOKEN', 'DB_PASSWORD'] }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ keys: ['API_TOKEN', 'DB_PASSWORD'] }));
     const output = captureOutput();
     const code = await secretListCommand({
       argv: [...BASE_ARGV, '--base-url', 'http://test:9000'],
@@ -39,9 +37,7 @@ describe('secret list command', () => {
   });
 
   it('emits JSON when --json set', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ keys: ['KEY_A'] }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ keys: ['KEY_A'] }));
     const output = captureOutput();
     const code = await secretListCommand({
       argv: [...BASE_ARGV, '--json'],
@@ -75,9 +71,7 @@ describe('secret list command', () => {
   });
 
   it('exits 1 on API error', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Unauthorized' }, 401),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Unauthorized' }, 401));
     const output = captureOutput();
     const code = await secretListCommand({
       argv: [...BASE_ARGV, '--json'],
@@ -90,9 +84,7 @@ describe('secret list command', () => {
   });
 
   it('lists namespace-level secrets when --workflow omitted', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ keys: ['OPENROUTER_API_KEY'] }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ keys: ['OPENROUTER_API_KEY'] }));
     const output = captureOutput();
     const code = await secretListCommand({
       argv: ['--namespace', 'ns-1'],
@@ -107,9 +99,7 @@ describe('secret list command', () => {
   });
 
   it('verifies fetch URL contains correct query params', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ keys: [] }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ keys: [] }));
     const output = captureOutput();
     await secretListCommand({
       argv: [...BASE_ARGV, '--base-url', 'http://test:9000'],

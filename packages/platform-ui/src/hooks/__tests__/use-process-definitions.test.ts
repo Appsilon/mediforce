@@ -5,7 +5,12 @@ import { createQueryWrapper } from '@/test/react-query';
 
 const listMock = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { workflows: { list: listMock } },
@@ -73,7 +78,14 @@ describe('useProcessDefinitions', () => {
     });
     listMock.mockResolvedValue({
       definitions: [
-        { namespace: 'ns1', name: 'wf-a', latestVersion: 1, defaultVersion: 1, definition: def, runSummary: { total: 0, active: 0, latest: [] } },
+        {
+          namespace: 'ns1',
+          name: 'wf-a',
+          latestVersion: 1,
+          defaultVersion: 1,
+          definition: def,
+          runSummary: { total: 0, active: 0, latest: [] },
+        },
       ],
     });
 

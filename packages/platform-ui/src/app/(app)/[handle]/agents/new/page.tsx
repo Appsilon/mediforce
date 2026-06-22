@@ -6,9 +6,20 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
-  Bot, Cpu, Terminal, BarChart3, Brain, Zap,
-  Shield, Code, Database, Globe, Sparkles, Settings,
-  Check, ChevronDown,
+  Bot,
+  Cpu,
+  Terminal,
+  BarChart3,
+  Brain,
+  Zap,
+  Shield,
+  Code,
+  Database,
+  Globe,
+  Sparkles,
+  Settings,
+  Check,
+  ChevronDown,
 } from 'lucide-react';
 import { mediforce } from '@/lib/mediforce';
 import { FOUNDATION_MODELS } from '@/lib/agent-models';
@@ -16,16 +27,16 @@ import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 
 const ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [
-  { icon: Bot,      label: 'Bot'      },
-  { icon: Cpu,      label: 'CPU'      },
+  { icon: Bot, label: 'Bot' },
+  { icon: Cpu, label: 'CPU' },
   { icon: Terminal, label: 'Terminal' },
-  { icon: BarChart3,label: 'Chart'    },
-  { icon: Brain,    label: 'Brain'    },
-  { icon: Zap,      label: 'Zap'      },
-  { icon: Shield,   label: 'Shield'   },
-  { icon: Code,     label: 'Code'     },
+  { icon: BarChart3, label: 'Chart' },
+  { icon: Brain, label: 'Brain' },
+  { icon: Zap, label: 'Zap' },
+  { icon: Shield, label: 'Shield' },
+  { icon: Code, label: 'Code' },
   { icon: Database, label: 'Database' },
-  { icon: Globe,    label: 'Globe'    },
+  { icon: Globe, label: 'Globe' },
   { icon: Sparkles, label: 'Sparkles' },
   { icon: Settings, label: 'Settings' },
 ];
@@ -86,13 +97,10 @@ export default function NewAgentPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-6 max-w-2xl">
       <div>
-        <p className="text-sm text-muted-foreground">
-          Register a new AI agent and configure its capabilities.
-        </p>
+        <p className="text-sm text-muted-foreground">Register a new AI agent and configure its capabilities.</p>
       </div>
 
       <div className="space-y-6">
-
         {/* 1. Agent name */}
         <div className="space-y-1.5">
           <label className="text-sm font-medium">Agent name</label>
@@ -187,7 +195,10 @@ export default function NewAgentPage() {
                 <span className="text-muted-foreground">Select a model…</span>
               )}
               <ChevronDown
-                className={cn('h-4 w-4 text-muted-foreground shrink-0 transition-transform', modelDropdownOpen && 'rotate-180')}
+                className={cn(
+                  'h-4 w-4 text-muted-foreground shrink-0 transition-transform',
+                  modelDropdownOpen && 'rotate-180',
+                )}
               />
             </button>
 
@@ -197,7 +208,10 @@ export default function NewAgentPage() {
                   <button
                     key={model.id}
                     type="button"
-                    onClick={() => { setSelectedModelId(model.id); setModelDropdownOpen(false); }}
+                    onClick={() => {
+                      setSelectedModelId(model.id);
+                      setModelDropdownOpen(false);
+                    }}
                     className={cn(
                       'flex w-full items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-accent transition-colors',
                       selectedModelId === model.id && 'bg-accent',
@@ -241,7 +255,6 @@ export default function NewAgentPage() {
             {saving ? 'Saving…' : 'Save new agent'}
           </button>
         </div>
-
       </div>
     </div>
   );

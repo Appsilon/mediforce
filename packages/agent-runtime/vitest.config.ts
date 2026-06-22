@@ -7,19 +7,10 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@mediforce/platform-core/testing': path.resolve(
-        __dirname,
-        '../platform-core/src/testing/index.ts',
-      ),
-      '@mediforce/platform-core': path.resolve(
-        __dirname,
-        '../platform-core/src/index.ts',
-      ),
+      '@mediforce/platform-core/testing': path.resolve(__dirname, '../platform-core/src/testing/index.ts'),
+      '@mediforce/platform-core': path.resolve(__dirname, '../platform-core/src/index.ts'),
       '@mediforce/agent-runtime': path.resolve(__dirname, './src/index.ts'),
-      '@mediforce/container-worker': path.resolve(
-        __dirname,
-        '../container-worker/src/index.ts',
-      ),
+      '@mediforce/container-worker': path.resolve(__dirname, '../container-worker/src/index.ts'),
     },
   },
 });

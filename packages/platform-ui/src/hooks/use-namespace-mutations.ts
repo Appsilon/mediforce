@@ -30,12 +30,7 @@ import { queryKeys } from '@/lib/query-keys';
  */
 export function useUpdateNamespace(handle: string) {
   const qc = useQueryClient();
-  return useMutation<
-    UpdateNamespaceOutput,
-    Error,
-    UpdateNamespaceInput,
-    { restore: () => void }
-  >({
+  return useMutation<UpdateNamespaceOutput, Error, UpdateNamespaceInput, { restore: () => void }>({
     mutationFn: (input) => mediforce.namespaces.update(input),
     onMutate: async (input) => {
       await qc.cancelQueries({ queryKey: queryKeys.namespace(handle) });
@@ -89,12 +84,7 @@ export function useUpdateNamespace(handle: string) {
  */
 export function useUpdateMemberRole(handle: string) {
   const qc = useQueryClient();
-  return useMutation<
-    UpdateNamespaceMemberRoleOutput,
-    Error,
-    UpdateNamespaceMemberRoleInput,
-    { restore: () => void }
-  >({
+  return useMutation<UpdateNamespaceMemberRoleOutput, Error, UpdateNamespaceMemberRoleInput, { restore: () => void }>({
     mutationFn: (input) => mediforce.namespaces.updateMemberRole(input),
     onMutate: async (input) => {
       await qc.cancelQueries({ queryKey: queryKeys.namespace(handle) });
@@ -130,12 +120,7 @@ export function useUpdateMemberRole(handle: string) {
  */
 export function useRemoveMember(handle: string) {
   const qc = useQueryClient();
-  return useMutation<
-    RemoveNamespaceMemberOutput,
-    Error,
-    RemoveNamespaceMemberInput,
-    { restore: () => void }
-  >({
+  return useMutation<RemoveNamespaceMemberOutput, Error, RemoveNamespaceMemberInput, { restore: () => void }>({
     mutationFn: (input) => mediforce.namespaces.removeMember(input),
     onMutate: async (input) => {
       await qc.cancelQueries({ queryKey: queryKeys.namespace(handle) });
@@ -159,19 +144,11 @@ export function useRemoveMember(handle: string) {
  */
 export function useLeaveNamespace() {
   const qc = useQueryClient();
-  return useMutation<
-    LeaveNamespaceOutput,
-    Error,
-    LeaveNamespaceInput,
-    { restore: () => void }
-  >({
+  return useMutation<LeaveNamespaceOutput, Error, LeaveNamespaceInput, { restore: () => void }>({
     mutationFn: (input) => mediforce.namespaces.leave(input),
     onMutate: async (input) => {
       await qc.cancelQueries({ queryKey: queryKeys.users.me() });
-      const { restore } = snapshotCache(qc, [
-        queryKeys.users.me(),
-        queryKeys.namespace(input.handle),
-      ]);
+      const { restore } = snapshotCache(qc, [queryKeys.users.me(), queryKeys.namespace(input.handle)]);
       qc.setQueryData<GetMeOutput | undefined>(queryKeys.users.me(), (prev) => {
         if (prev === undefined) return prev;
         return { ...prev, namespaces: prev.namespaces.filter((n) => n.handle !== input.handle) };
@@ -194,19 +171,11 @@ export function useLeaveNamespace() {
  */
 export function useDeleteNamespace() {
   const qc = useQueryClient();
-  return useMutation<
-    DeleteNamespaceOutput,
-    Error,
-    DeleteNamespaceInput,
-    { restore: () => void }
-  >({
+  return useMutation<DeleteNamespaceOutput, Error, DeleteNamespaceInput, { restore: () => void }>({
     mutationFn: (input) => mediforce.namespaces.delete(input),
     onMutate: async (input) => {
       await qc.cancelQueries({ queryKey: queryKeys.users.me() });
-      const { restore } = snapshotCache(qc, [
-        queryKeys.users.me(),
-        queryKeys.namespace(input.handle),
-      ]);
+      const { restore } = snapshotCache(qc, [queryKeys.users.me(), queryKeys.namespace(input.handle)]);
       qc.setQueryData<GetMeOutput | undefined>(queryKeys.users.me(), (prev) => {
         if (prev === undefined) return prev;
         return { ...prev, namespaces: prev.namespaces.filter((n) => n.handle !== input.handle) };

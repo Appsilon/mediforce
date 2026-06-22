@@ -67,9 +67,7 @@ describe('POST /api/processes/bulk/cancel', () => {
   });
 
   it('[DATA] mixed batch: completed runs surface as per-item error, never aborts', async () => {
-    mockInstanceGetById.mockImplementation(async (id: string) =>
-      id === 'r-done' ? completedRun(id) : runningRun(id),
-    );
+    mockInstanceGetById.mockImplementation(async (id: string) => (id === 'r-done' ? completedRun(id) : runningRun(id)));
 
     const res = await POST(makeRequest({ runIds: ['r1', 'r-done', 'r2'] }), {});
     const json = await res.json();
@@ -77,10 +75,7 @@ describe('POST /api/processes/bulk/cancel', () => {
     expect(res.status).toBe(200);
     expect(json.results).toHaveLength(3);
     const byId = Object.fromEntries(
-      (json.results as Array<{ id: string; status: string; error?: string }>).map((r) => [
-        r.id,
-        r,
-      ]),
+      (json.results as Array<{ id: string; status: string; error?: string }>).map((r) => [r.id, r]),
     );
     expect(byId.r1.status).toBe('ok');
     expect(byId.r2.status).toBe('ok');

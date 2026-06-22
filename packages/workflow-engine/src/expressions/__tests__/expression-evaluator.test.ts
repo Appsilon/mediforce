@@ -1,13 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import {
-  evaluateExpression,
-  ExpressionError,
-  type ExpressionContext,
-} from '../expression-evaluator';
+import { evaluateExpression, ExpressionError, type ExpressionContext } from '../expression-evaluator';
 
-function makeContext(
-  overrides: Partial<ExpressionContext> = {},
-): ExpressionContext {
+function makeContext(overrides: Partial<ExpressionContext> = {}): ExpressionContext {
   return {
     output: {},
     variables: {},
@@ -66,9 +60,7 @@ describe('evaluateExpression', () => {
     });
 
     it('[ERROR] unknown root field throws ExpressionError', () => {
-      expect(() =>
-        evaluateExpression('unknown.field', makeContext()),
-      ).toThrow(ExpressionError);
+      expect(() => evaluateExpression('unknown.field', makeContext())).toThrow(ExpressionError);
     });
   });
 
@@ -171,30 +163,22 @@ describe('evaluateExpression', () => {
   describe('logical operators', () => {
     it('AND: both true → true', () => {
       const ctx = makeContext({ output: { a: true, b: true } });
-      expect(
-        evaluateExpression('output.a == true && output.b == true', ctx),
-      ).toBe(true);
+      expect(evaluateExpression('output.a == true && output.b == true', ctx)).toBe(true);
     });
 
     it('AND: one false → false', () => {
       const ctx = makeContext({ output: { a: true, b: false } });
-      expect(
-        evaluateExpression('output.a == true && output.b == true', ctx),
-      ).toBe(false);
+      expect(evaluateExpression('output.a == true && output.b == true', ctx)).toBe(false);
     });
 
     it('OR: one true → true', () => {
       const ctx = makeContext({ output: { a: false, b: true } });
-      expect(
-        evaluateExpression('output.a == true || output.b == true', ctx),
-      ).toBe(true);
+      expect(evaluateExpression('output.a == true || output.b == true', ctx)).toBe(true);
     });
 
     it('OR: both false → false', () => {
       const ctx = makeContext({ output: { a: false, b: false } });
-      expect(
-        evaluateExpression('output.a == true || output.b == true', ctx),
-      ).toBe(false);
+      expect(evaluateExpression('output.a == true || output.b == true', ctx)).toBe(false);
     });
 
     it('NOT: negates boolean', () => {
@@ -209,33 +193,18 @@ describe('evaluateExpression', () => {
 
     it('grouping with parentheses: (a || b) && c', () => {
       const ctx = makeContext({ output: { a: false, b: true, c: true } });
-      expect(
-        evaluateExpression(
-          '(output.a == true || output.b == true) && output.c == true',
-          ctx,
-        ),
-      ).toBe(true);
+      expect(evaluateExpression('(output.a == true || output.b == true) && output.c == true', ctx)).toBe(true);
     });
 
     it('grouping: (a || b) && c — c is false', () => {
       const ctx = makeContext({ output: { a: false, b: true, c: false } });
-      expect(
-        evaluateExpression(
-          '(output.a == true || output.b == true) && output.c == true',
-          ctx,
-        ),
-      ).toBe(false);
+      expect(evaluateExpression('(output.a == true || output.b == true) && output.c == true', ctx)).toBe(false);
     });
 
     it('operator precedence: && binds tighter than ||', () => {
       // a || b && c  →  a || (b && c)
       const ctx = makeContext({ output: { a: true, b: false, c: false } });
-      expect(
-        evaluateExpression(
-          'output.a == true || output.b == true && output.c == true',
-          ctx,
-        ),
-      ).toBe(true);
+      expect(evaluateExpression('output.a == true || output.b == true && output.c == true', ctx)).toBe(true);
     });
   });
 
@@ -246,39 +215,27 @@ describe('evaluateExpression', () => {
     });
 
     it('[ERROR] empty expression throws ExpressionError', () => {
-      expect(() => evaluateExpression('', makeContext())).toThrow(
-        ExpressionError,
-      );
+      expect(() => evaluateExpression('', makeContext())).toThrow(ExpressionError);
     });
 
     it('[ERROR] whitespace-only expression throws ExpressionError', () => {
-      expect(() => evaluateExpression('   ', makeContext())).toThrow(
-        ExpressionError,
-      );
+      expect(() => evaluateExpression('   ', makeContext())).toThrow(ExpressionError);
     });
 
     it('[ERROR] incomplete expression throws ExpressionError', () => {
-      expect(() =>
-        evaluateExpression('output.valid ==', makeContext()),
-      ).toThrow(ExpressionError);
+      expect(() => evaluateExpression('output.valid ==', makeContext())).toThrow(ExpressionError);
     });
 
     it('[ERROR] invalid characters throw ExpressionError', () => {
-      expect(() =>
-        evaluateExpression('output.valid $$ true', makeContext()),
-      ).toThrow(ExpressionError);
+      expect(() => evaluateExpression('output.valid $$ true', makeContext())).toThrow(ExpressionError);
     });
 
     it('[ERROR] unclosed parenthesis throws ExpressionError', () => {
-      expect(() =>
-        evaluateExpression('(output.valid == true', makeContext()),
-      ).toThrow(ExpressionError);
+      expect(() => evaluateExpression('(output.valid == true', makeContext())).toThrow(ExpressionError);
     });
 
     it('[ERROR] unclosed string throws ExpressionError', () => {
-      expect(() =>
-        evaluateExpression('verdict == "approve', makeContext()),
-      ).toThrow(ExpressionError);
+      expect(() => evaluateExpression('verdict == "approve', makeContext())).toThrow(ExpressionError);
     });
 
     it('negative numbers: output.temp > -10', () => {
@@ -288,9 +245,7 @@ describe('evaluateExpression', () => {
 
     it('string with escaped quote: output.msg == "say \\"hello\\""', () => {
       const ctx = makeContext({ output: { msg: 'say "hello"' } });
-      expect(
-        evaluateExpression('output.msg == "say \\"hello\\""', ctx),
-      ).toBe(true);
+      expect(evaluateExpression('output.msg == "say \\"hello\\""', ctx)).toBe(true);
     });
   });
 });

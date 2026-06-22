@@ -42,10 +42,7 @@ export const auditEvents = pgTable(
     // Context — FK to process_instances.id (nullable: workspace-level
     // admin actions have no parent run). ON DELETE SET NULL preserves the
     // audit row when a run is hard-deleted.
-    processInstanceId: text('process_instance_id').references(
-      () => processInstances.id,
-      { onDelete: 'set null' },
-    ),
+    processInstanceId: text('process_instance_id').references(() => processInstances.id, { onDelete: 'set null' }),
     stepId: text('step_id'),
     processDefinitionVersion: text('process_definition_version'),
     executorType: text('executor_type'),
@@ -53,9 +50,7 @@ export const auditEvents = pgTable(
 
     // Contemporaneous
     timestamp: timestamp('timestamp', { withTimezone: true }).notNull(),
-    serverTimestamp: timestamp('server_timestamp', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    serverTimestamp: timestamp('server_timestamp', { withTimezone: true }).notNull().defaultNow(),
 
     // Original snapshots + legible description + basis
     payload: jsonb('payload').notNull().$type<{
@@ -72,10 +67,6 @@ export const auditEvents = pgTable(
       table.entityId,
       table.timestamp.desc(),
     ),
-    processIdx: index('audit_events_process_idx').on(
-      table.workspace,
-      table.processInstanceId,
-      table.timestamp.asc(),
-    ),
+    processIdx: index('audit_events_process_idx').on(table.workspace, table.processInstanceId, table.timestamp.asc()),
   }),
 );

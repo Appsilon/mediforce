@@ -20,24 +20,34 @@ function CollapsiblePayload({ label, data }: { label: string; data: Record<strin
         {label}
       </Collapsible.Trigger>
       <Collapsible.Content className="mt-1">
-        <pre className="rounded bg-muted p-3 text-xs overflow-auto max-h-48">
-          {JSON.stringify(data, null, 2)}
-        </pre>
+        <pre className="rounded bg-muted p-3 text-xs overflow-auto max-h-48">{JSON.stringify(data, null, 2)}</pre>
       </Collapsible.Content>
     </Collapsible.Root>
   );
 }
 
-export function AuditLogTab({ events, loading, error }: { events: AuditEvent[]; loading: boolean; error?: Error | null }) {
+export function AuditLogTab({
+  events,
+  loading,
+  error,
+}: {
+  events: AuditEvent[];
+  loading: boolean;
+  error?: Error | null;
+}) {
   if (loading) {
-    return <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 rounded bg-muted animate-pulse" />)}</div>;
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-10 rounded bg-muted animate-pulse" />
+        ))}
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <div className="py-8 text-center text-sm text-destructive">
-        Failed to load audit events: {error.message}
-      </div>
+      <div className="py-8 text-center text-sm text-destructive">Failed to load audit events: {error.message}</div>
     );
   }
 
@@ -57,13 +67,9 @@ export function AuditLogTab({ events, loading, error }: { events: AuditEvent[]; 
                   {ACTOR_ICON[event.actorType] ?? ACTOR_ICON.system}
                   {event.actorId}
                 </span>
-                {event.stepId && (
-                  <span className="font-mono">· {event.stepId}</span>
-                )}
+                {event.stepId && <span className="font-mono">· {event.stepId}</span>}
               </div>
-              {event.description && (
-                <div className="text-xs text-muted-foreground">{event.description}</div>
-              )}
+              {event.description && <div className="text-xs text-muted-foreground">{event.description}</div>}
             </div>
             <div className="text-xs text-muted-foreground shrink-0">
               {format(new Date(event.timestamp), 'MMM d, HH:mm:ss')}
@@ -78,9 +84,7 @@ export function AuditLogTab({ events, loading, error }: { events: AuditEvent[]; 
             {Object.keys(event.outputSnapshot).length > 0 && (
               <CollapsiblePayload label="Output snapshot" data={event.outputSnapshot} />
             )}
-            {event.basis && (
-              <div className="text-xs text-muted-foreground">Basis: {event.basis}</div>
-            )}
+            {event.basis && <div className="text-xs text-muted-foreground">Basis: {event.basis}</div>}
           </div>
         </div>
       ))}

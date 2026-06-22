@@ -30,9 +30,7 @@ export function useStepExecutions(
   const isTerminal = instanceStatus !== undefined && TERMINAL_STATUSES.has(instanceStatus);
 
   const query = useQuery({
-    queryKey: enabled
-      ? queryKeys.processSteps(instanceId)
-      : queryKeys.processSteps('__noop__'),
+    queryKey: enabled ? queryKeys.processSteps(instanceId) : queryKeys.processSteps('__noop__'),
     queryFn: async () => {
       if (instanceId === null || instanceId === undefined) {
         throw new Error('unreachable: enabled gates this');
@@ -66,4 +64,3 @@ export function useStepExecutions(
     error: (query.error as Error | null) ?? null,
   };
 }
-

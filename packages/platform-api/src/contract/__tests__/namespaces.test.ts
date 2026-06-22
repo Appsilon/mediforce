@@ -7,10 +7,7 @@ import {
   DeleteNamespaceInputSchema,
   RemoveNamespaceMemberInputSchema,
 } from '../namespaces';
-import {
-  ClearMustChangePasswordInputSchema,
-  ClearMustChangePasswordOutputSchema,
-} from '../users';
+import { ClearMustChangePasswordInputSchema, ClearMustChangePasswordOutputSchema } from '../users';
 
 describe('UpdateNamespace schemas', () => {
   it('UpdateNamespaceBodySchema requires at least one field', () => {
@@ -25,9 +22,7 @@ describe('UpdateNamespace schemas', () => {
   });
 
   it('UpdateNamespaceInputSchema accepts handle + one of the edit fields', () => {
-    expect(
-      UpdateNamespaceInputSchema.safeParse({ handle: 'acme', displayName: 'Acme' }).success,
-    ).toBe(true);
+    expect(UpdateNamespaceInputSchema.safeParse({ handle: 'acme', displayName: 'Acme' }).success).toBe(true);
   });
 
   it('UpdateNamespaceInputSchema rejects an empty displayName', () => {
@@ -76,9 +71,7 @@ describe('Path-param input schemas', () => {
   it('LeaveNamespace / DeleteNamespace / RemoveNamespaceMember require a valid handle', () => {
     expect(LeaveNamespaceInputSchema.safeParse({ handle: 'acme' }).success).toBe(true);
     expect(DeleteNamespaceInputSchema.safeParse({ handle: 'acme' }).success).toBe(true);
-    expect(
-      RemoveNamespaceMemberInputSchema.safeParse({ handle: 'acme', uid: 'uid-x' }).success,
-    ).toBe(true);
+    expect(RemoveNamespaceMemberInputSchema.safeParse({ handle: 'acme', uid: 'uid-x' }).success).toBe(true);
     expect(RemoveNamespaceMemberInputSchema.safeParse({ handle: 'acme', uid: '' }).success).toBe(false);
   });
 });

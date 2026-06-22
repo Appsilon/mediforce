@@ -21,9 +21,7 @@ describe('archiveRun handler', () => {
 
   describe('happy path', () => {
     it('archives a completed run and returns the post-mutation entity', async () => {
-      await instanceRepo.create(
-        buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'completed' }),
-      );
+      await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'completed' }));
       const scope = createTestScope({
         instanceRepo,
         auditRepo,
@@ -57,9 +55,7 @@ describe('archiveRun handler', () => {
     });
 
     it('archives a failed run', async () => {
-      await instanceRepo.create(
-        buildProcessInstance({ id: 'inst-f', namespace: 'team-alpha', status: 'failed' }),
-      );
+      await instanceRepo.create(buildProcessInstance({ id: 'inst-f', namespace: 'team-alpha', status: 'failed' }));
       const scope = createTestScope({
         instanceRepo,
         auditRepo,
@@ -94,9 +90,7 @@ describe('archiveRun handler', () => {
 
   describe('precondition failures', () => {
     it('throws PreconditionFailedError on a running run', async () => {
-      await instanceRepo.create(
-        buildProcessInstance({ id: 'inst-r', namespace: 'team-alpha', status: 'running' }),
-      );
+      await instanceRepo.create(buildProcessInstance({ id: 'inst-r', namespace: 'team-alpha', status: 'running' }));
       const scope = createTestScope({
         instanceRepo,
         auditRepo,
@@ -144,9 +138,7 @@ describe('archiveRun handler', () => {
     });
 
     it('throws NotFoundError for a foreign-workspace instance', async () => {
-      await instanceRepo.create(
-        buildProcessInstance({ id: 'inst-f', namespace: 'team-beta', status: 'completed' }),
-      );
+      await instanceRepo.create(buildProcessInstance({ id: 'inst-f', namespace: 'team-beta', status: 'completed' }));
       const scope = createTestScope({
         instanceRepo,
         auditRepo,
@@ -215,9 +207,7 @@ describe('archiveRun handler', () => {
     });
 
     it('attributes audit to api-user when caller is system actor', async () => {
-      await instanceRepo.create(
-        buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'completed' }),
-      );
+      await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'completed' }));
       const scope = createTestScope({ instanceRepo, auditRepo });
 
       await archiveRun({ runId: 'inst-a', archived: true }, scope);

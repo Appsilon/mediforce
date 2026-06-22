@@ -6,9 +6,7 @@ export interface FakeWorkspaceManagerOptions {
   handle?: Partial<RunWorkspaceHandle>;
 }
 
-export function createFakeWorkspaceManager(
-  options: FakeWorkspaceManagerOptions = {},
-): WorkspaceManagerLike {
+export function createFakeWorkspaceManager(options: FakeWorkspaceManagerOptions = {}): WorkspaceManagerLike {
   const handle: RunWorkspaceHandle = {
     path: '/tmp/mediforce-fake-workspace',
     branch: 'run/fake-run',

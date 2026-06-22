@@ -1,29 +1,11 @@
-import {
-  McpClientManager,
-  type McpToolDefinition,
-} from '@mediforce/mcp-client';
+import { McpClientManager, type McpToolDefinition } from '@mediforce/mcp-client';
 import type { ConversationTurn, CoworkSession, OutputSchemaShape } from '@mediforce/platform-core';
-import {
-  HandlerError,
-  PreconditionFailedError,
-} from '../../errors';
+import { HandlerError, PreconditionFailedError } from '../../errors';
 import { loadOr404 } from '../_helpers';
 import type { CallerScope } from '../../repositories/index';
-import type {
-  ChatCoworkSessionInput,
-  ChatCoworkSessionOutput,
-  ChatCoworkToolCall,
-} from '../../contract/cowork';
-import {
-  buildMessages,
-  buildToolsArray,
-  buildMcpSystemPromptSection,
-  type ChatMessage,
-} from './_lib/build-messages';
-import {
-  callOpenRouter,
-  type OpenRouterToolCall,
-} from '../../services/openrouter-client';
+import type { ChatCoworkSessionInput, ChatCoworkSessionOutput, ChatCoworkToolCall } from '../../contract/cowork';
+import { buildMessages, buildToolsArray, buildMcpSystemPromptSection, type ChatMessage } from './_lib/build-messages';
+import { callOpenRouter, type OpenRouterToolCall } from '../../services/openrouter-client';
 import { validateOutputSchema } from '@mediforce/agent-runtime';
 
 const MAX_TOOL_LOOP_ITERATIONS = 10;
@@ -49,11 +31,7 @@ export async function chatCoworkSession(
       'Session disappeared after saving human turn',
     );
     const result = await runToolLoop({ scope, ctx, reloaded, mcp });
-    const agentTurnId = await addTurn(
-      scope,
-      input.sessionId,
-      agentTurn(result.agentText, result.artifact ?? null),
-    );
+    const agentTurnId = await addTurn(scope, input.sessionId, agentTurn(result.agentText, result.artifact ?? null));
     const finalSession = await loadOr404(
       scope.coworkSessions.getById(input.sessionId),
       'Session disappeared after saving agent turn',
@@ -77,20 +55,14 @@ interface ChatContext {
   readonly namespace: string;
 }
 
-async function loadChatContext(
-  sessionId: string,
-  scope: CallerScope,
-): Promise<ChatContext> {
-  const session = await loadOr404(
-    scope.coworkSessions.getById(sessionId),
-    `Cowork session '${sessionId}' not found`,
-  );
+async function loadChatContext(sessionId: string, scope: CallerScope): Promise<ChatContext> {
+  const session = await loadOr404(scope.coworkSessions.getById(sessionId), `Cowork session '${sessionId}' not found`);
 
   if (session.status !== 'active') {
-    throw new PreconditionFailedError(
-      `Cannot message a ${session.status} session`,
-      { sessionId, status: session.status },
-    );
+    throw new PreconditionFailedError(`Cannot message a ${session.status} session`, {
+      sessionId,
+      status: session.status,
+    });
   }
 
   const instance = await loadOr404(
@@ -107,10 +79,7 @@ async function loadChatContext(
   const secrets = await scope.workspaceSecrets.getRuntimeSecrets(namespace, workflowName);
   const openRouterKey = secrets['OPENROUTER_API_KEY'];
   if (!openRouterKey) {
-    throw new HandlerError(
-      'validation',
-      'OPENROUTER_API_KEY not configured in workspace secrets',
-    );
+    throw new HandlerError('validation', 'OPENROUTER_API_KEY not configured in workspace secrets');
   }
 
   return {
@@ -155,10 +124,7 @@ function humanTurn(content: string): ConversationTurn {
   };
 }
 
-function agentTurn(
-  content: string,
-  artifactDelta: Record<string, unknown> | null,
-): ConversationTurn {
+function agentTurn(content: string, artifactDelta: Record<string, unknown> | null): ConversationTurn {
   return {
     id: crypto.randomUUID(),
     role: 'agent',
@@ -188,11 +154,7 @@ function toolRunningTurn(
   };
 }
 
-async function addTurn(
-  scope: CallerScope,
-  sessionId: string,
-  turn: ConversationTurn,
-): Promise<string> {
+async function addTurn(scope: CallerScope, sessionId: string, turn: ConversationTurn): Promise<string> {
   await scope.coworkSessions.addTurn(sessionId, turn);
   return turn.id;
 }
@@ -219,7 +181,10 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
   }
 
   const tools = buildToolsArray(mcp?.tools ?? []);
-  if (COWORK_DEBUG) console.log(`[cowork-chat] Tools sent to LLM: ${tools.map(t => t.function.name).join(', ')} (${tools.length} total)`);
+  if (COWORK_DEBUG)
+    console.log(
+      `[cowork-chat] Tools sent to LLM: ${tools.map((t) => t.function.name).join(', ')} (${tools.length} total)`,
+    );
   const toolCallSummaries: ChatCoworkToolCall[] = [];
   let artifact: Record<string, unknown> | undefined;
   let agentText = '';
@@ -232,14 +197,13 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
       apiKey: ctx.openRouterKey,
     });
     agentText = response.content;
-    if (COWORK_DEBUG) console.log(`[cowork-chat] LLM response: text=${agentText.length}chars toolCalls=[${response.toolCalls.map(tc => tc.function.name).join(', ')}]`);
+    if (COWORK_DEBUG)
+      console.log(
+        `[cowork-chat] LLM response: text=${agentText.length}chars toolCalls=[${response.toolCalls.map((tc) => tc.function.name).join(', ')}]`,
+      );
 
-    const artifactCalls = response.toolCalls.filter(
-      (tc) => tc.function.name === 'update_artifact',
-    );
-    const presentationCalls = response.toolCalls.filter(
-      (tc) => tc.function.name === 'update_presentation',
-    );
+    const artifactCalls = response.toolCalls.filter((tc) => tc.function.name === 'update_artifact');
+    const presentationCalls = response.toolCalls.filter((tc) => tc.function.name === 'update_presentation');
     const mcpCalls = response.toolCalls.filter(
       (tc) => tc.function.name !== 'update_artifact' && tc.function.name !== 'update_presentation',
     );
@@ -255,17 +219,11 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
 
         let resultMsg = 'Artifact updated.';
         if (ctx.session.outputSchema) {
-          const error = validateOutputSchema(
-            parsed,
-            ctx.session.outputSchema as OutputSchemaShape,
-          );
-          const validationResult = error === null
-            ? { valid: true, errors: [] as string[] }
-            : { valid: false, errors: [error] };
+          const error = validateOutputSchema(parsed, ctx.session.outputSchema as OutputSchemaShape);
+          const validationResult =
+            error === null ? { valid: true, errors: [] as string[] } : { valid: false, errors: [error] };
           await scope.coworkSessions.updateValidationResult(ctx.session.id, validationResult);
-          resultMsg = error === null
-            ? 'Artifact updated and validated.'
-            : `Artifact updated. Validation: ${error}`;
+          resultMsg = error === null ? 'Artifact updated and validated.' : `Artifact updated. Validation: ${error}`;
         }
         await scope.coworkSessions.updateTurn(ctx.session.id, turn.id, {
           toolResult: resultMsg,
@@ -309,7 +267,9 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
 
     for (const call of artifactCalls) {
       const validationMsg = ctx.session.outputSchema
-        ? (artifact ? 'Artifact updated and validated.' : 'Artifact update skipped (parse error).')
+        ? artifact
+          ? 'Artifact updated and validated.'
+          : 'Artifact update skipped (parse error).'
         : 'Artifact updated.';
       messages.push({ role: 'tool', content: validationMsg, tool_call_id: call.id });
     }
@@ -329,10 +289,7 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
   return { agentText, artifact, toolCalls: toolCallSummaries };
 }
 
-function assistantMessage(
-  content: string,
-  toolCalls: OpenRouterToolCall[],
-): ChatMessage {
+function assistantMessage(content: string, toolCalls: OpenRouterToolCall[]): ChatMessage {
   return {
     role: 'assistant',
     content,
@@ -386,9 +343,7 @@ function parseToolArgs(raw: string): Record<string, unknown> {
 
 // Malformed `update_artifact` payloads are skipped (parity with the
 // pre-migration route — `null` here means "ignore, keep going").
-function applyArtifactUpdate(
-  call: OpenRouterToolCall,
-): Record<string, unknown> | null {
+function applyArtifactUpdate(call: OpenRouterToolCall): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(call.function.arguments) as {
       artifact: Record<string, unknown>;
@@ -399,9 +354,7 @@ function applyArtifactUpdate(
   }
 }
 
-function applyPresentationUpdate(
-  call: OpenRouterToolCall,
-): string | null {
+function applyPresentationUpdate(call: OpenRouterToolCall): string | null {
   try {
     const parsed = JSON.parse(call.function.arguments) as { html: string };
     return typeof parsed.html === 'string' ? parsed.html : null;

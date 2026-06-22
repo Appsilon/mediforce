@@ -112,10 +112,9 @@ async function main(): Promise<void> {
   // PLATFORM_API_KEY only if you've consciously aliased them in dev.
   const adminApiKey = process.env.PLATFORM_ADMIN_API_KEY ?? process.env.MEDIFORCE_API_KEY ?? platformSecret;
 
-  const listResp = await fetch(
-    `${args.origin}/api/admin/oauth-providers?namespace=${args.namespace}`,
-    { headers: { 'X-Api-Key': adminApiKey } },
-  );
+  const listResp = await fetch(`${args.origin}/api/admin/oauth-providers?namespace=${args.namespace}`, {
+    headers: { 'X-Api-Key': adminApiKey },
+  });
   if (!listResp.ok) {
     console.error(`Failed to list providers (${listResp.status})`);
     process.exit(3);
@@ -147,10 +146,7 @@ async function main(): Promise<void> {
 
   const url = new URL(provider.authorizeUrl);
   url.searchParams.set('client_id', provider.clientId);
-  url.searchParams.set(
-    'redirect_uri',
-    `${args.origin}/api/oauth/${encodeURIComponent(args.provider)}/callback`,
-  );
+  url.searchParams.set('redirect_uri', `${args.origin}/api/oauth/${encodeURIComponent(args.provider)}/callback`);
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('scope', provider.scopes.join(' '));
   url.searchParams.set('state', state);

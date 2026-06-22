@@ -10,14 +10,12 @@ import { listAdapter } from '../_generic';
  * Returns the full `ProcessInstance` shape per Phase 4 PRD §9 (read-path
  * schema convergence with the detail endpoint).
  */
-export const listRuns = listAdapter<ListRunsInput, ProcessInstance, 'runs'>(
-  'runs',
-  async (input, scope) =>
-    scope.runs.list({
-      definitionName: input.workflow,
-      status: input.status,
-      namespace: input.namespace,
-      limit: input.limit,
-      dryRun: input.dryRun,
-    }),
+export const listRuns = listAdapter<ListRunsInput, ProcessInstance, 'runs'>('runs', async (input, scope) =>
+  scope.runs.list({
+    definitionName: input.workflow,
+    status: input.status,
+    namespace: input.namespace,
+    limit: input.limit,
+    dryRun: input.dryRun,
+  }),
 );

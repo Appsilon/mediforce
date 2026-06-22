@@ -5,7 +5,12 @@ import { createQueryWrapper } from '@/test/react-query';
 
 const listNamesMock = vi.fn<(...args: unknown[]) => Promise<{ runs: RunNameEntry[] }>>();
 class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { runs: { listNames: listNamesMock } },

@@ -70,10 +70,9 @@ export const processInstances = pgTable(
 
     // Carry-over from predecessor run (per WD inputForNextRun).
     previousRun: jsonb('previous_run'),
-    previousRunSourceId: text('previous_run_source_id').references(
-      (): AnyPgColumn => processInstances.id,
-      { onDelete: 'set null' },
-    ),
+    previousRunSourceId: text('previous_run_source_id').references((): AnyPgColumn => processInstances.id, {
+      onDelete: 'set null',
+    }),
 
     totalCostUsd: numeric('total_cost_usd', { precision: 12, scale: 6 }),
     createdBy: text('created_by'),
@@ -84,12 +83,8 @@ export const processInstances = pgTable(
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
 
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     // Workspace inbox: most reads start here (only live rows).
@@ -98,12 +93,7 @@ export const processInstances = pgTable(
       .where(sql`${table.deletedAt} is null and ${table.archivedAt} is null`),
     // Per-definition feed (status-filtered, newest activity first).
     workspaceDefStatusIdx: index('process_instances_workspace_def_status_idx')
-      .on(
-        table.workspace,
-        table.definitionName,
-        table.status,
-        table.updatedAt.desc(),
-      )
+      .on(table.workspace, table.definitionName, table.status, table.updatedAt.desc())
       .where(sql`${table.deletedAt} is null and ${table.archivedAt} is null`),
   }),
 );
@@ -147,9 +137,7 @@ export const stepExecutions = pgTable(
     startedAt: timestamp('started_at', { withTimezone: true }),
     completedAt: timestamp('completed_at', { withTimezone: true }),
 
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     // Per-instance, per-step history (latest-first via `desc`).
@@ -195,4 +183,3 @@ export const agentEvents = pgTable(
     ),
   }),
 );
-

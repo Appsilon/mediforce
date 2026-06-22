@@ -5,7 +5,12 @@ import { createQueryWrapper } from '@/test/react-query';
 
 const meMock = vi.fn<(...args: unknown[]) => Promise<GetMeOutput>>();
 class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { users: { me: meMock } },
@@ -79,10 +84,10 @@ describe('useUserMe', () => {
     meMock.mockResolvedValue(SAMPLE);
     const { wrapper } = createQueryWrapper();
 
-    const { result, rerender } = renderHook(
-      ({ enabled }: { enabled: boolean }) => useUserMe({ enabled }),
-      { wrapper, initialProps: { enabled: false } },
-    );
+    const { result, rerender } = renderHook(({ enabled }: { enabled: boolean }) => useUserMe({ enabled }), {
+      wrapper,
+      initialProps: { enabled: false },
+    });
 
     expect(meMock).not.toHaveBeenCalled();
 

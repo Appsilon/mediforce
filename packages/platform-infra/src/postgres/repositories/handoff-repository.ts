@@ -70,29 +70,17 @@ export class PostgresHandoffRepository implements HandoffRepository {
   }
 
   async getById(entityId: string): Promise<HandoffEntity | null> {
-    const rows = await this.db
-      .select()
-      .from(handoffEntities)
-      .where(eq(handoffEntities.id, entityId))
-      .limit(1);
+    const rows = await this.db.select().from(handoffEntities).where(eq(handoffEntities.id, entityId)).limit(1);
     const row = rows[0];
     return row ? HandoffEntitySchema.parse(toHandoffEntity(row)) : null;
   }
 
-  async getByIdInNamespaces(
-    entityId: string,
-    allowed: readonly string[],
-  ): Promise<HandoffEntity | null> {
+  async getByIdInNamespaces(entityId: string, allowed: readonly string[]): Promise<HandoffEntity | null> {
     if (allowed.length === 0) return null;
     const rows = await this.db
       .select()
       .from(handoffEntities)
-      .where(
-        and(
-          eq(handoffEntities.id, entityId),
-          inArray(handoffEntities.workspace, [...allowed]),
-        ),
-      )
+      .where(and(eq(handoffEntities.id, entityId), inArray(handoffEntities.workspace, [...allowed])))
       .limit(1);
     const row = rows[0];
     return row ? HandoffEntitySchema.parse(toHandoffEntity(row)) : null;
@@ -104,20 +92,12 @@ export class PostgresHandoffRepository implements HandoffRepository {
     const rows = await this.db
       .select()
       .from(handoffEntities)
-      .where(
-        and(
-          eq(handoffEntities.assignedRole, role),
-          inArray(handoffEntities.status, ['created', 'acknowledged']),
-        ),
-      )
+      .where(and(eq(handoffEntities.assignedRole, role), inArray(handoffEntities.status, ['created', 'acknowledged'])))
       .orderBy(asc(handoffEntities.createdAt));
     return rows.map((r) => HandoffEntitySchema.parse(toHandoffEntity(r)));
   }
 
-  async getByRoleInNamespaces(
-    role: string,
-    allowed: readonly string[],
-  ): Promise<HandoffEntity[]> {
+  async getByRoleInNamespaces(role: string, allowed: readonly string[]): Promise<HandoffEntity[]> {
     if (allowed.length === 0) return [];
     const rows = await this.db
       .select()
@@ -134,27 +114,16 @@ export class PostgresHandoffRepository implements HandoffRepository {
   }
 
   async getByInstanceId(instanceId: string): Promise<HandoffEntity[]> {
-    const rows = await this.db
-      .select()
-      .from(handoffEntities)
-      .where(eq(handoffEntities.processInstanceId, instanceId));
+    const rows = await this.db.select().from(handoffEntities).where(eq(handoffEntities.processInstanceId, instanceId));
     return rows.map((r) => HandoffEntitySchema.parse(toHandoffEntity(r)));
   }
 
-  async getByInstanceIdInNamespaces(
-    instanceId: string,
-    allowed: readonly string[],
-  ): Promise<HandoffEntity[]> {
+  async getByInstanceIdInNamespaces(instanceId: string, allowed: readonly string[]): Promise<HandoffEntity[]> {
     if (allowed.length === 0) return [];
     const rows = await this.db
       .select()
       .from(handoffEntities)
-      .where(
-        and(
-          eq(handoffEntities.processInstanceId, instanceId),
-          inArray(handoffEntities.workspace, [...allowed]),
-        ),
-      );
+      .where(and(eq(handoffEntities.processInstanceId, instanceId), inArray(handoffEntities.workspace, [...allowed])));
     return rows.map((r) => HandoffEntitySchema.parse(toHandoffEntity(r)));
   }
 
@@ -186,11 +155,7 @@ export class PostgresHandoffRepository implements HandoffRepository {
     return HandoffEntitySchema.parse(toHandoffEntity(row));
   }
 
-  async resolve(
-    entityId: string,
-    userId: string,
-    resolution: Record<string, unknown>,
-  ): Promise<HandoffEntity> {
+  async resolve(entityId: string, userId: string, resolution: Record<string, unknown>): Promise<HandoffEntity> {
     const existing = await this.getById(entityId);
     if (!existing) throw new Error(`HandoffEntity '${entityId}' not found`);
     if (existing.assignedUserId !== userId) {
@@ -215,9 +180,7 @@ export class PostgresHandoffRepository implements HandoffRepository {
   }
 }
 
-function toHandoffEntity(
-  row: typeof handoffEntities.$inferSelect,
-): HandoffEntity {
+function toHandoffEntity(row: typeof handoffEntities.$inferSelect): HandoffEntity {
   return {
     id: row.id,
     type: row.type,

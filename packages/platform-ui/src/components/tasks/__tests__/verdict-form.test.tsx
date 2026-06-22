@@ -70,9 +70,7 @@ describe('VerdictForm (single-click GitHub flow)', () => {
   });
 
   it('disables a requiresComment verdict button until a comment is typed', async () => {
-    const verdicts: TaskVerdict[] = [
-      { key: 'reject', label: 'Reject', intent: 'danger', requiresComment: true },
-    ];
+    const verdicts: TaskVerdict[] = [{ key: 'reject', label: 'Reject', intent: 'danger', requiresComment: true }];
     const user = userEvent.setup();
 
     render(<VerdictForm taskId="t1" disabled={false} verdicts={verdicts} />);
@@ -91,9 +89,7 @@ describe('VerdictForm (single-click GitHub flow)', () => {
   });
 
   it('passes the typed comment with a non-required verdict when present', async () => {
-    const verdicts: TaskVerdict[] = [
-      { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
-    ];
+    const verdicts: TaskVerdict[] = [{ key: 'approve', label: 'Approve', intent: 'success', requiresComment: false }];
     const user = userEvent.setup();
 
     render(<VerdictForm taskId="t1" disabled={false} verdicts={verdicts} />);
@@ -156,9 +152,7 @@ describe('VerdictConfirmationReadOnly', () => {
 
   it('renders the "no verdict data available" notice when completionData has no verdict', () => {
     render(
-      <VerdictConfirmationReadOnly
-        completionData={{ comment: 'orphan', completedAt: '2026-05-12T10:00:00.000Z' }}
-      />,
+      <VerdictConfirmationReadOnly completionData={{ comment: 'orphan', completedAt: '2026-05-12T10:00:00.000Z' }} />,
     );
     expect(screen.getByText(/Task completed\. No verdict data available\./)).toBeInTheDocument();
   });

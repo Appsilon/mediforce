@@ -16,20 +16,14 @@ interface RouteContext {
  * with `sequence > afterSequence`, letting the live poller fetch deltas.
  * Workspace gating in `scope.runs` / `scope.agentEvents`.
  */
-export const GET = createRouteAdapter<
-  typeof ListAgentEventsInputSchema,
-  ListAgentEventsInput,
-  unknown,
-  RouteContext
->(
+export const GET = createRouteAdapter<typeof ListAgentEventsInputSchema, ListAgentEventsInput, unknown, RouteContext>(
   ListAgentEventsInputSchema,
   async (req, ctx) => {
     const { instanceId } = await ctx.params;
     const params = new URL(req.url).searchParams;
     const stepId = params.get('stepId') ?? undefined;
     const afterSequenceRaw = params.get('afterSequence');
-    const afterSequence =
-      afterSequenceRaw === null ? undefined : Number(afterSequenceRaw);
+    const afterSequence = afterSequenceRaw === null ? undefined : Number(afterSequenceRaw);
     return { instanceId, stepId, afterSequence };
   },
   listAgentEvents,

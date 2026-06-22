@@ -33,22 +33,14 @@ export const runStartCommand = defineCommand({
     if (typeof args.version === 'string') {
       const parsedVersion = Number.parseInt(args.version, 10);
       if (!Number.isInteger(parsedVersion) || parsedVersion <= 0) {
-        printError(
-          output,
-          { error: `--version must be a positive integer, got '${args.version}'` },
-          jsonMode,
-        );
+        printError(output, { error: `--version must be a positive integer, got '${args.version}'` }, jsonMode);
         return 2;
       }
       definitionVersion = parsedVersion;
     }
 
     if (args.input !== undefined && args['input-file'] !== undefined) {
-      printError(
-        output,
-        { error: 'Flags are mutually exclusive: --input, --input-file' },
-        jsonMode,
-      );
+      printError(output, { error: 'Flags are mutually exclusive: --input, --input-file' }, jsonMode);
       return 2;
     }
 
@@ -76,11 +68,7 @@ export const runStartCommand = defineCommand({
         try {
           raw = await readFile(args['input-file'], 'utf-8');
         } catch (err) {
-          printError(
-            output,
-            { error: `Cannot read --input-file '${args['input-file']}': ${String(err)}` },
-            jsonMode,
-          );
+          printError(output, { error: `Cannot read --input-file '${args['input-file']}': ${String(err)}` }, jsonMode);
           return 2;
         }
       }

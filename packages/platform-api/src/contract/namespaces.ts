@@ -1,9 +1,5 @@
 import { z } from 'zod';
-import {
-  HandleSchema,
-  NamespaceSchema,
-  NamespaceMemberSchema,
-} from '@mediforce/platform-core';
+import { HandleSchema, NamespaceSchema, NamespaceMemberSchema } from '@mediforce/platform-core';
 
 export const GetNamespaceInputSchema = z.object({ handle: HandleSchema });
 export const GetNamespaceOutputSchema = z.object({
@@ -42,13 +38,13 @@ const atLeastOneUpdateField = (v: z.infer<typeof UpdateNamespaceFieldsSchema>): 
   v.displayName !== undefined || v.bio !== undefined || v.icon !== undefined;
 const atLeastOneUpdateFieldMessage = 'At least one of displayName, bio, icon must be provided';
 
-export const UpdateNamespaceBodySchema = UpdateNamespaceFieldsSchema.refine(
+export const UpdateNamespaceBodySchema = UpdateNamespaceFieldsSchema.refine(atLeastOneUpdateField, {
+  message: atLeastOneUpdateFieldMessage,
+});
+export const UpdateNamespaceInputSchema = UpdateNamespaceFieldsSchema.extend({ handle: HandleSchema }).refine(
   atLeastOneUpdateField,
   { message: atLeastOneUpdateFieldMessage },
 );
-export const UpdateNamespaceInputSchema = UpdateNamespaceFieldsSchema
-  .extend({ handle: HandleSchema })
-  .refine(atLeastOneUpdateField, { message: atLeastOneUpdateFieldMessage });
 export const UpdateNamespaceOutputSchema = z.object({ namespace: NamespaceSchema });
 
 export type UpdateNamespaceInput = z.infer<typeof UpdateNamespaceInputSchema>;

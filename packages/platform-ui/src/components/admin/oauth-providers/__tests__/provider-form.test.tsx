@@ -23,13 +23,7 @@ function makeProvider(overrides: Partial<OAuthProviderConfig> = {}): OAuthProvid
 
 describe('ProviderForm', () => {
   it('renders empty create form when provider and preset are null', () => {
-    render(
-      <ProviderForm
-        provider={null}
-        preset={null}
-        onSubmit={vi.fn()}
-      />,
-    );
+    render(<ProviderForm provider={null} preset={null} onSubmit={vi.fn()} />);
 
     const idInput = screen.getByLabelText(/^Id$/i) as HTMLInputElement;
     expect(idInput.value).toBe('');
@@ -37,13 +31,7 @@ describe('ProviderForm', () => {
   });
 
   it('pre-fills GitHub preset fields', () => {
-    render(
-      <ProviderForm
-        provider={null}
-        preset="github"
-        onSubmit={vi.fn()}
-      />,
-    );
+    render(<ProviderForm provider={null} preset="github" onSubmit={vi.fn()} />);
 
     expect((screen.getByLabelText(/^Id$/i) as HTMLInputElement).value).toBe('github');
     expect((screen.getByLabelText(/^Name$/i) as HTMLInputElement).value).toBe('GitHub');
@@ -53,29 +41,19 @@ describe('ProviderForm', () => {
     expect((screen.getByLabelText(/^Token URL$/i) as HTMLInputElement).value).toBe(
       'https://github.com/login/oauth/access_token',
     );
-    expect((screen.getByLabelText(/^User info URL$/i) as HTMLInputElement).value).toBe(
-      'https://api.github.com/user',
-    );
+    expect((screen.getByLabelText(/^User info URL$/i) as HTMLInputElement).value).toBe('https://api.github.com/user');
     expect((screen.getByLabelText(/^Scopes$/i) as HTMLTextAreaElement).value).toBe('repo read:user');
   });
 
   it('pre-fills Google preset fields including revokeUrl', () => {
-    render(
-      <ProviderForm
-        provider={null}
-        preset="google"
-        onSubmit={vi.fn()}
-      />,
-    );
+    render(<ProviderForm provider={null} preset="google" onSubmit={vi.fn()} />);
 
     expect((screen.getByLabelText(/^Id$/i) as HTMLInputElement).value).toBe('google');
     expect((screen.getByLabelText(/^Name$/i) as HTMLInputElement).value).toBe('Google');
     expect((screen.getByLabelText(/^Revoke URL$/i) as HTMLInputElement).value).toBe(
       'https://oauth2.googleapis.com/revoke',
     );
-    expect((screen.getByLabelText(/^Scopes$/i) as HTMLTextAreaElement).value).toBe(
-      'openid email profile',
-    );
+    expect((screen.getByLabelText(/^Scopes$/i) as HTMLTextAreaElement).value).toBe('openid email profile');
   });
 
   it('pre-fills edit form from existing provider', () => {
@@ -87,22 +65,14 @@ describe('ProviderForm', () => {
       revokeUrl: 'https://acme.example.com/revoke',
     });
 
-    render(
-      <ProviderForm
-        provider={provider}
-        preset={null}
-        onSubmit={vi.fn()}
-      />,
-    );
+    render(<ProviderForm provider={provider} preset={null} onSubmit={vi.fn()} />);
 
     expect((screen.getByLabelText(/^Id$/i) as HTMLInputElement).value).toBe('acme');
     expect((screen.getByLabelText(/^Id$/i) as HTMLInputElement).readOnly).toBe(true);
     expect((screen.getByLabelText(/^Name$/i) as HTMLInputElement).value).toBe('Acme');
     expect((screen.getByLabelText(/^Client id$/i) as HTMLInputElement).value).toBe('acme-client');
     expect((screen.getByLabelText(/^Scopes$/i) as HTMLTextAreaElement).value).toBe('read write');
-    expect((screen.getByLabelText(/^Revoke URL$/i) as HTMLInputElement).value).toBe(
-      'https://acme.example.com/revoke',
-    );
+    expect((screen.getByLabelText(/^Revoke URL$/i) as HTMLInputElement).value).toBe('https://acme.example.com/revoke');
     expect(screen.getByRole('button', { name: /^Save$/i })).toBeInTheDocument();
   });
 
@@ -110,13 +80,7 @@ describe('ProviderForm', () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
-    render(
-      <ProviderForm
-        provider={null}
-        preset="github"
-        onSubmit={onSubmit}
-      />,
-    );
+    render(<ProviderForm provider={null} preset="github" onSubmit={onSubmit} />);
 
     await user.type(screen.getByLabelText(/^Client id$/i), 'test-client-id');
     await user.type(screen.getByLabelText(/^Client secret$/i), 'test-secret');
@@ -141,38 +105,17 @@ describe('ProviderForm', () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
-    render(
-      <ProviderForm
-        provider={null}
-        preset={null}
-        onSubmit={onSubmit}
-      />,
-    );
+    render(<ProviderForm provider={null} preset={null} onSubmit={onSubmit} />);
 
     await user.type(screen.getByLabelText(/^Id$/i), 'custom');
     await user.type(screen.getByLabelText(/^Name$/i), 'Custom');
     await user.type(screen.getByLabelText(/^Client id$/i), 'cid');
     await user.type(screen.getByLabelText(/^Client secret$/i), 'csecret');
-    await user.type(
-      screen.getByLabelText(/^Authorize URL$/i),
-      'https://example.com/authorize',
-    );
-    await user.type(
-      screen.getByLabelText(/^Token URL$/i),
-      'https://example.com/token',
-    );
-    await user.type(
-      screen.getByLabelText(/^User info URL$/i),
-      'https://example.com/userinfo',
-    );
-    await user.type(
-      screen.getByLabelText(/^Revoke URL$/i),
-      'https://example.com/revoke',
-    );
-    await user.type(
-      screen.getByLabelText(/^Icon URL$/i),
-      'https://example.com/icon.svg',
-    );
+    await user.type(screen.getByLabelText(/^Authorize URL$/i), 'https://example.com/authorize');
+    await user.type(screen.getByLabelText(/^Token URL$/i), 'https://example.com/token');
+    await user.type(screen.getByLabelText(/^User info URL$/i), 'https://example.com/userinfo');
+    await user.type(screen.getByLabelText(/^Revoke URL$/i), 'https://example.com/revoke');
+    await user.type(screen.getByLabelText(/^Icon URL$/i), 'https://example.com/icon.svg');
     await user.type(screen.getByLabelText(/^Scopes$/i), 'scope.one scope.two');
 
     await user.click(screen.getByRole('button', { name: /^Create$/i }));
@@ -192,13 +135,7 @@ describe('ProviderForm', () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
-    render(
-      <ProviderForm
-        provider={null}
-        preset="github"
-        onSubmit={onSubmit}
-      />,
-    );
+    render(<ProviderForm provider={null} preset="github" onSubmit={onSubmit} />);
 
     const scopesTextarea = screen.getByLabelText(/^Scopes$/i);
     await user.clear(scopesTextarea);
@@ -219,13 +156,7 @@ describe('ProviderForm', () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
 
-    render(
-      <ProviderForm
-        provider={null}
-        preset={null}
-        onSubmit={onSubmit}
-      />,
-    );
+    render(<ProviderForm provider={null} preset={null} onSubmit={onSubmit} />);
 
     await user.click(screen.getByRole('button', { name: /^Create$/i }));
 
@@ -242,13 +173,7 @@ describe('ProviderForm', () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
 
-    render(
-      <ProviderForm
-        provider={null}
-        preset="github"
-        onSubmit={onSubmit}
-      />,
-    );
+    render(<ProviderForm provider={null} preset="github" onSubmit={onSubmit} />);
 
     // Clear scopes to trigger min-length failure
     const scopesTextarea = screen.getByLabelText(/^Scopes$/i);
@@ -264,14 +189,7 @@ describe('ProviderForm', () => {
   });
 
   it('shows submit error message when provided', () => {
-    render(
-      <ProviderForm
-        provider={null}
-        preset={null}
-        onSubmit={vi.fn()}
-        submitError="Boom"
-      />,
-    );
+    render(<ProviderForm provider={null} preset={null} onSubmit={vi.fn()} submitError="Boom" />);
 
     expect(screen.getByText('Boom')).toBeInTheDocument();
   });
@@ -280,14 +198,7 @@ describe('ProviderForm', () => {
     const provider = makeProvider();
     const onDelete = vi.fn();
 
-    render(
-      <ProviderForm
-        provider={provider}
-        preset={null}
-        onSubmit={vi.fn()}
-        onDelete={onDelete}
-      />,
-    );
+    render(<ProviderForm provider={provider} preset={null} onSubmit={vi.fn()} onDelete={onDelete} />);
 
     const deleteButton = screen.getByRole('button', { name: /Delete/i });
     expect(deleteButton).toBeInTheDocument();

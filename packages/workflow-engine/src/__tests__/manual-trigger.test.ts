@@ -5,11 +5,7 @@ import {
   InMemoryAuditRepository,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import {
-  WorkflowEngine,
-  ManualTrigger,
-  ManualTriggerNotDeclaredError,
-} from '../index';
+import { WorkflowEngine, ManualTrigger, ManualTriggerNotDeclaredError } from '../index';
 import type { WorkflowTriggerContext } from '../index';
 
 const linearDef: WorkflowDefinition = {
@@ -53,20 +49,14 @@ describe('ManualTrigger', () => {
     processRepo = new InMemoryProcessRepository();
     instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository();
-    engine = new WorkflowEngine(
-      processRepo,
-      instanceRepo,
-      auditRepo,
-    );
+    engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo);
     trigger = new ManualTrigger(engine, processRepo);
 
     await processRepo.saveWorkflowDefinition(linearDef);
     await processRepo.saveWorkflowDefinition(cronOnlyDef);
   });
 
-  function makeContext(
-    overrides: Partial<WorkflowTriggerContext> = {},
-  ): WorkflowTriggerContext {
+  function makeContext(overrides: Partial<WorkflowTriggerContext> = {}): WorkflowTriggerContext {
     return {
       namespace: 'test',
       definitionName: 'linear-process',
@@ -97,32 +87,25 @@ describe('ManualTrigger', () => {
   });
 
   it('fireWorkflow() on non-existent definition throws', async () => {
-    await expect(
-      trigger.fireWorkflow(makeContext({ definitionName: 'nonexistent' })),
-    ).rejects.toThrow();
+    await expect(trigger.fireWorkflow(makeContext({ definitionName: 'nonexistent' }))).rejects.toThrow();
   });
 
   it('returned instanceId is a valid UUID', async () => {
     const result = await trigger.fireWorkflow(makeContext());
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     expect(result.instanceId).toMatch(uuidRegex);
   });
 
   describe('manual trigger declaration enforcement', () => {
     it('rejects workflows that do not declare a manual trigger', async () => {
-      await expect(
-        trigger.fireWorkflow(
-          makeContext({ definitionName: 'cron-only-process' }),
-        ),
-      ).rejects.toThrow(ManualTriggerNotDeclaredError);
+      await expect(trigger.fireWorkflow(makeContext({ definitionName: 'cron-only-process' }))).rejects.toThrow(
+        ManualTriggerNotDeclaredError,
+      );
     });
 
     it('does not create an instance when manual trigger is missing', async () => {
       try {
-        await trigger.fireWorkflow(
-          makeContext({ definitionName: 'cron-only-process' }),
-        );
+        await trigger.fireWorkflow(makeContext({ definitionName: 'cron-only-process' }));
       } catch {
         // expected
       }

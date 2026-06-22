@@ -13,10 +13,15 @@ const FormSchema = z.object({
   id: z.string().regex(slugPattern, 'Lowercase letters, numbers, dashes, underscores'),
   command: z.string().min(1, 'Required'),
   args: z.array(z.object({ value: z.string() })),
-  env: z.array(z.object({
-    key: z.string().min(1, 'Required').regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'Valid env var name'),
-    value: z.string(),
-  })),
+  env: z.array(
+    z.object({
+      key: z
+        .string()
+        .min(1, 'Required')
+        .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'Valid env var name'),
+      value: z.string(),
+    }),
+  ),
   description: z.string(),
 });
 
@@ -105,9 +110,7 @@ export function CatalogForm({ entry, onSubmit, onDelete, submitError }: CatalogF
         hint="Positional arguments passed to the command."
         onAdd={() => argsArray.append({ value: '' })}
       >
-        {argsArray.fields.length === 0 && (
-          <p className="text-xs text-muted-foreground">No args.</p>
-        )}
+        {argsArray.fields.length === 0 && <p className="text-xs text-muted-foreground">No args.</p>}
         {argsArray.fields.map((field, index) => (
           <div key={field.id} className="flex items-center gap-2">
             <input
@@ -135,14 +138,13 @@ export function CatalogForm({ entry, onSubmit, onDelete, submitError }: CatalogF
         hint={
           <>
             Environment variables. Values support{' '}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">{'{{SECRET:name}}'}</code> — resolved at spawn time from workflow secrets.
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">{'{{SECRET:name}}'}</code> — resolved
+            at spawn time from workflow secrets.
           </>
         }
         onAdd={() => envArray.append({ key: '', value: '' })}
       >
-        {envArray.fields.length === 0 && (
-          <p className="text-xs text-muted-foreground">No env.</p>
-        )}
+        {envArray.fields.length === 0 && <p className="text-xs text-muted-foreground">No env.</p>}
         {envArray.fields.map((field, index) => (
           <div key={field.id} className="flex items-center gap-2">
             <input
@@ -212,15 +214,7 @@ export function CatalogForm({ entry, onSubmit, onDelete, submitError }: CatalogF
   );
 }
 
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-sm font-medium">{label}</span>

@@ -25,9 +25,9 @@ describe('ActionRegistry', () => {
 
   it('throws UnknownActionKindError for unregistered kind', async () => {
     const registry = new ActionRegistry();
-    await expect(
-      registry.dispatch({ kind: 'wait', config: {} } as never, ctx),
-    ).rejects.toBeInstanceOf(UnknownActionKindError);
+    await expect(registry.dispatch({ kind: 'wait', config: {} } as never, ctx)).rejects.toBeInstanceOf(
+      UnknownActionKindError,
+    );
   });
 
   it('reports has() correctly', () => {

@@ -105,10 +105,7 @@ describe('GET /api/admin/oauth-providers/:id', () => {
   it('[DATA] returns provider by id (wiring smoke)', async () => {
     mockProviderGet.mockResolvedValue(providerConfig);
 
-    const res = await GET(
-      makeGetRequest('github', 'appsilon'),
-      { params: makeParams('github') },
-    );
+    const res = await GET(makeGetRequest('github', 'appsilon'), { params: makeParams('github') });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -119,10 +116,7 @@ describe('GET /api/admin/oauth-providers/:id', () => {
   it('[SECURITY] strips clientSecret', async () => {
     mockProviderGet.mockResolvedValue(providerConfig);
 
-    const res = await GET(
-      makeGetRequest('github', 'appsilon'),
-      { params: makeParams('github') },
-    );
+    const res = await GET(makeGetRequest('github', 'appsilon'), { params: makeParams('github') });
     const json = await res.json();
 
     expect(json.provider).not.toHaveProperty('clientSecret');
@@ -132,10 +126,7 @@ describe('GET /api/admin/oauth-providers/:id', () => {
   it('[ERROR] 404 when provider not found', async () => {
     mockProviderGet.mockResolvedValue(null);
 
-    const res = await GET(
-      makeGetRequest('missing', 'appsilon'),
-      { params: makeParams('missing') },
-    );
+    const res = await GET(makeGetRequest('missing', 'appsilon'), { params: makeParams('missing') });
 
     expect(res.status).toBe(404);
   });
@@ -143,10 +134,7 @@ describe('GET /api/admin/oauth-providers/:id', () => {
   it('[AUTHZ] plain member gets 403', async () => {
     mockResolveCallerIdentity.mockResolvedValue(memberCaller());
 
-    const res = await GET(
-      makeGetRequest('github', 'appsilon'),
-      { params: makeParams('github') },
-    );
+    const res = await GET(makeGetRequest('github', 'appsilon'), { params: makeParams('github') });
 
     expect(res.status).toBe(403);
     expect(mockProviderGet).not.toHaveBeenCalled();
@@ -164,10 +152,9 @@ describe('PATCH /api/admin/oauth-providers/:id', () => {
     const patched = { ...providerConfig, name: 'GitHub Enterprise' };
     mockProviderUpdate.mockResolvedValue(patched);
 
-    const res = await PATCH(
-      makePatchRequest('github', 'appsilon', { name: 'GitHub Enterprise' }),
-      { params: makeParams('github') },
-    );
+    const res = await PATCH(makePatchRequest('github', 'appsilon', { name: 'GitHub Enterprise' }), {
+      params: makeParams('github'),
+    });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -180,10 +167,7 @@ describe('PATCH /api/admin/oauth-providers/:id', () => {
   it('[ERROR] 404 when provider does not exist', async () => {
     mockProviderUpdate.mockResolvedValue(null);
 
-    const res = await PATCH(
-      makePatchRequest('missing', 'appsilon', { name: 'X' }),
-      { params: makeParams('missing') },
-    );
+    const res = await PATCH(makePatchRequest('missing', 'appsilon', { name: 'X' }), { params: makeParams('missing') });
 
     expect(res.status).toBe(404);
   });
@@ -195,10 +179,9 @@ describe('PATCH /api/admin/oauth-providers/:id', () => {
     // partial-patch, but the API input schema reinstates it from the path.
     mockProviderUpdate.mockResolvedValue({ ...providerConfig, name: providerConfig.name });
 
-    const res = await PATCH(
-      makePatchRequest('github', 'appsilon', { id: 'renamed', name: 'X' }),
-      { params: makeParams('github') },
-    );
+    const res = await PATCH(makePatchRequest('github', 'appsilon', { id: 'renamed', name: 'X' }), {
+      params: makeParams('github'),
+    });
 
     expect(res.status).toBe(200);
     expect(mockProviderUpdate).toHaveBeenCalledWith('appsilon', 'github', { name: 'X' });
@@ -207,10 +190,7 @@ describe('PATCH /api/admin/oauth-providers/:id', () => {
   it('[AUTHZ] plain member gets 403', async () => {
     mockResolveCallerIdentity.mockResolvedValue(memberCaller());
 
-    const res = await PATCH(
-      makePatchRequest('github', 'appsilon', { name: 'X' }),
-      { params: makeParams('github') },
-    );
+    const res = await PATCH(makePatchRequest('github', 'appsilon', { name: 'X' }), { params: makeParams('github') });
 
     expect(res.status).toBe(403);
     expect(mockProviderUpdate).not.toHaveBeenCalled();
@@ -227,10 +207,7 @@ describe('DELETE /api/admin/oauth-providers/:id', () => {
   it('[DATA] deletes an existing provider', async () => {
     mockProviderDelete.mockResolvedValue(true);
 
-    const res = await DELETE(
-      makeDeleteRequest('github', 'appsilon'),
-      { params: makeParams('github') },
-    );
+    const res = await DELETE(makeDeleteRequest('github', 'appsilon'), { params: makeParams('github') });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -241,10 +218,7 @@ describe('DELETE /api/admin/oauth-providers/:id', () => {
   it('[DATA] idempotent — 200 even when provider does not exist', async () => {
     mockProviderDelete.mockResolvedValue(false);
 
-    const res = await DELETE(
-      makeDeleteRequest('missing', 'appsilon'),
-      { params: makeParams('missing') },
-    );
+    const res = await DELETE(makeDeleteRequest('missing', 'appsilon'), { params: makeParams('missing') });
 
     expect(res.status).toBe(200);
   });
@@ -252,10 +226,7 @@ describe('DELETE /api/admin/oauth-providers/:id', () => {
   it('[AUTHZ] plain member gets 403', async () => {
     mockResolveCallerIdentity.mockResolvedValue(memberCaller());
 
-    const res = await DELETE(
-      makeDeleteRequest('github', 'appsilon'),
-      { params: makeParams('github') },
-    );
+    const res = await DELETE(makeDeleteRequest('github', 'appsilon'), { params: makeParams('github') });
 
     expect(res.status).toBe(403);
     expect(mockProviderDelete).not.toHaveBeenCalled();

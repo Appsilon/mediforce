@@ -66,11 +66,7 @@ import type {
   SendInviteEmailInput,
   SendWorkspaceNotificationEmailInput,
 } from './invite-notification';
-import {
-  WorkflowEngine,
-  ManualTrigger,
-  CronTrigger,
-} from '@mediforce/workflow-engine';
+import { WorkflowEngine, ManualTrigger, CronTrigger } from '@mediforce/workflow-engine';
 import {
   AgentRunner,
   PluginRunner,
@@ -217,10 +213,7 @@ class EmailInviteNotificationService implements InviteNotificationService {
   ) {}
 
   async sendInviteEmail(input: SendInviteEmailInput): Promise<void> {
-    await sendInviteEmail(
-      { ...input, appUrl: this.appUrl, senderName: this.senderName },
-      this.sendEmail,
-    );
+    await sendInviteEmail({ ...input, appUrl: this.appUrl, senderName: this.senderName }, this.sendEmail);
   }
 
   async sendWorkspaceNotificationEmail(input: SendWorkspaceNotificationEmailInput): Promise<void> {
@@ -248,8 +241,7 @@ export function getPlatformServices(): PlatformServices {
   const pg = getSharedPostgresClient().db;
 
   const processRepo: ProcessRepository = new PostgresProcessRepository(pg);
-  const instanceRepo: PostgresProcessInstanceRepository =
-    new PostgresProcessInstanceRepository(pg);
+  const instanceRepo: PostgresProcessInstanceRepository = new PostgresProcessInstanceRepository(pg);
   // Indirect-namespace repos depend on instanceRepo for parent-run namespace
   // resolution inside the namespace-scoped read variants (ADR-0004 §"Storage-
   // layer filter, today").
@@ -259,21 +251,17 @@ export function getPlatformServices(): PlatformServices {
   const humanTaskRepo: HumanTaskRepository = new PostgresHumanTaskRepository(pg, instanceRepo);
   const handoffRepo: HandoffRepository = new PostgresHandoffRepository(pg, instanceRepo);
   const agentDefinitionRepo: AgentDefinitionRepository = new PostgresAgentDefinitionRepository(pg);
-  const coworkSessionRepo: CoworkSessionRepository =
-    new PostgresCoworkSessionRepository(pg, instanceRepo);
-  const cronTriggerStateRepo: CronTriggerStateRepository =
-    new PostgresCronTriggerStateRepository(pg);
+  const coworkSessionRepo: CoworkSessionRepository = new PostgresCoworkSessionRepository(pg, instanceRepo);
+  const cronTriggerStateRepo: CronTriggerStateRepository = new PostgresCronTriggerStateRepository(pg);
   const toolCatalogRepo: ToolCatalogRepository = new PostgresToolCatalogRepository(pg);
   const namespaceRepo: NamespaceRepository = new PostgresNamespaceRepository(pg);
   const userProfileRepo: UserProfileRepository = new PostgresUserProfileRepository(pg);
   const oauthProviderRepo: OAuthProviderRepository = new PostgresOAuthProviderRepository(pg);
-  const agentOAuthTokenRepo: AgentOAuthTokenRepository =
-    new PostgresAgentOAuthTokenRepository(pg);
+  const agentOAuthTokenRepo: AgentOAuthTokenRepository = new PostgresAgentOAuthTokenRepository(pg);
   const modelRegistryRepo: ModelRegistryRepository = new PostgresModelRegistryRepository(pg);
   const platformSettingsRepo: PlatformSettingsRepository = new PostgresPlatformSettingsRepository(pg);
   const secretsRepo: WorkflowSecretsRepository = new PostgresWorkflowSecretsRepository(pg);
-  const namespaceSecretsRepo: NamespaceSecretsRepository =
-    new PostgresNamespaceSecretsRepository(pg);
+  const namespaceSecretsRepo: NamespaceSecretsRepository = new PostgresNamespaceSecretsRepository(pg);
   const eventLog = new PostgresAgentEventLog(instanceRepo);
 
   const pluginRegistry = new PluginRegistry();
@@ -319,9 +307,7 @@ export function getPlatformServices(): PlatformServices {
 
   const rawEmailProvider = process.env.EMAIL_PROVIDER || undefined;
   if (rawEmailProvider !== undefined && rawEmailProvider !== 'mailgun' && rawEmailProvider !== 'smtp') {
-    throw new Error(
-      `EMAIL_PROVIDER="${rawEmailProvider}" is not valid. Use "mailgun" or "smtp".`,
-    );
+    throw new Error(`EMAIL_PROVIDER="${rawEmailProvider}" is not valid. Use "mailgun" or "smtp".`);
   }
   const explicitProvider = rawEmailProvider as 'mailgun' | 'smtp' | undefined;
   const resolvedProvider = resolveEmailProvider(explicitProvider, mailgunConfigured, smtpConfigured);
@@ -339,10 +325,12 @@ export function getPlatformServices(): PlatformServices {
         !mailgunApiKey && 'MAILGUN_API_KEY',
         !mailgunDomain && 'MAILGUN_DOMAIN',
         !mailgunFrom && 'MAILGUN_FROM_EMAIL',
-      ].filter(Boolean).join(', ');
+      ]
+        .filter(Boolean)
+        .join(', ');
       throw new Error(
         `EMAIL_PROVIDER=mailgun but config incomplete (missing: ${missing}). ` +
-        `Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.`,
+          `Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.`,
       );
     }
     emailSender = createMailgunSender({
@@ -355,13 +343,10 @@ export function getPlatformServices(): PlatformServices {
     console.log('[platform-services] Email provider: Mailgun');
   } else if (!emailDisabled && resolvedProvider === 'smtp') {
     if (!smtpConfigured) {
-      const missing = [
-        !smtpHost && 'SMTP_HOST',
-        !smtpFrom && 'SMTP_FROM_EMAIL',
-      ].filter(Boolean).join(', ');
+      const missing = [!smtpHost && 'SMTP_HOST', !smtpFrom && 'SMTP_FROM_EMAIL'].filter(Boolean).join(', ');
       throw new Error(
         `EMAIL_PROVIDER=smtp but config incomplete (missing: ${missing}). ` +
-        `Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.`,
+          `Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.`,
       );
     }
     emailSender = createSmtpSender({
@@ -378,19 +363,15 @@ export function getPlatformServices(): PlatformServices {
   } else if (!emailDisabled && resolvedProvider === null) {
     throw new Error(
       'Email is enabled but no email provider is configured. ' +
-      'Set MAILGUN_* or SMTP_* env vars, or set MEDIFORCE_DISABLE_EMAIL=true to start without email.',
+        'Set MAILGUN_* or SMTP_* env vars, or set MEDIFORCE_DISABLE_EMAIL=true to start without email.',
     );
   }
 
-  const notificationService = emailSender
-    ? new EmailNotificationService(emailSender)
-    : undefined;
+  const notificationService = emailSender ? new EmailNotificationService(emailSender) : undefined;
   // Wired whenever Firebase Auth is available — independent of email provider.
   // Email-disabled deployments still need uid → email/lastSignInTime lookups
   // for the namespace-members endpoint.
-  const userDirectoryService: UserDirectoryService = new FirebaseUserDirectoryService(
-    getAdminAuth(),
-  );
+  const userDirectoryService: UserDirectoryService = new FirebaseUserDirectoryService(getAdminAuth());
 
   const engine = new WorkflowEngine(
     processRepo,
@@ -406,13 +387,7 @@ export function getPlatformServices(): PlatformServices {
 
   const pluginRunner = new PluginRunner(eventLog);
 
-  const agentRunner = new AgentRunner(
-    instanceRepo,
-    auditRepo,
-    eventLog,
-    agentRunRepo,
-    otelTracingOptions,
-  );
+  const agentRunner = new AgentRunner(instanceRepo, auditRepo, eventLog, agentRunRepo, otelTracingOptions);
 
   const scriptStepExecutor = new ScriptStepExecutor(pluginRunner);
   const agentStepExecutor = new AgentStepExecutor(agentRunner);
@@ -442,8 +417,7 @@ export function getPlatformServices(): PlatformServices {
   const inviteService = new FirebaseInviteServiceAdapter(firebaseInvite, adminAuth, userProfileRepo);
   // `appUrl` matches the legacy invite route's fallback so dev-without-
   // NEXT_PUBLIC_PLATFORM_URL still renders sensible links.
-  const inviteAppUrl =
-    process.env.NEXT_PUBLIC_PLATFORM_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
+  const inviteAppUrl = process.env.NEXT_PUBLIC_PLATFORM_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
   const senderName = resolvedProvider === 'mailgun' ? mailgunSenderName : smtpSenderName;
   const inviteNotificationService = emailSender
     ? new EmailInviteNotificationService(emailSender, inviteAppUrl, senderName)

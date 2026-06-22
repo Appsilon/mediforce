@@ -105,9 +105,7 @@ describe('AgentMcpBindingSchema', () => {
       if (result.success && result.data.type === 'http') {
         expect(result.data.auth?.type).toBe('headers');
         if (result.data.auth?.type === 'headers') {
-          expect(result.data.auth.headers.Authorization).toBe(
-            'Bearer {{SECRET:mcp_token}}',
-          );
+          expect(result.data.auth.headers.Authorization).toBe('Bearer {{SECRET:mcp_token}}');
         }
       }
     });

@@ -15,11 +15,7 @@ export class PostgresUserProfileRepository implements UserProfileRepository {
   constructor(private readonly db: Database) {}
 
   async getProfile(uid: string): Promise<UserProfile | null> {
-    const rows = await this.db
-      .select()
-      .from(userProfiles)
-      .where(eq(userProfiles.uid, uid))
-      .limit(1);
+    const rows = await this.db.select().from(userProfiles).where(eq(userProfiles.uid, uid)).limit(1);
     const row = rows[0];
     return row ? { mustChangePassword: row.mustChangePassword } : null;
   }

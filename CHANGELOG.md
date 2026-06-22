@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Added
+- Biome adopted as the repo's first formatter + linter — `biome.json` curated to the existing style (2-space, single quotes, 80 cols), a one-shot format pass across the tree (recorded in `.git-blame-ignore-revs`), and a `lint` CI job. The format gate blocks; lint rules with an existing backlog (React hook deps, a11y, unused code) are `warn` and ratchet to error later. Type-aware rules (`no-floating-promises`) and the import-boundary rules that would replace the hand-rolled `fs`+regex architecture tests are deferred to a follow-up ESLint pass.
 - Docker image validation at workflow registration — server warns when a referenced image is not found on the platform, CLI deduplicates server vs local warnings, and the workflow editor shows an amber toast on save [#734](https://github.com/Appsilon/mediforce/pull/734).
 - SMTP email provider as alternative to Mailgun — organisations can now use their own SMTP infrastructure instead of Mailgun by setting `SMTP_*` env vars; `EMAIL_PROVIDER` auto-detects or can be set explicitly; includes read-only admin status page, `mediforce email status` CLI command, and bootstrap script prompts for initial setup [#748](https://github.com/Appsilon/mediforce/issues/748).
 - **Run view UX** — execution history panel (renamed from "Step Status"), scrollable workflow diagram, active step info (started time, live elapsed timer, executor name/claimer for claimed human tasks)

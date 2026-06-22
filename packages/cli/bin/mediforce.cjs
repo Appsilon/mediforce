@@ -23,18 +23,12 @@ try {
   // require.resolve('tsx/cli') points at the CommonJS entry that runs the CLI.
   tsxBin = require.resolve('tsx/cli', { paths: [packageRoot] });
 } catch (err) {
-  console.error(
-    'mediforce: could not resolve `tsx` runtime. Run `pnpm install` from the workspace root.',
-  );
+  console.error('mediforce: could not resolve `tsx` runtime. Run `pnpm install` from the workspace root.');
   console.error(String(err));
   process.exit(2);
 }
 
-const result = spawnSync(
-  process.execPath,
-  [tsxBin, entry, ...process.argv.slice(2)],
-  { stdio: 'inherit' },
-);
+const result = spawnSync(process.execPath, [tsxBin, entry, ...process.argv.slice(2)], { stdio: 'inherit' });
 
 if (result.error !== undefined) {
   console.error(`mediforce: failed to spawn tsx — ${String(result.error)}`);

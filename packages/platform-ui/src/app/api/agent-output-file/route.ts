@@ -57,10 +57,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   if (stepId !== null && kindRaw !== null) {
     if (kindRaw !== 'presentation') {
-      return NextResponse.json(
-        { error: `Unsupported kind: ${kindRaw}` },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: `Unsupported kind: ${kindRaw}` }, { status: 400 });
     }
     const filename = DELIVERABLE_FILENAME[kindRaw as DeliverableKind](stepId);
     resolved = join(tmpdir(), 'mediforce-deliverables', instanceId, filename);
@@ -69,10 +66,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     resolved = resolve(explicitPath);
     disposition = 'attachment';
   } else {
-    return NextResponse.json(
-      { error: 'Missing path or stepId+kind parameters' },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'Missing path or stepId+kind parameters' }, { status: 400 });
   }
 
   const instanceAllowedPrefixes = [
@@ -91,8 +85,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const contentType = contentTypeForFilePath(resolved);
     const filename = resolved.split('/').pop() ?? 'download';
 
-    const contentDisposition =
-      disposition === 'inline' ? 'inline' : attachmentContentDisposition(filename);
+    const contentDisposition = disposition === 'inline' ? 'inline' : attachmentContentDisposition(filename);
 
     return new NextResponse(buffer, {
       headers: {

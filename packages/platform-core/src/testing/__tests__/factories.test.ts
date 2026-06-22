@@ -295,9 +295,7 @@ describe('buildProcessConfig', () => {
       configName: 'staging',
       configVersion: '2.0',
       roles: ['admin', 'reviewer'],
-      notifications: [
-        { event: 'task_assigned', roles: ['reviewer'] },
-      ],
+      notifications: [{ event: 'task_assigned', roles: ['reviewer'] }],
     });
     expect(config.processName).toBe('custom-process');
     expect(config.configName).toBe('staging');
@@ -365,7 +363,11 @@ describe('resetFactorySequence', () => {
 // ---------------------------------------------------------------------------
 
 describe('all factories produce schema-valid defaults', () => {
-  const cases: Array<{ name: string; build: () => unknown; schema: { safeParse: (v: unknown) => { success: boolean } } }> = [
+  const cases: Array<{
+    name: string;
+    build: () => unknown;
+    schema: { safeParse: (v: unknown) => { success: boolean } };
+  }> = [
     { name: 'ProcessDefinition', build: buildProcessDefinition, schema: ProcessDefinitionSchema },
     { name: 'ProcessInstance', build: buildProcessInstance, schema: ProcessInstanceSchema },
     { name: 'StepExecution', build: buildStepExecution, schema: StepExecutionSchema },

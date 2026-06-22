@@ -80,9 +80,7 @@ describe('agentOutputFromEnvelope', () => {
   });
 
   it('returns null estimatedCostUsd — envelope schema does not carry cost', () => {
-    const out = agentOutputFromEnvelope(
-      buildEnvelope({ tokenUsage: { inputTokens: 10, outputTokens: 20 } }),
-    );
+    const out = agentOutputFromEnvelope(buildEnvelope({ tokenUsage: { inputTokens: 10, outputTokens: 20 } }));
     expect(out.estimatedCostUsd).toBeNull();
   });
 

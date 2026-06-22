@@ -5,11 +5,7 @@ import type {
   ProcessDefinition,
   ReviewVerdict,
 } from '@mediforce/platform-core';
-import {
-  resolveTransitions,
-  TransitionValidationError,
-  NoMatchingTransitionError,
-} from './transition-resolver';
+import { resolveTransitions, TransitionValidationError, NoMatchingTransitionError } from './transition-resolver';
 import { RoutingError, InvalidTransitionError } from './errors';
 
 export interface StepActor {
@@ -51,11 +47,7 @@ export class StepExecutor {
     let routingResult: { next: string; reason: string } | null = null;
 
     // --- Route: native verdict routing for review steps ---
-    if (
-      currentStep.type === 'review' &&
-      currentStep.verdicts &&
-      typeof stepOutput.verdict === 'string'
-    ) {
+    if (currentStep.type === 'review' && currentStep.verdicts && typeof stepOutput.verdict === 'string') {
       const verdictKey = stepOutput.verdict;
       const verdictConfig = currentStep.verdicts[verdictKey];
       if (!verdictConfig) {
@@ -63,27 +55,20 @@ export class StepExecutor {
           currentStepId,
           `Unknown verdict '${verdictKey}' on review step '${currentStepId}'`,
         );
-        await this.pauseOnRoutingError(
-          instance, currentStepId, stepOutput, actor, definition.version, error,
-        );
+        await this.pauseOnRoutingError(instance, currentStepId, stepOutput, actor, definition.version, error);
         throw error;
       }
       nextStepId = verdictConfig.target;
       routingResult = { next: nextStepId, reason: `Verdict: ${verdictKey}` };
     } else {
       // --- Route: when-expression evaluation ---
-      const outgoing = definition.transitions.filter(
-        (t) => t.from === currentStepId,
-      );
+      const outgoing = definition.transitions.filter((t) => t.from === currentStepId);
 
       try {
         const resolved = resolveTransitions(outgoing, {
           output: stepOutput,
           variables: instance.variables,
-          verdict:
-            typeof stepOutput.verdict === 'string'
-              ? stepOutput.verdict
-              : undefined,
+          verdict: typeof stepOutput.verdict === 'string' ? stepOutput.verdict : undefined,
         });
 
         if (resolved.length > 1) {
@@ -98,20 +83,12 @@ export class StepExecutor {
         routingResult = { next: nextStepId, reason: resolved[0].reason };
       } catch (err) {
         if (err instanceof RoutingError) {
-          await this.pauseOnRoutingError(
-            instance, currentStepId, stepOutput, actor, definition.version, err,
-          );
+          await this.pauseOnRoutingError(instance, currentStepId, stepOutput, actor, definition.version, err);
           throw err;
         }
-        if (
-          err instanceof TransitionValidationError ||
-          err instanceof NoMatchingTransitionError
-        ) {
+        if (err instanceof TransitionValidationError || err instanceof NoMatchingTransitionError) {
           const routingError = new RoutingError(currentStepId, err.message);
-          await this.pauseOnRoutingError(
-            instance, currentStepId, stepOutput, actor,
-            definition.version, routingError,
-          );
+          await this.pauseOnRoutingError(instance, currentStepId, stepOutput, actor, definition.version, routingError);
           throw routingError;
         }
         throw err;
@@ -121,13 +98,8 @@ export class StepExecutor {
     // Validate next step exists in definition
     const nextStep = definition.steps.find((s) => s.id === nextStepId);
     if (!nextStep) {
-      const error = new RoutingError(
-        currentStepId,
-        `Routing returned invalid step '${nextStepId}'`,
-      );
-      await this.pauseOnRoutingError(
-        instance, currentStepId, stepOutput, actor, definition.version, error,
-      );
+      const error = new RoutingError(currentStepId, `Routing returned invalid step '${nextStepId}'`);
+      await this.pauseOnRoutingError(instance, currentStepId, stepOutput, actor, definition.version, error);
       throw error;
     }
 
@@ -165,34 +137,35 @@ export class StepExecutor {
     }
 
     // Compute semantic input: previous step's output from instance variables
-    const incomingTransition = definition.transitions.find(
-      (t) => t.to === currentStepId,
-    );
+    const incomingTransition = definition.transitions.find((t) => t.to === currentStepId);
     const previousStepId = incomingTransition?.from ?? null;
-    const stepInput = previousStepId
-      ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
-      : {};
+    const stepInput = previousStepId ? ((instance.variables[previousStepId] as Record<string, unknown>) ?? {}) : {};
 
     await this.recordStepExecution(
-      instance, currentStepId, 'completed', stepInput, stepOutput,
-      actor, definition.version, routingResult, null,
+      instance,
+      currentStepId,
+      'completed',
+      stepInput,
+      stepOutput,
+      actor,
+      definition.version,
+      routingResult,
+      null,
     );
 
     await this.emitAuditEvent(
       'step.completed',
-      actor, instance, currentStepId, definition.version,
+      actor,
+      instance,
+      currentStepId,
+      definition.version,
       { stepId: currentStepId, input: stepOutput },
       routingResult ?? {},
       routingResult?.reason ?? 'direct transition',
     );
   }
 
-  async failStep(
-    instance: ProcessInstance,
-    stepId: string,
-    error: Error,
-    actor: StepActor,
-  ): Promise<void> {
+  async failStep(instance: ProcessInstance, stepId: string, error: Error, actor: StepActor): Promise<void> {
     await this.instanceRepository.update(instance.id, {
       status: 'paused',
       pauseReason: 'step_failure',
@@ -200,13 +173,23 @@ export class StepExecutor {
     });
 
     await this.recordStepExecution(
-      instance, stepId, 'failed', {}, {},
-      actor, instance.definitionVersion, null, error.message,
+      instance,
+      stepId,
+      'failed',
+      {},
+      {},
+      actor,
+      instance.definitionVersion,
+      null,
+      error.message,
     );
 
     await this.emitAuditEvent(
       'step.failed',
-      actor, instance, stepId, instance.definitionVersion,
+      actor,
+      instance,
+      stepId,
+      instance.definitionVersion,
       { stepId, error: error.message },
       {},
       `Step failure: ${error.message}`,
@@ -227,14 +210,14 @@ export class StepExecutor {
       updatedAt: new Date().toISOString(),
     });
 
-    await this.recordStepExecution(
-      instance, stepId, 'failed', {}, stepOutput,
-      actor, version, null, error.message,
-    );
+    await this.recordStepExecution(instance, stepId, 'failed', {}, stepOutput, actor, version, null, error.message);
 
     await this.emitAuditEvent(
       'routing.error',
-      actor, instance, stepId, version,
+      actor,
+      instance,
+      stepId,
+      version,
       { stepId, input: stepOutput },
       { error: error.message },
       `Routing error: ${error.message}`,
@@ -259,24 +242,21 @@ export class StepExecutor {
     // created a 'running' record before the agent ran). This prevents
     // duplicate rows in the step history.
     const allExecs = await this.instanceRepository.getStepExecutions(instance.id);
-    const existing = allExecs
-      .filter((e) => e.stepId === stepId)
-      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0] ?? null;
+    const existing =
+      allExecs
+        .filter((e) => e.stepId === stepId)
+        .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0] ?? null;
 
     if (existing) {
       const outputAlreadySet = existing.output !== null && existing.output !== undefined;
-      await this.instanceRepository.updateStepExecution(
-        instance.id,
-        existing.id,
-        {
-          status,
-          output: outputAlreadySet ? existing.output : (status === 'completed' ? stepOutput : null),
-          verdict,
-          completedAt: now,
-          gateResult,
-          error,
-        },
-      );
+      await this.instanceRepository.updateStepExecution(instance.id, existing.id, {
+        status,
+        output: outputAlreadySet ? existing.output : status === 'completed' ? stepOutput : null,
+        verdict,
+        completedAt: now,
+        gateResult,
+        error,
+      });
       return;
     }
 

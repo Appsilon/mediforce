@@ -2,10 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryToolCatalogRepository } from '@mediforce/platform-core/testing';
 import { getToolCatalogEntry } from '../get-entry';
 import { ForbiddenError, NotFoundError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { adminRoles, memberRoles, sampleEntry } from './fixtures';
 
 describe('getToolCatalogEntry handler', () => {
@@ -22,10 +19,7 @@ describe('getToolCatalogEntry handler', () => {
       caller: userCaller('u-admin', ['alpha'], adminRoles),
     });
 
-    const result = await getToolCatalogEntry(
-      { namespace: 'alpha', id: 'tealflow-mcp' },
-      scope,
-    );
+    const result = await getToolCatalogEntry({ namespace: 'alpha', id: 'tealflow-mcp' }, scope);
 
     expect(result.entry.id).toBe('tealflow-mcp');
   });
@@ -33,10 +27,7 @@ describe('getToolCatalogEntry handler', () => {
   it('returns the entry for an api-key caller', async () => {
     const scope = createTestScope({ toolCatalogRepo: repo });
 
-    const result = await getToolCatalogEntry(
-      { namespace: 'alpha', id: 'tealflow-mcp' },
-      scope,
-    );
+    const result = await getToolCatalogEntry({ namespace: 'alpha', id: 'tealflow-mcp' }, scope);
 
     expect(result.entry.command).toBe('npx');
   });
@@ -44,9 +35,9 @@ describe('getToolCatalogEntry handler', () => {
   it('throws NotFoundError when entry does not exist', async () => {
     const scope = createTestScope({ toolCatalogRepo: repo });
 
-    await expect(
-      getToolCatalogEntry({ namespace: 'alpha', id: 'missing' }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(getToolCatalogEntry({ namespace: 'alpha', id: 'missing' }, scope)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
   });
 
   it('throws ForbiddenError for a member-role caller (bug fix)', async () => {
@@ -55,8 +46,8 @@ describe('getToolCatalogEntry handler', () => {
       caller: userCaller('u-member', ['alpha'], memberRoles),
     });
 
-    await expect(
-      getToolCatalogEntry({ namespace: 'alpha', id: 'tealflow-mcp' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(getToolCatalogEntry({ namespace: 'alpha', id: 'tealflow-mcp' }, scope)).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
   });
 });

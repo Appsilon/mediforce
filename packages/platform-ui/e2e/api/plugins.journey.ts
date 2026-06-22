@@ -25,7 +25,7 @@ test.describe('GET /api/plugins — API E2E', () => {
   test('api-key caller receives a plugin list', async ({ request }) => {
     const res = await request.get('/api/plugins', { headers: apiKeyHeaders() });
     expect(res.status(), await res.text()).toBe(200);
-    const body = await res.json() as { plugins: Array<{ name: string }> };
+    const body = (await res.json()) as { plugins: Array<{ name: string }> };
     expect(Array.isArray(body.plugins)).toBe(true);
     expect(body.plugins.every((plugin) => typeof plugin.name === 'string')).toBe(true);
   });
@@ -37,8 +37,8 @@ test.describe('GET /api/plugins — API E2E', () => {
     });
     expect(userRes.status(), await userRes.text()).toBe(200);
 
-    const apiKeyBody = await apiKeyRes.json() as { plugins: Array<{ name: string }> };
-    const userBody = await userRes.json() as { plugins: Array<{ name: string }> };
+    const apiKeyBody = (await apiKeyRes.json()) as { plugins: Array<{ name: string }> };
+    const userBody = (await userRes.json()) as { plugins: Array<{ name: string }> };
     const apiKeyNames = apiKeyBody.plugins.map((plugin) => plugin.name).sort();
     const userNames = userBody.plugins.map((plugin) => plugin.name).sort();
     expect(userNames).toEqual(apiKeyNames);

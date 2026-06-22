@@ -1,10 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ],
+  "extends": ["config:recommended"],
   "minimumReleaseAge": "7 days",
-  "ignorePaths": [
-    "scripts/migrate-firestore-to-postgres/requirements.txt"
-  ]
+  "ignorePaths": ["scripts/migrate-firestore-to-postgres/requirements.txt"]
 }

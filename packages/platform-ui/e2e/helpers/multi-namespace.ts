@@ -46,22 +46,12 @@ export interface MultiNamespaceFixture {
  * to mint a token).
  */
 export async function setupMultiNamespaceCallers(): Promise<MultiNamespaceFixture> {
-  const memberToken = await signInAndGetIdToken(
-    TEST_USER_EMAIL,
-    TEST_USER_PASSWORD,
-  );
-  const outsiderUid = await createTestUser(
-    OUTSIDER_EMAIL,
-    OUTSIDER_PASSWORD,
-    'Outsider',
-  );
+  const memberToken = await signInAndGetIdToken(TEST_USER_EMAIL, TEST_USER_PASSWORD);
+  const outsiderUid = await createTestUser(OUTSIDER_EMAIL, OUTSIDER_PASSWORD, 'Outsider');
 
   await seedPostgresPersonalNamespace(OUTSIDER_NAMESPACE, outsiderUid, 'Outsider Org');
 
-  const outsiderToken = await signInAndGetIdToken(
-    OUTSIDER_EMAIL,
-    OUTSIDER_PASSWORD,
-  );
+  const outsiderToken = await signInAndGetIdToken(OUTSIDER_EMAIL, OUTSIDER_PASSWORD);
 
   // The `test` namespace has its members keyed by the seeded user's uid,
   // not their email — we can derive the uid from the token's `sub` claim
@@ -101,9 +91,8 @@ function decodeUidFromIdToken(idToken: string): string {
   const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
   const json = Buffer.from(padded, 'base64').toString('utf8');
   const payload = JSON.parse(json) as { sub?: unknown; user_id?: unknown };
-  const uid = typeof payload.sub === 'string'
-    ? payload.sub
-    : typeof payload.user_id === 'string' ? payload.user_id : '';
+  const uid =
+    typeof payload.sub === 'string' ? payload.sub : typeof payload.user_id === 'string' ? payload.user_id : '';
   if (uid === '') {
     throw new Error('ID token missing sub/user_id claim');
   }

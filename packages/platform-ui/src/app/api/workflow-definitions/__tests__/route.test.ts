@@ -67,9 +67,7 @@ describe('POST /api/workflow-definitions', () => {
     expect(mockSaveWorkflowDefinition).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'wf-new', namespace: 'ns-1', version: 1 }),
     );
-    expect(mockAuditAppend).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'workflow.created' }),
-    );
+    expect(mockAuditAppend).toHaveBeenCalledWith(expect.objectContaining({ action: 'workflow.created' }));
   });
 
   it('[DATA] increments version when prior versions exist', async () => {
@@ -80,9 +78,7 @@ describe('POST /api/workflow-definitions', () => {
 
     expect(res.status).toBe(201);
     expect(json.version).toBe(3);
-    expect(mockAuditAppend).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'workflow.version_added' }),
-    );
+    expect(mockAuditAppend).toHaveBeenCalledWith(expect.objectContaining({ action: 'workflow.version_added' }));
   });
 
   it('[ERROR] returns 400 when a deleted name is re-used', async () => {

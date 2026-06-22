@@ -18,9 +18,7 @@ export class InMemoryAuditRepository implements AuditRepository {
 
   constructor(private readonly parents?: ProcessInstanceRepository) {}
 
-  async append(
-    event: Omit<AuditEvent, 'serverTimestamp'>,
-  ): Promise<AuditEvent> {
+  async append(event: Omit<AuditEvent, 'serverTimestamp'>): Promise<AuditEvent> {
     // Strip the write-time-only `namespace` hint before storing so the
     // stored shape matches the Postgres read (workspace is derived state
     // there, not stored on the audit row). Parity with PostgresAuditRepository:
@@ -36,10 +34,7 @@ export class InMemoryAuditRepository implements AuditRepository {
     return completeEvent;
   }
 
-  async getByEntity(
-    entityType: string,
-    entityId: string,
-  ): Promise<AuditEvent[]> {
+  async getByEntity(entityType: string, entityId: string): Promise<AuditEvent[]> {
     return this.events
       .filter((e) => e.entityType === entityType && e.entityId === entityId)
       .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
@@ -51,14 +46,9 @@ export class InMemoryAuditRepository implements AuditRepository {
       .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   }
 
-  async getByProcessInNamespaces(
-    processInstanceId: string,
-    allowed: readonly string[],
-  ): Promise<AuditEvent[]> {
+  async getByProcessInNamespaces(processInstanceId: string, allowed: readonly string[]): Promise<AuditEvent[]> {
     if (this.parents === undefined) {
-      throw new Error(
-        'InMemoryAuditRepository: ProcessInstanceRepository required for namespace-scoped methods',
-      );
+      throw new Error('InMemoryAuditRepository: ProcessInstanceRepository required for namespace-scoped methods');
     }
     const parent = await this.parents.getById(processInstanceId);
     if (!parent || typeof parent.namespace !== 'string') return [];
@@ -66,10 +56,7 @@ export class InMemoryAuditRepository implements AuditRepository {
     return this.getByProcess(processInstanceId);
   }
 
-  async getByActor(
-    actorId: string,
-    options?: { limit?: number },
-  ): Promise<AuditEvent[]> {
+  async getByActor(actorId: string, options?: { limit?: number }): Promise<AuditEvent[]> {
     const filtered = this.events
       .filter((e) => e.actorId === actorId)
       .sort((a, b) => b.timestamp.localeCompare(a.timestamp));

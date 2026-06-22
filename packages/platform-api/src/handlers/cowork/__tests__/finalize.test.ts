@@ -10,10 +10,7 @@ import {
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { finalizeCoworkSession } from '../finalize';
 import { NotFoundError, PreconditionFailedError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { noopRunKicker } from '../../../runtime/run-kicker';
 
 interface AdvanceStepCall {
@@ -22,10 +19,7 @@ interface AdvanceStepCall {
   readonly actorId: string;
 }
 
-function makeEngineStub(opts: {
-  instanceRepo: InMemoryProcessInstanceRepository;
-  resultStepId: string;
-}) {
+function makeEngineStub(opts: { instanceRepo: InMemoryProcessInstanceRepository; resultStepId: string }) {
   const calls: AdvanceStepCall[] = [];
   return {
     calls,
@@ -87,10 +81,7 @@ describe('finalizeCoworkSession handler', () => {
     Object.assign(scope.system, { engine });
 
     const artifact = { title: 'Plan A', items: [1, 2, 3] };
-    const result = await finalizeCoworkSession(
-      { sessionId: 'sess-1', artifact },
-      scope,
-    );
+    const result = await finalizeCoworkSession({ sessionId: 'sess-1', artifact }, scope);
 
     expect(result).toEqual({
       sessionId: 'sess-1',
@@ -108,13 +99,9 @@ describe('finalizeCoworkSession handler', () => {
     expect(updatedInstance?.status).toBe('running');
     expect(updatedInstance?.pauseReason).toBeNull();
 
-    expect(engine.calls).toEqual([
-      { instanceId: 'inst-a', stepOutput: artifact, actorId: 'u-1' },
-    ]);
+    expect(engine.calls).toEqual([{ instanceId: 'inst-a', stepOutput: artifact, actorId: 'u-1' }]);
 
-    expect(kicker.kicks).toEqual([
-      { instanceId: 'inst-a', triggeredBy: 'u-1' },
-    ]);
+    expect(kicker.kicks).toEqual([{ instanceId: 'inst-a', triggeredBy: 'u-1' }]);
 
     const events = await auditRepo.getByProcess('inst-a');
     expect(events).toHaveLength(1);
@@ -128,9 +115,7 @@ describe('finalizeCoworkSession handler', () => {
   });
 
   it('throws PreconditionFailedError when session already finalized', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'paused' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'paused' }));
     await coworkSessionRepo.create(
       buildCoworkSession({
         id: 'sess-1',
@@ -149,15 +134,13 @@ describe('finalizeCoworkSession handler', () => {
       engine: makeEngineStub({ instanceRepo, resultStepId: 'x' }),
     });
 
-    await expect(
-      finalizeCoworkSession({ sessionId: 'sess-1', artifact: { a: 1 } }, scope),
-    ).rejects.toBeInstanceOf(PreconditionFailedError);
+    await expect(finalizeCoworkSession({ sessionId: 'sess-1', artifact: { a: 1 } }, scope)).rejects.toBeInstanceOf(
+      PreconditionFailedError,
+    );
   });
 
   it('throws PreconditionFailedError when instance is not paused', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'running' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'running' }));
     await coworkSessionRepo.create(
       buildCoworkSession({
         id: 'sess-1',
@@ -176,9 +159,9 @@ describe('finalizeCoworkSession handler', () => {
       engine: makeEngineStub({ instanceRepo, resultStepId: 'x' }),
     });
 
-    await expect(
-      finalizeCoworkSession({ sessionId: 'sess-1', artifact: { a: 1 } }, scope),
-    ).rejects.toBeInstanceOf(PreconditionFailedError);
+    await expect(finalizeCoworkSession({ sessionId: 'sess-1', artifact: { a: 1 } }, scope)).rejects.toBeInstanceOf(
+      PreconditionFailedError,
+    );
   });
 
   it('throws NotFoundError when the session does not exist', async () => {
@@ -192,15 +175,13 @@ describe('finalizeCoworkSession handler', () => {
       engine: makeEngineStub({ instanceRepo, resultStepId: 'x' }),
     });
 
-    await expect(
-      finalizeCoworkSession({ sessionId: 'sess-missing', artifact: {} }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(finalizeCoworkSession({ sessionId: 'sess-missing', artifact: {} }, scope)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
   });
 
   it('throws NotFoundError for cross-namespace caller (anti-enum)', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'paused' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'paused' }));
     await coworkSessionRepo.create(
       buildCoworkSession({
         id: 'sess-1',
@@ -219,8 +200,8 @@ describe('finalizeCoworkSession handler', () => {
       engine: makeEngineStub({ instanceRepo, resultStepId: 'x' }),
     });
 
-    await expect(
-      finalizeCoworkSession({ sessionId: 'sess-1', artifact: {} }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(finalizeCoworkSession({ sessionId: 'sess-1', artifact: {} }, scope)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
   });
 });

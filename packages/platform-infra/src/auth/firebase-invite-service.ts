@@ -35,12 +35,7 @@ export class FirebaseInviteService {
       uid = userRecord.uid;
     } catch (err: unknown) {
       // User already exists in Firebase Auth — add them to the workspace without touching their password
-      if (
-        err !== null &&
-        typeof err === 'object' &&
-        'code' in err &&
-        err.code === 'auth/email-already-exists'
-      ) {
+      if (err !== null && typeof err === 'object' && 'code' in err && err.code === 'auth/email-already-exists') {
         const existing = await this.adminAuth.getUserByEmail(email);
         uid = existing.uid;
         isExisting = true;

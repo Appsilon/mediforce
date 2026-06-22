@@ -1,16 +1,7 @@
 import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
-import type {
-  RegisterWorkflowInput,
-  RegisterWorkflowOutput,
-  RegistrationWarning,
-} from '../../contract/workflows';
+import type { RegisterWorkflowInput, RegisterWorkflowOutput, RegistrationWarning } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
-import {
-  ConflictError,
-  ForbiddenError,
-  HandlerError,
-  ValidationError,
-} from '../../errors';
+import { ConflictError, ForbiddenError, HandlerError, ValidationError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
 import { checkRetiredModels } from './retired-model-check';
 import { isLocalAgentMode, fetchFromContainerWorker, fetchFromLocalDocker } from '../system/_docker';
@@ -36,10 +27,7 @@ export async function registerWorkflow(
 
   const parsed = parseWorkflowDefinitionForCreation({ ...input, namespace: input.namespace });
   if (!parsed.success) {
-    throw new ValidationError(
-      parsed.error.issues.map((i) => i.message).join(', '),
-      parsed.error.issues,
-    );
+    throw new ValidationError(parsed.error.issues.map((i) => i.message).join(', '), parsed.error.issues);
   }
 
   const allModels = await scope.models.list();
@@ -54,8 +42,13 @@ export async function registerWorkflow(
       .filter((s) => {
         const cfg = s.agent;
         if (typeof cfg?.image === 'string' && cfg.image.length > 0) return false;
-        if (typeof cfg?.repo === 'string' && cfg.repo.length > 0
-          && typeof cfg?.commit === 'string' && cfg.commit.length > 0) return false;
+        if (
+          typeof cfg?.repo === 'string' &&
+          cfg.repo.length > 0 &&
+          typeof cfg?.commit === 'string' &&
+          cfg.commit.length > 0
+        )
+          return false;
         return true;
       });
     if (missingImage.length > 0) {
@@ -66,10 +59,7 @@ export async function registerWorkflow(
     }
   }
 
-  const latestVersion = await scope.workflowDefinitions.getLatestVersion(
-    input.namespace,
-    parsed.data.name,
-  );
+  const latestVersion = await scope.workflowDefinitions.getLatestVersion(input.namespace, parsed.data.name);
   const nextVersion = latestVersion + 1;
 
   const definition = {
@@ -105,28 +95,25 @@ export async function registerWorkflow(
 
   const warnings: RegistrationWarning[] = [];
 
-  const hasDockerSteps = definition.steps.some(
-    (s) => s.executor === 'agent' || s.executor === 'script',
-  );
+  const hasDockerSteps = definition.steps.some((s) => s.executor === 'agent' || s.executor === 'script');
 
   if (hasDockerSteps) {
     try {
-      const dockerInfo = isLocalAgentMode()
-        ? await fetchFromLocalDocker()
-        : await fetchFromContainerWorker();
+      const dockerInfo = isLocalAgentMode() ? await fetchFromLocalDocker() : await fetchFromContainerWorker();
       if (dockerInfo.available) {
         for (const step of definition.steps) {
           if (step.executor !== 'agent' && step.executor !== 'script') continue;
           const cfg = step.executor === 'script' ? step.script : step.agent;
           const image = cfg?.image;
           if (typeof image !== 'string' || image.length === 0) continue;
-          const hasBuildSource = typeof cfg?.repo === 'string' && cfg.repo.length > 0
-            && typeof cfg?.commit === 'string' && cfg.commit.length > 0;
+          const hasBuildSource =
+            typeof cfg?.repo === 'string' &&
+            cfg.repo.length > 0 &&
+            typeof cfg?.commit === 'string' &&
+            cfg.commit.length > 0;
           if (hasBuildSource) continue;
           const [repo, tag = 'latest'] = image.split(':');
-          const found = dockerInfo.images.some(
-            (img) => img.repository === repo && img.tag === tag,
-          );
+          const found = dockerInfo.images.some((img) => img.repository === repo && img.tag === tag);
           if (!found) {
             warnings.push({
               code: 'image-not-found',
@@ -139,7 +126,8 @@ export async function registerWorkflow(
     } catch {
       warnings.push({
         code: 'image-check-unavailable',
-        message: 'Could not verify Docker images — the container runtime is unreachable. Image availability will be checked again at run start.',
+        message:
+          'Could not verify Docker images — the container runtime is unreachable. Image availability will be checked again at run start.',
         stepName: '',
       });
     }

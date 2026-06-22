@@ -1,17 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  InMemoryProcessInstanceRepository,
-  InMemoryAuditRepository,
-} from '@mediforce/platform-core';
-import type {
-  ProcessDefinition,
-  ProcessInstance,
-} from '@mediforce/platform-core';
-import {
-  StepExecutor,
-  RoutingError,
-  InvalidTransitionError,
-} from '../index';
+import { InMemoryProcessInstanceRepository, InMemoryAuditRepository } from '@mediforce/platform-core';
+import type { ProcessDefinition, ProcessInstance } from '@mediforce/platform-core';
+import { StepExecutor, RoutingError, InvalidTransitionError } from '../index';
 import type { StepActor } from '../index';
 
 const linearDef: ProcessDefinition = {
@@ -49,10 +39,7 @@ const branchingDef: ProcessDefinition = {
 
 const actor: StepActor = { id: 'user-1', role: 'operator' };
 
-function makeRunningInstance(
-  currentStepId: string,
-  overrides: Partial<ProcessInstance> = {},
-): ProcessInstance {
+function makeRunningInstance(currentStepId: string, overrides: Partial<ProcessInstance> = {}): ProcessInstance {
   return {
     id: 'instance-1',
     definitionName: 'linear-process',
@@ -109,12 +96,7 @@ describe('StepExecutor', () => {
     const instance = makeRunningInstance('start');
     await instanceRepo.create(instance);
 
-    await executor.executeStep(
-      instance,
-      { verdict: 'approve', comment: 'Looks good' },
-      actor,
-      linearDef,
-    );
+    await executor.executeStep(instance, { verdict: 'approve', comment: 'Looks good' }, actor, linearDef);
 
     const executions = await instanceRepo.getStepExecutions('instance-1');
     const stepExec = executions.find((e) => e.stepId === 'start');
@@ -125,12 +107,7 @@ describe('StepExecutor', () => {
     const instance = makeRunningInstance('start');
     await instanceRepo.create(instance);
 
-    await executor.executeStep(
-      instance,
-      { result: 'ok' },
-      actor,
-      linearDef,
-    );
+    await executor.executeStep(instance, { result: 'ok' }, actor, linearDef);
 
     const executions = await instanceRepo.getStepExecutions('instance-1');
     const stepExec = executions.find((e) => e.stepId === 'start');
@@ -221,9 +198,7 @@ describe('StepExecutor', () => {
     await instanceRepo.create(instance);
     // Output does not match any when expression
 
-    await expect(
-      executor.executeStep(instance, { route: 'c' }, actor, branchingDef),
-    ).rejects.toThrow(RoutingError);
+    await expect(executor.executeStep(instance, { route: 'c' }, actor, branchingDef)).rejects.toThrow(RoutingError);
 
     const updated = await instanceRepo.getById('instance-1');
     expect(updated!.status).toBe('paused');
@@ -238,9 +213,7 @@ describe('StepExecutor', () => {
     const instance = makeRunningInstance('start', { status: 'paused' });
     await instanceRepo.create(instance);
 
-    await expect(
-      executor.executeStep(instance, {}, actor, linearDef),
-    ).rejects.toThrow(InvalidTransitionError);
+    await expect(executor.executeStep(instance, {}, actor, linearDef)).rejects.toThrow(InvalidTransitionError);
 
     // No state change
     const updated = await instanceRepo.getById('instance-1');

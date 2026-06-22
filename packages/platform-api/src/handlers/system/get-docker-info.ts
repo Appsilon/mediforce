@@ -5,16 +5,9 @@
 
 import type { CallerScope } from '../../repositories/index';
 import type { DockerInfoResponse, GetDockerInfoInput } from '../../contract/system';
-import {
-  fetchFromContainerWorker,
-  fetchFromLocalDocker,
-  isLocalAgentMode,
-} from './_docker';
+import { fetchFromContainerWorker, fetchFromLocalDocker, isLocalAgentMode } from './_docker';
 
-export async function getDockerInfo(
-  _input: GetDockerInfoInput,
-  _scope: CallerScope,
-): Promise<DockerInfoResponse> {
+export async function getDockerInfo(_input: GetDockerInfoInput, _scope: CallerScope): Promise<DockerInfoResponse> {
   try {
     return isLocalAgentMode() ? await fetchFromLocalDocker() : await fetchFromContainerWorker();
   } catch {

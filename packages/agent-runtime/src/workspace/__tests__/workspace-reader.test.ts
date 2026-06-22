@@ -31,10 +31,7 @@ describe('WorkspaceReader', () => {
     stepId: string,
     files: Record<string, Buffer | string>,
   ): Promise<void> {
-    const ws = await manager.createRunWorkspace(
-      { ...workflow, workspace: {} as WorkflowWorkspace },
-      runId,
-    );
+    const ws = await manager.createRunWorkspace({ ...workflow, workspace: {} as WorkflowWorkspace }, runId);
     for (const [relativePath, content] of Object.entries(files)) {
       const destPath = join(ws.path, '.mediforce', 'output', stepId, relativePath);
       await mkdir(dirname(destPath), { recursive: true });
@@ -140,9 +137,7 @@ describe('WorkspaceReader', () => {
     });
 
     it('returns null when the bare repo does not exist', async () => {
-      expect(
-        await reader.readOutputFile({ name: 'never-created' }, 'run-1', '.mediforce/output/s/x.txt'),
-      ).toBeNull();
+      expect(await reader.readOutputFile({ name: 'never-created' }, 'run-1', '.mediforce/output/s/x.txt')).toBeNull();
     });
 
     it('rejects paths containing .. segments', async () => {

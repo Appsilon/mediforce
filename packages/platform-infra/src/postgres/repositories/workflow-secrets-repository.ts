@@ -1,8 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import {
-  WorkflowSecretsSchema,
-  type WorkflowSecretsRepository,
-} from '@mediforce/platform-core';
+import { WorkflowSecretsSchema, type WorkflowSecretsRepository } from '@mediforce/platform-core';
 import type { Database } from '../client';
 import { workflowSecrets } from '../schema/workflow-secret';
 import { encrypt, decrypt } from '../../crypto/secrets-cipher';
@@ -25,12 +22,7 @@ export class PostgresWorkflowSecretsRepository implements WorkflowSecretsReposit
     const rows = await this.db
       .select()
       .from(workflowSecrets)
-      .where(
-        and(
-          eq(workflowSecrets.workspace, namespace),
-          eq(workflowSecrets.workflowName, workflowName),
-        ),
-      );
+      .where(and(eq(workflowSecrets.workspace, namespace), eq(workflowSecrets.workflowName, workflowName)));
     const result: Record<string, string> = {};
     for (const row of rows) {
       try {
@@ -56,20 +48,11 @@ export class PostgresWorkflowSecretsRepository implements WorkflowSecretsReposit
     const rows = await this.db
       .select({ key: workflowSecrets.key })
       .from(workflowSecrets)
-      .where(
-        and(
-          eq(workflowSecrets.workspace, namespace),
-          eq(workflowSecrets.workflowName, workflowName),
-        ),
-      );
+      .where(and(eq(workflowSecrets.workspace, namespace), eq(workflowSecrets.workflowName, workflowName)));
     return rows.map((r) => r.key);
   }
 
-  async setSecrets(
-    namespace: string,
-    workflowName: string,
-    secrets: Record<string, string>,
-  ): Promise<void> {
+  async setSecrets(namespace: string, workflowName: string, secrets: Record<string, string>): Promise<void> {
     WorkflowSecretsSchema.parse({
       workflowName,
       namespace,
@@ -79,12 +62,7 @@ export class PostgresWorkflowSecretsRepository implements WorkflowSecretsReposit
     await this.db.transaction(async (tx) => {
       await tx
         .delete(workflowSecrets)
-        .where(
-          and(
-            eq(workflowSecrets.workspace, namespace),
-            eq(workflowSecrets.workflowName, workflowName),
-          ),
-        );
+        .where(and(eq(workflowSecrets.workspace, namespace), eq(workflowSecrets.workflowName, workflowName)));
       const entries = Object.entries(secrets);
       if (entries.length === 0) return;
       await tx.insert(workflowSecrets).values(
@@ -101,12 +79,7 @@ export class PostgresWorkflowSecretsRepository implements WorkflowSecretsReposit
   async deleteSecrets(namespace: string, workflowName: string): Promise<void> {
     await this.db
       .delete(workflowSecrets)
-      .where(
-        and(
-          eq(workflowSecrets.workspace, namespace),
-          eq(workflowSecrets.workflowName, workflowName),
-        ),
-      );
+      .where(and(eq(workflowSecrets.workspace, namespace), eq(workflowSecrets.workflowName, workflowName)));
   }
 
   async deleteSecret(namespace: string, workflowName: string, key: string): Promise<void> {
@@ -121,12 +94,7 @@ export class PostgresWorkflowSecretsRepository implements WorkflowSecretsReposit
       );
   }
 
-  async upsertSecret(
-    namespace: string,
-    workflowName: string,
-    key: string,
-    value: string,
-  ): Promise<void> {
+  async upsertSecret(namespace: string, workflowName: string, key: string, value: string): Promise<void> {
     WorkflowSecretsSchema.parse({
       workflowName,
       namespace,
@@ -142,11 +110,7 @@ export class PostgresWorkflowSecretsRepository implements WorkflowSecretsReposit
         encryptedValue: encrypt(value),
       })
       .onConflictDoUpdate({
-        target: [
-          workflowSecrets.workspace,
-          workflowSecrets.workflowName,
-          workflowSecrets.key,
-        ],
+        target: [workflowSecrets.workspace, workflowSecrets.workflowName, workflowSecrets.key],
         set: { encryptedValue: encrypt(value) },
       });
   }

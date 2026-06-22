@@ -65,9 +65,7 @@ describe('protocol-to-tfl process definition', () => {
     const stepIds = def.steps.map((s) => s.id);
 
     // Every non-terminal step should have an outgoing transition
-    const nonTerminal = stepIds.filter(
-      (id) => def.steps.find((s) => s.id === id)?.type !== 'terminal',
-    );
+    const nonTerminal = stepIds.filter((id) => def.steps.find((s) => s.id === id)?.type !== 'terminal');
     for (const stepId of nonTerminal) {
       const hasOutgoing = def.transitions.some((t) => t.from === stepId);
       expect(hasOutgoing, `Step "${stepId}" should have an outgoing transition`).toBe(true);

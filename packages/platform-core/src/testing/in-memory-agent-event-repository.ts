@@ -22,10 +22,7 @@ export class InMemoryAgentEventRepository implements AgentEventRepository {
     return event;
   }
 
-  async listByInstance(
-    instanceId: string,
-    afterSequence?: number,
-  ): Promise<AgentEvent[]> {
+  async listByInstance(instanceId: string, afterSequence?: number): Promise<AgentEvent[]> {
     return this.events
       .filter((e) => e.processInstanceId === instanceId)
       .filter((e) => afterSequence === undefined || e.sequence > afterSequence)
@@ -33,15 +30,9 @@ export class InMemoryAgentEventRepository implements AgentEventRepository {
       .sort((a, b) => a.sequence - b.sequence);
   }
 
-  async listByStep(
-    instanceId: string,
-    stepId: string,
-    afterSequence?: number,
-  ): Promise<AgentEvent[]> {
+  async listByStep(instanceId: string, stepId: string, afterSequence?: number): Promise<AgentEvent[]> {
     return this.events
-      .filter(
-        (e) => e.processInstanceId === instanceId && e.stepId === stepId,
-      )
+      .filter((e) => e.processInstanceId === instanceId && e.stepId === stepId)
       .filter((e) => afterSequence === undefined || e.sequence > afterSequence)
       .slice()
       .sort((a, b) => a.sequence - b.sequence);
@@ -53,9 +44,7 @@ export class InMemoryAgentEventRepository implements AgentEventRepository {
     afterSequence?: number,
   ): Promise<AgentEvent[]> {
     if (this.parents === undefined) {
-      throw new Error(
-        'InMemoryAgentEventRepository: ProcessInstanceRepository required for namespace-scoped methods',
-      );
+      throw new Error('InMemoryAgentEventRepository: ProcessInstanceRepository required for namespace-scoped methods');
     }
     const parent = await this.parents.getById(instanceId);
     if (!parent || typeof parent.namespace !== 'string') return [];
@@ -70,9 +59,7 @@ export class InMemoryAgentEventRepository implements AgentEventRepository {
     afterSequence?: number,
   ): Promise<AgentEvent[]> {
     if (this.parents === undefined) {
-      throw new Error(
-        'InMemoryAgentEventRepository: ProcessInstanceRepository required for namespace-scoped methods',
-      );
+      throw new Error('InMemoryAgentEventRepository: ProcessInstanceRepository required for namespace-scoped methods');
     }
     const parent = await this.parents.getById(instanceId);
     if (!parent || typeof parent.namespace !== 'string') return [];

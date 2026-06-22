@@ -20,7 +20,11 @@ function mkRun(status: string, opts: { currentStepId?: string; dryRun?: boolean;
   };
 }
 
-function mkExecution(stepId: string, status: string, opts: { error?: string; startedAt?: string; completedAt?: string } = {}) {
+function mkExecution(
+  stepId: string,
+  status: string,
+  opts: { error?: string; startedAt?: string; completedAt?: string } = {},
+) {
   return {
     id: `exec-${stepId}`,
     instanceId: 'run-1',
@@ -114,10 +118,14 @@ describe('run watch command', () => {
   it('prints step status lines', async () => {
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse(mkRun('completed')))
-      .mockResolvedValueOnce(jsonResponse(mkSteps([
-        { stepId: 'step-a', status: 'completed' },
-        { stepId: 'step-b', status: 'completed', error: 'timeout' },
-      ])));
+      .mockResolvedValueOnce(
+        jsonResponse(
+          mkSteps([
+            { stepId: 'step-a', status: 'completed' },
+            { stepId: 'step-b', status: 'completed', error: 'timeout' },
+          ]),
+        ),
+      );
 
     const output = captureOutput();
     await runWatchCommand({

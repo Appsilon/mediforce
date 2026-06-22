@@ -36,8 +36,5 @@ export interface AgentRunRepository {
    * Workspace-scoped list — items whose parent `ProcessInstance.namespace` is
    * in `allowed`. Sorted by startedAt desc with `(startedAt, id)` tie-break.
    */
-  listInNamespaces(
-    allowed: readonly string[],
-    opts: ListAgentRunsOptions,
-  ): Promise<ListAgentRunsPage>;
+  listInNamespaces(allowed: readonly string[], opts: ListAgentRunsOptions): Promise<ListAgentRunsPage>;
 }

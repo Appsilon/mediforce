@@ -23,12 +23,7 @@ interface SubmittedData {
   timestamp: string;
 }
 
-export function SelectionForm({
-  taskId,
-  options,
-  remainingTaskCount,
-  onCompleted,
-}: SelectionFormProps) {
+export function SelectionForm({ taskId, options, remainingTaskCount, onCompleted }: SelectionFormProps) {
   const handle = useHandleFromPath();
   const [selectedIndex, setSelectedIndex] = React.useState<number | null>(null);
   const [mode, setMode] = React.useState<'select' | 'revise' | null>(null);
@@ -112,9 +107,7 @@ export function SelectionForm({
         ))}
       </div>
 
-      {error && (
-        <p className="text-sm text-destructive">{error}</p>
-      )}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       {/* Action buttons */}
       <div className="flex items-center gap-3">
@@ -160,7 +153,11 @@ export function SelectionForm({
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Request changes</span>
             <button
-              onClick={() => { setMode(null); setComment(''); setError(null); }}
+              onClick={() => {
+                setMode(null);
+                setComment('');
+                setError(null);
+              }}
               className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               <X className="h-3 w-3" />
@@ -224,8 +221,15 @@ function OptionCard({
       role="radio"
       aria-checked={selected}
       tabIndex={disabled ? -1 : 0}
-      onClick={() => { if (!disabled) onSelect(); }}
-      onKeyDown={(event) => { if (!disabled && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onSelect(); } }}
+      onClick={() => {
+        if (!disabled) onSelect();
+      }}
+      onKeyDown={(event) => {
+        if (!disabled && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
       className={cn(
         'w-full text-left rounded-lg border p-4 transition-colors cursor-pointer',
         selected
@@ -238,27 +242,24 @@ function OptionCard({
         <div
           className={cn(
             'mt-0.5 h-5 w-5 shrink-0 rounded-full border-2 flex items-center justify-center',
-            selected
-              ? 'border-green-600 bg-green-600'
-              : 'border-muted-foreground/40',
+            selected ? 'border-green-600 bg-green-600' : 'border-muted-foreground/40',
           )}
         >
-          {selected && (
-            <div className="h-2 w-2 rounded-full bg-white" />
-          )}
+          {selected && <div className="h-2 w-2 rounded-full bg-white" />}
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium">{label}</div>
-          {description && (
-            <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-          )}
+          {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
 
           {value && (
             <div className="mt-2">
               <button
                 type="button"
-                onClick={(event) => { event.stopPropagation(); setExpanded(!expanded); }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setExpanded(!expanded);
+                }}
                 className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -279,13 +280,7 @@ function OptionCard({
 
 // --- Post-submission confirmation ---
 
-function SelectionConfirmation({
-  data,
-  remainingTaskCount,
-}: {
-  data: SubmittedData;
-  remainingTaskCount?: number;
-}) {
+function SelectionConfirmation({ data, remainingTaskCount }: { data: SubmittedData; remainingTaskCount?: number }) {
   const handle = useHandleFromPath();
   const isApprove = data.verdict === 'approve';
 
@@ -308,14 +303,10 @@ function SelectionConfirmation({
           <span
             className={cn(
               'font-medium text-sm',
-              isApprove
-                ? 'text-green-800 dark:text-green-300'
-                : 'text-amber-800 dark:text-amber-300',
+              isApprove ? 'text-green-800 dark:text-green-300' : 'text-amber-800 dark:text-amber-300',
             )}
           >
-            {isApprove
-              ? `You approved: ${data.selectedLabel}`
-              : 'You requested revisions'}
+            {isApprove ? `You approved: ${data.selectedLabel}` : 'You requested revisions'}
           </span>
         </div>
 
@@ -335,9 +326,7 @@ function SelectionConfirmation({
         <p
           className={cn(
             'mt-2 text-xs',
-            isApprove
-              ? 'text-green-600/70 dark:text-green-400/70'
-              : 'text-amber-600/70 dark:text-amber-400/70',
+            isApprove ? 'text-green-600/70 dark:text-green-400/70' : 'text-amber-600/70 dark:text-amber-400/70',
           )}
         >
           {format(new Date(data.timestamp), 'MMM d, yyyy HH:mm')}
@@ -386,9 +375,7 @@ export function SelectionConfirmationReadOnly({
     );
   }
 
-  const label = selectedOption
-    ? (selectedOption.label as string) ?? `Option ${(selectedIdx ?? 0) + 1}`
-    : undefined;
+  const label = selectedOption ? ((selectedOption.label as string) ?? `Option ${(selectedIdx ?? 0) + 1}`) : undefined;
 
   return (
     <SelectionConfirmation

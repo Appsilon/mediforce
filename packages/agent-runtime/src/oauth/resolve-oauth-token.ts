@@ -48,7 +48,7 @@ export class RefreshTokenUnavailableError extends Error {
   constructor(provider: string) {
     super(
       `OAuth access token for provider "${provider}" is expired or expiring soon, ` +
-      `and no refresh token is available. User must reconnect via the UI.`,
+        `and no refresh token is available. User must reconnect via the UI.`,
     );
     this.name = 'RefreshTokenUnavailableError';
     this.provider = provider;
@@ -68,9 +68,7 @@ interface ProviderTokenResponse {
 /** Resolve a token for imminent use. If the access token has enough time
  *  left, returns it unchanged. Otherwise exchanges the refresh token with
  *  the provider and returns the new token (caller persists). */
-export async function resolveOAuthToken(
-  options: ResolveTokenOptions,
-): Promise<ResolvedToken> {
+export async function resolveOAuthToken(options: ResolveTokenOptions): Promise<ResolvedToken> {
   const { token, provider } = options;
   const fetchImpl = options.fetchImpl ?? fetch;
   const now = options.now ?? Date.now;
@@ -111,11 +109,7 @@ export async function resolveOAuthToken(
       body: body.toString(),
     });
   } catch (err) {
-    throw new RefreshTokenRejectedError(
-      provider.id,
-      0,
-      err instanceof Error ? err.message : 'network error',
-    );
+    throw new RefreshTokenRejectedError(provider.id, 0, err instanceof Error ? err.message : 'network error');
   }
 
   if (!response.ok) {
@@ -128,29 +122,18 @@ export async function resolveOAuthToken(
     throw new RefreshTokenRejectedError(
       provider.id,
       response.status,
-      typeof parsed.error_description === 'string'
-        ? parsed.error_description
-        : parsed.error,
+      typeof parsed.error_description === 'string' ? parsed.error_description : parsed.error,
     );
   }
 
   if (typeof parsed.access_token !== 'string' || parsed.access_token === '') {
-    throw new RefreshTokenRejectedError(
-      provider.id,
-      response.status,
-      'provider response missing access_token',
-    );
+    throw new RefreshTokenRejectedError(provider.id, response.status, 'provider response missing access_token');
   }
 
   const newAccessToken = parsed.access_token;
   const newRefreshToken =
-    typeof parsed.refresh_token === 'string' && parsed.refresh_token !== ''
-      ? parsed.refresh_token
-      : token.refreshToken;
-  const expiresIn =
-    typeof parsed.expires_in === 'number' && parsed.expires_in > 0
-      ? parsed.expires_in
-      : undefined;
+    typeof parsed.refresh_token === 'string' && parsed.refresh_token !== '' ? parsed.refresh_token : token.refreshToken;
+  const expiresIn = typeof parsed.expires_in === 'number' && parsed.expires_in > 0 ? parsed.expires_in : undefined;
   const newExpiresAt = expiresIn !== undefined ? currentTime + expiresIn * 1000 : undefined;
   const newScope = typeof parsed.scope === 'string' ? parsed.scope : token.scope;
 
@@ -169,9 +152,6 @@ export async function resolveOAuthToken(
 /** Convenience: apply `headerValueTemplate.replace('{token}', accessToken)`
  *  with safe fallbacks. Exported here so the runtime writer and tests
  *  share a single substitution point. */
-export function renderOAuthHeader(
-  headerValueTemplate: string,
-  accessToken: string,
-): string {
+export function renderOAuthHeader(headerValueTemplate: string, accessToken: string): string {
   return headerValueTemplate.split('{token}').join(accessToken);
 }

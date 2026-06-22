@@ -8,9 +8,6 @@ export async function POST(): Promise<NextResponse> {
     const result = await syncModels({ modelRegistryRepo });
     return NextResponse.json(result);
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Sync failed' },
-      { status: 502 },
-    );
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Sync failed' }, { status: 502 });
   }
 }

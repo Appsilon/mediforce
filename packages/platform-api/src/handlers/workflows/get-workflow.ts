@@ -1,9 +1,6 @@
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
-import type {
-  GetWorkflowInput,
-  GetWorkflowOutput,
-} from '../../contract/workflows';
+import type { GetWorkflowInput, GetWorkflowOutput } from '../../contract/workflows';
 
 /**
  * Fetch one workflow definition by name (+ optional version, + optional
@@ -11,10 +8,7 @@ import type {
  * `scope.workflowDefinitions` wrapper. Out-of-scope or private-not-allowed
  * collapses to 404 — same shape as a truly missing definition.
  */
-export async function getWorkflow(
-  input: GetWorkflowInput,
-  scope: CallerScope,
-): Promise<GetWorkflowOutput> {
+export async function getWorkflow(input: GetWorkflowInput, scope: CallerScope): Promise<GetWorkflowOutput> {
   const lookupNamespace = input.namespace ?? '';
 
   let version: number;

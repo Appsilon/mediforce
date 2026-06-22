@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
-import {
-  RegisterWorkflowInputSchema,
-  RegisterWorkflowOutputSchema,
-  ListWorkflowsOutputSchema,
-} from '../workflows';
+import { RegisterWorkflowInputSchema, RegisterWorkflowOutputSchema, ListWorkflowsOutputSchema } from '../workflows';
 import { omitServerFields } from './_helpers';
 
 describe('RegisterWorkflowInputSchema', () => {

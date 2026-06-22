@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { FallbackHandler } from './fallback-handler';
-import {
-  InMemoryProcessInstanceRepository,
-} from '@mediforce/platform-core';
+import { InMemoryProcessInstanceRepository } from '@mediforce/platform-core';
 import type { AgentContext } from '../interfaces/step-executor-plugin';
 import type { StepConfig, AgentEvent, ProcessConfig } from '@mediforce/platform-core';
 import { NoopLlmClient } from '../testing/index';

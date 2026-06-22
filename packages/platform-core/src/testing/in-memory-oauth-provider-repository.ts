@@ -1,7 +1,4 @@
-import {
-  ProviderAlreadyExistsError,
-  type OAuthProviderRepository,
-} from '../repositories/oauth-provider-repository';
+import { ProviderAlreadyExistsError, type OAuthProviderRepository } from '../repositories/oauth-provider-repository';
 import {
   OAuthProviderConfigSchema,
   type OAuthProviderConfig,
@@ -50,11 +47,7 @@ export class InMemoryOAuthProviderRepository implements OAuthProviderRepository 
     return config;
   }
 
-  async update(
-    namespace: string,
-    id: string,
-    patch: UpdateOAuthProviderInput,
-  ): Promise<OAuthProviderConfig | null> {
+  async update(namespace: string, id: string, patch: UpdateOAuthProviderInput): Promise<OAuthProviderConfig | null> {
     const scope = this.store.get(namespace);
     const existing = scope?.get(id);
     if (!existing || !scope) return null;

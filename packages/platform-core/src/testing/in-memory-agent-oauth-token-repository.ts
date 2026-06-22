@@ -14,12 +14,7 @@ export class InMemoryAgentOAuthTokenRepository implements AgentOAuthTokenReposit
     return entry ? { ...entry } : null;
   }
 
-  async put(
-    namespace: string,
-    agentId: string,
-    serverName: string,
-    token: AgentOAuthToken,
-  ): Promise<void> {
+  async put(namespace: string, agentId: string, serverName: string, token: AgentOAuthToken): Promise<void> {
     const parsed = AgentOAuthTokenSchema.parse(token);
     const scope = this.store.get(namespace) ?? new Map<string, AgentOAuthToken>();
     scope.set(keyOf(agentId, serverName), { ...parsed });
@@ -32,10 +27,7 @@ export class InMemoryAgentOAuthTokenRepository implements AgentOAuthTokenReposit
     return scope.delete(keyOf(agentId, serverName));
   }
 
-  async listByAgent(
-    namespace: string,
-    agentId: string,
-  ): Promise<Array<AgentOAuthToken & { serverName: string }>> {
+  async listByAgent(namespace: string, agentId: string): Promise<Array<AgentOAuthToken & { serverName: string }>> {
     const scope = this.store.get(namespace);
     if (!scope) return [];
     const results: Array<AgentOAuthToken & { serverName: string }> = [];

@@ -32,16 +32,12 @@ export function AgentOutputReviewPanel({
   if (!hasContent) {
     return (
       <div className="rounded-lg border border-dashed p-6 text-center">
-        <p className="text-sm text-muted-foreground">
-          No agent output to review.
-        </p>
+        <p className="text-sm text-muted-foreground">No agent output to review.</p>
       </div>
     );
   }
 
-  const confidencePct = agentOutput.confidence !== null
-    ? Math.round(agentOutput.confidence * 100)
-    : null;
+  const confidencePct = agentOutput.confidence !== null ? Math.round(agentOutput.confidence * 100) : null;
 
   return (
     <div className="rounded-lg border">
@@ -50,11 +46,7 @@ export function AgentOutputReviewPanel({
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Agent Output for Review
         </span>
-        {stepId && (
-          <span className="text-xs font-medium text-foreground">
-            — {formatStepName(stepId)}
-          </span>
-        )}
+        {stepId && <span className="text-xs font-medium text-foreground">— {formatStepName(stepId)}</span>}
         {agentOutput.escalationReason !== null && (
           <span
             className="inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
@@ -67,20 +59,20 @@ export function AgentOutputReviewPanel({
         )}
       </div>
 
-      <AgentOutputDisplay
-        agentOutput={agentOutput}
-        instanceId={instanceId}
-        onContentLoaded={onContentLoaded}
-      />
+      <AgentOutputDisplay agentOutput={agentOutput} instanceId={instanceId} onContentLoaded={onContentLoaded} />
     </div>
   );
 }
 
 function formatEscalationReason(reason: 'low_confidence' | 'timeout' | 'error' | 'iterations_limit'): string {
   switch (reason) {
-    case 'low_confidence': return 'low confidence';
-    case 'timeout': return 'timeout';
-    case 'error': return 'error';
-    case 'iterations_limit': return 'iterations limit reached';
+    case 'low_confidence':
+      return 'low confidence';
+    case 'timeout':
+      return 'timeout';
+    case 'error':
+      return 'error';
+    case 'iterations_limit':
+      return 'iterations limit reached';
   }
 }

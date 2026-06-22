@@ -24,10 +24,7 @@ import { actorFromCaller } from '../_helpers';
  * `scope.system.inviteService === null` → `PreconditionFailedError` — same
  * shape as `inviteUser` for an unconfigured deployment.
  */
-export async function resendInvite(
-  input: ResendInviteInput,
-  scope: CallerScope,
-): Promise<ResendInviteOutput> {
+export async function resendInvite(input: ResendInviteInput, scope: CallerScope): Promise<ResendInviteOutput> {
   assertCallerIsNamespaceAdmin(scope.caller, input.namespaceHandle);
 
   const invite = scope.system.inviteService;
@@ -42,9 +39,7 @@ export async function resendInvite(
 
   const pending = await invite.isInvitePending(input.uid);
   if (!pending) {
-    throw new PreconditionFailedError(
-      'Cannot resend invite: user has already activated their account',
-    );
+    throw new PreconditionFailedError('Cannot resend invite: user has already activated their account');
   }
 
   const temporaryPassword = await invite.resetInvitePassword(input.uid);

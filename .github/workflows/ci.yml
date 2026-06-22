@@ -32,6 +32,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Biome gate: blocks on formatting drift and on lint rules that are
+      # clean today (recommended errors). Rules with an existing backlog are
+      # set to `warn` in biome.json and surface here without failing the build
+      # — see biome.json for the ratchet plan.
+      - run: pnpm lint
+
   typecheck:
     runs-on: ubuntu-latest
     timeout-minutes: 5

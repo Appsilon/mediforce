@@ -86,9 +86,7 @@ describe('task complete command', () => {
   });
 
   it('completes task with inline --payload', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(COMPLETE_RESPONSE),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(COMPLETE_RESPONSE));
     const output = captureOutput();
     const code = await taskCompleteCommand({
       argv: ['task-1', '--payload', '{"kind":"verdict","verdict":"approve"}', '--base-url', 'http://test:9000'],
@@ -102,9 +100,7 @@ describe('task complete command', () => {
   });
 
   it('reads payload from stdin via --payload-file -', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(COMPLETE_RESPONSE),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(COMPLETE_RESPONSE));
     const output = captureOutput();
     const code = await taskCompleteCommand({
       argv: ['task-1', '--payload-file', '-', '--base-url', 'http://test:9000'],
@@ -118,9 +114,7 @@ describe('task complete command', () => {
   });
 
   it('outputs JSON on --json', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(COMPLETE_RESPONSE),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(COMPLETE_RESPONSE));
     const output = captureOutput();
     const code = await taskCompleteCommand({
       argv: ['task-1', '--payload', '{"kind":"verdict","verdict":"done"}', '--json', '--base-url', 'http://test:9000'],

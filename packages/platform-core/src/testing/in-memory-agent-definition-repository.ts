@@ -59,10 +59,7 @@ export class InMemoryAgentDefinitionRepository implements AgentDefinitionReposit
     return this.byId.get(id) ?? null;
   }
 
-  async getByIdVisibleTo(
-    id: string,
-    allowed: readonly string[],
-  ): Promise<AgentDefinition | null> {
+  async getByIdVisibleTo(id: string, allowed: readonly string[]): Promise<AgentDefinition | null> {
     const agent = this.byId.get(id);
     if (agent === undefined) return null;
     if (agent.visibility === 'public') return agent;

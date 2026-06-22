@@ -1,7 +1,4 @@
-import type {
-  AgentEvent,
-  AgentEventRepository,
-} from '@mediforce/platform-core';
+import type { AgentEvent, AgentEventRepository } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
 import { AuthorizedScope } from './authorized-repository';
 
@@ -24,29 +21,13 @@ export class AuthorizedAgentEventRepository extends AuthorizedScope {
     super(caller);
   }
 
-  listByInstance = async (
-    instanceId: string,
-    afterSequence?: number,
-  ): Promise<AgentEvent[]> =>
+  listByInstance = async (instanceId: string, afterSequence?: number): Promise<AgentEvent[]> =>
     this.caller.isSystemActor
       ? this.raw.listByInstance(instanceId, afterSequence)
-      : this.raw.listByInstanceInNamespaces(
-          instanceId,
-          [...this.caller.namespaces],
-          afterSequence,
-        );
+      : this.raw.listByInstanceInNamespaces(instanceId, [...this.caller.namespaces], afterSequence);
 
-  listByStep = async (
-    instanceId: string,
-    stepId: string,
-    afterSequence?: number,
-  ): Promise<AgentEvent[]> =>
+  listByStep = async (instanceId: string, stepId: string, afterSequence?: number): Promise<AgentEvent[]> =>
     this.caller.isSystemActor
       ? this.raw.listByStep(instanceId, stepId, afterSequence)
-      : this.raw.listByStepInNamespaces(
-          instanceId,
-          stepId,
-          [...this.caller.namespaces],
-          afterSequence,
-        );
+      : this.raw.listByStepInNamespaces(instanceId, stepId, [...this.caller.namespaces], afterSequence);
 }

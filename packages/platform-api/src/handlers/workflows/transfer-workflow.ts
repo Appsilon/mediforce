@@ -1,7 +1,4 @@
-import type {
-  TransferWorkflowInput,
-  TransferWorkflowOutput,
-} from '../../contract/workflows';
+import type { TransferWorkflowInput, TransferWorkflowOutput } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
 import { actorFromCaller } from '../_helpers';
 
@@ -18,11 +15,7 @@ export async function transferWorkflowNamespace(
   input: TransferWorkflowInput,
   scope: CallerScope,
 ): Promise<TransferWorkflowOutput> {
-  await scope.workflowDefinitions.transferNamespace(
-    input.name,
-    input.sourceNamespace,
-    input.targetNamespace,
-  );
+  await scope.workflowDefinitions.transferNamespace(input.name, input.sourceNamespace, input.targetNamespace);
 
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({

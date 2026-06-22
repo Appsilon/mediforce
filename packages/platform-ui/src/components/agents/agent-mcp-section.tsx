@@ -4,11 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle, Pencil, Plus, Server, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AgentMcpBinding, AgentMcpBindingMap, ToolCatalogEntry } from '@mediforce/platform-core';
-import {
-  deleteAgentBinding,
-  listAgentBindings,
-  putAgentBinding,
-} from '@/lib/agent-mcp-client';
+import { deleteAgentBinding, listAgentBindings, putAgentBinding } from '@/lib/agent-mcp-client';
 import { mediforce } from '@/lib/mediforce';
 import { AgentMcpBindingForm } from './agent-mcp-binding-form';
 import { OAuthConnectionStatus } from './oauth-connection-status';
@@ -18,10 +14,7 @@ interface AgentMcpSectionProps {
   handle: string;
 }
 
-type DialogState =
-  | { kind: 'closed' }
-  | { kind: 'create' }
-  | { kind: 'edit'; name: string; binding: AgentMcpBinding };
+type DialogState = { kind: 'closed' } | { kind: 'create' } | { kind: 'edit'; name: string; binding: AgentMcpBinding };
 
 export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
   const [bindings, setBindings] = useState<AgentMcpBindingMap>({});
@@ -102,8 +95,8 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
       </header>
 
       <p className="text-xs text-muted-foreground">
-        Tools this agent can invoke via MCP. Stdio bindings pull from the namespace catalog; HTTP
-        bindings point at external endpoints. Workflow steps may further narrow via{' '}
+        Tools this agent can invoke via MCP. Stdio bindings pull from the namespace catalog; HTTP bindings point at
+        external endpoints. Workflow steps may further narrow via{' '}
         <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">denyTools</code>.
       </p>
 
@@ -209,8 +202,8 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
               <Dialog.Description className="text-sm text-muted-foreground">
                 Remove <span className="font-mono text-foreground">{deleteTarget.name}</span> from this agent. Workflow
                 steps that referenced this server via{' '}
-                <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">mcpRestrictions</code> will no longer
-                resolve a server by that name.
+                <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">mcpRestrictions</code> will no
+                longer resolve a server by that name.
               </Dialog.Description>
             )}
             <div className="mt-5 flex justify-end gap-2">
@@ -254,13 +247,9 @@ function BindingRow({
   onRemove: () => void;
 }) {
   const transportLabel = binding.type === 'stdio' ? 'stdio' : 'HTTP';
-  const detail =
-    binding.type === 'stdio'
-      ? `catalogId: ${binding.catalogId}`
-      : truncateUrl(binding.url);
+  const detail = binding.type === 'stdio' ? `catalogId: ${binding.catalogId}` : truncateUrl(binding.url);
   const allowedCount = binding.allowedTools?.length ?? 0;
-  const oauthProvider =
-    binding.type === 'http' && binding.auth?.type === 'oauth' ? binding.auth.provider : null;
+  const oauthProvider = binding.type === 'http' && binding.auth?.type === 'oauth' ? binding.auth.provider : null;
   return (
     <li className="flex flex-col gap-2 rounded-md border bg-background px-3 py-2">
       <div className="flex flex-wrap items-center gap-3">
@@ -301,12 +290,7 @@ function BindingRow({
         </div>
       </div>
       {oauthProvider !== null && (
-        <OAuthConnectionStatus
-          agentId={agentId}
-          serverName={name}
-          provider={oauthProvider}
-          namespace={namespace}
-        />
+        <OAuthConnectionStatus agentId={agentId} serverName={name} provider={oauthProvider} namespace={namespace} />
       )}
     </li>
   );

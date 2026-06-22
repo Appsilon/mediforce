@@ -3,9 +3,7 @@ import { ProcessDefinitionSchema } from '../schemas/process-definition';
 import type { ProcessDefinition } from '../schemas/process-definition';
 import { formatZodErrors } from './error-formatter';
 
-export type ParseResult<T> =
-  | { success: true; data: T }
-  | { success: false; error: string };
+export type ParseResult<T> = { success: true; data: T } | { success: false; error: string };
 
 /**
  * Parses a YAML string into a validated ProcessDefinition.
@@ -19,9 +17,7 @@ export type ParseResult<T> =
  * YAML syntax errors include line/column information from the yaml library.
  * Schema validation errors include field paths (e.g., "steps.0.type").
  */
-export function parseProcessDefinition(
-  yamlString: unknown,
-): ParseResult<ProcessDefinition> {
+export function parseProcessDefinition(yamlString: unknown): ParseResult<ProcessDefinition> {
   // Step 0: Input validation
   if (typeof yamlString !== 'string' || yamlString.trim() === '') {
     return { success: false as const, error: 'Input must be a non-empty string' };

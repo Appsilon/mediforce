@@ -29,10 +29,7 @@ export class InMemoryHumanTaskRepository implements HumanTaskRepository {
     return task ? { ...task } : null;
   }
 
-  async getByIdInNamespaces(
-    taskId: string,
-    allowed: readonly string[],
-  ): Promise<HumanTask | null> {
+  async getByIdInNamespaces(taskId: string, allowed: readonly string[]): Promise<HumanTask | null> {
     const task = this.tasks.get(taskId);
     if (!task) return null;
     const parent = await this.requireParents().getById(task.processInstanceId);
@@ -44,47 +41,32 @@ export class InMemoryHumanTaskRepository implements HumanTaskRepository {
     // Mirror the Postgres partial index: tombstoned tasks are excluded from
     // the role queue. Callers narrow by status via ACTIONABLE_STATUSES if
     // they want the actionable subset.
-    return [...this.tasks.values()].filter(
-      (t) => t.assignedRole === role && t.deleted !== true,
-    );
+    return [...this.tasks.values()].filter((t) => t.assignedRole === role && t.deleted !== true);
   }
 
-  async getByRoleInNamespaces(
-    role: string,
-    allowed: readonly string[],
-  ): Promise<HumanTask[]> {
+  async getByRoleInNamespaces(role: string, allowed: readonly string[]): Promise<HumanTask[]> {
     const tasks = await this.getByRoleAll(role);
     return this.filterByParentNamespace(tasks, allowed);
   }
 
   async getByInstanceId(instanceId: string): Promise<HumanTask[]> {
-    return [...this.tasks.values()].filter(
-      (t) => t.processInstanceId === instanceId,
-    );
+    return [...this.tasks.values()].filter((t) => t.processInstanceId === instanceId);
   }
 
-  async getByInstanceIdInNamespaces(
-    instanceId: string,
-    allowed: readonly string[],
-  ): Promise<HumanTask[]> {
+  async getByInstanceIdInNamespaces(instanceId: string, allowed: readonly string[]): Promise<HumanTask[]> {
     const parent = await this.requireParents().getById(instanceId);
     if (!parent || typeof parent.namespace !== 'string') return [];
     if (!allowed.includes(parent.namespace)) return [];
     return this.getByInstanceId(instanceId);
   }
 
-  async getByInstanceIdsAll(
-    instanceIds: readonly string[],
-  ): Promise<HumanTask[]> {
+  async getByInstanceIdsAll(instanceIds: readonly string[]): Promise<HumanTask[]> {
     if (instanceIds.length === 0) return [];
     const idSet = new Set(instanceIds);
     return [...this.tasks.values()].filter((t) => idSet.has(t.processInstanceId));
   }
 
-  async getByInstanceIdsInNamespaces(
-    instanceIds: readonly string[],
-    allowed: readonly string[],
-  ): Promise<HumanTask[]> {
+  async getByInstanceIdsInNamespaces(instanceIds: readonly string[], allowed: readonly string[]): Promise<HumanTask[]> {
     const parents = this.requireParents();
     const resolved = await Promise.all(instanceIds.map((id) => parents.getById(id)));
     const allowedIds = instanceIds.filter((_, i) => {
@@ -145,10 +127,7 @@ export class InMemoryHumanTaskRepository implements HumanTaskRepository {
     return { ...updated };
   }
 
-  async setDeletedByInstanceIds(
-    instanceIds: string[],
-    deleted: boolean,
-  ): Promise<void> {
+  async setDeletedByInstanceIds(instanceIds: string[], deleted: boolean): Promise<void> {
     if (instanceIds.length === 0) return;
     const idSet = new Set(instanceIds);
     for (const [id, task] of this.tasks.entries()) {
@@ -161,9 +140,7 @@ export class InMemoryHumanTaskRepository implements HumanTaskRepository {
 
   private requireParents(): ProcessInstanceRepository {
     if (this.parents === undefined) {
-      throw new Error(
-        'InMemoryHumanTaskRepository: ProcessInstanceRepository required for namespace-scoped methods',
-      );
+      throw new Error('InMemoryHumanTaskRepository: ProcessInstanceRepository required for namespace-scoped methods');
     }
     return this.parents;
   }

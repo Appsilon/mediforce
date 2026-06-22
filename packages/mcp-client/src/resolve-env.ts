@@ -27,7 +27,7 @@ export function resolveValue(value: string, workflowSecrets?: Record<string, str
   if (namespace === 'OAUTH') {
     throw new Error(
       `Template "${value}" uses the OAUTH namespace, which is not resolved at env/header-template time. ` +
-      `Configure the HTTP MCP binding's auth as { type: 'oauth', provider: '${key}' } instead.`,
+        `Configure the HTTP MCP binding's auth as { type: 'oauth', provider: '${key}' } instead.`,
     );
   }
 
@@ -38,7 +38,7 @@ export function resolveValue(value: string, workflowSecrets?: Record<string, str
   if (resolved === undefined || resolved === '') {
     throw new Error(
       `Env var template "${value}" references secret "${key}" which is not set. ` +
-      `Configure it in workflow secrets or set server env "${key}" (or "DOCKER_${key}")`,
+        `Configure it in workflow secrets or set server env "${key}" (or "DOCKER_${key}")`,
     );
   }
   return resolved;

@@ -5,10 +5,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  InMemoryAgentEventRepository,
-  InMemoryProcessInstanceRepository,
-} from '@mediforce/platform-core';
+import { InMemoryAgentEventRepository, InMemoryProcessInstanceRepository } from '@mediforce/platform-core';
 import type {
   AgentEvent,
   AgentEventRepository,
@@ -26,10 +23,7 @@ const MIGRATIONS_DIR = resolve(__dirname, '..', 'migrations');
 const DATABASE_URL = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const skipPg = !DATABASE_URL;
 
-function instanceFor(
-  namespace: string,
-  overrides: Partial<ProcessInstance> = {},
-): ProcessInstance {
+function instanceFor(namespace: string, overrides: Partial<ProcessInstance> = {}): ProcessInstance {
   const now = '2026-05-30T00:00:00.000Z';
   return {
     id: `inst-${randomUUID()}`,
@@ -54,11 +48,7 @@ function instanceFor(
   };
 }
 
-function eventFor(
-  instanceId: string,
-  sequence: number,
-  overrides: Partial<AgentEvent> = {},
-): AgentEvent {
+function eventFor(instanceId: string, sequence: number, overrides: Partial<AgentEvent> = {}): AgentEvent {
   return {
     id: `evt-${randomUUID()}`,
     processInstanceId: instanceId,
@@ -136,12 +126,8 @@ function contract(
       await registerInstance(inst);
       await seed(eventFor(inst.id, 1));
 
-      const allowed = await repo.listByInstanceInNamespaces(inst.id, [
-        namespace,
-      ]);
-      const denied = await repo.listByInstanceInNamespaces(inst.id, [
-        'ws-other',
-      ]);
+      const allowed = await repo.listByInstanceInNamespaces(inst.id, [namespace]);
+      const denied = await repo.listByInstanceInNamespaces(inst.id, ['ws-other']);
       const empty = await repo.listByInstanceInNamespaces(inst.id, []);
 
       expect(allowed.map((e) => e.sequence)).toEqual([1]);
@@ -155,12 +141,8 @@ function contract(
       await registerInstance(inst);
       await seed(eventFor(inst.id, 1, { stepId: 'a' }));
 
-      const allowed = await repo.listByStepInNamespaces(inst.id, 'a', [
-        namespace,
-      ]);
-      const denied = await repo.listByStepInNamespaces(inst.id, 'a', [
-        'ws-other',
-      ]);
+      const allowed = await repo.listByStepInNamespaces(inst.id, 'a', [namespace]);
+      const denied = await repo.listByStepInNamespaces(inst.id, 'a', ['ws-other']);
 
       expect(allowed.map((e) => e.sequence)).toEqual([1]);
       expect(denied).toEqual([]);
@@ -183,8 +165,7 @@ function contract(
 }
 
 contract('InMemoryAgentEventRepository', async () => {
-  const parents: ProcessInstanceRepository =
-    new InMemoryProcessInstanceRepository();
+  const parents: ProcessInstanceRepository = new InMemoryProcessInstanceRepository();
   const repo = new InMemoryAgentEventRepository(parents);
   return {
     repo,

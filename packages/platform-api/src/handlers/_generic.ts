@@ -12,8 +12,7 @@ export function listAdapter<Input, Item, Key extends string>(
   envelopeKey: Key,
   fetch: (input: Input, scope: CallerScope) => Promise<readonly Item[]>,
 ): ScopeHandler<Input, Record<Key, readonly Item[]>> {
-  return async (input, scope) =>
-    ({ [envelopeKey]: await fetch(input, scope) }) as Record<Key, readonly Item[]>;
+  return async (input, scope) => ({ [envelopeKey]: await fetch(input, scope) }) as Record<Key, readonly Item[]>;
 }
 
 /**
@@ -45,8 +44,6 @@ export function getByIdAdapter<Input, Item, Key extends string>(
       const msg = typeof notFoundMessage === 'function' ? notFoundMessage(input) : notFoundMessage;
       throw new NotFoundError(msg);
     }
-    return envelopeKey !== undefined
-      ? ({ [envelopeKey]: result } as Record<Key, Item>)
-      : result;
+    return envelopeKey !== undefined ? ({ [envelopeKey]: result } as Record<Key, Item>) : result;
   };
 }

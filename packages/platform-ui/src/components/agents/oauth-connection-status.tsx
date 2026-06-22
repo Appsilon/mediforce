@@ -1,16 +1,7 @@
 'use client';
 
 import * as Dialog from '@radix-ui/react-dialog';
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Link2,
-  Link2Off,
-  Loader2,
-  LogIn,
-  ShieldAlert,
-  X,
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Link2, Link2Off, Loader2, LogIn, ShieldAlert, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -36,12 +27,7 @@ type LoadState =
   | { kind: 'loaded'; token: AgentOAuthTokenStatus | null }
   | { kind: 'error'; message: string };
 
-export function OAuthConnectionStatus({
-  agentId,
-  serverName,
-  provider,
-  namespace,
-}: OAuthConnectionStatusProps) {
+export function OAuthConnectionStatus({ agentId, serverName, provider, namespace }: OAuthConnectionStatusProps) {
   const router = useRouter();
   const search = useSearchParams();
 
@@ -55,9 +41,7 @@ export function OAuthConnectionStatus({
     setLoadState({ kind: 'loading' });
     try {
       const tokens = await listAgentOAuthTokens(agentId, namespace);
-      const match = tokens.find(
-        (entry) => entry.serverName === serverName && entry.provider === provider,
-      );
+      const match = tokens.find((entry) => entry.serverName === serverName && entry.provider === provider);
       setLoadState({ kind: 'loaded', token: match ?? null });
     } catch (err: unknown) {
       setLoadState({
@@ -185,11 +169,7 @@ export function OAuthConnectionStatus({
             disabled={mutating}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
-            {mutating ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <LogIn className="h-3.5 w-3.5" />
-            )}
+            {mutating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogIn className="h-3.5 w-3.5" />}
             Connect
           </button>
         </div>
@@ -247,9 +227,8 @@ export function OAuthConnectionStatus({
               </Dialog.Close>
             </div>
             <Dialog.Description className="text-sm text-muted-foreground">
-              Revokes the local token AND calls the provider&apos;s revoke endpoint. The OAuth grant
-              will no longer appear on your account at{' '}
-              <span className="font-mono text-foreground">{provider}</span>.
+              Revokes the local token AND calls the provider&apos;s revoke endpoint. The OAuth grant will no longer
+              appear on your account at <span className="font-mono text-foreground">{provider}</span>.
             </Dialog.Description>
             <div className="mt-5 flex justify-end gap-2">
               <button

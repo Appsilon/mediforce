@@ -31,13 +31,15 @@ export const DockerJobDataSchema = z.object({
    *  don't share a filesystem (e.g. Vercel → VPS). */
   inputFiles: z.record(z.string(), z.string()).optional(),
   /** Image build metadata — when present, worker ensures image exists before docker run. */
-  imageBuild: z.object({
-    image: z.string(),
-    repoUrl: z.string(),
-    commit: z.string(),
-    dockerfile: z.string().optional(),
-    repoToken: z.string().optional(),
-  }).optional(),
+  imageBuild: z
+    .object({
+      image: z.string(),
+      repoUrl: z.string(),
+      commit: z.string(),
+      dockerfile: z.string().optional(),
+      repoToken: z.string().optional(),
+    })
+    .optional(),
 });
 
 export type DockerJobData = z.infer<typeof DockerJobDataSchema>;

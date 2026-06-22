@@ -76,9 +76,7 @@ export async function executeAgentStep(
     Number(instance.definitionVersion),
   );
   if (!workflowDefinition) {
-    throw new Error(
-      `WorkflowDefinition not found: ${instance.definitionName} v${instance.definitionVersion}`,
-    );
+    throw new Error(`WorkflowDefinition not found: ${instance.definitionName} v${instance.definitionVersion}`);
   }
 
   // Resolve plugin: use workflowStep.plugin when set, fall back to stepId
@@ -88,22 +86,18 @@ export async function executeAgentStep(
     plugin = pluginRegistry.get(pluginId);
   } catch (err) {
     if (
-      process.env.MOCK_AGENT !== 'true'
-      || workflowStep.executor !== 'agent'
-      || !(err instanceof PluginNotFoundError)
+      process.env.MOCK_AGENT !== 'true' ||
+      workflowStep.executor !== 'agent' ||
+      !(err instanceof PluginNotFoundError)
     ) {
       throw err;
     }
-    console.warn(
-      `[mock-agent] Plugin "${pluginId}" is not registered; using claude-code-agent mock runtime.`,
-    );
+    console.warn(`[mock-agent] Plugin "${pluginId}" is not registered; using claude-code-agent mock runtime.`);
     plugin = pluginRegistry.get('claude-code-agent');
   }
 
   // Resolve autonomy level from step (script steps are always L4)
-  const autonomyLevel = workflowStep.executor === 'script'
-    ? 'L4'
-    : (workflowStep.autonomyLevel ?? 'L2');
+  const autonomyLevel = workflowStep.executor === 'script' ? 'L4' : (workflowStep.autonomyLevel ?? 'L2');
 
   // Merge step params into context — stepParams take lower priority than appContext
   const mergedInput: Record<string, unknown> = {
@@ -122,26 +116,28 @@ export async function executeAgentStep(
   // Pre-resolve MCP configuration from the agent definition + step restrictions
   // + tool catalog. undefined when step.agentId is unset. Namespace-scoped
   // catalog lookups use the workflow's namespace.
-  const resolvedMcpConfig = (await resolveMcpForStep(workflowStep, {
-    agentDefinitionRepo,
-    toolCatalogRepo,
-    namespace: workflowDefinition.namespace,
-  })) ?? undefined;
+  const resolvedMcpConfig =
+    (await resolveMcpForStep(workflowStep, {
+      agentDefinitionRepo,
+      toolCatalogRepo,
+      namespace: workflowDefinition.namespace,
+    })) ?? undefined;
 
   // Load and (lazily) refresh OAuth tokens for every HTTP binding that
   // requested OAuth auth. Done here, not in the runtime, so the runtime
   // stays decoupled from Firestore — queued-docker-spawn can serialize
   // the context over BullMQ once this is populated. Refresh failures
   // bubble up with actionable errors ("Reconnect via UI").
-  const oauthTokens = workflowStep.agentId !== undefined && resolvedMcpConfig !== undefined
-    ? await loadOAuthTokens({
-        namespace: workflowDefinition.namespace,
-        agentId: workflowStep.agentId,
-        resolvedMcpConfig,
-        oauthProviderRepo,
-        agentOAuthTokenRepo,
-      })
-    : undefined;
+  const oauthTokens =
+    workflowStep.agentId !== undefined && resolvedMcpConfig !== undefined
+      ? await loadOAuthTokens({
+          namespace: workflowDefinition.namespace,
+          agentId: workflowStep.agentId,
+          resolvedMcpConfig,
+          oauthProviderRepo,
+          agentOAuthTokenRepo,
+        })
+      : undefined;
 
   // Resolve agent identity prompt (systemPrompt) from the AgentDefinition.
   // Returns undefined when step has no agentId or agent has no systemPrompt.
@@ -163,9 +159,7 @@ export async function executeAgentStep(
     workflowSecrets,
     namespaceSecretKeys: new Set(Object.keys(namespaceSecrets)),
     resolvedMcpConfig,
-    ...(instance.previousRun !== undefined
-      ? { previousRun: instance.previousRun }
-      : {}),
+    ...(instance.previousRun !== undefined ? { previousRun: instance.previousRun } : {}),
     oauthTokens,
     agentIdentityPrompt,
     getPreviousStepOutputs: async () => {
@@ -198,9 +192,7 @@ export async function executeAgentStep(
   };
 
   // Dispatch to the right executor based on step type
-  const executor = workflowStep.executor === 'script'
-    ? scriptStepExecutor
-    : agentStepExecutor;
+  const executor = workflowStep.executor === 'script' ? scriptStepExecutor : agentStepExecutor;
 
   const executionResult = await executor.execute(plugin, workflowAgentContext, services, meta);
 
@@ -242,9 +234,7 @@ interface LoadOAuthTokensDeps {
  *  errors up — the workflow then fails with an actionable "Reconnect"
  *  message surfaced in the UI. Returns undefined when no OAuth bindings
  *  are present (so the context field stays absent, not an empty object). */
-async function loadOAuthTokens(
-  deps: LoadOAuthTokensDeps,
-): Promise<Record<string, ResolvedOAuthBinding> | undefined> {
+async function loadOAuthTokens(deps: LoadOAuthTokensDeps): Promise<Record<string, ResolvedOAuthBinding> | undefined> {
   const { namespace, agentId, resolvedMcpConfig, oauthProviderRepo, agentOAuthTokenRepo } = deps;
   const result: Record<string, ResolvedOAuthBinding> = {};
 
@@ -264,8 +254,8 @@ async function loadOAuthTokens(
     if (provider === null) {
       throw new Error(
         `OAuth provider "${providerId}" (referenced by MCP server "${serverName}") not found in ` +
-        `namespace "${namespace}". Recreate the provider in the admin OAuth Providers page, ` +
-        `or switch the binding to a different provider.`,
+          `namespace "${namespace}". Recreate the provider in the admin OAuth Providers page, ` +
+          `or switch the binding to a different provider.`,
       );
     }
 

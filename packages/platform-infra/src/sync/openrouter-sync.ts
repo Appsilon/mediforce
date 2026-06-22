@@ -53,9 +53,7 @@ function transformModel(model: OpenRouterModel): CreateModelRegistryEntryInput {
     pricing: {
       input: parsePrice(model.pricing.prompt),
       output: parsePrice(model.pricing.completion),
-      ...(model.pricing.input_cache_read
-        ? { cacheRead: parsePrice(model.pricing.input_cache_read) }
-        : {}),
+      ...(model.pricing.input_cache_read ? { cacheRead: parsePrice(model.pricing.input_cache_read) } : {}),
     },
     modality: model.architecture?.modality ?? 'text->text',
     inputModalities: model.architecture?.input_modalities ?? ['text'],
@@ -69,9 +67,7 @@ function transformModel(model: OpenRouterModel): CreateModelRegistryEntryInput {
   };
 }
 
-export async function syncFromOpenRouter(
-  repo: ModelRegistryRepository,
-): Promise<SyncResult> {
+export async function syncFromOpenRouter(repo: ModelRegistryRepository): Promise<SyncResult> {
   const response = await fetch(OPENROUTER_MODELS_URL, {
     signal: AbortSignal.timeout(15_000),
   });
@@ -117,7 +113,9 @@ export async function syncWithRetry(
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       if (attempt <= maxRetries) {
-        console.log(`[model-sync] Attempt ${attempt} failed: ${lastError.message}. Retrying in ${intervalMs / 1000}s...`);
+        console.log(
+          `[model-sync] Attempt ${attempt} failed: ${lastError.message}. Retrying in ${intervalMs / 1000}s...`,
+        );
         await onAttemptFail?.(attempt, lastError);
         await new Promise((r) => setTimeout(r, intervalMs));
       }

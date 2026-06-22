@@ -206,18 +206,14 @@ describe('POST /api/admin/oauth-providers', () => {
   });
 
   it('[ERROR] 400 on unknown field (strict schema)', async () => {
-    const res = await POST(
-      makePostRequest('appsilon', { ...providerInput, rogueField: 'nope' }),
-    );
+    const res = await POST(makePostRequest('appsilon', { ...providerInput, rogueField: 'nope' }));
 
     expect(res.status).toBe(400);
     expect(mockProviderCreate).not.toHaveBeenCalled();
   });
 
   it('[ERROR] 409 when provider already exists', async () => {
-    mockProviderCreate.mockRejectedValue(
-      new ProviderAlreadyExistsError('appsilon', 'github'),
-    );
+    mockProviderCreate.mockRejectedValue(new ProviderAlreadyExistsError('appsilon', 'github'));
 
     const res = await POST(makePostRequest('appsilon', providerInput));
     const json = await res.json();

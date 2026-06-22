@@ -105,11 +105,11 @@ function StepProgressBar({
               key={stepId}
               className={[
                 'flex-1 max-w-[200px] min-w-[80px] h-full flex items-center rounded px-1.5',
-                isPaused
-                  ? 'bg-blue-500/10 border border-blue-500/20'
-                  : 'bg-primary/15 border border-primary/20',
+                isPaused ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-primary/15 border border-primary/20',
                 isRunning ? 'animate-pulse' : '',
-              ].filter(Boolean).join(' ')}
+              ]
+                .filter(Boolean)
+                .join(' ')}
               title={label}
             >
               <span
@@ -131,13 +131,7 @@ function StepProgressBar({
           );
         }
 
-        return (
-          <div
-            key={stepId}
-            className="w-3 shrink-0 h-full rounded-sm bg-border/40"
-            title={label}
-          />
-        );
+        return <div key={stepId} className="w-3 shrink-0 h-full rounded-sm bg-border/40" title={label} />;
       })}
     </div>
   );
@@ -155,7 +149,19 @@ function shortTimeAgo(date: Date): string {
   return `${Math.floor(diffDays / 7)}w ago`;
 }
 
-export function ProcessInstanceRow({ instance, showProcess = false, steps, stepStyle = 'dots', activeTaskId }: { instance: ProcessInstance; showProcess?: boolean; steps?: string[]; stepStyle?: 'dots' | 'bar'; activeTaskId?: string }) {
+export function ProcessInstanceRow({
+  instance,
+  showProcess = false,
+  steps,
+  stepStyle = 'dots',
+  activeTaskId,
+}: {
+  instance: ProcessInstance;
+  showProcess?: boolean;
+  steps?: string[];
+  stepStyle?: 'dots' | 'bar';
+  activeTaskId?: string;
+}) {
   const handle = useHandleFromPath();
   const router = useRouter();
   const timeAgo = shortTimeAgo(new Date(instance.createdAt));
@@ -177,23 +183,16 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
         </span>
       )}
       {stepStyle === 'bar' ? (
-        <StepProgressBar
-          steps={steps ?? []}
-          currentStepId={instance.currentStepId}
-          instanceStatus={instance.status}
-        />
+        <StepProgressBar steps={steps ?? []} currentStepId={instance.currentStepId} instanceStatus={instance.status} />
       ) : (
         <>
-          <StepDots
-            steps={steps ?? []}
-            currentStepId={instance.currentStepId}
-            displayStatus={wfStatus.displayStatus}
-          />
+          <StepDots steps={steps ?? []} currentStepId={instance.currentStepId} displayStatus={wfStatus.displayStatus} />
           {wfStatus.displayStatus === 'completed' ? (
             <span className="text-xs text-muted-foreground truncate flex-1">Completed</span>
           ) : wfStatus.displayStatus === 'error' || wfStatus.displayStatus === 'cancelled' ? (
             <span className="text-xs text-red-600/70 dark:text-red-400/70 truncate flex-1">
-              {STATUS_LABELS[wfStatus.displayStatus]}{instance.currentStepId ? ` · ${formatStepName(instance.currentStepId)}` : ''}
+              {STATUS_LABELS[wfStatus.displayStatus]}
+              {instance.currentStepId ? ` · ${formatStepName(instance.currentStepId)}` : ''}
             </span>
           ) : instance.currentStepId ? (
             <span className="text-xs flex-1 inline-flex items-center gap-1.5 min-w-0 overflow-hidden">
@@ -227,7 +226,8 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
       )}
       {instance.totalCostUsd != null && (
         <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 text-right">
-          {formatCostUsd(instance.totalCostUsd)}{instance.status !== 'completed' && instance.status !== 'failed' ? '+' : ''}
+          {formatCostUsd(instance.totalCostUsd)}
+          {instance.status !== 'completed' && instance.status !== 'failed' ? '+' : ''}
         </span>
       )}
       <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 w-[48px] text-right" title={fullTimeAgo}>

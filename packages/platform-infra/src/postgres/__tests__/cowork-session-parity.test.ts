@@ -52,29 +52,60 @@ class StubProcessInstanceRepository implements ProcessInstanceRepository {
   }
 
   // Unused by the parity contract — throw if hit.
-  async create(): Promise<ProcessInstance> { throw new Error('stub'); }
-  async getByIdInNamespaces(): Promise<ProcessInstance | null> { throw new Error('stub'); }
-  async listAll(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async listInNamespaces(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async listDefinitionNames(): Promise<never> { throw new Error('stub'); }
-  async getByStatusAll(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async getByStatusInNamespaces(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async update(): Promise<void> { throw new Error('stub'); }
-  async getByDefinition(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async getLastCompletedByDefinitionName(): Promise<ProcessInstance | null> { throw new Error('stub'); }
-  async addStepExecution(): Promise<never> { throw new Error('stub'); }
-  async getStepExecutions(): Promise<never[]> { throw new Error('stub'); }
-  async getLatestStepExecution(): Promise<null> { throw new Error('stub'); }
-  async updateStepExecution(): Promise<void> { throw new Error('stub'); }
-  async getIdsByDefinitionName(): Promise<string[]> { throw new Error('stub'); }
-  async setDeletedByDefinitionName(): Promise<void> { throw new Error('stub'); }
-  async summarizeRunsByWorkflow(): Promise<never> { throw new Error('stub'); }
+  async create(): Promise<ProcessInstance> {
+    throw new Error('stub');
+  }
+  async getByIdInNamespaces(): Promise<ProcessInstance | null> {
+    throw new Error('stub');
+  }
+  async listAll(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async listInNamespaces(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async listDefinitionNames(): Promise<never> {
+    throw new Error('stub');
+  }
+  async getByStatusAll(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async getByStatusInNamespaces(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async update(): Promise<void> {
+    throw new Error('stub');
+  }
+  async getByDefinition(): Promise<ProcessInstance[]> {
+    throw new Error('stub');
+  }
+  async getLastCompletedByDefinitionName(): Promise<ProcessInstance | null> {
+    throw new Error('stub');
+  }
+  async addStepExecution(): Promise<never> {
+    throw new Error('stub');
+  }
+  async getStepExecutions(): Promise<never[]> {
+    throw new Error('stub');
+  }
+  async getLatestStepExecution(): Promise<null> {
+    throw new Error('stub');
+  }
+  async updateStepExecution(): Promise<void> {
+    throw new Error('stub');
+  }
+  async getIdsByDefinitionName(): Promise<string[]> {
+    throw new Error('stub');
+  }
+  async setDeletedByDefinitionName(): Promise<void> {
+    throw new Error('stub');
+  }
+  async summarizeRunsByWorkflow(): Promise<never> {
+    throw new Error('stub');
+  }
 }
 
-function sessionFor(
-  instanceId: string,
-  overrides: Partial<CoworkSession> = {},
-): CoworkSession {
+function sessionFor(instanceId: string, overrides: Partial<CoworkSession> = {}): CoworkSession {
   const now = '2026-05-27T00:00:00.000Z';
   return {
     id: `sess-${randomUUID()}`,
@@ -206,9 +237,7 @@ function contract(
       const instanceId = randomUUID();
       await registerInstance(instanceId, 'ws-1');
       const session = await repo.create(sessionFor(instanceId));
-      await expect(
-        repo.updateTurn(session.id, 'no-such-turn', { content: 'x' }),
-      ).rejects.toThrow();
+      await expect(repo.updateTurn(session.id, 'no-such-turn', { content: 'x' })).rejects.toThrow();
     });
 
     it('findMostRecentActive returns null when no active session', async () => {
@@ -316,12 +345,8 @@ function contract(
       const inst2 = randomUUID();
       await registerInstance(inst1, 'ws-alpha');
       await registerInstance(inst2, 'ws-beta');
-      const older = await repo.create(
-        sessionFor(inst1, { createdAt: '2026-05-27T00:00:00.000Z' }),
-      );
-      const newer = await repo.create(
-        sessionFor(inst2, { createdAt: '2026-05-27T00:05:00.000Z' }),
-      );
+      const older = await repo.create(sessionFor(inst1, { createdAt: '2026-05-27T00:00:00.000Z' }));
+      const newer = await repo.create(sessionFor(inst2, { createdAt: '2026-05-27T00:05:00.000Z' }));
       await repo.addTurn(newer.id, humanTurnFor('t-1', 'hi'));
 
       const all = await repo.listAll();
@@ -354,12 +379,8 @@ function contract(
       const inst2 = randomUUID();
       await registerInstance(inst1, 'ws-1');
       await registerInstance(inst2, 'ws-1');
-      const designer = await repo.create(
-        sessionFor(inst1, { assignedRole: 'designer' }),
-      );
-      const reviewer = await repo.create(
-        sessionFor(inst2, { assignedRole: 'reviewer' }),
-      );
+      const designer = await repo.create(sessionFor(inst1, { assignedRole: 'designer' }));
+      const reviewer = await repo.create(sessionFor(inst2, { assignedRole: 'reviewer' }));
 
       const designers = await repo.listByRoleAll('designer');
       const ids = designers.map((s) => s.id);
@@ -374,15 +395,9 @@ function contract(
       await registerInstance(inst1, 'ws-alpha');
       await registerInstance(inst2, 'ws-beta');
       await registerInstance(inst3, 'ws-alpha');
-      const match = await repo.create(
-        sessionFor(inst1, { assignedRole: 'designer' }),
-      );
-      const wrongNs = await repo.create(
-        sessionFor(inst2, { assignedRole: 'designer' }),
-      );
-      const wrongRole = await repo.create(
-        sessionFor(inst3, { assignedRole: 'reviewer' }),
-      );
+      const match = await repo.create(sessionFor(inst1, { assignedRole: 'designer' }));
+      const wrongNs = await repo.create(sessionFor(inst2, { assignedRole: 'designer' }));
+      const wrongRole = await repo.create(sessionFor(inst3, { assignedRole: 'reviewer' }));
 
       const scoped = await repo.listByRoleInNamespaces('designer', ['ws-alpha']);
       const ids = scoped.map((s) => s.id);
@@ -431,7 +446,9 @@ describe.skipIf(skipPg)('PostgresCoworkSessionRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sql);

@@ -1,9 +1,6 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { listRunOutputFiles } from '@mediforce/platform-api/handlers';
-import {
-  ListRunOutputFilesInputSchema,
-  type ListRunOutputFilesInput,
-} from '@mediforce/platform-api/contract';
+import { ListRunOutputFilesInputSchema, type ListRunOutputFilesInput } from '@mediforce/platform-api/contract';
 
 interface RouteContext {
   params: Promise<{ runId: string }>;
@@ -25,8 +22,4 @@ export const GET = createRouteAdapter<
   ListRunOutputFilesInput,
   unknown,
   RouteContext
->(
-  ListRunOutputFilesInputSchema,
-  async (_req, ctx) => ({ runId: (await ctx.params).runId }),
-  listRunOutputFiles,
-);
+>(ListRunOutputFilesInputSchema, async (_req, ctx) => ({ runId: (await ctx.params).runId }), listRunOutputFiles);

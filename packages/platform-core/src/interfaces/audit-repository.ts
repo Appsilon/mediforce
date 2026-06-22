@@ -10,12 +10,6 @@ export interface AuditRepository {
   getByEntity(entityType: string, entityId: string): Promise<AuditEvent[]>;
   getByProcess(processInstanceId: string): Promise<AuditEvent[]>;
   /** Returns events only if the parent run's namespace is in `allowed`. */
-  getByProcessInNamespaces(
-    processInstanceId: string,
-    allowed: readonly string[],
-  ): Promise<AuditEvent[]>;
-  getByActor(
-    actorId: string,
-    options?: { limit?: number },
-  ): Promise<AuditEvent[]>;
+  getByProcessInNamespaces(processInstanceId: string, allowed: readonly string[]): Promise<AuditEvent[]>;
+  getByActor(actorId: string, options?: { limit?: number }): Promise<AuditEvent[]>;
 }

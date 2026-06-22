@@ -1,9 +1,6 @@
 import { assertCallerIsNamespaceAdmin } from '../../auth';
 import type { CallerScope } from '../../repositories/index';
-import type {
-  DeleteToolCatalogEntryInput,
-  DeleteToolCatalogEntryOutput,
-} from '../../contract/tool-catalog';
+import type { DeleteToolCatalogEntryInput, DeleteToolCatalogEntryOutput } from '../../contract/tool-catalog';
 import { actorFromCaller } from '../_helpers';
 
 export async function deleteToolCatalogEntry(

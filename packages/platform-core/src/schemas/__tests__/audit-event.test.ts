@@ -28,9 +28,7 @@ describe('AuditEventSchema', () => {
       expect(result.data.actorType).toBe('user');
       expect(result.data.actorRole).toBe('supply-reviewer');
       expect(result.data.action).toBe('review.approved');
-      expect(result.data.basis).toBe(
-        'On-time delivery rate 95% exceeds threshold of 90% per policy section 5.2',
-      );
+      expect(result.data.basis).toBe('On-time delivery rate 95% exceeds threshold of 90% per policy section 5.2');
       expect(result.data.inputSnapshot.supplierId).toBe('SUP-001');
       expect(result.data.outputSnapshot.verdict).toBe('approved');
     }

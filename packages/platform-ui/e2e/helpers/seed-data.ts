@@ -564,7 +564,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       envelope: {
         model: 'openrouter/anthropic/claude-sonnet-4',
         confidence: 0.92,
-        confidence_rationale: 'Routine review of 12 well-structured vendor submissions. All fields present, no ambiguities. Expected error rate below 1 in 10.',
+        confidence_rationale:
+          'Routine review of 12 well-structured vendor submissions. All fields present, no ambiguities. Expected error rate below 1 in 10.',
         reasoning_summary: 'Reviewed 12 vendor submissions. No issues detected. All items within expected parameters.',
         reasoning_chain: [],
         duration_ms: 1200,
@@ -587,7 +588,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       envelope: {
         model: 'openrouter/anthropic/claude-sonnet-4',
         confidence: 0.45,
-        confidence_rationale: 'Multiple data inconsistencies in lab values — 3 out of 7 fields required interpolation from incomplete source data. In ~6/10 similar cases, at least one critical issue would be missed.',
+        confidence_rationale:
+          'Multiple data inconsistencies in lab values — 3 out of 7 fields required interpolation from incomplete source data. In ~6/10 similar cases, at least one critical issue would be missed.',
         reasoning_summary: 'Multiple data inconsistencies found in lab values. Requires human review.',
         reasoning_chain: [],
         duration_ms: 3500,
@@ -623,7 +625,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       envelope: {
         model: 'openrouter/anthropic/claude-sonnet-4',
         confidence: 0.97,
-        confidence_rationale: 'Standard vendor assessment with complete metrics. All values within established norms. Fewer than 3 in 100 similar cases would surface an issue.',
+        confidence_rationale:
+          'Standard vendor assessment with complete metrics. All values within established norms. Fewer than 3 in 100 similar cases would surface an issue.',
         reasoning_summary: 'All metrics within expected range. Auto-approved.',
         reasoning_chain: [],
         duration_ms: 800,
@@ -842,7 +845,12 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { id: 'data-quality', name: 'Data Quality Analysis', type: 'creation' },
         { id: 'query-status', name: 'Query Status Analysis', type: 'creation' },
         { id: 'human-review', name: 'Human Review', type: 'creation' },
-        { id: 'manager-approval', name: 'Manager Approval', type: 'review', verdicts: { approve: { target: 'archived' }, revise: { target: 'archived' } } },
+        {
+          id: 'manager-approval',
+          name: 'Manager Approval',
+          type: 'review',
+          verdicts: { approve: { target: 'archived' }, revise: { target: 'archived' } },
+        },
         { id: 'archived', name: 'Archived', type: 'terminal' },
       ],
       transitions: [
@@ -1021,9 +1029,25 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       configName: 'all-human',
       configVersion: '1',
       stepConfigs: [
-        { stepId: 'vendor-assessment', executorType: 'agent', autonomyLevel: 'L4', plugin: 'supply-chain/vendor-assessment' },
-        { stepId: 'narrative-summary', executorType: 'agent', autonomyLevel: 'L2', plugin: 'supply-chain/narrative-summary' },
-        { stepId: 'risk-scoring', executorType: 'agent', autonomyLevel: 'L3', plugin: 'supply-chain/risk-scoring', reviewerType: 'human' },
+        {
+          stepId: 'vendor-assessment',
+          executorType: 'agent',
+          autonomyLevel: 'L4',
+          plugin: 'supply-chain/vendor-assessment',
+        },
+        {
+          stepId: 'narrative-summary',
+          executorType: 'agent',
+          autonomyLevel: 'L2',
+          plugin: 'supply-chain/narrative-summary',
+        },
+        {
+          stepId: 'risk-scoring',
+          executorType: 'agent',
+          autonomyLevel: 'L3',
+          plugin: 'supply-chain/risk-scoring',
+          reviewerType: 'human',
+        },
         { stepId: 'data-quality', executorType: 'agent', autonomyLevel: 'L2', plugin: 'supply-chain/data-quality' },
         { stepId: 'query-status', executorType: 'agent', autonomyLevel: 'L1', plugin: 'supply-chain/query-status' },
         { stepId: 'human-review', executorType: 'human' },
@@ -1049,7 +1073,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       namespace: 'test',
       version: 1,
       title: 'Sales CSV → summary report',
-      description: 'Two-step pipeline: generate a small sales CSV, then summarise it into a markdown report. Each step commits its artefacts to the run branch.',
+      description:
+        'Two-step pipeline: generate a small sales CSV, then summarise it into a markdown report. Each step commits its artefacts to the run branch.',
       workspace: {},
       steps: [
         {
@@ -1086,7 +1111,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
               'cd /workspace',
               "ROWS=$(tail -n +2 data/sales.csv | wc -l | tr -d ' ')",
               "TOTAL=$(tail -n +2 data/sales.csv | awk -F, '{s+=$3} END{print s}')",
-              "TOP=$(tail -n +2 data/sales.csv | sort -t, -k3 -nr | head -1 | cut -d, -f1)",
+              'TOP=$(tail -n +2 data/sales.csv | sort -t, -k3 -nr | head -1 | cut -d, -f1)',
               '{',
               "  echo '# Sales summary'",
               '  echo',
@@ -1117,13 +1142,45 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       title: 'Initial vendor assessment workflow',
       description: 'End-to-end supply chain review process',
       steps: [
-        { id: 'vendor-assessment', name: 'Vendor Assessment', type: 'creation', executor: 'agent', autonomyLevel: 'L2', plugin: 'supply-data-collector', agent: { skill: 'vendor-assessment', mcpServers: [{ name: 'postgres-ro', command: 'npx', args: ['-y', '@modelcontextprotocol/server-postgres'], env: { DATABASE_URL: '{{DB_URL}}' }, allowedTools: ['query'] }, { name: 'filesystem', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/data'] }] } },
-        { id: 'narrative-summary', name: 'Narrative Summary', type: 'creation', executor: 'agent', autonomyLevel: 'L3' },
+        {
+          id: 'vendor-assessment',
+          name: 'Vendor Assessment',
+          type: 'creation',
+          executor: 'agent',
+          autonomyLevel: 'L2',
+          plugin: 'supply-data-collector',
+          agent: {
+            skill: 'vendor-assessment',
+            mcpServers: [
+              {
+                name: 'postgres-ro',
+                command: 'npx',
+                args: ['-y', '@modelcontextprotocol/server-postgres'],
+                env: { DATABASE_URL: '{{DB_URL}}' },
+                allowedTools: ['query'],
+              },
+              { name: 'filesystem', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/data'] },
+            ],
+          },
+        },
+        {
+          id: 'narrative-summary',
+          name: 'Narrative Summary',
+          type: 'creation',
+          executor: 'agent',
+          autonomyLevel: 'L3',
+        },
         { id: 'risk-scoring', name: 'Risk Scoring', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
         { id: 'data-quality', name: 'Data Quality Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
         { id: 'query-status', name: 'Query Status Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L1' },
         { id: 'human-review', name: 'Human Review', type: 'creation', executor: 'human' },
-        { id: 'manager-approval', name: 'Manager Approval', type: 'review', executor: 'human', verdicts: { approve: { target: 'archived' }, revise: { target: 'archived' } } },
+        {
+          id: 'manager-approval',
+          name: 'Manager Approval',
+          type: 'review',
+          executor: 'human',
+          verdicts: { approve: { target: 'archived' }, revise: { target: 'archived' } },
+        },
         { id: 'archived', name: 'Archived', type: 'terminal', executor: 'human' },
       ],
       transitions: [
@@ -1145,7 +1202,13 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       title: 'Data quality check',
       description: 'Data quality check workflow',
       steps: [
-        { id: 'verify-data-quality', name: 'Verify Data Quality', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
+        {
+          id: 'verify-data-quality',
+          name: 'Verify Data Quality',
+          type: 'creation',
+          executor: 'agent',
+          autonomyLevel: 'L2',
+        },
         { id: 'review-results', name: 'Review Results', type: 'creation', executor: 'human' },
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
@@ -1352,14 +1415,16 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         {
           id: 'turn-1',
           role: 'human',
-          content: 'I need a workflow for automated data quality review with 3 steps: collect data, analyze quality, and human review.',
+          content:
+            'I need a workflow for automated data quality review with 3 steps: collect data, analyze quality, and human review.',
           timestamp: oneHourAgo,
           artifactDelta: null,
         },
         {
           id: 'turn-2',
           role: 'agent',
-          content: 'I\'ve drafted a 3-step workflow: data collection via script, AI-powered quality analysis, and a final human review gate. The artifact has been updated with the full structure.',
+          content:
+            "I've drafted a 3-step workflow: data collection via script, AI-powered quality analysis, and a final human review gate. The artifact has been updated with the full structure.",
           timestamp: oneHourAgo,
           artifactDelta: {
             name: 'data-quality-review',
@@ -1409,7 +1474,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         name: 'Design Workflow',
         type: 'creation',
         executor: 'cowork',
-        description: 'Collaboratively build a workflow definition with AI assistance. Describe your requirements and iterate on the design.',
+        description:
+          'Collaboratively build a workflow definition with AI assistance. Describe your requirements and iterate on the design.',
         allowedRoles: ['analyst'],
         cowork: {
           agent: 'chat',
@@ -1475,9 +1541,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       },
       { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
     ],
-    transitions: [
-      { from: 'draft', to: 'review' },
-    ],
+    transitions: [{ from: 'draft', to: 'review' }],
     triggers: [{ type: 'manual', name: 'start' }],
     createdAt: twoDaysAgo,
   };
@@ -1496,7 +1560,14 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     triggers: [{ type: 'manual', name: 'start' }],
     triggerInput: [
       { name: 'studyId', type: 'string', required: true, description: 'Study identifier' },
-      { name: 'priority', type: 'select', required: false, options: ['low', 'normal', 'high'], default: 'normal', description: 'Run priority' },
+      {
+        name: 'priority',
+        type: 'select',
+        required: false,
+        options: ['low', 'normal', 'high'],
+        default: 'normal',
+        description: 'Run priority',
+      },
       { name: 'dryRun', type: 'boolean', required: false, default: false, description: 'Dry run mode' },
     ],
     createdAt: twoDaysAgo,
@@ -1630,5 +1701,29 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     }
   }
 
-  return { humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, modelRegistry };
+  return {
+    humanTasks,
+    processInstances,
+    agentRuns,
+    auditEvents,
+    stepExecutions,
+    humanWaitingStepExecutions,
+    stepFailureStepExecutions,
+    retryTestStepExecutions,
+    agentEscalatedCancelStepExecutions,
+    reviewTargetStepExecutions,
+    processDefinitions,
+    completedProcessStepExecutions,
+    completedSupplyChainStepExecutions,
+    processConfigs,
+    workflowDefinitions,
+    namespaces,
+    namespaceMembers,
+    coworkSessions,
+    toolCatalog,
+    oauthProviders,
+    agentDefinitions,
+    workflowRunStepExecutions,
+    modelRegistry,
+  };
 }

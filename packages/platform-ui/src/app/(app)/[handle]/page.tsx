@@ -36,7 +36,10 @@ type MemberPreview = {
 
 const MAX_AVATAR_MEMBERS = 20;
 
-function useWorkspaceMembers(handle: string, enabled: boolean): { members: MemberPreview[]; totalCount: number | null } {
+function useWorkspaceMembers(
+  handle: string,
+  enabled: boolean,
+): { members: MemberPreview[]; totalCount: number | null } {
   const { members: cachedMembers, loading } = useNamespace(enabled ? handle : null);
 
   return useMemo(() => {
@@ -70,12 +73,12 @@ function InitialsAvatar({ displayName, size = 'large' }: { displayName: string; 
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('');
 
-  const sizeClasses = size === 'large'
-    ? 'h-14 w-14 text-xl'
-    : 'h-10 w-10 text-sm';
+  const sizeClasses = size === 'large' ? 'h-14 w-14 text-xl' : 'h-10 w-10 text-sm';
 
   return (
-    <div className={`flex items-center justify-center rounded-full bg-primary/10 text-primary font-semibold shrink-0 ${sizeClasses}`}>
+    <div
+      className={`flex items-center justify-center rounded-full bg-primary/10 text-primary font-semibold shrink-0 ${sizeClasses}`}
+    >
       {initials}
     </div>
   );
@@ -88,12 +91,21 @@ function formatDate(iso: string): string {
 
 const ROLE_LABELS: Record<string, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' };
 
-function MemberTooltipAvatar({ member, resolvedName, resolvedAvatar }: { member: MemberPreview; resolvedName: string; resolvedAvatar: string | undefined }) {
+function MemberTooltipAvatar({
+  member,
+  resolvedName,
+  resolvedAvatar,
+}: {
+  member: MemberPreview;
+  resolvedName: string;
+  resolvedAvatar: string | undefined;
+}) {
   const [imgError, setImgError] = useState(false);
   const parts = resolvedName.split(' ');
-  const initials = parts.length >= 2
-    ? `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase()
-    : resolvedName.slice(0, 2).toUpperCase();
+  const initials =
+    parts.length >= 2
+      ? `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase()
+      : resolvedName.slice(0, 2).toUpperCase();
 
   return (
     <Tooltip.Root delayDuration={200}>
@@ -132,10 +144,7 @@ function MemberTooltipAvatar({ member, resolvedName, resolvedAvatar }: { member:
 }
 
 function MemberAvatars({ namespace, isMember }: { namespace: Namespace; isMember: boolean }) {
-  const { members, totalCount } = useWorkspaceMembers(
-    namespace.handle,
-    namespace.type === 'organization',
-  );
+  const { members, totalCount } = useWorkspaceMembers(namespace.handle, namespace.type === 'organization');
   const userProfiles = useUserProfiles(namespace.handle);
 
   if (namespace.type !== 'organization') return null;
@@ -154,16 +163,17 @@ function MemberAvatars({ namespace, isMember }: { namespace: Namespace; isMember
   if (isMember) {
     return (
       <div className="mt-3 flex items-center gap-4 flex-wrap">
-        <Link
-          href={`/${namespace.handle}/settings`}
-          className="group inline-flex items-center gap-2.5"
-        >
+        <Link href={`/${namespace.handle}/settings`} className="group inline-flex items-center gap-2.5">
           {members.length > 0 && (
             <Tooltip.Provider>
               <div className="flex -space-x-2" onClick={(e) => e.stopPropagation()}>
                 {members.map((member, index) => (
                   <div key={member.uid} className="relative" style={{ zIndex: members.length - index }}>
-                    <MemberTooltipAvatar member={member} resolvedName={resolveName(member)} resolvedAvatar={resolveAvatar(member)} />
+                    <MemberTooltipAvatar
+                      member={member}
+                      resolvedName={resolveName(member)}
+                      resolvedAvatar={resolveAvatar(member)}
+                    />
                   </div>
                 ))}
               </div>
@@ -185,27 +195,23 @@ function MemberAvatars({ namespace, isMember }: { namespace: Namespace; isMember
             <div className="flex -space-x-2">
               {members.map((member, index) => (
                 <div key={member.uid} className="relative" style={{ zIndex: members.length - index }}>
-                  <MemberTooltipAvatar member={member} resolvedName={resolveName(member)} resolvedAvatar={resolveAvatar(member)} />
+                  <MemberTooltipAvatar
+                    member={member}
+                    resolvedName={resolveName(member)}
+                    resolvedAvatar={resolveAvatar(member)}
+                  />
                 </div>
               ))}
             </div>
           </Tooltip.Provider>
         )}
-        <span className="text-sm text-muted-foreground">
-          {memberCountText}
-        </span>
+        <span className="text-sm text-muted-foreground">{memberCountText}</span>
       </div>
     </div>
   );
 }
 
-function InlineEditableBio({
-  namespace,
-  canEdit,
-}: {
-  namespace: Namespace;
-  canEdit: boolean;
-}) {
+function InlineEditableBio({ namespace, canEdit }: { namespace: Namespace; canEdit: boolean }) {
   const [editing, setEditing] = React.useState(false);
   const [value, setValue] = React.useState(namespace.bio ?? '');
   const updateNamespace = useUpdateNamespace(namespace.handle);
@@ -332,14 +338,9 @@ function InlineEditableBio({
 function UserWorkspaces({ namespace }: { namespace: Namespace }) {
   const { data } = useUserMe();
   const isSelf =
-    namespace.type === 'personal' &&
-    namespace.linkedUserId !== undefined &&
-    data?.user.uid === namespace.linkedUserId;
+    namespace.type === 'personal' && namespace.linkedUserId !== undefined && data?.user.uid === namespace.linkedUserId;
   const workspaces = useMemo(
-    () =>
-      isSelf
-        ? (data?.namespaces ?? []).filter((ns) => ns.type === 'organization')
-        : [],
+    () => (isSelf ? (data?.namespaces ?? []).filter((ns) => ns.type === 'organization') : []),
     [data, isSelf],
   );
 
@@ -355,7 +356,10 @@ function UserWorkspaces({ namespace }: { namespace: Namespace }) {
             href={`/${ws.handle}`}
             className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
           >
-            {(() => { const Icon = getWorkspaceIcon(ws.icon); return <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />; })()}
+            {(() => {
+              const Icon = getWorkspaceIcon(ws.icon);
+              return <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />;
+            })()}
             <span className="font-medium truncate">{ws.displayName}</span>
             <span className="text-xs text-muted-foreground ml-auto shrink-0">@{ws.handle}</span>
           </Link>
@@ -445,9 +449,7 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
   const hasArchivedDefinitions = namespacedDefinitions.some((d) => d.archived === true);
 
   const visibleDefinitions = useMemo(() => {
-    return definitions
-      .filter((d) => d.namespace === handle)
-      .filter((d) => showArchived || d.archived !== true);
+    return definitions.filter((d) => d.namespace === handle).filter((d) => showArchived || d.archived !== true);
   }, [definitions, showArchived, handle]);
 
   const sortedDefinitions = useMemo(() => {
@@ -462,77 +464,77 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
 
   return (
     <WorkflowSecretKeysProvider handle={handle} workflowNames={workflowNames}>
-    <div className="flex flex-col gap-4">
-      <OpenRouterCreditsIndicator handle={handle} />
-      <WorkflowProblems handle={handle} latestDocs={latestDocs} loading={defsLoading} />
+      <div className="flex flex-col gap-4">
+        <OpenRouterCreditsIndicator handle={handle} />
+        <WorkflowProblems handle={handle} latestDocs={latestDocs} loading={defsLoading} />
 
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Workflows</h2>
-        <div className="flex items-center gap-2">
-          <DisplayPopover
-            showCompleted={showCompleted}
-            onToggleCompleted={() => setShowCompleted((prev) => !prev)}
-            showArchived={showArchived}
-            onToggleArchived={() => setShowArchived((prev) => !prev)}
-            hasArchivedDefinitions={hasArchivedDefinitions}
-          />
-          <Link
-            href={`/${handle}/workflows/new`}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap shrink-0',
-              'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
-            )}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New Workflow
-          </Link>
-        </div>
-      </div>
-
-      {loading ? (
-        <WorkflowCatalogSkeletons />
-      ) : namespacedDefinitions.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-4 text-center py-16">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-            <GitBranch className="h-7 w-7 text-muted-foreground" />
-          </div>
-          <div>
-            <p className="font-medium">No workflows defined yet</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Create your first workflow to start orchestrating agents and humans.
-            </p>
-          </div>
-          <Link
-            href={`/${handle}/workflows/new`}
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New Workflow
-          </Link>
-        </div>
-      ) : sortedDefinitions.length === 0 ? (
-        <div className="text-center py-16 text-sm text-muted-foreground">
-          All workflows are archived.{' '}
-          <button onClick={() => setShowArchived(true)} className="text-primary hover:underline">
-            Show archived
-          </button>
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {sortedDefinitions.map((definition) => (
-            <ProcessCard
-              key={definition.name}
-              definition={definition}
-              runSummary={definition.runSummary}
-              steps={stepsByDefinition.get(definition.name)}
-              handle={handle}
-              activeTaskByInstance={activeTaskByInstance}
-              isMember={true}
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Workflows</h2>
+          <div className="flex items-center gap-2">
+            <DisplayPopover
+              showCompleted={showCompleted}
+              onToggleCompleted={() => setShowCompleted((prev) => !prev)}
+              showArchived={showArchived}
+              onToggleArchived={() => setShowArchived((prev) => !prev)}
+              hasArchivedDefinitions={hasArchivedDefinitions}
             />
-          ))}
+            <Link
+              href={`/${handle}/workflows/new`}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap shrink-0',
+                'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
+              )}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New Workflow
+            </Link>
+          </div>
         </div>
-      )}
-    </div>
+
+        {loading ? (
+          <WorkflowCatalogSkeletons />
+        ) : namespacedDefinitions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-4 text-center py-16">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+              <GitBranch className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="font-medium">No workflows defined yet</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Create your first workflow to start orchestrating agents and humans.
+              </p>
+            </div>
+            <Link
+              href={`/${handle}/workflows/new`}
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New Workflow
+            </Link>
+          </div>
+        ) : sortedDefinitions.length === 0 ? (
+          <div className="text-center py-16 text-sm text-muted-foreground">
+            All workflows are archived.{' '}
+            <button onClick={() => setShowArchived(true)} className="text-primary hover:underline">
+              Show archived
+            </button>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {sortedDefinitions.map((definition) => (
+              <ProcessCard
+                key={definition.name}
+                definition={definition}
+                runSummary={definition.runSummary}
+                steps={stepsByDefinition.get(definition.name)}
+                handle={handle}
+                activeTaskByInstance={activeTaskByInstance}
+                isMember={true}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </WorkflowSecretKeysProvider>
   );
 }
@@ -570,7 +572,9 @@ export default function ProfilePage() {
           <h1 className="text-xl font-semibold">Profile not found</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {handle !== undefined && handle !== '' ? (
-              <>No profile exists for <span className="font-mono">@{handle}</span>.</>
+              <>
+                No profile exists for <span className="font-mono">@{handle}</span>.
+              </>
             ) : (
               'The requested profile does not exist.'
             )}
@@ -593,9 +597,8 @@ export default function ProfilePage() {
               </div>
             );
           }
-          const linkedUserPhoto = namespace.linkedUserId !== undefined
-            ? userProfiles.get(namespace.linkedUserId)?.photoURL
-            : undefined;
+          const linkedUserPhoto =
+            namespace.linkedUserId !== undefined ? userProfiles.get(namespace.linkedUserId)?.photoURL : undefined;
           const avatarSrc = namespace.avatarUrl ?? linkedUserPhoto ?? undefined;
           return avatarSrc !== undefined && avatarSrc !== '' && !profileImgError ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -625,13 +628,13 @@ export default function ProfilePage() {
               {namespace.type === 'organization' ? 'Workspace' : 'Personal'}
             </span>
             {isMember && (
-            <Link
-              href={`/${namespace.handle}/settings`}
-              className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Settings className="h-3.5 w-3.5" />
-              <span>Settings</span>
-            </Link>
+              <Link
+                href={`/${namespace.handle}/settings`}
+                className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Settings className="h-3.5 w-3.5" />
+                <span>Settings</span>
+              </Link>
             )}
           </div>
 

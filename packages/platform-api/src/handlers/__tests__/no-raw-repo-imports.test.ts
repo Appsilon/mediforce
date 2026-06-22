@@ -41,9 +41,7 @@ const ALWAYS_BANNED: readonly RegExp[] = [
 // subpath bans above don't catch that route — only the handler signature does.
 
 /** Banned EXCEPT in @public-handler files. */
-const PUBLIC_GATED_BANNED: readonly RegExp[] = [
-  /from\s+['"]@mediforce\/platform-infra(['"\/])/,
-];
+const PUBLIC_GATED_BANNED: readonly RegExp[] = [/from\s+['"]@mediforce\/platform-infra(['"\/])/];
 
 const PUBLIC_MARKER = '@public-handler';
 

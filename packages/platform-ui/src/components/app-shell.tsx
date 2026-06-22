@@ -4,7 +4,24 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check, ArrowLeft, ChevronRight, Wrench, Database } from 'lucide-react';
+import {
+  User,
+  GitBranch,
+  Bot,
+  Activity,
+  LogOut,
+  Menu,
+  X,
+  Plus,
+  Play,
+  ChevronDown,
+  Building2,
+  Check,
+  ArrowLeft,
+  ChevronRight,
+  Wrench,
+  Database,
+} from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { useAuth } from '@/contexts/auth-context';
@@ -48,9 +65,7 @@ function NavItem({
       href={href}
       className={cn(
         'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-        active
-          ? 'bg-primary/10 text-primary'
-          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+        active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
@@ -137,9 +152,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Find the active namespace by matching the handle from the URL
   const activeNamespace = namespaces.find((ns) => ns.handle === handleFromPath) ?? null;
-  const activeDisplayName = activeNamespace !== null
-    ? (activeNamespace.type === 'personal' ? 'My profile' : activeNamespace.displayName)
-    : handleFromPath;
+  const activeDisplayName =
+    activeNamespace !== null
+      ? activeNamespace.type === 'personal'
+        ? 'My profile'
+        : activeNamespace.displayName
+      : handleFromPath;
 
   // Build handle-prefixed href
   const handlePrefix = handleFromPath !== '' ? `/${handleFromPath}` : '';
@@ -148,8 +166,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { canAdmin } = useNamespaceRole(handleFromPath);
   const { daysSinceUpdate, loading: rankingsLoading } = useRankingsAge();
   const [rankingsBannerDismissed, setRankingsBannerDismissed] = React.useState(false);
-  const showRankingsBanner = canAdmin && !rankingsLoading && !rankingsBannerDismissed
-    && (daysSinceUpdate === null || daysSinceUpdate > 21);
+  const showRankingsBanner =
+    canAdmin && !rankingsLoading && !rankingsBannerDismissed && (daysSinceUpdate === null || daysSinceUpdate > 21);
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
@@ -169,30 +187,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-label="Switch namespace"
             >
               {(() => {
-                const avatarSrc = activeNamespace?.avatarUrl ?? (activeNamespace?.type === 'personal' ? firebaseUser?.photoURL : undefined) ?? undefined;
+                const avatarSrc =
+                  activeNamespace?.avatarUrl ??
+                  (activeNamespace?.type === 'personal' ? firebaseUser?.photoURL : undefined) ??
+                  undefined;
                 const avatarFallback = (
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-semibold">
-                    {activeNamespace !== null && activeNamespace.type === 'organization' ? (
-                      (() => { const Icon = getWorkspaceIcon(activeNamespace.icon); return <Icon className="h-3.5 w-3.5" />; })()
-                    ) : (
-                      firebaseUser?.displayName
+                    {activeNamespace !== null && activeNamespace.type === 'organization'
+                      ? (() => {
+                          const Icon = getWorkspaceIcon(activeNamespace.icon);
+                          return <Icon className="h-3.5 w-3.5" />;
+                        })()
+                      : firebaseUser?.displayName
                         ? firebaseUser.displayName
                             .split(' ')
                             .slice(0, 2)
                             .map((part) => part[0]?.toUpperCase() ?? '')
                             .join('')
-                        : '?'
-                    )}
+                        : '?'}
                   </div>
                 );
                 if (avatarSrc) {
-                  return <ImgWithFallback src={avatarSrc} className="h-7 w-7 shrink-0 rounded-md object-cover" fallback={avatarFallback} />;
+                  return (
+                    <ImgWithFallback
+                      src={avatarSrc}
+                      className="h-7 w-7 shrink-0 rounded-md object-cover"
+                      fallback={avatarFallback}
+                    />
+                  );
                 }
                 return avatarFallback;
               })()}
-              <span className="flex-1 truncate text-left text-sm font-medium">
-                {activeDisplayName}
-              </span>
+              <span className="flex-1 truncate text-left text-sm font-medium">{activeDisplayName}</span>
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             </button>
           </Popover.Trigger>
@@ -215,7 +241,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         )}
                       >
                         {firebaseUser?.photoURL ? (
-                          <ImgWithFallback src={firebaseUser.photoURL} className="h-5 w-5 shrink-0 rounded-full object-cover" fallback={<User className="h-4 w-4 shrink-0" />} />
+                          <ImgWithFallback
+                            src={firebaseUser.photoURL}
+                            className="h-5 w-5 shrink-0 rounded-full object-cover"
+                            fallback={<User className="h-4 w-4 shrink-0" />}
+                          />
                         ) : (
                           <User className="h-4 w-4 shrink-0" />
                         )}
@@ -223,33 +253,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           <span className="block font-medium text-foreground">My profile</span>
                           <span className="block text-xs text-muted-foreground">@{personalNamespace.handle}</span>
                         </span>
-                        {handleFromPath === personalNamespace.handle && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                        {handleFromPath === personalNamespace.handle && (
+                          <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                        )}
                       </Link>
                     </Popover.Close>
                     <div className="my-1 border-t" />
                   </>
                 )}
-                {namespaces.filter((ns) => ns.type === 'organization').map((ns) => {
-                  const isActive = handleFromPath === ns.handle;
-                  return (
-                    <Popover.Close asChild key={ns.handle}>
-                      <Link
-                        href={`/${ns.handle}`}
-                        className={cn(
-                          'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
-                          isActive ? 'text-foreground' : 'text-muted-foreground',
-                        )}
-                      >
-                        {(() => { const Icon = getWorkspaceIcon(ns.icon); return <Icon className="h-4 w-4 shrink-0" />; })()}
-                        <span className="flex-1 truncate">
-                          <span className="block font-medium text-foreground">{ns.displayName}</span>
-                          <span className="block text-xs text-muted-foreground">@{ns.handle}</span>
-                        </span>
-                        {isActive && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
-                      </Link>
-                    </Popover.Close>
-                  );
-                })}
+                {namespaces
+                  .filter((ns) => ns.type === 'organization')
+                  .map((ns) => {
+                    const isActive = handleFromPath === ns.handle;
+                    return (
+                      <Popover.Close asChild key={ns.handle}>
+                        <Link
+                          href={`/${ns.handle}`}
+                          className={cn(
+                            'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
+                            isActive ? 'text-foreground' : 'text-muted-foreground',
+                          )}
+                        >
+                          {(() => {
+                            const Icon = getWorkspaceIcon(ns.icon);
+                            return <Icon className="h-4 w-4 shrink-0" />;
+                          })()}
+                          <span className="flex-1 truncate">
+                            <span className="block font-medium text-foreground">{ns.displayName}</span>
+                            <span className="block text-xs text-muted-foreground">@{ns.handle}</span>
+                          </span>
+                          {isActive && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                        </Link>
+                      </Popover.Close>
+                    );
+                  })}
                 <div className="my-1 border-t" />
                 <Popover.Close asChild>
                   <Link
@@ -286,13 +323,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             : pathname.startsWith(fullHref);
           return (
             <React.Fragment key={item.label}>
-              <NavItem
-                href={fullHref}
-                label={item.label}
-                icon={item.icon}
-                badge={item.badge}
-                active={isActive}
-              />
+              <NavItem href={fullHref} label={item.label} icon={item.icon} badge={item.badge} active={isActive} />
               {item.href === '/agents' && (
                 <div className="pl-4">
                   <NavItem
@@ -322,9 +353,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="border-t px-4 py-2">
           <span className="font-mono text-[10px] text-muted-foreground">
             {process.env.NEXT_PUBLIC_GIT_SHA}
-            {process.env.NEXT_PUBLIC_GIT_BRANCH && (
-              <span> · {process.env.NEXT_PUBLIC_GIT_BRANCH}</span>
-            )}
+            {process.env.NEXT_PUBLIC_GIT_BRANCH && <span> · {process.env.NEXT_PUBLIC_GIT_BRANCH}</span>}
           </span>
         </div>
       )}
@@ -336,97 +365,101 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {showRankingsBanner && (
         <div className="flex items-center justify-between bg-amber-100 dark:bg-amber-950/50 px-4 py-1.5 text-xs text-amber-800 dark:text-amber-300 border-b border-amber-200 dark:border-amber-900/50">
           <span>
-            Model rankings {daysSinceUpdate === null ? 'never synced' : `outdated (${daysSinceUpdate}d ago)`}.
-            Run <code className="mx-1 rounded bg-amber-200/60 dark:bg-amber-900/40 px-1 py-0.5 font-mono">python3 scripts/sync-model-rankings.py</code> to update.
+            Model rankings {daysSinceUpdate === null ? 'never synced' : `outdated (${daysSinceUpdate}d ago)`}. Run{' '}
+            <code className="mx-1 rounded bg-amber-200/60 dark:bg-amber-900/40 px-1 py-0.5 font-mono">
+              python3 scripts/sync-model-rankings.py
+            </code>{' '}
+            to update.
           </span>
-          <button onClick={() => setRankingsBannerDismissed(true)} className="ml-4 hover:text-amber-900 dark:hover:text-amber-100" aria-label="Dismiss">✕</button>
+          <button
+            onClick={() => setRankingsBannerDismissed(true)}
+            className="ml-4 hover:text-amber-900 dark:hover:text-amber-100"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
         </div>
       )}
       <div className="flex flex-1 overflow-hidden">
-      {/* Sidebar — desktop */}
-      <aside className="hidden w-[280px] shrink-0 border-r md:flex md:flex-col">
-        <SidebarContent />
-      </aside>
+        {/* Sidebar — desktop */}
+        <aside className="hidden w-[280px] shrink-0 border-r md:flex md:flex-col">
+          <SidebarContent />
+        </aside>
 
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setSidebarOpen(false)}
-          />
-          <aside className="absolute left-0 top-0 h-full w-[280px] border-r bg-background shadow-xl">
-            <SidebarContent />
-          </aside>
-        </div>
-      )}
+        {/* Mobile sidebar overlay */}
+        {sidebarOpen && (
+          <div className="fixed inset-0 z-50 md:hidden">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
+            <aside className="absolute left-0 top-0 h-full w-[280px] border-r bg-background shadow-xl">
+              <SidebarContent />
+            </aside>
+          </div>
+        )}
 
-      {/* Main content area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top bar */}
-        <header className="flex h-16 shrink-0 items-center justify-between border-b px-4 print:hidden">
-          <div className="flex items-center gap-3">
-            {/* Mobile menu toggle */}
-            <button
-              className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              aria-label="Toggle menu"
-            >
-              {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-            </button>
-            <nav className="flex items-center gap-1 text-sm">
-              {breadcrumbs.length > 1 && (
+        {/* Main content area */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Top bar */}
+          <header className="flex h-16 shrink-0 items-center justify-between border-b px-4 print:hidden">
+            <div className="flex items-center gap-3">
+              {/* Mobile menu toggle */}
+              <button
+                className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                aria-label="Toggle menu"
+              >
+                {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+              </button>
+              <nav className="flex items-center gap-1 text-sm">
+                {breadcrumbs.length > 1 && (
+                  <>
+                    <Link
+                      href={breadcrumbs[breadcrumbs.length - 2].href ?? '#'}
+                      className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors mr-2"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5" />
+                      Go back
+                    </Link>
+                    <span className="text-muted-foreground/30">|</span>
+                  </>
+                )}
+                {breadcrumbs.map((crumb, i) => (
+                  <React.Fragment key={i}>
+                    {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />}
+                    {crumb.href !== null ? (
+                      <Link href={crumb.href} className="text-muted-foreground hover:text-foreground transition-colors">
+                        {crumb.label}
+                      </Link>
+                    ) : (
+                      <span className="font-medium text-foreground">{crumb.label}</span>
+                    )}
+                  </React.Fragment>
+                ))}
+              </nav>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <CommandPaletteTrigger />
+              <ThemeToggle />
+              {firebaseUser && (
                 <>
-                  <Link
-                    href={breadcrumbs[breadcrumbs.length - 2].href ?? '#'}
-                    className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors mr-2"
+                  <span className="text-sm text-muted-foreground hidden sm:block">
+                    {firebaseUser.displayName || firebaseUser.email}
+                  </span>
+                  <button
+                    onClick={signOut}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                    aria-label="Sign out"
                   >
-                    <ArrowLeft className="h-3.5 w-3.5" />
-                    Go back
-                  </Link>
-                  <span className="text-muted-foreground/30">|</span>
+                    <LogOut className="h-4 w-4" />
+                  </button>
                 </>
               )}
-              {breadcrumbs.map((crumb, i) => (
-                <React.Fragment key={i}>
-                  {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />}
-                  {crumb.href !== null ? (
-                    <Link href={crumb.href} className="text-muted-foreground hover:text-foreground transition-colors">
-                      {crumb.label}
-                    </Link>
-                  ) : (
-                    <span className="font-medium text-foreground">{crumb.label}</span>
-                  )}
-                </React.Fragment>
-              ))}
-            </nav>
-          </div>
+            </div>
+          </header>
 
-          <div className="flex items-center gap-2">
-            <CommandPaletteTrigger />
-            <ThemeToggle />
-            {firebaseUser && (
-              <>
-                <span className="text-sm text-muted-foreground hidden sm:block">
-                  {firebaseUser.displayName || firebaseUser.email}
-                </span>
-                <button
-                  onClick={signOut}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                  aria-label="Sign out"
-                >
-                  <LogOut className="h-4 w-4" />
-                </button>
-              </>
-            )}
-          </div>
-        </header>
-
-        {/* Page content */}
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
-      </div>
+          {/* Page content */}
+          <main className="flex-1 overflow-auto">{children}</main>
+        </div>
       </div>
     </div>
   );

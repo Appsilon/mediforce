@@ -48,9 +48,7 @@ describe('agent list command', () => {
   });
 
   it('lists agents in human-readable format', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ agents: FAKE_AGENTS }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ agents: FAKE_AGENTS }));
     const output = captureOutput();
     const code = await agentListCommand({
       argv: ['--base-url', 'http://localhost:5555'],
@@ -66,9 +64,7 @@ describe('agent list command', () => {
   });
 
   it('emits JSON when --json is set', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ agents: FAKE_AGENTS }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ agents: FAKE_AGENTS }));
     const output = captureOutput();
     const code = await agentListCommand({
       argv: ['--json'],
@@ -81,9 +77,7 @@ describe('agent list command', () => {
   });
 
   it('prints empty message when no agents exist', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ agents: [] }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ agents: [] }));
     const output = captureOutput();
     const code = await agentListCommand({
       argv: [],
@@ -95,9 +89,7 @@ describe('agent list command', () => {
   });
 
   it('exits 1 with error on API failure', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Unauthorized' }, 401),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Unauthorized' }, 401));
     const output = captureOutput();
     const code = await agentListCommand({
       argv: ['--json'],

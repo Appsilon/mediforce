@@ -14,11 +14,7 @@ import type {
   EmitFn,
   WorkflowAgentContext,
 } from '../interfaces/step-executor-plugin';
-import type {
-  StepConfig,
-  ProcessConfig,
-  AgentOutputEnvelope,
-} from '@mediforce/platform-core';
+import type { StepConfig, ProcessConfig, AgentOutputEnvelope } from '@mediforce/platform-core';
 import { trace } from '@opentelemetry/api';
 import { RecordingTracerProvider } from '../testing/index';
 
@@ -284,21 +280,15 @@ describe('AgentRunner', () => {
     const tracerProvider = new RecordingTracerProvider();
     trace.setGlobalTracerProvider(tracerProvider);
 
-    const capturingRunner = new AgentRunner(
-      instanceRepository,
-      auditRepository,
-      eventLog,
-      undefined,
-      { captureContent: true },
-    );
+    const capturingRunner = new AgentRunner(instanceRepository, auditRepository, eventLog, undefined, {
+      captureContent: true,
+    });
     const plugin = makeSuccessPlugin(makeValidEnvelope());
     await capturingRunner.runWithWorkflowStep(plugin, makeWorkflowContext());
 
     const span = tracerProvider.spans[0];
     expect(span.attributes['input.value']).toBe(JSON.stringify({ patientId: 'P001' }));
-    expect(span.attributes['output.value']).toBe(
-      JSON.stringify({ recommendation: 'continue_monitoring' }),
-    );
+    expect(span.attributes['output.value']).toBe(JSON.stringify({ recommendation: 'continue_monitoring' }));
     expect(span.attributes['output.mime_type']).toBe('application/json');
   });
 
@@ -340,9 +330,7 @@ describe('AgentRunner', () => {
   // --- Test 4: L2 (Annotator) — annotations visible, no recommendation surfaced ---
   it('L2 Annotator: annotations in event log, result not applied to workflow', async () => {
     const envelope = makeValidEnvelope({
-      annotations: [
-        { id: crypto.randomUUID(), content: 'High risk flag', timestamp: new Date().toISOString() },
-      ],
+      annotations: [{ id: crypto.randomUUID(), content: 'High risk flag', timestamp: new Date().toISOString() }],
     });
     const plugin = makeSuccessPlugin(envelope);
     const context = makeContext({ autonomyLevel: 'L2' });
@@ -486,7 +474,9 @@ describe('AgentRunner', () => {
   it('plugin throw: fallbackReason is error, instance paused with agent_escalated', async () => {
     const plugin: StepExecutorPlugin = {
       initialize: async () => {},
-      run: async () => { throw new Error('LLM API key invalid'); },
+      run: async () => {
+        throw new Error('LLM API key invalid');
+      },
     };
     const context = makeContext({ autonomyLevel: 'L2' });
     const stepConfig = makeStepConfig({ fallbackBehavior: 'escalate_to_human' });
@@ -505,7 +495,9 @@ describe('AgentRunner', () => {
   it('plugin throw: error message is captured in audit outputSnapshot', async () => {
     const plugin: StepExecutorPlugin = {
       initialize: async () => {},
-      run: async () => { throw new Error('OpenRouter 401 Unauthorized'); },
+      run: async () => {
+        throw new Error('OpenRouter 401 Unauthorized');
+      },
     };
     const context = makeContext({ autonomyLevel: 'L2' });
     const stepConfig = makeStepConfig({ fallbackBehavior: 'escalate_to_human' });
@@ -541,7 +533,9 @@ describe('AgentRunner', () => {
   it('plugin throw: audit event written even when no result emitted', async () => {
     const plugin: StepExecutorPlugin = {
       initialize: async () => {},
-      run: async () => { throw new TypeError('Cannot read properties of undefined'); },
+      run: async () => {
+        throw new TypeError('Cannot read properties of undefined');
+      },
     };
     const context = makeContext({ autonomyLevel: 'L4' });
     const stepConfig = makeStepConfig();

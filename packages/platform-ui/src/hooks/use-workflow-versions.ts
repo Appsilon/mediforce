@@ -86,9 +86,7 @@ export function useWorkflowVersion(
 ): { definition: WorkflowDefinition | null; loading: boolean; error: Error | null } {
   const enabled = name.length > 0 && namespace.length > 0 && version !== null && version !== undefined && version > 0;
   const query = useQuery({
-    queryKey: enabled
-      ? queryKeys.workflow(namespace, name, version)
-      : (['workflow', '__noop__'] as const),
+    queryKey: enabled ? queryKeys.workflow(namespace, name, version) : (['workflow', '__noop__'] as const),
     queryFn: async () => {
       if (!enabled || version === null || version === undefined) {
         throw new Error('unreachable: enabled gates this');

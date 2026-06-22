@@ -40,10 +40,10 @@ export function useTask(taskId: string | undefined): {
     },
   });
 
-  const err = taskId === undefined ? null : (query.error as Error | null) ?? null;
+  const err = taskId === undefined ? null : ((query.error as Error | null) ?? null);
   const notFound = err instanceof ApiError && err.status === 404;
   return {
-    task: taskId === undefined ? null : query.data ?? null,
+    task: taskId === undefined ? null : (query.data ?? null),
     loading: query.isLoading && taskId !== undefined,
     error: notFound ? null : err,
     notFound,

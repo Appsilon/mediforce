@@ -39,9 +39,7 @@ function makePostRequest(
   body: unknown,
   authHeader: string | null = 'Bearer valid-token',
 ): NextRequest {
-  const url = new URL(
-    `http://localhost/api/agents/${agentId}/oauth/${providerSlug}/start`,
-  );
+  const url = new URL(`http://localhost/api/agents/${agentId}/oauth/${providerSlug}/start`);
   if (namespace !== null) url.searchParams.set('namespace', namespace);
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (authHeader !== null) headers.Authorization = authHeader;
@@ -67,9 +65,7 @@ const providerConfig: OAuthProviderConfig = {
   updatedAt: '2026-04-23T00:00:00.000Z',
 };
 
-function makeAgentWithOAuthBinding(
-  overrides: { serverName?: string; provider?: string } = {},
-): AgentDefinition {
+function makeAgentWithOAuthBinding(overrides: { serverName?: string; provider?: string } = {}): AgentDefinition {
   const serverName = overrides.serverName ?? 'gh';
   const provider = overrides.provider ?? 'github';
   return {
@@ -120,10 +116,9 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
     mockAgentGetById.mockResolvedValue(makeAgentWithOAuthBinding());
     mockProviderGet.mockResolvedValue(providerConfig);
 
-    const res = await POST(
-      makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }),
-      { params: makeParams('agent-1', 'github') },
-    );
+    const res = await POST(makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }), {
+      params: makeParams('agent-1', 'github'),
+    });
     const json = (await res.json()) as { authorizeUrl: string; state: string };
 
     expect(res.status).toBe(200);
@@ -137,19 +132,16 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
     expect(url.searchParams.get('response_type')).toBe('code');
     expect(url.searchParams.get('scope')).toBe('repo read:user');
     expect(url.searchParams.get('state')).toBe(json.state);
-    expect(url.searchParams.get('redirect_uri')).toBe(
-      'http://localhost/api/oauth/github/callback',
-    );
+    expect(url.searchParams.get('redirect_uri')).toBe('http://localhost/api/oauth/github/callback');
   });
 
   it('[DATA] state verifies and carries namespace, agentId, serverName, providerId, connectedBy', async () => {
     mockAgentGetById.mockResolvedValue(makeAgentWithOAuthBinding());
     mockProviderGet.mockResolvedValue(providerConfig);
 
-    const res = await POST(
-      makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }),
-      { params: makeParams('agent-1', 'github') },
-    );
+    const res = await POST(makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }), {
+      params: makeParams('agent-1', 'github'),
+    });
     const json = (await res.json()) as { state: string };
 
     const payload = await verifyState(json.state, 'test-platform-secret', 60_000);
@@ -162,37 +154,33 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
   });
 
   it('[ERROR] 401 when auth header missing', async () => {
-    const res = await POST(
-      makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }, null),
-      { params: makeParams('agent-1', 'github') },
-    );
+    const res = await POST(makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }, null), {
+      params: makeParams('agent-1', 'github'),
+    });
     expect(res.status).toBe(401);
     expect(mockAgentGetById).not.toHaveBeenCalled();
   });
 
   it('[ERROR] 401 when token verification fails', async () => {
     mockVerifyIdToken.mockRejectedValue(new Error('bad token'));
-    const res = await POST(
-      makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }),
-      { params: makeParams('agent-1', 'github') },
-    );
+    const res = await POST(makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }), {
+      params: makeParams('agent-1', 'github'),
+    });
     expect(res.status).toBe(401);
   });
 
   it('[ERROR] 400 when namespace query missing', async () => {
-    const res = await POST(
-      makePostRequest('agent-1', 'github', null, { serverName: 'gh' }),
-      { params: makeParams('agent-1', 'github') },
-    );
+    const res = await POST(makePostRequest('agent-1', 'github', null, { serverName: 'gh' }), {
+      params: makeParams('agent-1', 'github'),
+    });
     expect(res.status).toBe(400);
     expect(mockAgentGetById).not.toHaveBeenCalled();
   });
 
   it('[ERROR] 400 when serverName missing from body', async () => {
-    const res = await POST(
-      makePostRequest('agent-1', 'github', 'appsilon', {}),
-      { params: makeParams('agent-1', 'github') },
-    );
+    const res = await POST(makePostRequest('agent-1', 'github', 'appsilon', {}), {
+      params: makeParams('agent-1', 'github'),
+    });
     const json = await res.json();
     expect(res.status).toBe(400);
     expect(json.error).toBe('Validation failed');
@@ -200,9 +188,7 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
   });
 
   it('[ERROR] 400 when body is missing or not JSON', async () => {
-    const url = new URL(
-      'http://localhost/api/agents/agent-1/oauth/github/start?namespace=appsilon',
-    );
+    const url = new URL('http://localhost/api/agents/agent-1/oauth/github/start?namespace=appsilon');
     const req = new NextRequest(url.toString(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer x' },
@@ -216,10 +202,9 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
   it('[ERROR] 404 when agent not found', async () => {
     mockAgentGetById.mockResolvedValue(null);
 
-    const res = await POST(
-      makePostRequest('missing', 'github', 'appsilon', { serverName: 'gh' }),
-      { params: makeParams('missing', 'github') },
-    );
+    const res = await POST(makePostRequest('missing', 'github', 'appsilon', { serverName: 'gh' }), {
+      params: makeParams('missing', 'github'),
+    });
     expect(res.status).toBe(404);
     expect(mockProviderGet).not.toHaveBeenCalled();
   });
@@ -227,10 +212,9 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
   it('[ERROR] 404 when binding with given serverName does not exist', async () => {
     mockAgentGetById.mockResolvedValue(makeAgentWithOAuthBinding({ serverName: 'gh' }));
 
-    const res = await POST(
-      makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'other' }),
-      { params: makeParams('agent-1', 'github') },
-    );
+    const res = await POST(makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'other' }), {
+      params: makeParams('agent-1', 'github'),
+    });
     const json = await res.json();
     expect(res.status).toBe(404);
     expect(json.error).toContain('other');
@@ -244,22 +228,18 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
       },
     });
 
-    const res = await POST(
-      makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }),
-      { params: makeParams('agent-1', 'github') },
-    );
+    const res = await POST(makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }), {
+      params: makeParams('agent-1', 'github'),
+    });
     expect(res.status).toBe(400);
   });
 
   it('[ERROR] 400 when binding oauth provider does not match URL provider slug', async () => {
-    mockAgentGetById.mockResolvedValue(
-      makeAgentWithOAuthBinding({ provider: 'github' }),
-    );
+    mockAgentGetById.mockResolvedValue(makeAgentWithOAuthBinding({ provider: 'github' }));
 
-    const res = await POST(
-      makePostRequest('agent-1', 'google', 'appsilon', { serverName: 'gh' }),
-      { params: makeParams('agent-1', 'google') },
-    );
+    const res = await POST(makePostRequest('agent-1', 'google', 'appsilon', { serverName: 'gh' }), {
+      params: makeParams('agent-1', 'google'),
+    });
     const json = await res.json();
     expect(res.status).toBe(400);
     expect(json.error).toContain('google');
@@ -270,10 +250,9 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
     mockAgentGetById.mockResolvedValue(makeAgentWithOAuthBinding());
     mockProviderGet.mockResolvedValue(null);
 
-    const res = await POST(
-      makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }),
-      { params: makeParams('agent-1', 'github') },
-    );
+    const res = await POST(makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }), {
+      params: makeParams('agent-1', 'github'),
+    });
     const json = await res.json();
     expect(res.status).toBe(404);
     expect(json.error).toContain('github');
@@ -288,10 +267,9 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
       mockAgentGetById.mockResolvedValue(makeAgentWithOAuthBinding());
       mockProviderGet.mockResolvedValue(providerConfig);
 
-      const res = await POST(
-        makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }),
-        { params: makeParams('agent-1', 'github') },
-      );
+      const res = await POST(makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }), {
+        params: makeParams('agent-1', 'github'),
+      });
       expect(res.status).toBe(500);
     } finally {
       if (previousOAuthSecret === undefined) delete process.env.OAUTH_STATE_SECRET;
@@ -302,10 +280,9 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
   it('[AUTHZ] caller who is not a member of the namespace gets 404', async () => {
     mockGetMember.mockResolvedValue(null);
 
-    const res = await POST(
-      makePostRequest('agent-1', 'github', 'other-ns', { serverName: 'gh' }),
-      { params: makeParams('agent-1', 'github') },
-    );
+    const res = await POST(makePostRequest('agent-1', 'github', 'other-ns', { serverName: 'gh' }), {
+      params: makeParams('agent-1', 'github'),
+    });
     expect(res.status).toBe(404);
     expect(mockAgentGetById).not.toHaveBeenCalled();
     expect(mockProviderGet).not.toHaveBeenCalled();
@@ -315,10 +292,9 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
     mockAgentGetById.mockResolvedValue(makeAgentWithOAuthBinding());
     mockProviderGet.mockResolvedValue(providerConfig);
 
-    await POST(
-      makePostRequest('agent-1', 'github', 'other-ns', { serverName: 'gh' }),
-      { params: makeParams('agent-1', 'github') },
-    );
+    await POST(makePostRequest('agent-1', 'github', 'other-ns', { serverName: 'gh' }), {
+      params: makeParams('agent-1', 'github'),
+    });
     expect(mockGetMember).toHaveBeenCalledWith('other-ns', 'user-firebase-uid');
   });
 
@@ -328,10 +304,9 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
       mockAgentGetById.mockResolvedValue(makeAgentWithOAuthBinding());
       mockProviderGet.mockResolvedValue(providerConfig);
 
-      const res = await POST(
-        makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }),
-        { params: makeParams('agent-1', 'github') },
-      );
+      const res = await POST(makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }), {
+        params: makeParams('agent-1', 'github'),
+      });
       const json = (await res.json()) as { state: string };
       expect(res.status).toBe(200);
 
@@ -353,10 +328,9 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
     mockAgentGetById.mockResolvedValue(makeAgentWithOAuthBinding());
     mockProviderGet.mockResolvedValue(providerConfig);
 
-    const res = await POST(
-      makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }),
-      { params: makeParams('agent-1', 'github') },
-    );
+    const res = await POST(makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }), {
+      params: makeParams('agent-1', 'github'),
+    });
     const json = (await res.json()) as { state: string };
     expect(res.status).toBe(200);
 

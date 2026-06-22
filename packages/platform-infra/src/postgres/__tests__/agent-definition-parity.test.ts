@@ -5,10 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type {
-  AgentDefinitionRepository,
-  CreateAgentDefinitionInput,
-} from '@mediforce/platform-core';
+import type { AgentDefinitionRepository, CreateAgentDefinitionInput } from '@mediforce/platform-core';
 import { InMemoryAgentDefinitionRepository } from '@mediforce/platform-core/testing';
 import { PostgresAgentDefinitionRepository } from '../repositories/agent-definition-repository';
 import { PostgresNamespaceRepository } from '../repositories/namespace-repository';
@@ -20,9 +17,7 @@ const MIGRATIONS_DIR = resolve(__dirname, '..', 'migrations');
 const DATABASE_URL = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const skipPg = !DATABASE_URL;
 
-function inputBase(
-  overrides: Partial<CreateAgentDefinitionInput> = {},
-): CreateAgentDefinitionInput {
+function inputBase(overrides: Partial<CreateAgentDefinitionInput> = {}): CreateAgentDefinitionInput {
   return {
     kind: 'plugin',
     runtimeId: 'claude-code-agent',
@@ -96,10 +91,7 @@ function contract(
           allowedTools: ['issues_get'],
         },
       };
-      const created = await repo.upsert(
-        'with-mcp',
-        inputBase({ mcpServers: mcp }),
-      );
+      const created = await repo.upsert('with-mcp', inputBase({ mcpServers: mcp }));
       const got = await repo.getById('with-mcp');
       expect(got?.mcpServers).toEqual(mcp);
       expect(created.mcpServers).toEqual(mcp);
@@ -108,10 +100,7 @@ function contract(
     it('listAll returns every agent regardless of visibility', async () => {
       await registerWorkspace('ws-1');
       await repo.upsert('a', inputBase({ visibility: 'public' }));
-      await repo.upsert(
-        'b',
-        inputBase({ visibility: 'private', namespace: 'ws-1' }),
-      );
+      await repo.upsert('b', inputBase({ visibility: 'private', namespace: 'ws-1' }));
       const all = await repo.listAll();
       expect(all.map((a) => a.id).sort()).toEqual(['a', 'b']);
     });
@@ -120,14 +109,8 @@ function contract(
       await registerWorkspace('ws-1');
       await registerWorkspace('ws-2');
       await repo.upsert('pub', inputBase({ visibility: 'public' }));
-      await repo.upsert(
-        'priv-1',
-        inputBase({ visibility: 'private', namespace: 'ws-1' }),
-      );
-      await repo.upsert(
-        'priv-2',
-        inputBase({ visibility: 'private', namespace: 'ws-2' }),
-      );
+      await repo.upsert('priv-1', inputBase({ visibility: 'private', namespace: 'ws-1' }));
+      await repo.upsert('priv-2', inputBase({ visibility: 'private', namespace: 'ws-2' }));
       const visible = await repo.listVisibleTo(['ws-1']);
       expect(visible.map((a) => a.id).sort()).toEqual(['priv-1', 'pub']);
     });
@@ -135,10 +118,7 @@ function contract(
     it('listVisibleTo with empty allowed returns only public agents', async () => {
       await registerWorkspace('ws-1');
       await repo.upsert('pub', inputBase({ visibility: 'public' }));
-      await repo.upsert(
-        'priv',
-        inputBase({ visibility: 'private', namespace: 'ws-1' }),
-      );
+      await repo.upsert('priv', inputBase({ visibility: 'private', namespace: 'ws-1' }));
       const visible = await repo.listVisibleTo([]);
       expect(visible.map((a) => a.id)).toEqual(['pub']);
     });
@@ -147,10 +127,7 @@ function contract(
       await registerWorkspace('ws-1');
       await registerWorkspace('ws-2');
       await repo.upsert('pub', inputBase({ visibility: 'public' }));
-      await repo.upsert(
-        'priv',
-        inputBase({ visibility: 'private', namespace: 'ws-1' }),
-      );
+      await repo.upsert('priv', inputBase({ visibility: 'private', namespace: 'ws-1' }));
       expect((await repo.getByIdVisibleTo('pub', []))?.id).toBe('pub');
       expect((await repo.getByIdVisibleTo('priv', ['ws-1']))?.id).toBe('priv');
       expect(await repo.getByIdVisibleTo('priv', ['ws-2'])).toBeNull();
@@ -168,9 +145,7 @@ function contract(
       // clock returns a fixed timestamp; the Postgres trigger uses real time
       // and the surrounding sleep guarantees strict monotonicity there. The
       // dedicated trigger test below asserts the strict bump.
-      expect(new Date(updated.updatedAt).getTime()).toBeGreaterThanOrEqual(
-        new Date(created.updatedAt).getTime(),
-      );
+      expect(new Date(updated.updatedAt).getTime()).toBeGreaterThanOrEqual(new Date(created.updatedAt).getTime());
     });
 
     it('delete removes the row; subsequent getById returns null', async () => {
@@ -188,9 +163,7 @@ function contract(
     });
 
     it('rejects create with invalid payload (empty namespace)', async () => {
-      await expect(
-        repo.create(inputBase({ namespace: '' })),
-      ).rejects.toThrow();
+      await expect(repo.create(inputBase({ namespace: '' }))).rejects.toThrow();
     });
   });
 }
@@ -213,7 +186,9 @@ describe.skipIf(skipPg)('PostgresAgentDefinitionRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sql);
@@ -261,8 +236,6 @@ describe.skipIf(skipPg)('PostgresAgentDefinitionRepository (parity)', () => {
     const before = await repo.upsert('trig', inputBase());
     await new Promise((r) => setTimeout(r, 10));
     const after = await repo.update('trig', { name: 'Renamed' });
-    expect(new Date(after.updatedAt).getTime()).toBeGreaterThan(
-      new Date(before.updatedAt).getTime(),
-    );
+    expect(new Date(after.updatedAt).getTime()).toBeGreaterThan(new Date(before.updatedAt).getTime());
   });
 });

@@ -6,7 +6,10 @@ import { createNamespace } from '../create-namespace';
 import { ConflictError, ForbiddenError } from '../../../errors';
 
 function directoryWithMetadata(
-  map: ReadonlyMap<string, { email: string | null; displayName: string | null; lastSignInTime: string | null; photoURL: string | null }>,
+  map: ReadonlyMap<
+    string,
+    { email: string | null; displayName: string | null; lastSignInTime: string | null; photoURL: string | null }
+  >,
 ): UserDirectoryService {
   return {
     async getUsersByRole() {
@@ -34,10 +37,7 @@ describe('createNamespace handler', () => {
       caller: userCaller('uid-marek', []),
     });
 
-    const result = await createNamespace(
-      { handle: 'acme', displayName: 'Acme Co.' },
-      scope,
-    );
+    const result = await createNamespace({ handle: 'acme', displayName: 'Acme Co.' }, scope);
 
     expect(result.namespace).toMatchObject({
       handle: 'acme',
@@ -45,9 +45,7 @@ describe('createNamespace handler', () => {
       displayName: 'Acme Co.',
     });
     expect(namespaceRepo.namespaces.get('acme')?.type).toBe('organization');
-    expect(namespaceRepo.members.get('acme')).toEqual([
-      expect.objectContaining({ uid: 'uid-marek', role: 'owner' }),
-    ]);
+    expect(namespaceRepo.members.get('acme')).toEqual([expect.objectContaining({ uid: 'uid-marek', role: 'owner' })]);
     expect(namespaceRepo.userOrganizations.get('uid-marek')).toEqual(['acme']);
 
     const events = auditRepo.getAll().filter((e) => e.action === 'namespace.created');
@@ -63,10 +61,7 @@ describe('createNamespace handler', () => {
       caller: userCaller('uid-marek', []),
     });
 
-    const result = await createNamespace(
-      { handle: 'acme', displayName: 'Acme Co.', bio: 'A widget company.' },
-      scope,
-    );
+    const result = await createNamespace({ handle: 'acme', displayName: 'Acme Co.', bio: 'A widget company.' }, scope);
 
     expect(result.namespace.bio).toBe('A widget company.');
   });
@@ -84,9 +79,9 @@ describe('createNamespace handler', () => {
       caller: userCaller('uid-marek', []),
     });
 
-    await expect(
-      createNamespace({ handle: 'acme', displayName: 'Acme Co.' }, scope),
-    ).rejects.toBeInstanceOf(ConflictError);
+    await expect(createNamespace({ handle: 'acme', displayName: 'Acme Co.' }, scope)).rejects.toBeInstanceOf(
+      ConflictError,
+    );
     expect(auditRepo.getAll().some((e) => e.action === 'namespace.created')).toBe(false);
   });
 
@@ -129,8 +124,8 @@ describe('createNamespace handler', () => {
   it('rejects apiKey caller (no human owner to attribute the workspace to)', async () => {
     const scope = createTestScope({ namespaceRepo, auditRepo });
 
-    await expect(
-      createNamespace({ handle: 'acme', displayName: 'Acme Co.' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(createNamespace({ handle: 'acme', displayName: 'Acme Co.' }, scope)).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
   });
 });

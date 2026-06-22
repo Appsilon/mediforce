@@ -11,27 +11,18 @@ import type { ListTasksInput, ListTasksOutput } from '../../contract/tasks';
  * job (the Zod schema is the source of truth — handlers conform by type, not
  * by runtime parse).
  */
-export async function listTasks(
-  input: ListTasksInput,
-  scope: CallerScope,
-): Promise<ListTasksOutput> {
+export async function listTasks(input: ListTasksInput, scope: CallerScope): Promise<ListTasksOutput> {
   const base = await selectBase(input, scope);
   return { tasks: applyFilters(base, input) };
 }
 
-async function selectBase(
-  input: ListTasksInput,
-  scope: CallerScope,
-): Promise<readonly HumanTask[]> {
+async function selectBase(input: ListTasksInput, scope: CallerScope): Promise<readonly HumanTask[]> {
   if (input.instanceId !== undefined) return scope.tasks.getByInstanceId(input.instanceId);
   if (input.role !== undefined) return scope.tasks.getByRole(input.role);
   return scope.tasks.listForCaller();
 }
 
-function applyFilters(
-  tasks: readonly HumanTask[],
-  input: ListTasksInput,
-): HumanTask[] {
+function applyFilters(tasks: readonly HumanTask[], input: ListTasksInput): HumanTask[] {
   const statusSet = input.status !== undefined ? new Set<HumanTaskStatus>(input.status) : null;
   const stepId = input.stepId;
   return tasks.filter((task) => {

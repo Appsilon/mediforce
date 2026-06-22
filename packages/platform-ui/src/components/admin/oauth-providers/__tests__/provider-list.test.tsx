@@ -75,13 +75,9 @@ describe('ProviderList', () => {
   });
 
   it('renders icon when iconUrl is set', () => {
-    const providers = [
-      makeProvider({ id: 'github', iconUrl: 'https://example.com/github.svg' }),
-    ];
+    const providers = [makeProvider({ id: 'github', iconUrl: 'https://example.com/github.svg' })];
 
-    const { container } = render(
-      <ProviderList providers={providers} selectedId={null} onSelect={vi.fn()} />,
-    );
+    const { container } = render(<ProviderList providers={providers} selectedId={null} onSelect={vi.fn()} />);
 
     const img = container.querySelector('img');
     expect(img).not.toBeNull();

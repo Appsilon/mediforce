@@ -19,11 +19,7 @@ export const workflowArchiveCommand = defineCommand({
     const archived = args.unarchive !== true;
 
     if (args.version !== undefined && args.all === true) {
-      printError(
-        output,
-        { error: 'Flags are mutually exclusive: --version, --all' },
-        jsonMode,
-      );
+      printError(output, { error: 'Flags are mutually exclusive: --version, --all' }, jsonMode);
       return 2;
     }
     if (args.all !== true && args.version === undefined) {
@@ -41,17 +37,11 @@ export const workflowArchiveCommand = defineCommand({
 
     const action = archived ? 'Archived' : 'Unarchived';
     if (version !== undefined) {
-      const result = await mediforce.workflows.archiveVersion(
-        { name: args.name, version, archived },
-        { namespace },
-      );
+      const result = await mediforce.workflows.archiveVersion({ name: args.name, version, archived }, { namespace });
       if (jsonMode) printJson(output, result);
       else output.stdout(`${action} ${args.name} v${String(version)}`);
     } else {
-      const result = await mediforce.workflows.archiveAll(
-        { name: args.name, archived },
-        { namespace },
-      );
+      const result = await mediforce.workflows.archiveAll({ name: args.name, archived }, { namespace });
       if (jsonMode) printJson(output, result);
       else output.stdout(`${action} all versions of ${args.name}`);
     }

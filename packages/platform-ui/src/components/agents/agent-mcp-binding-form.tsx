@@ -5,11 +5,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus, Trash2 } from 'lucide-react';
-import type {
-  AgentMcpBinding,
-  OAuthProviderConfig,
-  ToolCatalogEntry,
-} from '@mediforce/platform-core';
+import type { AgentMcpBinding, OAuthProviderConfig, ToolCatalogEntry } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { mediforce } from '@/lib/mediforce';
 
@@ -52,10 +48,7 @@ const HttpFormSchema = z
         message: 'Header name is required',
       });
     }
-    if (
-      values.oauthHeaderValueTemplate === undefined ||
-      !values.oauthHeaderValueTemplate.includes('{token}')
-    ) {
+    if (values.oauthHeaderValueTemplate === undefined || !values.oauthHeaderValueTemplate.includes('{token}')) {
       ctx.addIssue({
         path: ['oauthHeaderValueTemplate'],
         code: z.ZodIssueCode.custom,
@@ -317,10 +310,8 @@ function HttpFields({
       authMode: initialAuthMode,
       headers: initialHeaders,
       oauthProvider: initial?.auth?.type === 'oauth' ? initial.auth.provider : '',
-      oauthHeaderName:
-        initial?.auth?.type === 'oauth' ? initial.auth.headerName : 'Authorization',
-      oauthHeaderValueTemplate:
-        initial?.auth?.type === 'oauth' ? initial.auth.headerValueTemplate : 'Bearer {token}',
+      oauthHeaderName: initial?.auth?.type === 'oauth' ? initial.auth.headerName : 'Authorization',
+      oauthHeaderValueTemplate: initial?.auth?.type === 'oauth' ? initial.auth.headerValueTemplate : 'Bearer {token}',
     },
   });
   const allowedArray = useFieldArray({ control: form.control, name: 'allowedTools' });
@@ -440,12 +431,10 @@ function HttpFields({
           </div>
           <p className="text-xs text-muted-foreground">
             Values support{' '}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">{'{{SECRET:name}}'}</code> — resolved at spawn
-            time from the workflow secrets that trigger the run.
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">{'{{SECRET:name}}'}</code> — resolved
+            at spawn time from the workflow secrets that trigger the run.
           </p>
-          {headersArray.fields.length === 0 && (
-            <p className="text-xs text-muted-foreground">No headers.</p>
-          )}
+          {headersArray.fields.length === 0 && <p className="text-xs text-muted-foreground">No headers.</p>}
           {headersArray.fields.map((field, index) => (
             <div key={field.id} className="flex items-center gap-2">
               <input
@@ -490,13 +479,10 @@ function HttpFields({
                 </option>
               ))}
             </select>
-            {providersError !== null && (
-              <span className="mt-1 text-xs text-destructive">{providersError}</span>
-            )}
+            {providersError !== null && <span className="mt-1 text-xs text-destructive">{providersError}</span>}
             {providers.length === 0 && providersError === null && (
               <span className="mt-1 text-xs text-muted-foreground">
-                No OAuth providers configured for this namespace. Ask an admin to add one via
-                OAuth providers.
+                No OAuth providers configured for this namespace. Ask an admin to add one via OAuth providers.
               </span>
             )}
           </Field>
@@ -511,10 +497,7 @@ function HttpFields({
                 autoComplete="off"
               />
             </Field>
-            <Field
-              label="Header value template"
-              error={form.formState.errors.oauthHeaderValueTemplate?.message}
-            >
+            <Field label="Header value template" error={form.formState.errors.oauthHeaderValueTemplate?.message}>
               <input
                 aria-label="OAuth header value template"
                 {...form.register('oauthHeaderValueTemplate')}
@@ -540,8 +523,7 @@ function HttpFields({
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Close this dialog — the Connect / Disconnect / Revoke actions live inline on the
-              binding row.
+              Close this dialog — the Connect / Disconnect / Revoke actions live inline on the binding row.
             </p>
           )}
         </div>
@@ -594,8 +576,8 @@ function AllowedToolsSection({
         </button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Optional. When empty, the agent may call any tool exposed by the server. When set, steps may
-        additionally narrow via <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">denyTools</code>.
+        Optional. When empty, the agent may call any tool exposed by the server. When set, steps may additionally narrow
+        via <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">denyTools</code>.
       </p>
       {fields.length === 0 && <p className="text-xs text-muted-foreground">No allowlist.</p>}
       {fields.map((field, index) => (
@@ -660,15 +642,7 @@ function FormFooter({
   );
 }
 
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string | null;
-  children: React.ReactNode;
-}) {
+function Field({ label, error, children }: { label: string; error?: string | null; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-sm font-medium">{label}</span>

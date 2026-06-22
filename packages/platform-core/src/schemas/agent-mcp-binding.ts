@@ -3,10 +3,12 @@ import { z } from 'zod';
 /** Headers-based auth for HTTP MCP transports. Header values support
  *  {{SECRET:name}} template syntax — resolved from workflowSecrets at
  *  writeMcpConfig time. Literal values pass through untouched. */
-export const HttpHeadersAuthSchema = z.object({
-  type: z.literal('headers'),
-  headers: z.record(z.string(), z.string()),
-}).strict();
+export const HttpHeadersAuthSchema = z
+  .object({
+    type: z.literal('headers'),
+    headers: z.record(z.string(), z.string()),
+  })
+  .strict();
 
 export type HttpHeadersAuth = z.infer<typeof HttpHeadersAuthSchema>;
 
@@ -15,27 +17,26 @@ export type HttpHeadersAuth = z.infer<typeof HttpHeadersAuthSchema>;
  *  writeMcpConfig time: `headerValueTemplate.replace('{token}', accessToken)`
  *  is emitted as a single header named `headerName`. Defaults produce the
  *  standard `Authorization: Bearer <token>` form. */
-export const HttpOAuthAuthSchema = z.object({
-  type: z.literal('oauth'),
-  /** References an entry in `namespaces/{h}/oauthProviders/{provider}`. */
-  provider: z.string().min(1),
-  /** Header name to inject. Default: 'Authorization'. */
-  headerName: z.string().min(1).default('Authorization'),
-  /** Header value template. `{token}` is replaced with the access token
-   *  at spawn time. Default: 'Bearer {token}'. */
-  headerValueTemplate: z.string().min(1).default('Bearer {token}'),
-  /** Optional scope display override (purely informational; authoritative
-   *  scopes live on the provider config). */
-  scopes: z.array(z.string()).optional(),
-}).strict();
+export const HttpOAuthAuthSchema = z
+  .object({
+    type: z.literal('oauth'),
+    /** References an entry in `namespaces/{h}/oauthProviders/{provider}`. */
+    provider: z.string().min(1),
+    /** Header name to inject. Default: 'Authorization'. */
+    headerName: z.string().min(1).default('Authorization'),
+    /** Header value template. `{token}` is replaced with the access token
+     *  at spawn time. Default: 'Bearer {token}'. */
+    headerValueTemplate: z.string().min(1).default('Bearer {token}'),
+    /** Optional scope display override (purely informational; authoritative
+     *  scopes live on the provider config). */
+    scopes: z.array(z.string()).optional(),
+  })
+  .strict();
 
 export type HttpOAuthAuth = z.infer<typeof HttpOAuthAuthSchema>;
 
 /** Discriminated union of supported HTTP auth strategies. */
-export const HttpAuthConfigSchema = z.discriminatedUnion('type', [
-  HttpHeadersAuthSchema,
-  HttpOAuthAuthSchema,
-]);
+export const HttpAuthConfigSchema = z.discriminatedUnion('type', [HttpHeadersAuthSchema, HttpOAuthAuthSchema]);
 
 export type HttpAuthConfig = z.infer<typeof HttpAuthConfigSchema>;
 
@@ -60,22 +61,26 @@ function normalizeLegacyAuth(val: unknown): unknown {
 /** Stdio binding — must reference a curated ToolCatalogEntry by id.
  *  Inline command/args are NOT accepted on bindings: that would re-open
  *  the RCE surface this refactor is closing. */
-export const StdioAgentMcpBindingSchema = z.object({
-  type: z.literal('stdio'),
-  catalogId: z.string().min(1),
-  allowedTools: z.array(z.string()).min(1).optional(),
-}).strict();
+export const StdioAgentMcpBindingSchema = z
+  .object({
+    type: z.literal('stdio'),
+    catalogId: z.string().min(1),
+    allowedTools: z.array(z.string()).min(1).optional(),
+  })
+  .strict();
 
 export type StdioAgentMcpBinding = z.infer<typeof StdioAgentMcpBindingSchema>;
 
 /** HTTP binding — free-form URL. Domain allowlist validation arrives
  *  in Step 2 (not enforced at schema level). */
-export const HttpAgentMcpBindingSchema = z.object({
-  type: z.literal('http'),
-  url: z.string().url(),
-  allowedTools: z.array(z.string()).min(1).optional(),
-  auth: z.preprocess(normalizeLegacyAuth, HttpAuthConfigSchema.optional()),
-}).strict();
+export const HttpAgentMcpBindingSchema = z
+  .object({
+    type: z.literal('http'),
+    url: z.string().url(),
+    allowedTools: z.array(z.string()).min(1).optional(),
+    auth: z.preprocess(normalizeLegacyAuth, HttpAuthConfigSchema.optional()),
+  })
+  .strict();
 
 export type HttpAgentMcpBinding = z.infer<typeof HttpAgentMcpBindingSchema>;
 
@@ -95,10 +100,12 @@ export type AgentMcpBindingMap = z.infer<typeof AgentMcpBindingMapSchema>;
 /** Step-level restriction for a single MCP server. Subtractive only —
  *  there is intentionally no `allowTools` field: the shape itself makes
  *  broadening the agent's allowlist impossible. */
-export const StepMcpRestrictionEntrySchema = z.object({
-  disable: z.boolean().optional(),
-  denyTools: z.array(z.string()).optional(),
-}).strict();
+export const StepMcpRestrictionEntrySchema = z
+  .object({
+    disable: z.boolean().optional(),
+    denyTools: z.array(z.string()).optional(),
+  })
+  .strict();
 
 export type StepMcpRestrictionEntry = z.infer<typeof StepMcpRestrictionEntrySchema>;
 
@@ -109,12 +116,14 @@ export type StepMcpRestriction = z.infer<typeof StepMcpRestrictionSchema>;
 
 /** Admin-curated stdio MCP server definition, referenced by AgentMcpBinding.catalogId.
  *  Env values support {{SECRET:name}} template syntax. */
-export const ToolCatalogEntrySchema = z.object({
-  id: z.string().min(1),
-  command: z.string().min(1),
-  args: z.array(z.string()).optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  description: z.string().optional(),
-}).strict();
+export const ToolCatalogEntrySchema = z
+  .object({
+    id: z.string().min(1),
+    command: z.string().min(1),
+    args: z.array(z.string()).optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    description: z.string().optional(),
+  })
+  .strict();
 
 export type ToolCatalogEntry = z.infer<typeof ToolCatalogEntrySchema>;

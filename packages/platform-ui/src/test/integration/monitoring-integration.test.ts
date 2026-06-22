@@ -47,15 +47,9 @@ describe('Mediforce client ↔ route-adapter ↔ monitoring summary handler (in-
   beforeEach(async () => {
     instanceRepo = new InMemoryProcessInstanceRepository();
     humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-1', namespace: 'team-alpha', status: 'running' }),
-    );
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-2', namespace: 'team-alpha', status: 'paused' }),
-    );
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-3', namespace: 'team-beta', status: 'running' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-1', namespace: 'team-alpha', status: 'running' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-2', namespace: 'team-alpha', status: 'paused' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-3', namespace: 'team-beta', status: 'running' }));
     await humanTaskRepo.create(
       buildHumanTask({ id: 't1', processInstanceId: 'inst-1', assignedRole: 'reviewer', status: 'pending' }),
     );

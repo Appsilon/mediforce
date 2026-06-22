@@ -7,9 +7,7 @@ export interface MailgunConfig {
   defaultSenderName: string;
 }
 
-export function createMailgunSender(
-  config: MailgunConfig,
-): (params: SendEmailParams) => Promise<SendEmailResult> {
+export function createMailgunSender(config: MailgunConfig): (params: SendEmailParams) => Promise<SendEmailResult> {
   return async (params) => {
     const from = params.from ?? `${config.defaultSenderName} <${config.defaultFrom}>`;
     const formData = new URLSearchParams();
@@ -37,24 +35,21 @@ export function createMailgunSender(
     }
 
     const credentials = Buffer.from(`api:${config.apiKey}`).toString('base64');
-    const response = await fetch(
-      `https://api.mailgun.net/v3/${config.domain}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${credentials}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData.toString(),
+    const response = await fetch(`https://api.mailgun.net/v3/${config.domain}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-    );
+      body: formData.toString(),
+    });
 
     if (!response.ok) {
       const body = await response.text();
       throw new Error(`Mailgun error ${response.status}: ${body}`);
     }
 
-    const result = await response.json() as Record<string, unknown>;
+    const result = (await response.json()) as Record<string, unknown>;
     return { messageId: (result.id as string) ?? '' };
   };
 }

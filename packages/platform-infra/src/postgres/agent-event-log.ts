@@ -31,16 +31,14 @@ export class PostgresAgentEventLog implements AgentEventLog {
     const prev = this.writeChains.get(key) ?? Promise.resolve();
     const next = prev.then(() => this.writeImpl(key, instanceId, stepId, event));
     // Tail swallows rejections so one failed write doesn't poison the chain.
-    this.writeChains.set(key, next.catch(() => undefined));
+    this.writeChains.set(
+      key,
+      next.catch(() => undefined),
+    );
     return next;
   }
 
-  private async writeImpl(
-    key: string,
-    instanceId: string,
-    stepId: string,
-    event: EmitPayload,
-  ): Promise<void> {
+  private async writeImpl(key: string, instanceId: string, stepId: string, event: EmitPayload): Promise<void> {
     const existing = this.cache.get(key) ?? [];
     const agentEvent: AgentEvent = {
       id: crypto.randomUUID(),

@@ -37,7 +37,7 @@ describe('isStuckLoop', () => {
     expect(isStuckLoop('step-1', tracker)).toBe(false);
     expect(isStuckLoop('step-1', tracker)).toBe(false); // count=1
     expect(isStuckLoop('step-1', tracker)).toBe(false); // count=2
-    expect(isStuckLoop('step-1', tracker)).toBe(true);  // count=3 → stuck
+    expect(isStuckLoop('step-1', tracker)).toBe(true); // count=3 → stuck
   });
 
   it('[DATA] legitimate ping-pong (review → revise → review) does not trigger', () => {
@@ -54,6 +54,6 @@ describe('isStuckLoop', () => {
     // tracker starts with previousStepId=null, so null matches immediately
     expect(isStuckLoop(null, tracker)).toBe(false); // count=1
     expect(isStuckLoop(null, tracker)).toBe(false); // count=2
-    expect(isStuckLoop(null, tracker)).toBe(true);  // count=3 → stuck
+    expect(isStuckLoop(null, tracker)).toBe(true); // count=3 → stuck
   });
 });

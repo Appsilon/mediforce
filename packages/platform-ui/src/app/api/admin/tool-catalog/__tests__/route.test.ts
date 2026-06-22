@@ -158,13 +158,9 @@ describe('POST /api/admin/tool-catalog', () => {
 
   it('[DATA] derives id from command when not supplied', async () => {
     mockCatalogGetById.mockResolvedValue(null);
-    mockCatalogUpsert.mockImplementation(
-      (_ns: string, entry: unknown) => Promise.resolve(entry),
-    );
+    mockCatalogUpsert.mockImplementation((_ns: string, entry: unknown) => Promise.resolve(entry));
 
-    const res = await POST(
-      makePostRequest('appsilon', { command: '/usr/bin/npx', args: ['-y', 'foo'] }),
-    );
+    const res = await POST(makePostRequest('appsilon', { command: '/usr/bin/npx', args: ['-y', 'foo'] }));
     const json = await res.json();
 
     expect(res.status).toBe(201);

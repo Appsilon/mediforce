@@ -98,10 +98,7 @@ function ToastEntry({ item, onDismissed }: { item: ToastItem; onDismissed: () =>
           </Toast.Description>
         )}
         {item.action !== undefined && (
-          <Toast.Action
-            asChild
-            altText={item.action.label}
-          >
+          <Toast.Action asChild altText={item.action.label}>
             <a
               href={item.action.href}
               target="_blank"

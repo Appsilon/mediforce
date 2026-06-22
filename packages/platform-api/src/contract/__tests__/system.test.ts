@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  OpenRouterCreditsInputSchema,
-  OpenRouterCreditsOutputSchema,
-} from '../system';
+import { OpenRouterCreditsInputSchema, OpenRouterCreditsOutputSchema } from '../system';
 
 describe('OpenRouterCreditsInputSchema', () => {
   it('accepts valid namespace', () => {

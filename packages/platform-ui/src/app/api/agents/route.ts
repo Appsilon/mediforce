@@ -1,10 +1,6 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { createAgent, listAdapter } from '@mediforce/platform-api/handlers';
-import {
-  ListAgentsInputSchema,
-  CreateAgentInputSchema,
-  type CreateAgentInput,
-} from '@mediforce/platform-api/contract';
+import { ListAgentsInputSchema, CreateAgentInputSchema, type CreateAgentInput } from '@mediforce/platform-api/contract';
 
 /**
  * GET /api/agents — list visible agents.
@@ -20,7 +16,7 @@ export const GET = createRouteAdapter(
  */
 export const POST = createRouteAdapter<typeof CreateAgentInputSchema, CreateAgentInput>(
   CreateAgentInputSchema,
-  async (req) => (await req.json().catch(() => ({}))),
+  async (req) => await req.json().catch(() => ({})),
   createAgent,
   { successStatus: 201 },
 );

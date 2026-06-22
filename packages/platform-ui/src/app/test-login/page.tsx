@@ -52,7 +52,9 @@ export default function TestLoginPage() {
           <p className="text-sm text-muted-foreground">Test Login (Emulator)</p>
         </div>
         {error && (
-          <p className="text-sm text-destructive text-center" role="alert">{error}</p>
+          <p className="text-sm text-destructive text-center" role="alert">
+            {error}
+          </p>
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <input

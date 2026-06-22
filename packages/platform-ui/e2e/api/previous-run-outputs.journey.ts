@@ -40,9 +40,7 @@ async function pollUntil<T>(
 }
 
 test.describe('Previous run outputs — API E2E', () => {
-  test('user-typed message round-trips across runs via inputForNextRun', async ({
-    request,
-  }) => {
+  test('user-typed message round-trips across runs via inputForNextRun', async ({ request }) => {
     const wdName = `e2e-prev-run-${Date.now()}`;
 
     // -------- 1. Register WD --------
@@ -74,18 +72,13 @@ test.describe('Previous run outputs — API E2E', () => {
       ],
       transitions: [{ from: 'set-next', to: 'done' }],
       triggers: [{ type: 'manual', name: 'Start' }],
-      inputForNextRun: [
-        { stepId: 'set-next', output: 'message', as: 'message' },
-      ],
+      inputForNextRun: [{ stepId: 'set-next', output: 'message', as: 'message' }],
     };
 
-    const createWdRes = await request.post(
-      `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
-      {
-        headers: { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' },
-        data: wd,
-      },
-    );
+    const createWdRes = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
+      headers: { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' },
+      data: wd,
+    });
     expect(createWdRes.status(), await createWdRes.text()).toBe(201);
 
     async function driveRun(messageForNext: string): Promise<string> {
@@ -116,11 +109,7 @@ test.describe('Previous run outputs — API E2E', () => {
           const body = (await res.json()) as {
             tasks: Array<{ id: string; stepId: string; status: string }>;
           };
-          return (
-            body.tasks.find(
-              (t) => t.stepId === 'set-next' && t.status !== 'completed',
-            ) ?? null
-          );
+          return body.tasks.find((t) => t.stepId === 'set-next' && t.status !== 'completed') ?? null;
         },
         { description: `pending task on set-next for ${instanceId}` },
       );
@@ -192,11 +181,7 @@ test.describe('Previous run outputs — API E2E', () => {
         const body = (await res.json()) as {
           tasks: Array<{ id: string; stepId: string; status: string }>;
         };
-        return (
-          body.tasks.find(
-            (t) => t.stepId === 'set-next' && t.status !== 'completed',
-          ) ?? null
-        );
+        return body.tasks.find((t) => t.stepId === 'set-next' && t.status !== 'completed') ?? null;
       },
       { description: 'pending task on set-next for run 2' },
     );

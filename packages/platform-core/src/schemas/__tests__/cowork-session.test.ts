@@ -130,9 +130,7 @@ describe('ConversationTurnSchema', () => {
 describe('CoworkSessionSchema with mcpServers', () => {
   it('should parse a session with mcpServers', () => {
     const session = buildCoworkSession({
-      mcpServers: [
-        { name: 'tealflow', command: 'tealflow-mcp', args: [] },
-      ],
+      mcpServers: [{ name: 'tealflow', command: 'tealflow-mcp', args: [] }],
     });
     const result = CoworkSessionSchema.safeParse(session);
     expect(result.success).toBe(true);

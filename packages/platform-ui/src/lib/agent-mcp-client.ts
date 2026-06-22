@@ -25,10 +25,7 @@ export async function putAgentBinding(
   return mcpServers;
 }
 
-export async function deleteAgentBinding(
-  agentId: string,
-  serverName: string,
-): Promise<AgentMcpBindingMap> {
+export async function deleteAgentBinding(agentId: string, serverName: string): Promise<AgentMcpBindingMap> {
   const { mcpServers } = await mediforce.agents.deleteMcpBinding({
     id: agentId,
     name: serverName,

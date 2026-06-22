@@ -8,16 +8,8 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core';
-import type {
-  HumanTask,
-  ProcessInstance,
-  WorkflowDefinition,
-} from '@mediforce/platform-core';
-import {
-  WorkflowEngine,
-  InvalidTransitionError,
-  CompleteHumanTaskValidationError,
-} from '../../index';
+import type { HumanTask, ProcessInstance, WorkflowDefinition } from '@mediforce/platform-core';
+import { WorkflowEngine, InvalidTransitionError, CompleteHumanTaskValidationError } from '../../index';
 
 /**
  * Integration coverage for `WorkflowEngine.completeHumanTask` — the
@@ -56,9 +48,7 @@ const PARAMS_THEN_DONE: WorkflowDefinition = {
   triggers: [{ type: 'manual', name: 'Start' }],
 };
 
-function pausedReviewInstance(
-  overrides: Partial<ProcessInstance> = {},
-): ProcessInstance {
+function pausedReviewInstance(overrides: Partial<ProcessInstance> = {}): ProcessInstance {
   return buildProcessInstance({
     definitionName: 'review-then-done',
     definitionVersion: '1',
@@ -83,15 +73,7 @@ describe('WorkflowEngine.completeHumanTask', () => {
     instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository();
     humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
-    engine = new WorkflowEngine(
-      processRepo,
-      instanceRepo,
-      auditRepo,
-      undefined,
-      undefined,
-      undefined,
-      humanTaskRepo,
-    );
+    engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo, undefined, undefined, undefined, humanTaskRepo);
 
     await processRepo.saveWorkflowDefinition(REVIEW_THEN_DONE);
     await processRepo.saveWorkflowDefinition(PARAMS_THEN_DONE);
@@ -110,11 +92,7 @@ describe('WorkflowEngine.completeHumanTask', () => {
     });
     await humanTaskRepo.create(task);
 
-    const result = await engine.completeHumanTask(
-      task.id,
-      { kind: 'verdict', verdict: 'approve' },
-      'u-1',
-    );
+    const result = await engine.completeHumanTask(task.id, { kind: 'verdict', verdict: 'approve' }, 'u-1');
 
     expect(result.isL3Revise).toBe(false);
     expect(result.resolvedStepId).toBe('review');
@@ -146,11 +124,7 @@ describe('WorkflowEngine.completeHumanTask', () => {
     });
     await humanTaskRepo.create(task);
 
-    const result = await engine.completeHumanTask(
-      task.id,
-      { kind: 'params', paramValues: { foo: 'bar' } },
-      'u-1',
-    );
+    const result = await engine.completeHumanTask(task.id, { kind: 'params', paramValues: { foo: 'bar' } }, 'u-1');
 
     expect(result.isL3Revise).toBe(false);
     expect(result.stepOutput).toEqual({ foo: 'bar' });
@@ -211,11 +185,7 @@ describe('WorkflowEngine.completeHumanTask', () => {
     await humanTaskRepo.create(task);
 
     await expect(
-      engine.completeHumanTask(
-        task.id,
-        { kind: 'verdict', verdict: 'approve' },
-        'u-1',
-      ),
+      engine.completeHumanTask(task.id, { kind: 'verdict', verdict: 'approve' }, 'u-1'),
     ).rejects.toBeInstanceOf(InvalidTransitionError);
 
     const storedTask = await humanTaskRepo.getById(task.id);
@@ -223,18 +193,10 @@ describe('WorkflowEngine.completeHumanTask', () => {
   });
 
   it('throws when the engine was constructed without a humanTaskRepository', async () => {
-    const engineWithoutTasks = new WorkflowEngine(
-      processRepo,
-      instanceRepo,
-      auditRepo,
-    );
+    const engineWithoutTasks = new WorkflowEngine(processRepo, instanceRepo, auditRepo);
 
     await expect(
-      engineWithoutTasks.completeHumanTask(
-        'any-task',
-        { kind: 'verdict', verdict: 'approve' },
-        'u-1',
-      ),
+      engineWithoutTasks.completeHumanTask('any-task', { kind: 'verdict', verdict: 'approve' }, 'u-1'),
     ).rejects.toThrow(/humanTaskRepository/);
   });
 
@@ -247,18 +209,12 @@ describe('WorkflowEngine.completeHumanTask', () => {
       stepId: 'review',
       status: 'claimed',
       assignedUserId: 'u-1',
-      verdicts: [
-        { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
-      ],
+      verdicts: [{ key: 'approve', label: 'Approve', intent: 'success', requiresComment: false }],
     });
     await humanTaskRepo.create(task);
 
     await expect(
-      engine.completeHumanTask(
-        task.id,
-        { kind: 'verdict', verdict: 'revise', comment: 'redo' },
-        'u-1',
-      ),
+      engine.completeHumanTask(task.id, { kind: 'verdict', verdict: 'revise', comment: 'redo' }, 'u-1'),
     ).rejects.toBeInstanceOf(CompleteHumanTaskValidationError);
   });
 });

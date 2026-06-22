@@ -1,9 +1,5 @@
 import type { CallerScope } from '../../repositories/index';
-import type {
-  GetMonitoringSummaryOutput,
-  MonitoringSummary,
-  MonitoringSummaryInput,
-} from '../../contract/monitoring';
+import type { GetMonitoringSummaryOutput, MonitoringSummary, MonitoringSummaryInput } from '../../contract/monitoring';
 import { assertNamespaceAccess } from '../../auth';
 
 /**

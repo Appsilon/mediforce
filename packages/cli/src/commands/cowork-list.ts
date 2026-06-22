@@ -37,8 +37,7 @@ export const coworkListCommand = defineCommand({
     }
     for (const session of result.sessions) {
       const icon = STATUS_ICONS[session.status] ?? '?';
-      const assigned =
-        session.assignedUserId !== null ? ` (${session.assignedUserId})` : '';
+      const assigned = session.assignedUserId !== null ? ` (${session.assignedUserId})` : '';
       output.stdout(
         `${icon} ${session.status.padEnd(10)} ${session.id}  step:${session.stepId}  role:${session.assignedRole}${assigned}`,
       );

@@ -7,7 +7,6 @@ import { listAdapter } from '../_generic';
  * Namespace-gated via `scope.runs.listDefinitionNames` (out-of-scope → empty
  * list, not an error); see that interface method for the full rationale.
  */
-export const listRunNames = listAdapter<ListRunNamesInput, RunNameEntry, 'runs'>(
-  'runs',
-  async (input, scope) => scope.runs.listDefinitionNames(input.namespace),
+export const listRunNames = listAdapter<ListRunNamesInput, RunNameEntry, 'runs'>('runs', async (input, scope) =>
+  scope.runs.listDefinitionNames(input.namespace),
 );

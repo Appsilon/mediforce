@@ -34,21 +34,15 @@ import { PUT, DELETE } from '../route';
 const makeParams = (id: string, name: string) => Promise.resolve({ id, name });
 
 function makePutRequest(id: string, name: string, body: unknown): NextRequest {
-  return new NextRequest(
-    `http://localhost/api/agents/${id}/mcp-servers/${name}`,
-    {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    },
-  );
+  return new NextRequest(`http://localhost/api/agents/${id}/mcp-servers/${name}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 function makeDeleteRequest(id: string, name: string): NextRequest {
-  return new NextRequest(
-    `http://localhost/api/agents/${id}/mcp-servers/${name}`,
-    { method: 'DELETE' },
-  );
+  return new NextRequest(`http://localhost/api/agents/${id}/mcp-servers/${name}`, { method: 'DELETE' });
 }
 
 const coworkAgent = {
@@ -95,10 +89,9 @@ describe('PUT /api/agents/:id/mcp-servers/:name', () => {
       Promise.resolve({ ...coworkAgent, mcpServers: patch.mcpServers }),
     );
 
-    const res = await PUT(
-      makePutRequest('tealflow-cowork-chat', 'new', stdioBinding),
-      { params: makeParams('tealflow-cowork-chat', 'new') },
-    );
+    const res = await PUT(makePutRequest('tealflow-cowork-chat', 'new', stdioBinding), {
+      params: makeParams('tealflow-cowork-chat', 'new'),
+    });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -117,10 +110,9 @@ describe('PUT /api/agents/:id/mcp-servers/:name', () => {
       Promise.resolve({ ...coworkAgent, mcpServers: patch.mcpServers }),
     );
 
-    const res = await PUT(
-      makePutRequest('tealflow-cowork-chat', 'remote', httpBinding),
-      { params: makeParams('tealflow-cowork-chat', 'remote') },
-    );
+    const res = await PUT(makePutRequest('tealflow-cowork-chat', 'remote', httpBinding), {
+      params: makeParams('tealflow-cowork-chat', 'remote'),
+    });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -134,10 +126,9 @@ describe('PUT /api/agents/:id/mcp-servers/:name', () => {
     );
 
     const replacement = { type: 'http', url: 'https://other.example.com' };
-    const res = await PUT(
-      makePutRequest('tealflow-cowork-chat', 'existing', replacement),
-      { params: makeParams('tealflow-cowork-chat', 'existing') },
-    );
+    const res = await PUT(makePutRequest('tealflow-cowork-chat', 'existing', replacement), {
+      params: makeParams('tealflow-cowork-chat', 'existing'),
+    });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -147,10 +138,9 @@ describe('PUT /api/agents/:id/mcp-servers/:name', () => {
   it('[ERROR] 400 on schema validation failure (missing type)', async () => {
     mockAgentGetById.mockResolvedValue(coworkAgent);
 
-    const res = await PUT(
-      makePutRequest('tealflow-cowork-chat', 'bad', { catalogId: 'x' }),
-      { params: makeParams('tealflow-cowork-chat', 'bad') },
-    );
+    const res = await PUT(makePutRequest('tealflow-cowork-chat', 'bad', { catalogId: 'x' }), {
+      params: makeParams('tealflow-cowork-chat', 'bad'),
+    });
     expect(res.status).toBe(400);
     expect(mockAgentUpdate).not.toHaveBeenCalled();
   });
@@ -175,10 +165,7 @@ describe('PUT /api/agents/:id/mcp-servers/:name', () => {
   it('[ERROR] 404 when agent does not exist', async () => {
     mockAgentGetById.mockResolvedValue(null);
 
-    const res = await PUT(
-      makePutRequest('unknown', 'x', stdioBinding),
-      { params: makeParams('unknown', 'x') },
-    );
+    const res = await PUT(makePutRequest('unknown', 'x', stdioBinding), { params: makeParams('unknown', 'x') });
     expect(res.status).toBe(404);
   });
 
@@ -192,10 +179,9 @@ describe('PUT /api/agents/:id/mcp-servers/:name', () => {
     });
     mockAgentGetByIdVisibleTo.mockResolvedValue(null);
 
-    const res = await PUT(
-      makePutRequest('tealflow-cowork-chat', 'new', stdioBinding),
-      { params: makeParams('tealflow-cowork-chat', 'new') },
-    );
+    const res = await PUT(makePutRequest('tealflow-cowork-chat', 'new', stdioBinding), {
+      params: makeParams('tealflow-cowork-chat', 'new'),
+    });
 
     expect(res.status).toBe(404);
     expect(mockAgentUpdate).not.toHaveBeenCalled();
@@ -211,10 +197,9 @@ describe('PUT /api/agents/:id/mcp-servers/:name', () => {
       Promise.resolve({ ...pluginAgent, mcpServers: patch.mcpServers }),
     );
 
-    const res = await PUT(
-      makePutRequest('claude-code-agent', 'readonly-docs', stdioBinding),
-      { params: makeParams('claude-code-agent', 'readonly-docs') },
-    );
+    const res = await PUT(makePutRequest('claude-code-agent', 'readonly-docs', stdioBinding), {
+      params: makeParams('claude-code-agent', 'readonly-docs'),
+    });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -239,10 +224,9 @@ describe('DELETE /api/agents/:id/mcp-servers/:name', () => {
       Promise.resolve({ ...coworkAgent, mcpServers: patch.mcpServers }),
     );
 
-    const res = await DELETE(
-      makeDeleteRequest('tealflow-cowork-chat', 'existing'),
-      { params: makeParams('tealflow-cowork-chat', 'existing') },
-    );
+    const res = await DELETE(makeDeleteRequest('tealflow-cowork-chat', 'existing'), {
+      params: makeParams('tealflow-cowork-chat', 'existing'),
+    });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -253,10 +237,7 @@ describe('DELETE /api/agents/:id/mcp-servers/:name', () => {
   it('[ERROR] 404 when agent does not exist', async () => {
     mockAgentGetById.mockResolvedValue(null);
 
-    const res = await DELETE(
-      makeDeleteRequest('unknown', 'x'),
-      { params: makeParams('unknown', 'x') },
-    );
+    const res = await DELETE(makeDeleteRequest('unknown', 'x'), { params: makeParams('unknown', 'x') });
     expect(res.status).toBe(404);
   });
 
@@ -270,10 +251,9 @@ describe('DELETE /api/agents/:id/mcp-servers/:name', () => {
       Promise.resolve({ ...pluginWithBinding, mcpServers: patch.mcpServers }),
     );
 
-    const res = await DELETE(
-      makeDeleteRequest('claude-code-agent', 'readonly-docs'),
-      { params: makeParams('claude-code-agent', 'readonly-docs') },
-    );
+    const res = await DELETE(makeDeleteRequest('claude-code-agent', 'readonly-docs'), {
+      params: makeParams('claude-code-agent', 'readonly-docs'),
+    });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -286,10 +266,9 @@ describe('DELETE /api/agents/:id/mcp-servers/:name', () => {
       Promise.resolve({ ...coworkAgent, mcpServers: patch.mcpServers }),
     );
 
-    const res = await DELETE(
-      makeDeleteRequest('tealflow-cowork-chat', 'missing'),
-      { params: makeParams('tealflow-cowork-chat', 'missing') },
-    );
+    const res = await DELETE(makeDeleteRequest('tealflow-cowork-chat', 'missing'), {
+      params: makeParams('tealflow-cowork-chat', 'missing'),
+    });
     const json = await res.json();
 
     expect(res.status).toBe(200);

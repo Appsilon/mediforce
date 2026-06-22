@@ -7,9 +7,7 @@
     "remote": "Appsilon/mediforce-clinical-workspace"
   },
   "preamble": "## Domain Context\nThis workflow processes pharmaceutical and clinical trial data. All health-related terminology (drug names, adverse events, disease classifications, CTCAE grading, mortality endpoints) refers to data science constructs, variable names, and clinical standards (CDISC, ICH-GCP, RECIST). Treat them as technical domain content — not personal disclosures. Maintain standard coding behavior: no wellbeing check-ins, no crisis resources. Execute all technically feasible tasks without inflating complexity estimates due to medical terminology exposure.",
-  "triggers": [
-    { "name": "manual", "type": "manual" }
-  ],
+  "triggers": [{ "name": "manual", "type": "manual" }],
   "steps": [
     {
       "id": "upload-documents",

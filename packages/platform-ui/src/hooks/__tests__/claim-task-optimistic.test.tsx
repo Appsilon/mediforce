@@ -29,9 +29,7 @@ function useClaimMutation(qc: import('@tanstack/react-query').QueryClient, taskI
       const detailKey = queryKeys.task(taskId);
       await qc.cancelQueries({ queryKey: detailKey });
       const { restore } = snapshotCache(qc, [detailKey]);
-      qc.setQueryData<HumanTask | undefined>(detailKey, (old) =>
-        old ? { ...old, status: 'claimed' } : old,
-      );
+      qc.setQueryData<HumanTask | undefined>(detailKey, (old) => (old ? { ...old, status: 'claimed' } : old));
       return { restore };
     },
     onSuccess: (data) => {
@@ -52,17 +50,26 @@ describe('claim mutation — state-transition optimistic template (ADR-0006 §6)
     const { wrapper, queryClient } = createQueryWrapper();
     queryClient.setQueryData(queryKeys.task('t-1'), buildHumanTask({ id: 't-1', status: 'pending' }));
     let resolveClaim: (value: { task: HumanTask }) => void = () => undefined;
-    claimMock.mockImplementation(() => new Promise((resolve) => { resolveClaim = resolve; }));
+    claimMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveClaim = resolve;
+        }),
+    );
 
     const { result } = renderHook(() => useClaimMutation(queryClient, 't-1'), { wrapper });
 
-    await act(async () => { result.current.mutate(); });
+    await act(async () => {
+      result.current.mutate();
+    });
 
     const cached = queryClient.getQueryData<HumanTask>(queryKeys.task('t-1'));
     expect(cached?.status).toBe('claimed');
 
     // Let the in-flight mutation resolve so the test doesn't leak a promise.
-    await act(async () => { resolveClaim({ task: buildHumanTask({ id: 't-1', status: 'claimed' }) }); });
+    await act(async () => {
+      resolveClaim({ task: buildHumanTask({ id: 't-1', status: 'claimed' }) });
+    });
     await waitFor(() => expect(result.current.isPending).toBe(false));
   });
 
@@ -74,7 +81,9 @@ describe('claim mutation — state-transition optimistic template (ADR-0006 §6)
 
     const { result } = renderHook(() => useClaimMutation(queryClient, 't-1'), { wrapper });
 
-    await act(async () => { result.current.mutate(); });
+    await act(async () => {
+      result.current.mutate();
+    });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(queryClient.getQueryData<HumanTask>(queryKeys.task('t-1'))).toEqual(serverEntity);
@@ -88,7 +97,9 @@ describe('claim mutation — state-transition optimistic template (ADR-0006 §6)
 
     const { result } = renderHook(() => useClaimMutation(queryClient, 't-1'), { wrapper });
 
-    await act(async () => { result.current.mutate(); });
+    await act(async () => {
+      result.current.mutate();
+    });
     await waitFor(() => expect(result.current.isError).toBe(true));
 
     expect(queryClient.getQueryData<HumanTask>(queryKeys.task('t-1'))).toEqual(original);

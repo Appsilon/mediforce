@@ -67,9 +67,7 @@ describe('mediforce.runs.get', () => {
   });
 
   it('throws ApiError on 404', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Run not found' }, 404),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Run not found' }, 404));
 
     const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
     const error = await mediforce.runs.get({ runId: 'nope' }).catch((err) => err);
@@ -113,9 +111,7 @@ describe('mediforce.runs.listNames', () => {
   });
 
   it('throws on a response entry missing definitionName (fail loud)', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ runs: [{ id: 'r1' }] }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ runs: [{ id: 'r1' }] }));
 
     const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
     await expect(mediforce.runs.listNames({ namespace: 'alpha' })).rejects.toThrow();

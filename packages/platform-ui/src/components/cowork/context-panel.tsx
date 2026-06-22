@@ -18,11 +18,7 @@ interface ContextPanelProps {
   handle: string;
 }
 
-export function ContextPanel({
-  instance,
-  session,
-  handle,
-}: ContextPanelProps) {
+export function ContextPanel({ instance, session, handle }: ContextPanelProps) {
   const [open, setOpen] = React.useState(true);
 
   const previousStepOutput = React.useMemo(() => {
@@ -36,9 +32,7 @@ export function ContextPanel({
   return (
     <Collapsible.Root open={open} onOpenChange={setOpen}>
       <Collapsible.Trigger className="w-full flex items-center justify-between px-4 py-2 hover:bg-muted/50 transition-colors rounded-t-lg border border-b-0 rounded-b-none bg-muted/30">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Session Context
-        </span>
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Session Context</span>
         <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
       </Collapsible.Trigger>
       <Collapsible.Content>
@@ -55,7 +49,9 @@ export function ContextPanel({
                   {instance.id.slice(0, 8)}...
                 </Link>
               ) : (
-                <span className="font-mono text-xs text-muted-foreground">{session.processInstanceId.slice(0, 8)}...</span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {session.processInstanceId.slice(0, 8)}...
+                </span>
               )}
             </div>
             <div>

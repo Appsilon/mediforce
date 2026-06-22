@@ -35,9 +35,7 @@ describe('printError stream contract — direct', () => {
 
 describe('printError stream contract — end-to-end via command path', () => {
   it('--json error from `run get` lands on stdout, not stderr', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Run not found' }, 404),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Run not found' }, 404));
     const output = captureOutput();
     const code = await runGetCommand({
       argv: ['nope', '--json'],
@@ -53,9 +51,7 @@ describe('printError stream contract — end-to-end via command path', () => {
   });
 
   it('human-mode error from `run get` lands on stderr, not stdout', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Run not found' }, 404),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Run not found' }, 404));
     const output = captureOutput();
     const code = await runGetCommand({
       argv: ['nope'],
@@ -70,9 +66,7 @@ describe('printError stream contract — end-to-end via command path', () => {
   });
 
   it('--json error from `workflow register` lands on stdout, not stderr', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Validation failed' }, 400),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Validation failed' }, 400));
     const output = captureOutput();
     const code = await workflowRegisterCommand({
       argv: ['--file', '/no/such/file.json', '--namespace', 'ns', '--json'],

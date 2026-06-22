@@ -113,9 +113,6 @@ describe('createHttpSelfFetchRunKicker', () => {
     url = 'http://b';
     await kicker.kick('inst-1');
 
-    expect(urls).toEqual([
-      'http://a/api/processes/inst-1/run',
-      'http://b/api/processes/inst-1/run',
-    ]);
+    expect(urls).toEqual(['http://a/api/processes/inst-1/run', 'http://b/api/processes/inst-1/run']);
   });
 });

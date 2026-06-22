@@ -7,9 +7,7 @@ describe('gather-perspective', () => {
   const appDir = resolve(import.meta.dirname, '../..');
 
   function loadDefinition() {
-    const raw = JSON.parse(
-      readFileSync(resolve(appDir, 'src/gather-perspective.wd.json'), 'utf8'),
-    );
+    const raw = JSON.parse(readFileSync(resolve(appDir, 'src/gather-perspective.wd.json'), 'utf8'));
     return WorkflowDefinitionSchema.safeParse({ ...raw, version: 1 });
   }
 

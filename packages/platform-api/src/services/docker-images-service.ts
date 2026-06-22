@@ -18,9 +18,7 @@ export class LocalDockerImagesService implements DockerImagesService {
     try {
       const result = await execFileAsync('docker', ['rmi', imageId]);
       const trimmed = result.stdout.trim();
-      return trimmed === ''
-        ? { deleted: imageId }
-        : { deleted: imageId, output: trimmed };
+      return trimmed === '' ? { deleted: imageId } : { deleted: imageId, output: trimmed };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       throw new HandlerError('internal', message);
@@ -45,10 +43,7 @@ export class ContainerWorkerDockerImagesService implements DockerImagesService {
       headers['X-Worker-Secret'] = this.workerSecret;
     }
 
-    const res = await fetch(
-      `${this.baseUrl}/images/${encodeURIComponent(imageId)}`,
-      { method: 'DELETE', headers },
-    );
+    const res = await fetch(`${this.baseUrl}/images/${encodeURIComponent(imageId)}`, { method: 'DELETE', headers });
 
     if (!res.ok) {
       const text = await res.text().catch(() => 'Unknown error');
@@ -61,8 +56,5 @@ export class ContainerWorkerDockerImagesService implements DockerImagesService {
 
 export function isLocalAgentMode(): boolean {
   const redisUrl = process.env.REDIS_URL;
-  return (
-    process.env.ALLOW_LOCAL_AGENTS === 'true'
-    && (redisUrl === undefined || redisUrl === '')
-  );
+  return process.env.ALLOW_LOCAL_AGENTS === 'true' && (redisUrl === undefined || redisUrl === '');
 }

@@ -28,9 +28,7 @@ export function ProviderList({ providers, selectedId, onSelect }: ProviderListPr
           <KeyRound className="h-5 w-5 text-muted-foreground" />
         </div>
         <p className="text-sm text-muted-foreground">No OAuth providers yet.</p>
-        <p className="text-xs text-muted-foreground">
-          Add one to enable OAuth-backed HTTP MCP bindings.
-        </p>
+        <p className="text-xs text-muted-foreground">Add one to enable OAuth-backed HTTP MCP bindings.</p>
       </div>
     );
   }
@@ -51,11 +49,7 @@ export function ProviderList({ providers, selectedId, onSelect }: ProviderListPr
             >
               {provider.iconUrl !== undefined ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={provider.iconUrl}
-                  alt=""
-                  className="h-6 w-6 shrink-0 rounded object-cover"
-                />
+                <img src={provider.iconUrl} alt="" className="h-6 w-6 shrink-0 rounded object-cover" />
               ) : (
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-primary/10 text-primary">
                   <KeyRound className="h-3.5 w-3.5" />

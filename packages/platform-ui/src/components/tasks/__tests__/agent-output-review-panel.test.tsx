@@ -214,13 +214,12 @@ describe('AgentOutputReviewPanel', () => {
     // The object-array header contains a "(2)" count suffix; the long-text
     // header is the plain "Proposed Rules Yaml" label.
     const yamlLabel = screen.getByText('Proposed Rules Yaml');
-    const rulesLabel = Array.from(document.querySelectorAll('dt'))
-      .find((node) => node.textContent?.startsWith('Proposed Rules ')) ?? null;
+    const rulesLabel =
+      Array.from(document.querySelectorAll('dt')).find((node) => node.textContent?.startsWith('Proposed Rules ')) ??
+      null;
     expect(rulesLabel).not.toBeNull();
 
-    expect(
-      rulesLabel!.compareDocumentPosition(yamlLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(rulesLabel!.compareDocumentPosition(yamlLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('renders cost and token usage when present (single metrics row)', () => {
@@ -277,14 +276,10 @@ describe('AgentOutputReviewPanel', () => {
       result: { proposed_rules_yaml: yaml },
     });
 
-    const { container } = render(
-      <AgentOutputReviewPanel agentOutput={agentOutput} instanceId="run-1" />,
-    );
+    const { container } = render(<AgentOutputReviewPanel agentOutput={agentOutput} instanceId="run-1" />);
 
     // Open the collapsible trigger that summarises the YAML
-    const trigger = Array.from(container.querySelectorAll('button')).find(
-      (btn) => btn.textContent?.includes('lines'),
-    );
+    const trigger = Array.from(container.querySelectorAll('button')).find((btn) => btn.textContent?.includes('lines'));
     expect(trigger).toBeDefined();
     trigger!.click();
 

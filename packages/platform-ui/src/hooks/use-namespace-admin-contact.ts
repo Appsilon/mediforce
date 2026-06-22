@@ -18,9 +18,9 @@ export function useNamespaceAdminContact(handle: string | undefined): {
     staleTime: 5 * 60 * 1000,
   });
 
-  const owner = query.data?.members
-    .filter((m) => m.role === 'owner')
-    .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt))[0] ?? null;
+  const owner =
+    query.data?.members.filter((m) => m.role === 'owner').sort((a, b) => a.joinedAt.localeCompare(b.joinedAt))[0] ??
+    null;
 
   return {
     email: owner?.email ?? null,

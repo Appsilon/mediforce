@@ -1,9 +1,6 @@
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
-import type {
-  GetCoworkSessionByInstanceInput,
-  GetCoworkSessionByInstanceOutput,
-} from '../../contract/cowork';
+import type { GetCoworkSessionByInstanceInput, GetCoworkSessionByInstanceOutput } from '../../contract/cowork';
 
 /**
  * Get the most recent *active* cowork session for a given process instance.
@@ -17,9 +14,7 @@ export async function getCoworkSessionByInstance(
 ): Promise<GetCoworkSessionByInstanceOutput> {
   const session = await scope.coworkSessions.findMostRecentActiveForInstance(input.instanceId);
   if (session === null) {
-    throw new NotFoundError(
-      `No active cowork session found for instance '${input.instanceId}'`,
-    );
+    throw new NotFoundError(`No active cowork session found for instance '${input.instanceId}'`);
   }
   return session;
 }

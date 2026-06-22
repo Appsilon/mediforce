@@ -30,15 +30,11 @@ export function validateSecretsKey(): void {
 function getKey(): Buffer {
   const raw = process.env.SECRETS_ENCRYPTION_KEY;
   if (!raw) {
-    throw new Error(
-      'SECRETS_ENCRYPTION_KEY env var is not set. Required for workflow secrets encryption.',
-    );
+    throw new Error('SECRETS_ENCRYPTION_KEY env var is not set. Required for workflow secrets encryption.');
   }
   const buf = Buffer.from(raw, 'hex');
   if (buf.length !== 32) {
-    throw new Error(
-      `SECRETS_ENCRYPTION_KEY must be 64 hex chars (32 bytes). Got ${raw.length} chars.`,
-    );
+    throw new Error(`SECRETS_ENCRYPTION_KEY must be 64 hex chars (32 bytes). Got ${raw.length} chars.`);
   }
   return buf;
 }
@@ -65,10 +61,7 @@ export function decrypt(encoded: string): string {
   });
   decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
   try {
-    const decrypted = Buffer.concat([
-      decipher.update(Buffer.from(ciphertextHex, 'hex')),
-      decipher.final(),
-    ]);
+    const decrypted = Buffer.concat([decipher.update(Buffer.from(ciphertextHex, 'hex')), decipher.final()]);
     return decrypted.toString('utf8');
   } catch (cause) {
     const rootMessage = cause instanceof Error ? cause.message : String(cause);

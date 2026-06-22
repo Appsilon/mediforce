@@ -35,9 +35,7 @@ export function PreviousRunBanner({
                 <>
                   {' — '}
                   {sourceArchived === true ? (
-                    <span className="font-mono text-xs">
-                      {sourceId.slice(0, 8)} (archived)
-                    </span>
+                    <span className="font-mono text-xs">{sourceId.slice(0, 8)} (archived)</span>
                   ) : sourceHref ? (
                     <Link
                       href={sourceHref}
@@ -52,9 +50,7 @@ export function PreviousRunBanner({
               )}
             </span>
           ) : (
-            <span>
-              No previous run to continue from — starting with an empty snapshot.
-            </span>
+            <span>No previous run to continue from — starting with an empty snapshot.</span>
           )}
         </div>
         {hasValues && (

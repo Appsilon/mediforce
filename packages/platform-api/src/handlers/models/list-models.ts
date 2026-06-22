@@ -10,10 +10,7 @@ export interface ListModelsDeps {
  * namespaced. Pre-dates the caller-threaded handler shape and is not retro-
  * fitted because there's nothing to gate.
  */
-export async function listModels(
-  input: ListModelsInput | undefined,
-  deps: ListModelsDeps,
-): Promise<ListModelsOutput> {
+export async function listModels(input: ListModelsInput | undefined, deps: ListModelsDeps): Promise<ListModelsOutput> {
   let models = await deps.modelRegistryRepo.list();
 
   if (input?.provider) {

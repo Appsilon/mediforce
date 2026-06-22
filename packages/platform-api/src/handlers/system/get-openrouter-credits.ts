@@ -1,8 +1,5 @@
 import type { CallerScope } from '../../repositories/index';
-import type {
-  OpenRouterCreditsInput,
-  OpenRouterCreditsOutput,
-} from '../../contract/system';
+import type { OpenRouterCreditsInput, OpenRouterCreditsOutput } from '../../contract/system';
 
 const EMPTY: OpenRouterCreditsOutput = {
   available: false,
@@ -39,10 +36,7 @@ export async function getOpenRouterCredits(
   return fetchCredits(apiKey, options.fetch ?? globalThis.fetch);
 }
 
-async function fetchCredits(
-  apiKey: string,
-  fetchImpl: typeof globalThis.fetch,
-): Promise<OpenRouterCreditsOutput> {
+async function fetchCredits(apiKey: string, fetchImpl: typeof globalThis.fetch): Promise<OpenRouterCreditsOutput> {
   try {
     const res = await fetchImpl('https://openrouter.ai/api/v1/auth/key', {
       headers: { Authorization: `Bearer ${apiKey}` },

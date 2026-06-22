@@ -4,16 +4,8 @@ import {
   GetNamespaceInputSchema,
   UpdateNamespaceInputSchema,
 } from '@mediforce/platform-api/contract';
-import type {
-  DeleteNamespaceInput,
-  GetNamespaceInput,
-  UpdateNamespaceInput,
-} from '@mediforce/platform-api/contract';
-import {
-  deleteNamespace,
-  getNamespace,
-  updateNamespace,
-} from '@mediforce/platform-api/handlers';
+import type { DeleteNamespaceInput, GetNamespaceInput, UpdateNamespaceInput } from '@mediforce/platform-api/contract';
+import { deleteNamespace, getNamespace, updateNamespace } from '@mediforce/platform-api/handlers';
 
 interface RouteContext {
   params: Promise<{ handle: string }>;
@@ -34,8 +26,9 @@ export const PATCH = createRouteAdapter<typeof UpdateNamespaceInputSchema, Updat
   updateNamespace,
 );
 
-export const DELETE = createRouteAdapter<typeof DeleteNamespaceInputSchema, DeleteNamespaceInput, unknown, RouteContext>(
-  DeleteNamespaceInputSchema,
-  async (_req, ctx) => ({ handle: (await ctx.params).handle }),
-  deleteNamespace,
-);
+export const DELETE = createRouteAdapter<
+  typeof DeleteNamespaceInputSchema,
+  DeleteNamespaceInput,
+  unknown,
+  RouteContext
+>(DeleteNamespaceInputSchema, async (_req, ctx) => ({ handle: (await ctx.params).handle }), deleteNamespace);

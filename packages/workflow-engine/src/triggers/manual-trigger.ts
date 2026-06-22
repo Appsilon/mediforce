@@ -39,14 +39,9 @@ export class ManualTrigger {
         `Workflow definition '${context.definitionName}' version '${context.definitionVersion}' not found`,
       );
     }
-    const hasManualTrigger = definition.triggers.some(
-      (trigger) => trigger.type === 'manual',
-    );
+    const hasManualTrigger = definition.triggers.some((trigger) => trigger.type === 'manual');
     if (!hasManualTrigger) {
-      throw new ManualTriggerNotDeclaredError(
-        context.definitionName,
-        context.definitionVersion,
-      );
+      throw new ManualTriggerNotDeclaredError(context.definitionName, context.definitionVersion);
     }
 
     const instance = await this.engine.createInstance(
@@ -56,7 +51,11 @@ export class ManualTrigger {
       context.triggeredBy,
       'manual',
       context.payload,
-      { parentInstanceId: context.parentInstanceId, parentDefinitionName: context.parentDefinitionName, dryRun: context.dryRun },
+      {
+        parentInstanceId: context.parentInstanceId,
+        parentDefinitionName: context.parentDefinitionName,
+        dryRun: context.dryRun,
+      },
     );
 
     await this.engine.startInstance(instance.id);

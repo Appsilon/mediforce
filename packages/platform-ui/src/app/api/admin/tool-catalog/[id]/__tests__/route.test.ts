@@ -98,10 +98,7 @@ describe('GET /api/admin/tool-catalog/:id', () => {
   it('[DATA] returns entry by id (wiring smoke)', async () => {
     mockCatalogGetById.mockResolvedValue(catalogEntry);
 
-    const res = await GET(
-      makeGetRequest('tealflow-mcp', 'appsilon'),
-      { params: makeParams('tealflow-mcp') },
-    );
+    const res = await GET(makeGetRequest('tealflow-mcp', 'appsilon'), { params: makeParams('tealflow-mcp') });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -112,10 +109,7 @@ describe('GET /api/admin/tool-catalog/:id', () => {
   it('[ERROR] 404 when entry not found', async () => {
     mockCatalogGetById.mockResolvedValue(null);
 
-    const res = await GET(
-      makeGetRequest('unknown', 'appsilon'),
-      { params: makeParams('unknown') },
-    );
+    const res = await GET(makeGetRequest('unknown', 'appsilon'), { params: makeParams('unknown') });
 
     expect(res.status).toBe(404);
   });
@@ -123,10 +117,7 @@ describe('GET /api/admin/tool-catalog/:id', () => {
   it('[AUTHZ] plain member gets 403 (bug fix)', async () => {
     mockResolveCallerIdentity.mockResolvedValue(memberCaller());
 
-    const res = await GET(
-      makeGetRequest('tealflow-mcp', 'appsilon'),
-      { params: makeParams('tealflow-mcp') },
-    );
+    const res = await GET(makeGetRequest('tealflow-mcp', 'appsilon'), { params: makeParams('tealflow-mcp') });
 
     expect(res.status).toBe(403);
     expect(mockCatalogGetById).not.toHaveBeenCalled();
@@ -142,14 +133,11 @@ describe('PATCH /api/admin/tool-catalog/:id', () => {
 
   it('[DATA] merges partial update with existing entry', async () => {
     mockCatalogGetById.mockResolvedValue(catalogEntry);
-    mockCatalogUpsert.mockImplementation(
-      (_ns: string, entry: unknown) => Promise.resolve(entry),
-    );
+    mockCatalogUpsert.mockImplementation((_ns: string, entry: unknown) => Promise.resolve(entry));
 
-    const res = await PATCH(
-      makePatchRequest('tealflow-mcp', 'appsilon', { description: 'Updated description' }),
-      { params: makeParams('tealflow-mcp') },
-    );
+    const res = await PATCH(makePatchRequest('tealflow-mcp', 'appsilon', { description: 'Updated description' }), {
+      params: makeParams('tealflow-mcp'),
+    });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -168,14 +156,11 @@ describe('PATCH /api/admin/tool-catalog/:id', () => {
     // reinstates it from the path segment — bindings reference id, so renames
     // must never reach the repo.
     mockCatalogGetById.mockResolvedValue(catalogEntry);
-    mockCatalogUpsert.mockImplementation(
-      (_ns: string, entry: unknown) => Promise.resolve(entry),
-    );
+    mockCatalogUpsert.mockImplementation((_ns: string, entry: unknown) => Promise.resolve(entry));
 
-    const res = await PATCH(
-      makePatchRequest('tealflow-mcp', 'appsilon', { id: 'renamed', description: 'x' }),
-      { params: makeParams('tealflow-mcp') },
-    );
+    const res = await PATCH(makePatchRequest('tealflow-mcp', 'appsilon', { id: 'renamed', description: 'x' }), {
+      params: makeParams('tealflow-mcp'),
+    });
 
     expect(res.status).toBe(200);
     expect(mockCatalogUpsert).toHaveBeenCalledWith('appsilon', {
@@ -185,10 +170,9 @@ describe('PATCH /api/admin/tool-catalog/:id', () => {
   });
 
   it('[ERROR] 400 on schema validation failure', async () => {
-    const res = await PATCH(
-      makePatchRequest('tealflow-mcp', 'appsilon', { args: 'not-an-array' }),
-      { params: makeParams('tealflow-mcp') },
-    );
+    const res = await PATCH(makePatchRequest('tealflow-mcp', 'appsilon', { args: 'not-an-array' }), {
+      params: makeParams('tealflow-mcp'),
+    });
 
     expect(res.status).toBe(400);
   });
@@ -196,10 +180,9 @@ describe('PATCH /api/admin/tool-catalog/:id', () => {
   it('[ERROR] 404 when entry does not exist', async () => {
     mockCatalogGetById.mockResolvedValue(null);
 
-    const res = await PATCH(
-      makePatchRequest('unknown', 'appsilon', { description: 'x' }),
-      { params: makeParams('unknown') },
-    );
+    const res = await PATCH(makePatchRequest('unknown', 'appsilon', { description: 'x' }), {
+      params: makeParams('unknown'),
+    });
 
     expect(res.status).toBe(404);
   });
@@ -207,10 +190,9 @@ describe('PATCH /api/admin/tool-catalog/:id', () => {
   it('[AUTHZ] plain member gets 403 (bug fix)', async () => {
     mockResolveCallerIdentity.mockResolvedValue(memberCaller());
 
-    const res = await PATCH(
-      makePatchRequest('tealflow-mcp', 'appsilon', { description: 'x' }),
-      { params: makeParams('tealflow-mcp') },
-    );
+    const res = await PATCH(makePatchRequest('tealflow-mcp', 'appsilon', { description: 'x' }), {
+      params: makeParams('tealflow-mcp'),
+    });
 
     expect(res.status).toBe(403);
     expect(mockCatalogUpsert).not.toHaveBeenCalled();
@@ -228,10 +210,7 @@ describe('DELETE /api/admin/tool-catalog/:id', () => {
     mockCatalogGetById.mockResolvedValue(catalogEntry);
     mockCatalogDelete.mockResolvedValue(undefined);
 
-    const res = await DELETE(
-      makeDeleteRequest('tealflow-mcp', 'appsilon'),
-      { params: makeParams('tealflow-mcp') },
-    );
+    const res = await DELETE(makeDeleteRequest('tealflow-mcp', 'appsilon'), { params: makeParams('tealflow-mcp') });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -243,10 +222,7 @@ describe('DELETE /api/admin/tool-catalog/:id', () => {
     mockCatalogGetById.mockResolvedValue(null);
     mockCatalogDelete.mockResolvedValue(undefined);
 
-    const res = await DELETE(
-      makeDeleteRequest('unknown', 'appsilon'),
-      { params: makeParams('unknown') },
-    );
+    const res = await DELETE(makeDeleteRequest('unknown', 'appsilon'), { params: makeParams('unknown') });
 
     expect(res.status).toBe(200);
     expect(mockCatalogDelete).toHaveBeenCalledWith('appsilon', 'unknown');
@@ -255,10 +231,7 @@ describe('DELETE /api/admin/tool-catalog/:id', () => {
   it('[AUTHZ] plain member gets 403 (bug fix)', async () => {
     mockResolveCallerIdentity.mockResolvedValue(memberCaller());
 
-    const res = await DELETE(
-      makeDeleteRequest('tealflow-mcp', 'appsilon'),
-      { params: makeParams('tealflow-mcp') },
-    );
+    const res = await DELETE(makeDeleteRequest('tealflow-mcp', 'appsilon'), { params: makeParams('tealflow-mcp') });
 
     expect(res.status).toBe(403);
     expect(mockCatalogDelete).not.toHaveBeenCalled();

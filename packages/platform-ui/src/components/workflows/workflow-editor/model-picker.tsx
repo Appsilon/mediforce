@@ -37,12 +37,13 @@ export function ModelPicker({ value, onChange, defaultModel, className }: ModelP
       .catch(() => {});
   }, []);
 
-  const topPicks = useMemo(() =>
-    models
-      .filter((m) => m.retiredAt === null)
-      .filter((m) => m.requestCount !== null && m.requestCount > 0)
-      .sort((a, b) => (b.requestCount ?? 0) - (a.requestCount ?? 0))
-      .slice(0, TOP_PICKS_COUNT),
+  const topPicks = useMemo(
+    () =>
+      models
+        .filter((m) => m.retiredAt === null)
+        .filter((m) => m.requestCount !== null && m.requestCount > 0)
+        .sort((a, b) => (b.requestCount ?? 0) - (a.requestCount ?? 0))
+        .slice(0, TOP_PICKS_COUNT),
     [models],
   );
 
@@ -79,7 +80,13 @@ export function ModelPicker({ value, onChange, defaultModel, className }: ModelP
           </button>
         </div>
         <datalist id="model-registry-list">
-          {models.filter((m) => m.retiredAt === null).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          {models
+            .filter((m) => m.retiredAt === null)
+            .map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
         </datalist>
         {selectedModel && <ModelMeta model={selectedModel} />}
         {retiredModel && <RetiredWarning model={retiredModel} />}
@@ -135,7 +142,12 @@ function ModelMeta({ model }: { model: ModelRegistryEntry }) {
       {model.supportsTools && <span>tools ✓</span>}
       {model.supportsVision && <span>vision ✓</span>}
       {model.requestCount !== null && model.requestCount > 0 && (
-        <span>{model.requestCount >= 1_000_000 ? `${(model.requestCount / 1_000_000).toFixed(1)}M` : `${Math.round(model.requestCount / 1000)}K`} requests</span>
+        <span>
+          {model.requestCount >= 1_000_000
+            ? `${(model.requestCount / 1_000_000).toFixed(1)}M`
+            : `${Math.round(model.requestCount / 1000)}K`}{' '}
+          requests
+        </span>
       )}
     </div>
   );

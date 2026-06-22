@@ -76,7 +76,7 @@ export class DatabricksClient {
   }
 
   async getRun(runId: number): Promise<DatabricksRunStatus> {
-    const run = await this.request('GET', `/api/2.2/jobs/runs/get?run_id=${runId}`) as RawRunResponse;
+    const run = (await this.request('GET', `/api/2.2/jobs/runs/get?run_id=${runId}`)) as RawRunResponse;
     return {
       lifecycle: run.status?.state ?? run.state?.life_cycle_state ?? 'PENDING',
       resultState: run.status?.termination_details?.code ?? run.state?.result_state ?? null,
@@ -89,7 +89,7 @@ export class DatabricksClient {
   }
 
   async getRunOutput(taskRunId: number): Promise<{ notebookResult: string | null; truncated: boolean }> {
-    const output = await this.request('GET', `/api/2.2/jobs/runs/get-output?run_id=${taskRunId}`) as {
+    const output = (await this.request('GET', `/api/2.2/jobs/runs/get-output?run_id=${taskRunId}`)) as {
       notebook_output?: { result?: string; truncated?: boolean };
     };
     return {
@@ -114,9 +114,7 @@ export class DatabricksClient {
     const text = await response.text();
     if (response.ok === false) {
       // Body excerpt only — the token never appears in error messages.
-      throw new Error(
-        `Databricks ${method} ${path} failed (HTTP ${response.status}): ${text.slice(0, 300)}`,
-      );
+      throw new Error(`Databricks ${method} ${path} failed (HTTP ${response.status}): ${text.slice(0, 300)}`);
     }
     return text.length > 0 ? JSON.parse(text) : {};
   }

@@ -33,9 +33,7 @@ describe('GET /api/workflow-secrets/keys-batch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
-    mockGetSecretKeys.mockImplementation(async (_ns: string, wf: string) =>
-      wf === 'wf-a' ? ['K1', 'K2'] : ['K3'],
-    );
+    mockGetSecretKeys.mockImplementation(async (_ns: string, wf: string) => (wf === 'wf-a' ? ['K1', 'K2'] : ['K3']));
   });
 
   it('[DATA] returns keys grouped by workflow', async () => {

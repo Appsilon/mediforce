@@ -1,9 +1,6 @@
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
-import type {
-  ListAgentEventsInput,
-  ListAgentEventsOutput,
-} from '../../contract/processes';
+import type { ListAgentEventsInput, ListAgentEventsOutput } from '../../contract/processes';
 
 /**
  * Agent event feed for a process instance, wrapped as `{ events }` (matches
@@ -23,26 +20,14 @@ import type {
  * `sequence > afterSequence` come back, so the live poller fetches deltas
  * instead of re-reading the whole subcollection every tick.
  */
-export async function listAgentEvents(
-  input: ListAgentEventsInput,
-  scope: CallerScope,
-): Promise<ListAgentEventsOutput> {
+export async function listAgentEvents(input: ListAgentEventsInput, scope: CallerScope): Promise<ListAgentEventsOutput> {
   const instance = await scope.runs.getById(input.instanceId);
   if (instance === null) {
-    throw new NotFoundError(
-      `Process instance ${input.instanceId} not found`,
-    );
+    throw new NotFoundError(`Process instance ${input.instanceId} not found`);
   }
   const events =
     input.stepId !== undefined
-      ? await scope.agentEvents.listByStep(
-          input.instanceId,
-          input.stepId,
-          input.afterSequence,
-        )
-      : await scope.agentEvents.listByInstance(
-          input.instanceId,
-          input.afterSequence,
-        );
+      ? await scope.agentEvents.listByStep(input.instanceId, input.stepId, input.afterSequence)
+      : await scope.agentEvents.listByInstance(input.instanceId, input.afterSequence);
   return { events };
 }

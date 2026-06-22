@@ -15,9 +15,6 @@ export const HandleSchema = z
   .string()
   .min(1)
   .max(HANDLE_MAX_LENGTH)
-  .regex(
-    HANDLE_REGEX,
-    'handle must be lowercase alphanumeric with internal hyphens (no leading/trailing hyphen)',
-  );
+  .regex(HANDLE_REGEX, 'handle must be lowercase alphanumeric with internal hyphens (no leading/trailing hyphen)');
 
 export type Handle = z.infer<typeof HandleSchema>;

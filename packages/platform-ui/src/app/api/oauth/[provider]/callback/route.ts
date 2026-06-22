@@ -34,11 +34,7 @@ function redirectSuccess(request: Request, state: OAuthStatePayload): NextRespon
   return NextResponse.redirect(destination, 302);
 }
 
-function redirectError(
-  request: Request,
-  reason: string,
-  state: OAuthStatePayload | null,
-): NextResponse {
+function redirectError(request: Request, reason: string, state: OAuthStatePayload | null): NextResponse {
   const origin = publicOrigin(request);
   const destination =
     state !== null
@@ -126,17 +122,8 @@ async function fetchUserInfo(
  *  shape GitHub (`{id, login}`) and Google (`{sub, email}`) return, plus a
  *  generic fallback for custom providers using OpenID-style fields. */
 function extractUserInfo(payload: Record<string, unknown>): ProviderUserInfo | null {
-  const rawId =
-    payload.id ??
-    payload.sub ??
-    payload.user_id ??
-    payload.uid;
-  const rawLogin =
-    payload.login ??
-    payload.email ??
-    payload.preferred_username ??
-    payload.name ??
-    payload.username;
+  const rawId = payload.id ?? payload.sub ?? payload.user_id ?? payload.uid;
+  const rawLogin = payload.login ?? payload.email ?? payload.preferred_username ?? payload.name ?? payload.username;
 
   if (rawId === undefined || rawId === null) return null;
   if (typeof rawLogin !== 'string' || rawLogin === '') return null;
@@ -196,9 +183,7 @@ export async function GET(
 
   const accessToken = exchange.access_token;
   const refreshToken =
-    typeof exchange.refresh_token === 'string' && exchange.refresh_token !== ''
-      ? exchange.refresh_token
-      : undefined;
+    typeof exchange.refresh_token === 'string' && exchange.refresh_token !== '' ? exchange.refresh_token : undefined;
   const expiresAt =
     typeof exchange.expires_in === 'number' && exchange.expires_in > 0
       ? Date.now() + exchange.expires_in * 1000
@@ -222,12 +207,7 @@ export async function GET(
     connectedBy: state.connectedBy,
   };
 
-  await services.agentOAuthTokenRepo.put(
-    state.namespace,
-    state.agentId,
-    state.serverName,
-    token,
-  );
+  await services.agentOAuthTokenRepo.put(state.namespace, state.agentId, state.serverName, token);
 
   return redirectSuccess(request, state);
 }

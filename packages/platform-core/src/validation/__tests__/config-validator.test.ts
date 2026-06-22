@@ -100,7 +100,9 @@ describe('validateProcessConfig', () => {
     };
     const result = validateProcessConfig(config, baseDefinition);
     expect(result.valid).toBe(true); // warnings don't make it invalid
-    expect(result.warnings.some((w) => w.includes('step-intake') && w.toLowerCase().includes('self-review'))).toBe(true);
+    expect(result.warnings.some((w) => w.includes('step-intake') && w.toLowerCase().includes('self-review'))).toBe(
+      true,
+    );
   });
 
   it('[DATA] should return error when claude-code-agent step has no skill or prompt', () => {
@@ -114,14 +116,21 @@ describe('validateProcessConfig', () => {
     };
     const result = validateProcessConfig(config, baseDefinition);
     expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.includes('step-intake') && e.includes('skill or agentConfig.prompt'))).toBe(true);
+    expect(result.errors.some((e) => e.includes('step-intake') && e.includes('skill or agentConfig.prompt'))).toBe(
+      true,
+    );
   });
 
   it('[DATA] should pass when claude-code-agent step has prompt', () => {
     const config: ProcessConfig = {
       ...baseConfig,
       stepConfigs: [
-        { stepId: 'step-intake', executorType: 'agent', plugin: 'claude-code-agent', agentConfig: { prompt: 'Do the thing', model: 'sonnet' } },
+        {
+          stepId: 'step-intake',
+          executorType: 'agent',
+          plugin: 'claude-code-agent',
+          agentConfig: { prompt: 'Do the thing', model: 'sonnet' },
+        },
         { stepId: 'step-review', executorType: 'human' },
         { stepId: 'step-done', executorType: 'human' },
       ],
@@ -134,14 +143,21 @@ describe('validateProcessConfig', () => {
     const config: ProcessConfig = {
       ...baseConfig,
       stepConfigs: [
-        { stepId: 'step-intake', executorType: 'script', plugin: 'script-container', agentConfig: { runtime: 'javascript' } },
+        {
+          stepId: 'step-intake',
+          executorType: 'script',
+          plugin: 'script-container',
+          agentConfig: { runtime: 'javascript' },
+        },
         { stepId: 'step-review', executorType: 'human' },
         { stepId: 'step-done', executorType: 'human' },
       ],
     };
     const result = validateProcessConfig(config, baseDefinition);
     expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.includes('step-intake') && e.includes('inlineScript or agentConfig.command'))).toBe(true);
+    expect(
+      result.errors.some((e) => e.includes('step-intake') && e.includes('inlineScript or agentConfig.command')),
+    ).toBe(true);
   });
 
   it('[DATA] should skip registry validation when registeredPlugins not provided', () => {

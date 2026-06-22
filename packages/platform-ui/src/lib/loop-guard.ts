@@ -6,10 +6,7 @@ export interface LoopTracker {
 }
 
 /** Tracks consecutive re-executions of the same step. Returns true if stuck. */
-export function isStuckLoop(
-  currentStepId: string | null,
-  tracker: LoopTracker,
-): boolean {
+export function isStuckLoop(currentStepId: string | null, tracker: LoopTracker): boolean {
   if (currentStepId === tracker.previousStepId) {
     tracker.count++;
     return tracker.count >= MAX_SAME_STEP_ITERATIONS;

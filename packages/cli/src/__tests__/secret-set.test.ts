@@ -22,9 +22,7 @@ describe('secret set command', () => {
   });
 
   it('sets secret via --value flag', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ ok: true }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ ok: true }));
     const output = captureOutput();
     const code = await secretSetCommand({
       argv: [...BASE_ARGV, '--value', 'secret-val', '--base-url', 'http://test:9000'],
@@ -52,9 +50,7 @@ describe('secret set command', () => {
       stdin: async () => 'piped-value',
     });
     expect(code).toBe(0);
-    const body = JSON.parse(
-      (vi.mocked(globalThis.fetch).mock.calls[0]![1]?.body as string),
-    ) as { value: string };
+    const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0]![1]?.body as string) as { value: string };
     expect(body.value).toBe('piped-value');
   });
 
@@ -103,9 +99,7 @@ describe('secret set command', () => {
   });
 
   it('exits 1 on API error and prints status', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Forbidden' }, 403),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Forbidden' }, 403));
     const output = captureOutput();
     const code = await secretSetCommand({
       argv: [...BASE_ARGV, '--value', 'x', '--json'],
@@ -128,9 +122,7 @@ describe('secret set command', () => {
   });
 
   it('sets namespace-level secret when --workflow omitted', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ ok: true }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ ok: true }));
     const output = captureOutput();
     const code = await secretSetCommand({
       argv: ['--namespace', 'ns-1', '--key', 'TOKEN', '--value', 'val'],

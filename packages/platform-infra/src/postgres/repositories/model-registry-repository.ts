@@ -27,11 +27,7 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
   constructor(private readonly db: Database) {}
 
   async getById(id: string): Promise<ModelRegistryEntry | null> {
-    const rows = await this.db
-      .select()
-      .from(modelRegistryEntries)
-      .where(eq(modelRegistryEntries.id, id))
-      .limit(1);
+    const rows = await this.db.select().from(modelRegistryEntries).where(eq(modelRegistryEntries.id, id)).limit(1);
     const row = rows[0];
     return row ? ModelRegistryEntrySchema.parse(toEntry(row)) : null;
   }
@@ -42,9 +38,7 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
   }
 
   async listIds(): Promise<string[]> {
-    const rows = await this.db
-      .select({ id: modelRegistryEntries.id })
-      .from(modelRegistryEntries);
+    const rows = await this.db.select({ id: modelRegistryEntries.id }).from(modelRegistryEntries);
     return rows.map((r) => r.id);
   }
 
@@ -63,18 +57,14 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
     const retiredRows = await this.db
       .update(modelRegistryEntries)
       .set({ retiredAt: sql`NOW()` })
-      .where(
-        sql`${notInArray(modelRegistryEntries.id, presentIds)} AND ${isNull(modelRegistryEntries.retiredAt)}`,
-      )
+      .where(sql`${notInArray(modelRegistryEntries.id, presentIds)} AND ${isNull(modelRegistryEntries.retiredAt)}`)
       .returning({ id: modelRegistryEntries.id });
 
     // Reinstate models that reappear
     const reinstatedRows = await this.db
       .update(modelRegistryEntries)
       .set({ retiredAt: null })
-      .where(
-        sql`${inArray(modelRegistryEntries.id, presentIds)} AND ${isNotNull(modelRegistryEntries.retiredAt)}`,
-      )
+      .where(sql`${inArray(modelRegistryEntries.id, presentIds)} AND ${isNotNull(modelRegistryEntries.retiredAt)}`)
       .returning({ id: modelRegistryEntries.id });
 
     return { retired: retiredRows.length, reinstated: reinstatedRows.length };
@@ -212,10 +202,7 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
     for (let offset = 0; offset < resolved.length; offset += batchSize) {
       const chunk = resolved.slice(offset, offset + batchSize);
       for (const { id, requestCount } of chunk) {
-        await this.db
-          .update(modelRegistryEntries)
-          .set({ requestCount })
-          .where(eq(modelRegistryEntries.id, id));
+        await this.db.update(modelRegistryEntries).set({ requestCount }).where(eq(modelRegistryEntries.id, id));
         updated += 1;
       }
     }
@@ -224,11 +211,7 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
   }
 
   async getMeta(): Promise<ModelRegistryMeta> {
-    const rows = await this.db
-      .select()
-      .from(modelRegistryMeta)
-      .where(eq(modelRegistryMeta.id, META_ID))
-      .limit(1);
+    const rows = await this.db.select().from(modelRegistryMeta).where(eq(modelRegistryMeta.id, META_ID)).limit(1);
     const row = rows[0];
     if (!row) return { rankingsUpdatedAt: null };
     return {

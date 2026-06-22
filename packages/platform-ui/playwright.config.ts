@@ -2,7 +2,11 @@ import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/te
 
 // Load .env.local so PLATFORM_API_KEY is available inside test processes
 // (Next.js reads it for the server, but Playwright's Node runner doesn't).
-try { process.loadEnvFile('.env.local'); } catch { /* file may not exist in CI */ }
+try {
+  process.loadEnvFile('.env.local');
+} catch {
+  /* file may not exist in CI */
+}
 
 const useEmulators = process.env.NEXT_PUBLIC_USE_EMULATORS === 'true';
 const recording = process.env.E2E_RECORD === 'true';
@@ -11,9 +15,7 @@ const recording = process.env.E2E_RECORD === 'true';
 // that connects to production Firebase. This is the #1 cause of "data not found"
 // failures: seed data goes into the emulator but the reused dev server reads
 // from production.
-const testPort = useEmulators
-  ? Number(process.env.E2E_PORT ?? 9007)
-  : Number(process.env.PORT ?? 9003);
+const testPort = useEmulators ? Number(process.env.E2E_PORT ?? 9007) : Number(process.env.PORT ?? 9003);
 
 const projects: PlaywrightTestConfig['projects'] = [];
 
@@ -52,11 +54,13 @@ if (useEmulators) {
     use: {
       ...devices['Desktop Chrome'],
       storageState: 'e2e/.auth/user.json',
-      ...(recording ? {
-        channel: 'chromium',
-        video: { mode: 'on', size: { width: 1280, height: 720 } },
-        launchOptions: { slowMo: 500 },
-      } : {}),
+      ...(recording
+        ? {
+            channel: 'chromium',
+            video: { mode: 'on', size: { width: 1280, height: 720 } },
+            launchOptions: { slowMo: 500 },
+          }
+        : {}),
     },
   });
 }

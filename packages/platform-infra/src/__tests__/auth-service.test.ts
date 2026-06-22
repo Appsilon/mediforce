@@ -2,9 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryAuthService } from '@mediforce/platform-core';
 import type { AuthUser } from '@mediforce/platform-core';
 
-function createTestUser(
-  overrides: Partial<AuthUser> = {},
-): AuthUser {
+function createTestUser(overrides: Partial<AuthUser> = {}): AuthUser {
   return {
     uid: 'user-001',
     email: 'test@example.com',
@@ -38,9 +36,7 @@ describe('InMemoryAuthService', () => {
 
   describe('requireAuth', () => {
     it('throws when no user is signed in', async () => {
-      await expect(service.requireAuth()).rejects.toThrow(
-        'Authentication required',
-      );
+      await expect(service.requireAuth()).rejects.toThrow('Authentication required');
     });
 
     it('returns user when authenticated', async () => {
@@ -57,15 +53,11 @@ describe('InMemoryAuthService', () => {
       const testUser = createTestUser({ roles: ['reviewer'] });
       service.setCurrentUser(testUser);
 
-      await expect(service.requireRole('admin')).rejects.toThrow(
-        'Authorization failed',
-      );
+      await expect(service.requireRole('admin')).rejects.toThrow('Authorization failed');
     });
 
     it('throws when no user is signed in', async () => {
-      await expect(service.requireRole('admin')).rejects.toThrow(
-        'Authentication required',
-      );
+      await expect(service.requireRole('admin')).rejects.toThrow('Authentication required');
     });
 
     it('returns user when user has role', async () => {

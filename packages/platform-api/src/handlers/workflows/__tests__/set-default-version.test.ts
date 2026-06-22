@@ -7,10 +7,7 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { setDefaultWorkflowVersion } from '../set-default-version';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('setDefaultWorkflowVersion handler', () => {
   let processRepo: InMemoryProcessRepository;

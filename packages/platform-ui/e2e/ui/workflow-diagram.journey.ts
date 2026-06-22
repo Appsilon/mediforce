@@ -52,7 +52,9 @@ test.describe('Workflow Diagram Journey', () => {
     await showStep(page);
 
     // Urgent Processing now appears in the diagram
-    await expect(page.locator('.react-flow__node').filter({ hasText: 'Urgent Processing' })).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.react-flow__node').filter({ hasText: 'Urgent Processing' })).toBeVisible({
+      timeout: 5_000,
+    });
 
     // Standard Processing is now hidden
     await expect(page.locator('.react-flow__node').filter({ hasText: 'Standard Processing' })).not.toBeVisible();
@@ -64,7 +66,9 @@ test.describe('Workflow Diagram Journey', () => {
     // Switch back to standard — first branch content reappears
     const standardButton = page.locator('button').filter({ hasText: /type = "standard"/ });
     await click(page, standardButton);
-    await expect(page.locator('.react-flow__node').filter({ hasText: 'Standard Processing' })).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.react-flow__node').filter({ hasText: 'Standard Processing' })).toBeVisible({
+      timeout: 5_000,
+    });
     await expect(page.locator('.react-flow__node').filter({ hasText: 'Urgent Processing' })).not.toBeVisible();
     await expect(standardButton.locator('svg.lucide-chevron-down')).toBeVisible();
     await showResult(page);

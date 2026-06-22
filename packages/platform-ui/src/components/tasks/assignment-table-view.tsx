@@ -122,11 +122,7 @@ function AssignmentTableForm({ task }: { task: TaskBodyProps['task'] }) {
   );
 }
 
-function buildAssignments(
-  rows: OutputRow[],
-  items: ItemRow[],
-  assignees: AssigneeOption[],
-): SubmittedAssignment[] {
+function buildAssignments(rows: OutputRow[], items: ItemRow[], assignees: AssigneeOption[]): SubmittedAssignment[] {
   const out: SubmittedAssignment[] = [];
   for (const row of rows) {
     const assigneeId = (row.values.assigneeId as string | undefined) ?? '';
@@ -147,11 +143,7 @@ function buildAssignments(
   return out;
 }
 
-function AssignmentTableConfirmation({
-  completionData,
-}: {
-  completionData: Record<string, unknown>;
-}) {
+function AssignmentTableConfirmation({ completionData }: { completionData: Record<string, unknown> }) {
   const assignments = (completionData.assignments as SubmittedAssignment[] | undefined) ?? [];
   const completedAt = completionData.completedAt as string | undefined;
   const handle = useHandleFromPath();

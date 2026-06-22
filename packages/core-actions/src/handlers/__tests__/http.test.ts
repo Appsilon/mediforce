@@ -68,9 +68,7 @@ describe('httpActionHandler', () => {
   });
 
   it('returns non-2xx responses without throwing', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      new Response('upstream broke', { status: 502 }),
-    );
+    fetchSpy.mockResolvedValueOnce(new Response('upstream broke', { status: 502 }));
     const out = await httpActionHandler({ method: 'GET', url: 'http://x' }, baseCtx);
     expect(out.status).toBe(502);
     expect(out.body).toEqual({ json: null, text: 'upstream broke' });
@@ -78,10 +76,7 @@ describe('httpActionHandler', () => {
 
   it('passes a string body as-is when configured as string (no JSON wrap)', async () => {
     fetchSpy.mockResolvedValueOnce(new Response('ok', { status: 200 }));
-    await httpActionHandler(
-      { method: 'POST', url: 'http://x', body: 'plain text' },
-      baseCtx,
-    );
+    await httpActionHandler({ method: 'POST', url: 'http://x', body: 'plain text' }, baseCtx);
     const [, init] = fetchSpy.mock.calls[0];
     expect(init?.body).toBe('plain text');
     // No automatic Content-Type for strings — caller can set it via headers.
@@ -114,8 +109,6 @@ describe('httpActionHandler', () => {
 
   it('throws on transport errors', async () => {
     fetchSpy.mockRejectedValueOnce(new Error('ECONNREFUSED'));
-    await expect(
-      httpActionHandler({ method: 'GET', url: 'http://nope' }, baseCtx),
-    ).rejects.toThrow('ECONNREFUSED');
+    await expect(httpActionHandler({ method: 'GET', url: 'http://nope' }, baseCtx)).rejects.toThrow('ECONNREFUSED');
   });
 });

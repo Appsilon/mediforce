@@ -2,10 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import {
-  Send, Loader2, Bot, User, CheckCircle, AlertCircle,
-  Info, ArrowRight,
-} from 'lucide-react';
+import { Send, Loader2, Bot, User, CheckCircle, AlertCircle, Info, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
@@ -66,19 +63,12 @@ function ChatBubble({ turn }: { turn: ConversationTurn }) {
       <div
         className={cn(
           'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs',
-          isHuman
-            ? 'bg-primary/10 text-primary'
-            : 'bg-muted text-muted-foreground',
+          isHuman ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
         )}
       >
         {isHuman ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
       </div>
-      <div
-        className={cn(
-          'max-w-[80%] rounded-lg px-3 py-2 text-sm',
-          isHuman ? 'bg-primary/10' : 'bg-muted',
-        )}
-      >
+      <div className={cn('max-w-[80%] rounded-lg px-3 py-2 text-sm', isHuman ? 'bg-primary/10' : 'bg-muted')}>
         <p className="whitespace-pre-wrap break-words">{turn.content}</p>
       </div>
     </div>
@@ -106,12 +96,7 @@ function StepDescriptionBubble({ description }: { description: string }) {
 // Main ChatCoworkView
 // ---------------------------------------------------------------------------
 
-export function ChatCoworkView({
-  session,
-  instance,
-  handle,
-  stepDescription,
-}: ChatCoworkViewProps) {
+export function ChatCoworkView({ session, instance, handle, stepDescription }: ChatCoworkViewProps) {
   // Chat send + turns polling. `isPending` from the mutation flips the
   // turns-query polling cadence to 1 s (CRITICAL LIVE) while a message is
   // in-flight, so tool-call bubbles surface within the polling tick.
@@ -191,9 +176,7 @@ export function ChatCoworkView({
     try {
       await mediforce.cowork.finalize({ sessionId: session.id, artifact });
     } catch (err) {
-      const fallback = err instanceof ApiError || err instanceof Error
-        ? err.message
-        : 'Failed to finalize';
+      const fallback = err instanceof ApiError || err instanceof Error ? err.message : 'Failed to finalize';
       setError(fallback);
     } finally {
       setFinalizing(false);
@@ -210,9 +193,7 @@ export function ChatCoworkView({
     [handleSend],
   );
 
-  const runHref = instance
-    ? routes.workflowRun(handle, instance.definitionName, instance.id)
-    : null;
+  const runHref = instance ? routes.workflowRun(handle, instance.definitionName, instance.id) : null;
 
   return (
     <div className="flex h-[calc(100vh-12rem)] gap-4">
@@ -224,9 +205,7 @@ export function ChatCoworkView({
         {/* Messages */}
         <div className="flex-1 overflow-auto p-4 space-y-3">
           {/* Step description as first system message */}
-          {stepDescription && (
-            <StepDescriptionBubble description={stepDescription} />
-          )}
+          {stepDescription && <StepDescriptionBubble description={stepDescription} />}
 
           {turns.length === 0 && !stepDescription && (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -242,9 +221,7 @@ export function ChatCoworkView({
             ),
           )}
 
-          {sending && turns.length > 0 && turns[turns.length - 1].role !== 'tool' && (
-            <ThinkingIndicator />
-          )}
+          {sending && turns.length > 0 && turns[turns.length - 1].role !== 'tool' && <ThinkingIndicator />}
 
           <div ref={messagesEndRef} />
         </div>
@@ -287,7 +264,9 @@ export function ChatCoworkView({
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleKeyDown}
               disabled={sending || finalized}
-              placeholder={finalized ? 'Session finalized' : 'Type a message... (Enter to send, Shift+Enter for newline)'}
+              placeholder={
+                finalized ? 'Session finalized' : 'Type a message... (Enter to send, Shift+Enter for newline)'
+              }
               rows={1}
               className={cn(
                 'flex-1 resize-none overflow-y-auto max-h-[200px] rounded-md border bg-background px-3 py-2 text-sm',
@@ -305,11 +284,7 @@ export function ChatCoworkView({
                   : 'bg-muted text-muted-foreground cursor-not-allowed',
               )}
             >
-              {sending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </button>
           </div>
         </div>

@@ -1,15 +1,9 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import type {
-  NamespaceSecretsRepository,
-  WorkflowSecretsRepository,
-} from '@mediforce/platform-core';
+import type { NamespaceSecretsRepository, WorkflowSecretsRepository } from '@mediforce/platform-core';
 import { deleteSecret } from '../delete-secret';
 import { ForbiddenError } from '../../../errors';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
-import {
-  buildNamespaceSecretsRepo,
-  buildWorkflowSecretsRepo,
-} from './fakes';
+import { buildNamespaceSecretsRepo, buildWorkflowSecretsRepo } from './fakes';
 
 describe('deleteSecret handler', () => {
   let workspaceSecretsRepo: NamespaceSecretsRepository;
@@ -66,11 +60,9 @@ describe('deleteSecret handler', () => {
       caller: userCaller('u-2', ['beta']),
     });
 
-    await expect(
-      deleteSecret({ namespace: 'alpha', key: 'KEEP_ME' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
-    await expect(
-      deleteSecret({ namespace: 'alpha', workflow: 'wf-1', key: 'DB_URL' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(deleteSecret({ namespace: 'alpha', key: 'KEEP_ME' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(deleteSecret({ namespace: 'alpha', workflow: 'wf-1', key: 'DB_URL' }, scope)).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
   });
 });

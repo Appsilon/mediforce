@@ -51,9 +51,7 @@ describe('run start command', () => {
   });
 
   it('starts a run without payload', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(mkRun('inst-1')),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(mkRun('inst-1')));
     const output = captureOutput();
     const code = await runStartCommand({
       argv: ['--workflow', 'my-wf', '--base-url', 'http://test:9000'],
@@ -67,9 +65,7 @@ describe('run start command', () => {
   });
 
   it('passes --namespace to the start run request body', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(mkRun('inst-ns')),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(mkRun('inst-ns')));
     const output = captureOutput();
     const code = await runStartCommand({
       argv: ['--workflow', 'my-wf', '--namespace', 'test', '--base-url', 'http://test:9000'],
@@ -83,16 +79,10 @@ describe('run start command', () => {
   });
 
   it('passes inline --input JSON as payload', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(mkRun('inst-2')),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(mkRun('inst-2')));
     const output = captureOutput();
     const code = await runStartCommand({
-      argv: [
-        '--workflow', 'my-wf',
-        '--input', '{"ruleId":"CORE-000127"}',
-        '--base-url', 'http://test:9000',
-      ],
+      argv: ['--workflow', 'my-wf', '--input', '{"ruleId":"CORE-000127"}', '--base-url', 'http://test:9000'],
       env: BASE_ENV,
       output,
     });
@@ -146,9 +136,7 @@ describe('run start command', () => {
   });
 
   it('reads payload from stdin via --input-file -', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(mkRun('inst-3')),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(mkRun('inst-3')));
     const output = captureOutput();
     const code = await runStartCommand({
       argv: ['--workflow', 'my-wf', '--input-file', '-', '--base-url', 'http://test:9000'],
@@ -187,9 +175,7 @@ describe('run start command', () => {
   });
 
   it('outputs JSON on --json flag', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(mkRun('inst-4')),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(mkRun('inst-4')));
     const output = captureOutput();
     const code = await runStartCommand({
       argv: ['--workflow', 'my-wf', '--json', '--base-url', 'http://test:9000'],

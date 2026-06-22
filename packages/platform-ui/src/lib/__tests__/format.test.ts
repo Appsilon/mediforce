@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildStepExecution } from '@mediforce/platform-core/testing';
-import {
-  formatDuration,
-  formatStepName,
-  computeWallClockDuration,
-  computeActiveProcessingTime,
-} from '../format';
+import { formatDuration, formatStepName, computeWallClockDuration, computeActiveProcessingTime } from '../format';
 
 describe('formatDuration', () => {
   it('[DATA] formats 0ms', () => {

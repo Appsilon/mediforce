@@ -1,16 +1,10 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import type {
-  NamespaceSecretsRepository,
-  WorkflowSecretsRepository,
-} from '@mediforce/platform-core';
+import type { NamespaceSecretsRepository, WorkflowSecretsRepository } from '@mediforce/platform-core';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
 import { getWorkflowSecretsFull } from '../get-workflow-secrets-full';
 import { ForbiddenError } from '../../../errors';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
-import {
-  buildNamespaceSecretsRepo,
-  buildWorkflowSecretsRepo,
-} from './fakes';
+import { buildNamespaceSecretsRepo, buildWorkflowSecretsRepo } from './fakes';
 
 describe('getWorkflowSecretsFull handler', () => {
   let workspaceSecretsRepo: NamespaceSecretsRepository;
@@ -33,10 +27,7 @@ describe('getWorkflowSecretsFull handler', () => {
       caller: userCaller('u-1', ['alpha']),
     });
 
-    const result = await getWorkflowSecretsFull(
-      { namespace: 'alpha', workflow: 'wf-1' },
-      scope,
-    );
+    const result = await getWorkflowSecretsFull({ namespace: 'alpha', workflow: 'wf-1' }, scope);
 
     expect(result.secrets).toEqual({ OPENROUTER_API_KEY: 'sk-1', VIKING_PASSWORD: 's3cret' });
 
@@ -61,10 +52,7 @@ describe('getWorkflowSecretsFull handler', () => {
       auditRepo,
     });
 
-    const result = await getWorkflowSecretsFull(
-      { namespace: 'alpha', workflow: 'wf-1' },
-      scope,
-    );
+    const result = await getWorkflowSecretsFull({ namespace: 'alpha', workflow: 'wf-1' }, scope);
 
     expect(result.secrets).toEqual({ OPENROUTER_API_KEY: 'sk-1', VIKING_PASSWORD: 's3cret' });
     const events = auditRepo.getAll();
@@ -84,9 +72,9 @@ describe('getWorkflowSecretsFull handler', () => {
       caller: userCaller('u-2', ['beta']),
     });
 
-    await expect(
-      getWorkflowSecretsFull({ namespace: 'alpha', workflow: 'wf-1' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(getWorkflowSecretsFull({ namespace: 'alpha', workflow: 'wf-1' }, scope)).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
 
     const events = auditRepo.getAll();
     expect(events).toEqual([]);

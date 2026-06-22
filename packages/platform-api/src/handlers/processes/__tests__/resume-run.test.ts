@@ -7,10 +7,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import { resumeRun } from '../resume-run';
 import { NotFoundError, PreconditionFailedError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { noopRunKicker } from '../../../runtime/run-kicker';
 
 describe('resumeRun handler', () => {
@@ -65,9 +62,7 @@ describe('resumeRun handler', () => {
     expect(event.outputSnapshot).toMatchObject({ status: 'running' });
     expect(event.basis).toMatch(/resume/i);
 
-    expect(kicker.kicks).toEqual([
-      { instanceId: 'inst-paused', triggeredBy: 'u-1' },
-    ]);
+    expect(kicker.kicks).toEqual([{ instanceId: 'inst-paused', triggeredBy: 'u-1' }]);
   });
 
   it('transitions a failed run to running (agent-paused recovery path)', async () => {
@@ -122,9 +117,7 @@ describe('resumeRun handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    await expect(
-      resumeRun({ runId: 'inst-missing' }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(resumeRun({ runId: 'inst-missing' }, scope)).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('throws NotFoundError for a foreign-workspace instance (anti-enum)', async () => {
@@ -141,8 +134,6 @@ describe('resumeRun handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    await expect(
-      resumeRun({ runId: 'inst-foreign' }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(resumeRun({ runId: 'inst-foreign' }, scope)).rejects.toBeInstanceOf(NotFoundError);
   });
 });

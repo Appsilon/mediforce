@@ -69,11 +69,13 @@ export const SpawnActionConfigSchema = z.object({
 });
 
 export const WaitActionConfigSchema = z.object({
-  duration: z.object({
-    seconds: z.number().int().nonnegative().optional(),
-    minutes: z.number().int().nonnegative().optional(),
-    hours: z.number().int().nonnegative().optional(),
-  }).optional(),
+  duration: z
+    .object({
+      seconds: z.number().int().nonnegative().optional(),
+      minutes: z.number().int().nonnegative().optional(),
+      hours: z.number().int().nonnegative().optional(),
+    })
+    .optional(),
   deadline: z.string().min(1).optional(),
   condition: z.string().optional(),
 });
@@ -107,7 +109,10 @@ export const WorkflowAgentConfigSchema = z.object({
   image: z.string().optional(),
   dockerfile: z.string().optional(),
   repo: z.string().optional(),
-  commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
+  commit: z
+    .string()
+    .regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)')
+    .optional(),
   /** Name of a workflow secret containing a token for repo access. */
   repoAuth: z.string().optional(),
   confidenceThreshold: z.number().min(0).max(1).optional(),
@@ -130,32 +135,37 @@ export const WorkflowAgentConfigSchema = z.object({
  * must be set. `image`/`dockerfile`/`repo`/`commit`/`repoAuth` mirror the agent
  * config fields — container plugins resolve image builds identically for both.
  */
-export const ScriptStepConfigSchema = z.object({
-  command: z.string().min(1).optional(),
-  inlineScript: z.string().min(1).optional(),
-  runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),
-  image: z.string().optional(),
-  dockerfile: z.string().optional(),
-  repo: z.string().optional(),
-  commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
-  /** Name of a workflow secret containing a token for repo access. */
-  repoAuth: z.string().optional(),
-  timeoutMinutes: z.number().positive().optional(),
-}).superRefine((config, ctx) => {
-  if ((config.command !== undefined) === (config.inlineScript !== undefined)) {
-    ctx.addIssue({
-      code: 'custom',
-      message: 'exactly one of command or inlineScript must be set',
-    });
-  }
-  if (config.inlineScript !== undefined && config.runtime === undefined) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['runtime'],
-      message: 'runtime is required when inlineScript is set',
-    });
-  }
-});
+export const ScriptStepConfigSchema = z
+  .object({
+    command: z.string().min(1).optional(),
+    inlineScript: z.string().min(1).optional(),
+    runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),
+    image: z.string().optional(),
+    dockerfile: z.string().optional(),
+    repo: z.string().optional(),
+    commit: z
+      .string()
+      .regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)')
+      .optional(),
+    /** Name of a workflow secret containing a token for repo access. */
+    repoAuth: z.string().optional(),
+    timeoutMinutes: z.number().positive().optional(),
+  })
+  .superRefine((config, ctx) => {
+    if ((config.command !== undefined) === (config.inlineScript !== undefined)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'exactly one of command or inlineScript must be set',
+      });
+    }
+    if (config.inlineScript !== undefined && config.runtime === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['runtime'],
+        message: 'runtime is required when inlineScript is set',
+      });
+    }
+  });
 
 /** Config for Databricks job steps (executor='script', plugin='databricks-job'). */
 export const DatabricksJobConfigSchema = z.object({
@@ -419,7 +429,10 @@ function validateExecutorAndTriggers(
         });
       }
       if (action.kind === 'wait') {
-        const c = action.config as { duration?: { seconds?: number; minutes?: number; hours?: number }; deadline?: string };
+        const c = action.config as {
+          duration?: { seconds?: number; minutes?: number; hours?: number };
+          deadline?: string;
+        };
         if ((c.duration !== undefined) === (c.deadline !== undefined)) {
           ctx.addIssue({
             code: 'custom',
@@ -566,7 +579,9 @@ function validateVerdicts(
  * refinement for you.
  */
 export const TriggerInputFieldSchema = StepParamSchema.extend({
-  type: z.enum(['string', 'number', 'boolean', 'date', 'datetime', 'select', 'multiselect', 'textarea']).default('string'),
+  type: z
+    .enum(['string', 'number', 'boolean', 'date', 'datetime', 'select', 'multiselect', 'textarea'])
+    .default('string'),
 });
 
 export type TriggerInputField = z.infer<typeof TriggerInputFieldSchema>;
@@ -596,11 +611,13 @@ export const WorkflowDefinitionBaseSchema = z.object({
   transitions: z.array(TransitionSchema),
   triggers: z.array(TriggerSchema).min(1),
   metadata: z.record(z.string(), z.unknown()).optional(),
-  copiedFrom: z.object({
-    namespace: z.string().min(1),
-    name: z.string().min(1),
-    version: z.number().int().positive(),
-  }).optional(),
+  copiedFrom: z
+    .object({
+      namespace: z.string().min(1),
+      name: z.string().min(1),
+      version: z.number().int().positive(),
+    })
+    .optional(),
   archived: z.boolean().optional(),
   deleted: z.boolean().optional(),
   createdAt: z.string().datetime().optional(),
@@ -608,14 +625,12 @@ export const WorkflowDefinitionBaseSchema = z.object({
   triggerInput: z.array(TriggerInputFieldSchema).optional(),
 });
 
-export const WorkflowDefinitionSchema = WorkflowDefinitionBaseSchema.superRefine(
-  (wd, ctx) => {
-    validateInputForNextRun(wd, ctx);
-    validateExecutorAndTriggers(wd, ctx);
-    validateVerdicts(wd, ctx);
-    validateTriggerInput(wd, ctx);
-  },
-);
+export const WorkflowDefinitionSchema = WorkflowDefinitionBaseSchema.superRefine((wd, ctx) => {
+  validateInputForNextRun(wd, ctx);
+  validateExecutorAndTriggers(wd, ctx);
+  validateVerdicts(wd, ctx);
+  validateTriggerInput(wd, ctx);
+});
 
 export { validateInputForNextRun, validateExecutorAndTriggers, validateVerdicts, validateTriggerInput };
 
@@ -663,20 +678,14 @@ export const WorkflowTemplateSchema = WorkflowDefinitionBaseSchema.omit({
 export type WorkflowTemplate = z.infer<typeof WorkflowTemplateSchema>;
 
 export function parseWorkflowTemplate(input: unknown) {
-  if (
-    typeof input === 'object' &&
-    input !== null &&
-    !Array.isArray(input) &&
-    'namespace' in input
-  ) {
+  if (typeof input === 'object' && input !== null && !Array.isArray(input) && 'namespace' in input) {
     return {
       success: false as const,
       error: new z.ZodError([
         {
           code: 'custom',
           path: ['namespace'],
-          message:
-            'Workflow templates must not declare a namespace; it is injected at registration time',
+          message: 'Workflow templates must not declare a namespace; it is injected at registration time',
           input,
         },
       ]),
@@ -699,11 +708,6 @@ export type InputForNextRunEntry = z.infer<typeof InputForNextRunEntrySchema>;
  * Effective step timeout in minutes, regardless of executor flavour.
  * Mirrors the runtime's historical default of 30 minutes (agent-runner).
  */
-export function resolveStepTimeoutMinutes(
-  step: Pick<WorkflowStep, 'agent' | 'script' | 'databricks'>,
-): number {
-  return step.agent?.timeoutMinutes
-    ?? step.script?.timeoutMinutes
-    ?? step.databricks?.timeoutMinutes
-    ?? 30;
+export function resolveStepTimeoutMinutes(step: Pick<WorkflowStep, 'agent' | 'script' | 'databricks'>): number {
+  return step.agent?.timeoutMinutes ?? step.script?.timeoutMinutes ?? step.databricks?.timeoutMinutes ?? 30;
 }

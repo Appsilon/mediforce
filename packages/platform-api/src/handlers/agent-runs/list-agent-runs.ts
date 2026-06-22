@@ -1,8 +1,5 @@
 import type { CallerScope } from '../../repositories/index';
-import type {
-  ListAgentRunsInput,
-  ListAgentRunsOutput,
-} from '../../contract/agent-runs';
+import type { ListAgentRunsInput, ListAgentRunsOutput } from '../../contract/agent-runs';
 
 const DEFAULT_LIMIT = 50;
 
@@ -15,10 +12,7 @@ const DEFAULT_LIMIT = 50;
  * `(startedAt, id)` tie-breaker. Sorting is `startedAt DESC` so the operator
  * sees newest activity first.
  */
-export async function listAgentRuns(
-  input: ListAgentRunsInput,
-  scope: CallerScope,
-): Promise<ListAgentRunsOutput> {
+export async function listAgentRuns(input: ListAgentRunsInput, scope: CallerScope): Promise<ListAgentRunsOutput> {
   const page = await scope.agentRuns.list({
     limit: input.limit ?? DEFAULT_LIMIT,
     cursor: input.cursor,

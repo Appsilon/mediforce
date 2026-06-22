@@ -7,12 +7,7 @@ interface RouteContext {
   params: Promise<{ instanceId: string; stepId: string }>;
 }
 
-export const POST = createRouteAdapter<
-  typeof RetryStepInputSchema,
-  RetryStepInput,
-  unknown,
-  RouteContext
->(
+export const POST = createRouteAdapter<typeof RetryStepInputSchema, RetryStepInput, unknown, RouteContext>(
   RetryStepInputSchema,
   async (_req, ctx) => {
     const { instanceId, stepId } = await ctx.params;

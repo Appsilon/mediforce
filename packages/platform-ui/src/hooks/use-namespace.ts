@@ -30,7 +30,7 @@ export function useNamespace(handle: string | undefined | null): UseNamespaceRes
     retry: stopRetryOn4xx,
   });
 
-  const err = enabled ? (query.error as Error | null) ?? null : null;
+  const err = enabled ? ((query.error as Error | null) ?? null) : null;
   const notFound = err instanceof ApiError && err.status === 404;
 
   const rawHandles = query.data?.personalHandles;
@@ -40,8 +40,8 @@ export function useNamespace(handle: string | undefined | null): UseNamespaceRes
   }, [rawHandles]);
 
   return {
-    namespace: enabled ? query.data?.namespace ?? null : null,
-    members: enabled ? query.data?.members ?? [] : [],
+    namespace: enabled ? (query.data?.namespace ?? null) : null,
+    members: enabled ? (query.data?.members ?? []) : [],
     personalHandles,
     loading: query.isLoading && enabled,
     error: notFound ? null : err,

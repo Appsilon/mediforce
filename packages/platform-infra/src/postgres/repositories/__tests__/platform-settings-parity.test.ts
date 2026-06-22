@@ -64,10 +64,7 @@ function contract(name: string, factory: () => Promise<PlatformSettingsRepositor
   });
 }
 
-contract(
-  'InMemoryPlatformSettingsRepository',
-  async () => new InMemoryPlatformSettingsRepository(),
-);
+contract('InMemoryPlatformSettingsRepository', async () => new InMemoryPlatformSettingsRepository());
 
 describe.skipIf(skipPg)('PostgresPlatformSettingsRepository (parity)', () => {
   const schemaName = `ps_${randomBytes(8).toString('hex')}`;
@@ -82,7 +79,9 @@ describe.skipIf(skipPg)('PostgresPlatformSettingsRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sql);
@@ -99,9 +98,7 @@ describe.skipIf(skipPg)('PostgresPlatformSettingsRepository (parity)', () => {
 
   contract('PostgresPlatformSettingsRepository', async () => {
     const db = drizzle(testClient, { schema });
-    await testClient.unsafe(
-      `TRUNCATE TABLE "${schemaName}"."platform_settings"`,
-    );
+    await testClient.unsafe(`TRUNCATE TABLE "${schemaName}"."platform_settings"`);
     return new PostgresPlatformSettingsRepository(db);
   });
 });

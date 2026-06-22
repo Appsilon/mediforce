@@ -7,7 +7,13 @@ vi.mock('@xyflow/react', () => {
   const Position = { Top: 'top', Bottom: 'bottom', Left: 'left', Right: 'right' };
   const MarkerType = { ArrowClosed: 'arrowclosed' };
   return {
-    ReactFlow: ({ nodes, nodeTypes }: { nodes: Array<{ id: string; type: string; data: Record<string, unknown>; selected?: boolean }>; nodeTypes: Record<string, React.ComponentType<unknown>> }) => (
+    ReactFlow: ({
+      nodes,
+      nodeTypes,
+    }: {
+      nodes: Array<{ id: string; type: string; data: Record<string, unknown>; selected?: boolean }>;
+      nodeTypes: Record<string, React.ComponentType<unknown>>;
+    }) => (
       <div data-testid="reactflow">
         {nodes.map((node) => {
           const Component = nodeTypes[node.type];

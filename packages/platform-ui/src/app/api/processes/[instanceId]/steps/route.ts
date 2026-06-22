@@ -15,12 +15,7 @@ interface RouteContext {
  * step with `completed | running | pending`. Workspace gating in `scope.runs`
  * + `scope.workflowDefinitions`.
  */
-export const GET = createRouteAdapter<
-  typeof GetProcessStepsInputSchema,
-  GetProcessStepsInput,
-  unknown,
-  RouteContext
->(
+export const GET = createRouteAdapter<typeof GetProcessStepsInputSchema, GetProcessStepsInput, unknown, RouteContext>(
   GetProcessStepsInputSchema,
   async (_req, ctx) => ({ instanceId: (await ctx.params).instanceId }),
   getProcessSteps,

@@ -7,9 +7,7 @@ describe('backlog-triage', () => {
   const appDir = resolve(import.meta.dirname, '../..');
 
   function loadDefinition() {
-    const raw = JSON.parse(
-      readFileSync(resolve(appDir, 'src/backlog-triage.wd.json'), 'utf8'),
-    );
+    const raw = JSON.parse(readFileSync(resolve(appDir, 'src/backlog-triage.wd.json'), 'utf8'));
     return WorkflowDefinitionSchema.safeParse({ ...raw, version: 1 });
   }
 
@@ -114,8 +112,7 @@ describe('backlog-triage', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
-    const t = (from: string, to: string) =>
-      result.data.transitions.some((tr) => tr.from === from && tr.to === to);
+    const t = (from: string, to: string) => result.data.transitions.some((tr) => tr.from === from && tr.to === to);
     expect(t('tag-issues', 'apply-tags')).toBe(true);
     expect(t('apply-tags', 'fetch-backlog')).toBe(true);
     const applyTags = result.data.steps.find((s) => s.id === 'apply-tags');

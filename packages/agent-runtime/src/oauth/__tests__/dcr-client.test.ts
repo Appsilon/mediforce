@@ -3,9 +3,7 @@ import { DcrError, pickAuthMethod, registerOAuthClient } from '../dcr-client';
 
 describe('pickAuthMethod', () => {
   it('prefers client_secret_basic, then post, then none', () => {
-    expect(pickAuthMethod(['none', 'client_secret_basic', 'client_secret_post'])).toBe(
-      'client_secret_basic',
-    );
+    expect(pickAuthMethod(['none', 'client_secret_basic', 'client_secret_post'])).toBe('client_secret_basic');
     expect(pickAuthMethod(['none', 'client_secret_post'])).toBe('client_secret_post');
     expect(pickAuthMethod(['none'])).toBe('none');
   });
@@ -64,11 +62,12 @@ describe('registerOAuthClient', () => {
   });
 
   it('handles public clients that omit client_secret', async () => {
-    fetchMock.mockImplementationOnce(async () =>
-      new Response(
-        JSON.stringify({ client_id: 'public-cid', token_endpoint_auth_method: 'none' }),
-        { status: 201, headers: { 'Content-Type': 'application/json' } },
-      ),
+    fetchMock.mockImplementationOnce(
+      async () =>
+        new Response(JSON.stringify({ client_id: 'public-cid', token_endpoint_auth_method: 'none' }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        }),
     );
 
     const result = await registerOAuthClient('https://as.example.com/register', {
@@ -83,11 +82,12 @@ describe('registerOAuthClient', () => {
   });
 
   it('throws DcrError with the provider-reported code on non-2xx', async () => {
-    fetchMock.mockImplementationOnce(async () =>
-      new Response(JSON.stringify({ error: 'invalid_redirect_uri' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+    fetchMock.mockImplementationOnce(
+      async () =>
+        new Response(JSON.stringify({ error: 'invalid_redirect_uri' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }),
     );
 
     await expect(
@@ -101,11 +101,12 @@ describe('registerOAuthClient', () => {
   });
 
   it('throws DcrError when the response lacks client_id', async () => {
-    fetchMock.mockImplementationOnce(async () =>
-      new Response(JSON.stringify({ nope: true }), {
-        status: 201,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+    fetchMock.mockImplementationOnce(
+      async () =>
+        new Response(JSON.stringify({ nope: true }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        }),
     );
 
     await expect(

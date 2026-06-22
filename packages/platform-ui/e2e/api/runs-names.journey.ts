@@ -43,7 +43,7 @@ test.describe('GET /api/runs/names — API E2E', () => {
     });
     expect(res.status(), await res.text()).toBe(200);
 
-    const body = await res.json() as { runs: Array<Record<string, unknown>> };
+    const body = (await res.json()) as { runs: Array<Record<string, unknown>> };
     expect(Array.isArray(body.runs)).toBe(true);
 
     const byId = new Map(body.runs.map((entry) => [entry.id, entry]));
@@ -63,7 +63,7 @@ test.describe('GET /api/runs/names — API E2E', () => {
     });
     expect(res.status(), await res.text()).toBe(200);
 
-    const body = await res.json() as { runs: Array<{ id: string }> };
+    const body = (await res.json()) as { runs: Array<{ id: string }> };
     const ids = body.runs.map((entry) => entry.id);
     expect(ids).not.toContain(RUN_DELETED_ID);
   });
@@ -74,7 +74,7 @@ test.describe('GET /api/runs/names — API E2E', () => {
     });
     expect(res.status(), await res.text()).toBe(200);
 
-    const body = await res.json() as { runs: unknown[] };
+    const body = (await res.json()) as { runs: unknown[] };
     expect(body.runs).toEqual([]);
   });
 
@@ -84,7 +84,7 @@ test.describe('GET /api/runs/names — API E2E', () => {
     });
     expect(res.status()).toBe(400);
 
-    const body = await res.json() as { error: { code: string; message: string } };
+    const body = (await res.json()) as { error: { code: string; message: string } };
     expect(body.error.code).toBe('validation');
   });
 
@@ -94,7 +94,7 @@ test.describe('GET /api/runs/names — API E2E', () => {
     });
     expect(res.status()).toBe(400);
 
-    const body = await res.json() as { error: { code: string } };
+    const body = (await res.json()) as { error: { code: string } };
     expect(body.error.code).toBe('validation');
   });
 });

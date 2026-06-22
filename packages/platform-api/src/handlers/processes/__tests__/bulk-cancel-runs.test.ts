@@ -19,12 +19,8 @@ describe('bulkCancelRuns handler', () => {
   });
 
   it('returns per-id results in ADR-0005 shape', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'a', namespace: 'team-alpha', status: 'running' }),
-    );
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'b', namespace: 'team-alpha', status: 'completed' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'a', namespace: 'team-alpha', status: 'running' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'b', namespace: 'team-alpha', status: 'completed' }));
     const scope = createTestScope({
       instanceRepo,
       auditRepo,
@@ -41,12 +37,8 @@ describe('bulkCancelRuns handler', () => {
   });
 
   it('cancels each ok-eligible run and emits per-item audit', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'a', namespace: 'team-alpha', status: 'running' }),
-    );
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'b', namespace: 'team-alpha', status: 'paused' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'a', namespace: 'team-alpha', status: 'running' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'b', namespace: 'team-alpha', status: 'paused' }));
     const scope = createTestScope({
       instanceRepo,
       auditRepo,
@@ -62,9 +54,7 @@ describe('bulkCancelRuns handler', () => {
   });
 
   it('foreign-workspace ids surface as error not_found (anti-enum)', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'a', namespace: 'team-beta', status: 'running' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'a', namespace: 'team-beta', status: 'running' }));
     const scope = createTestScope({
       instanceRepo,
       auditRepo,

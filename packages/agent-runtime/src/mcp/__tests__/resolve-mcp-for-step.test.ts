@@ -1,17 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  CatalogEntryNotFoundError,
-  WorkflowStepSchema,
-  type WorkflowStep,
-} from '@mediforce/platform-core';
-import {
-  InMemoryAgentDefinitionRepository,
-  InMemoryToolCatalogRepository,
-} from '@mediforce/platform-core/testing';
-import {
-  AgentDefinitionNotFoundError,
-  resolveMcpForStep,
-} from '../resolve-mcp-for-step';
+import { CatalogEntryNotFoundError, WorkflowStepSchema, type WorkflowStep } from '@mediforce/platform-core';
+import { InMemoryAgentDefinitionRepository, InMemoryToolCatalogRepository } from '@mediforce/platform-core/testing';
+import { AgentDefinitionNotFoundError, resolveMcpForStep } from '../resolve-mcp-for-step';
 
 function makeStep(overrides: Partial<WorkflowStep> = {}): WorkflowStep {
   return WorkflowStepSchema.parse({
@@ -181,8 +171,10 @@ describe('resolveMcpForStep', () => {
 
     expect(result!.servers.cdisc).toBeUndefined();
     expect(result!.servers.github).toBeDefined();
-    expect((result!.servers.github as { allowedTools?: string[] }).allowedTools)
-      .toEqual(['search_code', 'get_file_contents']);
+    expect((result!.servers.github as { allowedTools?: string[] }).allowedTools).toEqual([
+      'search_code',
+      'get_file_contents',
+    ]);
   });
 
   it('passes http bindings through without touching the catalog', async () => {

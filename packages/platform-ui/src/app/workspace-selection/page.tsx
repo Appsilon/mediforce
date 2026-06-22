@@ -84,7 +84,9 @@ function WorkspaceLoadError({ error }: { error: Error | null }) {
   const heading = isEmpty ? 'No workspaces available' : 'Couldn’t load your workspaces';
   const message = isEmpty
     ? 'No workspaces are associated with your account.'
-    : error.message !== '' ? error.message : 'An unexpected error occurred.';
+    : error.message !== ''
+      ? error.message
+      : 'An unexpected error occurred.';
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-6 py-12">

@@ -17,10 +17,7 @@ import { actorFromCaller, loadOr404, resolvePersonalNamespace } from '../_helper
  * callers editing a global agent have no namespace to attribute to — reject
  * loudly rather than letting the Postgres NOT-NULL audit write throw.
  */
-async function actingNamespace(
-  scope: CallerScope,
-  agentNamespace: string | undefined,
-): Promise<string> {
+async function actingNamespace(scope: CallerScope, agentNamespace: string | undefined): Promise<string> {
   if (agentNamespace !== undefined) return agentNamespace;
   if (scope.caller.kind === 'user') {
     const personal = await resolvePersonalNamespace(scope, scope.caller.uid);

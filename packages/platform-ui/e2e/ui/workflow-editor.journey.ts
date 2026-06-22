@@ -44,7 +44,10 @@ function executorButton(page: import('@playwright/test').Page, executor: 'human'
  * Returns the executor toggle button inside the step editor side panel.
  * Scoped to the side panel to avoid matching the Add Step dropdown buttons.
  */
-function stepEditorExecutorButton(page: import('@playwright/test').Page, executor: 'human' | 'agent' | 'script' | 'cowork') {
+function stepEditorExecutorButton(
+  page: import('@playwright/test').Page,
+  executor: 'human' | 'agent' | 'script' | 'cowork',
+) {
   // The side panel is the right half of the canvas layout (border-l container).
   return page.locator('div.border-l button').filter({ hasText: new RegExp(`^${executor}$`, 'i') });
 }

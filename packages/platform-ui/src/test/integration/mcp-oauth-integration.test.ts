@@ -1,15 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import type {
-  AgentDefinition,
-  AgentOAuthToken,
-  Namespace,
-  OAuthProviderConfig,
-} from '@mediforce/platform-core';
-import {
-  InMemoryAgentOAuthTokenRepository,
-  InMemoryOAuthProviderRepository,
-} from '@mediforce/platform-core/testing';
+import type { AgentDefinition, AgentOAuthToken, Namespace, OAuthProviderConfig } from '@mediforce/platform-core';
+import { InMemoryAgentOAuthTokenRepository, InMemoryOAuthProviderRepository } from '@mediforce/platform-core/testing';
 
 // ---- Shared state + fake platform services ----
 //
@@ -26,8 +18,7 @@ const fake = vi.hoisted(() => {
   const services = {
     namespaceRepo: {
       getNamespace: async (handle: string) => namespaces.get(handle) ?? null,
-      getMember: async (handle: string, uid: string) =>
-        members.get(handle)?.get(uid) ?? null,
+      getMember: async (handle: string, uid: string) => members.get(handle)?.get(uid) ?? null,
       getNamespacesByUser: async (uid: string) => {
         const result: Array<{ handle: string }> = [];
         for (const [handle, byUid] of members.entries()) {
@@ -38,9 +29,7 @@ const fake = vi.hoisted(() => {
       getMembershipsForUser: async (uid: string) => {
         const out: Array<{ handle: string; role: 'owner' | 'admin' | 'member' }> = [];
         for (const [handle, byUid] of members.entries()) {
-          const member = byUid.get(uid) as
-            | { role: 'owner' | 'admin' | 'member' }
-            | undefined;
+          const member = byUid.get(uid) as { role: 'owner' | 'admin' | 'member' } | undefined;
           if (member) out.push({ handle, role: member.role });
         }
         return out;
@@ -67,10 +56,7 @@ const fake = vi.hoisted(() => {
     state: { agents, namespaces, members },
     services,
     // Replaced per-test by `beforeEach` so each test has fresh repos.
-    setRepos(options: {
-      oauthProviderRepo: unknown;
-      agentOAuthTokenRepo: unknown;
-    }): void {
+    setRepos(options: { oauthProviderRepo: unknown; agentOAuthTokenRepo: unknown }): void {
       (services as { oauthProviderRepo: unknown }).oauthProviderRepo = options.oauthProviderRepo;
       (services as { agentOAuthTokenRepo: unknown }).agentOAuthTokenRepo = options.agentOAuthTokenRepo;
     },
@@ -173,10 +159,10 @@ function tokenExchangeResponse(overrides: Record<string, unknown> = {}): Respons
 }
 
 function userInfoResponse(overrides: Record<string, unknown> = {}): Response {
-  return new Response(
-    JSON.stringify({ id: 10001, login: 'journey-user', ...overrides }),
-    { status: 200, headers: { 'Content-Type': 'application/json' } },
-  );
+  return new Response(JSON.stringify({ id: 10001, login: 'journey-user', ...overrides }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 // ---- HTTP helpers ----
@@ -202,15 +188,8 @@ function adminCreateProvider(ns: string, body: unknown): Promise<Response> {
   return Promise.resolve(adminProvidersRoute.POST(req));
 }
 
-function userStartOAuth(
-  agentId: string,
-  providerSlug: string,
-  ns: string,
-  serverName: string,
-): Promise<Response> {
-  const url = new URL(
-    `http://localhost/api/agents/${agentId}/oauth/${providerSlug}/start?namespace=${ns}`,
-  );
+function userStartOAuth(agentId: string, providerSlug: string, ns: string, serverName: string): Promise<Response> {
+  const url = new URL(`http://localhost/api/agents/${agentId}/oauth/${providerSlug}/start?namespace=${ns}`);
   const req = new NextRequest(url.toString(), {
     method: 'POST',
     headers: {
@@ -226,11 +205,7 @@ function userStartOAuth(
   );
 }
 
-function userCallback(
-  providerSlug: string,
-  state: string,
-  code: string,
-): Promise<Response> {
+function userCallback(providerSlug: string, state: string, code: string): Promise<Response> {
   const url = new URL(
     `http://localhost/api/oauth/${providerSlug}/callback?code=${code}&state=${encodeURIComponent(state)}`,
   );
@@ -243,16 +218,12 @@ function userCallback(
 }
 
 function userListOAuthTokens(agentId: string, ns: string): Promise<Response> {
-  const url = new URL(
-    `http://localhost/api/agents/${agentId}/oauth?namespace=${ns}`,
-  );
+  const url = new URL(`http://localhost/api/agents/${agentId}/oauth?namespace=${ns}`);
   const req = new NextRequest(url.toString(), {
     method: 'GET',
     headers: { Authorization: 'Bearer valid-token' },
   });
-  return Promise.resolve(
-    oauthListRoute.GET(req, { params: Promise.resolve({ id: agentId }) }),
-  );
+  return Promise.resolve(oauthListRoute.GET(req, { params: Promise.resolve({ id: agentId }) }));
 }
 
 function userDeleteToken(
@@ -373,13 +344,7 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
     expect(tokenList1.tokens[0]).not.toHaveProperty('accessToken');
 
     // 7. User disconnects with revokeAtProvider=false.
-    const disconnectRes = await userDeleteToken(
-      'agent-1',
-      'github',
-      'appsilon',
-      'gh',
-      false,
-    );
+    const disconnectRes = await userDeleteToken('agent-1', 'github', 'appsilon', 'gh', false);
     expect(disconnectRes.status).toBe(200);
     expect(await tokenRepo.get('appsilon', 'agent-1', 'gh')).toBeNull();
 
@@ -396,9 +361,7 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
     fetchMock.mockResolvedValueOnce(
       tokenExchangeResponse({ access_token: 'second_access', refresh_token: 'second_refresh' }),
     );
-    fetchMock.mockResolvedValueOnce(
-      userInfoResponse({ id: 10001, login: 'journey-user' }),
-    );
+    fetchMock.mockResolvedValueOnce(userInfoResponse({ id: 10001, login: 'journey-user' }));
 
     const callbackRes2 = await userCallback('github', startBody2.state, 'second-code');
     expect(callbackRes2.status).toBe(302);
@@ -409,20 +372,12 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
     // 9. User revokes with revokeAtProvider=true.
     fetchMock.mockResolvedValueOnce(new Response('ok', { status: 200 }));
 
-    const revokeRes = await userDeleteToken(
-      'agent-1',
-      'github',
-      'appsilon',
-      'gh',
-      true,
-    );
+    const revokeRes = await userDeleteToken('agent-1', 'github', 'appsilon', 'gh', true);
     expect(revokeRes.status).toBe(200);
     expect(await tokenRepo.get('appsilon', 'agent-1', 'gh')).toBeNull();
 
     // Verify provider revoke endpoint was POSTed exactly once with the token.
-    const revokeCalls = fetchMock.mock.calls.filter(
-      ([url]) => (url as string) === providerCreateInput.revokeUrl,
-    );
+    const revokeCalls = fetchMock.mock.calls.filter(([url]) => (url as string) === providerCreateInput.revokeUrl);
     expect(revokeCalls).toHaveLength(1);
     const [, revokeInit] = revokeCalls[0] as [string, RequestInit];
     const revokeBody = (revokeInit.body as string) ?? '';
@@ -445,14 +400,10 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
     const dot = startBody.state.indexOf('.');
     const firstSigChar = startBody.state[dot + 1] ?? 'A';
     const tampered =
-      startBody.state.slice(0, dot + 1) +
-      (firstSigChar === 'A' ? 'B' : 'A') +
-      startBody.state.slice(dot + 2);
+      startBody.state.slice(0, dot + 1) + (firstSigChar === 'A' ? 'B' : 'A') + startBody.state.slice(dot + 2);
     const callbackRes = await userCallback('github', tampered, 'code-x');
     expect(callbackRes.status).toBe(302);
-    expect(callbackRes.headers.get('Location') ?? '').toContain(
-      'oauthError=invalid-state',
-    );
+    expect(callbackRes.headers.get('Location') ?? '').toContain('oauthError=invalid-state');
 
     expect(await tokenRepo.get('appsilon', 'agent-1', 'gh')).toBeNull();
     // No token/userinfo fetches were issued.

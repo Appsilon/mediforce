@@ -11,9 +11,7 @@ import type { AgentOutputData } from '@/components/tasks/task-utils';
  * server-side `estimateCostField` (in `execute-agent-step.ts`) to populate
  * cost on `StepExecution.agentOutput` for the legacy display path.
  */
-export function agentOutputFromEnvelope(
-  envelope: NonNullable<AgentRun['envelope']>,
-): AgentOutputData {
+export function agentOutputFromEnvelope(envelope: NonNullable<AgentRun['envelope']>): AgentOutputData {
   return {
     confidence: envelope.confidence,
     confidence_rationale: envelope.confidence_rationale ?? null,

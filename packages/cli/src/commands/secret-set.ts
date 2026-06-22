@@ -29,11 +29,7 @@ export const secretSetCommand = defineCommand({
       return 2;
     }
     if (hasValue && hasStdin) {
-      printError(
-        output,
-        { error: 'Flags are mutually exclusive: --value, --stdin' },
-        jsonMode,
-      );
+      printError(output, { error: 'Flags are mutually exclusive: --value, --stdin' }, jsonMode);
       return 2;
     }
 
@@ -58,9 +54,10 @@ export const secretSetCommand = defineCommand({
     if (jsonMode) {
       printJson(output, { ok: true });
     } else {
-      const scope = args.workflow !== undefined
-        ? `workflow "${args.workflow}" in namespace "${args.namespace}"`
-        : `namespace "${args.namespace}"`;
+      const scope =
+        args.workflow !== undefined
+          ? `workflow "${args.workflow}" in namespace "${args.namespace}"`
+          : `namespace "${args.namespace}"`;
       output.stdout(`Secret "${args.key}" set for ${scope}.`);
     }
     return 0;

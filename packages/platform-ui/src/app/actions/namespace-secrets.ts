@@ -7,8 +7,6 @@ import { getPlatformServices } from '@/lib/platform-services';
 // Read mutations migrated to headless handlers (Phase 2.5); this thin
 // runtime-only entry point survives because workflow steps still call it
 // directly from server code paths.
-export async function getNamespaceSecretsForRuntime(
-  namespace: string,
-): Promise<Record<string, string>> {
+export async function getNamespaceSecretsForRuntime(namespace: string): Promise<Record<string, string>> {
   return getPlatformServices().namespaceSecretsRepo.getSecrets(namespace);
 }

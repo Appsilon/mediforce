@@ -21,18 +21,13 @@ interface NextStepCardProps {
 
 /** Format a stepId into a human-readable title. */
 function formatStepName(stepId: string): string {
-  return stepId
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return stepId.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
   const handle = useHandleFromPath();
   const { data: instance, loading: instanceLoading } = useProcessInstance(processInstanceId);
-  const { data: executions, loading: execLoading } = useStepExecutions(
-    processInstanceId,
-    instance?.status,
-  );
+  const { data: executions, loading: execLoading } = useStepExecutions(processInstanceId, instance?.status);
 
   const stepExecution = React.useMemo(() => {
     if (executions.length === 0) return null;
@@ -102,12 +97,11 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
   const executorType = nextStep?.executor ?? null;
   const processCompleted = instance?.status === 'completed';
 
-  const runHref = instance
-    ? routes.workflowRun(handle, instance.definitionName, processInstanceId)
-    : null;
-  const nextStepHref = instance && nextStepId
-    ? routes.workflowRunStep(handle, instance.definitionName, processInstanceId, nextStepId)
-    : null;
+  const runHref = instance ? routes.workflowRun(handle, instance.definitionName, processInstanceId) : null;
+  const nextStepHref =
+    instance && nextStepId
+      ? routes.workflowRunStep(handle, instance.definitionName, processInstanceId, nextStepId)
+      : null;
 
   return (
     <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
@@ -124,9 +118,7 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
             <>
               <p className="text-sm font-medium">Process completed</p>
               {stepExecution.gateResult?.reason && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {stepExecution.gateResult.reason}
-                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">{stepExecution.gateResult.reason}</p>
               )}
             </>
           ) : (

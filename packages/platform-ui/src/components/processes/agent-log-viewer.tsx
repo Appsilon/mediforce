@@ -54,7 +54,6 @@ function classifyEntry(entry: LogEntry): 'tool_call' | 'tool_result' | 'assistan
   return 'skip';
 }
 
-
 /** Shorten temp paths to just the filename for readability. */
 function cleanPath(value: string): string {
   // /var/folders/.../mediforce-agent-xxx/filename.pdf → filename.pdf
@@ -63,7 +62,12 @@ function cleanPath(value: string): string {
 
 function formatTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return new Date(iso).toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
   } catch {
     return iso;
   }
@@ -74,11 +78,7 @@ function ElapsedBadge({ prevTs, currentTs }: { prevTs: string | null; currentTs:
   const elapsed = new Date(currentTs).getTime() - new Date(prevTs).getTime();
   if (elapsed < 500) return null;
   const seconds = (elapsed / 1000).toFixed(1);
-  return (
-    <span className="text-[10px] text-muted-foreground bg-muted rounded px-1 py-0.5 ml-2">
-      +{seconds}s
-    </span>
-  );
+  return <span className="text-[10px] text-muted-foreground bg-muted rounded px-1 py-0.5 ml-2">+{seconds}s</span>;
 }
 
 interface TodoItem {
@@ -103,19 +103,23 @@ function TodoWriteEntry({ todos }: { todos: TodoItem[] }) {
       <div className="min-w-0 flex-1 space-y-0.5">
         <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Tasks</span>
         {todos.map((todo, index) => {
-          const StatusIcon = todo.status === 'completed' ? CheckCircle2
-            : todo.status === 'in_progress' ? Loader2
-            : Circle;
-          const statusColor = todo.status === 'completed' ? 'text-green-500'
-            : todo.status === 'in_progress' ? 'text-blue-500'
-            : 'text-muted-foreground';
+          const StatusIcon =
+            todo.status === 'completed' ? CheckCircle2 : todo.status === 'in_progress' ? Loader2 : Circle;
+          const statusColor =
+            todo.status === 'completed'
+              ? 'text-green-500'
+              : todo.status === 'in_progress'
+                ? 'text-blue-500'
+                : 'text-muted-foreground';
           return (
             <div key={index} className="flex items-center gap-1.5">
               <StatusIcon className={cn('h-3 w-3 shrink-0', statusColor)} />
-              <span className={cn(
-                'text-xs',
-                todo.status === 'completed' ? 'text-muted-foreground line-through' : 'text-foreground/80',
-              )}>
+              <span
+                className={cn(
+                  'text-xs',
+                  todo.status === 'completed' ? 'text-muted-foreground line-through' : 'text-foreground/80',
+                )}
+              >
                 {todo.content}
               </span>
             </div>
@@ -156,9 +160,7 @@ function ToolCallEntry({ entry }: { entry: LogEntry }) {
     <div className="flex items-start gap-2 py-1">
       <div className="min-w-0 flex-1">
         <span className="text-xs font-medium text-purple-700 dark:text-purple-300">{entry.tool}</span>
-        {summary && (
-          <span className="text-xs text-muted-foreground ml-1.5 font-mono">{summary}</span>
-        )}
+        {summary && <span className="text-xs text-muted-foreground ml-1.5 font-mono">{summary}</span>}
       </div>
     </div>
   );
@@ -186,11 +188,11 @@ function ToolResultEntry({ entry }: { entry: LogEntry }) {
   return (
     <div className="py-1">
       <div className="min-w-0">
-        {toolName && (
-          <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{toolName} </span>
-        )}
+        {toolName && <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{toolName} </span>}
         {summary && (
-          <p className="text-xs text-muted-foreground font-mono whitespace-pre-wrap line-clamp-3">{cleanPath(summary)}</p>
+          <p className="text-xs text-muted-foreground font-mono whitespace-pre-wrap line-clamp-3">
+            {cleanPath(summary)}
+          </p>
         )}
       </div>
     </div>
@@ -221,7 +223,9 @@ function parseLogEntries(content: string): LogEntry[] {
   return entries;
 }
 
-type LogGroup = { kind: 'batch'; entries: LogEntry[]; ts: string } | { kind: 'single'; entry: LogEntry; category: string };
+type LogGroup =
+  | { kind: 'batch'; entries: LogEntry[]; ts: string }
+  | { kind: 'single'; entry: LogEntry; category: string };
 
 function buildGroups(entries: LogEntry[]): LogGroup[] {
   const groups: LogGroup[] = [];
@@ -251,11 +255,12 @@ function LogGroupList({ groups }: { groups: LogGroup[] }) {
   return (
     <>
       {groups.map((group, groupIndex) => {
-        const prevTs = groupIndex > 0
-          ? (groups[groupIndex - 1].kind === 'batch'
-            ? (groups[groupIndex - 1] as { ts: string }).ts
-            : (groups[groupIndex - 1] as { entry: LogEntry }).entry.ts)
-          : null;
+        const prevTs =
+          groupIndex > 0
+            ? groups[groupIndex - 1].kind === 'batch'
+              ? (groups[groupIndex - 1] as { ts: string }).ts
+              : (groups[groupIndex - 1] as { entry: LogEntry }).entry.ts
+            : null;
         const currentTs = group.kind === 'batch' ? group.ts : group.entry.ts;
 
         return (
@@ -266,7 +271,12 @@ function LogGroupList({ groups }: { groups: LogGroup[] }) {
             </div>
 
             {group.kind === 'batch' ? (
-              <div className={cn('ml-2', group.entries.length > 1 && 'border-l-2 border-purple-200 dark:border-purple-800 pl-2')}>
+              <div
+                className={cn(
+                  'ml-2',
+                  group.entries.length > 1 && 'border-l-2 border-purple-200 dark:border-purple-800 pl-2',
+                )}
+              >
                 {group.entries.length > 1 && (
                   <span className="text-[10px] text-muted-foreground">{group.entries.length} parallel calls</span>
                 )}
@@ -288,7 +298,9 @@ function LogGroupList({ groups }: { groups: LogGroup[] }) {
   );
 }
 
-async function fetchSingleLog(file: string): Promise<{ entries: LogEntry[]; rawContent: string | null; error: string | null }> {
+async function fetchSingleLog(
+  file: string,
+): Promise<{ entries: LogEntry[]; rawContent: string | null; error: string | null }> {
   let response: Response;
   try {
     response = await apiFetch(`/api/step-logs?file=${encodeURIComponent(file)}`);
@@ -310,7 +322,7 @@ async function fetchSingleLog(file: string): Promise<{ entries: LogEntry[]; rawC
   }
 
   try {
-    const data = await response.json() as { content: string; error?: string };
+    const data = (await response.json()) as { content: string; error?: string };
     if (data.error && !data.content) {
       return { entries: [], rawContent: null, error: data.error };
     }
@@ -322,7 +334,11 @@ async function fetchSingleLog(file: string): Promise<{ entries: LogEntry[]; rawC
     }
     return { entries: [], rawContent: null, error: null };
   } catch (parseError) {
-    return { entries: [], rawContent: null, error: `Failed to parse response: ${parseError instanceof Error ? parseError.message : String(parseError)}` };
+    return {
+      entries: [],
+      rawContent: null,
+      error: `Failed to parse response: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+    };
   }
 }
 
@@ -528,11 +544,7 @@ export function AgentLogViewer({ logFiles, initialStepId, runningStepIds = new S
   }, [activeSection]);
 
   if (logFiles.length === 0) {
-    return (
-      <div className="text-sm text-muted-foreground py-8 text-center">
-        No agent log available for this run.
-      </div>
-    );
+    return <div className="text-sm text-muted-foreground py-8 text-center">No agent log available for this run.</div>;
   }
 
   const totalEvents = sections.reduce((sum, section) => sum + section.entries.length, 0);
@@ -543,7 +555,11 @@ export function AgentLogViewer({ logFiles, initialStepId, runningStepIds = new S
       {/* Controls bar */}
       <div className="flex items-center justify-between mb-2 shrink-0">
         <div className="text-xs text-muted-foreground">
-          {totalEvents > 0 && <span>{totalEvents} events across {sections.length} agent{sections.length > 1 ? 's' : ''}</span>}
+          {totalEvents > 0 && (
+            <span>
+              {totalEvents} events across {sections.length} agent{sections.length > 1 ? 's' : ''}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <button
@@ -575,18 +591,21 @@ export function AgentLogViewer({ logFiles, initialStepId, runningStepIds = new S
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted',
                   )}
                 >
-                  {section.executor === 'script'
-                    ? <Terminal className={cn('h-3 w-3', isActive ? 'text-yellow-500' : 'text-muted-foreground/60')} />
-                    : <Bot className={cn('h-3 w-3', isActive ? 'text-blue-500' : 'text-muted-foreground/60')} />
-                  }
+                  {section.executor === 'script' ? (
+                    <Terminal className={cn('h-3 w-3', isActive ? 'text-yellow-500' : 'text-muted-foreground/60')} />
+                  ) : (
+                    <Bot className={cn('h-3 w-3', isActive ? 'text-blue-500' : 'text-muted-foreground/60')} />
+                  )}
                   {section.stepId}
                   {section.entries.length > 0 && (
-                    <span className={cn(
-                      'text-[10px] rounded-full px-1.5 py-0.5 tabular-nums',
-                      isActive
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                        : 'bg-muted text-muted-foreground',
-                    )}>
+                    <span
+                      className={cn(
+                        'text-[10px] rounded-full px-1.5 py-0.5 tabular-nums',
+                        isActive
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                          : 'bg-muted text-muted-foreground',
+                      )}
+                    >
                       {section.entries.length}
                     </span>
                   )}
@@ -597,14 +616,9 @@ export function AgentLogViewer({ logFiles, initialStepId, runningStepIds = new S
         )}
 
         {/* Log content area — fills remaining height, scrolls, auto-scrolled to bottom */}
-        <div
-          ref={scrollRef}
-          className="p-3 overflow-auto flex-1 min-h-0 space-y-0.5"
-        >
+        <div ref={scrollRef} className="p-3 overflow-auto flex-1 min-h-0 space-y-0.5">
           {!initialStepHasLog && (
-            <p className="text-xs text-muted-foreground text-center py-4">
-              No log for this step.
-            </p>
+            <p className="text-xs text-muted-foreground text-center py-4">No log for this step.</p>
           )}
 
           {sections.length === 0 && initialStepHasLog && (
@@ -624,9 +638,11 @@ export function AgentLogViewer({ logFiles, initialStepId, runningStepIds = new S
           )}
 
           {/* Thinking indicator — only while the step is actively running */}
-          {pollingActive && activeSection && activeSection.entries.length > 0 && !isSectionTerminal(activeSection) && runningStepIds.has(activeSection.stepId) && (
-            <ThinkingIndicator />
-          )}
+          {pollingActive &&
+            activeSection &&
+            activeSection.entries.length > 0 &&
+            !isSectionTerminal(activeSection) &&
+            runningStepIds.has(activeSection.stepId) && <ThinkingIndicator />}
         </div>
       </div>
     </div>

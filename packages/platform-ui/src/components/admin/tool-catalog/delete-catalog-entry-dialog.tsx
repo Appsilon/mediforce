@@ -62,7 +62,8 @@ export function DeleteCatalogEntryDialog({
           </div>
 
           <Dialog.Description className="text-sm text-muted-foreground">
-            Remove <span className="font-mono text-foreground">{entryId}</span> from the catalog. Agents that referenced it will no longer resolve a binding for this id.
+            Remove <span className="font-mono text-foreground">{entryId}</span> from the catalog. Agents that referenced
+            it will no longer resolve a binding for this id.
           </Dialog.Description>
 
           {referenceCount > 0 && (
@@ -71,7 +72,8 @@ export function DeleteCatalogEntryDialog({
                 {referenceCount} agent {referenceCount === 1 ? 'binding references' : 'bindings reference'} this entry.
               </p>
               <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-200/80">
-                Those bindings will fail to resolve at spawn time until the entry is re-created or the binding is updated.
+                Those bindings will fail to resolve at spawn time until the entry is re-created or the binding is
+                updated.
               </p>
             </div>
           )}

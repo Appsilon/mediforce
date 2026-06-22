@@ -37,9 +37,7 @@ export const processesAgentEventsCommand = defineCommand({
       return 0;
     }
     for (const event of result.events) {
-      output.stdout(
-        `[${String(event.sequence).padStart(4, '0')}] ${event.stepId} ${event.type} ${event.timestamp}`,
-      );
+      output.stdout(`[${String(event.sequence).padStart(4, '0')}] ${event.stepId} ${event.type} ${event.timestamp}`);
     }
     return 0;
   },

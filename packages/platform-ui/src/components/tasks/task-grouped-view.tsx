@@ -127,11 +127,7 @@ function TH({ children, className }: { children?: React.ReactNode; className?: s
 }
 
 function TD({ children, className }: { children?: React.ReactNode; className?: string }) {
-  return (
-    <td className={cn('px-3 py-2 text-sm border-b border-border/40 align-middle', className)}>
-      {children}
-    </td>
-  );
+  return <td className={cn('px-3 py-2 text-sm border-b border-border/40 align-middle', className)}>{children}</td>;
 }
 
 function TaskRow({
@@ -194,18 +190,15 @@ function TaskRow({
         />
       </TD>
       <TD className="min-w-[200px] max-w-[300px]">
-        <Link
-          href={taskHref}
-          className="flex items-center gap-2 group/link hover:text-primary transition-colors"
-        >
+        <Link href={taskHref} className="flex items-center gap-2 group/link hover:text-primary transition-colors">
           <ActionIcon className={cn('h-3.5 w-3.5 shrink-0', actionType.colorClass)} />
-          <span className="truncate font-medium group-hover/link:underline">
-            {getItemLabel(item)}
-          </span>
+          <span className="truncate font-medium group-hover/link:underline">{getItemLabel(item)}</span>
         </Link>
       </TD>
       <TD className="w-[100px]">
-        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', status.className)}>
+        <span
+          className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', status.className)}
+        >
           {status.label}
         </span>
       </TD>
@@ -248,9 +241,7 @@ function TaskRow({
             <span
               className={cn(
                 'inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold shrink-0',
-                isCurrentUser
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted-foreground/20 text-muted-foreground',
+                isCurrentUser ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/20 text-muted-foreground',
               )}
               title={assigneeName}
             >
@@ -385,11 +376,7 @@ function BulkActionBar({
         disabled={loading}
         className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <AlertTriangle className="h-3.5 w-3.5" />
-        )}
+        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <AlertTriangle className="h-3.5 w-3.5" />}
         Cancel {selectedCount === 1 ? 'run' : 'runs'}
       </button>
     </div>
@@ -548,18 +535,20 @@ export function TaskGroupedView({
     const activeSet = new Set(activeItems.map(getItemId));
     const groups = [...byDef.entries()].sort(
       ([, a], [, b]) =>
-        b.filter((i) => activeSet.has(getItemId(i))).length -
-        a.filter((i) => activeSet.has(getItemId(i))).length,
+        b.filter((i) => activeSet.has(getItemId(i))).length - a.filter((i) => activeSet.has(getItemId(i))).length,
     );
 
-    tableContent = groups.length === 0
-      ? <EmptyState />
-      : groups.map(([name, items]) => (
+    tableContent =
+      groups.length === 0 ? (
+        <EmptyState />
+      ) : (
+        groups.map(([name, items]) => (
           <div key={name}>
             <SectionHeader title={formatStepName(name)} count={items.length} />
             <TaskTable items={items} {...sharedTableProps} showWorkflow={false} />
           </div>
-        ));
+        ))
+      );
   } else if (groupByAction) {
     const byAction = new Map<string, ActionItem[]>();
     for (const item of allItems) {
@@ -574,9 +563,11 @@ export function TaskGroupedView({
       .filter(([, items]) => items.some((i) => activeSet.has(getItemId(i))))
       .sort(([, a], [, b]) => b.length - a.length);
 
-    tableContent = groups.length === 0
-      ? <EmptyState />
-      : groups.map(([type, items]) => {
+    tableContent =
+      groups.length === 0 ? (
+        <EmptyState />
+      ) : (
+        groups.map(([type, items]) => {
           const actionInfo = getActionType(items[0]!);
           const Icon = actionInfo.icon;
           return (
@@ -589,11 +580,11 @@ export function TaskGroupedView({
               <TaskTable items={items} {...sharedTableProps} showWorkflow />
             </div>
           );
-        });
+        })
+      );
   } else {
-    tableContent = allItems.length === 0
-      ? <EmptyState />
-      : <TaskTable items={allItems} {...sharedTableProps} showWorkflow />;
+    tableContent =
+      allItems.length === 0 ? <EmptyState /> : <TaskTable items={allItems} {...sharedTableProps} showWorkflow />;
   }
 
   return (
@@ -611,7 +602,10 @@ export function TaskGroupedView({
         )}
         {completedItems.length > 0 && (
           <button
-            onClick={() => { setHideCompleted((v) => !v); setSelectedIds(new Set()); }}
+            onClick={() => {
+              setHideCompleted((v) => !v);
+              setSelectedIds(new Set());
+            }}
             className={cn(
               'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs transition-colors',
               hideCompleted

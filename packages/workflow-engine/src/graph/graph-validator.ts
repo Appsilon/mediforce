@@ -25,18 +25,14 @@ export function validateStepGraph(definition: ProcessDefinition): ValidationResu
   // 1. All transition `from` fields reference existing step IDs
   for (const transition of definition.transitions) {
     if (!stepIds.has(transition.from)) {
-      errors.push(
-        `Transition references nonexistent source step "${transition.from}"`,
-      );
+      errors.push(`Transition references nonexistent source step "${transition.from}"`);
     }
   }
 
   // 2. All transition `to` fields reference existing step IDs
   for (const transition of definition.transitions) {
     if (!stepIds.has(transition.to)) {
-      errors.push(
-        `Transition references nonexistent target step "${transition.to}"`,
-      );
+      errors.push(`Transition references nonexistent target step "${transition.to}"`);
     }
   }
 
@@ -45,9 +41,7 @@ export function validateStepGraph(definition: ProcessDefinition): ValidationResu
     if (step.verdicts) {
       for (const [verdictName, verdict] of Object.entries(step.verdicts)) {
         if (!stepIds.has(verdict.target)) {
-          errors.push(
-            `Step "${step.id}" verdict "${verdictName}" targets nonexistent step "${verdict.target}"`,
-          );
+          errors.push(`Step "${step.id}" verdict "${verdictName}" targets nonexistent step "${verdict.target}"`);
         }
       }
     }
@@ -88,9 +82,7 @@ export function validateStepGraph(definition: ProcessDefinition): ValidationResu
       }
       if (typeof step.selection === 'object') {
         if (step.selection.min > step.selection.max) {
-          errors.push(
-            `Step "${step.id}" selection min (${step.selection.min}) exceeds max (${step.selection.max})`,
-          );
+          errors.push(`Step "${step.id}" selection min (${step.selection.min}) exceeds max (${step.selection.max})`);
         }
       }
     }
@@ -106,15 +98,11 @@ export function validateStepGraph(definition: ProcessDefinition): ValidationResu
   for (const step of definition.steps) {
     if (step.type === 'terminal') continue;
 
-    const hasOutgoingTransition = definition.transitions.some(
-      (t) => t.from === step.id,
-    );
+    const hasOutgoingTransition = definition.transitions.some((t) => t.from === step.id);
     const hasVerdicts = step.verdicts && Object.keys(step.verdicts).length > 0;
 
     if (!hasOutgoingTransition && !hasVerdicts) {
-      errors.push(
-        `Non-terminal step "${step.id}" has no outgoing transitions or verdicts`,
-      );
+      errors.push(`Non-terminal step "${step.id}" has no outgoing transitions or verdicts`);
     }
   }
 

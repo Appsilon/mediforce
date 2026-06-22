@@ -110,11 +110,7 @@ describe('ScriptStepExecutor', () => {
     expect(result.fallbackReason).toBeNull();
     expect(result.envelope?.result).toEqual({ rows: 42 });
 
-    expect(mockEngine.advanceStep).toHaveBeenCalledWith(
-      'inst-001',
-      { rows: 42 },
-      { id: 'auto-runner', role: 'agent' },
-    );
+    expect(mockEngine.advanceStep).toHaveBeenCalledWith('inst-001', { rows: 42 }, { id: 'auto-runner', role: 'agent' });
 
     expect(mockAuditRepo.append).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -177,9 +173,12 @@ describe('ScriptStepExecutor', () => {
 
     expect(mockEngine.advanceStep).not.toHaveBeenCalled();
 
-    expect(mockInstanceRepo.update).toHaveBeenCalledWith('inst-001', expect.objectContaining({
-      error: expect.stringContaining('ENOENT: script not found'),
-    }));
+    expect(mockInstanceRepo.update).toHaveBeenCalledWith(
+      'inst-001',
+      expect.objectContaining({
+        error: expect.stringContaining('ENOENT: script not found'),
+      }),
+    );
 
     expect(mockAuditRepo.append).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -202,9 +201,12 @@ describe('ScriptStepExecutor', () => {
     expect(result.fallbackReason).toBe('timeout');
     expect(result.appliedToWorkflow).toBe(false);
 
-    expect(mockInstanceRepo.update).toHaveBeenCalledWith('inst-001', expect.objectContaining({
-      error: expect.stringContaining('timed out'),
-    }));
+    expect(mockInstanceRepo.update).toHaveBeenCalledWith(
+      'inst-001',
+      expect.objectContaining({
+        error: expect.stringContaining('timed out'),
+      }),
+    );
   });
 
   it('marks step execution as failed on error', async () => {
@@ -261,9 +263,9 @@ describe('ScriptStepExecutor', () => {
       errorMessage: null,
     });
 
-    await expect(
-      executor.execute(mockPlugin, makeContext(), services, meta),
-    ).rejects.toThrow('completed with null result');
+    await expect(executor.execute(mockPlugin, makeContext(), services, meta)).rejects.toThrow(
+      'completed with null result',
+    );
   });
 
   it('skips step execution persistence when no stepExecutionId', async () => {

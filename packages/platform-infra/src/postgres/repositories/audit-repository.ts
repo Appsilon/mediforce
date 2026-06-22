@@ -32,9 +32,7 @@ export class PostgresAuditRepository implements AuditRepository {
     private readonly parents: ProcessInstanceRepository,
   ) {}
 
-  async append(
-    event: Omit<AuditEvent, 'serverTimestamp'>,
-  ): Promise<AuditEvent> {
+  async append(event: Omit<AuditEvent, 'serverTimestamp'>): Promise<AuditEvent> {
     let workspace: string | undefined = event.namespace;
     if (workspace === undefined && typeof event.processInstanceId === 'string') {
       const parent = await this.parents.getById(event.processInstanceId);
@@ -76,19 +74,11 @@ export class PostgresAuditRepository implements AuditRepository {
     return toAuditEvent(row);
   }
 
-  async getByEntity(
-    entityType: string,
-    entityId: string,
-  ): Promise<AuditEvent[]> {
+  async getByEntity(entityType: string, entityId: string): Promise<AuditEvent[]> {
     const rows = await this.db
       .select()
       .from(auditEvents)
-      .where(
-        and(
-          eq(auditEvents.entityType, entityType),
-          eq(auditEvents.entityId, entityId),
-        ),
-      )
+      .where(and(eq(auditEvents.entityType, entityType), eq(auditEvents.entityId, entityId)))
       .orderBy(desc(auditEvents.timestamp));
     return rows.map((r) => toAuditEvent(r));
   }
@@ -102,28 +92,17 @@ export class PostgresAuditRepository implements AuditRepository {
     return rows.map((r) => toAuditEvent(r));
   }
 
-  async getByProcessInNamespaces(
-    processInstanceId: string,
-    allowed: readonly string[],
-  ): Promise<AuditEvent[]> {
+  async getByProcessInNamespaces(processInstanceId: string, allowed: readonly string[]): Promise<AuditEvent[]> {
     if (allowed.length === 0) return [];
     const rows = await this.db
       .select()
       .from(auditEvents)
-      .where(
-        and(
-          eq(auditEvents.processInstanceId, processInstanceId),
-          inArray(auditEvents.workspace, [...allowed]),
-        ),
-      )
+      .where(and(eq(auditEvents.processInstanceId, processInstanceId), inArray(auditEvents.workspace, [...allowed])))
       .orderBy(asc(auditEvents.timestamp));
     return rows.map((r) => toAuditEvent(r));
   }
 
-  async getByActor(
-    actorId: string,
-    options?: { limit?: number },
-  ): Promise<AuditEvent[]> {
+  async getByActor(actorId: string, options?: { limit?: number }): Promise<AuditEvent[]> {
     const base = this.db
       .select()
       .from(auditEvents)

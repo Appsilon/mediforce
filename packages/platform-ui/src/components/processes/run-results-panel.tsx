@@ -54,11 +54,7 @@ function isEmptyResultValue(value: unknown): boolean {
 
 function isHtmlString(value: string): boolean {
   const trimmed = value.trimStart().toLowerCase();
-  return (
-    trimmed.startsWith('<!doctype html') ||
-    trimmed.startsWith('<html>') ||
-    trimmed.startsWith('<html ')
-  );
+  return trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html>') || trimmed.startsWith('<html ');
 }
 
 function ResultValue({ value }: { value: unknown }) {
@@ -99,12 +95,7 @@ function ResultValue({ value }: { value: unknown }) {
 
 function GithubMark({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 16 16"
-      aria-hidden="true"
-      fill="currentColor"
-      className={className}
-    >
+    <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor" className={className}>
       <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
     </svg>
   );
@@ -132,7 +123,9 @@ function ViewPullRequestButton({ url }: { url: string }) {
         className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm hover:bg-muted/50 transition-colors"
       >
         <GithubMark className="h-3.5 w-3.5 shrink-0" />
-        <span className="text-muted-foreground">{parsed.org}/{parsed.repo}</span>
+        <span className="text-muted-foreground">
+          {parsed.org}/{parsed.repo}
+        </span>
         <span className="font-semibold">#{parsed.number}</span>
       </a>
     );
@@ -174,18 +167,13 @@ function findFinalAgentOutput(stepExecutions: StepExecution[]): {
 }
 
 export function RunResultsPanel({ stepExecutions, stepConfigMap }: RunResultsPanelProps) {
-  const finalOutput = React.useMemo(
-    () => findFinalAgentOutput(stepExecutions),
-    [stepExecutions],
-  );
+  const finalOutput = React.useMemo(() => findFinalAgentOutput(stepExecutions), [stepExecutions]);
 
   if (!finalOutput) return null;
 
   const { stepId, output, result } = finalOutput;
   const isScript = stepConfigMap?.get(stepId)?.executorType === 'script';
-  const confidencePct = !isScript && output.confidence !== null
-    ? Math.round(output.confidence * 100)
-    : null;
+  const confidencePct = !isScript && output.confidence !== null ? Math.round(output.confidence * 100) : null;
   const git = output.gitMetadata;
 
   return (
@@ -195,9 +183,7 @@ export function RunResultsPanel({ stepExecutions, stepConfigMap }: RunResultsPan
         <div className="flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 text-green-500" />
           <span className="text-sm font-medium">Results</span>
-          <span className="text-xs text-muted-foreground">
-            from {formatStepName(stepId)}
-          </span>
+          <span className="text-xs text-muted-foreground">from {formatStepName(stepId)}</span>
         </div>
       </div>
 
@@ -208,12 +194,18 @@ export function RunResultsPanel({ stepExecutions, stepConfigMap }: RunResultsPan
             <div className="flex items-center gap-1.5">
               <Gauge className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-muted-foreground">Confidence:</span>
-              <span className={cn(
-                'font-medium',
-                confidencePct >= 80 ? 'text-green-600 dark:text-green-400' :
-                confidencePct >= 50 ? 'text-amber-600 dark:text-amber-400' :
-                'text-red-600 dark:text-red-400'
-              )}>{confidencePct}%</span>
+              <span
+                className={cn(
+                  'font-medium',
+                  confidencePct >= 80
+                    ? 'text-green-600 dark:text-green-400'
+                    : confidencePct >= 50
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-red-600 dark:text-red-400',
+                )}
+              >
+                {confidencePct}%
+              </span>
             </div>
           )}
           {!isScript && output.confidence_rationale && (
@@ -244,10 +236,11 @@ export function RunResultsPanel({ stepExecutions, stepConfigMap }: RunResultsPan
         {/* Git deliverables */}
         {git && (
           <div className="space-y-2">
-            {result && (() => {
-              const pr = findPrUrl(result);
-              return pr ? <ViewPullRequestButton url={pr.url} /> : null;
-            })()}
+            {result &&
+              (() => {
+                const pr = findPrUrl(result);
+                return pr ? <ViewPullRequestButton url={pr.url} /> : null;
+              })()}
             <div className="flex items-center gap-4 text-sm">
               <div className="flex items-center gap-1.5">
                 <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />
@@ -275,9 +268,7 @@ export function RunResultsPanel({ stepExecutions, stepConfigMap }: RunResultsPan
                   </a>
                 </>
               ) : (
-                <span className="font-mono text-xs text-muted-foreground">
-                  {git.commitSha.slice(0, 7)}
-                </span>
+                <span className="font-mono text-xs text-muted-foreground">{git.commitSha.slice(0, 7)}</span>
               )}
             </div>
 
@@ -315,38 +306,42 @@ export function RunResultsPanel({ stepExecutions, stepConfigMap }: RunResultsPan
         )}
 
         {/* Result data (non-git output) */}
-        {!git && result && Object.keys(result).length > 0 && (() => {
-          const pr = findPrUrl(result);
-          const remainingEntries = Object.entries(result).filter(([key, value]) => {
-            if (pr && key === pr.key) return false;
-            return !isEmptyResultValue(value);
-          });
-          return (
-            <div className="space-y-3">
-              {pr && <ViewPullRequestButton url={pr.url} />}
-              {remainingEntries.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-                    Output
-                  </h4>
-                  <dl className="space-y-1.5">
-                    {remainingEntries.map(([key, value]) => {
-                      const isHtml = typeof value === 'string' && isHtmlString(value);
-                      return (
-                        <div key={key} className={isHtml ? 'space-y-1 text-sm' : 'flex flex-wrap items-baseline gap-2 text-sm'}>
-                          <dt className="text-muted-foreground">{formatResultKey(key)}:</dt>
-                          <dd className="min-w-0 flex-1">
-                            <ResultValue value={value} />
-                          </dd>
-                        </div>
-                      );
-                    })}
-                  </dl>
-                </div>
-              )}
-            </div>
-          );
-        })()}
+        {!git &&
+          result &&
+          Object.keys(result).length > 0 &&
+          (() => {
+            const pr = findPrUrl(result);
+            const remainingEntries = Object.entries(result).filter(([key, value]) => {
+              if (pr && key === pr.key) return false;
+              return !isEmptyResultValue(value);
+            });
+            return (
+              <div className="space-y-3">
+                {pr && <ViewPullRequestButton url={pr.url} />}
+                {remainingEntries.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Output</h4>
+                    <dl className="space-y-1.5">
+                      {remainingEntries.map(([key, value]) => {
+                        const isHtml = typeof value === 'string' && isHtmlString(value);
+                        return (
+                          <div
+                            key={key}
+                            className={isHtml ? 'space-y-1 text-sm' : 'flex flex-wrap items-baseline gap-2 text-sm'}
+                          >
+                            <dt className="text-muted-foreground">{formatResultKey(key)}:</dt>
+                            <dd className="min-w-0 flex-1">
+                              <ResultValue value={value} />
+                            </dd>
+                          </div>
+                        );
+                      })}
+                    </dl>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
       </div>
     </div>
   );

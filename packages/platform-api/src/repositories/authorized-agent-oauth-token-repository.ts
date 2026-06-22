@@ -1,7 +1,4 @@
-import type {
-  AgentOAuthToken,
-  AgentOAuthTokenRepository,
-} from '@mediforce/platform-core';
+import type { AgentOAuthToken, AgentOAuthTokenRepository } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
 import { AuthorizedScope } from './authorized-repository';
 
@@ -17,30 +14,17 @@ export class AuthorizedAgentOAuthTokenRepository extends AuthorizedScope {
     super(caller);
   }
 
-  get = async (
-    namespace: string,
-    agentId: string,
-    serverName: string,
-  ): Promise<AgentOAuthToken | null> => {
+  get = async (namespace: string, agentId: string, serverName: string): Promise<AgentOAuthToken | null> => {
     if (!this.canSeeNamespace(namespace)) return null;
     return this.raw.get(namespace, agentId, serverName);
   };
 
-  put = async (
-    namespace: string,
-    agentId: string,
-    serverName: string,
-    token: AgentOAuthToken,
-  ): Promise<void> => {
+  put = async (namespace: string, agentId: string, serverName: string, token: AgentOAuthToken): Promise<void> => {
     this.assertNamespaceWrite(namespace);
     await this.raw.put(namespace, agentId, serverName, token);
   };
 
-  delete = async (
-    namespace: string,
-    agentId: string,
-    serverName: string,
-  ): Promise<boolean> => {
+  delete = async (namespace: string, agentId: string, serverName: string): Promise<boolean> => {
     this.assertNamespaceWrite(namespace);
     return this.raw.delete(namespace, agentId, serverName);
   };

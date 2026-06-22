@@ -37,9 +37,7 @@ export function useMyActionableTasksByRole(
     const tasks = query.data ?? [];
     const notDeleted = tasks.filter((t) => !t.deleted);
     if (currentUserId === undefined || currentUserId === null) return notDeleted;
-    return notDeleted.filter(
-      (t) => t.assignedUserId === null || t.assignedUserId === currentUserId,
-    );
+    return notDeleted.filter((t) => t.assignedUserId === null || t.assignedUserId === currentUserId);
   }, [query.data, currentUserId]);
 
   return {
@@ -55,9 +53,11 @@ export function useMyActionableTasksByRole(
  * `mediforce.tasks.list` (no `instanceId` / `role` ⇒ caller scope).
  * STANDARD LIVE per ADR-0006 §4.
  */
-export function useMyActionableTasks(
-  currentUserId?: string | null,
-): { data: HumanTask[]; loading: boolean; error: Error | null } {
+export function useMyActionableTasks(currentUserId?: string | null): {
+  data: HumanTask[];
+  loading: boolean;
+  error: Error | null;
+} {
   const query = useQuery({
     queryKey: queryKeys.tasks.forCaller({ status: [...ACTIONABLE_STATUSES] }),
     queryFn: async () => {
@@ -71,9 +71,7 @@ export function useMyActionableTasks(
   const filtered = useMemo(() => {
     const tasks = (query.data ?? []).filter((t) => !t.deleted);
     if (currentUserId === undefined || currentUserId === null) return tasks;
-    return tasks.filter(
-      (t) => t.assignedUserId === null || t.assignedUserId === currentUserId,
-    );
+    return tasks.filter((t) => t.assignedUserId === null || t.assignedUserId === currentUserId);
   }, [query.data, currentUserId]);
 
   return {
@@ -87,9 +85,11 @@ export function useMyActionableTasks(
  * Role-scoped completed task list, react-query backed (STANDARD LIVE).
  * Sorts `completedAt` desc client-side — the API does not promise an order.
  */
-export function useCompletedTasksByRole(
-  assignedRole: string | undefined,
-): { data: HumanTask[]; loading: boolean; error: Error | null } {
+export function useCompletedTasksByRole(assignedRole: string | undefined): {
+  data: HumanTask[];
+  loading: boolean;
+  error: Error | null;
+} {
   const query = useQuery({
     queryKey: queryKeys.tasks.byRole(assignedRole ?? '', { status: ['completed'] }),
     queryFn: async () => {
@@ -148,9 +148,10 @@ export function useMyCompletedTasks(): { data: HumanTask[]; loading: boolean; er
  * watch this to know when the run unblocks. Returns `null` when no actionable
  * task is open against the instance.
  */
-export function useActiveTaskForInstance(
-  processInstanceId: string | null,
-): { task: HumanTask | null; loading: boolean } {
+export function useActiveTaskForInstance(processInstanceId: string | null): {
+  task: HumanTask | null;
+  loading: boolean;
+} {
   const enabled = processInstanceId !== null && processInstanceId.length > 0;
   const query = useQuery({
     queryKey: enabled
@@ -169,10 +170,7 @@ export function useActiveTaskForInstance(
     retry: stopRetryOn4xx,
   });
 
-  const activeTask = useMemo(
-    () => (query.data ?? []).find((task) => !task.deleted) ?? null,
-    [query.data],
-  );
+  const activeTask = useMemo(() => (query.data ?? []).find((task) => !task.deleted) ?? null, [query.data]);
 
   return { task: activeTask, loading: enabled && query.isPending };
 }
@@ -190,14 +188,11 @@ export function useStepTasks(
   stepId: string | null,
   instanceStatus: InstanceStatus | undefined,
 ): { tasks: HumanTask[]; loading: boolean } {
-  const enabled =
-    instanceId !== null && instanceId.length > 0 && stepId !== null && stepId.length > 0;
+  const enabled = instanceId !== null && instanceId.length > 0 && stepId !== null && stepId.length > 0;
   const isTerminal = instanceStatus !== undefined && TERMINAL_STATUSES.has(instanceStatus);
 
   const query = useQuery({
-    queryKey: enabled
-      ? queryKeys.tasks.byInstance(instanceId, { stepId })
-      : (['tasks', '__noop__'] as const),
+    queryKey: enabled ? queryKeys.tasks.byInstance(instanceId, { stepId }) : (['tasks', '__noop__'] as const),
     queryFn: async () => {
       if (instanceId === null || stepId === null) {
         throw new Error('unreachable: enabled gates this');
@@ -213,10 +208,7 @@ export function useStepTasks(
     retry: stopRetryOn4xx,
   });
 
-  const tasks = useMemo(
-    () => (query.data ?? []).filter((task) => !task.deleted),
-    [query.data],
-  );
+  const tasks = useMemo(() => (query.data ?? []).filter((task) => !task.deleted), [query.data]);
 
   return { tasks, loading: enabled && query.isPending };
 }
@@ -226,14 +218,13 @@ export function useStepTasks(
  * LIVE. The server `getByInstance` endpoint returns the session if any —
  * a 404 surfaces here as `session: null` so callers can branch cleanly.
  */
-export function useActiveCoworkSession(
-  processInstanceId: string | null,
-): { session: CoworkSession | null; loading: boolean } {
+export function useActiveCoworkSession(processInstanceId: string | null): {
+  session: CoworkSession | null;
+  loading: boolean;
+} {
   const enabled = processInstanceId !== null && processInstanceId.length > 0;
   const query = useQuery({
-    queryKey: enabled
-      ? queryKeys.cowork.byInstance(processInstanceId)
-      : queryKeys.cowork.byInstance('__noop__'),
+    queryKey: enabled ? queryKeys.cowork.byInstance(processInstanceId) : queryKeys.cowork.byInstance('__noop__'),
     queryFn: () => {
       if (processInstanceId === null) throw new Error('unreachable: enabled gates this');
       return mediforce.cowork.getByInstance({ instanceId: processInstanceId });
@@ -254,7 +245,7 @@ export function useActiveCoworkSession(
 
   const err = query.error;
   const notFound = err instanceof ApiError && err.status === 404;
-  const session = notFound ? null : query.data ?? null;
+  const session = notFound ? null : (query.data ?? null);
   return {
     session: session !== null && session.status === 'active' ? session : null,
     loading: enabled && query.isPending,
@@ -267,9 +258,11 @@ export function useActiveCoworkSession(
  * to the caller across roles. Sorted `createdAt` asc client-side to preserve
  * the old Firestore ordering — the contract does not promise an order.
  */
-export function useMyCoworkSessions(
-  assignedRole: string | null,
-): { data: CoworkSession[]; loading: boolean; error: Error | null } {
+export function useMyCoworkSessions(assignedRole: string | null): {
+  data: CoworkSession[];
+  loading: boolean;
+  error: Error | null;
+} {
   const query = useQuery({
     queryKey: ['cowork', 'list', { role: assignedRole, status: ['active'] }] as const,
     queryFn: async () => {
@@ -298,9 +291,11 @@ export function useMyCoworkSessions(
  * Finalized cowork sessions assigned to a role, react-query backed
  * (STANDARD LIVE). Sorted `finalizedAt` desc client-side.
  */
-export function useFinalizedCoworkSessions(
-  assignedRole: string | null,
-): { data: CoworkSession[]; loading: boolean; error: Error | null } {
+export function useFinalizedCoworkSessions(assignedRole: string | null): {
+  data: CoworkSession[];
+  loading: boolean;
+  error: Error | null;
+} {
   const query = useQuery({
     queryKey: ['cowork', 'list', { role: assignedRole, status: ['finalized'] }] as const,
     queryFn: async () => {

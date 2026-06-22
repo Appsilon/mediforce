@@ -1,9 +1,5 @@
 import { z } from 'zod';
-import {
-  ConversationTurnSchema,
-  CoworkSessionSchema,
-  CoworkSessionStatusSchema,
-} from '@mediforce/platform-core';
+import { ConversationTurnSchema, CoworkSessionSchema, CoworkSessionStatusSchema } from '@mediforce/platform-core';
 
 /**
  * Contracts for the `cowork` domain.
@@ -53,12 +49,8 @@ export const GetCoworkSessionByInstanceInputSchema = z.object({
 
 export const GetCoworkSessionByInstanceOutputSchema = CoworkSessionSchema;
 
-export type GetCoworkSessionByInstanceInput = z.infer<
-  typeof GetCoworkSessionByInstanceInputSchema
->;
-export type GetCoworkSessionByInstanceOutput = z.infer<
-  typeof GetCoworkSessionByInstanceOutputSchema
->;
+export type GetCoworkSessionByInstanceInput = z.infer<typeof GetCoworkSessionByInstanceInputSchema>;
+export type GetCoworkSessionByInstanceOutput = z.infer<typeof GetCoworkSessionByInstanceOutputSchema>;
 
 // ---- POST /api/cowork/:sessionId/chat ---------------------------------------
 //
@@ -134,12 +126,8 @@ export const CreateVoiceEphemeralKeyOutputSchema = z.object({
   model: z.string(),
 });
 
-export type CreateVoiceEphemeralKeyInput = z.infer<
-  typeof CreateVoiceEphemeralKeyInputSchema
->;
-export type CreateVoiceEphemeralKeyOutput = z.infer<
-  typeof CreateVoiceEphemeralKeyOutputSchema
->;
+export type CreateVoiceEphemeralKeyInput = z.infer<typeof CreateVoiceEphemeralKeyInputSchema>;
+export type CreateVoiceEphemeralKeyOutput = z.infer<typeof CreateVoiceEphemeralKeyOutputSchema>;
 
 // ---- POST /api/cowork/:sessionId/voice/synthesize ---------------------------
 //
@@ -156,9 +144,5 @@ export const SynthesizeVoiceArtifactOutputSchema = z.object({
   artifact: z.record(z.string(), z.unknown()),
 });
 
-export type SynthesizeVoiceArtifactInput = z.infer<
-  typeof SynthesizeVoiceArtifactInputSchema
->;
-export type SynthesizeVoiceArtifactOutput = z.infer<
-  typeof SynthesizeVoiceArtifactOutputSchema
->;
+export type SynthesizeVoiceArtifactInput = z.infer<typeof SynthesizeVoiceArtifactInputSchema>;
+export type SynthesizeVoiceArtifactOutput = z.infer<typeof SynthesizeVoiceArtifactOutputSchema>;

@@ -83,9 +83,7 @@ describe('StepEditor', () => {
     const allButtons = screen.getAllByRole('button');
     const typeChangeLabels = ['Creation', 'Review', 'Decision', 'End'];
     for (const label of typeChangeLabels) {
-      const matchingButtons = allButtons.filter(
-        (btn) => btn.textContent?.trim() === label,
-      );
+      const matchingButtons = allButtons.filter((btn) => btn.textContent?.trim() === label);
       expect(matchingButtons).toHaveLength(0);
     }
   });
@@ -112,9 +110,7 @@ describe('StepEditor', () => {
       />,
     );
 
-    const badge = screen.getByTitle(
-      'Step type is set at creation. To change, remove this step and add a new one.',
-    );
+    const badge = screen.getByTitle('Step type is set at creation. To change, remove this step and add a new one.');
     expect(badge).toBeInTheDocument();
   });
 
@@ -134,49 +130,25 @@ describe('StepEditor', () => {
   });
 
   it('[RENDER] header shows executor label for agent step', () => {
-    render(
-      <StepEditor
-        step={buildStep({ executor: 'agent', type: 'creation' })}
-        allSteps={[]}
-        onChange={noop}
-      />,
-    );
+    render(<StepEditor step={buildStep({ executor: 'agent', type: 'creation' })} allSteps={[]} onChange={noop} />);
 
     expect(screen.getByText('Agent')).toBeInTheDocument();
   });
 
   it('[RENDER] header shows executor label for human step', () => {
-    render(
-      <StepEditor
-        step={buildStep({ executor: 'human', type: 'creation' })}
-        allSteps={[]}
-        onChange={noop}
-      />,
-    );
+    render(<StepEditor step={buildStep({ executor: 'human', type: 'creation' })} allSteps={[]} onChange={noop} />);
 
     expect(screen.getByText('Human')).toBeInTheDocument();
   });
 
   it('[RENDER] header shows executor label for script step', () => {
-    render(
-      <StepEditor
-        step={buildStep({ executor: 'script', type: 'creation' })}
-        allSteps={[]}
-        onChange={noop}
-      />,
-    );
+    render(<StepEditor step={buildStep({ executor: 'script', type: 'creation' })} allSteps={[]} onChange={noop} />);
 
     expect(screen.getByText('Script')).toBeInTheDocument();
   });
 
   it('[RENDER] header shows Review type label for review step', () => {
-    render(
-      <StepEditor
-        step={buildStep({ type: 'review', executor: 'human' })}
-        allSteps={[]}
-        onChange={noop}
-      />,
-    );
+    render(<StepEditor step={buildStep({ type: 'review', executor: 'human' })} allSteps={[]} onChange={noop} />);
 
     expect(screen.getAllByText('Review').length).toBeGreaterThanOrEqual(1);
   });
@@ -184,13 +156,7 @@ describe('StepEditor', () => {
   // ── New: tooltip info icons ───────────────────────────────────────────────
 
   it('[RENDER] tooltip info icons are present on identity fields', () => {
-    render(
-      <StepEditor
-        step={buildStep()}
-        allSteps={[]}
-        onChange={noop}
-      />,
-    );
+    render(<StepEditor step={buildStep()} allSteps={[]} onChange={noop} />);
 
     // Identity fields (name, id, description, type, executor) all have tooltips.
     // FieldTooltip renders with data-testid="field-tooltip-trigger".
@@ -199,13 +165,7 @@ describe('StepEditor', () => {
   });
 
   it('[RENDER] agent config fields are shown for agent executor', () => {
-    render(
-      <StepEditor
-        step={buildStep({ executor: 'agent' })}
-        allSteps={[]}
-        onChange={noop}
-      />,
-    );
+    render(<StepEditor step={buildStep({ executor: 'agent' })} allSteps={[]} onChange={noop} />);
 
     // Agent-specific labels should be visible
     expect(screen.getByText('autonomyLevel')).toBeInTheDocument();
@@ -215,13 +175,7 @@ describe('StepEditor', () => {
   });
 
   it('[RENDER] script config fields are shown for script executor', () => {
-    render(
-      <StepEditor
-        step={buildStep({ executor: 'script' })}
-        allSteps={[]}
-        onChange={noop}
-      />,
-    );
+    render(<StepEditor step={buildStep({ executor: 'script' })} allSteps={[]} onChange={noop} />);
 
     expect(screen.getByText('script.runtime')).toBeInTheDocument();
     expect(screen.getByText('script.command')).toBeInTheDocument();
@@ -229,25 +183,13 @@ describe('StepEditor', () => {
   });
 
   it('[RENDER] human config shows allowedRoles field', () => {
-    render(
-      <StepEditor
-        step={buildStep({ executor: 'human' })}
-        allSteps={[]}
-        onChange={noop}
-      />,
-    );
+    render(<StepEditor step={buildStep({ executor: 'human' })} allSteps={[]} onChange={noop} />);
 
     expect(screen.getByText('allowedRoles')).toBeInTheDocument();
   });
 
   it('[RENDER] no placeholder text on regular inputs', () => {
-    render(
-      <StepEditor
-        step={buildStep({ executor: 'agent' })}
-        allSteps={[]}
-        onChange={noop}
-      />,
-    );
+    render(<StepEditor step={buildStep({ executor: 'agent' })} allSteps={[]} onChange={noop} />);
 
     // Regular inputs (not textareas) should have no placeholder text
     const inputs = document.querySelectorAll('input[type="text"], input:not([type])');

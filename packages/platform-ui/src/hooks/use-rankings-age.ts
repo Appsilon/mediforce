@@ -21,9 +21,7 @@ export function useRankingsAge(): RankingsAge {
       .then((res) => res.json())
       .then((data: { meta: { rankingsUpdatedAt: string | null } }) => {
         const updatedAt = data.meta.rankingsUpdatedAt;
-        const daysSince = updatedAt
-          ? Math.floor((Date.now() - new Date(updatedAt).getTime()) / 86_400_000)
-          : null;
+        const daysSince = updatedAt ? Math.floor((Date.now() - new Date(updatedAt).getTime()) / 86_400_000) : null;
         setState({
           daysSinceUpdate: daysSince,
           rankingsUpdatedAt: updatedAt,

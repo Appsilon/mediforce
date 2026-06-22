@@ -1,17 +1,7 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { createTestUser } from '../helpers/emulator';
-import {
-  readPostgresWorkspace,
-  seedPostgresOrganizationNamespace,
-} from '../helpers/postgres-seed';
-import {
-  setupRecording,
-  click,
-  showStep,
-  showResult,
-  showCaption,
-  endRecording,
-} from '../helpers/recording';
+import { readPostgresWorkspace, seedPostgresOrganizationNamespace } from '../helpers/postgres-seed';
+import { setupRecording, click, showStep, showResult, showCaption, endRecording } from '../helpers/recording';
 
 const OWNER_EMAIL = 'bio-clear-owner@mediforce.dev';
 const OWNER_PASSWORD = 'BioClear123!';
@@ -31,9 +21,7 @@ test.describe('Workspace bio clear journey', () => {
     await seedPostgresOrganizationNamespace(HANDLE, uid, 'Bio Clear Labs', { bio: INITIAL_BIO });
   });
 
-  test('owner clears bio → bio stored as empty string', async ({
-    page,
-  }, testInfo) => {
+  test('owner clears bio → bio stored as empty string', async ({ page }, testInfo) => {
     await setupRecording(page, 'workspace-bio-clear', testInfo);
 
     await page.goto('/login');

@@ -38,9 +38,7 @@ function buildMockAgentContext(overrides: Partial<AgentContext> = {}): AgentCont
   };
 }
 
-function buildMockWorkflowAgentContext(
-  overrides: Partial<WorkflowAgentContext> = {},
-): WorkflowAgentContext {
+function buildMockWorkflowAgentContext(overrides: Partial<WorkflowAgentContext> = {}): WorkflowAgentContext {
   const step: WorkflowStep = {
     id: 'extract',
     name: 'Extract Step',
@@ -212,9 +210,9 @@ describe('writeMcpConfig integration', () => {
     ]);
     await plugin.initialize(context);
 
-    await expect(
-      (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir),
-    ).rejects.toThrow(/FALLBACK_TOKEN.*not configured/);
+    await expect((plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir)).rejects.toThrow(
+      /FALLBACK_TOKEN.*not configured/,
+    );
 
     await cleanup();
   });
@@ -286,9 +284,7 @@ describe('writeMcpConfig integration', () => {
   });
 
   it('[DATA] omits allowedTools when not configured', async () => {
-    const context = buildContextWithMcpServers([
-      { name: 'no-filter', command: 'node', args: ['/opt/mcp/server.js'] },
-    ]);
+    const context = buildContextWithMcpServers([{ name: 'no-filter', command: 'node', args: ['/opt/mcp/server.js'] }]);
     await plugin.initialize(context);
 
     await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
@@ -304,9 +300,7 @@ describe('writeMcpConfig integration', () => {
   });
 
   it('[DATA] writes url entry (no empty command) for URL-only servers', async () => {
-    const context = buildContextWithMcpServers([
-      { name: 'remote', url: 'https://mcp.example.com/v1' },
-    ]);
+    const context = buildContextWithMcpServers([{ name: 'remote', url: 'https://mcp.example.com/v1' }]);
     await plugin.initialize(context);
 
     await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
@@ -410,10 +404,7 @@ describe('writeMcpConfig integration', () => {
       const parsed = JSON.parse(raw) as {
         mcpServers: Record<string, { allowedTools?: string[] }>;
       };
-      expect(parsed.mcpServers.github?.allowedTools).toEqual([
-        'search_code',
-        'get_file_contents',
-      ]);
+      expect(parsed.mcpServers.github?.allowedTools).toEqual(['search_code', 'get_file_contents']);
 
       await cleanup();
     });
@@ -426,9 +417,7 @@ describe('writeMcpConfig integration', () => {
 
       await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
 
-      const contents = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8').catch(
-        () => null,
-      );
+      const contents = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8').catch(() => null);
       expect(contents).toBeNull();
 
       await cleanup();
@@ -449,9 +438,7 @@ describe('writeMcpConfig integration', () => {
             skill: 'test-skill',
             skillsDir: '/plugins/test/skills',
             image: 'mediforce-agent:test',
-            mcpServers: [
-              { name: 'should-be-ignored', command: 'legacy-inline' },
-            ],
+            mcpServers: [{ name: 'should-be-ignored', command: 'legacy-inline' }],
           },
         } as unknown as WorkflowStep,
         resolvedMcpConfig: {
@@ -676,9 +663,9 @@ describe('writeMcpConfig integration', () => {
       });
       await plugin.initialize(context);
 
-      await expect(
-        (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir),
-      ).rejects.toThrow(/not connected.*Connect the account via the agent editor/);
+      await expect((plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir)).rejects.toThrow(
+        /not connected.*Connect the account via the agent editor/,
+      );
 
       await cleanup();
     });

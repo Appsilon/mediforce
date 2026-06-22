@@ -15,7 +15,11 @@ test.describe('Verdict With Params Journey', () => {
     await showCaption(page, 'Verdict buttons locked — required field empty');
 
     // Fill the required findings field (first textbox in the param section)
-    await page.locator('label:has-text("findings")').locator('..').locator('input[type="text"]').fill('No critical issues identified');
+    await page
+      .locator('label:has-text("findings")')
+      .locator('..')
+      .locator('input[type="text"]')
+      .fill('No critical issues identified');
     await showCaption(page, 'Required field filled — verdict buttons unlocked');
 
     // Submit verdict — single click, no secondary confirmation step

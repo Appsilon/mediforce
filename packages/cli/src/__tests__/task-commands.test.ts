@@ -27,9 +27,7 @@ const SAMPLE_TASK = {
 
 describe('task list command', () => {
   it('GETs /api/tasks with role filter and prints task rows', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ tasks: [SAMPLE_TASK] }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ tasks: [SAMPLE_TASK] }));
     const output = captureOutput();
     const code = await taskListCommand({
       argv: ['--role', 'reviewer', '--base-url', 'http://localhost:5555'],
@@ -42,9 +40,7 @@ describe('task list command', () => {
   });
 
   it('passes --instance-id + --step-id + --status as query params', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ tasks: [] }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ tasks: [] }));
     await taskListCommand({
       argv: ['--instance-id', 'inst-a', '--step-id', 'step-review', '--status', 'pending'],
       env: { MEDIFORCE_API_KEY: 'k' },
@@ -57,9 +53,7 @@ describe('task list command', () => {
   });
 
   it('hits /api/tasks with no axis flag — caller-scope queue (GitHub-like default)', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ tasks: [SAMPLE_TASK] }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ tasks: [SAMPLE_TASK] }));
     const output = captureOutput();
     const code = await taskListCommand({
       argv: [],
@@ -86,9 +80,7 @@ describe('task list command', () => {
 
 describe('task get command', () => {
   it('GETs /api/tasks/:taskId and prints the entity', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(SAMPLE_TASK),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(SAMPLE_TASK));
     const output = captureOutput();
     const code = await taskGetCommand({
       argv: ['task-1'],
@@ -103,9 +95,9 @@ describe('task get command', () => {
 
 describe('task claim command', () => {
   it('POSTs /api/tasks/:taskId/claim and prints the claimed entity', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ task: { ...SAMPLE_TASK, status: 'claimed', assignedUserId: 'u-1' } }),
-    );
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse({ task: { ...SAMPLE_TASK, status: 'claimed', assignedUserId: 'u-1' } }));
     const output = captureOutput();
     const code = await taskClaimCommand({
       argv: ['task-1'],

@@ -56,39 +56,20 @@ describe('PluginCombobox', () => {
   });
 
   it('[RENDER] shows "Select plugin..." placeholder when no value', () => {
-    render(
-      <PluginCombobox
-        plugins={mockPlugins}
-        value={undefined}
-        onChange={vi.fn()}
-        role="executor"
-      />,
-    );
+    render(<PluginCombobox plugins={mockPlugins} value={undefined} onChange={vi.fn()} role="executor" />);
     expect(screen.getByText('Select plugin...')).toBeInTheDocument();
   });
 
   it('[RENDER] shows selected plugin name when value is set', () => {
     render(
-      <PluginCombobox
-        plugins={mockPlugins}
-        value="supply-chain/intake-agent"
-        onChange={vi.fn()}
-        role="executor"
-      />,
+      <PluginCombobox plugins={mockPlugins} value="supply-chain/intake-agent" onChange={vi.fn()} role="executor" />,
     );
     expect(screen.getByText('Intake Agent')).toBeInTheDocument();
   });
 
   it('[DATA] filters plugins by search text (name and description, case-insensitive)', async () => {
     const user = userEvent.setup();
-    render(
-      <PluginCombobox
-        plugins={mockPlugins}
-        value={undefined}
-        onChange={vi.fn()}
-        role="executor"
-      />,
-    );
+    render(<PluginCombobox plugins={mockPlugins} value={undefined} onChange={vi.fn()} role="executor" />);
 
     // Open the combobox
     await user.click(screen.getByText('Select plugin...'));
@@ -104,14 +85,7 @@ describe('PluginCombobox', () => {
 
   it('[DATA] only shows plugins matching the role prop (executor or reviewer)', async () => {
     const user = userEvent.setup();
-    render(
-      <PluginCombobox
-        plugins={mockPlugins}
-        value={undefined}
-        onChange={vi.fn()}
-        role="executor"
-      />,
-    );
+    render(<PluginCombobox plugins={mockPlugins} value={undefined} onChange={vi.fn()} role="executor" />);
 
     // Open the combobox
     await user.click(screen.getByText('Select plugin...'));
@@ -125,14 +99,7 @@ describe('PluginCombobox', () => {
 
   it('[RENDER] shows "No plugins found" when filter yields empty results', async () => {
     const user = userEvent.setup();
-    render(
-      <PluginCombobox
-        plugins={mockPlugins}
-        value={undefined}
-        onChange={vi.fn()}
-        role="executor"
-      />,
-    );
+    render(<PluginCombobox plugins={mockPlugins} value={undefined} onChange={vi.fn()} role="executor" />);
 
     await user.click(screen.getByText('Select plugin...'));
 
@@ -145,14 +112,7 @@ describe('PluginCombobox', () => {
   it('[CLICK] selecting a plugin calls onChange with plugin name', async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
-    render(
-      <PluginCombobox
-        plugins={mockPlugins}
-        value={undefined}
-        onChange={onChange}
-        role="executor"
-      />,
-    );
+    render(<PluginCombobox plugins={mockPlugins} value={undefined} onChange={onChange} role="executor" />);
 
     await user.click(screen.getByText('Select plugin...'));
     await user.click(screen.getByText('Intake Agent'));
@@ -164,12 +124,7 @@ describe('PluginCombobox', () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
     render(
-      <PluginCombobox
-        plugins={mockPlugins}
-        value="supply-chain/intake-agent"
-        onChange={onChange}
-        role="executor"
-      />,
+      <PluginCombobox plugins={mockPlugins} value="supply-chain/intake-agent" onChange={onChange} role="executor" />,
     );
 
     // Click the clear button (X)

@@ -4,11 +4,7 @@ import { signState, generateNonce, generatePkcePair } from '@mediforce/agent-run
 import { getPlatformServices } from '@/lib/platform-services';
 import { getOAuthStateSecret } from '@/lib/oauth-state-secret';
 import { buildOAuthCallbackUrl } from '@/lib/app-base-url';
-import {
-  requireFirebaseUid,
-  requireNamespaceFromQuery,
-  requireNamespaceMembership,
-} from '../../_shared/auth';
+import { requireFirebaseUid, requireNamespaceFromQuery, requireNamespaceMembership } from '../../_shared/auth';
 
 const StartBodySchema = z.object({
   serverName: z.string().min(1),
@@ -63,10 +59,7 @@ export async function POST(
   const body = await request.json().catch(() => null);
   const parsed = StartBodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Validation failed', issues: parsed.error.issues },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'Validation failed', issues: parsed.error.issues }, { status: 400 });
   }
   const { serverName } = parsed.data;
 
@@ -77,23 +70,16 @@ export async function POST(
 
   const binding = agent.mcpServers?.[serverName];
   if (binding === undefined) {
-    return NextResponse.json(
-      { error: `Agent has no MCP binding named "${serverName}"` },
-      { status: 404 },
-    );
+    return NextResponse.json({ error: `Agent has no MCP binding named "${serverName}"` }, { status: 404 });
   }
   if (binding.type !== 'http' || binding.auth?.type !== 'oauth') {
-    return NextResponse.json(
-      { error: `Binding "${serverName}" is not configured for OAuth` },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: `Binding "${serverName}" is not configured for OAuth` }, { status: 400 });
   }
   if (binding.auth.provider !== providerSlug) {
     return NextResponse.json(
       {
         error:
-          `Binding "${serverName}" is configured for provider "${binding.auth.provider}", ` +
-          `not "${providerSlug}"`,
+          `Binding "${serverName}" is configured for provider "${binding.auth.provider}", ` + `not "${providerSlug}"`,
       },
       { status: 400 },
     );

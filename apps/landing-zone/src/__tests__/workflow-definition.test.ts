@@ -7,9 +7,7 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
   const appDir = resolve(import.meta.dirname, '../..');
 
   function loadDefinition() {
-    const raw = JSON.parse(
-      readFileSync(resolve(appDir, 'src/landing-zone-CDISCPILOT01.wd.json'), 'utf8'),
-    );
+    const raw = JSON.parse(readFileSync(resolve(appDir, 'src/landing-zone-CDISCPILOT01.wd.json'), 'utf8'));
     return WorkflowDefinitionSchema.safeParse({ ...raw, version: 1 });
   }
 
@@ -65,9 +63,7 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
     expect(result.success).toBe(true);
     if (!result.success) return;
 
-    const scriptSteps = result.data.steps.filter(
-      (step) => step.executor === 'script' && step.type !== 'terminal',
-    );
+    const scriptSteps = result.data.steps.filter((step) => step.executor === 'script' && step.type !== 'terminal');
     expect(scriptSteps.length).toBeGreaterThan(0);
 
     for (const step of scriptSteps) {

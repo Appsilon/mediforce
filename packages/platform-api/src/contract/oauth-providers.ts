@@ -19,8 +19,7 @@ export const GetOAuthProviderOutputSchema = z.object({
   provider: PublicOAuthProviderConfigSchema,
 });
 
-export const CreateOAuthProviderInputApiSchema =
-  NamespaceQuery.merge(CreateOAuthProviderInputSchema);
+export const CreateOAuthProviderInputApiSchema = NamespaceQuery.merge(CreateOAuthProviderInputSchema);
 export const CreateOAuthProviderOutputSchema = z.object({
   provider: PublicOAuthProviderConfigSchema,
 });

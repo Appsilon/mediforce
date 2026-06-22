@@ -8,7 +8,10 @@ const listAuditMock = vi.fn<(...args: unknown[]) => Promise<{ events: AuditEvent
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { processes: { listAuditEvents: listAuditMock } },
   ApiError: class ApiError extends Error {
-    constructor(public status: number, message: string) {
+    constructor(
+      public status: number,
+      message: string,
+    ) {
       super(message);
     }
   },

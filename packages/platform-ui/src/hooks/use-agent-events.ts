@@ -38,9 +38,7 @@ export function useAgentEvents(
   });
 
   const query = useQuery({
-    queryKey: enabled
-      ? queryKeys.agentEvents(instanceId, stepId)
-      : queryKeys.agentEvents('__noop__', null),
+    queryKey: enabled ? queryKeys.agentEvents(instanceId, stepId) : queryKeys.agentEvents('__noop__', null),
     queryFn: async () => {
       if (instanceId === null || instanceId === undefined) {
         throw new Error('unreachable: enabled gates this');
@@ -50,8 +48,7 @@ export function useAgentEvents(
         accumulator.current = { key, events: [] };
       }
       const seen = accumulator.current.events;
-      const afterSequence =
-        seen.length > 0 ? seen[seen.length - 1].sequence : undefined;
+      const afterSequence = seen.length > 0 ? seen[seen.length - 1].sequence : undefined;
       const result = await mediforce.processes.agentEvents({
         instanceId,
         stepId: stepId ?? undefined,
@@ -84,10 +81,7 @@ export function useAgentEvents(
  * cursor-based delta should never overlap, but de-duping defends against a
  * retried poll that re-fetches the boundary event.
  */
-function mergeBySequence(
-  existing: readonly AgentEvent[],
-  delta: readonly AgentEvent[],
-): AgentEvent[] {
+function mergeBySequence(existing: readonly AgentEvent[], delta: readonly AgentEvent[]): AgentEvent[] {
   if (delta.length === 0) return existing.slice();
   const bySequence = new Map<number, AgentEvent>();
   for (const event of existing) bySequence.set(event.sequence, event);

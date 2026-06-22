@@ -19,7 +19,9 @@ import { setupRecording, click, showStep, showResult, endRecording } from '../he
  * `proc-completed-2`.
  */
 test.describe('Archive run from list — useArchiveRun optimistic', () => {
-  test('archive hides row immediately; show archived brings it back with unarchive icon', async ({ page }, testInfo) => {
+  test('archive hides row immediately; show archived brings it back with unarchive icon', async ({
+    page,
+  }, testInfo) => {
     await setupRecording(page, 'archive-from-runs-list', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/runs`);
 

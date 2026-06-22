@@ -3,7 +3,18 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Server, HardDrive, Container, AlertTriangle, ArrowUpDown, Trash2, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Server,
+  HardDrive,
+  Container,
+  AlertTriangle,
+  ArrowUpDown,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+} from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { useDockerImages } from '@/hooks/use-docker-images';
@@ -36,7 +47,15 @@ function parseAge(created: string): number {
   if (!match) return 0;
   const num = parseInt(match[1], 10);
   const unit = match[2].toLowerCase();
-  const seconds: Record<string, number> = { second: 1, minute: 60, hour: 3600, day: 86400, week: 604800, month: 2592000, year: 31536000 };
+  const seconds: Record<string, number> = {
+    second: 1,
+    minute: 60,
+    hour: 3600,
+    day: 86400,
+    week: 604800,
+    month: 2592000,
+    year: 31536000,
+  };
   return num * (seconds[unit] ?? 0);
 }
 
@@ -79,9 +98,8 @@ export default function AdminInfrastructurePage() {
       await mediforce.dockerImages.delete({ imageId });
       refresh();
     } catch (err) {
-      const message = err instanceof ApiError
-        ? err.message
-        : err instanceof Error ? err.message : 'Failed to delete image';
+      const message =
+        err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to delete image';
       setDeleteError(message);
       refresh();
     } finally {
@@ -95,14 +113,11 @@ export default function AdminInfrastructurePage() {
     }
   }, [roleLoading, canAdmin, handle, router]);
 
-  const sortedImages = useMemo(
-    () => sortImages(images, sortField, sortDir),
-    [images, sortField, sortDir],
-  );
+  const sortedImages = useMemo(() => sortImages(images, sortField, sortDir), [images, sortField, sortDir]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
-      setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortField(field);
       setSortDir(field === 'repository' ? 'asc' : 'desc');
@@ -141,7 +156,9 @@ export default function AdminInfrastructurePage() {
           {deleteError && (
             <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20 p-3 flex items-center justify-between">
               <p className="text-sm text-red-700 dark:text-red-400">{deleteError}</p>
-              <button onClick={() => setDeleteError(null)} className="text-xs text-red-500 hover:text-red-700">Dismiss</button>
+              <button onClick={() => setDeleteError(null)} className="text-xs text-red-500 hover:text-red-700">
+                Dismiss
+              </button>
             </div>
           )}
           {disk && (
@@ -170,7 +187,9 @@ export default function AdminInfrastructurePage() {
           <div className="rounded-lg border">
             <div className="px-4 py-3 border-b">
               <h2 className="text-sm font-semibold">Docker images</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">{images.length} image{images.length !== 1 ? 's' : ''} available on platform</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {images.length} image{images.length !== 1 ? 's' : ''} available on platform
+              </p>
             </div>
             {images.length === 0 ? (
               <p className="px-4 py-6 text-sm text-muted-foreground text-center">No images found.</p>
@@ -179,11 +198,31 @@ export default function AdminInfrastructurePage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-left text-xs text-muted-foreground">
-                      <SortHeader label="Repository" field="repository" current={sortField} dir={sortDir} onSort={toggleSort} />
+                      <SortHeader
+                        label="Repository"
+                        field="repository"
+                        current={sortField}
+                        dir={sortDir}
+                        onSort={toggleSort}
+                      />
                       <th className="px-4 py-2 font-medium">Tag</th>
                       <th className="px-4 py-2 font-medium">ID</th>
-                      <SortHeader label="Size" field="size" current={sortField} dir={sortDir} onSort={toggleSort} align="right" />
-                      <SortHeader label="Created" field="created" current={sortField} dir={sortDir} onSort={toggleSort} align="right" />
+                      <SortHeader
+                        label="Size"
+                        field="size"
+                        current={sortField}
+                        dir={sortDir}
+                        onSort={toggleSort}
+                        align="right"
+                      />
+                      <SortHeader
+                        label="Created"
+                        field="created"
+                        current={sortField}
+                        dir={sortDir}
+                        onSort={toggleSort}
+                        align="right"
+                      />
                       <th className="px-4 py-2 font-medium w-10" />
                     </tr>
                   </thead>
@@ -207,7 +246,14 @@ export default function AdminInfrastructurePage() {
   );
 }
 
-function SortHeader({ label, field, current, dir, onSort, align }: {
+function SortHeader({
+  label,
+  field,
+  current,
+  dir,
+  onSort,
+  align,
+}: {
   label: string;
   field: SortField;
   current: SortField;
@@ -233,7 +279,13 @@ function SortHeader({ label, field, current, dir, onSort, align }: {
   );
 }
 
-function DiskCard({ icon, title, count, active, size }: {
+function DiskCard({
+  icon,
+  title,
+  count,
+  active,
+  size,
+}: {
   icon: React.ReactNode;
   title: string;
   count?: number;
@@ -256,11 +308,7 @@ function DiskCard({ icon, title, count, active, size }: {
   );
 }
 
-function ImageRow({ img, deleting, onDelete }: {
-  img: DockerImageInfo;
-  deleting: boolean;
-  onDelete: () => void;
-}) {
+function ImageRow({ img, deleting, onDelete }: { img: DockerImageInfo; deleting: boolean; onDelete: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [workflows, setWorkflows] = useState<WorkflowImageMatch[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -271,9 +319,7 @@ function ImageRow({ img, deleting, onDelete }: {
     setError(null);
     try {
       const imageRef = `${img.repository}:${img.tag}`;
-      const res = await apiFetch(
-        `/api/workflow-definitions/by-image?image=${encodeURIComponent(imageRef)}`,
-      );
+      const res = await apiFetch(`/api/workflow-definitions/by-image?image=${encodeURIComponent(imageRef)}`);
       if (!res.ok) {
         setError(`Failed to load (${res.status})`);
         return;
@@ -303,19 +349,19 @@ function ImageRow({ img, deleting, onDelete }: {
             onClick={toggle}
             className="inline-flex items-center gap-1 hover:text-foreground transition-colors text-left"
           >
-            {expanded
-              ? <ChevronDown className="h-3 w-3 shrink-0" />
-              : <ChevronRight className="h-3 w-3 shrink-0" />}
+            {expanded ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
             {img.repository}
           </button>
         </td>
         <td className="px-4 py-2">
-          <span className={cn(
-            'inline-block rounded-full px-2 py-0.5 text-[10px] font-medium',
-            img.tag === 'latest'
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-              : 'bg-muted text-muted-foreground',
-          )}>
+          <span
+            className={cn(
+              'inline-block rounded-full px-2 py-0.5 text-[10px] font-medium',
+              img.tag === 'latest'
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                : 'bg-muted text-muted-foreground',
+            )}
+          >
             {img.tag}
           </span>
         </td>
@@ -342,11 +388,10 @@ function ImageRow({ img, deleting, onDelete }: {
                 Loading workflows...
               </div>
             )}
-            {error && (
-              <p className="text-xs text-red-500">{error}</p>
-            )}
-            {workflows !== null && !loading && (
-              workflows.length === 0 ? (
+            {error && <p className="text-xs text-red-500">{error}</p>}
+            {workflows !== null &&
+              !loading &&
+              (workflows.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No workflows use this image.</p>
               ) : (
                 <div className="space-y-1">
@@ -355,7 +400,9 @@ function ImageRow({ img, deleting, onDelete }: {
                   </p>
                   {workflows.map((wf) => (
                     <div key={`${wf.namespace}:${wf.name}`} className="flex items-center gap-2 text-xs">
-                      <span className="font-mono">{wf.namespace}/{wf.name}</span>
+                      <span className="font-mono">
+                        {wf.namespace}/{wf.name}
+                      </span>
                       {wf.title && <span className="text-muted-foreground">— {wf.title}</span>}
                       <span className="text-muted-foreground">v{wf.version}</span>
                       <span className="text-muted-foreground">
@@ -364,8 +411,7 @@ function ImageRow({ img, deleting, onDelete }: {
                     </div>
                   ))}
                 </div>
-              )
-            )}
+              ))}
           </td>
         </tr>
       )}

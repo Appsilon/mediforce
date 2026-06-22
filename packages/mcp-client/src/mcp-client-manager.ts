@@ -70,9 +70,7 @@ export class McpClientManager {
    * Returns all tools in OpenRouter-compatible function format, namespaced as serverName__toolName.
    */
   async connect(): Promise<McpToolDefinition[]> {
-    const results = await Promise.allSettled(
-      this.servers.map((serverConfig) => this.connectServer(serverConfig)),
-    );
+    const results = await Promise.allSettled(this.servers.map((serverConfig) => this.connectServer(serverConfig)));
 
     const rejected = results
       .map((r, i) => ({ r, name: this.servers[i].name }))
@@ -108,7 +106,10 @@ export class McpClientManager {
         ...inheritedEnv(),
         ...resolvedEnv,
       };
-      if (MCP_DEBUG) console.log(`[MCP] Spawning '${serverConfig.name}': command=${serverConfig.command} args=${JSON.stringify(serverConfig.args ?? [])} cwd=${process.cwd()} PATH=${(spawnEnv.PATH ?? '').slice(0, 120)}…`);
+      if (MCP_DEBUG)
+        console.log(
+          `[MCP] Spawning '${serverConfig.name}': command=${serverConfig.command} args=${JSON.stringify(serverConfig.args ?? [])} cwd=${process.cwd()} PATH=${(spawnEnv.PATH ?? '').slice(0, 120)}…`,
+        );
       const cwd = spawnEnv.MEDIFORCE_ROOT || undefined;
       transport = new StdioClientTransport({
         command: serverConfig.command,
@@ -120,9 +121,7 @@ export class McpClientManager {
         if (MCP_DEBUG) console.error(`[MCP] Transport error for '${serverConfig.name}':`, err);
       };
     } else if (serverConfig.url) {
-      transport = new StreamableHTTPClientTransport(
-        new URL(serverConfig.url),
-      );
+      transport = new StreamableHTTPClientTransport(new URL(serverConfig.url));
     } else {
       throw new Error(`MCP server '${serverConfig.name}': either command or url must be provided`);
     }
@@ -204,11 +203,9 @@ export class McpClientManager {
     const timeout = setTimeout(() => abortController.abort(), timeoutMs);
 
     try {
-      const result = await server.client.callTool(
-        { name: toolInfo.originalName, arguments: args },
-        undefined,
-        { signal: abortController.signal },
-      );
+      const result = await server.client.callTool({ name: toolInfo.originalName, arguments: args }, undefined, {
+        signal: abortController.signal,
+      });
 
       const contentParts = result.content as Array<{ type: string; text?: string }>;
       const textContent = contentParts

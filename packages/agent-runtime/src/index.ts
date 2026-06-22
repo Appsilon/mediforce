@@ -17,8 +17,18 @@ export type {
 } from './interfaces/index';
 
 // Plugins
-export { BaseContainerAgentPlugin, isLocalExecutionAllowed, OAuthTokenUnavailableError, validateOutputSchema } from './plugins/base-container-agent-plugin';
-export type { AgentCommandSpec, OutputSchema, SpawnCliOptions, SpawnDockerResult } from './plugins/base-container-agent-plugin';
+export {
+  BaseContainerAgentPlugin,
+  isLocalExecutionAllowed,
+  OAuthTokenUnavailableError,
+  validateOutputSchema,
+} from './plugins/base-container-agent-plugin';
+export type {
+  AgentCommandSpec,
+  OutputSchema,
+  SpawnCliOptions,
+  SpawnDockerResult,
+} from './plugins/base-container-agent-plugin';
 export { ClaudeCodeAgentPlugin } from './plugins/claude-code-agent-plugin';
 export { MockClaudeCodeAgentPlugin } from './plugins/mock-claude-code-agent-plugin';
 export { OpenCodeAgentPlugin } from './plugins/opencode-agent-plugin';
@@ -49,7 +59,12 @@ export type {
 } from './runner/step-executor';
 
 // Env validation
-export { validateWorkflowEnv, validateWorkflowModels, validateRetiredModels, validatePluginRequiredEnv } from './plugins/resolve-env';
+export {
+  validateWorkflowEnv,
+  validateWorkflowModels,
+  validateRetiredModels,
+  validatePluginRequiredEnv,
+} from './plugins/resolve-env';
 export type { MissingEnvVar, MissingPluginEnv, UnknownModel, RetiredModelRef } from './plugins/resolve-env';
 
 // MCP resolution helpers

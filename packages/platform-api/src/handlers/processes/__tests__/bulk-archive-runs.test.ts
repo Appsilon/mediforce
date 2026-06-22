@@ -19,12 +19,8 @@ describe('bulkArchiveRuns handler', () => {
   });
 
   it('archives each eligible run and reports errors for active runs', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'a', namespace: 'team-alpha', status: 'completed' }),
-    );
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'b', namespace: 'team-alpha', status: 'running' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'a', namespace: 'team-alpha', status: 'completed' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'b', namespace: 'team-alpha', status: 'running' }));
     const scope = createTestScope({
       instanceRepo,
       auditRepo,

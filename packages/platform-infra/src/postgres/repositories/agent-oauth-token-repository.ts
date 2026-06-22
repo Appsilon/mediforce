@@ -25,11 +25,7 @@ import { agentOAuthTokens } from '../schema/agent-oauth-token';
 export class PostgresAgentOAuthTokenRepository implements AgentOAuthTokenRepository {
   constructor(private readonly db: Database) {}
 
-  async get(
-    namespace: string,
-    agentId: string,
-    serverName: string,
-  ): Promise<AgentOAuthToken | null> {
+  async get(namespace: string, agentId: string, serverName: string): Promise<AgentOAuthToken | null> {
     const rows = await this.db
       .select()
       .from(agentOAuthTokens)
@@ -45,12 +41,7 @@ export class PostgresAgentOAuthTokenRepository implements AgentOAuthTokenReposit
     return row ? toToken(row) : null;
   }
 
-  async put(
-    namespace: string,
-    agentId: string,
-    serverName: string,
-    token: AgentOAuthToken,
-  ): Promise<void> {
+  async put(namespace: string, agentId: string, serverName: string, token: AgentOAuthToken): Promise<void> {
     const parsed = AgentOAuthTokenSchema.parse(token);
     const values = {
       workspace: namespace,
@@ -70,11 +61,7 @@ export class PostgresAgentOAuthTokenRepository implements AgentOAuthTokenReposit
       .insert(agentOAuthTokens)
       .values(values)
       .onConflictDoUpdate({
-        target: [
-          agentOAuthTokens.workspace,
-          agentOAuthTokens.agentId,
-          agentOAuthTokens.serverName,
-        ],
+        target: [agentOAuthTokens.workspace, agentOAuthTokens.agentId, agentOAuthTokens.serverName],
         set: {
           providerId: values.providerId,
           accessToken: values.accessToken,
@@ -90,11 +77,7 @@ export class PostgresAgentOAuthTokenRepository implements AgentOAuthTokenReposit
       });
   }
 
-  async delete(
-    namespace: string,
-    agentId: string,
-    serverName: string,
-  ): Promise<boolean> {
+  async delete(namespace: string, agentId: string, serverName: string): Promise<boolean> {
     const rows = await this.db
       .delete(agentOAuthTokens)
       .where(
@@ -108,19 +91,11 @@ export class PostgresAgentOAuthTokenRepository implements AgentOAuthTokenReposit
     return rows.length > 0;
   }
 
-  async listByAgent(
-    namespace: string,
-    agentId: string,
-  ): Promise<Array<AgentOAuthToken & { serverName: string }>> {
+  async listByAgent(namespace: string, agentId: string): Promise<Array<AgentOAuthToken & { serverName: string }>> {
     const rows = await this.db
       .select()
       .from(agentOAuthTokens)
-      .where(
-        and(
-          eq(agentOAuthTokens.workspace, namespace),
-          eq(agentOAuthTokens.agentId, agentId),
-        ),
-      )
+      .where(and(eq(agentOAuthTokens.workspace, namespace), eq(agentOAuthTokens.agentId, agentId)))
       .orderBy(asc(agentOAuthTokens.serverName));
     return rows.map((row) => {
       const token = toToken(row);

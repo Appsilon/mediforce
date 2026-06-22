@@ -32,13 +32,9 @@ test.describe('GET /api/agents — API E2E', () => {
       headers: apiKeyHeaders(),
     });
     expect(res.status(), await res.text()).toBe(200);
-    const body = await res.json() as { agents: Array<{ id: string }> };
+    const body = (await res.json()) as { agents: Array<{ id: string }> };
     const ids = body.agents.map((agent) => agent.id);
-    expect(ids).toEqual(expect.arrayContaining([
-      'claude-code-agent',
-      'mcp-test-agent',
-      'oauth-test-agent',
-    ]));
+    expect(ids).toEqual(expect.arrayContaining(['claude-code-agent', 'mcp-test-agent', 'oauth-test-agent']));
   });
 
   test('list: outsider user sees only public agents (not the `test`-private ones)', async ({ request }) => {
@@ -46,7 +42,7 @@ test.describe('GET /api/agents — API E2E', () => {
       headers: bearerHeaders(callers.outsider),
     });
     expect(res.status(), await res.text()).toBe(200);
-    const body = await res.json() as { agents: Array<{ id: string; visibility?: string }> };
+    const body = (await res.json()) as { agents: Array<{ id: string; visibility?: string }> };
     const ids = body.agents.map((agent) => agent.id);
     expect(ids).toContain('claude-code-agent');
     // Private agents belonging to namespace `test` must be filtered out.
@@ -67,7 +63,7 @@ test.describe('GET /api/agents — API E2E', () => {
       headers: bearerHeaders(callers.outsider),
     });
     expect(res.status(), await res.text()).toBe(200);
-    const body = await res.json() as { agent: { id: string; visibility?: string } };
+    const body = (await res.json()) as { agent: { id: string; visibility?: string } };
     expect(body.agent.id).toBe('claude-code-agent');
     expect(body.agent.visibility).toBe('public');
   });

@@ -9,10 +9,7 @@ import {
 import type { NamespaceSecretsRepository } from '@mediforce/platform-core';
 import { chatCoworkSession } from '../chat';
 import { HandlerError, NotFoundError, PreconditionFailedError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 function fixedNamespaceSecrets(values: Record<string, string>): NamespaceSecretsRepository {
   return {
@@ -83,10 +80,7 @@ describe('chatCoworkSession handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    const result = await chatCoworkSession(
-      { sessionId: 'sess-1', message: 'Hi there' },
-      scope,
-    );
+    const result = await chatCoworkSession({ sessionId: 'sess-1', message: 'Hi there' }, scope);
 
     expect(result.agentText).toBe('Hello back');
     expect(result.artifact).toBeUndefined();
@@ -120,7 +114,8 @@ describe('chatCoworkSession handler', () => {
       }),
     );
 
-    fetchSpy = vi.spyOn(globalThis, 'fetch')
+    fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
@@ -161,10 +156,7 @@ describe('chatCoworkSession handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    const result = await chatCoworkSession(
-      { sessionId: 'sess-1', message: 'Make it' },
-      scope,
-    );
+    const result = await chatCoworkSession({ sessionId: 'sess-1', message: 'Make it' }, scope);
 
     expect(result.artifact).toEqual({ title: 'v1' });
     expect(result.toolCalls).toEqual([]);
@@ -191,10 +183,7 @@ describe('chatCoworkSession handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    const err = await chatCoworkSession(
-      { sessionId: 'sess-1', message: 'hi' },
-      scope,
-    ).catch((e) => e);
+    const err = await chatCoworkSession({ sessionId: 'sess-1', message: 'hi' }, scope).catch((e) => e);
 
     expect(err).toBeInstanceOf(HandlerError);
     expect((err as HandlerError).message).toMatch(/OPENROUTER_API_KEY/);
@@ -215,9 +204,9 @@ describe('chatCoworkSession handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    await expect(
-      chatCoworkSession({ sessionId: 'sess-1', message: 'hi' }, scope),
-    ).rejects.toBeInstanceOf(PreconditionFailedError);
+    await expect(chatCoworkSession({ sessionId: 'sess-1', message: 'hi' }, scope)).rejects.toBeInstanceOf(
+      PreconditionFailedError,
+    );
   });
 
   it('throws NotFoundError for foreign-namespace session (anti-enum)', async () => {
@@ -235,8 +224,8 @@ describe('chatCoworkSession handler', () => {
       caller: userCaller('u-other', ['team-beta']),
     });
 
-    await expect(
-      chatCoworkSession({ sessionId: 'sess-1', message: 'hi' }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(chatCoworkSession({ sessionId: 'sess-1', message: 'hi' }, scope)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
   });
 });

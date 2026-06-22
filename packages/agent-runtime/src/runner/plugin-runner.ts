@@ -1,4 +1,9 @@
-import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitPayload } from '../interfaces/step-executor-plugin';
+import type {
+  StepExecutorPlugin,
+  AgentContext,
+  WorkflowAgentContext,
+  EmitPayload,
+} from '../interfaces/step-executor-plugin';
 import type { AgentEventLog } from './agent-event-log';
 
 export interface PluginRunResult {

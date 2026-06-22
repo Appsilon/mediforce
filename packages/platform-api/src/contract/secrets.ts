@@ -93,9 +93,5 @@ export const ListWorkflowSecretKeysBatchOutputSchema = z.object({
   keysByWorkflow: z.record(z.string(), z.array(z.string())),
 });
 
-export type ListWorkflowSecretKeysBatchInput = z.infer<
-  typeof ListWorkflowSecretKeysBatchInputSchema
->;
-export type ListWorkflowSecretKeysBatchOutput = z.infer<
-  typeof ListWorkflowSecretKeysBatchOutputSchema
->;
+export type ListWorkflowSecretKeysBatchInput = z.infer<typeof ListWorkflowSecretKeysBatchInputSchema>;
+export type ListWorkflowSecretKeysBatchOutput = z.infer<typeof ListWorkflowSecretKeysBatchOutputSchema>;

@@ -55,8 +55,7 @@ export const httpActionHandler: HttpActionHandler = async (config, ctx) => {
     response = await fetch(resolvedConfig.url, init);
   } catch (cause) {
     const rootMessage = cause instanceof Error ? cause.message : String(cause);
-    const underlyingDetail =
-      cause instanceof Error && cause.cause instanceof Error ? ` (${cause.cause.message})` : '';
+    const underlyingDetail = cause instanceof Error && cause.cause instanceof Error ? ` (${cause.cause.message})` : '';
     // Strip query string — it may contain interpolated secret values (e.g. ?key=${secrets.API_KEY}).
     const safeUrl = (() => {
       try {
@@ -66,9 +65,7 @@ export const httpActionHandler: HttpActionHandler = async (config, ctx) => {
         return resolvedConfig.url;
       }
     })();
-    throw new Error(
-      `HTTP request failed: ${resolvedConfig.method} ${safeUrl} — ${rootMessage}${underlyingDetail}`,
-    );
+    throw new Error(`HTTP request failed: ${resolvedConfig.method} ${safeUrl} — ${rootMessage}${underlyingDetail}`);
   }
   const text = await response.text();
   let json: unknown = null;
@@ -110,9 +107,7 @@ function interpolateConfig(
   const url = String(interpolate(config.url, sources));
   const body = config.body !== undefined ? interpolate(config.body, sources) : undefined;
   const headers = config.headers
-    ? Object.fromEntries(
-        Object.entries(config.headers).map(([k, v]) => [k, String(interpolate(v, sources))]),
-      )
+    ? Object.fromEntries(Object.entries(config.headers).map(([k, v]) => [k, String(interpolate(v, sources))]))
     : undefined;
 
   return {

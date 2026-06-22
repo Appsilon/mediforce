@@ -7,12 +7,7 @@ interface RouteContext {
   params: Promise<{ instanceId: string }>;
 }
 
-export const POST = createRouteAdapter<
-  typeof ResumeRunInputSchema,
-  ResumeRunInput,
-  unknown,
-  RouteContext
->(
+export const POST = createRouteAdapter<typeof ResumeRunInputSchema, ResumeRunInput, unknown, RouteContext>(
   ResumeRunInputSchema,
   async (_req, ctx) => ({ runId: (await ctx.params).instanceId }),
   resumeRun,

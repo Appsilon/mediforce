@@ -27,7 +27,13 @@ import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import type { WorkflowWorkspace } from '@mediforce/platform-core';
 import { normalizeRepoUrls, toHttpsWithToken } from '../plugins/container-plugin';
-import { bareRepoPathFor, defaultDataDir, runBranchName, worktreePathFor, type WorkflowIdentity } from './workspace-paths';
+import {
+  bareRepoPathFor,
+  defaultDataDir,
+  runBranchName,
+  worktreePathFor,
+  type WorkflowIdentity,
+} from './workspace-paths';
 
 export type { WorkflowIdentity } from './workspace-paths';
 
@@ -69,12 +75,10 @@ const SECRET_CONTENT_PATTERNS: Array<{ name: string; pattern: RegExp }> = [
 
 export class SecretDetectedError extends Error {
   constructor(matches: Array<{ file: string; kind: string }>) {
-    const summary = matches
-      .map((m) => `  - ${m.file}: ${m.kind}`)
-      .join('\n');
+    const summary = matches.map((m) => `  - ${m.file}: ${m.kind}`).join('\n');
     super(
       `Refusing to commit — secret-like content detected in staged files:\n${summary}\n` +
-      `Remove the sensitive content or add the file to .gitignore before retrying.`,
+        `Remove the sensitive content or add the file to .gitignore before retrying.`,
     );
     this.name = 'SecretDetectedError';
   }
@@ -200,9 +204,7 @@ export function formatStepCommitMessage(
   let subject: string;
   if (status === 'failed') {
     const firstErrLine = (opts.error ?? '').split('\n')[0].trim();
-    subject = firstErrLine
-      ? `✗ ${stepName} — failed: ${truncate(firstErrLine, 80)}`
-      : `✗ ${stepName} — failed`;
+    subject = firstErrLine ? `✗ ${stepName} — failed: ${truncate(firstErrLine, 80)}` : `✗ ${stepName} — failed`;
   } else {
     const marker = opts.isTerminal ? '✓' : '◆';
     if (summary) {
@@ -231,11 +233,7 @@ export function formatStepCommitMessage(
 
   // Trailers
   const runId = ws.branch.startsWith('run/') ? ws.branch.slice(4) : ws.branch;
-  const trailers: string[] = [
-    `Step-Id: ${opts.stepId}`,
-    `Run-Id: ${runId}`,
-    `Step-Status: ${status}`,
-  ];
+  const trailers: string[] = [`Step-Id: ${opts.stepId}`, `Run-Id: ${runId}`, `Step-Status: ${status}`];
   if (typeof opts.durationMs === 'number') trailers.push(`Step-Duration-Ms: ${opts.durationMs}`);
   if (opts.agentPlugin) trailers.push(`Agent-Plugin: ${opts.agentPlugin}`);
   if (opts.agentImage) trailers.push(`Agent-Image: ${opts.agentImage}`);
@@ -376,11 +374,14 @@ export class WorkspaceManager {
    */
   private snapshotHeritage(bareRepoPath: string, remoteName: string): void {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const out = runGit(
-      ['for-each-ref', '--format=%(refname) %(objectname)', `refs/remotes/${remoteName}/`],
-      { cwd: bareRepoPath, capture: true },
-    );
-    const lines = out.split('\n').map((line) => line.trim()).filter(Boolean);
+    const out = runGit(['for-each-ref', '--format=%(refname) %(objectname)', `refs/remotes/${remoteName}/`], {
+      cwd: bareRepoPath,
+      capture: true,
+    });
+    const lines = out
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
     for (const line of lines) {
       const idx = line.lastIndexOf(' ');
       if (idx < 0) continue;
@@ -399,7 +400,10 @@ export class WorkspaceManager {
    */
   private hasRemote(bareRepoPath: string, remoteName: string): boolean {
     const out = runGit(['remote'], { cwd: bareRepoPath, capture: true });
-    return out.split('\n').map((s) => s.trim()).includes(remoteName);
+    return out
+      .split('\n')
+      .map((s) => s.trim())
+      .includes(remoteName);
   }
 
   /**
@@ -513,14 +517,18 @@ export class WorkspaceManager {
       stdio: ['pipe', 'pipe', 'pipe'],
       encoding: 'utf-8',
       input: content,
-    }).toString().trim();
+    })
+      .toString()
+      .trim();
 
     const treeSha = execFileSync('git', ['mktree'], {
       cwd: bareRepoPath,
       stdio: ['pipe', 'pipe', 'pipe'],
       encoding: 'utf-8',
       input: `100644 blob ${blobSha}\t.gitignore\n`,
-    }).toString().trim();
+    })
+      .toString()
+      .trim();
 
     const seedMessage = [
       '◇ Initialize workspace repository',
@@ -537,7 +545,9 @@ export class WorkspaceManager {
       stdio: ['pipe', 'pipe', 'pipe'],
       encoding: 'utf-8',
       env: commitEnv,
-    }).toString().trim();
+    })
+      .toString()
+      .trim();
 
     execFileSync('git', ['update-ref', 'refs/heads/main', commitSha], {
       cwd: bareRepoPath,
@@ -559,11 +569,14 @@ export class WorkspaceManager {
 
     // Try the remote's HEAD symref first (set by fetch when remote advertises one).
     try {
-      const headOut = execFileSync(
-        'git',
-        ['symbolic-ref', '--short', `refs/remotes/${remoteName}/HEAD`],
-        { cwd: bareRepoPath, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf-8', maxBuffer: GIT_MAX_BUFFER },
-      ).toString().trim();
+      const headOut = execFileSync('git', ['symbolic-ref', '--short', `refs/remotes/${remoteName}/HEAD`], {
+        cwd: bareRepoPath,
+        stdio: ['ignore', 'pipe', 'ignore'],
+        encoding: 'utf-8',
+        maxBuffer: GIT_MAX_BUFFER,
+      })
+        .toString()
+        .trim();
       if (headOut) return headOut;
     } catch {
       // No symref — fall through to explicit lookups.
@@ -742,13 +755,15 @@ export class WorkspaceManager {
    * Callers decide which to dispose — policy (e.g. "only terminal runs")
    * lives where the run state does, not in filesystem plumbing.
    */
-  async listRunWorktrees(): Promise<Array<{
-    namespace: string;
-    workflowName: string;
-    runId: string;
-    path: string;
-    bareRepoPath: string;
-  }>> {
+  async listRunWorktrees(): Promise<
+    Array<{
+      namespace: string;
+      workflowName: string;
+      runId: string;
+      path: string;
+      bareRepoPath: string;
+    }>
+  > {
     const worktreesRoot = join(this.dataDir, 'worktrees');
     if (!(await pathExists(worktreesRoot))) return [];
 

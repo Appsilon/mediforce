@@ -10,12 +10,7 @@ export function VerdictView({ task, remainingTaskCount }: TaskBodyProps) {
 
   if (isActionable) {
     return (
-      <VerdictForm
-        taskId={task.id}
-        disabled={false}
-        remainingTaskCount={remainingTaskCount}
-        verdicts={task.verdicts}
-      />
+      <VerdictForm taskId={task.id} disabled={false} remainingTaskCount={remainingTaskCount} verdicts={task.verdicts} />
     );
   }
   if (isCompleted && task.completionData) {

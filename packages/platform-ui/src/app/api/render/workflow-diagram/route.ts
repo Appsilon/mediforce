@@ -10,6 +10,6 @@ import { RenderWorkflowDiagramInputSchema } from '@mediforce/platform-api/handle
  */
 export const POST = createRouteAdapter(
   RenderWorkflowDiagramInputSchema,
-  async (req) => (await req.json().catch(() => ({}))),
+  async (req) => await req.json().catch(() => ({})),
   renderWorkflowDiagramHandler,
 );

@@ -34,7 +34,7 @@ test.describe('GET /api/processes/* — API E2E', () => {
       headers: apiKeyHeaders(),
     });
     expect(res.status(), await res.text()).toBe(200);
-    const instance = await res.json() as {
+    const instance = (await res.json()) as {
       id: string;
       namespace: string;
       status: string;
@@ -57,7 +57,7 @@ test.describe('GET /api/processes/* — API E2E', () => {
       headers: apiKeyHeaders(),
     });
     expect(res.status()).toBe(404);
-    const body = await res.json() as { error: { code: string; message: string } };
+    const body = (await res.json()) as { error: { code: string; message: string } };
     expect(body.error.code).toBe('not_found');
     expect(body.error.message).toMatch(/not found/i);
   });
@@ -67,7 +67,7 @@ test.describe('GET /api/processes/* — API E2E', () => {
       headers: apiKeyHeaders(),
     });
     expect(res.status(), await res.text()).toBe(200);
-    const body = await res.json() as { events?: unknown };
+    const body = (await res.json()) as { events?: unknown };
     expect(Array.isArray(body.events)).toBe(true);
     const events = body.events as Array<{ processInstanceId: string; action: string }>;
     expect(events.length).toBeGreaterThan(0);
@@ -88,7 +88,7 @@ test.describe('GET /api/processes/* — API E2E', () => {
       headers: apiKeyHeaders(),
     });
     expect(res.status(), await res.text()).toBe(200);
-    const body = await res.json() as {
+    const body = (await res.json()) as {
       instanceId: string;
       definitionName: string;
       instanceStatus: string;

@@ -116,7 +116,9 @@ describe('PluginRunner', () => {
     const runner = new PluginRunner(eventLog);
     const plugin: StepExecutorPlugin = {
       initialize: async () => {},
-      run: async () => { throw new Error('API key invalid'); },
+      run: async () => {
+        throw new Error('API key invalid');
+      },
     };
 
     const result = await runner.execute(plugin, makeContext(), 30_000);
@@ -148,7 +150,9 @@ describe('PluginRunner', () => {
     const eventLog = new InMemoryAgentEventLog();
     const runner = new PluginRunner(eventLog);
     const plugin: StepExecutorPlugin = {
-      initialize: async () => { throw new Error('MCP server unreachable'); },
+      initialize: async () => {
+        throw new Error('MCP server unreachable');
+      },
       run: async () => {},
     };
 

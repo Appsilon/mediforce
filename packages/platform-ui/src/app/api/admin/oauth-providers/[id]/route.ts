@@ -7,22 +7,13 @@ import {
   type GetOAuthProviderInput,
   type UpdateOAuthProviderInputApi,
 } from '@mediforce/platform-api/contract';
-import {
-  deleteOAuthProvider,
-  getOAuthProvider,
-  updateOAuthProvider,
-} from '@mediforce/platform-api/handlers';
+import { deleteOAuthProvider, getOAuthProvider, updateOAuthProvider } from '@mediforce/platform-api/handlers';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export const GET = createRouteAdapter<
-  typeof GetOAuthProviderInputSchema,
-  GetOAuthProviderInput,
-  unknown,
-  RouteContext
->(
+export const GET = createRouteAdapter<typeof GetOAuthProviderInputSchema, GetOAuthProviderInput, unknown, RouteContext>(
   GetOAuthProviderInputSchema,
   async (req, ctx) => ({
     namespace: new URL(req.url).searchParams.get('namespace') ?? '',

@@ -14,9 +14,7 @@ export class AgentDefinitionNotFoundError extends Error {
   public readonly stepId: string;
 
   constructor(agentId: string, stepId: string) {
-    super(
-      `AgentDefinition '${agentId}' (referenced by step '${stepId}' via agentId) not found in the repository`,
-    );
+    super(`AgentDefinition '${agentId}' (referenced by step '${stepId}' via agentId) not found in the repository`);
     this.name = 'AgentDefinitionNotFoundError';
     this.agentId = agentId;
     this.stepId = stepId;

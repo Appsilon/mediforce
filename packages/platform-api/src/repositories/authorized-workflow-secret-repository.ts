@@ -21,11 +21,7 @@ export class AuthorizedWorkflowSecretRepository extends AuthorizedScope {
     return this.raw.getSecretKeys(namespace, workflowName);
   };
 
-  setSecrets = async (
-    namespace: string,
-    workflowName: string,
-    secrets: Record<string, string>,
-  ): Promise<void> => {
+  setSecrets = async (namespace: string, workflowName: string, secrets: Record<string, string>): Promise<void> => {
     this.assertNamespaceWrite(namespace);
     await this.raw.setSecrets(namespace, workflowName, secrets);
   };
@@ -35,21 +31,12 @@ export class AuthorizedWorkflowSecretRepository extends AuthorizedScope {
     await this.raw.deleteSecrets(namespace, workflowName);
   };
 
-  deleteSecret = async (
-    namespace: string,
-    workflowName: string,
-    key: string,
-  ): Promise<void> => {
+  deleteSecret = async (namespace: string, workflowName: string, key: string): Promise<void> => {
     this.assertNamespaceWrite(namespace);
     await this.raw.deleteSecret(namespace, workflowName, key);
   };
 
-  upsertSecret = async (
-    namespace: string,
-    workflowName: string,
-    key: string,
-    value: string,
-  ): Promise<void> => {
+  upsertSecret = async (namespace: string, workflowName: string, key: string, value: string): Promise<void> => {
     this.assertNamespaceWrite(namespace);
     await this.raw.upsertSecret(namespace, workflowName, key, value);
   };

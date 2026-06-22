@@ -49,9 +49,7 @@ export function DisplayPopover({
           className="z-50 w-52 rounded-lg border bg-popover p-1 shadow-md animate-in fade-in-0 zoom-in-95"
         >
           <div className="px-2 py-1.5">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Show
-            </span>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Show</span>
           </div>
           <button
             onClick={onToggleCompleted}
@@ -171,59 +169,59 @@ export function ProcessCard({
           <Settings className="h-4 w-4 text-muted-foreground shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" />
         </Link>
         {isMember && (
-        <div className="flex items-center justify-between px-4 pb-3">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {totalCount > 0 ? (
-              <>
-                <span>{totalCount} {totalCount === 1 ? 'run' : 'runs'}</span>
-                {activeCount > 0 && (
-                  <span className="inline-flex rounded-full bg-green-500/10 px-1.5 py-0.5 text-[11px] font-medium text-green-600 dark:text-green-400">
-                    {activeCount} active
+          <div className="flex items-center justify-between px-4 pb-3">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {totalCount > 0 ? (
+                <>
+                  <span>
+                    {totalCount} {totalCount === 1 ? 'run' : 'runs'}
                   </span>
-                )}
-              </>
-            ) : (
-              <span>No runs</span>
+                  {activeCount > 0 && (
+                    <span className="inline-flex rounded-full bg-green-500/10 px-1.5 py-0.5 text-[11px] font-medium text-green-600 dark:text-green-400">
+                      {activeCount} active
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span>No runs</span>
+              )}
+            </div>
+            {isMember && (
+              <StartRunButton
+                workflowName={definition.name}
+                showVersionPicker
+                hasManualTrigger={definition.hasManualTrigger}
+                archived={definition.archived === true}
+              />
             )}
           </div>
-          {isMember && (
-            <StartRunButton
-              workflowName={definition.name}
-              showVersionPicker
-              hasManualTrigger={definition.hasManualTrigger}
-              archived={definition.archived === true}
-            />
-          )}
-        </div>
         )}
 
         {/* Runs preview — compact list only */}
         {isMember && previewInstances.length > 0 && (
-        <div className="border-t">
+          <div className="border-t">
+            <div>
+              {previewInstances.map((instance) => (
+                <ProcessInstanceRow
+                  key={instance.id}
+                  instance={instance}
+                  steps={runSummary.stepsByVersion[String(instance.definitionVersion)] ?? steps}
+                  activeTaskId={activeTaskByInstance.get(instance.id)}
+                />
+              ))}
+            </div>
 
-          <div>
-            {previewInstances.map((instance) => (
-              <ProcessInstanceRow
-                key={instance.id}
-                instance={instance}
-                steps={runSummary.stepsByVersion[String(instance.definitionVersion)] ?? steps}
-                activeTaskId={activeTaskByInstance.get(instance.id)}
-              />
-            ))}
+            {hasMore && (
+              <Link
+                href={`/${handle}/runs?workflow=${encodeURIComponent(definition.name)}`}
+                className="block w-full px-4 py-2 text-xs font-medium text-primary hover:bg-muted/30 transition-colors border-t border-border/30 text-center"
+              >
+                Show all {totalCount} runs
+              </Link>
+            )}
           </div>
-
-          {hasMore && (
-            <Link
-              href={`/${handle}/runs?workflow=${encodeURIComponent(definition.name)}`}
-              className="block w-full px-4 py-2 text-xs font-medium text-primary hover:bg-muted/30 transition-colors border-t border-border/30 text-center"
-            >
-              Show all {totalCount} runs
-            </Link>
-          )}
-        </div>
         )}
       </div>
-
     </>
   );
 }

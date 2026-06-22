@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  AgentRunner,
-  PluginRegistry,
-  InMemoryAgentEventLog,
-  NoopLlmClient,
-} from '@mediforce/agent-runtime';
+import { AgentRunner, PluginRegistry, InMemoryAgentEventLog, NoopLlmClient } from '@mediforce/agent-runtime';
 import {
   InMemoryAuditRepository,
   InMemoryProcessInstanceRepository,

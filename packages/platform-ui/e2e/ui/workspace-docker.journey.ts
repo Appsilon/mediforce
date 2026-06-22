@@ -73,7 +73,10 @@ test.describe('Docker-backed workspace E2E', () => {
   // starts. Fix is server-side admin SDK adoption — out of scope for #213.
   test.skip(process.env.CI === 'true', 'Blocked by #239 (Firestore rules + client-SDK auth)');
   test.skip(process.env.E2E_RECORD === 'true', 'Excluded from GIF recording — known broken locally, tracked in #239');
-  test.skip(process.env.NEXT_PUBLIC_USE_EMULATORS === 'true', 'Blocked by #239 — Firestore rules deny writes in emulator mode');
+  test.skip(
+    process.env.NEXT_PUBLIC_USE_EMULATORS === 'true',
+    'Blocked by #239 — Firestore rules deny writes in emulator mode',
+  );
   test.skip(!dockerAvailable(), 'Docker daemon not available');
 
   test.beforeAll(() => {
@@ -84,7 +87,9 @@ test.describe('Docker-backed workspace E2E', () => {
     }
   });
 
-  test('multi-step run commits per step, next step sees prior step files, run branch carries full history', async ({ request }) => {
+  test('multi-step run commits per step, next step sees prior step files, run branch carries full history', async ({
+    request,
+  }) => {
     const wdName = `e2e-docker-${Date.now()}`;
     const wd = {
       name: wdName,
@@ -98,7 +103,8 @@ test.describe('Docker-backed workspace E2E', () => {
           plugin: 'script-container',
           script: {
             image: TEST_IMAGE,
-            command: 'bash -c "echo step 1 content > /workspace/step-1.md && echo \'{\\"ok\\":true}\' > /output/result.json"',
+            command:
+              'bash -c "echo step 1 content > /workspace/step-1.md && echo \'{\\"ok\\":true}\' > /output/result.json"',
           },
         },
         {
@@ -110,7 +116,8 @@ test.describe('Docker-backed workspace E2E', () => {
           script: {
             image: TEST_IMAGE,
             // Fails hard if /workspace/step-1.md isn't there — proves inter-step file visibility.
-            command: 'bash -c "test -f /workspace/step-1.md && cp /workspace/step-1.md /workspace/step-2.md && echo \'{\\"ok\\":true}\' > /output/result.json"',
+            command:
+              'bash -c "test -f /workspace/step-1.md && cp /workspace/step-1.md /workspace/step-2.md && echo \'{\\"ok\\":true}\' > /output/result.json"',
           },
         },
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
@@ -129,10 +136,10 @@ test.describe('Docker-backed workspace E2E', () => {
     rmSync(join(DATA_DIR, 'worktrees', TEST_ORG_HANDLE, wdName), { recursive: true, force: true });
 
     // 1. Register the workflow.
-    const createRes = await request.post(
-      `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
-      { headers: AUTH, data: wd },
-    );
+    const createRes = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
+      headers: AUTH,
+      data: wd,
+    });
     expect(createRes.status(), await createRes.text()).toBe(201);
 
     // 2. Trigger a run.
@@ -155,7 +162,9 @@ test.describe('Docker-backed workspace E2E', () => {
     expect(branches).toContain('main');
 
     // 4b. Run branch carries three commits: initial .gitignore seed + one per step.
-    const log = execSync(`git --git-dir="${bareRepoPath}" log run/${instanceId} --oneline`, { encoding: 'utf-8' }).trim();
+    const log = execSync(`git --git-dir="${bareRepoPath}" log run/${instanceId} --oneline`, {
+      encoding: 'utf-8',
+    }).trim();
     const commitLines = log.split('\n').filter(Boolean);
     expect(commitLines.length, `Expected 3 commits, got:\n${log}`).toBe(3);
     expect(log).toMatch(/step-1/);

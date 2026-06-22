@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import type {
-  ChatCoworkSessionOutput,
-  CoworkSession,
-  ConversationTurn,
-} from '@mediforce/platform-core';
+import type { ChatCoworkSessionOutput, CoworkSession, ConversationTurn } from '@mediforce/platform-core';
 import { buildCoworkSession } from '@mediforce/platform-core/testing';
 import { createQueryWrapper } from '@/test/react-query';
 import { queryKeys } from '@/lib/query-keys';
@@ -12,7 +8,12 @@ import { queryKeys } from '@/lib/query-keys';
 const chatMock = vi.fn<(...args: unknown[]) => Promise<ChatCoworkSessionOutput>>();
 const getMock = vi.fn<(...args: unknown[]) => Promise<CoworkSession>>();
 class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { cowork: { chat: chatMock, get: getMock } },
@@ -53,11 +54,18 @@ describe('useSendCoworkMessage — optimistic prepend template (ADR-0006 §6)', 
     const existing = [turn('t-0', 'earlier')];
     queryClient.setQueryData(queryKeys.cowork.turns('sess-1'), existing);
     let resolveChat: (v: ChatCoworkSessionOutput) => void = () => undefined;
-    chatMock.mockImplementation(() => new Promise((resolve) => { resolveChat = resolve; }));
+    chatMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveChat = resolve;
+        }),
+    );
 
     const { result } = renderHook(() => useSendCoworkMessage('sess-1'), { wrapper });
 
-    await act(async () => { void result.current.send('hello'); });
+    await act(async () => {
+      void result.current.send('hello');
+    });
 
     const cached = queryClient.getQueryData<ConversationTurn[]>(queryKeys.cowork.turns('sess-1'));
     expect(cached?.length).toBe(2);
@@ -66,7 +74,13 @@ describe('useSendCoworkMessage — optimistic prepend template (ADR-0006 §6)', 
     expect(cached?.[1].role).toBe('human');
 
     await act(async () => {
-      resolveChat(chatReply(buildCoworkSession({ id: 'sess-1' }), [turn('t-0', 'earlier'), turn('srv-h', 'hello'), turn('srv-a', 'ok')]));
+      resolveChat(
+        chatReply(buildCoworkSession({ id: 'sess-1' }), [
+          turn('t-0', 'earlier'),
+          turn('srv-h', 'hello'),
+          turn('srv-a', 'ok'),
+        ]),
+      );
     });
     await waitFor(() => expect(result.current.isPending).toBe(false));
   });
@@ -80,7 +94,9 @@ describe('useSendCoworkMessage — optimistic prepend template (ADR-0006 §6)', 
 
     const { result } = renderHook(() => useSendCoworkMessage('sess-1'), { wrapper });
 
-    await act(async () => { await result.current.send('hello'); });
+    await act(async () => {
+      await result.current.send('hello');
+    });
     await waitFor(() => expect(result.current.isPending).toBe(false));
 
     expect(queryClient.getQueryData<ConversationTurn[]>(queryKeys.cowork.turns('sess-1'))).toEqual(serverTurns);
@@ -95,7 +111,9 @@ describe('useSendCoworkMessage — optimistic prepend template (ADR-0006 §6)', 
 
     const { result } = renderHook(() => useSendCoworkMessage('sess-1'), { wrapper });
 
-    await act(async () => { await result.current.send('hello').catch(() => undefined); });
+    await act(async () => {
+      await result.current.send('hello').catch(() => undefined);
+    });
     await waitFor(() => expect(result.current.error).not.toBeNull());
 
     expect(queryClient.getQueryData<ConversationTurn[]>(queryKeys.cowork.turns('sess-1'))).toEqual(original);
@@ -109,7 +127,9 @@ describe('useSendCoworkMessage — optimistic prepend template (ADR-0006 §6)', 
     queryClient.setQueryData(queryKeys.cowork.turns('sess-1'), [turn('t-0', 'earlier')]);
 
     let resolveGet: (v: CoworkSession) => void = () => undefined;
-    const inflightTurns: Promise<CoworkSession> = new Promise((resolve) => { resolveGet = resolve; });
+    const inflightTurns: Promise<CoworkSession> = new Promise((resolve) => {
+      resolveGet = resolve;
+    });
 
     // Start an in-flight turns query (the one polling would have produced).
     void queryClient.fetchQuery({
@@ -123,11 +143,18 @@ describe('useSendCoworkMessage — optimistic prepend template (ADR-0006 §6)', 
     await new Promise<void>((r) => setTimeout(r, 0));
 
     let resolveChat: (v: ChatCoworkSessionOutput) => void = () => undefined;
-    chatMock.mockImplementation(() => new Promise((resolve) => { resolveChat = resolve; }));
+    chatMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveChat = resolve;
+        }),
+    );
 
     const { result } = renderHook(() => useSendCoworkMessage('sess-1'), { wrapper });
 
-    await act(async () => { void result.current.send('hello'); });
+    await act(async () => {
+      void result.current.send('hello');
+    });
 
     // Now the stale poll resolves with PRE-message turns. Optimistic prepend
     // must NOT be overwritten — cancellation in onMutate guarantees this.

@@ -88,7 +88,10 @@ function parseDaysOfWeek(field: string): string | null {
   if (sorted.length === 5 && sorted.join(',') === '1,2,3,4,5') return 'weekdays';
   if (sorted.length === 2 && sorted.join(',') === '0,6') return 'weekends';
 
-  return sorted.map((d) => DAYS_OF_WEEK[d]).filter(Boolean).join(', ');
+  return sorted
+    .map((d) => DAYS_OF_WEEK[d])
+    .filter(Boolean)
+    .join(', ');
 }
 
 function ordinalSuffix(n: number): string {

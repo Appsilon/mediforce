@@ -1,8 +1,4 @@
-import type {
-  ProcessRepository,
-  WorkflowDefinition,
-  WebhookTriggerConfig,
-} from '@mediforce/platform-core';
+import type { ProcessRepository, WorkflowDefinition, WebhookTriggerConfig } from '@mediforce/platform-core';
 import { WebhookTriggerConfigSchema } from '@mediforce/platform-core';
 import type { WorkflowEngine } from '../engine/workflow-engine';
 
@@ -59,10 +55,7 @@ export class WebhookRouter {
       return { status: 400, error: 'namespace and workflowName are required' };
     }
 
-    const version = await this.processRepository.getLatestWorkflowVersion(
-      input.namespace,
-      input.workflowName,
-    );
+    const version = await this.processRepository.getLatestWorkflowVersion(input.namespace, input.workflowName);
     if (version === 0) {
       return {
         status: 404,
@@ -70,11 +63,7 @@ export class WebhookRouter {
       };
     }
 
-    const definition = await this.processRepository.getWorkflowDefinition(
-      input.namespace,
-      input.workflowName,
-      version,
-    );
+    const definition = await this.processRepository.getWorkflowDefinition(input.namespace, input.workflowName, version);
     if (!definition) {
       return {
         status: 404,
@@ -137,10 +126,7 @@ interface MatchedTrigger {
   config: WebhookTriggerConfig;
 }
 
-function findMatchingWebhookTrigger(
-  definition: WorkflowDefinition,
-  normalizedSuffix: string,
-): MatchedTrigger | null {
+function findMatchingWebhookTrigger(definition: WorkflowDefinition, normalizedSuffix: string): MatchedTrigger | null {
   for (const trigger of definition.triggers) {
     if (trigger.type !== 'webhook') continue;
     const parsed = WebhookTriggerConfigSchema.safeParse(trigger.config);

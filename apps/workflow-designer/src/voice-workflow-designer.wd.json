@@ -9,31 +9,21 @@
       "type": "manual"
     }
   ],
-  "roles": [
-    "workflow-designer"
-  ],
+  "roles": ["workflow-designer"],
   "steps": [
     {
       "id": "design",
       "name": "Design Workflow by Voice",
       "type": "creation",
       "executor": "cowork",
-      "allowedRoles": [
-        "workflow-designer"
-      ],
+      "allowedRoles": ["workflow-designer"],
       "description": "Describe your workflow through voice conversation. The AI asks clarifying questions and helps you think through steps, transitions, and execution config. When you're done talking, Claude synthesizes the structured definition from the conversation transcript.",
       "cowork": {
         "agent": "voice-realtime",
         "systemPrompt": "You are an expert Mediforce workflow designer. Help the user design a workflow through voice conversation.\n\nYour goal: understand what the user wants to build by asking questions and proposing ideas.\n\nApproach:\n1. Ask what the workflow should accomplish\n2. Propose steps and get feedback\n3. Ask about executors (human, agent, script), review loops, triggers\n4. Confirm the design before the user finalizes\n\nKeep responses concise and conversational — you're speaking, not writing.\nAsk one question at a time. Don't overwhelm with options.",
         "outputSchema": {
           "type": "object",
-          "required": [
-            "name",
-            "version",
-            "steps",
-            "transitions",
-            "triggers"
-          ],
+          "required": ["name", "version", "steps", "transitions", "triggers"],
           "properties": {
             "name": {
               "type": "string"

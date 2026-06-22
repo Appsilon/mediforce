@@ -48,12 +48,10 @@ describe('createRouteAdapter', () => {
   // resolveCaller and buildScope to bypass Firebase/Firestore.
 
   it('returns 400 with the first Zod issue when input fails validation', async () => {
-    const GET = createRouteAdapter(
-      InputSchema,
-      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
-      vi.fn(),
-      { resolveCaller: stubCaller(), buildScope },
-    );
+    const GET = createRouteAdapter(InputSchema, (req) => ({ name: req.nextUrl.searchParams.get('name') }), vi.fn(), {
+      resolveCaller: stubCaller(),
+      buildScope,
+    });
 
     const res = await GET(makeRequest(), undefined);
 
@@ -74,31 +72,25 @@ describe('createRouteAdapter', () => {
       namespaceRoles: new Map([['ns-a', 'member']]),
       isSystemActor: false,
     };
-    const GET = createRouteAdapter(
-      InputSchema,
-      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
-      handler,
-      { resolveCaller: stubCaller(userCaller), buildScope },
-    );
+    const GET = createRouteAdapter(InputSchema, (req) => ({ name: req.nextUrl.searchParams.get('name') }), handler, {
+      resolveCaller: stubCaller(userCaller),
+      buildScope,
+    });
 
     const res = await GET(makeRequest({ name: 'alice' }), undefined);
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ greeting: 'hello alice' });
-    expect(handler).toHaveBeenCalledWith(
-      { name: 'alice' },
-      expect.objectContaining({ caller: userCaller }),
-    );
+    expect(handler).toHaveBeenCalledWith({ name: 'alice' }, expect.objectContaining({ caller: userCaller }));
   });
 
   it('emits the configured successStatus (e.g. 201) on a successful handler', async () => {
     const handler = vi.fn().mockResolvedValue({ id: 'agent-1' });
-    const POST = createRouteAdapter(
-      InputSchema,
-      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
-      handler,
-      { resolveCaller: stubCaller(), buildScope, successStatus: 201 },
-    );
+    const POST = createRouteAdapter(InputSchema, (req) => ({ name: req.nextUrl.searchParams.get('name') }), handler, {
+      resolveCaller: stubCaller(),
+      buildScope,
+      successStatus: 201,
+    });
 
     const res = await POST(makeRequest({ name: 'alice' }), undefined);
 
@@ -106,16 +98,13 @@ describe('createRouteAdapter', () => {
     expect(await res.json()).toEqual({ id: 'agent-1' });
   });
 
-
   it('short-circuits with the 401 response returned by resolveCaller', async () => {
     const handler = vi.fn();
     const unauthorized = NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const GET = createRouteAdapter(
-      InputSchema,
-      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
-      handler,
-      { resolveCaller: vi.fn().mockResolvedValue(unauthorized), buildScope },
-    );
+    const GET = createRouteAdapter(InputSchema, (req) => ({ name: req.nextUrl.searchParams.get('name') }), handler, {
+      resolveCaller: vi.fn().mockResolvedValue(unauthorized),
+      buildScope,
+    });
 
     const res = await GET(makeRequest({ name: 'alice' }), undefined);
 
@@ -144,9 +133,7 @@ describe('createRouteAdapter', () => {
     for (const { code, status } of cases) {
       it(`maps HandlerError('${code}') to HTTP ${status} with typed envelope`, async () => {
         const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const handler = vi
-          .fn()
-          .mockRejectedValue(new HandlerError(code, `boom: ${code}`, { hint: 'detail' }));
+        const handler = vi.fn().mockRejectedValue(new HandlerError(code, `boom: ${code}`, { hint: 'detail' }));
         const GET = createRouteAdapter(
           InputSchema,
           (req) => ({ name: req.nextUrl.searchParams.get('name') }),
@@ -169,12 +156,10 @@ describe('createRouteAdapter', () => {
     const handler = vi
       .fn()
       .mockRejectedValue(new PreconditionFailedError('Task not pending', { currentStatus: 'claimed' }));
-    const GET = createRouteAdapter(
-      InputSchema,
-      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
-      handler,
-      { resolveCaller: stubCaller(), buildScope },
-    );
+    const GET = createRouteAdapter(InputSchema, (req) => ({ name: req.nextUrl.searchParams.get('name') }), handler, {
+      resolveCaller: stubCaller(),
+      buildScope,
+    });
 
     const res = await GET(makeRequest({ name: 'alice' }), undefined);
 
@@ -186,12 +171,10 @@ describe('createRouteAdapter', () => {
 
   it('NotFoundError default message renders as { code: "not_found", message: "Not found" } at 404', async () => {
     const handler = vi.fn().mockRejectedValue(new NotFoundError('Task not found'));
-    const GET = createRouteAdapter(
-      InputSchema,
-      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
-      handler,
-      { resolveCaller: stubCaller(), buildScope },
-    );
+    const GET = createRouteAdapter(InputSchema, (req) => ({ name: req.nextUrl.searchParams.get('name') }), handler, {
+      resolveCaller: stubCaller(),
+      buildScope,
+    });
 
     const res = await GET(makeRequest({ name: 'alice' }), undefined);
 
@@ -203,12 +186,10 @@ describe('createRouteAdapter', () => {
 
   it('ForbiddenError with no message defaults to "Forbidden" at 403', async () => {
     const handler = vi.fn().mockRejectedValue(new ForbiddenError());
-    const GET = createRouteAdapter(
-      InputSchema,
-      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
-      handler,
-      { resolveCaller: stubCaller(), buildScope },
-    );
+    const GET = createRouteAdapter(InputSchema, (req) => ({ name: req.nextUrl.searchParams.get('name') }), handler, {
+      resolveCaller: stubCaller(),
+      buildScope,
+    });
 
     const res = await GET(makeRequest({ name: 'alice' }), undefined);
 
@@ -224,12 +205,10 @@ describe('createRouteAdapter', () => {
     const handler = vi.fn().mockImplementation(() => {
       Inner.parse({ x: 'not-a-number' });
     });
-    const GET = createRouteAdapter(
-      InputSchema,
-      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
-      handler,
-      { resolveCaller: stubCaller(), buildScope },
-    );
+    const GET = createRouteAdapter(InputSchema, (req) => ({ name: req.nextUrl.searchParams.get('name') }), handler, {
+      resolveCaller: stubCaller(),
+      buildScope,
+    });
 
     const res = await GET(makeRequest({ name: 'alice' }), undefined);
 
@@ -243,12 +222,10 @@ describe('createRouteAdapter', () => {
   it('returns 500 with a generic envelope when the handler throws an unexpected error', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const handler = vi.fn().mockRejectedValue(new Error('database on fire'));
-    const GET = createRouteAdapter(
-      InputSchema,
-      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
-      handler,
-      { resolveCaller: stubCaller(), buildScope },
-    );
+    const GET = createRouteAdapter(InputSchema, (req) => ({ name: req.nextUrl.searchParams.get('name') }), handler, {
+      resolveCaller: stubCaller(),
+      buildScope,
+    });
 
     const res = await GET(makeRequest({ name: 'alice' }), undefined);
 
@@ -275,16 +252,11 @@ describe('createRouteAdapter', () => {
     const res = await GET(makeRequest(), { params: Promise.resolve({ id: 'abc' }) });
 
     expect(res.status).toBe(200);
-    expect(handler).toHaveBeenCalledWith(
-      { id: 'abc' },
-      expect.objectContaining({ caller: apiKeyCaller }),
-    );
+    expect(handler).toHaveBeenCalledWith({ id: 'abc' }, expect.objectContaining({ caller: apiKeyCaller }));
   });
 
   describe('NarrowInput generic', () => {
-    type NarrowExample =
-      | { instanceId: string; role?: undefined }
-      | { role: string; instanceId?: undefined };
+    type NarrowExample = { instanceId: string; role?: undefined } | { role: string; instanceId?: undefined };
 
     const _check: NarrowExample = { instanceId: 'x' };
     void _check;
@@ -294,10 +266,9 @@ describe('createRouteAdapter', () => {
         instanceId: z.string().min(1).optional(),
         role: z.string().min(1).optional(),
       })
-      .refine(
-        (val) => (val.instanceId !== undefined) !== (val.role !== undefined),
-        { message: 'Exactly one of `instanceId` or `role` is required' },
-      );
+      .refine((val) => (val.instanceId !== undefined) !== (val.role !== undefined), {
+        message: 'Exactly one of `instanceId` or `role` is required',
+      });
 
     it('passes the narrowed input type through to the handler', async () => {
       const handler = vi

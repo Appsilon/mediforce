@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  MonitoringSummaryInputSchema,
-  MonitoringSummarySchema,
-  GetMonitoringSummaryOutputSchema,
-} from '../monitoring';
+import { MonitoringSummaryInputSchema, MonitoringSummarySchema, GetMonitoringSummaryOutputSchema } from '../monitoring';
 
 describe('MonitoringSummaryInputSchema', () => {
   it('requires a non-empty handle', () => {

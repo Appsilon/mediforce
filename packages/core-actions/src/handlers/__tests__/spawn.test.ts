@@ -55,10 +55,12 @@ describe('createSpawnActionHandler', () => {
     const repo = makeProcessRepo();
     const handler = createSpawnActionHandler(trigger as never, repo as never);
 
-    const result = asSpawn(await handler(
-      { targets: { definitionName: 'child-wf', payload: { key: 'val' } }, continueOnSpawnError: true },
-      baseCtx,
-    ));
+    const result = asSpawn(
+      await handler(
+        { targets: { definitionName: 'child-wf', payload: { key: 'val' } }, continueOnSpawnError: true },
+        baseCtx,
+      ),
+    );
 
     expect(trigger.fireWorkflow).toHaveBeenCalledTimes(1);
     expect(trigger.fireWorkflow).toHaveBeenCalledWith(
@@ -83,16 +85,15 @@ describe('createSpawnActionHandler', () => {
     const repo = makeProcessRepo();
     const handler = createSpawnActionHandler(trigger as never, repo as never);
 
-    const result = asSpawn(await handler(
-      {
-        targets: [
-          { definitionName: 'legal-review' },
-          { definitionName: 'medical-review' },
-        ],
-        continueOnSpawnError: true,
-      },
-      baseCtx,
-    ));
+    const result = asSpawn(
+      await handler(
+        {
+          targets: [{ definitionName: 'legal-review' }, { definitionName: 'medical-review' }],
+          continueOnSpawnError: true,
+        },
+        baseCtx,
+      ),
+    );
 
     expect(trigger.fireWorkflow).toHaveBeenCalledTimes(2);
     expect(result.spawnedCount).toBe(2);
@@ -105,17 +106,19 @@ describe('createSpawnActionHandler', () => {
     const repo = makeProcessRepo();
     const handler = createSpawnActionHandler(trigger as never, repo as never);
 
-    const result = asSpawn(await handler(
-      {
-        targets: {
-          definitionName: 'gather-perspective',
-          payload: { userId: '${item.userId}', email: '${item.email}' },
+    const result = asSpawn(
+      await handler(
+        {
+          targets: {
+            definitionName: 'gather-perspective',
+            payload: { userId: '${item.userId}', email: '${item.email}' },
+          },
+          forEach: '${steps.prepare.teamMembers}',
+          continueOnSpawnError: true,
         },
-        forEach: '${steps.prepare.teamMembers}',
-        continueOnSpawnError: true,
-      },
-      baseCtx,
-    ));
+        baseCtx,
+      ),
+    );
 
     expect(trigger.fireWorkflow).toHaveBeenCalledTimes(2);
     expect(trigger.fireWorkflow).toHaveBeenCalledWith(
@@ -147,14 +150,16 @@ describe('createSpawnActionHandler', () => {
       },
     };
 
-    const result = asSpawn(await handler(
-      {
-        targets: { definitionName: 'gather-perspective' },
-        forEach: '${steps.prepare.teamMembers}',
-        continueOnSpawnError: true,
-      },
-      ctx,
-    ));
+    const result = asSpawn(
+      await handler(
+        {
+          targets: { definitionName: 'gather-perspective' },
+          forEach: '${steps.prepare.teamMembers}',
+          continueOnSpawnError: true,
+        },
+        ctx,
+      ),
+    );
 
     expect(trigger.fireWorkflow).not.toHaveBeenCalled();
     expect(result.spawnedCount).toBe(0);
@@ -180,23 +185,23 @@ describe('createSpawnActionHandler', () => {
 
   it('accumulates errors when continueOnSpawnError is true', async () => {
     const trigger = {
-      fireWorkflow: vi.fn()
+      fireWorkflow: vi
+        .fn()
         .mockResolvedValueOnce({ instanceId: 'inst-1', status: 'created' })
         .mockRejectedValueOnce(new Error('WD not found')),
     };
     const repo = makeProcessRepo();
     const handler = createSpawnActionHandler(trigger as never, repo as never);
 
-    const result = asSpawn(await handler(
-      {
-        targets: [
-          { definitionName: 'ok-wf' },
-          { definitionName: 'bad-wf' },
-        ],
-        continueOnSpawnError: true,
-      },
-      baseCtx,
-    ));
+    const result = asSpawn(
+      await handler(
+        {
+          targets: [{ definitionName: 'ok-wf' }, { definitionName: 'bad-wf' }],
+          continueOnSpawnError: true,
+        },
+        baseCtx,
+      ),
+    );
 
     expect(result.spawnedCount).toBe(1);
     expect(result.errorCount).toBe(1);
@@ -236,9 +241,7 @@ describe('createSpawnActionHandler', () => {
     );
 
     expect(repo.getLatestWorkflowVersion).not.toHaveBeenCalled();
-    expect(trigger.fireWorkflow).toHaveBeenCalledWith(
-      expect.objectContaining({ definitionVersion: 7 }),
-    );
+    expect(trigger.fireWorkflow).toHaveBeenCalledWith(expect.objectContaining({ definitionVersion: 7 }));
   });
 
   it('forwards custom triggerName to fireWorkflow', async () => {
@@ -254,9 +257,7 @@ describe('createSpawnActionHandler', () => {
       baseCtx,
     );
 
-    expect(trigger.fireWorkflow).toHaveBeenCalledWith(
-      expect.objectContaining({ triggerName: 'api' }),
-    );
+    expect(trigger.fireWorkflow).toHaveBeenCalledWith(expect.objectContaining({ triggerName: 'api' }));
   });
 
   it('rejects when fan-out exceeds 50 spawns', async () => {
@@ -291,13 +292,15 @@ describe('createSpawnActionHandler', () => {
     const repo = makeProcessRepo({ 'missing-wf': 0 });
     const handler = createSpawnActionHandler(trigger as never, repo as never);
 
-    const result = asSpawn(await handler(
-      {
-        targets: { definitionName: 'missing-wf' },
-        continueOnSpawnError: true,
-      },
-      baseCtx,
-    ));
+    const result = asSpawn(
+      await handler(
+        {
+          targets: { definitionName: 'missing-wf' },
+          continueOnSpawnError: true,
+        },
+        baseCtx,
+      ),
+    );
 
     expect(result.errorCount).toBe(1);
     expect(result.errors[0].message).toContain('not found');

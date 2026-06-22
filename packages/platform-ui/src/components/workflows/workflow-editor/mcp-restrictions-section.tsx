@@ -83,7 +83,9 @@ export function McpRestrictionsSection({ agentId, restrictions, onChange }: McpR
                 onAddDenyTool={(tool) =>
                   updateEntry(name, { denyTools: [...denyTools.filter((existing) => existing !== tool), tool] })
                 }
-                onRemoveDenyTool={(tool) => updateEntry(name, { denyTools: denyTools.filter((existing) => existing !== tool) })}
+                onRemoveDenyTool={(tool) =>
+                  updateEntry(name, { denyTools: denyTools.filter((existing) => existing !== tool) })
+                }
               />
             );
           })}
@@ -122,7 +124,12 @@ function ServerRow({
   }
 
   return (
-    <div className={cn('rounded-md border px-2.5 py-2', disabled ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/20' : 'border-border/60')}>
+    <div
+      className={cn(
+        'rounded-md border px-2.5 py-2',
+        disabled ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/20' : 'border-border/60',
+      )}
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <span className="font-mono text-xs font-semibold truncate">{name}</span>
@@ -181,4 +188,3 @@ function ServerRow({
     </div>
   );
 }
-

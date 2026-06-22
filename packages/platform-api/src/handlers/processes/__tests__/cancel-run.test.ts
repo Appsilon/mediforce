@@ -6,15 +6,8 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { cancelRun } from '../cancel-run';
-import {
-  HandlerError,
-  NotFoundError,
-  PreconditionFailedError,
-} from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { HandlerError, NotFoundError, PreconditionFailedError } from '../../../errors';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('cancelRun handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;
@@ -203,10 +196,7 @@ describe('cancelRun handler', () => {
         caller: userCaller('u-1', ['team-alpha']),
       });
 
-      const result = await cancelRun(
-        { runId: 'inst-a', reason: 'Audit cleanup' },
-        scope,
-      );
+      const result = await cancelRun({ runId: 'inst-a', reason: 'Audit cleanup' }, scope);
 
       expect(result.run.error).toBe('Audit cleanup');
       const events = await auditRepo.getByProcess('inst-a');

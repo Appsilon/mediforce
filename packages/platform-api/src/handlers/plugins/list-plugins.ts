@@ -12,10 +12,7 @@ import type { ListPluginsInput, ListPluginsOutput } from '../../contract/plugins
  * the no-raw-repo-imports static guard passes because the handler only
  * touches `scope`.
  */
-export async function listPlugins(
-  _input: ListPluginsInput,
-  scope: CallerScope,
-): Promise<ListPluginsOutput> {
+export async function listPlugins(_input: ListPluginsInput, scope: CallerScope): Promise<ListPluginsOutput> {
   const plugins = scope.plugins.list().map((entry) => ({
     name: entry.name,
     metadata: entry.metadata as PluginCapabilityMetadata | undefined,

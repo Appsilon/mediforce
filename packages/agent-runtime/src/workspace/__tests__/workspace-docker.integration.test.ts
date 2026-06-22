@@ -19,16 +19,9 @@ import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
-import type {
-  WorkflowDefinition,
-  WorkflowStep,
-} from '@mediforce/platform-core';
+import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import { ScriptContainerPlugin } from '../../plugins/script-container-plugin';
-import type {
-  EmitFn,
-  EmitPayload,
-  WorkflowAgentContext,
-} from '../../interfaces/step-executor-plugin';
+import type { EmitFn, EmitPayload, WorkflowAgentContext } from '../../interfaces/step-executor-plugin';
 
 function dockerAvailable(): boolean {
   try {
@@ -86,7 +79,9 @@ function buildScriptContext(overrides: {
 
 function emitSpy(): { emit: EmitFn; events: EmitPayload[] } {
   const events: EmitPayload[] = [];
-  const emit: EmitFn = vi.fn(async (event: EmitPayload) => { events.push(event); });
+  const emit: EmitFn = vi.fn(async (event: EmitPayload) => {
+    events.push(event);
+  });
   return { emit, events };
 }
 
@@ -141,7 +136,9 @@ describe.skipIf(!dockerAvailable())('WorkspaceManager + Docker end-to-end', () =
       'git',
       ['--git-dir', bareRepo, 'log', '--format=%s', `run/${context.processInstanceId}`],
       { encoding: 'utf-8' },
-    ).trim().split('\n');
+    )
+      .trim()
+      .split('\n');
     expect(subjects).toHaveLength(2);
     expect(subjects[1]).toBe('◇ Initialize workspace repository');
     // Step is the only step in the WD → no outgoing transitions → ✓ marker.
@@ -184,7 +181,9 @@ describe.skipIf(!dockerAvailable())('WorkspaceManager + Docker end-to-end', () =
       'git',
       ['--git-dir', bareRepo, 'log', '--format=%s', `run/${context.processInstanceId}`],
       { encoding: 'utf-8' },
-    ).trim().split('\n');
+    )
+      .trim()
+      .split('\n');
     // seed + failed step commit
     expect(subjects).toHaveLength(2);
     expect(subjects[0]).toMatch(/^✗ Run script — failed: /);
@@ -225,7 +224,7 @@ describe.skipIf(!dockerAvailable())('WorkspaceManager + Docker end-to-end', () =
             '#!/bin/sh',
             'set -eu',
             'test -f /workspace/marker.txt',
-            "cat /workspace/marker.txt > /workspace/mirror.txt",
+            'cat /workspace/marker.txt > /workspace/mirror.txt',
             'printf \'{"ok":true}\' > /output/result.json',
           ].join('\n'),
         },
@@ -246,7 +245,9 @@ describe.skipIf(!dockerAvailable())('WorkspaceManager + Docker end-to-end', () =
     // Three commits total: seed + step 1 + step 2.
     const log = execFileSync('git', ['--git-dir', bareRepo, 'log', '--oneline', `run/${ctx1.processInstanceId}`], {
       encoding: 'utf-8',
-    }).trim().split('\n');
+    })
+      .trim()
+      .split('\n');
     expect(log.length).toBe(3);
   });
 });

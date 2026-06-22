@@ -7,10 +7,7 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { setWorkflowVisibility } from '../set-visibility';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 describe('setWorkflowVisibility handler', () => {
   let processRepo: InMemoryProcessRepository;

@@ -2,10 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryOAuthProviderRepository } from '@mediforce/platform-core/testing';
 import { getOAuthProvider } from '../get-provider';
 import { ForbiddenError, NotFoundError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { adminRoles, memberRoles, sampleProviderInput } from './fixtures';
 
 describe('getOAuthProvider handler', () => {
@@ -22,10 +19,7 @@ describe('getOAuthProvider handler', () => {
       caller: userCaller('u-admin', ['alpha'], adminRoles),
     });
 
-    const result = await getOAuthProvider(
-      { namespace: 'alpha', id: 'github' },
-      scope,
-    );
+    const result = await getOAuthProvider({ namespace: 'alpha', id: 'github' }, scope);
 
     expect(result.provider.id).toBe('github');
     expect(result.provider).not.toHaveProperty('clientSecret');
@@ -34,9 +28,7 @@ describe('getOAuthProvider handler', () => {
   it('throws NotFoundError when the provider id is missing', async () => {
     const scope = createTestScope({ oauthProviderRepo: repo });
 
-    await expect(
-      getOAuthProvider({ namespace: 'alpha', id: 'missing' }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(getOAuthProvider({ namespace: 'alpha', id: 'missing' }, scope)).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('throws ForbiddenError for a member-role caller (before lookup)', async () => {
@@ -45,8 +37,6 @@ describe('getOAuthProvider handler', () => {
       caller: userCaller('u-member', ['alpha'], memberRoles),
     });
 
-    await expect(
-      getOAuthProvider({ namespace: 'alpha', id: 'github' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(getOAuthProvider({ namespace: 'alpha', id: 'github' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

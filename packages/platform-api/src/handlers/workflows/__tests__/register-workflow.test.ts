@@ -9,10 +9,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import { registerWorkflow } from '../register-workflow';
 import { ValidationError } from '../../../errors';
-import {
-  createTestScope,
-  userCaller,
-} from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { fetchFromContainerWorker } from '../../system/_docker';
 
 vi.mock('../../system/_docker', async (importOriginal) => {
@@ -51,10 +48,7 @@ describe('registerWorkflow handler', () => {
     body.steps[1].agent = { image: 'test-image' };
     const { version: _omitVersion, createdAt: _omitCreatedAt, namespace: _omitNamespace, ...input } = body;
 
-    const result = await registerWorkflow(
-      { ...input, namespace: 'team-alpha' },
-      scope,
-    );
+    const result = await registerWorkflow({ ...input, namespace: 'team-alpha' }, scope);
 
     expect(result).toEqual({ success: true, name: 'flow-new', version: 1 });
     const stored = await processRepo.getWorkflowDefinition('team-alpha', 'flow-new', 1);
@@ -95,21 +89,24 @@ describe('registerWorkflow handler', () => {
       name: 'retired-flow',
       namespace: 'team-alpha',
       steps: [
-        { id: 'analyze', name: 'Analyze', type: 'review', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'openai/gpt-4' } },
+        {
+          id: 'analyze',
+          name: 'Analyze',
+          type: 'review',
+          executor: 'agent',
+          autonomyLevel: 'L2',
+          agent: { model: 'openai/gpt-4' },
+        },
         { id: 'complete', name: 'Complete', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'analyze', to: 'complete' }],
     });
     const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
 
-    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .rejects.toThrow(ValidationError);
-    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .rejects.toThrow(/openai\/gpt-4/);
-    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .rejects.toThrow(/retired/i);
-    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .rejects.toThrow(/Analyze/);
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope)).rejects.toThrow(ValidationError);
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope)).rejects.toThrow(/openai\/gpt-4/);
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope)).rejects.toThrow(/retired/i);
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope)).rejects.toThrow(/Analyze/);
   });
 
   it('accepts workflow when models are not retired', async () => {
@@ -142,15 +139,24 @@ describe('registerWorkflow handler', () => {
       name: 'active-flow',
       namespace: 'team-alpha',
       steps: [
-        { id: 'analyze', name: 'Analyze', type: 'review', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'anthropic/claude-sonnet-4', image: 'test-image' } },
+        {
+          id: 'analyze',
+          name: 'Analyze',
+          type: 'review',
+          executor: 'agent',
+          autonomyLevel: 'L2',
+          agent: { model: 'anthropic/claude-sonnet-4', image: 'test-image' },
+        },
         { id: 'complete', name: 'Complete', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'analyze', to: 'complete' }],
     });
     const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
 
-    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .resolves.toMatchObject({ success: true, name: 'active-flow' });
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope)).resolves.toMatchObject({
+      success: true,
+      name: 'active-flow',
+    });
   });
 
   it('rejects agent step without Docker image when not in local agent mode', async () => {
@@ -159,19 +165,23 @@ describe('registerWorkflow handler', () => {
       name: 'no-image-flow',
       namespace: 'team-alpha',
       steps: [
-        { id: 'analyze', name: 'AI Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'anthropic/claude-sonnet-4', prompt: 'Analyze' } },
+        {
+          id: 'analyze',
+          name: 'AI Analysis',
+          type: 'creation',
+          executor: 'agent',
+          autonomyLevel: 'L2',
+          agent: { model: 'anthropic/claude-sonnet-4', prompt: 'Analyze' },
+        },
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'analyze', to: 'done' }],
     });
     const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
 
-    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .rejects.toThrow(ValidationError);
-    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .rejects.toThrow(/AI Analysis/);
-    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .rejects.toThrow(/Docker image/i);
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope)).rejects.toThrow(ValidationError);
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope)).rejects.toThrow(/AI Analysis/);
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope)).rejects.toThrow(/Docker image/i);
   });
 
   it('accepts agent step without image when repo + commit configured (auto-build)', async () => {
@@ -180,15 +190,29 @@ describe('registerWorkflow handler', () => {
       name: 'auto-build-flow',
       namespace: 'team-alpha',
       steps: [
-        { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'anthropic/claude-sonnet-4', prompt: 'Analyze', repo: 'git@github.com:org/repo.git', commit: 'abc1234' } },
+        {
+          id: 'analyze',
+          name: 'Analyze',
+          type: 'creation',
+          executor: 'agent',
+          autonomyLevel: 'L2',
+          agent: {
+            model: 'anthropic/claude-sonnet-4',
+            prompt: 'Analyze',
+            repo: 'git@github.com:org/repo.git',
+            commit: 'abc1234',
+          },
+        },
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'analyze', to: 'done' }],
     });
     const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
 
-    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .resolves.toMatchObject({ success: true, name: 'auto-build-flow' });
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope)).resolves.toMatchObject({
+      success: true,
+      name: 'auto-build-flow',
+    });
   });
 
   it('accepts agent step with Docker image configured', async () => {
@@ -197,31 +221,49 @@ describe('registerWorkflow handler', () => {
       name: 'with-image-flow',
       namespace: 'team-alpha',
       steps: [
-        { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'anthropic/claude-sonnet-4', prompt: 'Analyze', image: 'mediforce-golden-image' } },
+        {
+          id: 'analyze',
+          name: 'Analyze',
+          type: 'creation',
+          executor: 'agent',
+          autonomyLevel: 'L2',
+          agent: { model: 'anthropic/claude-sonnet-4', prompt: 'Analyze', image: 'mediforce-golden-image' },
+        },
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'analyze', to: 'done' }],
     });
     const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
 
-    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .resolves.toMatchObject({ success: true, name: 'with-image-flow' });
+    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope)).resolves.toMatchObject({
+      success: true,
+      name: 'with-image-flow',
+    });
   });
 
   it('returns warning when Docker image not found on platform', async () => {
     vi.mocked(fetchFromContainerWorker).mockResolvedValueOnce({
       available: true,
-      images: [
-        { repository: 'mediforce-golden-image', tag: 'latest', id: 'abc', size: '1GB', created: '1d ago' },
-      ],
-      disk: { images: { totalCount: 1, size: '1GB' }, containers: { totalCount: 0, active: 0, size: '0B' }, buildCache: { size: '0B' } },
+      images: [{ repository: 'mediforce-golden-image', tag: 'latest', id: 'abc', size: '1GB', created: '1d ago' }],
+      disk: {
+        images: { totalCount: 1, size: '1GB' },
+        containers: { totalCount: 0, active: 0, size: '0B' },
+        buildCache: { size: '0B' },
+      },
     });
     const scope = buildScope();
     const body = buildWorkflowDefinition({
       name: 'warning-flow',
       namespace: 'team-alpha',
       steps: [
-        { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent', autonomyLevel: 'L2', agent: { model: 'anthropic/claude-sonnet-4', prompt: 'Analyze', image: 'nonexistent-image:v1' } },
+        {
+          id: 'analyze',
+          name: 'Analyze',
+          type: 'creation',
+          executor: 'agent',
+          autonomyLevel: 'L2',
+          agent: { model: 'anthropic/claude-sonnet-4', prompt: 'Analyze', image: 'nonexistent-image:v1' },
+        },
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'analyze', to: 'done' }],
@@ -249,10 +291,7 @@ describe('registerWorkflow handler', () => {
     body.steps[1].agent = { image: 'test-image' };
     const { version: _omitVersion, createdAt: _omitCreatedAt, namespace: _omitNamespace, ...input } = body;
 
-    const result = await registerWorkflow(
-      { ...input, namespace: 'team-alpha' },
-      scope,
-    );
+    const result = await registerWorkflow({ ...input, namespace: 'team-alpha' }, scope);
 
     expect(result).toEqual({ success: true, name: 'flow-existing', version: 2 });
     const events = auditRepo.getAll();

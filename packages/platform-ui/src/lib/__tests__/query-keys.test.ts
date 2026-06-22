@@ -11,9 +11,10 @@ describe('queryKeys', () => {
   });
 
   it('tasks.byInstance carries optional stepId + status filters', () => {
-    expect(
-      queryKeys.tasks.byInstance('inst-1', { stepId: 'step-x', status: ['pending'] }),
-    ).toEqual(['tasks', { instanceId: 'inst-1', stepId: 'step-x', status: ['pending'] }]);
+    expect(queryKeys.tasks.byInstance('inst-1', { stepId: 'step-x', status: ['pending'] })).toEqual([
+      'tasks',
+      { instanceId: 'inst-1', stepId: 'step-x', status: ['pending'] },
+    ]);
   });
 
   it('tasks.byRole puts the role in a filter object on the tail', () => {

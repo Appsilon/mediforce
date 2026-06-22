@@ -1,7 +1,4 @@
-import {
-  CronTriggerStateSchema,
-  type CronTriggerState,
-} from '../schemas/cron-trigger-state';
+import { CronTriggerStateSchema, type CronTriggerState } from '../schemas/cron-trigger-state';
 import type { CronTriggerStateRepository } from '../interfaces/cron-trigger-state-repository';
 
 export class InMemoryCronTriggerStateRepository implements CronTriggerStateRepository {

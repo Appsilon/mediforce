@@ -1,5 +1,10 @@
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
-import type { AgentContext, StepExecutorPlugin, EmitFn, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
+import type {
+  AgentContext,
+  StepExecutorPlugin,
+  EmitFn,
+  WorkflowAgentContext,
+} from '../interfaces/step-executor-plugin';
 import { ClaudeCodeAgentPlugin } from './claude-code-agent-plugin';
 
 export class MockClaudeCodeAgentPlugin implements StepExecutorPlugin {
@@ -29,10 +34,7 @@ export class MockClaudeCodeAgentPlugin implements StepExecutorPlugin {
         confidence: 1,
         confidence_rationale: 'MOCK_AGENT=true generated deterministic output.',
         reasoning_summary: `Mock agent completed step '${this.context.stepId}'.`,
-        reasoning_chain: [
-          'MOCK_AGENT=true',
-          `Step: ${this.context.stepId}`,
-        ],
+        reasoning_chain: ['MOCK_AGENT=true', `Step: ${this.context.stepId}`],
         annotations: [],
         model: 'mock-claude-code-agent',
         duration_ms: 0,

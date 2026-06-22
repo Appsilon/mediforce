@@ -1,10 +1,7 @@
 import { assertCallerIsNamespaceAdmin } from '../../auth';
 import { NotFoundError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
-import type {
-  UpdateToolCatalogEntryInputApi,
-  UpdateToolCatalogEntryOutput,
-} from '../../contract/tool-catalog';
+import type { UpdateToolCatalogEntryInputApi, UpdateToolCatalogEntryOutput } from '../../contract/tool-catalog';
 import { actorFromCaller } from '../_helpers';
 
 export async function updateToolCatalogEntry(

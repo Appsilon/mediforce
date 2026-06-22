@@ -41,7 +41,10 @@ export async function removeImage(imageId: string): Promise<string> {
 
 export async function getDiskUsage(): Promise<DockerDiskUsage> {
   const { stdout } = await execFileAsync('docker', ['system', 'df', '--format', '{{json .}}']);
-  const rows = stdout.trim().split('\n').map((line) => JSON.parse(line));
+  const rows = stdout
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line));
 
   const find = (type: string) => rows.find((r) => r.Type === type);
 

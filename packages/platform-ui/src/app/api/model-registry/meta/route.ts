@@ -7,9 +7,6 @@ export async function GET(): Promise<NextResponse> {
     const meta = await modelRegistryRepo.getMeta();
     return NextResponse.json({ meta });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Failed to get meta' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed to get meta' }, { status: 500 });
   }
 }

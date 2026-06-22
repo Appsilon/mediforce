@@ -9,7 +9,12 @@ function file(stepId: string, name: string): RunOutputFileEntry {
 
 const listOutputFilesMock = vi.fn<(...args: unknown[]) => Promise<{ files: RunOutputFileEntry[] }>>();
 class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { runs: { listOutputFiles: listOutputFilesMock } },

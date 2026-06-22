@@ -123,14 +123,18 @@ function contract(name: string, factory: () => Promise<ModelRegistryRepository>)
     });
 
     it('updateRankings updates by id and by canonicalSlug', async () => {
-      await repo.upsert(entryInput({
-        id: 'anthropic/claude-sonnet-4',
-        canonicalSlug: 'anthropic/claude-sonnet-4',
-      }));
-      await repo.upsert(entryInput({
-        id: 'openai/gpt-4o',
-        canonicalSlug: 'openai/gpt-4o-2024-08',
-      }));
+      await repo.upsert(
+        entryInput({
+          id: 'anthropic/claude-sonnet-4',
+          canonicalSlug: 'anthropic/claude-sonnet-4',
+        }),
+      );
+      await repo.upsert(
+        entryInput({
+          id: 'openai/gpt-4o',
+          canonicalSlug: 'openai/gpt-4o-2024-08',
+        }),
+      );
 
       const updated = await repo.updateRankings([
         { id: 'anthropic/claude-sonnet-4', requestCount: 100 },
@@ -253,10 +257,7 @@ function contract(name: string, factory: () => Promise<ModelRegistryRepository>)
   });
 }
 
-contract(
-  'InMemoryModelRegistryRepository',
-  async () => new InMemoryModelRegistryRepository(),
-);
+contract('InMemoryModelRegistryRepository', async () => new InMemoryModelRegistryRepository());
 
 describe.skipIf(skipPg)('PostgresModelRegistryRepository (parity)', () => {
   const schemaName = `mr_${randomBytes(8).toString('hex')}`;
@@ -271,7 +272,9 @@ describe.skipIf(skipPg)('PostgresModelRegistryRepository (parity)', () => {
       onnotice: () => {},
       connection: { search_path: schemaName },
     });
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     for (const file of files) {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
       await testClient.unsafe(sql);
@@ -288,12 +291,8 @@ describe.skipIf(skipPg)('PostgresModelRegistryRepository (parity)', () => {
 
   contract('PostgresModelRegistryRepository', async () => {
     const db = drizzle(testClient, { schema });
-    await testClient.unsafe(
-      `TRUNCATE TABLE "${schemaName}"."model_registry_entries"`,
-    );
-    await testClient.unsafe(
-      `TRUNCATE TABLE "${schemaName}"."model_registry_meta"`,
-    );
+    await testClient.unsafe(`TRUNCATE TABLE "${schemaName}"."model_registry_entries"`);
+    await testClient.unsafe(`TRUNCATE TABLE "${schemaName}"."model_registry_meta"`);
     return new PostgresModelRegistryRepository(db);
   });
 
@@ -310,7 +309,6 @@ describe.skipIf(skipPg)('PostgresModelRegistryRepository (parity)', () => {
     const [after] = await testClient<{ updated_at: string }[]>`
       SELECT updated_at::text FROM model_registry_entries WHERE id = 'trig/one'
     `;
-    expect(new Date(after.updated_at).getTime())
-      .toBeGreaterThan(new Date(before.updated_at).getTime());
+    expect(new Date(after.updated_at).getTime()).toBeGreaterThan(new Date(before.updated_at).getTime());
   });
 });

@@ -90,9 +90,7 @@ describe('workflow get command', () => {
 
   it('fetches and prints JSON to stdout on success', async () => {
     const wd = makeDefinition({ name: 'my-wf', version: 2 });
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ definition: wd }),
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ definition: wd }));
     const output = captureOutput();
     const code = await workflowGetCommand({
       argv: [...BASE_ARGS, 'my-wf', '--namespace', 'test', '--json'],
@@ -100,18 +98,14 @@ describe('workflow get command', () => {
       output,
     });
     expect(code).toBe(0);
-    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
-      'http://localhost:1234/api/workflow-definitions/my-wf?namespace=test',
-    );
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://localhost:1234/api/workflow-definitions/my-wf?namespace=test');
     const parsed: unknown = JSON.parse(output.stdoutLines.join('\n'));
     expect(parsed).toMatchObject({ name: 'my-wf', version: 2 });
   });
 
   it('--json flag produces full JSON output', async () => {
     const wd = makeDefinition({ name: 'wf-json', version: 5 });
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ definition: wd }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ definition: wd }));
     const output = captureOutput();
     const code = await workflowGetCommand({
       argv: [...BASE_ARGS, 'wf-json', '--namespace', 'test', '--json'],
@@ -129,9 +123,7 @@ describe('workflow get command', () => {
 
   it('human-readable mode (no --json) prints summary line', async () => {
     const wd = makeDefinition({ name: 'mediforce-fullstack', version: 3, namespace: 'appsilon' });
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ definition: wd }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ definition: wd }));
     const output = captureOutput();
     const code = await workflowGetCommand({
       argv: [...BASE_ARGS, 'mediforce-fullstack', '--namespace', 'appsilon'],
@@ -150,9 +142,7 @@ describe('workflow get command', () => {
 
   it('--template strips version, createdAt, namespace from output', async () => {
     const wd = makeDefinition({ name: 'tpl-wf', version: 4, namespace: 'ns1' });
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ definition: wd }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ definition: wd }));
     const output = captureOutput();
     const code = await workflowGetCommand({
       argv: [...BASE_ARGS, 'tpl-wf', '--namespace', 'ns1', '--template', '--json'],
@@ -174,9 +164,7 @@ describe('workflow get command', () => {
 
   it('--output writes to file', async () => {
     const wd = makeDefinition({ name: 'file-wf', version: 1 });
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ definition: wd }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ definition: wd }));
     const output = captureOutput();
     const code = await workflowGetCommand({
       argv: [...BASE_ARGS, 'file-wf', '--namespace', 'test', '--output', tmpFile],
@@ -191,9 +179,7 @@ describe('workflow get command', () => {
   });
 
   it('exits 1 with error on API 404', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'Workflow not found' }, 404),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Workflow not found' }, 404));
     const output = captureOutput();
     const code = await workflowGetCommand({
       argv: [...BASE_ARGS, 'missing-wf', '--namespace', 'ns'],

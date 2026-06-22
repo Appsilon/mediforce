@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  WorkflowDefinitionSchema,
-  resolveStepTimeoutMinutes,
-  type WorkflowStep,
-} from '../workflow-definition';
+import { WorkflowDefinitionSchema, resolveStepTimeoutMinutes, type WorkflowStep } from '../workflow-definition';
 
 const baseWd = {
   name: 'sftp-monitor',
@@ -33,16 +29,12 @@ describe('WorkflowDefinitionSchema — inputForNextRun', () => {
   it('rejects when stepId does not match any step', () => {
     const wd = {
       ...baseWd,
-      inputForNextRun: [
-        { stepId: 'does-not-exist', output: 'cursor', as: 'cursor' },
-      ],
+      inputForNextRun: [{ stepId: 'does-not-exist', output: 'cursor', as: 'cursor' }],
     };
     const result = WorkflowDefinitionSchema.safeParse(wd);
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0].message).toMatch(
-        /does not match any step id/,
-      );
+      expect(result.error.issues[0].message).toMatch(/does not match any step id/);
     }
   });
 
@@ -57,9 +49,7 @@ describe('WorkflowDefinitionSchema — inputForNextRun', () => {
     const result = WorkflowDefinitionSchema.safeParse(wd);
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(
-        result.error.issues.some((i) => /duplicated/.test(i.message)),
-      ).toBe(true);
+      expect(result.error.issues.some((i) => /duplicated/.test(i.message))).toBe(true);
     }
   });
 
@@ -89,9 +79,7 @@ describe('WorkflowDefinitionSchema — verdicts', () => {
       },
       { id: 'done', name: 'Done', type: 'terminal' as const, executor: 'human' as const },
     ],
-    transitions: [
-      { from: 'scan', to: 'review' },
-    ],
+    transitions: [{ from: 'scan', to: 'review' }],
   };
 
   it('accepts a human review step with approve + revise verdicts', () => {
@@ -194,9 +182,7 @@ describe('WorkflowDefinitionSchema — verdicts', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(
-        result.error.issues.some((issue) =>
-          /verdict 'approve'.*targets 'nope'.*does not match/.test(issue.message),
-        ),
+        result.error.issues.some((issue) => /verdict 'approve'.*targets 'nope'.*does not match/.test(issue.message)),
       ).toBe(true);
     }
   });
@@ -396,7 +382,9 @@ describe('WorkflowDefinitionSchema — script step config', () => {
       script: { command: 'run' },
     });
     const messages = issueMessages(wd);
-    expect(messages.some((m) => /script config but plugin is 'databricks-job' \(expected 'script-container'\)/.test(m))).toBe(true);
+    expect(
+      messages.some((m) => /script config but plugin is 'databricks-job' \(expected 'script-container'\)/.test(m)),
+    ).toBe(true);
   });
 });
 
@@ -409,26 +397,32 @@ describe('resolveStepTimeoutMinutes', () => {
   };
 
   it('prefers agent.timeoutMinutes', () => {
-    expect(resolveStepTimeoutMinutes({
-      ...baseStep,
-      agent: { timeoutMinutes: 5 },
-      script: { command: 'run', timeoutMinutes: 10 },
-    })).toBe(5);
+    expect(
+      resolveStepTimeoutMinutes({
+        ...baseStep,
+        agent: { timeoutMinutes: 5 },
+        script: { command: 'run', timeoutMinutes: 10 },
+      }),
+    ).toBe(5);
   });
 
   it('falls back to script.timeoutMinutes', () => {
-    expect(resolveStepTimeoutMinutes({
-      ...baseStep,
-      script: { command: 'run', timeoutMinutes: 10 },
-      databricks: { jobId: 1, pollIntervalMs: 10_000, timeoutMinutes: 20 },
-    })).toBe(10);
+    expect(
+      resolveStepTimeoutMinutes({
+        ...baseStep,
+        script: { command: 'run', timeoutMinutes: 10 },
+        databricks: { jobId: 1, pollIntervalMs: 10_000, timeoutMinutes: 20 },
+      }),
+    ).toBe(10);
   });
 
   it('falls back to databricks.timeoutMinutes', () => {
-    expect(resolveStepTimeoutMinutes({
-      ...baseStep,
-      databricks: { jobId: 1, pollIntervalMs: 10_000, timeoutMinutes: 20 },
-    })).toBe(20);
+    expect(
+      resolveStepTimeoutMinutes({
+        ...baseStep,
+        databricks: { jobId: 1, pollIntervalMs: 10_000, timeoutMinutes: 20 },
+      }),
+    ).toBe(20);
   });
 
   it('defaults to 30 when no config carries a timeout', () => {
@@ -476,11 +470,7 @@ describe('WorkflowDefinitionSchema — assignedTo', () => {
     const result = WorkflowDefinitionSchema.safeParse(wd);
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(
-        result.error.issues.some((issue) =>
-          /assignedTo.*executor is 'script'/.test(issue.message),
-        ),
-      ).toBe(true);
+      expect(result.error.issues.some((issue) => /assignedTo.*executor is 'script'/.test(issue.message))).toBe(true);
     }
   });
 });

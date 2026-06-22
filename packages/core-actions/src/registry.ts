@@ -1,10 +1,5 @@
 import type { ActionConfig } from '@mediforce/platform-core';
-import type {
-  ActionContext,
-  ActionHandler,
-  ActionOutput,
-  AnyActionHandler,
-} from './types';
+import type { ActionContext, ActionHandler, ActionOutput, AnyActionHandler } from './types';
 
 /**
  * Hints shown when a workflow references an action `kind` whose handler
@@ -21,11 +16,15 @@ const KIND_DISABLED_HINTS: Record<string, string> = {
 };
 
 export class UnknownActionKindError extends Error {
-  constructor(public readonly kind: string, registeredKinds: ReadonlyArray<string> = []) {
+  constructor(
+    public readonly kind: string,
+    registeredKinds: ReadonlyArray<string> = [],
+  ) {
     const hint = KIND_DISABLED_HINTS[kind];
-    const registeredList = registeredKinds.length > 0
-      ? ` Registered kinds: ${registeredKinds.join(', ')}.`
-      : ' No action handlers are registered.';
+    const registeredList =
+      registeredKinds.length > 0
+        ? ` Registered kinds: ${registeredKinds.join(', ')}.`
+        : ' No action handlers are registered.';
     const detail = hint !== undefined ? ` ${hint}` : '';
     super(`No action handler registered for kind '${kind}'.${registeredList}${detail}`);
     this.name = 'UnknownActionKindError';

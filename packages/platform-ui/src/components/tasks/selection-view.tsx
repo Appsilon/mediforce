@@ -9,20 +9,11 @@ export function SelectionView({ task, remainingTaskCount }: TaskBodyProps) {
   const isCompleted = task.status === 'completed';
 
   if (isActionable) {
-    return (
-      <SelectionForm
-        taskId={task.id}
-        options={task.options ?? []}
-        remainingTaskCount={remainingTaskCount}
-      />
-    );
+    return <SelectionForm taskId={task.id} options={task.options ?? []} remainingTaskCount={remainingTaskCount} />;
   }
   if (isCompleted && task.completionData) {
     return (
-      <SelectionConfirmationReadOnly
-        completionData={task.completionData}
-        remainingTaskCount={remainingTaskCount}
-      />
+      <SelectionConfirmationReadOnly completionData={task.completionData} remainingTaskCount={remainingTaskCount} />
     );
   }
   return null;

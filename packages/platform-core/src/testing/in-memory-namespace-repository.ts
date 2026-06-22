@@ -29,10 +29,7 @@ export class InMemoryNamespaceRepository implements NamespaceRepository {
     this.namespaces.set(parsed.handle, { ...parsed });
   }
 
-  async createNamespaceWithOwner(input: {
-    namespace: Namespace;
-    ownerMember: NamespaceMember;
-  }): Promise<void> {
+  async createNamespaceWithOwner(input: { namespace: Namespace; ownerMember: NamespaceMember }): Promise<void> {
     const parsedNs = NamespaceSchema.parse(input.namespace);
     const parsedMember = NamespaceMemberSchema.parse(input.ownerMember);
     this.namespaces.set(parsedNs.handle, { ...parsedNs });
@@ -79,11 +76,7 @@ export class InMemoryNamespaceRepository implements NamespaceRepository {
     this.members.get(handle)?.delete(uid);
   }
 
-  async setMemberRole(
-    handle: string,
-    uid: string,
-    role: NamespaceMember['role'],
-  ): Promise<void> {
+  async setMemberRole(handle: string, uid: string, role: NamespaceMember['role']): Promise<void> {
     const bucket = this.members.get(handle);
     const current = bucket?.get(uid);
     if (!bucket || !current) return;

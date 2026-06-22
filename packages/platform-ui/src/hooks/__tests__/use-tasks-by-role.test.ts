@@ -6,7 +6,12 @@ import { createQueryWrapper } from '@/test/react-query';
 
 const listMock = vi.fn<(...args: unknown[]) => Promise<{ tasks: HumanTask[] }>>();
 class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { tasks: { list: listMock } },
@@ -18,7 +23,9 @@ vi.mock('../use-collection', () => ({
   useCollection: () => ({ data: [], loading: false, error: null }),
 }));
 
-const { useMyActionableTasksByRole, useMyActionableTasks, useCompletedTasksByRole, useMyCompletedTasks } = await import('../use-tasks');
+const { useMyActionableTasksByRole, useMyActionableTasks, useCompletedTasksByRole, useMyCompletedTasks } = await import(
+  '../use-tasks'
+);
 
 describe('useMyActionableTasksByRole', () => {
   beforeEach(() => {
@@ -58,10 +65,7 @@ describe('useMyActionableTasksByRole', () => {
     });
     const { wrapper } = createQueryWrapper();
 
-    const { result } = renderHook(
-      () => useMyActionableTasksByRole('reviewer', 'u-me'),
-      { wrapper },
-    );
+    const { result } = renderHook(() => useMyActionableTasksByRole('reviewer', 'u-me'), { wrapper });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.data.map((t) => t.id)).toEqual(['t1', 't2']);
@@ -69,10 +73,7 @@ describe('useMyActionableTasksByRole', () => {
 
   it('strips deleted tasks regardless of currentUserId', async () => {
     listMock.mockResolvedValue({
-      tasks: [
-        buildHumanTask({ id: 't1', deleted: true }),
-        buildHumanTask({ id: 't2', deleted: false }),
-      ],
+      tasks: [buildHumanTask({ id: 't1', deleted: true }), buildHumanTask({ id: 't2', deleted: false })],
     });
     const { wrapper } = createQueryWrapper();
 

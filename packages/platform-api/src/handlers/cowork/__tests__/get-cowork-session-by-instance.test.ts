@@ -19,9 +19,7 @@ describe('getCoworkSessionByInstance handler', () => {
     instanceRepo = new InMemoryProcessInstanceRepository();
     coworkSessionRepo = new InMemoryCoworkSessionRepository(instanceRepo);
 
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }));
   });
 
   it('returns the active session for api-key callers', async () => {
@@ -34,10 +32,7 @@ describe('getCoworkSessionByInstance handler', () => {
     );
 
     const scope = createTestScope({ coworkSessionRepo, instanceRepo });
-    const result = await getCoworkSessionByInstance(
-      { instanceId: 'inst-a' },
-      scope,
-    );
+    const result = await getCoworkSessionByInstance({ instanceId: 'inst-a' }, scope);
 
     expect(result.id).toBe('sess-1');
     expect(result.processInstanceId).toBe('inst-a');
@@ -58,20 +53,14 @@ describe('getCoworkSessionByInstance handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    const result = await getCoworkSessionByInstance(
-      { instanceId: 'inst-a' },
-      scope,
-    );
+    const result = await getCoworkSessionByInstance({ instanceId: 'inst-a' }, scope);
 
     expect(result.id).toBe('sess-1');
   });
 
   it('throws NotFoundError when the instance is completely unknown', async () => {
     const scope = createTestScope({ coworkSessionRepo, instanceRepo });
-    const err = await getCoworkSessionByInstance(
-      { instanceId: 'inst-missing' },
-      scope,
-    ).catch((e) => e);
+    const err = await getCoworkSessionByInstance({ instanceId: 'inst-missing' }, scope).catch((e) => e);
 
     expect(err).toBeInstanceOf(NotFoundError);
     expect((err as NotFoundError).statusCode).toBe(404);
@@ -88,12 +77,7 @@ describe('getCoworkSessionByInstance handler', () => {
     );
 
     const scope = createTestScope({ coworkSessionRepo, instanceRepo });
-    await expect(
-      getCoworkSessionByInstance(
-        { instanceId: 'inst-a' },
-        scope,
-      ),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(getCoworkSessionByInstance({ instanceId: 'inst-a' }, scope)).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('throws NotFoundError (not ForbiddenError) when a user caller is outside the instance’s namespace (anti-enumeration)', async () => {
@@ -110,18 +94,11 @@ describe('getCoworkSessionByInstance handler', () => {
       caller: userCaller('u-2', ['team-beta']),
     });
 
-    await expect(
-      getCoworkSessionByInstance(
-        { instanceId: 'inst-a' },
-        scope,
-      ),
-    ).rejects.toThrow(NotFoundError);
+    await expect(getCoworkSessionByInstance({ instanceId: 'inst-a' }, scope)).rejects.toThrow(NotFoundError);
   });
 
   it('throws NotFoundError when the instance has no namespace', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'inst-orphan', namespace: undefined }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-orphan', namespace: undefined }));
     await coworkSessionRepo.create(
       buildCoworkSession({
         id: 'sess-orphan',
@@ -135,12 +112,7 @@ describe('getCoworkSessionByInstance handler', () => {
       caller: userCaller('u-3', ['team-alpha']),
     });
 
-    await expect(
-      getCoworkSessionByInstance(
-        { instanceId: 'inst-orphan' },
-        scope,
-      ),
-    ).rejects.toThrow(NotFoundError);
+    await expect(getCoworkSessionByInstance({ instanceId: 'inst-orphan' }, scope)).rejects.toThrow(NotFoundError);
   });
 
   it('returns the most recent active session when several exist', async () => {
@@ -162,10 +134,7 @@ describe('getCoworkSessionByInstance handler', () => {
     );
 
     const scope = createTestScope({ coworkSessionRepo, instanceRepo });
-    const result = await getCoworkSessionByInstance(
-      { instanceId: 'inst-a' },
-      scope,
-    );
+    const result = await getCoworkSessionByInstance({ instanceId: 'inst-a' }, scope);
 
     expect(result.id).toBe('sess-new');
   });
@@ -181,11 +150,6 @@ describe('getCoworkSessionByInstance handler', () => {
       caller: userCaller('u-2', ['team-beta']),
     });
 
-    await expect(
-      getCoworkSessionByInstance(
-        { instanceId: 'inst-a' },
-        scope,
-      ),
-    ).rejects.toThrow(NotFoundError);
+    await expect(getCoworkSessionByInstance({ instanceId: 'inst-a' }, scope)).rejects.toThrow(NotFoundError);
   });
 });

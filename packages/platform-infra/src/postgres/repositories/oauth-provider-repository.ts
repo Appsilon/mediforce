@@ -29,43 +29,25 @@ export class PostgresOAuthProviderRepository implements OAuthProviderRepository 
   constructor(private readonly db: Database) {}
 
   async list(namespace: string): Promise<OAuthProviderConfig[]> {
-    const rows = await this.db
-      .select()
-      .from(oauthProviders)
-      .where(eq(oauthProviders.workspace, namespace));
-    return rows
-      .map((r) => toConfig(r))
-      .sort((a, b) => a.id.localeCompare(b.id));
+    const rows = await this.db.select().from(oauthProviders).where(eq(oauthProviders.workspace, namespace));
+    return rows.map((r) => toConfig(r)).sort((a, b) => a.id.localeCompare(b.id));
   }
 
   async get(namespace: string, id: string): Promise<OAuthProviderConfig | null> {
     const rows = await this.db
       .select()
       .from(oauthProviders)
-      .where(
-        and(
-          eq(oauthProviders.workspace, namespace),
-          eq(oauthProviders.id, id),
-        ),
-      )
+      .where(and(eq(oauthProviders.workspace, namespace), eq(oauthProviders.id, id)))
       .limit(1);
     const row = rows[0];
     return row ? toConfig(row) : null;
   }
 
-  async create(
-    namespace: string,
-    input: CreateOAuthProviderInput,
-  ): Promise<OAuthProviderConfig> {
+  async create(namespace: string, input: CreateOAuthProviderInput): Promise<OAuthProviderConfig> {
     const existing = await this.db
       .select({ id: oauthProviders.id })
       .from(oauthProviders)
-      .where(
-        and(
-          eq(oauthProviders.workspace, namespace),
-          eq(oauthProviders.id, input.id),
-        ),
-      )
+      .where(and(eq(oauthProviders.workspace, namespace), eq(oauthProviders.id, input.id)))
       .limit(1);
     if (existing.length > 0) {
       throw new ProviderAlreadyExistsError(namespace, input.id);
@@ -93,11 +75,7 @@ export class PostgresOAuthProviderRepository implements OAuthProviderRepository 
     return toConfig(row);
   }
 
-  async update(
-    namespace: string,
-    id: string,
-    patch: UpdateOAuthProviderInput,
-  ): Promise<OAuthProviderConfig | null> {
+  async update(namespace: string, id: string, patch: UpdateOAuthProviderInput): Promise<OAuthProviderConfig | null> {
     const current = await this.get(namespace, id);
     if (!current) return null;
     const merged: OAuthProviderConfig = OAuthProviderConfigSchema.parse({
@@ -124,12 +102,7 @@ export class PostgresOAuthProviderRepository implements OAuthProviderRepository 
         iconUrl: merged.iconUrl ?? null,
         // updated_at handled by the set_updated_at trigger.
       })
-      .where(
-        and(
-          eq(oauthProviders.workspace, namespace),
-          eq(oauthProviders.id, id),
-        ),
-      )
+      .where(and(eq(oauthProviders.workspace, namespace), eq(oauthProviders.id, id)))
       .returning();
     return row ? toConfig(row) : null;
   }
@@ -137,12 +110,7 @@ export class PostgresOAuthProviderRepository implements OAuthProviderRepository 
   async delete(namespace: string, id: string): Promise<boolean> {
     const rows = await this.db
       .delete(oauthProviders)
-      .where(
-        and(
-          eq(oauthProviders.workspace, namespace),
-          eq(oauthProviders.id, id),
-        ),
-      )
+      .where(and(eq(oauthProviders.workspace, namespace), eq(oauthProviders.id, id)))
       .returning({ id: oauthProviders.id });
     return rows.length > 0;
   }

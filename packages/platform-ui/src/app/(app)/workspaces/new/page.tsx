@@ -38,12 +38,7 @@ export default function NewWorkspacePage() {
   // namespace entry to the cached `['users','me']` so the sidebar shows the
   // new workspace immediately. On success the server-echoed entity replaces
   // the placeholder; on failure the snapshot rolls back.
-  const create = useMutation<
-    CreateNamespaceOutput,
-    Error,
-    CreateNamespaceInput,
-    { restore: () => void }
-  >({
+  const create = useMutation<CreateNamespaceOutput, Error, CreateNamespaceInput, { restore: () => void }>({
     mutationFn: (input) => mediforce.namespaces.create(input),
     onMutate: async (input) => {
       await qc.cancelQueries({ queryKey: queryKeys.users.me() });
@@ -105,8 +100,7 @@ export default function NewWorkspacePage() {
     if (handle.trim() === '') {
       nextErrors.handle = 'Handle is required.';
     } else if (!HANDLE_REGEX.test(handle) || handle.length > HANDLE_MAX_LENGTH) {
-      nextErrors.handle =
-        `Handle must be lowercase alphanumeric with internal hyphens (max ${HANDLE_MAX_LENGTH} characters).`;
+      nextErrors.handle = `Handle must be lowercase alphanumeric with internal hyphens (max ${HANDLE_MAX_LENGTH} characters).`;
     }
 
     if (displayName.trim() === '') {
@@ -162,9 +156,7 @@ export default function NewWorkspacePage() {
           Home
         </Link>
         <h1 className="text-xl font-headline font-semibold">New Workspace</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Create a shared namespace for your team.
-        </p>
+        <p className="text-sm text-muted-foreground mt-0.5">Create a shared namespace for your team.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
@@ -205,15 +197,12 @@ export default function NewWorkspacePage() {
             className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             disabled={submitting}
           />
-          {errors.displayName !== undefined && (
-            <p className="text-xs text-destructive">{errors.displayName}</p>
-          )}
+          {errors.displayName !== undefined && <p className="text-xs text-destructive">{errors.displayName}</p>}
         </div>
 
         <div className="flex flex-col gap-1.5">
           <label htmlFor="bio" className="text-sm font-medium">
-            Bio{' '}
-            <span className="font-normal text-muted-foreground">(optional)</span>
+            Bio <span className="font-normal text-muted-foreground">(optional)</span>
           </label>
           <textarea
             id="bio"
@@ -225,14 +214,10 @@ export default function NewWorkspacePage() {
             className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 resize-none"
             disabled={submitting}
           />
-          {errors.bio !== undefined && (
-            <p className="text-xs text-destructive">{errors.bio}</p>
-          )}
+          {errors.bio !== undefined && <p className="text-xs text-destructive">{errors.bio}</p>}
         </div>
 
-        {submitError !== null && (
-          <p className="text-sm text-destructive">{submitError}</p>
-        )}
+        {submitError !== null && <p className="text-sm text-destructive">{submitError}</p>}
 
         <div>
           <button

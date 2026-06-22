@@ -34,9 +34,7 @@ async function pollUntil<T>(
 }
 
 test.describe('POST /api/tasks/[taskId]/complete — verdict variant', () => {
-  test('drives a run to completion and emits the Phase 3 audit chain', async ({
-    request,
-  }) => {
+  test('drives a run to completion and emits the Phase 3 audit chain', async ({ request }) => {
     const wdName = `e2e-complete-verdict-${Date.now()}`;
     const wd = {
       name: wdName,
@@ -54,13 +52,10 @@ test.describe('POST /api/tasks/[taskId]/complete — verdict variant', () => {
       transitions: [{ from: 'review', to: 'done' }],
       triggers: [{ type: 'manual', name: 'Start' }],
     };
-    const createWdRes = await request.post(
-      `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
-      {
-        headers: { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' },
-        data: wd,
-      },
-    );
+    const createWdRes = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
+      headers: { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' },
+      data: wd,
+    });
     expect(createWdRes.status(), await createWdRes.text()).toBe(201);
 
     const triggerRes = await request.post('/api/processes', {

@@ -42,7 +42,7 @@ export function OpenRouterCreditsProvider({ children }: { children: ReactNode })
     try {
       const res = await apiFetch(`/api/system/openrouter-credits?namespace=${encodeURIComponent(handle)}`);
       if (!res.ok || cancelledRef.current) return;
-      const data = await res.json() as OpenRouterCreditsOutput;
+      const data = (await res.json()) as OpenRouterCreditsOutput;
       if (cancelledRef.current) return;
       setAvailable(data.available);
       setRemaining(data.remaining);
@@ -63,26 +63,30 @@ export function OpenRouterCreditsProvider({ children }: { children: ReactNode })
     cancelledRef.current = false;
     fetchCredits();
     const interval = setInterval(fetchCredits, REFRESH_INTERVAL_MS);
-    return () => { cancelledRef.current = true; clearInterval(interval); };
+    return () => {
+      cancelledRef.current = true;
+      clearInterval(interval);
+    };
   }, [activated, handle, fetchCredits]);
 
   const activate = useCallback(() => setActivated(true), []);
 
-  const value = useMemo<OpenRouterCreditsState>(() => ({
-    available,
-    remaining,
-    limit,
-    usage,
-    isLoading,
-    error,
-    refresh: fetchCredits,
-  }), [available, remaining, limit, usage, isLoading, error, fetchCredits]);
+  const value = useMemo<OpenRouterCreditsState>(
+    () => ({
+      available,
+      remaining,
+      limit,
+      usage,
+      isLoading,
+      error,
+      refresh: fetchCredits,
+    }),
+    [available, remaining, limit, usage, isLoading, error, fetchCredits],
+  );
 
   return (
     <ActivateContext.Provider value={activate}>
-      <OpenRouterCreditsContext.Provider value={value}>
-        {children}
-      </OpenRouterCreditsContext.Provider>
+      <OpenRouterCreditsContext.Provider value={value}>{children}</OpenRouterCreditsContext.Provider>
     </ActivateContext.Provider>
   );
 }
@@ -91,6 +95,8 @@ const ActivateContext = createContext<() => void>(() => {});
 
 export function useOpenRouterCredits(): OpenRouterCreditsState {
   const activate = useContext(ActivateContext);
-  useEffect(() => { activate(); }, [activate]);
+  useEffect(() => {
+    activate();
+  }, [activate]);
   return useContext(OpenRouterCreditsContext);
 }

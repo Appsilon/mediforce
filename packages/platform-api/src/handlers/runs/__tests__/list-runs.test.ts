@@ -16,12 +16,8 @@ describe('listRuns handler', () => {
   });
 
   it('returns every run for an api-key caller, as full ProcessInstance shape', async () => {
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'r1', namespace: 'alpha', definitionName: 'wf' }),
-    );
-    await instanceRepo.create(
-      buildProcessInstance({ id: 'r2', namespace: 'beta', definitionName: 'wf' }),
-    );
+    await instanceRepo.create(buildProcessInstance({ id: 'r1', namespace: 'alpha', definitionName: 'wf' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'r2', namespace: 'beta', definitionName: 'wf' }));
 
     const scope = createTestScope({ instanceRepo });
     const result = await listRuns({ limit: 20 }, scope);

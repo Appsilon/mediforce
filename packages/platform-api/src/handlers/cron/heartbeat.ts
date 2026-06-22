@@ -1,11 +1,6 @@
 import type { CronTriggerState, Trigger, WorkflowDefinition } from '@mediforce/platform-core';
 import { validateCronSchedule, isDue } from '@mediforce/workflow-engine';
-import type {
-  HeartbeatInput,
-  HeartbeatOutput,
-  SkippedEntry,
-  TriggeredEntry,
-} from '../../contract/cron';
+import type { HeartbeatInput, HeartbeatOutput, SkippedEntry, TriggeredEntry } from '../../contract/cron';
 import type { CallerScope } from '../../repositories/index';
 import { ForbiddenError, PreconditionFailedError } from '../../errors';
 import { resumeWait } from '../processes/resume-wait';
@@ -37,14 +32,9 @@ function evaluateTrigger(
 // System-actor only — reads across every workspace's definitions; gating
 // is by apiKey at the call site, not per row. Skipped triggers surface in
 // the response body + console.log but are NOT audited (no state change).
-export async function heartbeat(
-  _input: HeartbeatInput,
-  scope: CallerScope,
-): Promise<HeartbeatOutput> {
+export async function heartbeat(_input: HeartbeatInput, scope: CallerScope): Promise<HeartbeatOutput> {
   if (scope.caller.kind !== 'apiKey') {
-    throw new ForbiddenError(
-      'cron heartbeat requires system-actor credentials (X-Api-Key)',
-    );
+    throw new ForbiddenError('cron heartbeat requires system-actor credentials (X-Api-Key)');
   }
 
   const now = new Date();
@@ -115,9 +105,7 @@ export async function heartbeat(
 
   // Sweep: resume timer-paused instances whose deadline has passed
   const pausedInstances = await scope.runs.getByStatus('paused');
-  const waitingInstances = pausedInstances.filter(
-    (inst) => inst.pauseReason === 'waiting_for_timer',
-  );
+  const waitingInstances = pausedInstances.filter((inst) => inst.pauseReason === 'waiting_for_timer');
 
   for (const inst of waitingInstances) {
     try {
@@ -161,7 +149,9 @@ export async function heartbeat(
         processInstanceId: inst.id,
         processDefinitionVersion: inst.definitionVersion,
       });
-      console.log(`[cron-heartbeat] Escalated orphaned paused run '${inst.id}' (step: ${inst.currentStepId}) to failed`);
+      console.log(
+        `[cron-heartbeat] Escalated orphaned paused run '${inst.id}' (step: ${inst.currentStepId}) to failed`,
+      );
     } catch (err) {
       console.error(`[cron-heartbeat] Failed to escalate orphaned run '${inst.id}':`, err);
     }

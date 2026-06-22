@@ -1,9 +1,32 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ModelRegistryRepository, CreateModelRegistryEntryInput, ModelRegistryEntry } from '@mediforce/platform-core';
+import type {
+  ModelRegistryRepository,
+  CreateModelRegistryEntryInput,
+  ModelRegistryEntry,
+} from '@mediforce/platform-core';
 import { syncWithRetry } from '../openrouter-sync';
 
 function stubEntry(): ModelRegistryEntry {
-  return { id: 'test/m', name: 'm', provider: 'test', contextLength: 0, maxCompletionTokens: null, pricing: { input: 0, output: 0 }, modality: 'text->text', inputModalities: ['text'], outputModalities: ['text'], supportsTools: false, supportsVision: false, source: 'openrouter' as const, canonicalSlug: null, requestCount: null, lastSyncedAt: '', createdAt: '', updatedAt: '', retiredAt: null };
+  return {
+    id: 'test/m',
+    name: 'm',
+    provider: 'test',
+    contextLength: 0,
+    maxCompletionTokens: null,
+    pricing: { input: 0, output: 0 },
+    modality: 'text->text',
+    inputModalities: ['text'],
+    outputModalities: ['text'],
+    supportsTools: false,
+    supportsVision: false,
+    source: 'openrouter' as const,
+    canonicalSlug: null,
+    requestCount: null,
+    lastSyncedAt: '',
+    createdAt: '',
+    updatedAt: '',
+    retiredAt: null,
+  };
 }
 
 function makeRepo(overrides: Partial<ModelRegistryRepository> = {}): ModelRegistryRepository {
@@ -38,9 +61,7 @@ function makeFakeModel(overrides: Record<string, unknown> = {}) {
 describe('syncWithRetry', () => {
   it('succeeds on first attempt', async () => {
     const fakeResponse = { data: [makeFakeModel()] };
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify(fakeResponse), { status: 200 }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify(fakeResponse), { status: 200 }));
     const result = await syncWithRetry(makeRepo(), { maxRetries: 3, intervalMs: 10 });
     expect(result.synced).toBe(1);
     vi.restoreAllMocks();

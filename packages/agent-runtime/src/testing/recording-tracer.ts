@@ -122,11 +122,7 @@ class RecordingTracer implements Tracer {
     fnMaybe?: SpanCallback<T>,
   ): T {
     const callback =
-      typeof optionsOrFn === 'function'
-        ? optionsOrFn
-        : typeof contextOrFn === 'function'
-          ? contextOrFn
-          : fnMaybe;
+      typeof optionsOrFn === 'function' ? optionsOrFn : typeof contextOrFn === 'function' ? contextOrFn : fnMaybe;
 
     if (callback === undefined) {
       throw new Error('Missing span callback');

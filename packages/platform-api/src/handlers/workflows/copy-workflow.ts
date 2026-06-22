@@ -1,7 +1,4 @@
-import type {
-  CopyWorkflowInput,
-  CopyWorkflowOutput,
-} from '../../contract/workflows';
+import type { CopyWorkflowInput, CopyWorkflowOutput } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, NotFoundError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
@@ -17,10 +14,7 @@ interface ScopedInput extends CopyWorkflowInput {
  * by non-members) and write to the target (membership-gated). No wrapper
  * shortcut.
  */
-export async function copyWorkflow(
-  input: ScopedInput,
-  scope: CallerScope,
-): Promise<CopyWorkflowOutput> {
+export async function copyWorkflow(input: ScopedInput, scope: CallerScope): Promise<CopyWorkflowOutput> {
   const sourceNamespace = input.sourceNamespace ?? input.targetNamespace;
 
   const sourceVersion =
@@ -35,14 +29,9 @@ export async function copyWorkflow(
   }
 
   const copyName = input.targetName ?? input.name;
-  const existingTargetVersion = await scope.workflowDefinitions.getLatestVersion(
-    input.targetNamespace,
-    copyName,
-  );
+  const existingTargetVersion = await scope.workflowDefinitions.getLatestVersion(input.targetNamespace, copyName);
   if (existingTargetVersion > 0) {
-    throw new ConflictError(
-      `Workflow '${copyName}' already exists in namespace '${input.targetNamespace}'`,
-    );
+    throw new ConflictError(`Workflow '${copyName}' already exists in namespace '${input.targetNamespace}'`);
   }
 
   const copiedFrom = {

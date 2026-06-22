@@ -30,9 +30,7 @@ export default function ToolDetailPage() {
         mediforce.toolCatalog
           .get({ namespace: handle, id: toolId })
           .then((res) => res.entry)
-          .catch((err: unknown) =>
-            err instanceof ApiError && err.status === 404 ? null : Promise.reject(err),
-          ),
+          .catch((err: unknown) => (err instanceof ApiError && err.status === 404 ? null : Promise.reject(err))),
         apiFetch('/api/agents').then(async (res) =>
           res.ok ? ((await res.json()) as { agents: AgentDefinition[] }).agents : [],
         ),
@@ -65,10 +63,7 @@ export default function ToolDetailPage() {
     return rows;
   }, [entry, agents]);
 
-  const secretEntries = useMemo(
-    () => (entry?.env ? Object.entries(entry.env) : []),
-    [entry],
-  );
+  const secretEntries = useMemo(() => (entry?.env ? Object.entries(entry.env) : []), [entry]);
 
   if (loading) {
     return (
@@ -115,9 +110,7 @@ export default function ToolDetailPage() {
 
         <div className="mb-8">
           <h1 className="text-xl font-headline font-semibold font-mono">{entry.id}</h1>
-          {entry.description !== undefined && (
-            <p className="text-sm text-muted-foreground mt-1">{entry.description}</p>
-          )}
+          {entry.description !== undefined && <p className="text-sm text-muted-foreground mt-1">{entry.description}</p>}
         </div>
 
         <div className="rounded-lg border bg-card px-4 py-5 mb-6">
@@ -145,7 +138,8 @@ export default function ToolDetailPage() {
               Environment variables
             </h2>
             <p className="text-xs text-muted-foreground mb-3">
-              Values containing <code className="text-[11px] font-mono bg-muted px-1 py-0.5 rounded">{'{{SECRET:name}}'}</code> are
+              Values containing{' '}
+              <code className="text-[11px] font-mono bg-muted px-1 py-0.5 rounded">{'{{SECRET:name}}'}</code> are
               resolved at runtime against the workflow secrets.
             </p>
             <div className="space-y-2">
@@ -205,22 +199,23 @@ export default function ToolDetailPage() {
         <div className="rounded-lg border bg-card px-4 py-5">
           <h2 className="text-sm font-semibold mb-3">Usage in agent definition</h2>
           <p className="text-xs text-muted-foreground mb-3">
-            Reference this entry via <code className="text-[11px] font-mono bg-muted px-1 py-0.5 rounded">mcpServers</code> on
-            an AgentDefinition:
+            Reference this entry via{' '}
+            <code className="text-[11px] font-mono bg-muted px-1 py-0.5 rounded">mcpServers</code> on an
+            AgentDefinition:
           </p>
           <pre className="rounded-md bg-muted p-3 text-xs font-mono overflow-x-auto">
-{JSON.stringify(
-  {
-    mcpServers: {
-      [entry.id]: {
-        type: 'stdio',
-        catalogId: entry.id,
-      },
-    },
-  },
-  null,
-  2,
-)}
+            {JSON.stringify(
+              {
+                mcpServers: {
+                  [entry.id]: {
+                    type: 'stdio',
+                    catalogId: entry.id,
+                  },
+                },
+              },
+              null,
+              2,
+            )}
           </pre>
         </div>
       </div>

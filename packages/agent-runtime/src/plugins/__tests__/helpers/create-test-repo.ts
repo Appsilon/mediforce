@@ -93,11 +93,7 @@ export function createTestRepo(options: CreateTestRepoOptions = {}): TestRepo {
  * Add a new commit to an existing test repo.
  * Returns the new commit SHA.
  */
-export function addCommitToTestRepo(
-  repoPath: string,
-  files: Record<string, string>,
-  message = 'update',
-): string {
+export function addCommitToTestRepo(repoPath: string, files: Record<string, string>, message = 'update'): string {
   const workDir = mkdtempSync(join(tmpdir(), 'mediforce-test-update-'));
 
   const gitEnv = {

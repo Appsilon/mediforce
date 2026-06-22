@@ -28,29 +28,19 @@ describe('listAdapter', () => {
 
 describe('getByIdAdapter', () => {
   it('returns the entity directly when no envelope key is given', async () => {
-    const handler = getByIdAdapter(
-      async () => ({ id: 'x', name: 'foo' }),
-      'Not found',
-    );
+    const handler = getByIdAdapter(async () => ({ id: 'x', name: 'foo' }), 'Not found');
     const result = await handler({}, fakeScope);
     expect(result).toEqual({ id: 'x', name: 'foo' });
   });
 
   it('wraps the entity under the envelope key when provided', async () => {
-    const handler = getByIdAdapter(
-      async () => ({ id: 'x' }),
-      'Not found',
-      'agent',
-    );
+    const handler = getByIdAdapter(async () => ({ id: 'x' }), 'Not found', 'agent');
     const result = await handler({}, fakeScope);
     expect(result).toEqual({ agent: { id: 'x' } });
   });
 
   it('throws NotFoundError with a string message when the fetch returns null', async () => {
-    const handler = getByIdAdapter<{ id: string }, unknown>(
-      async () => null,
-      'Task not found',
-    );
+    const handler = getByIdAdapter<{ id: string }, unknown>(async () => null, 'Task not found');
     await expect(handler({ id: 'missing' }, fakeScope)).rejects.toThrow(NotFoundError);
     await expect(handler({ id: 'missing' }, fakeScope)).rejects.toThrow('Task not found');
   });
@@ -76,14 +66,11 @@ describe('getByIdAdapter', () => {
   it('passes input + scope through to the fetch callback', async () => {
     let seenInput: unknown;
     let seenScope: unknown;
-    const handler = getByIdAdapter(
-      async (input: { id: string }, scope) => {
-        seenInput = input;
-        seenScope = scope;
-        return { id: input.id };
-      },
-      'Not found',
-    );
+    const handler = getByIdAdapter(async (input: { id: string }, scope) => {
+      seenInput = input;
+      seenScope = scope;
+      return { id: input.id };
+    }, 'Not found');
     await handler({ id: 'q' }, fakeScope);
     expect(seenInput).toEqual({ id: 'q' });
     expect(seenScope).toBe(fakeScope);

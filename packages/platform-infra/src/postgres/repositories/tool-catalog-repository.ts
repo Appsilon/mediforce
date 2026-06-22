@@ -27,22 +27,14 @@ export class PostgresToolCatalogRepository implements ToolCatalogRepository {
     const rows = await this.db
       .select()
       .from(toolCatalogEntries)
-      .where(
-        and(
-          eq(toolCatalogEntries.workspace, namespace),
-          eq(toolCatalogEntries.id, entryId),
-        ),
-      )
+      .where(and(eq(toolCatalogEntries.workspace, namespace), eq(toolCatalogEntries.id, entryId)))
       .limit(1);
     const row = rows[0];
     return row ? toEntry(row) : null;
   }
 
   async list(namespace: string): Promise<ToolCatalogEntry[]> {
-    const rows = await this.db
-      .select()
-      .from(toolCatalogEntries)
-      .where(eq(toolCatalogEntries.workspace, namespace));
+    const rows = await this.db.select().from(toolCatalogEntries).where(eq(toolCatalogEntries.workspace, namespace));
     return rows.map((r) => toEntry(r));
   }
 
@@ -76,12 +68,7 @@ export class PostgresToolCatalogRepository implements ToolCatalogRepository {
   async delete(namespace: string, entryId: string): Promise<void> {
     await this.db
       .delete(toolCatalogEntries)
-      .where(
-        and(
-          eq(toolCatalogEntries.workspace, namespace),
-          eq(toolCatalogEntries.id, entryId),
-        ),
-      );
+      .where(and(eq(toolCatalogEntries.workspace, namespace), eq(toolCatalogEntries.id, entryId)));
   }
 }
 
