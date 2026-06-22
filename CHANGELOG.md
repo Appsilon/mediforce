@@ -14,6 +14,38 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ### Fixed
 - Postgres workflow definitions now persist imported workflow `source` provenance, so get/list calls keep the advertised repo/path/ref after GitHub imports.
 - `pnpm test` is now fully self-contained — Playwright `globalSetup` auto-starts the Firebase Auth emulator when absent and runs pending DB migrations, so E2E tests pass without manual pre-flight steps.
+### Added
+- Docker image validation at workflow registration — server warns when a referenced image is not found on the platform, CLI deduplicates server vs local warnings, and the workflow editor shows an amber toast on save [#734](https://github.com/Appsilon/mediforce/pull/734).
+- SMTP email provider as alternative to Mailgun — organisations can now use their own SMTP infrastructure instead of Mailgun by setting `SMTP_*` env vars; `EMAIL_PROVIDER` auto-detects or can be set explicitly; includes read-only admin status page, `mediforce email status` CLI command, and bootstrap script prompts for initial setup [#748](https://github.com/Appsilon/mediforce/issues/748).
+- **Run view UX** — execution history panel (renamed from "Step Status"), scrollable workflow diagram, active step info (started time, live elapsed timer, executor name/claimer for claimed human tasks)
+- **Task view** — spreadsheet-style table replaces card grid; status column, clickable run links, bulk cancel via batch endpoint, hide-completed toggle. Absolute dates replace relative timestamps in the table. `process × action` cross-grouping (sub-grouping within a process group by action type) is not carried forward in the table layout; each grouping mode renders a flat table.
+- **Process card** — step-progress dots rendered against the run's actual definition version instead of the latest definition
+- Pre-flight model validation: agent steps with unknown model IDs show an "Unknown model" warning (with Levenshtein-based "did you mean?" suggestions) in the start-run dialog before the run begins.
+- Start-run dialog: selecting a different workflow version from the dropdown no longer skips pre-flight checks — the dialog now waits for the new version's definition and validation to load before allowing start.
+- Extracted `normaliseModelId` to `platform-core` — was duplicated 5 times across 3 packages.
+- Codex now mirrors Claude's repo-local skill and agent discovery layout via `.codex/skills/*` and `.codex/agents` symlinks, with `AGENTS.md` documenting how Codex should translate Claude-specific skill tool syntax.
+
+### Removed
+- Dead uploaded-skills feature — dropped `AgentDefinition.skillFileNames` + the `agents.skill_file_names` column, the skill-upload UI, and the Firebase Storage skill download from agent identity resolution; `skillsDir` is now the only skill mechanism (ADR-0003 PR1).
+
+### Fixed
+- Image-less build-mode workflow agents now resolve their derived Docker tag before choosing execution mode, so `dockerfile`/`repo`/`commit` agents run in containers instead of falling back to local host execution.
+- Workflow editor agent image fields keep custom Docker tag entry available even when discovered local Docker images are listed.
+- E2E test setup deletes only the workspace handles it owns (`test`, `tenant-a`, `tenant-b`, and journey-specific handles) and resets seeded agent definitions — personal namespaces and their registered workflows are no longer wiped when running `pnpm test:e2e`, while interrupted MCP-binding journeys no longer dirty the next run.
+- `datetime` params now store UTC ISO strings — scheduled wait steps fire at the user's intended local time instead of being off by the browser-to-UTC offset; the datetime field shows the detected browser timezone (e.g. "Europe/Warsaw (UTC+2)") so users can see exactly what time the server will act on.
+- Runs stuck at a wait step with no recorded `pauseReason` are now surfaced as errors instead of silently stalling forever: the auto-runner verifies the `waiting_for_timer` write after it commits and escalates to `failed` if the write was lost; the heartbeat sweeps and escalates any surviving `paused/null` orphans; the run view shows an actionable message ("Resume this run to restart from the current step") instead of "Workflow stopped unexpectedly".
+- Staging deploys now pick up each push to main — `build-images.yml` now builds native `linux/amd64 + linux/arm64` images via a matrix job on GitHub-hosted ARM64 runners; the Hetzner ARM64 staging server was silently falling back to a stale local `be65eae4` build because the amd64-only CI images had no matching manifest for `arm64/v8`; deploy script pull errors are now visible instead of swallowed [#740](https://github.com/Appsilon/mediforce/pull/740).
+- `scripts/sync-model-rankings.py` now uses OpenRouter's frontend rankings JSON endpoint instead of a brittle private server-action scrape, restoring local model ranking sync.
+- On-demand preview deploys now work: `/deploy` on a PR runs a real `vercel build` + `vercel deploy --prebuilt` via the Vercel CLI, replacing the empty-commit `[preview]`-marker hack that silently no-op'd.
+- Execution history panel now shows all iterations of looped steps — steps that completed before the current loop revisit (e.g. a timer-wait that ran between two visits to the same decision gate) were previously hidden or incorrectly marked pending due to the steps API returning only the latest execution per step and using a positional definition-order algorithm for status derivation.
+
+## [2026-06-14]
+
+### Added
+- The "Before you start" pre-flight dialog now shows actionable resolution paths per warning instead of a static hint: missing-image warnings link to "Configure build source" (workflow editor), "Build manually" (Docker setup tutorial), and "Contact admin" (mailto: to the namespace owner); missing-secret warnings deep-link directly to the Secrets panel for the affected key. Backed by a new `GET /api/namespaces/:handle/admin-contact` endpoint that resolves the earliest owner's email [#312](https://github.com/Appsilon/mediforce/pull/312).
+- **Task view** — spreadsheet-style table replaces card grid; status column, clickable run links, bulk cancel via batch endpoint, hide-completed toggle
+- **Process card** — step-progress dots rendered against the run's actual definition version instead of the latest definition
+
 ### Changed
 - **StepExecutor strategy pattern (ADR-0008)** — agent and script steps now execute through separate `StepExecutor` strategies (`AgentStepExecutor`, `ScriptStepExecutor`) instead of a monolithic `AgentRunner` with `isScript` branches. Each strategy owns its full lifecycle (run, audit, advance/review, cost tracking). `AgentPlugin` interface renamed to `StepExecutorPlugin` to reflect that scripts and Databricks jobs are peers, not special-cased agents:
   - `StepOutputEnvelope` base schema in platform-core [#688](https://github.com/Appsilon/mediforce/pull/688)

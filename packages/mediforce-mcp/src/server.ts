@@ -10,6 +10,7 @@
  *   complete_task           — complete a human task with payload
  *   get_run_logs            — audit events + step executions
  *   list_models             — query the model registry
+ *   list_docker_images      — available Docker images on the platform
  *
  * API tools require APP_BASE_URL + PLATFORM_API_KEY env vars.
  * Runs via stdio transport.
@@ -126,6 +127,7 @@ server.registerTool(
         definitionName: registered.name,
         definitionVersion: registered.version,
         status: startResult.run.status,
+        ...(registered.warnings?.length ? { warnings: registered.warnings } : {}),
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -333,6 +335,7 @@ server.registerTool(
       return mcpJson({
         runId,
         instanceStatus: stepsResult.instanceStatus,
+        instanceError: stepsResult.instanceError ?? null,
         currentStepId: stepsResult.currentStepId,
         steps,
         auditEvents: events,
@@ -383,6 +386,39 @@ server.registerTool(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return mcpText(`Error listing models: ${message}`);
+    }
+  },
+);
+
+// --- list_docker_images -----------------------------------------------------
+
+server.registerTool(
+  'list_docker_images',
+  {
+    description:
+      'List Docker images available on the platform. ' +
+      'Use this to find valid image references for agent steps (e.g. "mediforce-golden-image:latest"). ' +
+      'Returns repository:tag pairs that can be used in step.agent.image.',
+    inputSchema: {},
+  },
+  async () => {
+    try {
+      const client = getClient();
+      const result = await client.system.dockerInfo();
+      if (!result.available) {
+        return mcpText('Docker is not available on this platform instance.');
+      }
+      const images = result.images.map((img) => ({
+        repository: img.repository,
+        tag: img.tag,
+        ref: img.tag && img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.repository,
+        id: img.id,
+        size: img.size,
+      }));
+      return mcpJson({ count: images.length, images });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return mcpText(`Error listing Docker images: ${message}`);
     }
   },
 );

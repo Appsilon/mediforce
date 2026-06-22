@@ -1,0 +1,1455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mediforce — Server Setup Wizard</title>
+  <meta name="description" content="Set up a new Mediforce server instance. Everything runs in your browser." />
+  <link rel="icon" type="image/png" href="../logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #F8FAFC;
+      --card: #FFFFFF;
+      --dark: #0F172A;
+      --accent: #0D9488;
+      --accent-hover: #0F766E;
+      --accent-light: rgba(13,148,136,0.08);
+      --text: #1E293B;
+      --text-secondary: #64748B;
+      --text-muted: #94A3B8;
+      --border: #E2E8F0;
+      --error: #DC2626;
+      --error-bg: #FEF2F2;
+      --success: #16A34A;
+      --warning-bg: #FFFBEB;
+      --warning-border: #F59E0B;
+      --code-bg: #1E293B;
+      --radius: 8px;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* Security banner */
+    .security-banner {
+      background: var(--accent-light);
+      border-bottom: 1px solid rgba(13,148,136,0.15);
+      padding: 10px 24px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--accent-hover);
+    }
+    .security-banner svg {
+      width: 14px;
+      height: 14px;
+      vertical-align: -2px;
+      margin-right: 4px;
+    }
+
+    /* Main layout */
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+
+    /* Progress bar */
+    .progress {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 32px;
+    }
+    .progress-step {
+      flex: 1;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      transition: background 0.3s;
+    }
+    .progress-step.active { background: var(--accent); }
+    .progress-step.done { background: var(--accent); opacity: 0.5; }
+    .progress-step-label {
+      flex: 1;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: 6px;
+      transition: color 0.3s;
+    }
+    .progress-step-label.active { color: var(--accent); }
+    .progress-step-label.done { color: var(--accent); opacity: 0.6; }
+    .progress-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    /* Step card */
+    .step {
+      display: none;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+    }
+    .step.active { display: block; }
+    .step h2 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      letter-spacing: -0.02em;
+    }
+    .step .subtitle {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+    }
+
+    /* Guidance box */
+    .guidance {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+    .guidance-title {
+      font-weight: 600;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .guidance ol {
+      padding-left: 20px;
+      margin: 0;
+    }
+    .guidance li {
+      margin-bottom: 4px;
+      line-height: 1.5;
+    }
+    .guidance a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .guidance a:hover { text-decoration: underline; }
+
+    /* Form fields */
+    .field {
+      margin-bottom: 20px;
+    }
+    .field:last-child { margin-bottom: 0; }
+    .field label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+    .field label .optional {
+      font-weight: 400;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    .field input, .field textarea, .field select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--text);
+      background: white;
+      transition: border-color 0.2s;
+    }
+    .field input:focus, .field textarea:focus, .field select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(13,148,136,0.1);
+    }
+    .field input.error, .field textarea.error {
+      border-color: var(--error);
+    }
+    .field .error-msg {
+      color: var(--error);
+      font-size: 13px;
+      margin-top: 4px;
+      display: none;
+    }
+    .field .hint {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    .file-drop {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+    .file-drop:hover, .file-drop.dragover {
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+    .file-drop.file-loaded {
+      border-style: solid;
+      border-color: var(--success);
+      background: #F0FDF4;
+    }
+    .field textarea {
+      min-height: 100px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      resize: vertical;
+    }
+
+    /* Toggle / radio group */
+    .radio-group {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .radio-option {
+      flex: 1;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .radio-option:hover { border-color: var(--accent); }
+    .radio-option.selected {
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+    .radio-option input { display: none; }
+    .radio-option .radio-label {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .radio-option .radio-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    /* Toggle switch */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding: 12px 0;
+    }
+    .toggle-row label { margin: 0; font-size: 14px; font-weight: 500; cursor: pointer; }
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle .slider {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .toggle .slider::before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 3px;
+      top: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+    .toggle input:checked + .slider { background: var(--accent); }
+    .toggle input:checked + .slider::before { transform: translateX(20px); }
+
+    /* Collapsible section */
+    .collapsible { display: none; }
+    .collapsible.open { display: block; }
+
+    /* Nav buttons */
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+    .btn {
+      padding: 10px 24px;
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background: var(--bg); }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Review table */
+    .review-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    .review-table th {
+      text-align: left;
+      padding: 8px 12px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-weight: 500;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+    .review-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      word-break: break-all;
+    }
+    .review-table .masked {
+      color: var(--text-muted);
+      font-family: monospace;
+      font-size: 13px;
+    }
+    .review-section {
+      font-weight: 600;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      padding-top: 16px !important;
+    }
+
+    /* Script output */
+    .script-output {
+      position: relative;
+      margin-top: 24px;
+    }
+    .script-output pre {
+      background: var(--code-bg);
+      color: #E2E8F0;
+      padding: 20px;
+      border-radius: var(--radius);
+      overflow-x: auto;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    .script-output .comment { color: #64748B; }
+    .script-output .string { color: #34D399; }
+    .script-output .keyword { color: #7DD3FC; }
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(255,255,255,0.1);
+      color: #E2E8F0;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover { background: rgba(255,255,255,0.2); }
+    .copy-btn.copied { background: var(--accent); border-color: var(--accent); }
+
+    /* Warning box */
+    .warning {
+      background: var(--warning-bg);
+      border: 1px solid var(--warning-border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 13px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .warning svg {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      color: var(--warning-border);
+      margin-top: 1px;
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .container { padding: 16px; }
+      .step { padding: 20px; }
+      .radio-group { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+<script src="../nav.js"></script>
+
+<div class="security-banner">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+  Everything runs in your browser. No data is sent anywhere.
+</div>
+
+<div class="container">
+  <div class="progress-label" id="progress-label">Step 1 of 7</div>
+  <div class="progress" id="progress-bar"></div>
+  <div class="progress" id="progress-labels" style="margin-top:-28px; margin-bottom:32px;"></div>
+
+  <!-- Step 1: Repository -->
+  <div class="step active" id="step-1">
+    <h2>Repository</h2>
+    <p class="subtitle">Which Mediforce repo to deploy.</p>
+
+    <div class="field">
+      <label for="repo">GitHub repository</label>
+      <input type="text" id="repo" value="Appsilon/mediforce" placeholder="Org/repo-name" />
+      <div class="error-msg" id="repo-error"></div>
+    </div>
+
+    <div class="field">
+      <label class="toggle-row" style="cursor:pointer; margin-top:8px;">
+        <span>Private repository</span>
+        <div class="toggle">
+          <input type="checkbox" id="private-repo" onchange="togglePrivateRepo()" />
+          <span class="slider"></span>
+        </div>
+      </label>
+      <div id="private-repo-note" style="display:none; margin-top:8px; padding:10px 12px; background:var(--warning-bg); border:1px solid var(--warning-border); border-radius:var(--radius); font-size:13px;">
+        Your server needs read access to this private repo to pull code. During setup, the script will generate an SSH key on the server and pause &mdash; you&rsquo;ll copy that key to your repo&rsquo;s deploy keys on GitHub. The script will walk you through it step by step.
+      </div>
+    </div>
+
+    <div class="nav">
+      <div></div>
+      <button class="btn btn-primary" onclick="goNext()">Next</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Server -->
+  <div class="step" id="step-2">
+    <h2>Server</h2>
+    <p class="subtitle">Create a server or enter the IP of an existing one.</p>
+
+    <div class="guidance">
+      <div class="guidance-title">Hetzner Cloud (recommended)</div>
+      <ol>
+        <li>Open <a href="https://console.hetzner.cloud" target="_blank">console.hetzner.cloud</a> &rarr; your project</li>
+        <li>Click <strong>Add Server</strong></li>
+        <li>Location: pick close to your users (e.g. Falkenstein or Helsinki for Europe)</li>
+        <li>Image: <strong>Ubuntu 22.04</strong></li>
+        <li>Type: <strong>CPX31</strong> (4 vCPU, 8 GB RAM)</li>
+        <li>SSH keys: add yours (and any team members who need access &mdash; all keys added here get root + deploy access)</li>
+        <li>Create &amp; copy the IP address</li>
+      </ol>
+      <p class="guidance-note" style="margin-top: 8px; font-size: 13px; color: var(--text-secondary);">
+        &#9888; You can add more SSH keys later via <code>ssh-copy-id</code>, but it&rsquo;s easiest to add them all during server creation.
+      </p>
+    </div>
+
+    <div class="field">
+      <label for="server-ip">Server IP address</label>
+      <input type="text" id="server-ip" placeholder="e.g. 167.235.42.100" />
+      <div class="error-msg" id="server-ip-error"></div>
+    </div>
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="goPrev()">Back</button>
+      <button class="btn btn-primary" onclick="goNext()">Next</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Firebase -->
+  <div class="step" id="step-3">
+    <h2>Firebase</h2>
+    <p class="subtitle">Authentication backend. Create a project and paste the configuration.</p>
+
+    <div class="guidance">
+      <div class="guidance-title">Setup steps</div>
+      <ol>
+        <li>Open <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a> &rarr; <strong>Add project</strong></li>
+        <li>Go to <strong>Authentication</strong> &rarr; Get started &rarr; enable <strong>Email/Password</strong></li>
+        <li>Go to <strong>Authentication</strong> &rarr; <strong>Settings</strong> &rarr; <strong>Authorized domains</strong> &rarr; add your domain (e.g. <code>demo.mediforce.ai</code>) &mdash; <em>sign-in will fail without this!</em></li>
+        <li>Go to <strong>Project Settings</strong> &rarr; <strong>General</strong> &rarr; add a <strong>Web app</strong> (&lt;/&gt; icon)</li>
+        <li>Copy the config snippet below</li>
+        <li>Go to <strong>Project Settings</strong> &rarr; <strong>Service Accounts</strong> &rarr; <strong>Generate new private key</strong></li>
+        <li>Drop the downloaded JSON below</li>
+      </ol>
+    </div>
+
+    <div class="field">
+      <label for="fb-config-paste">Web app config snippet</label>
+      <textarea id="fb-config-paste" rows="10" placeholder='Paste the firebaseConfig snippet from Firebase Console here, e.g.:
+
+const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "my-project.firebaseapp.com",
+  projectId: "my-project",
+  storageBucket: "my-project.firebasestorage.app",
+  messagingSenderId: "123456789012",
+  appId: "1:123456789012:web:abc123..."
+};' oninput="parseFirebaseConfig()"></textarea>
+      <div class="error-msg" id="fb-config-paste-error"></div>
+      <div class="hint">Firebase Console &rarr; Project Settings &rarr; General &rarr; Your apps &rarr; SDK setup and configuration &rarr; copy the config object</div>
+      <div id="fb-parsed-ok" style="display:none; margin-top:8px; padding:8px 12px; background:var(--accent-light); border-radius:var(--radius); font-size:13px; color:var(--accent);">
+        &#10003; Parsed: <strong id="fb-parsed-project"></strong>
+      </div>
+    </div>
+    <!-- Hidden fields populated by parser -->
+    <input type="hidden" id="fb-api-key" />
+    <input type="hidden" id="fb-auth-domain" />
+    <input type="hidden" id="fb-project-id" />
+    <input type="hidden" id="fb-storage-bucket" />
+    <input type="hidden" id="fb-messaging-id" />
+    <input type="hidden" id="fb-app-id" />
+    <div class="field">
+      <label for="fb-sa-file">Admin Service Account JSON</label>
+      <div class="file-drop" id="fb-sa-drop" onclick="document.getElementById('fb-sa-file').click()" ondragover="event.preventDefault(); this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="event.preventDefault(); this.classList.remove('dragover'); handleSaFile(event.dataTransfer.files[0])">
+        <div id="fb-sa-drop-label">
+          <span style="font-size:24px; display:block; margin-bottom:4px;">&#128196;</span>
+          Drop the .json file here or <strong>click to browse</strong>
+        </div>
+      </div>
+      <input type="file" id="fb-sa-file" accept=".json,application/json" style="display:none" onchange="handleSaFile(this.files[0])" />
+      <textarea id="fb-sa-json" style="display:none"></textarea>
+      <div class="error-msg" id="fb-sa-json-error"></div>
+      <div class="hint">The .json file downloaded from Firebase Console &rarr; Service Accounts &rarr; Generate new private key</div>
+    </div>
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="goPrev()">Back</button>
+      <button class="btn btn-primary" onclick="goNext()">Next</button>
+    </div>
+  </div>
+
+  <!-- Step 4: API Keys -->
+  <div class="step" id="step-4">
+    <h2>API Keys</h2>
+    <p class="subtitle">LLM provider keys for agent execution.</p>
+
+    <div class="field">
+      <label for="openrouter-key">OpenRouter API Key</label>
+      <input type="password" id="openrouter-key" placeholder="sk-or-..." />
+      <div class="error-msg" id="openrouter-key-error"></div>
+      <div class="hint">Get one at <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a></div>
+    </div>
+    <div class="field">
+      <label for="openai-key">OpenAI API Key <span class="optional">(optional)</span></label>
+      <input type="password" id="openai-key" placeholder="sk-..." />
+      <div class="error-msg" id="openai-key-error"></div>
+    </div>
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="goPrev()">Back</button>
+      <button class="btn btn-primary" onclick="goNext()">Next</button>
+    </div>
+  </div>
+
+  <!-- Step 5: Domain -->
+  <div class="step" id="step-5">
+    <h2>Domain</h2>
+    <p class="subtitle">HTTPS domain for your instance. Caddy handles TLS automatically.</p>
+
+    <div class="radio-group" id="domain-type-group">
+      <div class="radio-option selected" onclick="selectDomainType('mediforce')">
+        <input type="radio" name="domain-type" value="mediforce" checked />
+        <div class="radio-label">*.mediforce.ai</div>
+        <div class="radio-desc">Cloudflare DNS</div>
+      </div>
+      <div class="radio-option" onclick="selectDomainType('custom')">
+        <input type="radio" name="domain-type" value="custom" />
+        <div class="radio-label">Custom domain</div>
+        <div class="radio-desc">You manage DNS</div>
+      </div>
+      <div class="radio-option" onclick="selectDomainType('none')">
+        <input type="radio" name="domain-type" value="none" />
+        <div class="radio-label">No domain</div>
+        <div class="radio-desc">IP + self-signed TLS</div>
+      </div>
+    </div>
+
+    <div id="domain-mediforce" class="collapsible open">
+      <div class="field">
+        <label for="subdomain">Subdomain</label>
+        <input type="text" id="subdomain" placeholder="e.g. demo" />
+        <div class="hint" id="subdomain-preview">Your instance will be at <strong>demo.mediforce.ai</strong></div>
+        <div class="error-msg" id="subdomain-error"></div>
+      </div>
+      <div class="guidance" id="dns-guidance">
+        <div class="guidance-title">Cloudflare DNS</div>
+        <ol>
+          <li>Open <a href="https://dash.cloudflare.com" target="_blank">dash.cloudflare.com</a> &rarr; <strong>mediforce.ai</strong> &rarr; DNS</li>
+          <li>Click <strong>Add record</strong></li>
+          <li>Type: <strong>A</strong></li>
+          <li>Name: <strong id="dns-name">demo</strong></li>
+          <li>IPv4 address: <strong id="dns-ip">your server IP</strong></li>
+          <li>Proxy status: <strong>DNS only</strong> (grey cloud) &mdash; Caddy handles TLS</li>
+          <li>TTL: Auto &rarr; Save</li>
+        </ol>
+      </div>
+    </div>
+
+    <div id="domain-custom" class="collapsible">
+      <div class="field">
+        <label for="custom-domain">Domain</label>
+        <input type="text" id="custom-domain" placeholder="e.g. mediforce.yourcompany.com" />
+        <div class="error-msg" id="custom-domain-error"></div>
+      </div>
+      <div class="field">
+        <label>DNS provider</label>
+        <div style="display:flex; gap:8px; margin-top:4px;">
+          <button type="button" class="btn btn-secondary dns-provider-btn" id="dns-cloudflare-btn" onclick="setDnsProvider('cloudflare')" style="flex:1">Cloudflare</button>
+          <button type="button" class="btn btn-secondary dns-provider-btn" id="dns-other-btn" onclick="setDnsProvider('other')" style="flex:1">Other</button>
+        </div>
+      </div>
+      <div id="dns-custom-cloudflare" style="display:none;">
+        <div class="guidance">
+          <div class="guidance-title">Cloudflare DNS</div>
+          <ol>
+            <li>Open <a href="https://dash.cloudflare.com" target="_blank">dash.cloudflare.com</a> &rarr; your domain &rarr; DNS</li>
+            <li>Click <strong>Add record</strong></li>
+            <li>Type: <strong>A</strong></li>
+            <li>Name: <strong id="custom-dns-subdomain"></strong></li>
+            <li>IPv4 address: <strong id="custom-cf-ip"></strong></li>
+            <li>Proxy status: <strong>DNS only</strong> (grey cloud) &mdash; Caddy handles TLS</li>
+            <li>TTL: Auto &rarr; Save</li>
+          </ol>
+        </div>
+      </div>
+      <div id="dns-custom-other" style="display:none;">
+        <div class="guidance">
+          <div class="guidance-title">DNS setup</div>
+          <p>Add an <strong>A record</strong> pointing your domain to <strong id="custom-dns-ip"></strong> at your DNS provider. Make sure no CDN/proxy sits in front &mdash; Caddy needs direct access for TLS.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="domain-none" class="collapsible">
+      <div class="warning">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>Browsers will show a security warning with a self-signed certificate. Fine for testing, not recommended for production.</span>
+      </div>
+    </div>
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="goPrev()">Back</button>
+      <button class="btn btn-primary" onclick="goNext()">Next</button>
+    </div>
+  </div>
+
+  <!-- Step 6: Email -->
+  <div class="step" id="step-6">
+    <h2>Email</h2>
+    <p class="subtitle">Email notifications for user invites and alerts.</p>
+
+    <label class="toggle-row" style="cursor:pointer;">
+      <span>Configure Mailgun</span>
+      <div class="toggle">
+        <input type="checkbox" id="email-toggle" onchange="toggleEmail()" />
+        <span class="slider"></span>
+      </div>
+    </label>
+
+    <div id="email-fields" class="collapsible">
+      <div class="field">
+        <label for="mailgun-key">Mailgun API Key</label>
+        <input type="password" id="mailgun-key" placeholder="key-..." />
+        <div class="error-msg" id="mailgun-key-error"></div>
+      </div>
+      <div class="field">
+        <label for="mailgun-domain">Mailgun Domain</label>
+        <input type="text" id="mailgun-domain" placeholder="e.g. mg.mediforce.ai" />
+        <div class="error-msg" id="mailgun-domain-error"></div>
+      </div>
+      <div class="field">
+        <label for="mailgun-from">From Email</label>
+        <input type="text" id="mailgun-from" placeholder="e.g. noreply@mediforce.ai" />
+        <div class="error-msg" id="mailgun-from-error"></div>
+      </div>
+      <div class="field">
+        <label for="mailgun-sender">Sender Name</label>
+        <input type="text" id="mailgun-sender" placeholder="Mediforce" value="Mediforce" />
+      </div>
+    </div>
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="goPrev()">Back</button>
+      <button class="btn btn-primary" onclick="goNext()">Next</button>
+    </div>
+  </div>
+
+  <!-- Step 7: Review & Generate -->
+  <div class="step" id="step-7">
+    <h2>Review &amp; Generate</h2>
+    <p class="subtitle">Verify your configuration, then generate the bootstrap script.</p>
+
+    <table class="review-table" id="review-table"></table>
+
+    <div style="text-align:center; margin: 24px 0;">
+      <button class="btn btn-primary" onclick="generateScript()" style="padding: 12px 32px; font-size: 15px;">
+        Generate Script
+      </button>
+    </div>
+
+    <div id="script-container" style="display:none;">
+      <div class="warning">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span><strong>Security:</strong> This script contains your API keys and credentials. Treat it like a password. Do not share it or commit it to version control.</span>
+      </div>
+
+      <div style="display:flex; gap:12px; margin: 16px 0;">
+        <button class="btn btn-primary" onclick="downloadScript()" style="flex:1; padding:12px;">
+          &#11015; Download bootstrap.sh
+        </button>
+        <button class="btn btn-secondary" onclick="copyScript()" id="copy-btn-top" style="flex:1; padding:12px;">
+          Copy to clipboard
+        </button>
+      </div>
+
+      <div class="guidance">
+        <div class="guidance-title">Run it</div>
+        <pre style="background:var(--code-bg); color:#E2E8F0; padding:12px 16px; border-radius:var(--radius); font-size:13px; margin:8px 0; user-select:all; cursor:text; line-height:1.8;"><span style="color:#64748B;"># 1. Upload</span>
+scp bootstrap.sh root@<span class="use-ip">IP</span>:/tmp/
+<span style="color:#64748B;"># 2. Run</span>
+ssh -t root@<span class="use-ip">IP</span> bash /tmp/bootstrap.sh</pre>
+        <div class="hint" style="margin-top:8px;">The script will pause to let you register the deploy key on GitHub. First deploy takes ~10 min. Safe to re-run if interrupted.</div>
+      </div>
+
+      <details style="margin-top:16px;">
+        <summary style="cursor:pointer; font-size:14px; color:var(--text-secondary); padding:8px 0;">Show script contents</summary>
+        <div class="script-output">
+          <pre><code id="script-code"></code></pre>
+        </div>
+      </details>
+    </div>
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="goPrev()">Back</button>
+      <div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOTAL_STEPS = 7;
+const STEP_LABELS = ['GitHub', 'Server', 'Firebase', 'LLM', 'Domain', 'Email', 'Deploy'];
+let currentStep = 1;
+
+// --- Progress bar ---
+function initProgress() {
+  const bar = document.getElementById('progress-bar');
+  const labels = document.getElementById('progress-labels');
+  bar.innerHTML = '';
+  labels.innerHTML = '';
+  for (let i = 1; i <= TOTAL_STEPS; i++) {
+    const el = document.createElement('div');
+    el.className = 'progress-step';
+    el.id = `prog-${i}`;
+    bar.appendChild(el);
+
+    const lbl = document.createElement('div');
+    lbl.className = 'progress-step-label';
+    lbl.id = `prog-label-${i}`;
+    lbl.textContent = STEP_LABELS[i - 1];
+    labels.appendChild(lbl);
+  }
+  updateProgress();
+}
+
+function updateProgress() {
+  for (let i = 1; i <= TOTAL_STEPS; i++) {
+    const el = document.getElementById(`prog-${i}`);
+    el.className = 'progress-step';
+    if (i < currentStep) el.classList.add('done');
+    if (i === currentStep) el.classList.add('active');
+
+    const lbl = document.getElementById(`prog-label-${i}`);
+    lbl.className = 'progress-step-label';
+    if (i < currentStep) lbl.classList.add('done');
+    if (i === currentStep) lbl.classList.add('active');
+  }
+  document.getElementById('progress-label').textContent = `Step ${currentStep} of ${TOTAL_STEPS}`;
+}
+
+function showStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById(`step-${n}`).classList.add('active');
+  currentStep = n;
+  updateProgress();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  if (n === 7) buildReview();
+}
+
+// --- Validation ---
+function clearError(id) {
+  const input = document.getElementById(id);
+  const err = document.getElementById(id + '-error');
+  if (input) input.classList.remove('error');
+  if (err) { err.style.display = 'none'; err.textContent = ''; }
+}
+
+function setError(id, msg) {
+  const input = document.getElementById(id);
+  const err = document.getElementById(id + '-error');
+  if (input) input.classList.add('error');
+  if (err) { err.style.display = 'block'; err.textContent = msg; }
+}
+
+function val(id) { return (document.getElementById(id)?.value || '').trim(); }
+
+// --- Firebase SA file upload ---
+function handleSaFile(file) {
+  if (!file) return;
+  clearError('fb-sa-json');
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const content = e.target.result;
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed.type !== 'service_account') {
+        setError('fb-sa-json', 'JSON "type" is not "service_account". Wrong file?');
+        return;
+      }
+      document.getElementById('fb-sa-json').value = content;
+      const label = document.getElementById('fb-sa-drop-label');
+      const drop = document.getElementById('fb-sa-drop');
+      label.textContent = '';
+      const check = document.createElement('span');
+      check.style.cssText = 'color:var(--success); font-size:18px;';
+      check.textContent = '✓';
+      const fname = document.createElement('strong');
+      fname.textContent = ' ' + file.name + ' ';
+      const proj = document.createElement('span');
+      proj.style.color = 'var(--text-secondary)';
+      proj.textContent = '(' + parsed.project_id + ')';
+      label.append(check, fname, proj);
+      drop.classList.add('file-loaded');
+    } catch {
+      setError('fb-sa-json', 'File is not valid JSON.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// --- Firebase config parser ---
+function parseFirebaseConfig() {
+  const raw = val('fb-config-paste');
+  const okBox = document.getElementById('fb-parsed-ok');
+  clearError('fb-config-paste');
+  okBox.style.display = 'none';
+
+  if (!raw) return;
+
+  // Extract key:value pairs from JS object literal or JSON
+  const fieldMap = {
+    apiKey: 'fb-api-key',
+    authDomain: 'fb-auth-domain',
+    projectId: 'fb-project-id',
+    storageBucket: 'fb-storage-bucket',
+    messagingSenderId: 'fb-messaging-id',
+    appId: 'fb-app-id',
+  };
+
+  let parsed = 0;
+  for (const [jsKey, inputId] of Object.entries(fieldMap)) {
+    // Match both JS (apiKey: "val") and JSON ("apiKey": "val") formats
+    const re = new RegExp(`["']?${jsKey}["']?\\s*:\\s*["']([^"']+)["']`);
+    const m = raw.match(re);
+    if (m) {
+      document.getElementById(inputId).value = m[1];
+      parsed++;
+    }
+  }
+
+  if (parsed >= 5) {
+    okBox.style.display = 'block';
+    document.getElementById('fb-parsed-project').textContent = val('fb-project-id');
+  } else if (parsed > 0) {
+    setError('fb-config-paste', `Only parsed ${parsed}/6 fields. Make sure you copied the full config snippet.`);
+  } else {
+    setError('fb-config-paste', 'Could not parse. Paste the firebaseConfig object from Firebase Console.');
+  }
+}
+
+function validateStep(step) {
+  let ok = true;
+  const fail = (id, msg) => { setError(id, msg); ok = false; };
+
+  if (step === 1) {
+    clearError('repo');
+    const repo = val('repo');
+    if (!repo) fail('repo', 'Required.');
+    else if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repo)) fail('repo', 'Format: Org/repo-name');
+  }
+
+  if (step === 2) {
+    clearError('server-ip');
+    const ip = val('server-ip');
+    if (!ip) fail('server-ip', 'Required.');
+    else if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) fail('server-ip', 'Enter a valid IPv4 address.');
+    else {
+      const parts = ip.split('.').map(Number);
+      if (parts.some(p => p < 0 || p > 255)) fail('server-ip', 'Each octet must be 0-255.');
+    }
+  }
+
+  if (step === 3) {
+    clearError('fb-config-paste');
+    clearError('fb-sa-json');
+    if (!val('fb-api-key') || !val('fb-project-id')) {
+      fail('fb-config-paste', 'Paste the Firebase config snippet and make sure it parses correctly.');
+    }
+    const saJson = val('fb-sa-json');
+    if (!saJson) {
+      fail('fb-sa-json', 'Required. Paste the entire service account JSON file.');
+    } else {
+      try {
+        const parsed = JSON.parse(saJson);
+        if (parsed.type !== 'service_account') fail('fb-sa-json', 'JSON must have "type": "service_account". This doesn\'t look like a service account key.');
+      } catch { fail('fb-sa-json', 'Invalid JSON. Paste the raw file content.'); }
+    }
+  }
+
+  if (step === 4) {
+    clearError('openrouter-key');
+    clearError('openai-key');
+    const ork = val('openrouter-key');
+    if (!ork) fail('openrouter-key', 'Required.');
+    else if (!ork.startsWith('sk-or-')) fail('openrouter-key', 'Must start with sk-or-');
+    const oak = val('openai-key');
+    if (oak && !oak.startsWith('sk-')) fail('openai-key', 'Must start with sk-');
+  }
+
+  if (step === 5) {
+    clearError('subdomain');
+    clearError('custom-domain');
+    const type = getDomainType();
+    if (type === 'mediforce') {
+      const sub = val('subdomain');
+      if (!sub) fail('subdomain', 'Required.');
+      else if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(sub)) fail('subdomain', 'Lowercase letters, digits, hyphens only.');
+    } else if (type === 'custom') {
+      const d = val('custom-domain');
+      if (!d) fail('custom-domain', 'Required.');
+      else if (!/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/.test(d)) fail('custom-domain', 'Enter a valid domain.');
+    }
+  }
+
+  if (step === 6) {
+    if (document.getElementById('email-toggle').checked) {
+      clearError('mailgun-key');
+      clearError('mailgun-domain');
+      clearError('mailgun-from');
+      if (!val('mailgun-key')) fail('mailgun-key', 'Required when email is enabled.');
+      if (!val('mailgun-domain')) fail('mailgun-domain', 'Required when email is enabled.');
+      if (!val('mailgun-from')) fail('mailgun-from', 'Required when email is enabled.');
+    }
+  }
+
+  return ok;
+}
+
+// --- Navigation ---
+function goNext() {
+  if (!validateStep(currentStep)) return;
+  if (currentStep < TOTAL_STEPS) showStep(currentStep + 1);
+}
+
+function goPrev() {
+  if (currentStep > 1) showStep(currentStep - 1);
+}
+
+// --- Private repo toggle ---
+function togglePrivateRepo() {
+  const note = document.getElementById('private-repo-note');
+  note.style.display = document.getElementById('private-repo').checked ? 'block' : 'none';
+}
+
+// --- Domain type ---
+function getDomainType() {
+  return document.querySelector('input[name="domain-type"]:checked')?.value || 'mediforce';
+}
+
+function selectDomainType(type) {
+  document.querySelectorAll('#domain-type-group .radio-option').forEach(el => el.classList.remove('selected'));
+  const radio = document.querySelector(`input[name="domain-type"][value="${type}"]`);
+  radio.checked = true;
+  radio.closest('.radio-option').classList.add('selected');
+
+  document.getElementById('domain-mediforce').classList.toggle('open', type === 'mediforce');
+  document.getElementById('domain-custom').classList.toggle('open', type === 'custom');
+  document.getElementById('domain-none').classList.toggle('open', type === 'none');
+}
+
+// --- Subdomain live preview ---
+document.getElementById('subdomain').addEventListener('input', function() {
+  const sub = this.value.trim() || 'example';
+  const preview = document.getElementById('subdomain-preview');
+  preview.textContent = '';
+  preview.append('Your instance will be at ');
+  const b = document.createElement('strong');
+  b.textContent = `${sub}.mediforce.ai`;
+  preview.appendChild(b);
+  document.getElementById('dns-name').textContent = sub;
+});
+
+// --- DNS provider toggle for custom domain ---
+function setDnsProvider(provider) {
+  document.getElementById('dns-custom-cloudflare').style.display = provider === 'cloudflare' ? 'block' : 'none';
+  document.getElementById('dns-custom-other').style.display = provider === 'other' ? 'block' : 'none';
+  document.querySelectorAll('.dns-provider-btn').forEach(b => b.classList.remove('btn-primary'));
+  document.getElementById(`dns-${provider}-btn`).classList.add('btn-primary');
+  updateCustomDnsPreview();
+}
+
+function updateCustomDnsPreview() {
+  const ip = val('server-ip') || 'your server IP';
+  const domain = val('custom-domain') || '';
+  const parts = domain.split('.');
+  const subdomain = parts.length > 2 ? parts[0] : domain;
+  document.getElementById('custom-cf-ip').textContent = ip;
+  document.getElementById('custom-dns-subdomain').textContent = subdomain || 'subdomain';
+  document.getElementById('custom-dns-ip').textContent = ip;
+}
+
+document.getElementById('custom-domain').addEventListener('input', updateCustomDnsPreview);
+
+// --- Update DNS IP when server IP changes ---
+document.getElementById('server-ip').addEventListener('input', function() {
+  const ip = this.value.trim() || 'your server IP';
+  document.getElementById('dns-ip').textContent = ip;
+  document.getElementById('custom-dns-ip').textContent = ip;
+  document.getElementById('custom-cf-ip').textContent = ip;
+  document.querySelectorAll('.use-ip').forEach(el => el.textContent = ip);
+});
+
+// --- Email toggle ---
+function toggleEmail() {
+  const open = document.getElementById('email-toggle').checked;
+  document.getElementById('email-fields').classList.toggle('open', open);
+}
+
+// --- Get domain ---
+function getDomain() {
+  const type = getDomainType();
+  if (type === 'mediforce') return val('subdomain') + '.mediforce.ai';
+  if (type === 'custom') return val('custom-domain');
+  return '';
+}
+
+function getBaseUrl() {
+  const domain = getDomain();
+  return domain ? `https://${domain}` : `http://${val('server-ip')}`;
+}
+
+// --- Masking ---
+function mask(v) {
+  if (!v) return '(empty)';
+  if (v.length <= 8) return '•'.repeat(v.length);
+  return v.slice(0, 4) + '••••' + v.slice(-4);
+}
+
+// --- Review ---
+function buildReview() {
+  const domain = getDomain();
+  const isPrivate = document.getElementById('private-repo').checked;
+  const rows = [
+    ['Repository', null],
+    ['Repo', val('repo') || 'Appsilon/mediforce'],
+    ['Access', isPrivate ? 'Private (deploy key)' : 'Public (HTTPS)'],
+    ['Server', null],
+    ['IP Address', val('server-ip')],
+    ['Domain', domain || `${val('server-ip')} (no domain)`],
+    ['URL', getBaseUrl()],
+    ['Firebase', null],
+    ['Project ID', val('fb-project-id')],
+    ['Auth Domain', val('fb-auth-domain')],
+    ['Admin SA', val('fb-sa-json') ? 'Provided (✓)' : 'Missing'],
+    ['API Keys', null],
+    ['OpenRouter', mask(val('openrouter-key'))],
+    ['OpenAI', val('openai-key') ? mask(val('openai-key')) : '(not set)'],
+    ['Auto-generated', null],
+    ['Platform API Key', 'Generated on server'],
+    ['Secrets Encryption Key', 'Generated on server'],
+    ['Postgres Password', 'Generated on server'],
+  ];
+
+  if (document.getElementById('email-toggle').checked) {
+    rows.push(['Email', null]);
+    rows.push(['Mailgun Domain', val('mailgun-domain')]);
+    rows.push(['From', val('mailgun-from')]);
+  }
+
+  const table = document.getElementById('review-table');
+  table.innerHTML = rows.map(([label, value]) => {
+    if (value === null) return `<tr><td colspan="2" class="review-section">${label}</td></tr>`;
+    const cls = (label.includes('Key') || label.includes('OpenRouter') || label.includes('OpenAI')) ? ' class="masked"' : '';
+    return `<tr><th>${label}</th><td${cls}>${value}</td></tr>`;
+  }).join('');
+
+  document.querySelectorAll('.use-ip').forEach(el => el.textContent = val('server-ip'));
+}
+
+// --- Shell escaping ---
+function shellEscape(s) {
+  if (!s) return "''";
+  if (/^[a-zA-Z0-9._\/:@=-]+$/.test(s)) return s;
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
+// --- Script generation ---
+function generateScript() {
+  const ip = val('server-ip');
+  const domain = getDomain();
+  const baseUrl = getBaseUrl();
+  const caddySite = domain || ip;
+  const repo = val('repo') || 'Appsilon/mediforce';
+  const isPrivate = document.getElementById('private-repo').checked;
+
+  const fbSaB64 = btoa(val('fb-sa-json'));
+
+  const emailEnabled = document.getElementById('email-toggle').checked;
+
+  let s = '';
+  s += '#!/bin/bash\n';
+  s += 'set -euo pipefail\n\n';
+
+  s += '# ══════════════════════════════════════════════════════════════\n';
+  s += '# Mediforce Server Bootstrap\n';
+  s += `# Generated by setup wizard — ${new Date().toISOString().slice(0, 10)}\n`;
+  s += '# ══════════════════════════════════════════════════════════════\n\n';
+
+  s += '# ── Configuration ──\n';
+  s += `DOMAIN=${shellEscape(caddySite)}\n`;
+  s += `BASE_URL=${shellEscape(baseUrl)}\n\n`;
+
+  s += '# Firebase web config\n';
+  s += `NEXT_PUBLIC_FIREBASE_API_KEY=${shellEscape(val('fb-api-key'))}\n`;
+  s += `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${shellEscape(val('fb-auth-domain'))}\n`;
+  s += `NEXT_PUBLIC_FIREBASE_PROJECT_ID=${shellEscape(val('fb-project-id'))}\n`;
+  s += `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${shellEscape(val('fb-storage-bucket'))}\n`;
+  s += `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${shellEscape(val('fb-messaging-id'))}\n`;
+  s += `NEXT_PUBLIC_FIREBASE_APP_ID=${shellEscape(val('fb-app-id'))}\n\n`;
+
+  s += '# Firebase Admin SA (base64-encoded)\n';
+  s += `FIREBASE_SA_B64=${shellEscape(fbSaB64)}\n\n`;
+
+  s += '# API keys\n';
+  s += `OPENROUTER_API_KEY=${shellEscape(val('openrouter-key'))}\n`;
+  s += `OPENAI_API_KEY=${shellEscape(val('openai-key'))}\n\n`;
+
+  s += '# Mailgun\n';
+  s += `MAILGUN_API_KEY=${shellEscape(emailEnabled ? val('mailgun-key') : '')}\n`;
+  s += `MAILGUN_DOMAIN=${shellEscape(emailEnabled ? val('mailgun-domain') : '')}\n`;
+  s += `MAILGUN_FROM_EMAIL=${shellEscape(emailEnabled ? val('mailgun-from') : '')}\n`;
+  s += `MAILGUN_SENDER_NAME=${shellEscape(emailEnabled ? (val('mailgun-sender') || 'Mediforce') : 'Mediforce')}\n\n`;
+
+  s += '# Auto-generated secrets (unique per server)\n';
+  s += 'PLATFORM_API_KEY=$(openssl rand -base64 32)\n';
+  s += 'SECRETS_ENCRYPTION_KEY=$(openssl rand -hex 32)\n';
+  s += "POSTGRES_PASSWORD=$(openssl rand -base64 32 | tr -d '=/+')\n\n";
+
+  s += '# Repo\n';
+  s += `REPO=${shellEscape(repo)}\n`;
+  s += 'BRANCH="main"\n';
+  s += 'DEPLOY_DIR="/opt/mediforce"\n\n';
+
+  s += 'echo ""\n';
+  s += 'echo "═══════════════════════════════════════════════════════════"\n';
+  s += 'echo "  Mediforce Server Bootstrap"\n';
+  s += 'echo "  Target: $DOMAIN"\n';
+  s += 'echo "═══════════════════════════════════════════════════════════"\n';
+  s += 'echo ""\n\n';
+
+  // Step 1: System packages
+  s += '# ── 1. System packages ──\n';
+  s += 'echo "▸ Installing system packages..."\n';
+  s += 'export DEBIAN_FRONTEND=noninteractive\n';
+  s += 'apt-get update -qq\n';
+  s += 'apt-get install -y git curl ca-certificates gnupg lsb-release ufw jq unzip\n';
+  s += 'echo "✓ System packages"\n\n';
+
+  // Step 2: Docker
+  s += '# ── 2. Docker ──\n';
+  s += 'if ! command -v docker &>/dev/null; then\n';
+  s += '  echo "▸ Installing Docker..."\n';
+  s += '  install -m 0755 -d /etc/apt/keyrings\n';
+  s += '  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg\n';
+  s += '  chmod a+r /etc/apt/keyrings/docker.gpg\n';
+  s += '  codename=$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")\n';
+  s += '  arch=$(dpkg --print-architecture)\n';
+  s += '  echo "deb [arch=$arch signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $codename stable" > /etc/apt/sources.list.d/docker.list\n';
+  s += '  apt-get update -qq\n';
+  s += '  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin\n';
+  s += '  systemctl enable --now docker\n';
+  s += 'fi\n';
+  s += 'echo "✓ Docker $(docker --version)"\n\n';
+
+  // Step 3: Docker GC
+  s += '# ── 3. Docker builder GC ──\n';
+  s += "python3 -c '\n";
+  s += 'import json, os, sys\n';
+  s += 'path = "/etc/docker/daemon.json"\n';
+  s += 'try:\n';
+  s += '    with open(path) as f: cfg = json.load(f)\n';
+  s += 'except (FileNotFoundError, ValueError): cfg = {}\n';
+  s += 'if cfg.get("builder",{}).get("gc",{}).get("defaultKeepStorage"): sys.exit(0)\n';
+  s += 'cfg.setdefault("builder",{}).setdefault("gc",{}).update({"enabled":True,"defaultKeepStorage":"20GB","policy":[{"keepStorage":"20GB","all":True}]})\n';
+  s += 'os.makedirs("/etc/docker",exist_ok=True)\n';
+  s += 'with open(path,"w") as f: json.dump(cfg,f,indent=2)\n';
+  s += "print(\"RESTART\")' && systemctl restart docker 2>/dev/null || true\n";
+  s += 'echo "✓ Docker GC configured"\n\n';
+
+  // Step 4: Deploy user
+  s += '# ── 4. Deploy user ──\n';
+  s += 'if ! id deploy &>/dev/null; then\n';
+  s += '  echo "▸ Creating deploy user..."\n';
+  s += '  useradd -m -s /bin/bash -G docker,sudo deploy\n';
+  s += '  mkdir -p /home/deploy/.ssh\n';
+  s += '  chmod 700 /home/deploy/.ssh\n';
+  s += '  cp /root/.ssh/authorized_keys /home/deploy/.ssh/authorized_keys\n';
+  s += '  chmod 600 /home/deploy/.ssh/authorized_keys\n';
+  s += '  chown -R deploy:deploy /home/deploy/.ssh\n';
+  s += "  echo 'deploy ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/deploy\n";
+  s += '  chmod 0440 /etc/sudoers.d/deploy\n';
+  s += 'fi\n';
+  s += 'touch /var/log/mediforce-deploy.log\n';
+  s += 'chown deploy:deploy /var/log/mediforce-deploy.log\n';
+  s += 'echo "✓ Deploy user"\n\n';
+
+  // Step 5: Deploy key (private repos only) + Clone
+  if (isPrivate) {
+    s += '# ── 5a. GitHub deploy key (private repo) ──\n';
+    s += 'KEY_PATH="/home/deploy/.ssh/github_deploy"\n';
+    s += 'if [ ! -f "$KEY_PATH" ]; then\n';
+    s += '  sudo -u deploy ssh-keygen -t ed25519 -f "$KEY_PATH" -N "" -C "mediforce-deploy-$(hostname)-$(date +%Y%m%d)"\n';
+    s += "  sudo -u deploy bash -c 'ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null'\n";
+    s += '  sudo -u deploy bash -c "printf \'Host github.com\\n  IdentityFile %s\\n  IdentitiesOnly yes\\n\' $KEY_PATH > ~/.ssh/config && chmod 600 ~/.ssh/config"\n';
+    s += 'fi\n';
+    s += 'echo ""\n';
+    s += 'echo "════════════════════════════════════════════════════════════"\n';
+    s += 'echo "  ACTION REQUIRED: Register the deploy key on GitHub"\n';
+    s += 'echo "════════════════════════════════════════════════════════════"\n';
+    s += 'echo ""\n';
+    s += 'echo "  Public key:"\n';
+    s += 'cat "${KEY_PATH}.pub"\n';
+    s += 'echo ""\n';
+    s += 'echo "  Go to: https://github.com/${REPO}/settings/keys"\n';
+    s += "echo \"  Click 'Add deploy key', paste the key, check 'Allow read access only'\"\n";
+    s += 'echo ""\n';
+    s += 'read -p "  Press Enter after adding the deploy key... "\n';
+    s += 'echo ""\n';
+    s += 'echo "✓ Deploy key"\n\n';
+  }
+
+  s += '# ── 5b. Clone repo ──\n';
+  s += 'if [ ! -d "$DEPLOY_DIR/.git" ]; then\n';
+  s += '  echo "▸ Cloning repository..."\n';
+  s += '  mkdir -p "$DEPLOY_DIR"\n';
+  s += '  chown deploy:deploy "$DEPLOY_DIR"\n';
+  if (isPrivate) {
+    s += '  sudo -u deploy git clone --branch "$BRANCH" "git@github.com:${REPO}.git" "$DEPLOY_DIR"\n';
+  } else {
+    s += '  sudo -u deploy git clone --branch "$BRANCH" "https://github.com/${REPO}.git" "$DEPLOY_DIR"\n';
+  }
+  s += 'fi\n';
+  s += 'echo "✓ Repo cloned at $(sudo -u deploy git -C $DEPLOY_DIR rev-parse --short HEAD)"\n\n';
+
+  // Step 7: Firebase Admin SA
+  s += '# ── 7. Firebase Admin SA ──\n';
+  s += 'mkdir -p "$DEPLOY_DIR/secrets"\n';
+  s += 'echo "$FIREBASE_SA_B64" | base64 -d > "$DEPLOY_DIR/secrets/firebase-admin-sa.json"\n';
+  s += 'chmod 600 "$DEPLOY_DIR/secrets/firebase-admin-sa.json"\n';
+  s += 'chown deploy:deploy "$DEPLOY_DIR/secrets" "$DEPLOY_DIR/secrets/firebase-admin-sa.json"\n';
+  s += 'echo "✓ Firebase Admin SA key"\n\n';
+
+  // Step 8: Env files
+  s += '# ── 8. Environment files ──\n';
+
+  // .env (docker compose)
+  s += "cat > \"$DEPLOY_DIR/.env\" << 'ENVEOF'\n";
+  s += `# Auto-generated by mediforce setup wizard\n`;
+  s += `NEXT_PUBLIC_FIREBASE_API_KEY=${val('fb-api-key')}\n`;
+  s += `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${val('fb-auth-domain')}\n`;
+  s += `NEXT_PUBLIC_FIREBASE_PROJECT_ID=${val('fb-project-id')}\n`;
+  s += `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${val('fb-storage-bucket')}\n`;
+  s += `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${val('fb-messaging-id')}\n`;
+  s += `NEXT_PUBLIC_FIREBASE_APP_ID=${val('fb-app-id')}\n`;
+  s += `NEXT_PUBLIC_APP_URL=${baseUrl}\n`;
+  s += 'ENVEOF\n';
+
+  // Append secrets using shell variables (these are generated at runtime)
+  s += '{\n';
+  s += '  echo "PLATFORM_API_KEY=$PLATFORM_API_KEY"\n';
+  s += '  echo "SECRETS_ENCRYPTION_KEY=$SECRETS_ENCRYPTION_KEY"\n';
+  s += '  echo "DOCKER_OPENROUTER_API_KEY=$OPENROUTER_API_KEY"\n';
+  s += '  echo "DOCKER_DEEPSEEK_API_KEY="\n';
+  s += '  echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD"\n';
+  s += `  echo "DOMAIN=${caddySite}"\n`;
+  s += `  echo "APP_BASE_URL=${baseUrl}"\n`;
+  s += `  echo "MAILGUN_API_KEY=${emailEnabled ? val('mailgun-key') : ''}"\n`;
+  s += `  echo "MAILGUN_DOMAIN=${emailEnabled ? val('mailgun-domain') : ''}"\n`;
+  s += `  echo "MAILGUN_FROM_EMAIL=${emailEnabled ? val('mailgun-from') : ''}"\n`;
+  s += `  echo "MAILGUN_SENDER_NAME=${emailEnabled ? (val('mailgun-sender') || 'Mediforce') : 'Mediforce'}"\n`;
+  s += '} >> "$DEPLOY_DIR/.env"\n';
+  s += 'chmod 600 "$DEPLOY_DIR/.env"\n';
+  s += 'chown deploy:deploy "$DEPLOY_DIR/.env"\n\n';
+
+  // .env.local (Next.js)
+  s += "cat > \"$DEPLOY_DIR/packages/platform-ui/.env.local\" << 'ENVEOF'\n";
+  s += `NEXT_PUBLIC_FIREBASE_API_KEY=${val('fb-api-key')}\n`;
+  s += `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${val('fb-auth-domain')}\n`;
+  s += `NEXT_PUBLIC_FIREBASE_PROJECT_ID=${val('fb-project-id')}\n`;
+  s += `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${val('fb-storage-bucket')}\n`;
+  s += `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${val('fb-messaging-id')}\n`;
+  s += `NEXT_PUBLIC_FIREBASE_APP_ID=${val('fb-app-id')}\n`;
+  s += `APP_BASE_URL=${baseUrl}\n`;
+  s += 'NAMESPACE=\n';
+  s += 'ENVEOF\n';
+
+  s += '{\n';
+  s += '  echo "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"\n';
+  s += `  echo "OPENAI_API_KEY=${val('openai-key')}"\n`;
+  s += '  echo "PLATFORM_API_KEY=$PLATFORM_API_KEY"\n';
+  s += '} >> "$DEPLOY_DIR/packages/platform-ui/.env.local"\n';
+  s += 'chmod 600 "$DEPLOY_DIR/packages/platform-ui/.env.local"\n';
+  s += 'chown deploy:deploy "$DEPLOY_DIR/packages/platform-ui/.env.local"\n';
+  s += 'echo "✓ Environment files"\n\n';
+
+  // Step 9: Postgres data dir
+  s += '# ── 9. Postgres data dir ──\n';
+  s += 'docker run --rm -v /var/lib:/host/var/lib alpine:latest \\\n';
+  s += "  sh -c 'mkdir -p /host/var/lib/mediforce/postgres-data && chown -R 999:999 /host/var/lib/mediforce/postgres-data'\n";
+  s += 'echo "✓ Postgres data dir"\n\n';
+
+  // Step 10: Firewall
+  s += '# ── 10. Firewall ──\n';
+  s += 'ufw allow 22/tcp\n';
+  s += 'ufw allow 80/tcp\n';
+  s += 'ufw allow 443/tcp\n';
+  s += 'ufw --force enable\n';
+  s += 'echo "✓ Firewall (22, 80, 443)"\n\n';
+
+  // Step 11: Pull pre-built images + start platform
+  s += '# ── 11. First deploy ──\n';
+  s += 'echo ""\n';
+  s += 'echo "▸ Starting platform — pulling pre-built images..."\n';
+  s += 'echo ""\n';
+  s += 'cd "$DEPLOY_DIR"\n';
+  s += 'export NEXT_PUBLIC_GIT_SHA=$(sudo -u deploy git -C "$DEPLOY_DIR" rev-parse --short HEAD)\n';
+  s += '# Pull pre-built images from registry (fast). Falls back to local build.\n';
+  s += 'sudo -u deploy docker compose -f docker-compose.prod.yml pull --ignore-pull-failures 2>/dev/null || true\n';
+  s += 'sudo -u deploy docker compose -f docker-compose.prod.yml up -d --remove-orphans\n';
+  s += 'docker image prune -f > /dev/null 2>&1\n';
+  s += 'echo ""\n';
+  s += 'echo "═══════════════════════════════════════════════════════════"\n';
+  s += 'echo "  ✓ Mediforce is running!"\n';
+  s += `echo "  URL: ${baseUrl}"\n`;
+  s += 'echo "═══════════════════════════════════════════════════════════"\n';
+  s += 'echo ""\n';
+  s += 'docker compose -f docker-compose.prod.yml ps\n';
+  s += 'echo ""\n';
+
+  // Step 12: Build agent images in background
+  s += '# ── 12. Build agent images (background) ──\n';
+  s += 'echo "▸ Building agent images in background..."\n';
+  s += 'echo "  Workflows will be available once images finish building."\n';
+  s += 'echo "  Monitor progress: tail -f /var/log/mediforce-deploy.log"\n';
+  s += 'echo ""\n';
+  s += 'AGENT_LOG="/var/log/mediforce-deploy.log"\n';
+  s += 'nohup sudo -u deploy bash -c \'\n';
+  s += '  bash scripts/rebuild-docker-images.sh >> "$0" 2>&1\n';
+  s += '  echo "[$(date -Iseconds)] Agent images ready" >> "$0"\n';
+  s += '\' "$AGENT_LOG" >> "$AGENT_LOG" 2>&1 &\n';
+
+  // Store raw script for copy
+  window._generatedScript = s;
+
+  // Render with basic syntax highlighting
+  const highlighted = s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/^(#.*)$/gm, '<span class="comment">$1</span>')
+    .replace(/(echo\s+)"([^"]*?)"/g, '$1"<span class="string">$2</span>"')
+    .replace(/\b(if|then|fi|else|elif|for|do|done|while|case|esac|export|set)\b/g, '<span class="keyword">$1</span>');
+
+  document.getElementById('script-code').innerHTML = highlighted;
+  document.getElementById('script-container').style.display = 'block';
+  document.getElementById('script-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// --- Copy ---
+function copyScript() {
+  const btn = document.getElementById('copy-btn-top');
+  navigator.clipboard.writeText(window._generatedScript).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy to clipboard';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+function downloadScript() {
+  const blob = new Blob([window._generatedScript], { type: 'text/x-shellscript' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'bootstrap.sh';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// --- Init ---
+initProgress();
+</script>
+</body>
+</html>

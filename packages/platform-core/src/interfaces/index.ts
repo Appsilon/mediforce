@@ -10,7 +10,7 @@ export type {
 export type { HumanTaskRepository } from './human-task-repository';
 export type { HandoffRepository } from './handoff-repository';
 export type { NotificationService, NotificationEvent, NotificationTarget } from './notification-service';
-export type { SendEmailParams, SendEmailResult, SendEmailFn } from './email-service';
+export type { SendEmailParams, SendEmailResult, SendEmailFn, EmailProviderInfo } from './email-service';
 export type { UserDirectoryService, DirectoryUser, UserAuthMetadata } from './user-directory-service';
 export type {
   AgentRunRepository,

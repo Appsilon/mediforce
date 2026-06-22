@@ -1,4 +1,6 @@
 import type { WorkflowStep } from '@mediforce/platform-core';
+import type { RegistrationWarning } from '@mediforce/platform-api/contract';
+import type { ToastOpts } from '@/components/command-palette/types';
 
 export type ValidationIssue = { path: (string | number)[]; message: string };
 
@@ -68,4 +70,16 @@ export function mergeVerdictTransitions(steps: WorkflowStep[], transitions: Tran
     }
   }
   return merged;
+}
+
+export function toastRegistrationWarnings(
+  warnings: RegistrationWarning[] | undefined,
+  toast: (opts: ToastOpts) => void,
+): void {
+  if (!warnings?.length) return;
+  toast({
+    title: `Saved with ${warnings.length} warning(s)`,
+    description: warnings.map((w) => w.message).join('\n'),
+    variant: 'warning',
+  });
 }

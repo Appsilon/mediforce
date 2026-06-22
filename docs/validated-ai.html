@@ -36,25 +36,6 @@
     a { color: var(--accent); text-decoration: none; }
     .w { max-width: 780px; margin: 0 auto; padding: 0 32px; }
 
-    /* Header */
-    .header { position: sticky; top: 0; z-index: 50; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.88); backdrop-filter: blur(16px); }
-    .header-inner { max-width: 68rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; }
-    .logo-group { display: flex; align-items: center; gap: 0.625rem; text-decoration: none; }
-    .logo-mark { width: 1.75rem; height: 1.75rem; display: flex; align-items: center; justify-content: center; }
-    .logo-mark svg { width: 100%; height: 100%; }
-    .logo-text { font-family: 'Manrope', sans-serif; font-size: 1.125rem; font-weight: 700; letter-spacing: -0.025em; color: var(--text); }
-    .header-links { display: flex; align-items: center; gap: 0.25rem; }
-    .header-link { display: inline-flex; align-items: center; font-size: 0.8125rem; font-weight: 600; color: var(--text-2); padding: 0.375rem 0.75rem; border-radius: 0.375rem; text-decoration: none; transition: color 0.15s; }
-    .header-link:hover { color: var(--text); background: var(--bg-2); }
-    .header-link--icon { display: flex; align-items: center; padding: 0.375rem 0.5rem; color: var(--text-3); }
-    .header-link--icon:hover { color: var(--text); background: var(--bg-2); }
-    .header-link--active { color: var(--accent); background: rgba(13,148,136,0.07); }
-    .header-link--active:hover { color: #0F766E; background: rgba(13,148,136,0.12); }
-    .header-link--discord { background: #5865F2; color: #fff; display: inline-flex; align-items: center; gap: 0.375rem; margin-left: 0.25rem; }
-    .header-link--discord:hover { background: #4752C4; color: #fff; }
-    .header-link--discord svg { width: 1rem; height: 1rem; }
-    .header-link--icon svg { width: 1.125rem; height: 1.125rem; }
-
     /* Draft banner */
     .evolving-badge {
       display: inline-block;
@@ -340,58 +321,7 @@
     .f a { color: var(--text-4); text-decoration: none; } .f a:hover { color: var(--text-3); }
     .f-links { display: flex; gap: 16px; }
 
-    /* ── Mobile navigation ── */
-    .nav-toggle {
-      display: none;
-      align-items: center;
-      justify-content: center;
-      width: 2.25rem;
-      height: 2.25rem;
-      padding: 0;
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--text-60, #6B7280);
-      border-radius: 0.375rem;
-      flex-shrink: 0;
-    }
-    .nav-toggle:hover { background: rgba(0,0,0,0.04); color: var(--text, #111827); }
-    .nav-toggle svg { display: block; }
-    .mobile-nav {
-      display: none;
-      flex-direction: column;
-      padding: 0.75rem 1.5rem 1.25rem;
-      border-top: 1px solid var(--border, #E5E7EB);
-      background: rgba(255,255,255,0.98);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-    }
-    .mobile-nav.is-open { display: flex; }
-    .mobile-nav a {
-      display: block;
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      font-size: 0.9375rem;
-      font-weight: 500;
-      color: var(--text-70, #4B5563);
-      padding: 0.625rem 0.75rem;
-      border-radius: 0.375rem;
-      text-decoration: none;
-    }
-    .mobile-nav a:hover { background: rgba(0,0,0,0.04); color: var(--text, #111827); }
-    .mobile-nav-discord {
-      background: #5865F2 !important;
-      color: #fff !important;
-      display: flex !important;
-      align-items: center !important;
-      gap: 0.5rem;
-      justify-content: center;
-      margin-top: 0.5rem;
-    }
-    .mobile-nav-discord:hover { background: #4752C4 !important; }
-    @media (max-width: 767px) {
-      .nav-toggle { display: flex !important; }
-      .header-links { display: none !important; }
-    }
+    /* Mobile navigation injected by nav.js */
 
     /* ── Footer (shared) ── */
     .footer { border-top: 1px solid var(--border, #E5E7EB); background: var(--bg-dark, #F8F9FA); }
@@ -411,33 +341,7 @@
   </style>
 </head>
 <body>
-
-<header class="header">
-  <div class="header-inner">
-    <a href="index.html" class="logo-group">
-      <div class="logo-mark"><img src="logo.png" alt="Mediforce logo" style="width:100%;height:100%;object-fit:contain;" /></div>
-      <span class="logo-text">Mediforce</span>
-    </a>
-    <div class="header-links">
-      <a href="data-delivery.html" class="header-link">Data Delivery</a>
-      <a href="validated-ai.html" class="header-link header-link--active">Validation</a>
-      <a href="security.html" class="header-link">Security</a>
-      <a href="fda-principles.html" class="header-link">FDA Alignment</a>
-      <a href="https://github.com/Appsilon/mediforce" target="_blank" class="header-link header-link--icon" aria-label="GitHub"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
-      <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="header-link header-link--discord"><svg viewBox="0 -28.5 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z" fill="currentColor"/></svg> Join Discord</a>
-    </div>
-    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/></svg></button>
-  </div>
-  <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
-    <a href="index.html">Home</a>
-    <a href="data-delivery.html">Data Delivery</a>
-    <a href="validated-ai.html" style="color:var(--accent,#0D9488);font-weight:600">Validation</a>
-    <a href="security.html">Security</a>
-    <a href="fda-principles.html">FDA Alignment</a>
-    <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer">GitHub</a>
-    <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="mobile-nav-discord"><svg width="14" height="14" viewBox="0 -28.5 256 256" fill="currentColor" aria-hidden="true"><path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z"/></svg> Join Discord</a>
-  </nav>
-</header>
+  <script src="nav.js"></script>
 
 <section class="hero">
   <div class="w">
@@ -1025,24 +929,6 @@ tocItems.forEach(item => {
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 });
-</script>
-<script>
-(function() {
-  var toggle = document.getElementById('nav-toggle');
-  var nav = document.getElementById('mobile-nav');
-  if (!toggle || !nav) return;
-  toggle.addEventListener('click', function() {
-    var open = nav.classList.toggle('is-open');
-    toggle.setAttribute('aria-expanded', String(open));
-  });
-  document.addEventListener('click', function(e) {
-    if (!nav.classList.contains('is-open')) return;
-    if (!nav.contains(e.target) && !toggle.contains(e.target)) {
-      nav.classList.remove('is-open');
-      toggle.setAttribute('aria-expanded', 'false');
-    }
-  });
-})();
 </script>
 </body>
 </html>

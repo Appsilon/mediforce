@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
+import * as Popover from '@radix-ui/react-popover';
 import { useRouter } from 'next/navigation';
 import { Play, FlaskConical, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRound, FileInput } from 'lucide-react';
 import { useWorkflowVersions, useWorkflowVersion } from '@/hooks/use-workflow-versions';
@@ -14,6 +15,8 @@ import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { useOpenRouterCredits } from '@/hooks/use-openrouter-credits';
+import { useNamespaceAdminContact } from '@/hooks/use-namespace-admin-contact';
+import { useModelValidation } from '@/hooks/use-model-validation';
 import { runPreflightChecks, type PreflightWarning } from '@/lib/preflight-checks';
 import { ParamField } from '@/components/ui/param-field';
 import type { TriggerInputField } from '@mediforce/platform-core';
@@ -39,6 +42,7 @@ export function StartRunButton({
   const { versions: definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowVersions(workflowName, handle);
   const { images: dockerImages, isAvailable: dockerAvailable, isLoading: dockerLoading } = useDockerImages();
   const openRouterCredits = useOpenRouterCredits();
+  const adminContact = useNamespaceAdminContact(handle);
   const [starting, setStarting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const startMutation = useStartRun();
@@ -49,15 +53,14 @@ export function StartRunButton({
   const [localSecretKeys, setLocalSecretKeys] = React.useState<string[] | undefined>(undefined);
   const [localNsSecretKeys, setLocalNsSecretKeys] = React.useState<string[]>([]);
   const [localSecretsLoading, setLocalSecretsLoading] = React.useState(true);
-  const dropdownRef = React.useRef<HTMLDivElement>(null);
-
   const effectiveVersion = version ?? hookEffectiveVersion;
   const preflightVersion = pendingVersion ?? effectiveVersion;
-  const { definition: effectiveDefinition } = useWorkflowVersion(
+  const { definition: effectiveDefinition, loading: definitionLoading } = useWorkflowVersion(
     workflowName,
     handle,
     preflightVersion,
   );
+  const modelValidation = useModelValidation(effectiveDefinition);
 
   const hasContext = secretKeysCtx !== null;
   const uid = firebaseUser?.uid;
@@ -126,23 +129,17 @@ export function StartRunButton({
         available: openRouterCredits.available,
         remaining: openRouterCredits.remaining,
       },
+      handle,
+      workflowName,
+      version: preflightVersion ?? undefined,
+      adminEmail: adminContact.email ?? undefined,
+      modelValidation: modelValidation.isLoading ? undefined : { unknown: modelValidation.unknown },
     });
-  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining]);
+  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining, handle, workflowName, adminContact.email, modelValidation.isLoading, modelValidation.unknown]);
 
-  const preflightLoading = dockerLoading || secretKeysLoading || openRouterCredits.isLoading;
+  const preflightLoading = definitionLoading || dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading || modelValidation.isLoading;
   const hasWarnings = warnings.length > 0;
   const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
-
-  React.useEffect(() => {
-    if (!dropdownOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [dropdownOpen]);
 
   async function executeStart(v?: number, dryRun?: boolean) {
     const targetVersion = v ?? effectiveVersion;
@@ -205,7 +202,8 @@ export function StartRunButton({
   }
 
   function handleStart(v?: number) {
-    if (hasTriggerInput || hasWarnings) {
+    const versionChanged = v !== undefined && v !== effectiveVersion;
+    if (hasTriggerInput || hasWarnings || versionChanged) {
       setPendingVersion(v);
       setDialogOpen(true);
     } else {
@@ -263,7 +261,9 @@ export function StartRunButton({
               <Dialog.Description className="text-xs text-muted-foreground mt-0.5">
                 {hasTriggerInput
                   ? 'Provide input values for this workflow run.'
-                  : `${warnings.length} item${warnings.length !== 1 ? 's' : ''} to review for a smooth run.`}
+                  : preflightLoading
+                    ? 'Checking workflow readiness...'
+                    : `${warnings.length} item${warnings.length !== 1 ? 's' : ''} to review for a smooth run.`}
               </Dialog.Description>
             </div>
             <Dialog.Close className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
@@ -271,42 +271,57 @@ export function StartRunButton({
             </Dialog.Close>
           </div>
 
-          {hasWarnings && (
+          {(hasWarnings || preflightLoading) && (
             <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3 mb-4">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-                <span className="text-xs font-medium text-amber-800 dark:text-amber-300">
-                  {warnings.length} warning{warnings.length !== 1 ? 's' : ''}
-                </span>
-                {missingSecretKeys.length > 0 && (
-                  <button
-                    onClick={() => {
-                      setDialogOpen(false);
-                      const setup = encodeURIComponent(missingSecretKeys.join(','));
-                      const wf = encodeURIComponent(workflowName);
-                      router.push(`/${handle}/workflows/${wf}?tab=secrets&setup=${setup}`);
-                    }}
-                    className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                  >
-                    <KeyRound className="h-3 w-3" />
-                    Set secrets
-                  </button>
-                )}
-              </div>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                <WarningGroup
-                  title="Missing Docker images"
-                  warnings={warnings.filter((w) => w.category === 'missing-image')}
-                />
-                <WarningGroup
-                  title="Missing secrets"
-                  warnings={warnings.filter((w) => w.category === 'missing-secret')}
-                />
-                <WarningGroup
-                  title="LLM credits"
-                  warnings={warnings.filter((w) => w.category === 'low-credits')}
-                />
-              </div>
+              {preflightLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-amber-500 shrink-0" />
+                  <span className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                    Checking models and dependencies...
+                  </span>
+                </div>
+              ) : (
+              <>
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                  <span className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                    {warnings.length} warning{warnings.length !== 1 ? 's' : ''}
+                  </span>
+                  {missingSecretKeys.length > 0 && (
+                    <button
+                      onClick={() => {
+                        setDialogOpen(false);
+                        const setup = encodeURIComponent(missingSecretKeys.join(','));
+                        const wf = encodeURIComponent(workflowName);
+                        router.push(`/${handle}/workflows/${wf}?tab=secrets&setup=${setup}`);
+                      }}
+                      className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                      <KeyRound className="h-3 w-3" />
+                      Set secrets
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  <WarningGroup
+                    title="Missing Docker images"
+                    warnings={warnings.filter((w) => w.category === 'missing-image')}
+                  />
+                  <WarningGroup
+                    title="Missing secrets"
+                    warnings={warnings.filter((w) => w.category === 'missing-secret')}
+                  />
+                  <WarningGroup
+                    title="LLM credits"
+                    warnings={warnings.filter((w) => w.category === 'low-credits')}
+                  />
+                  <WarningGroup
+                    title="Unknown models"
+                    warnings={warnings.filter((w) => w.category === 'unknown-model')}
+                  />
+                </div>
+              </>
+              )}
             </div>
           )}
 
@@ -384,7 +399,7 @@ export function StartRunButton({
 
   return (
     <div>
-      <div className="relative inline-flex" ref={dropdownRef}>
+      <div className="relative inline-flex">
         <button
           disabled={isDisabled}
           onClick={() => handleStart()}
@@ -399,47 +414,52 @@ export function StartRunButton({
           {buttonIcon}
           {buttonLabel}
         </button>
-        <button
-          disabled={isDisabled}
-          onClick={() => setDropdownOpen((prev) => !prev)}
-          title={tooltip}
-          aria-disabled={isDisabled}
-          className={cn(
-            'inline-flex items-center rounded-r-md border-l border-white/20 px-1.5 py-1.5 transition-colors',
-            buttonClasses,
-            isDisabled && 'opacity-50 cursor-not-allowed',
-          )}
-        >
-          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', dropdownOpen && 'rotate-180')} />
-        </button>
+        <Popover.Root open={dropdownOpen} onOpenChange={setDropdownOpen}>
+          <Popover.Trigger asChild>
+            <button
+              disabled={isDisabled}
+              title={tooltip}
+              aria-disabled={isDisabled}
+              className={cn(
+                'inline-flex items-center rounded-r-md border-l border-white/20 px-1.5 py-1.5 transition-colors',
+                buttonClasses,
+                isDisabled && 'opacity-50 cursor-not-allowed',
+              )}
+            >
+              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', dropdownOpen && 'rotate-180')} />
+            </button>
+          </Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content
+              align="end"
+              sideOffset={4}
+              className="z-50 min-w-[200px] max-h-60 overflow-y-auto rounded-md border bg-popover shadow-md animate-in fade-in-0 zoom-in-95"
+            >
+              {definitions.filter((def) => def.archived !== true).map((def) => {
+                const isEffective = def.version === effectiveVersion;
+                return (
+                  <button
+                    key={def.version}
+                    onClick={() => handleStart(def.version)}
+                    className={cn(
+                      'flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors first:rounded-t-md last:rounded-b-md',
+                      isEffective && 'bg-muted/30 font-medium',
+                    )}
+                  >
+                    <Check className={cn('h-3.5 w-3.5 shrink-0', isEffective ? 'text-primary' : 'invisible')} />
+                    <VersionLabel version={def.version} title={def.title} variant="inline" />
+                    {isEffective && (
+                      <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400 ml-auto shrink-0">
+                        default
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
         {warningBadge}
-
-        {dropdownOpen && (
-          <div className="absolute right-0 top-full mt-1 z-30 min-w-[200px] rounded-md border bg-popover shadow-md">
-            {definitions.filter((def) => def.archived !== true).map((def) => {
-              const isEffective = def.version === effectiveVersion;
-
-              return (
-                <button
-                  key={def.version}
-                  onClick={() => handleStart(def.version)}
-                  className={cn(
-                    'flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors first:rounded-t-md last:rounded-b-md',
-                    isEffective && 'bg-muted/30 font-medium',
-                  )}
-                >
-                  <Check className={cn('h-3.5 w-3.5 shrink-0', isEffective ? 'text-primary' : 'invisible')} />
-                  <VersionLabel version={def.version} title={def.title} variant="inline" />
-                  {isEffective && (
-                    <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400 ml-auto shrink-0">
-                      default
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
       </div>
       {errorBanner}
       {preflightDialog}
@@ -465,7 +485,21 @@ function WarningGroup({ title, warnings }: { title: string; warnings: PreflightW
               <div>
                 <p className="font-mono font-medium">{w.message || w.resource}</p>
                 <p className="text-muted-foreground mt-0.5">Used by: {formatStepList(w.stepNames)}</p>
-                <p className="text-muted-foreground/70 mt-0.5">{w.hint}</p>
+                {w.actions.length > 0 && (
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                    {w.actions.map((action) => (
+                      <a
+                        key={action.label}
+                        href={action.href}
+                        target={action.href.startsWith('mailto:') || action.href.startsWith('/') ? undefined : '_blank'}
+                        rel={action.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                        className="text-primary hover:underline"
+                      >
+                        {action.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </li>

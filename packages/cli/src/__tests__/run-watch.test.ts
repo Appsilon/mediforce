@@ -53,7 +53,7 @@ function mkSteps(steps: Array<{ stepId: string; status: string; error?: string }
       status: s.status,
       input: null,
       output: null,
-      execution: mkExecution(s.stepId, s.status, { error: s.error }),
+      executions: [mkExecution(s.stepId, s.status, { error: s.error })],
     })),
   };
 }

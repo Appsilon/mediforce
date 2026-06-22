@@ -41,6 +41,8 @@ export {
   type RegisterWorkflowBody,
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
+  RegistrationWarningSchema,
+  type RegistrationWarning,
   WorkflowRunSummarySchema,
   type WorkflowRunSummary,
   type WorkflowDefinitionGroupSummary,
@@ -110,6 +112,13 @@ export {
   type OpenRouterCreditsInput,
   type OpenRouterCreditsOutput,
 } from './system';
+
+export {
+  GetEmailStatusInputSchema,
+  GetEmailStatusOutputSchema,
+  type GetEmailStatusInput,
+  type GetEmailStatusOutput,
+} from './email-status';
 
 export {
   ListAgentsInputSchema,
@@ -206,6 +215,10 @@ export {
   type UpdateRankingsInput,
   type UpdateRankingsOutput,
   type GetMetaOutput,
+  ValidateModelsInputSchema,
+  ValidateModelsOutputSchema,
+  type ValidateModelsInput,
+  type ValidateModelsOutput,
 } from './models';
 
 export {

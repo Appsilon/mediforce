@@ -54,11 +54,6 @@ services:
   #   sudo mkdir -p /var/lib/mediforce/postgres-data
   #   sudo chown -R 999:999 /var/lib/mediforce/postgres-data   # postgres-alpine UID
   postgres:
-    volumes:
-      - /var/lib/mediforce/postgres-data:/var/lib/postgresql/data
-
-volumes:
-  phoenix-data:
     # ADR-0001 — staging-only planner tuning. The staging host has only
     # ~3.7GB total RAM shared across postgres + platform-ui +
     # container-worker + agent-worker + caddy + redis + stunnel. Postgres
@@ -75,3 +70,8 @@ volumes:
       - postgres
       - -c
       - effective_cache_size=1536MB
+    volumes:
+      - /var/lib/mediforce/postgres-data:/var/lib/postgresql/data
+
+volumes:
+  phoenix-data:

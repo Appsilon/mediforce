@@ -11,11 +11,12 @@ const { useUserProfiles, useUserDisplayNames } = await import('../use-users');
 
 function namespaceResult(members: Partial<NamespaceMember>[] | null) {
   if (members === null) {
-    return { namespace: null, members: [], loading: false, error: null };
+    return { namespace: null, members: [], personalHandles: new Map<string, string>(), loading: false, error: null };
   }
   return {
     namespace: { handle: 'ns1' },
     members,
+    personalHandles: new Map<string, string>(),
     loading: false,
     error: null,
   };
@@ -45,8 +46,8 @@ describe('useUserProfiles', () => {
       ]),
     );
     const { result } = renderHook(() => useUserProfiles('ns1'));
-    expect(result.current.get('u1')).toEqual({ displayName: 'Alice', photoURL: 'https://x/a.png' });
-    expect(result.current.get('u2')).toEqual({ displayName: 'Bob', photoURL: undefined });
+    expect(result.current.get('u1')).toEqual({ displayName: 'Alice', photoURL: 'https://x/a.png', personalHandle: undefined });
+    expect(result.current.get('u2')).toEqual({ displayName: 'Bob', photoURL: undefined, personalHandle: undefined });
   });
 
   it('falls back to uid when displayName is missing', () => {

@@ -1,18 +1,22 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 
-// jsdom picks up --localstorage-file from process.argv (set by the Claude Code
-// runner) and replaces localStorage with a NoOpStorage that omits `clear`.
-// Replace it unconditionally with a working in-memory implementation.
-const _lsStore = new Map<string, string>();
-vi.stubGlobal('localStorage', {
-  get length() { return _lsStore.size; },
-  clear: () => { _lsStore.clear(); },
-  getItem: (key: string) => _lsStore.get(key) ?? null,
-  key: (i: number) => [..._lsStore.keys()][i] ?? null,
-  removeItem: (key: string) => { _lsStore.delete(key); },
-  setItem: (key: string, v: string) => { _lsStore.set(key, String(v)); },
-} satisfies Storage);
+// Node.js ≥22 ships a built-in localStorage stub that requires --localstorage-file to function;
+// its stub doesn't implement the Storage interface (no clear/key), breaking tests that call
+// localStorage.clear(). Replace it with a plain in-memory implementation before jsdom loads.
+const _localStore: Record<string, string> = {};
+Object.defineProperty(globalThis, 'localStorage', {
+  configurable: true,
+  writable: true,
+  value: {
+    getItem: (key: string) => _localStore[key] ?? null,
+    setItem: (key: string, value: string) => { _localStore[key] = String(value); },
+    removeItem: (key: string) => { delete _localStore[key]; },
+    clear: () => { for (const k in _localStore) delete _localStore[k]; },
+    get length() { return Object.keys(_localStore).length; },
+    key: (index: number) => Object.keys(_localStore)[index] ?? null,
+  } as Storage,
+});
 
 vi.mock('@/hooks/use-handle-from-path', () => ({
   useHandleFromPath: () => 'test-org',

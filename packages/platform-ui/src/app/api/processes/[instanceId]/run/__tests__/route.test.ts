@@ -53,6 +53,7 @@ vi.mock('@/lib/platform-services', () => ({
       getByInstanceId: mockHumanTaskGetByInstanceId,
     },
     namespaceRepo: {},
+    pluginRegistry: { list: vi.fn().mockReturnValue([]) },
     modelRegistryRepo: { list: vi.fn().mockResolvedValue([]) },
     actionRegistry: { dispatch: mockActionDispatch },
     engine: { advanceStep: (...args: unknown[]) => mockAdvanceStep(...args) },

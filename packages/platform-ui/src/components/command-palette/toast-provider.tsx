@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import * as Toast from '@radix-ui/react-toast';
-import { CheckCircle2, AlertCircle, Info, X, ExternalLink } from 'lucide-react';
+import { CheckCircle2, AlertCircle, AlertTriangle, Info, X, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToastOpts, ToastVariant } from './types';
 
@@ -62,12 +62,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 const VARIANT_ICON: Record<ToastVariant, React.ComponentType<{ className?: string }>> = {
   success: CheckCircle2,
   error: AlertCircle,
+  warning: AlertTriangle,
   info: Info,
 };
 
 const VARIANT_ACCENT: Record<ToastVariant, string> = {
   success: 'text-green-600 dark:text-green-400',
   error: 'text-destructive',
+  warning: 'text-amber-600 dark:text-amber-400',
   info: 'text-muted-foreground',
 };
 

@@ -28,10 +28,17 @@ export const RegisterWorkflowInputSchema = WorkflowDefinitionBaseSchema.omit({
   namespace: true,
 });
 
+export const RegistrationWarningSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  stepName: z.string(),
+});
+
 export const RegisterWorkflowOutputSchema = z.object({
   success: z.literal(true),
   name: z.string().min(1),
   version: z.number().int().positive(),
+  warnings: z.array(RegistrationWarningSchema).optional(),
 });
 
 /**
@@ -48,6 +55,13 @@ export const WorkflowRunSummarySchema = z.object({
   active: z.number().int().nonnegative(),
   /** Up to 3 newest-first runs for the card preview. */
   latest: z.array(ProcessInstanceSchema).max(3),
+  /**
+   * Non-terminal step IDs keyed by definition version (as string), covering
+   * every version present in `latest`. Used by the card preview to render
+   * progress dots against the run's actual definition, not the latest one.
+   * Defaults to {} for backwards-compatibility with clients that pre-date this field.
+   */
+  stepsByVersion: z.record(z.string(), z.array(z.string())).default({}),
 });
 
 export const WorkflowDefinitionGroupSchema = z.object({
@@ -133,6 +147,7 @@ export type RegisterWorkflowInput = z.infer<typeof RegisterWorkflowInputSchema>;
  */
 export type RegisterWorkflowBody = z.input<typeof RegisterWorkflowInputSchema>;
 export type RegisterWorkflowOutput = z.infer<typeof RegisterWorkflowOutputSchema>;
+export type RegistrationWarning = z.infer<typeof RegistrationWarningSchema>;
 export type WorkflowRunSummary = z.infer<typeof WorkflowRunSummarySchema>;
 export type WorkflowDefinitionGroupSummary = z.infer<typeof WorkflowDefinitionGroupSchema>;
 export type ListWorkflowsInput = z.infer<typeof ListWorkflowsInputSchema>;

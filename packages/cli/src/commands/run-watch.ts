@@ -32,21 +32,28 @@ export const runWatchCommand = defineCommand({
 
       const steps = await mediforce.processes.getSteps({ instanceId: args.runId });
       for (const step of steps.steps) {
-        const exec = step.execution;
-        const key = `${step.stepId}:${exec?.status ?? step.status}`;
-        if (seenSteps.has(key)) continue;
-        seenSteps.add(key);
+        for (const exec of step.executions) {
+          const key = `${step.stepId}:${exec.iterationNumber}:${exec.status}`;
+          if (seenSteps.has(key)) continue;
+          seenSteps.add(key);
 
-        const status = exec?.status ?? step.status;
-        const duration = exec?.startedAt && exec?.completedAt
-          ? ` (${Math.round((new Date(exec.completedAt).getTime() - new Date(exec.startedAt).getTime()) / 1000)}s)`
-          : '';
+          const duration = exec.startedAt && exec.completedAt
+            ? ` (${Math.round((new Date(exec.completedAt).getTime() - new Date(exec.startedAt).getTime()) / 1000)}s)`
+            : '';
 
-        if (jsonMode) {
-          printJson(output, { type: 'step', stepId: step.stepId, status, duration });
-        } else {
-          output.stdout(`  ${status.padEnd(12)} ${step.stepId}${duration}`);
-          if (exec?.error) output.stdout(`             error: ${exec.error}`);
+          if (jsonMode) {
+            printJson(output, { type: 'step', stepId: step.stepId, status: exec.status, duration });
+          } else {
+            output.stdout(`  ${exec.status.padEnd(12)} ${step.stepId}${duration}`);
+            if (exec.error) output.stdout(`             error: ${exec.error}`);
+          }
+        }
+        if (step.executions.length === 0) {
+          const key = `${step.stepId}::${step.status}`;
+          if (!seenSteps.has(key)) {
+            seenSteps.add(key);
+            if (!jsonMode) output.stdout(`  ${step.status.padEnd(12)} ${step.stepId}`);
+          }
         }
       }
 

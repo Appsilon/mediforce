@@ -2,6 +2,7 @@ import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
 import type {
   RegisterWorkflowInput,
   RegisterWorkflowOutput,
+  RegistrationWarning,
 } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
 import {
@@ -12,6 +13,7 @@ import {
 } from '../../errors';
 import { actorFromCaller } from '../_helpers';
 import { checkRetiredModels } from './retired-model-check';
+import { isLocalAgentMode, fetchFromContainerWorker, fetchFromLocalDocker } from '../system/_docker';
 
 interface RegisterScopedInput extends RegisterWorkflowInput {
   namespace: string;
@@ -44,6 +46,24 @@ export async function registerWorkflow(
   const retired = checkRetiredModels(parsed.data, allModels);
   if (retired !== null) {
     throw new ValidationError(retired.message.replace('Cannot run', 'Cannot save'));
+  }
+
+  if (!isLocalAgentMode()) {
+    const missingImage = parsed.data.steps
+      .filter((s) => s.executor === 'agent')
+      .filter((s) => {
+        const cfg = s.agent;
+        if (typeof cfg?.image === 'string' && cfg.image.length > 0) return false;
+        if (typeof cfg?.repo === 'string' && cfg.repo.length > 0
+          && typeof cfg?.commit === 'string' && cfg.commit.length > 0) return false;
+        return true;
+      });
+    if (missingImage.length > 0) {
+      const names = missingImage.map((s) => `'${s.name}'`).join(', ');
+      throw new ValidationError(
+        `Agent step(s) ${names} missing Docker image. Set agent.image or configure agent.repo + agent.commit for auto-build.`,
+      );
+    }
   }
 
   const latestVersion = await scope.workflowDefinitions.getLatestVersion(
@@ -83,5 +103,52 @@ export async function registerWorkflow(
     namespace: input.namespace,
   });
 
-  return { success: true as const, name: definition.name, version: definition.version };
+  const warnings: RegistrationWarning[] = [];
+
+  const hasDockerSteps = definition.steps.some(
+    (s) => s.executor === 'agent' || s.executor === 'script',
+  );
+
+  if (hasDockerSteps) {
+    try {
+      const dockerInfo = isLocalAgentMode()
+        ? await fetchFromLocalDocker()
+        : await fetchFromContainerWorker();
+      if (dockerInfo.available) {
+        for (const step of definition.steps) {
+          if (step.executor !== 'agent' && step.executor !== 'script') continue;
+          const cfg = step.executor === 'script' ? step.script : step.agent;
+          const image = cfg?.image;
+          if (typeof image !== 'string' || image.length === 0) continue;
+          const hasBuildSource = typeof cfg?.repo === 'string' && cfg.repo.length > 0
+            && typeof cfg?.commit === 'string' && cfg.commit.length > 0;
+          if (hasBuildSource) continue;
+          const [repo, tag = 'latest'] = image.split(':');
+          const found = dockerInfo.images.some(
+            (img) => img.repository === repo && img.tag === tag,
+          );
+          if (!found) {
+            warnings.push({
+              code: 'image-not-found',
+              message: `Image '${image}' not found on platform (step '${step.name}'). The workflow will fail at runtime unless this image is built or pushed before starting a run.`,
+              stepName: step.name,
+            });
+          }
+        }
+      }
+    } catch {
+      warnings.push({
+        code: 'image-check-unavailable',
+        message: 'Could not verify Docker images — the container runtime is unreachable. Image availability will be checked again at run start.',
+        stepName: '',
+      });
+    }
+  }
+
+  return {
+    success: true as const,
+    name: definition.name,
+    version: definition.version,
+    ...(warnings.length > 0 ? { warnings } : {}),
+  };
 }

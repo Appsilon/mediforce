@@ -5,6 +5,7 @@ export { listModels, type ListModelsDeps } from './models/list-models';
 export { getModel, type GetModelDeps } from './models/get-model';
 export { syncModels, type SyncModelsDeps } from './models/sync-models';
 export { updateRankings, type UpdateRankingsDeps } from './models/update-rankings';
+export { validateModels, type ValidateModelsDeps } from './models/validate-models';
 
 export { listAgentEvents } from './processes/list-agent-events';
 export { listAuditEvents } from './processes/list-audit-events';
@@ -76,6 +77,7 @@ export { saveWorkflowSecrets } from './secrets/save-workflow-secrets';
 
 export { getDockerInfo } from './system/get-docker-info';
 export { getOpenRouterCredits } from './system/get-openrouter-credits';
+export { getEmailStatus } from './admin/email-status';
 
 export { deleteDockerImage } from './docker-images/delete-image';
 

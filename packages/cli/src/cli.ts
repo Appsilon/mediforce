@@ -37,6 +37,7 @@ import {
   systemDiskCommand,
   systemRmiCommand,
 } from './commands/system-status';
+import { emailStatusCommand } from './commands/email-status';
 import { systemCreditsCommand } from './commands/system-credits';
 import { agentListCommand } from './commands/agent-list';
 import { agentGetCommand } from './commands/agent-get';
@@ -46,6 +47,7 @@ import { agentCreateCommand } from './commands/agent-create';
 import { modelListCommand } from './commands/model-list';
 import { modelGetCommand } from './commands/model-get';
 import { modelSyncCommand } from './commands/model-sync';
+import { modelValidateCommand } from './commands/model-validate';
 import { secretSetCommand } from './commands/secret-set';
 import { secretListCommand } from './commands/secret-list';
 import { secretDeleteCommand } from './commands/secret-delete';
@@ -164,11 +166,12 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   model: {
-    description: 'Foundation model registry (list, get, sync)',
+    description: 'Foundation model registry (list, get, sync, validate)',
     leaves: {
       list: { description: 'List models in registry', fn: modelListCommand },
       get: { description: 'Fetch a model from registry', fn: modelGetCommand },
       sync: { description: 'Sync models from OpenRouter', fn: modelSyncCommand },
+      validate: { description: 'Validate model IDs against registry', fn: modelValidateCommand },
     },
   },
   secret: {
@@ -218,6 +221,12 @@ export const TREE: Record<string, BranchEntry> = {
       rmi: { description: 'Remove a Docker image by ID or name:tag', fn: systemRmiCommand },
       disk: { description: 'Docker disk usage breakdown', fn: systemDiskCommand },
       credits: { description: 'OpenRouter credit balance for a workspace', fn: systemCreditsCommand },
+    },
+  },
+  email: {
+    description: 'Email provider status',
+    leaves: {
+      status: { description: 'Show configured email provider', fn: emailStatusCommand },
     },
   },
   config: {

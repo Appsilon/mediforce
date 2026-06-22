@@ -48,6 +48,7 @@ export {
   NotificationTargetSchema,
   PluginRoleSchema,
   PluginCapabilityMetadataSchema,
+  ContainerSchema,
   WorkflowAgentConfigSchema,
   ScriptStepConfigSchema,
   DatabricksJobConfigSchema,
@@ -160,6 +161,7 @@ export type {
   NotificationTarget,
   ProcessNotificationConfig,
   PluginCapabilityMetadata,
+  ContainerConfig,
   WorkflowAgentConfig,
   ScriptStepConfig,
   DatabricksJobConfig,
@@ -247,6 +249,7 @@ export type {
   SendEmailParams,
   SendEmailResult,
   SendEmailFn,
+  EmailProviderInfo,
 } from './interfaces/index';
 
 export { encodeCursor, decodeCursor } from './cursors/cursor';
@@ -389,3 +392,4 @@ export type { LineStreamReader } from './utils/line-stream';
 export { calculateEstimatedCost } from './utils/cost';
 export { formatBytes } from './utils/format';
 export { compact, parseRow } from './utils/compact';
+export { normaliseModelId } from './utils/normalise-model-id';

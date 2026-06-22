@@ -40,11 +40,17 @@ async function pollUntil<T>(
   throw new Error(`Timed out waiting for ${description} (${timeoutMs}ms)`);
 }
 
+interface StepExecution {
+  status: string;
+  output?: Record<string, unknown>;
+  error?: string;
+}
+
 interface StepsResponse {
   steps: Array<{
     stepId: string;
     executorType?: string;
-    execution: { status: string; output?: Record<string, unknown>; error?: string } | null;
+    executions: StepExecution[];
   }>;
 }
 
@@ -67,7 +73,7 @@ async function waitForStepResult(
   request: APIRequestContext,
   instanceId: string,
   stepId: string,
-): Promise<NonNullable<StepsResponse['steps'][number]['execution']>> {
+): Promise<StepExecution> {
   return pollUntil(
     async () => {
       const res = await request.get(`/api/processes/${instanceId}/steps`, {
@@ -76,11 +82,12 @@ async function waitForStepResult(
       if (res.status() !== 200) return null;
       const body = (await res.json()) as StepsResponse;
       const entry = body.steps.find((step) => step.stepId === stepId);
-      if (entry?.execution == null) return null;
-      if (entry.execution.status === 'failed') {
-        throw new Error(`step '${stepId}' failed: ${entry.execution.error ?? 'no error detail'}`);
+      if (!entry || entry.executions.length === 0) return null;
+      const latest = entry.executions[entry.executions.length - 1]!;
+      if (latest.status === 'failed') {
+        throw new Error(`step '${stepId}' failed: ${latest.error ?? 'no error detail'}`);
       }
-      return entry.execution.status === 'completed' ? entry.execution : null;
+      return latest.status === 'completed' ? latest : null;
     },
     { description: `step '${stepId}' of ${instanceId} to complete` },
   );

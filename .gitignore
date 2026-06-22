@@ -29,6 +29,10 @@ apps/*/secrets/
 memory/
 CLAUDE.local.md
 
+# codex
+.codex/settings.local.json
+.codex/worktrees/
+
 # env
 .env.local
 .env*.local
@@ -49,3 +53,6 @@ packages/platform-ui/.emulator-data
 .planning/wave-*-status.log
 staging-dump.dump
 __pycache__/
+
+# rendered research docs — regenerate locally if needed
+docs/research/rendered-pdfs/

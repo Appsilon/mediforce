@@ -12,7 +12,7 @@ type StepEntry = {
   status: 'completed' | 'running' | 'pending';
   input: Record<string, unknown> | null;
   output: Record<string, unknown> | null;
-  execution: StepExecution | null;
+  executions: StepExecution[];
 };
 
 type GetStepsResult = {
@@ -24,16 +24,16 @@ type GetStepsResult = {
   steps: StepEntry[];
 };
 
-function entry(stepId: string, execution: StepExecution | null): StepEntry {
+function entry(stepId: string, ...executions: StepExecution[]): StepEntry {
   return {
     stepId,
     name: stepId,
     type: 'review',
     executorType: 'agent',
-    status: execution !== null ? 'completed' : 'pending',
+    status: executions.length > 0 ? 'completed' : 'pending',
     input: null,
     output: null,
-    execution,
+    executions,
   };
 }
 
@@ -43,6 +43,7 @@ function result(instanceId: string, steps: StepEntry[], status: GetStepsResult['
     definitionName: 'wf',
     definitionVersion: '1',
     instanceStatus: status,
+    instanceError: null,
     currentStepId: null,
     steps,
   };
@@ -82,7 +83,7 @@ describe('useStepExecutions', () => {
     const ex2 = buildStepExecution({ id: 'ex-2', stepId: 's2' });
     getStepsMock.mockResolvedValue(result('inst-a', [
       entry('s1', ex1),
-      entry('s-pending', null),
+      entry('s-pending'),
       entry('s2', ex2),
     ]));
     const { wrapper } = createQueryWrapper();

@@ -36,20 +36,47 @@ export async function seedPostgresNamespace(
     const data = buildSeedData(testUserId, { mockOAuthBaseUrl: options.mockOAuthBaseUrl });
 
     // ── 0. Wipe prior fixture rows ──────────────────────────────────────────
-    // Auth-setup `clearEmulators` resets the Auth emulator but does not touch
-    // Postgres, so a re-run of the setup task (Playwright retries, dev-mode
-    // re-auth) would dupe human_tasks / agent_runs / audit_events (uuid PKs,
-    // no business-key unique constraints) and conflict on workflow_definitions
-    // (workspace, name, version) for the tenant-a / tenant-b dynamic WDs that
-    // workflow-namespacing.journey created in the previous attempt. TRUNCATE
-    // every fixture table with CASCADE so children are cleared transitively.
+    // Delete only the workspace handles that e2e tests own. Every child table
+    // (workspace_members, workflow_definitions, workflow_meta, process_instances,
+    // step_executions, human_tasks, agent_runs, audit_events, cowork_sessions,
+    // cowork_turns, agents, tool_catalog_entries, oauth_providers) carries
+    // "FOREIGN KEY (workspace) REFERENCES workspaces(handle) ON DELETE CASCADE",
+    // so one DELETE cascades the full fixture tree without touching workspaces
+    // that belong to the developer (e.g. their personal namespace + registered
+    // workflows). model_registry_entries has no workspace FK; its seed inserts
+    // use ON CONFLICT DO NOTHING so it stays idempotent without a DELETE.
+    //
+    // Handles covered:
+    //   fixture    – test, tenant-a, tenant-b
+    //   journeys   – other, acme-labs, invited-personal, bio-clear-labs,
+    //                bio-clear-owner, journey-user, bootstrap-journey
+    //   patterns   – journey-org-* (create-workspace.journey, timestamp suffix)
+    //
+    // Agents use ON DELETE SET NULL for workspace removal, and built-in agents
+    // have no workspace FK at all, so reset the seeded IDs explicitly before
+    // the ON CONFLICT insert path below restores their fixture mcp_servers.
+    const fixtureAgentIds = Object.keys(data.agentDefinitions);
     await sql`
-      TRUNCATE TABLE
-        workspaces, workspace_members, workflow_definitions, workflow_meta,
-        process_instances, step_executions, human_tasks, agent_runs,
-        audit_events, cowork_sessions, cowork_turns, agents,
-        model_registry_entries, tool_catalog_entries, oauth_providers
-      RESTART IDENTITY CASCADE
+      DELETE FROM agents
+      WHERE id IN ${sql(fixtureAgentIds)}
+    `;
+
+    const fixtureHandles = [
+      TEST_ORG_HANDLE,
+      'tenant-a',
+      'tenant-b',
+      'other',
+      'acme-labs',
+      'invited-personal',
+      'bio-clear-labs',
+      'bio-clear-owner',
+      'journey-user',
+      'bootstrap-journey',
+    ];
+    await sql`
+      DELETE FROM workspaces
+      WHERE handle IN ${sql(fixtureHandles)}
+         OR handle LIKE 'journey-org-%'
     `;
 
     // ── 1. workspaces ───────────────────────────────────────────────────────
@@ -345,7 +372,7 @@ export async function seedPostgresNamespace(
         INSERT INTO agents (
           id, workspace, kind, runtime_id, name, icon_name, description,
           foundation_model, system_prompt, input_description,
-          output_description, skill_file_names, mcp_servers, namespace,
+          output_description, mcp_servers, namespace,
           visibility, created_at, updated_at
         ) VALUES (
           ${id},
@@ -359,7 +386,6 @@ export async function seedPostgresNamespace(
           ${(agent.systemPrompt as string | undefined) ?? ''},
           ${agent.inputDescription as string},
           ${agent.outputDescription as string},
-          ${sql.json((agent.skillFileNames as unknown) ?? [])},
           ${agent.mcpServers ? sql.json(agent.mcpServers as unknown) : null},
           ${(agent.namespace as string | undefined) ?? null},
           ${(agent.visibility as string | undefined) ?? 'private'},
@@ -398,7 +424,20 @@ export async function seedPostgresNamespace(
           ${model.createdAt as string},
           ${model.updatedAt as string}
         )
-        ON CONFLICT (id) DO NOTHING
+        ON CONFLICT (id) DO UPDATE SET
+          name = EXCLUDED.name,
+          provider = EXCLUDED.provider,
+          context_length = EXCLUDED.context_length,
+          max_completion_tokens = EXCLUDED.max_completion_tokens,
+          pricing = EXCLUDED.pricing,
+          modality = EXCLUDED.modality,
+          input_modalities = EXCLUDED.input_modalities,
+          output_modalities = EXCLUDED.output_modalities,
+          supports_tools = EXCLUDED.supports_tools,
+          supports_vision = EXCLUDED.supports_vision,
+          request_count = EXCLUDED.request_count,
+          last_synced_at = EXCLUDED.last_synced_at,
+          updated_at = EXCLUDED.updated_at
       `;
     }
 

@@ -8,7 +8,7 @@ import { useProcessInstances } from '@/hooks/use-process-instances';
 import { useMyActionableTasks } from '@/hooks/use-tasks';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { RunsTable } from '@/components/processes/runs-table';
-import { formatStepName } from '@/components/tasks/task-utils';
+import { formatStepName } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 export default function RunsPage() {

@@ -40,6 +40,7 @@ export class DatabricksJobPlugin implements StepExecutorPlugin {
     inputDescription: 'step.databricks: jobId + optional notebookParams/jobParameters (values support ${steps.*} interpolation). Secrets: DATABRICKS_HOST, DATABRICKS_TOKEN.',
     outputDescription: 'JSON object the notebook exits with (dbutils.notebook.exit) as the step result; { raw } when the output is not a JSON object.',
     roles: ['executor'],
+    requiredEnv: [['DATABRICKS_HOST', 'DATABRICKS_TOKEN']],
   };
 
   private context!: WorkflowAgentContext;

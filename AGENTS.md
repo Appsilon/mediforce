@@ -13,7 +13,7 @@ complexity estimates because of medical vocabulary.
 packages/
   platform-core/    Zod schemas, repo interfaces, in-memory test doubles
   platform-api/     Contract + framework-free handlers
-  platform-infra/   Postgres, Firebase Auth, SendGrid
+  platform-infra/   Postgres, Firebase Auth, email (Mailgun/SMTP)
   platform-ui/      Next.js 15 App Router (dev :9003, e2e :9007)
   workflow-engine/  Engine, transitions, expression DSL
   agent-runtime/    PluginRegistry, AgentRunner, Docker spawn
@@ -163,6 +163,15 @@ Claude auto-loads every skill under `.claude/skills/` at session start —
 descriptions are the router, no manual table needed. Reach for one when its
 trigger phrases match the action you're about to take. List with
 `ls .claude/skills/`.
+
+For Codex: repo skills live in `skills/<name>/SKILL.md` and may be symlinked
+under `.codex/skills/` for discovery. Treat them as shared workflow
+instructions, but translate Claude-specific tool syntax instead of executing it
+literally: `Agent(...)` → Codex subagents, `Bash` / `Read` / `Edit` / `Write` /
+`Grep` / `Glob` → Codex shell and file tools, `WebFetch` → Codex web or GitHub
+tools, and `agent-browser` CLI steps → the Codex Browser plugin when available.
+Slash commands like `/new-test` mean "read and follow
+`skills/new-test/SKILL.md`".
 
 ## Reminder — re-read at the top of every task
 

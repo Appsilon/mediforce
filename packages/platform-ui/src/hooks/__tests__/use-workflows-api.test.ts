@@ -5,6 +5,7 @@ describe('mapApiToDefinitionGroups', () => {
   it('maps API response to DefinitionGroup shape', () => {
     const items: ApiDefinitionItem[] = [{
       name: 'test-workflow',
+      namespace: 'acme',
       latestVersion: 2,
       defaultVersion: 1,
       definition: {
@@ -20,7 +21,7 @@ describe('mapApiToDefinitionGroups', () => {
         description: 'A test',
         namespace: 'acme',
         visibility: 'public',
-        repo: { url: 'https://github.com/example/repo' },
+        externalSkillsRepo: { url: 'https://github.com/example/repo' },
       },
     }];
 
@@ -41,12 +42,12 @@ describe('mapApiToDefinitionGroups', () => {
       }],
       stepCount: 3,
       hasManualTrigger: true,
-      repo: { url: 'https://github.com/example/repo' },
+      externalSkillsRepo: { url: 'https://github.com/example/repo' },
       url: undefined,
       archived: undefined,
       namespace: 'acme',
       visibility: 'public',
-      runSummary: { total: 0, active: 0, latest: [] },
+      runSummary: { total: 0, active: 0, latest: [], stepsByVersion: {} },
     });
   });
 
@@ -54,6 +55,7 @@ describe('mapApiToDefinitionGroups', () => {
     const items: ApiDefinitionItem[] = [
       {
         name: 'wf-a',
+        namespace: 'ns-a',
         latestVersion: 1,
         defaultVersion: 1,
         definition: {
@@ -66,6 +68,7 @@ describe('mapApiToDefinitionGroups', () => {
       },
       {
         name: 'wf-b',
+        namespace: 'ns-a',
         latestVersion: 1,
         defaultVersion: 1,
         definition: {
@@ -85,6 +88,7 @@ describe('mapApiToDefinitionGroups', () => {
   it('skips items with null definition', () => {
     const items: ApiDefinitionItem[] = [{
       name: 'broken',
+      namespace: 'ns',
       latestVersion: 1,
       defaultVersion: 1,
       definition: null,
@@ -97,6 +101,7 @@ describe('mapApiToDefinitionGroups', () => {
   it('detects no manual trigger', () => {
     const items: ApiDefinitionItem[] = [{
       name: 'cron-only',
+      namespace: 'ns',
       latestVersion: 1,
       defaultVersion: 1,
       definition: {

@@ -9,6 +9,7 @@ interface MissingEnvVar {
   secretName: string;
   template: string;
   steps: Array<{ stepId: string; stepName: string }>;
+  hint?: string;
 }
 
 export function MissingEnvBanner({
@@ -98,6 +99,7 @@ export function MissingEnvBanner({
             </div>
             <p className="text-xs text-amber-600 dark:text-amber-500 pl-[13.5rem]">
               Used by: {m.steps.map((s) => s.stepName).join(', ')}
+              {m.hint && <span className="ml-1">({m.hint})</span>}
             </p>
           </div>
         ))}

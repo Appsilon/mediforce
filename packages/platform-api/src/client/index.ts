@@ -308,11 +308,15 @@ import {
   GetModelInputSchema,
   GetModelOutputSchema,
   SyncModelsOutputSchema,
+  ValidateModelsInputSchema,
+  ValidateModelsOutputSchema,
   type ListModelsInput,
   type ListModelsOutput,
   type GetModelInput,
   type GetModelOutput,
   type SyncModelsOutput,
+  type ValidateModelsInput,
+  type ValidateModelsOutput,
   type GetProcessInput,
   type GetProcessOutput,
   type ListAuditEventsInput,
@@ -371,6 +375,8 @@ import {
   type GetConfigByPrefixOutput,
   type SetConfigOutput,
   type TestWebhookOutput,
+  GetEmailStatusOutputSchema,
+  type GetEmailStatusOutput,
 } from '../contract/index';
 // SDK consumers reach for one path:
 //   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
@@ -553,6 +559,7 @@ export class Mediforce {
     list: (input?: ListModelsInput) => Promise<ListModelsOutput>;
     get: (input: GetModelInput) => Promise<GetModelOutput>;
     sync: () => Promise<SyncModelsOutput>;
+    validate: (input: ValidateModelsInput) => Promise<ValidateModelsOutput>;
   };
 
   readonly secrets: {
@@ -575,6 +582,7 @@ export class Mediforce {
   readonly system: {
     dockerInfo: () => Promise<DockerInfoResponse>;
     credits: (input: OpenRouterCreditsInput) => Promise<OpenRouterCreditsOutput>;
+    emailStatus: () => Promise<GetEmailStatusOutput>;
   };
 
   readonly cron: {
@@ -1131,6 +1139,16 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.models.sync');
         return SyncModelsOutputSchema.parse(body);
       },
+      validate: async (input) => {
+        const validated = ValidateModelsInputSchema.parse(input);
+        const res = await this.request('/api/model-registry/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.models.validate');
+        return ValidateModelsOutputSchema.parse(body);
+      },
     };
 
     this.runs = {
@@ -1359,6 +1377,11 @@ export class Mediforce {
         const res = await this.request(`/api/system/openrouter-credits${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.system.credits');
         return OpenRouterCreditsOutputSchema.parse(body);
+      },
+      emailStatus: async () => {
+        const res = await this.request('/api/admin/email-status');
+        const body = await parseJsonOrThrow(res, 'mediforce.system.emailStatus');
+        return GetEmailStatusOutputSchema.parse(body);
       },
     };
 

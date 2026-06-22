@@ -40,7 +40,6 @@ const coworkAgent = {
   systemPrompt: '',
   inputDescription: '',
   outputDescription: '',
-  skillFileNames: [],
   mcpServers: {
     tealflow: { type: 'stdio', catalogId: 'tealflow-mcp' },
   },

@@ -60,16 +60,20 @@ export function validateEnv(existsSync: (path: string) => boolean): void {
     );
   }
 
-  // --- MAILGUN EMAIL CONFIG ---
+  // --- EMAIL PROVIDER CONFIG ---
   if (process.env.MEDIFORCE_DISABLE_EMAIL !== 'true') {
     const mailgunVars = ['MAILGUN_API_KEY', 'MAILGUN_DOMAIN', 'MAILGUN_FROM_EMAIL'] as const;
-    const missingMailgun = mailgunVars.filter(
-      (v) => typeof process.env[v] !== 'string' || process.env[v] === '',
+    const smtpVars = ['SMTP_HOST', 'SMTP_FROM_EMAIL'] as const;
+    const hasMailgun = mailgunVars.every(
+      (v) => typeof process.env[v] === 'string' && process.env[v] !== '',
     );
-    if (missingMailgun.length > 0) {
+    const hasSmtp = smtpVars.every(
+      (v) => typeof process.env[v] === 'string' && process.env[v] !== '',
+    );
+    if (!hasMailgun && !hasSmtp) {
       errors.push(
-        `Email is enabled but Mailgun config incomplete (missing: ${missingMailgun.join(', ')}). `
-        + 'Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.',
+        'Email is enabled but no email provider is configured. '
+        + 'Set MAILGUN_* or SMTP_* env vars, or set MEDIFORCE_DISABLE_EMAIL=true to start without email.',
       );
     }
   }

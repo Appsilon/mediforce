@@ -6,8 +6,9 @@ import { ChevronRight, ExternalLink, Archive, ArchiveRestore, XCircle } from 'lu
 import { formatDistanceToNow } from 'date-fns';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
-import { useUserDisplayNames } from '@/hooks/use-users';
+import { useUserProfiles } from '@/hooks/use-users';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { UserProfileLink } from '@/components/user-profile-link';
 import { routes } from '@/lib/routes';
 import { ApiError } from '@/lib/mediforce';
 import type { BulkRunOutput } from '@mediforce/platform-api/contract';
@@ -52,7 +53,7 @@ export function RunsTable({
 }: RunsTableProps) {
   const handle = useHandleFromPath();
   const { toast } = useToast();
-  const userNames = useUserDisplayNames(handle);
+  const userProfiles = useUserProfiles(handle);
   const archiveMutation = useArchiveRun();
   const bulkCancelMutation = useBulkCancelRuns();
   const bulkArchiveMutation = useBulkArchiveRuns();
@@ -311,7 +312,12 @@ export function RunsTable({
                     >
                       {run.parentDefinitionName}
                     </Link>
-                  ) : run.createdBy ? (userNames.get(run.createdBy) ?? run.createdBy) : '—'}
+                  ) : run.createdBy ? (
+                    <UserProfileLink
+                      displayName={userProfiles.get(run.createdBy)?.displayName ?? run.createdBy}
+                      personalHandle={userProfiles.get(run.createdBy)?.personalHandle}
+                    />
+                  ) : '—'}
                 </td>
                 <td className="px-4 py-3 text-xs">
                   {run.currentStepId ? (

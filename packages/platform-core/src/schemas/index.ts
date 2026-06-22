@@ -149,6 +149,7 @@ export {
 } from './agent-mcp-binding';
 
 export {
+  ContainerSchema,
   WorkflowAgentConfigSchema,
   ScriptStepConfigSchema,
   DatabricksJobConfigSchema,
@@ -178,6 +179,7 @@ export {
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,
   resolveStepTimeoutMinutes,
+  type ContainerConfig,
   type WorkflowAgentConfig,
   type ScriptStepConfig,
   type DatabricksJobConfig,

@@ -50,7 +50,7 @@ export type ViewCommand = CommandBase & {
 
 export type Command = ActionCommand | ViewCommand;
 
-export type ToastVariant = 'success' | 'error' | 'info';
+export type ToastVariant = 'success' | 'error' | 'info' | 'warning';
 
 export type ToastOpts = {
   title: string;

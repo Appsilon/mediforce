@@ -23,6 +23,11 @@ export const StepParamSchema = z.object({
   // still fails parsing loudly.
   type: z.string().min(1).default('string'),
   required: z.boolean().default(false),
+  // When set, the param is only required when the user chooses one of these
+  // verdict keys — all other verdicts can be submitted without filling it.
+  // Takes precedence over `required` for the named verdicts; `required: true`
+  // still blocks every verdict unconditionally.
+  requiredForVerdicts: z.array(z.string()).optional(),
   description: z.string().optional(),
   default: z.unknown().optional(),
   options: z.array(z.string()).optional(),
@@ -66,8 +71,6 @@ export const TriggerSchema = z.object({
 
 export const RepoSchema = z.object({
   url: z.string().url(),
-  branch: z.string().optional(),
-  directory: z.string().optional(),
   commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
   /** Name of a workflow secret containing a token for repo access (e.g. "GITHUB_TOKEN"). */
   auth: z.string().optional(),

@@ -605,6 +605,7 @@ export function WorkflowEditorCanvas({
                   onChange={(patch) => updateStep(selectedStep.id, patch)}
                   errors={stepErrors?.[selectedStep.id]}
                   imageWarning={warningStepIds?.get(selectedStep.id)}
+                  dockerImages={dockerImages}
                 />
               </div>
             </>

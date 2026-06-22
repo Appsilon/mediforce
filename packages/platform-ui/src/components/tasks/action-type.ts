@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import { Eye, FileText, CheckSquare, Upload, CircleDot, MessageSquare } from 'lucide-react';
 import type { HumanTask, CoworkSession } from '@mediforce/platform-core';
-import { formatStepName } from './task-utils';
+import { formatStepName } from '@/lib/format';
 
 // ---------------------------------------------------------------------------
 // ActionItem — unified wrapper for things that appear in the task queue
