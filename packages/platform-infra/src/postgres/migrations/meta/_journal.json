@@ -176,6 +176,20 @@
       "when": 1780588800006,
       "tag": "0024_script_step_config",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1780588800007,
+      "tag": "0025_drop_skill_file_names",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1750329600000,
+      "tag": "0026_repo_to_external_skills_repo",
+      "breakpoints": true
     }
   ]
 }

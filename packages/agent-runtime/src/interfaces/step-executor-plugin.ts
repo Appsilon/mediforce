@@ -80,6 +80,9 @@ export interface WorkflowAgentContext {
   getPreviousStepOutputs: () => Promise<Record<string, unknown>>;
   /** Pre-fetched workflow secrets for {{TEMPLATE}} resolution */
   workflowSecrets?: Record<string, string>;
+  /** Keys that came from namespace-level secrets (vs workflow-level).
+   *  Used by env resolution to tag source for audit visibility. */
+  namespaceSecretKeys?: ReadonlySet<string>;
   /** Pre-resolved MCP configuration for this step. Produced by
    *  resolveMcpForStep at handoff time: AgentDefinition + step
    *  restrictions + tool catalog collapsed into a flat map of server

@@ -71,8 +71,6 @@ export const TriggerSchema = z.object({
 
 export const RepoSchema = z.object({
   url: z.string().url(),
-  branch: z.string().optional(),
-  directory: z.string().optional(),
   commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
   /** Name of a workflow secret containing a token for repo access (e.g. "GITHUB_TOKEN"). */
   auth: z.string().optional(),

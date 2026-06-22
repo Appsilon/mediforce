@@ -467,6 +467,7 @@ images for script-executor steps](#build-images-for-script-executor-steps)).
 | `pnpm test:unit`       | vitest unit + integration                         |
 | `pnpm test:affected`   | vitest, only changed files                        |
 | `pnpm test:e2e`        | All Playwright E2E (L3 + L4)                       |
+| `pnpm build:e2e`       | Rebuild the Next.js bundle for E2E (emulator URLs baked in). Run after any schema, Zod, or handler change — `test:e2e` reuses the existing `.next` build and will silently run stale code otherwise. |
 | `pnpm test`            | Everything (unit + e2e)                           |
 
 ---

@@ -2,13 +2,16 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
-import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/step-executor-plugin';
+import type { AgentContext, EmitFn, EmitPayload, WorkflowAgentContext } from '../../interfaces/step-executor-plugin';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 
 type DockerResult = { cliOutput: string; gitMetadata: null; presentation: string | null; outputDir: string; injectedEnvVars: string[] };
 type SpawnDockerTarget = { spawnDockerContainer: (prompt: string, options?: Record<string, unknown>) => Promise<DockerResult> };
+type SpawnLocalTarget = {
+  spawnLocalProcess: (prompt: string, options: Record<string, unknown>, workingDir: string) => Promise<DockerResult>;
+};
 type ReadSkillTarget = { readSkillFile: (skillsDir: string, skill: string) => Promise<string> };
 
 // Ensure ALLOW_LOCAL_AGENTS is not set during tests (unless explicitly set in a test)
@@ -28,6 +31,10 @@ function mockSpawn(plugin: ClaudeCodeAgentPlugin) {
 
 function mockReadSkill(plugin: ClaudeCodeAgentPlugin) {
   return vi.spyOn(plugin as unknown as ReadSkillTarget, 'readSkillFile');
+}
+
+function mockSpawnLocal(plugin: ClaudeCodeAgentPlugin) {
+  return vi.spyOn(plugin as unknown as SpawnLocalTarget, 'spawnLocalProcess');
 }
 
 function buildMockContext(overrides: Partial<AgentContext> = {}): AgentContext {
@@ -270,6 +277,70 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(resultEvent?.payload).toMatchObject({
         tokenUsage: { inputTokens: 120, outputTokens: 50, cachedInputTokens: 30 },
       });
+    });
+
+    it('[DATA] routes image-less build-mode workflow agents through Docker', async () => {
+      const context: WorkflowAgentContext = {
+        stepId: 'extract',
+        processInstanceId: 'pi-001',
+        runNamespace: 'test-namespace',
+        definitionVersion: 'v1',
+        stepInput: { filePaths: ['/data/protocol.pdf'] },
+        autonomyLevel: 'L2',
+        workflowDefinition: {
+          name: 'protocol-to-tfl',
+          version: 1,
+          namespace: 'test-namespace',
+          visibility: 'private',
+          steps: [],
+          transitions: [],
+          triggers: [],
+        },
+        step: {
+          id: 'extract',
+          name: 'Extract metadata',
+          type: 'creation',
+          executor: 'agent',
+          agent: {
+            skill: 'trial-metadata-extractor',
+            skillsDir: '/plugins/protocol-to-tfl/skills',
+            dockerfile: 'Dockerfile.agent',
+            repo: 'https://github.com/appsilon/mediforce-agent.git',
+            commit: 'abcdef1234567890abcdef1234567890abcdef12',
+          },
+        },
+        llm: { complete: vi.fn() },
+        getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
+      };
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
+      const dockerSpy = mockSpawn(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ result: 'ok' }),
+        gitMetadata: null,
+        presentation: null,
+        outputDir: '/tmp/mock-output',
+        injectedEnvVars: [],
+      });
+      const localSpy = mockSpawnLocal(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ result: 'local' }),
+        gitMetadata: null,
+        presentation: null,
+        outputDir: '/tmp/mock-output',
+        injectedEnvVars: [],
+      });
+
+      await plugin.run(emit);
+
+      expect(localSpy).not.toHaveBeenCalled();
+      expect(dockerSpy).toHaveBeenCalledOnce();
+      expect(events).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'status',
+          payload: expect.stringMatching(/using Docker container image 'mediforce-built:[a-f0-9]{12}'/),
+        }),
+      ]));
     });
 
     it('[DATA] builds prompt from SKILL.md content and input data', async () => {

@@ -97,6 +97,51 @@ export type SpawnActionConfig = z.infer<typeof SpawnActionConfigSchema>;
 export type WaitActionConfig = z.infer<typeof WaitActionConfigSchema>;
 export type ActionConfig = z.infer<typeof ActionConfigSchema>;
 
+/**
+ * Shared container-image configuration, merged flat into both
+ * WorkflowAgentConfigSchema and ScriptStepConfigSchema so the fields
+ * are not copy-pasted across both definitions.
+ *
+ * Two mutually exclusive execution modes:
+ *
+ *   Prebuilt mode  — supply `image` (and nothing else from this group).
+ *                    The runtime pulls the named tag as-is.
+ *
+ *   Build mode     — supply `dockerfile` + `repo` + `commit`.
+ *                    The runtime clones `repo` at `commit`, builds the
+ *                    Dockerfile, and runs the resulting image.
+ *                    `image` is optional in build mode: when omitted the
+ *                    runtime derives a deterministic tag from
+ *                    sha256(repo + commit + dockerfile) so repeated builds
+ *                    of the same source hit the local image cache.
+ *                    Supply `image` explicitly to control the registry tag
+ *                    or when you push to a shared registry.
+ *
+ * Fallback: when a step sets `dockerfile` but no step-level `repo`/`commit`,
+ * the workflow's `externalSkillsRepo` (or the deprecated `repo`) field is
+ * used as the build context. This fallback is retained for backward
+ * compatibility and will be removed once the deprecated `repo` field is
+ * dropped (see follow-up issue for that migration).
+ */
+export const ContainerSchema = z.object({
+  /**
+   * Docker image tag (e.g. `mediforce-golden-image:latest`).
+   * Required in prebuilt mode; optional in build mode (auto-derived when absent).
+   */
+  image: z.string().optional(),
+  /** Path to a Dockerfile inside the cloned `repo`. Activates build mode. */
+  dockerfile: z.string().optional(),
+  /** Git repository URL for the Docker build context (SSH or HTTPS). */
+  repo: z.string().optional(),
+  /**
+   * Commit SHA (7–40 hex chars) to check out from `repo`.
+   * Must be set whenever `repo` is set — omitting it silently no-ops the build.
+   */
+  commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
+  /** Name of a workflow secret containing a token for cloning a private repo. */
+  repoAuth: z.string().optional(),
+});
+
 export const WorkflowAgentConfigSchema = z.object({
   model: z.string().optional(),
   skill: z.string().optional(),
@@ -104,12 +149,6 @@ export const WorkflowAgentConfigSchema = z.object({
   skillsDir: z.string().optional(),
   timeoutMs: z.number().positive().optional(),
   timeoutMinutes: z.number().optional(),
-  image: z.string().optional(),
-  dockerfile: z.string().optional(),
-  repo: z.string().optional(),
-  commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
-  /** Name of a workflow secret containing a token for repo access. */
-  repoAuth: z.string().optional(),
   confidenceThreshold: z.number().min(0).max(1).optional(),
   fallbackBehavior: z.enum(['escalate_to_human', 'continue_with_flag', 'pause']).optional(),
   /** @deprecated Step-level MCP configuration is being removed.
@@ -122,26 +161,21 @@ export const WorkflowAgentConfigSchema = z.object({
    *  (Bash, Read, Write, Edit, Glob, Grep). Use this to grant internet
    *  access (WebSearch, WebFetch) or any other built-in tool. */
   allowedTools: z.array(z.string()).optional(),
-});
+}).merge(ContainerSchema);
 
 /**
  * Config for deterministic script steps (executor='script', plugin='script-container').
  * Exactly one of `command` (run in `image`) or `inlineScript` (run via `runtime`)
- * must be set. `image`/`dockerfile`/`repo`/`commit`/`repoAuth` mirror the agent
- * config fields — container plugins resolve image builds identically for both.
+ * must be set. Container image fields (`image`, `dockerfile`, `repo`, `commit`,
+ * `repoAuth`) are shared with agent steps via ContainerSchema — both executor
+ * flavours resolve container images identically.
  */
 export const ScriptStepConfigSchema = z.object({
   command: z.string().min(1).optional(),
   inlineScript: z.string().min(1).optional(),
   runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),
-  image: z.string().optional(),
-  dockerfile: z.string().optional(),
-  repo: z.string().optional(),
-  commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
-  /** Name of a workflow secret containing a token for repo access. */
-  repoAuth: z.string().optional(),
   timeoutMinutes: z.number().positive().optional(),
-}).superRefine((config, ctx) => {
+}).merge(ContainerSchema).superRefine((config, ctx) => {
   if ((config.command !== undefined) === (config.inlineScript !== undefined)) {
     ctx.addIssue({
       code: 'custom',
@@ -586,7 +620,17 @@ export const WorkflowDefinitionBaseSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   preamble: z.string().optional(),
-  repo: RepoSchema.optional(),
+  /**
+   * External git repository that provides skills for this workflow.
+   * The runtime clones the repo at `commit` and mounts the directory
+   * containing the skill files into the agent container.
+   *
+   * `commit` is required — omitting it silently no-ops the skills fetch.
+   * `auth` names a workflow secret that holds the clone token for private repos.
+   */
+  externalSkillsRepo: RepoSchema.extend({
+    commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)'),
+  }).optional(),
   url: z.string().url().optional(),
   roles: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
@@ -685,6 +729,7 @@ export function parseWorkflowTemplate(input: unknown) {
   return WorkflowTemplateSchema.safeParse(input);
 }
 
+export type ContainerConfig = z.infer<typeof ContainerSchema>;
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
 export type ScriptStepConfig = z.infer<typeof ScriptStepConfigSchema>;
 export type DatabricksJobConfig = z.infer<typeof DatabricksJobConfigSchema>;

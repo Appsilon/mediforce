@@ -47,7 +47,6 @@ describe('deleteAgent handler', () => {
       systemPrompt: 'p',
       inputDescription: 'i',
       outputDescription: 'o',
-      skillFileNames: [],
       namespace: undefined,
       visibility: 'public',
     });

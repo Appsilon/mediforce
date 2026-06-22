@@ -6,7 +6,7 @@
  */
 import { execSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { chmodSync, copyFileSync, existsSync, mkdtempSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdtempSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 
@@ -21,7 +21,7 @@ let preparedDeployKeyPath: string | null = null;
  */
 function prepareDeployKeyPath(): string {
   const source = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
-  if (!existsSync(source)) return source;
+  if (!existsSync(source) || !statSync(source).isFile()) return source;
   if (preparedDeployKeyPath && existsSync(preparedDeployKeyPath)) return preparedDeployKeyPath;
   const dir = mkdtempSync(join(tmpdir(), 'mediforce-ssh-'));
   const dest = join(dir, 'deploy_key');

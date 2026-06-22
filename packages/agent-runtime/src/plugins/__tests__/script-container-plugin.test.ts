@@ -2,7 +2,14 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { Readable, Writable } from 'node:stream';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+const originalAllowLocal = process.env.ALLOW_LOCAL_AGENTS;
+beforeEach(() => { delete process.env.ALLOW_LOCAL_AGENTS; });
+afterEach(() => {
+  if (originalAllowLocal === undefined) delete process.env.ALLOW_LOCAL_AGENTS;
+  else process.env.ALLOW_LOCAL_AGENTS = originalAllowLocal;
+});
 import type { ChildProcess } from 'node:child_process';
 import type { AgentContext, WorkflowAgentContext, EmitFn, EmitPayload } from '../../interfaces/step-executor-plugin';
 import type { ProcessConfig } from '@mediforce/platform-core';

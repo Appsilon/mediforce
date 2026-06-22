@@ -46,7 +46,6 @@ const existing: AgentDefinition = {
   systemPrompt: '',
   inputDescription: '',
   outputDescription: '',
-  skillFileNames: [],
   namespace: 'ns-1',
   visibility: 'private',
   createdAt: '2026-01-01T00:00:00Z',

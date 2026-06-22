@@ -19,7 +19,9 @@ vi.mock('../../system/_docker', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../system/_docker')>();
   return {
     ...actual,
+    isLocalAgentMode: vi.fn().mockReturnValue(false),
     fetchFromContainerWorker: vi.fn().mockResolvedValue({ available: false }),
+    fetchFromLocalDocker: vi.fn().mockResolvedValue({ available: false }),
   };
 });
 

@@ -153,10 +153,10 @@ export function ProcessCard({
                   <Layers className="h-3 w-3" />
                   {definition.stepCount} {definition.stepCount === 1 ? 'step' : 'steps'}
                 </span>
-                {definition.repo && (
+                {definition.externalSkillsRepo && (
                   <>
                     <span className="text-border">·</span>
-                    <CatalogRepoIcon repo={definition.repo} />
+                    <CatalogRepoIcon repo={definition.externalSkillsRepo} />
                   </>
                 )}
                 {definition.url && (
@@ -228,12 +228,8 @@ export function ProcessCard({
   );
 }
 
-function CatalogRepoIcon({ repo }: { repo: { url: string; branch?: string; directory?: string } }) {
-  let href = repo.url;
-  if (repo.branch) {
-    href += `/tree/${repo.branch}`;
-    if (repo.directory) href += `/${repo.directory}`;
-  }
+function CatalogRepoIcon({ repo }: { repo: { url: string; commit?: string } }) {
+  const href = repo.commit ? `${repo.url}/tree/${repo.commit}` : repo.url;
   return (
     <button
       type="button"

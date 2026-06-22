@@ -669,21 +669,17 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   );
 }
 
-function RepoLink({ definition }: { definition: { repo?: { url: string; branch?: string; directory?: string } } | null }) {
-  if (!definition?.repo) return null;
-  const repo = definition.repo;
-  let href = repo.url;
-  if (repo.branch) {
-    href += `/tree/${repo.branch}`;
-    if (repo.directory) href += `/${repo.directory}`;
-  }
+function RepoLink({ definition }: { definition: { externalSkillsRepo?: { url: string; commit?: string } } | null }) {
+  if (!definition?.externalSkillsRepo?.url) return null;
+  const { url, commit } = definition.externalSkillsRepo;
+  const href = commit ? `${url}/tree/${commit}` : url;
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
       className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-      title={[repo.branch, repo.directory].filter(Boolean).join('/') || undefined}
+      title={commit ?? undefined}
     >
       <GitBranch className="h-3 w-3" />
       Repo

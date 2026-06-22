@@ -145,14 +145,17 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         this.commandDisplay = this.commandArgs.join(' ');
       }
     } else if (scriptConfig.command) {
-      // Command mode — existing behavior
-      if (!scriptConfig.image) {
+      // Command mode — image is required unless build mode (dockerfile + repo + commit) is used,
+      // in which case the image tag is derived automatically by resolveImageBuild.
+      const scriptInBuildMode = !!(scriptConfig.dockerfile || scriptConfig.repo);
+      if (!scriptConfig.image && !scriptInBuildMode) {
         throw new Error(
           `No Docker image configured in script config for step '${context.stepId}'. ` +
-          'ScriptContainerPlugin requires script.image when using command mode.',
+          'ScriptContainerPlugin requires script.image when using command mode, ' +
+          'or script.dockerfile + repo + commit for build mode.',
         );
       }
-      this.image = scriptConfig.image;
+      this.image = scriptConfig.image ?? '';
       this.commandArgs = scriptConfig.command.split(' ');
       this.commandDisplay = scriptConfig.command;
     } else {
@@ -164,8 +167,13 @@ export class ScriptContainerPlugin extends ContainerPlugin {
 
     // Resolve env vars from definition-level + step-level env + workflow secrets
     const workflowSecrets = isWorkflowAgentContext(context) ? context.workflowSecrets : undefined;
-    this.resolveEnvironment(definitionEnv, stepEnv, workflowSecrets);
-    this.imageBuild = resolveImageBuild(this.image, scriptConfig, context, this.resolvedEnv.vars);
+    const nsKeys = isWorkflowAgentContext(context) ? context.namespaceSecretKeys : undefined;
+    this.resolveEnvironment(definitionEnv, stepEnv, workflowSecrets, nsKeys);
+    this.imageBuild = resolveImageBuild(scriptConfig.image, scriptConfig, context, this.resolvedEnv.vars);
+    // In build mode the actual image tag is derived by resolveImageBuild — use it.
+    if (this.imageBuild && !scriptConfig.image) {
+      this.image = this.imageBuild.image;
+    }
   }
 
   async run(emit: EmitFn): Promise<void> {
