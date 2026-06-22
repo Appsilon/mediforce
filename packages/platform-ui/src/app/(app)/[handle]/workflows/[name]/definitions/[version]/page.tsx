@@ -94,7 +94,7 @@ export default function WorkflowDefinitionVersionPage() {
           env: definition.env,
           notifications: definition.notifications,
           metadata: definition.metadata,
-          repo: definition.repo,
+          externalSkillsRepo: definition.externalSkillsRepo,
           url: definition.url,
         },
         { namespace: definition.namespace },

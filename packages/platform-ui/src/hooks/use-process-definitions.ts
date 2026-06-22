@@ -23,7 +23,7 @@ export interface DefinitionGroup {
   versions: DefinitionVersion[];
   stepCount: number;
   hasManualTrigger: boolean;
-  repo?: { url: string; branch?: string; directory?: string };
+  externalSkillsRepo?: { url: string; commit?: string; auth?: string };
   url?: string;
   archived?: boolean;
   namespace?: string;
@@ -85,7 +85,7 @@ export function useProcessDefinitions(includeCompletedRuns: boolean = true) {
           ],
           stepCount: def.steps.length,
           hasManualTrigger: def.triggers.some((t) => t.type === 'manual'),
-          repo: def.repo,
+          externalSkillsRepo: def.externalSkillsRepo,
           url: def.url,
           archived: def.archived,
           namespace: g.namespace,
