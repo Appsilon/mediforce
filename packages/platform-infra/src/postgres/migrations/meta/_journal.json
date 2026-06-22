@@ -187,15 +187,8 @@
     {
       "idx": 26,
       "version": "7",
-      "when": 1750329600000,
-      "tag": "0026_repo_to_external_skills_repo",
-      "breakpoints": true
-    },
-    {
-      "idx": 27,
-      "version": "7",
-      "when": 1782086400000,
-      "tag": "0027_repair_invalid_external_skills_repo",
+      "when": 1782133205780,
+      "tag": "0026_external_skills_repo",
       "breakpoints": true
     }
   ]

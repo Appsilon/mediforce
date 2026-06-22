@@ -26,6 +26,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Dead uploaded-skills feature — dropped `AgentDefinition.skillFileNames` + the `agents.skill_file_names` column, the skill-upload UI, and the Firebase Storage skill download from agent identity resolution; `skillsDir` is now the only skill mechanism (ADR-0003 PR1).
 
 ### Fixed
+- `repo` → `external_skills_repo` migration applies on staging again — the previous `0026`/`0027` pair carried an out-of-order journal `when` timestamp (2025-06-19) that drizzle-kit silently skips on any DB already past it, leaving the new column uncreated and every workflow listing empty. Merged both into a single `0026_external_skills_repo` migration (column add + `repo` copy + invalid-value repair) with a correct timestamp.
 - Image-less build-mode workflow agents now resolve their derived Docker tag before choosing execution mode, so `dockerfile`/`repo`/`commit` agents run in containers instead of falling back to local host execution.
 - Workflow editor agent image fields keep custom Docker tag entry available even when discovered local Docker images are listed.
 - E2E test setup deletes only the workspace handles it owns (`test`, `tenant-a`, `tenant-b`, and journey-specific handles) and resets seeded agent definitions — personal namespaces and their registered workflows are no longer wiped when running `pnpm test:e2e`, while interrupted MCP-binding journeys no longer dirty the next run.
