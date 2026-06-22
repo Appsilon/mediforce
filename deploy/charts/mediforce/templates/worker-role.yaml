@@ -14,5 +14,5 @@ rules:
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["pods/log"]
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "watch"]
 {{- end }}

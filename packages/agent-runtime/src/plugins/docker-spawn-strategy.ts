@@ -12,6 +12,7 @@ import { appendFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { ensureImage } from './docker-image-builder';
 import { createLineStreamReader } from '@mediforce/platform-core';
+import { getSpawnStrategy } from './spawn-strategy-selector';
 
 export interface ImageBuildMeta {
   image: string;
@@ -289,22 +290,13 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
   }
 }
 
-let cachedStrategy: DockerSpawnStrategy | null = null;
-
 /**
  * Returns the appropriate spawn strategy based on environment.
- * - REDIS_URL set → QueuedDockerSpawnStrategy (BullMQ worker)
- * - Otherwise → LocalDockerSpawnStrategy (child process, current behavior)
+ * Delegates to getSpawnStrategy() in spawn-strategy-selector.ts, which handles
+ * SPAWN_MODE=docker (default, REDIS_URL-aware) and SPAWN_MODE=kuber (KJSS).
  */
 export function getDockerSpawnStrategy(): DockerSpawnStrategy {
-  if (cachedStrategy) return cachedStrategy;
-
-  if (process.env.REDIS_URL) {
-    console.log('[docker-strategy] Using queued strategy (BullMQ via REDIS_URL)');
-    cachedStrategy = new QueuedDockerSpawnStrategy();
-  } else {
-    cachedStrategy = new LocalDockerSpawnStrategy();
-  }
-
-  return cachedStrategy;
+  // SPAWN_MODE-aware selector; see ./spawn-strategy-selector.ts
+  // Existing REDIS_URL behavior is preserved inside SPAWN_MODE=docker.
+  return getSpawnStrategy();
 }

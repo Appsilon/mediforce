@@ -165,6 +165,40 @@ worker:
     enabled: true
     claimName: mediforce-shared
     mountPath: /var/lib/mediforce
+  # ============================================================
+  # KubernetesJobSpawnStrategy (local-08, KJSS)
+  #
+  # Knob group for SPAWN_MODE=kuber deployments. To activate KJSS,
+  # set the worker's SPAWN_MODE env var to "kuber" (currently driven by
+  # worker.env, e.g. --set 'worker.env[0].value=kuber'). The fields below
+  # tune KJSS-specific behavior. They are read by the agent-runtime's
+  # spawn-strategy-selector via env / chart-injected values.
+  # ============================================================
+  spawn:
+    kuber:
+      # Namespace where spawned Jobs are created. Defaults to the
+      # release namespace (recommended). Override only if your worker
+      # spawns into a separate compute tenant namespace.
+      namespace: ""
+      # ServiceAccount that spawned Jobs run as. Defaults to "" → the
+      # namespace's `default` SA → zero K8s perms (recommended;
+      # defense-in-depth — privileged SA is the worker's, never the
+      # spawned Job's). Override for IRSA-bound agent containers.
+      serviceAccountName: ""
+      # imagePullSecrets attached to every spawned Job pod. Required
+      # when spawned-Job images live in a private registry not already
+      # bound to the configured serviceAccountName.
+      imagePullSecrets: []
+      # Default resource requests/limits applied to spawned Job
+      # containers when the per-step agent definition doesn't specify
+      # them. Conservative defaults; tune per workload.
+      defaultResources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: "2"
+          memory: 4Gi
   podAnnotations: {}
   nodeSelector: {}
   tolerations: []
