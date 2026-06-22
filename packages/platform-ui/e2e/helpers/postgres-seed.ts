@@ -424,7 +424,20 @@ export async function seedPostgresNamespace(
           ${model.createdAt as string},
           ${model.updatedAt as string}
         )
-        ON CONFLICT (id) DO NOTHING
+        ON CONFLICT (id) DO UPDATE SET
+          name = EXCLUDED.name,
+          provider = EXCLUDED.provider,
+          context_length = EXCLUDED.context_length,
+          max_completion_tokens = EXCLUDED.max_completion_tokens,
+          pricing = EXCLUDED.pricing,
+          modality = EXCLUDED.modality,
+          input_modalities = EXCLUDED.input_modalities,
+          output_modalities = EXCLUDED.output_modalities,
+          supports_tools = EXCLUDED.supports_tools,
+          supports_vision = EXCLUDED.supports_vision,
+          request_count = EXCLUDED.request_count,
+          last_synced_at = EXCLUDED.last_synced_at,
+          updated_at = EXCLUDED.updated_at
       `;
     }
 
