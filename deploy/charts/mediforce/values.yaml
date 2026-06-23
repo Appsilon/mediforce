@@ -65,6 +65,18 @@ database:
 config:
   domain: ""
   appBaseUrl: ""
+  # In-cluster loopback URL used by the runKicker's HTTP self-fetch
+  # (the POST that wakes the auto-runner after a process is created).
+  # Set this when `appBaseUrl` points at an external ALB the UI pod
+  # can't reach from inside the cluster — typical on EKS/GKE. The
+  # recommended value for a default release is the in-cluster Service
+  # URL:
+  #   http://{{ release-fullname }}-ui:{{ ui.service.port }}
+  # …which usually evaluates to `http://mediforce-ui:3000` for the
+  # default release name + port. Leave empty on VM / docker-compose
+  # deployments; the kicker falls back to `appBaseUrl` and behaves
+  # exactly as it did before this knob existed.
+  internalUrl: ""
   disableEmail: "true"
   useEmulators: "false"
   frameAncestors: "'none'"

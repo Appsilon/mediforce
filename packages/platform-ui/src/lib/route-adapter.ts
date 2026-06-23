@@ -128,6 +128,10 @@ function jsonErrorResponse(err: HandlerError): NextResponse {
 
 const prodRunKicker: RunKicker = createHttpSelfFetchRunKicker({
   baseUrl: getAppBaseUrl,
+  // INTERNAL_APP_URL lets K8s deployments self-fetch via the
+  // cluster-internal Service URL instead of the external ALB. Unset
+  // on VM / docker-compose / Vercel → kicker falls back to baseUrl.
+  internalUrl: () => process.env.INTERNAL_APP_URL,
   apiKey: () => process.env.PLATFORM_API_KEY ?? '',
 });
 

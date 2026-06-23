@@ -26,8 +26,37 @@ export function noopRunKicker(): NoopRunKicker {
 
 export interface HttpSelfFetchRunKickerConfig {
   readonly baseUrl: () => string;
+  /** Optional override of the host used for the loopback self-fetch.
+   *  Set this on deployment topologies where the running process can't
+   *  reach its own `baseUrl` from the inside — notably Kubernetes pods
+   *  with an external ALB (the pod has no route back through the ALB to
+   *  itself). Point it at the cluster-internal Service URL
+   *  (e.g. `http://mediforce-ui:3000`).
+   *
+   *  When unset, returns undefined, returns an empty string, or returns
+   *  a malformed URL, the kicker falls back to `baseUrl()` — identical
+   *  to the prior behaviour, so VM / docker-compose / Vercel deployments
+   *  that don't set this need no other changes. */
+  readonly internalUrl?: () => string | undefined;
   readonly apiKey: () => string;
   readonly fetch?: typeof fetch;
+}
+
+/** Resolves which host the kicker self-fetches against — the in-cluster
+ *  override when valid, falling back to `baseUrl()` for all the empty /
+ *  malformed / not-supplied cases. URL parsing is done with `new URL`,
+ *  so anything that doesn't parse safely falls through. */
+function resolveHost(config: HttpSelfFetchRunKickerConfig): string {
+  const raw = config.internalUrl?.();
+  if (raw) {
+    try {
+      return new URL(raw).origin;
+    } catch {
+      // operator typo / docker-compose `${VAR:-}` empty-string variant —
+      // fall through to baseUrl rather than crashing the kicker
+    }
+  }
+  return config.baseUrl();
 }
 
 // Getters so env reads happen at call time, not module-load time.
@@ -37,7 +66,7 @@ export function createHttpSelfFetchRunKicker(
   const fetchImpl = config.fetch ?? globalThis.fetch;
   return {
     async kick(instanceId, opts) {
-      const url = `${config.baseUrl()}/api/processes/${encodeURIComponent(instanceId)}/run`;
+      const url = `${resolveHost(config)}/api/processes/${encodeURIComponent(instanceId)}/run`;
       try {
         await fetchImpl(url, {
           method: 'POST',

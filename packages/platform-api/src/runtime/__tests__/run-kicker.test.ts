@@ -118,4 +118,118 @@ describe('createHttpSelfFetchRunKicker', () => {
       'http://b/api/processes/inst-1/run',
     ]);
   });
+
+  // ─── internalUrl override (in-cluster loopback) ────────────────────────────
+  // Lets K8s deployments self-fetch via the cluster-internal Service URL
+  // when APP_BASE_URL points at an unreachable external ALB. Empty / unset /
+  // malformed values fall back to baseUrl() so VM users see byte-identical
+  // behaviour to the original code.
+
+  it('uses internalUrl when set, preferring it over baseUrl', async () => {
+    const urls: string[] = [];
+    const fakeFetch = (async (url: string) => {
+      urls.push(url);
+      return new Response('{}', { status: 202 });
+    }) as unknown as typeof fetch;
+
+    const kicker = createHttpSelfFetchRunKicker({
+      baseUrl: () => 'https://public.example.com',
+      internalUrl: () => 'http://mediforce-ui:3000',
+      apiKey: () => 'k',
+      fetch: fakeFetch,
+    });
+
+    await kicker.kick('inst-1');
+    expect(urls).toEqual(['http://mediforce-ui:3000/api/processes/inst-1/run']);
+  });
+
+  it('falls back to baseUrl when internalUrl accessor returns undefined', async () => {
+    const urls: string[] = [];
+    const fakeFetch = (async (url: string) => {
+      urls.push(url);
+      return new Response('{}', { status: 202 });
+    }) as unknown as typeof fetch;
+
+    const kicker = createHttpSelfFetchRunKicker({
+      baseUrl: () => 'http://test.example',
+      internalUrl: () => undefined,
+      apiKey: () => 'k',
+      fetch: fakeFetch,
+    });
+
+    await kicker.kick('inst-1');
+    expect(urls).toEqual(['http://test.example/api/processes/inst-1/run']);
+  });
+
+  it('falls back to baseUrl when internalUrl is an empty string (docker-compose ${VAR:-default} shape)', async () => {
+    const urls: string[] = [];
+    const fakeFetch = (async (url: string) => {
+      urls.push(url);
+      return new Response('{}', { status: 202 });
+    }) as unknown as typeof fetch;
+
+    const kicker = createHttpSelfFetchRunKicker({
+      baseUrl: () => 'http://test.example',
+      internalUrl: () => '',
+      apiKey: () => 'k',
+      fetch: fakeFetch,
+    });
+
+    await kicker.kick('inst-1');
+    expect(urls).toEqual(['http://test.example/api/processes/inst-1/run']);
+  });
+
+  it('falls back to baseUrl when internalUrl is a malformed URL (operator typo)', async () => {
+    const urls: string[] = [];
+    const fakeFetch = (async (url: string) => {
+      urls.push(url);
+      return new Response('{}', { status: 202 });
+    }) as unknown as typeof fetch;
+
+    const kicker = createHttpSelfFetchRunKicker({
+      baseUrl: () => 'http://test.example',
+      internalUrl: () => 'not a url',
+      apiKey: () => 'k',
+      fetch: fakeFetch,
+    });
+
+    await kicker.kick('inst-1');
+    expect(urls).toEqual(['http://test.example/api/processes/inst-1/run']);
+  });
+
+  it('strips path/query from internalUrl — only the origin is used', async () => {
+    const urls: string[] = [];
+    const fakeFetch = (async (url: string) => {
+      urls.push(url);
+      return new Response('{}', { status: 202 });
+    }) as unknown as typeof fetch;
+
+    const kicker = createHttpSelfFetchRunKicker({
+      baseUrl: () => 'http://wrong',
+      internalUrl: () => 'http://mediforce-ui:3000/some/junk/path?x=1',
+      apiKey: () => 'k',
+      fetch: fakeFetch,
+    });
+
+    await kicker.kick('inst-1');
+    expect(urls).toEqual(['http://mediforce-ui:3000/api/processes/inst-1/run']);
+  });
+
+  it('omitting the internalUrl property entirely is identical to the prior behaviour (full backward compat)', async () => {
+    const urls: string[] = [];
+    const fakeFetch = (async (url: string) => {
+      urls.push(url);
+      return new Response('{}', { status: 202 });
+    }) as unknown as typeof fetch;
+
+    // No internalUrl on the config at all — pre-local-15 callers look like this.
+    const kicker = createHttpSelfFetchRunKicker({
+      baseUrl: () => 'http://test.example',
+      apiKey: () => 'k',
+      fetch: fakeFetch,
+    });
+
+    await kicker.kick('inst-1');
+    expect(urls).toEqual(['http://test.example/api/processes/inst-1/run']);
+  });
 });
