@@ -80,7 +80,7 @@ let preparedDeployKeyPath: string | null = null;
 export function prepareDeployKeyPath(): string {
   const source = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
   if (!existsSync(source) || !statSync(source).isFile()) return source;
-  if (preparedDeployKeyPath && existsSync(preparedDeployKeyPath)) return preparedDeployKeyPath;
+  if (preparedDeployKeyPath && existsSync(preparedDeployKeyPath) && statSync(preparedDeployKeyPath).isFile()) return preparedDeployKeyPath;
   const dir = mkdtempSync(join(tmpdir(), 'mediforce-ssh-'));
   const dest = join(dir, 'deploy_key');
   copyFileSync(source, dest);
@@ -200,6 +200,33 @@ export function toHttpsWithToken(sshUrl: string, token: string): string {
     return `https://x-access-token:${token}@github.com/${match[1]}.git`;
   }
   return sshUrl.replace('https://', `https://x-access-token:${token}@`);
+}
+
+/**
+ * Resolve the clone URL + transport for a skills repo reference, honouring the
+ * form the user supplied: an `https://` URL clones over HTTPS, a `git@` URL
+ * clones over SSH. We never silently convert one to the other.
+ *
+ *   - token present  → authenticated HTTPS (`x-access-token`); a PAT only works
+ *                      over HTTPS, mirroring the main-repo clone path
+ *   - `git@…`        → SSH as given (needs deploy key + `GIT_SSH_COMMAND`)
+ *   - `https://…` / local path → HTTPS / local as given
+ *   - `owner/repo` shorthand   → anonymous HTTPS (github default)
+ */
+export function resolveSkillsCloneUrl(
+  repoRef: string,
+  repoToken?: string,
+): { cloneUrl: string; useSsh: boolean } {
+  if (repoToken) {
+    return { cloneUrl: toHttpsWithToken(normalizeRepoUrls(repoRef).gitUrl, repoToken), useSsh: false };
+  }
+  if (repoRef.startsWith('git@')) {
+    return { cloneUrl: repoRef, useSsh: true };
+  }
+  if (repoRef.startsWith('https://') || repoRef.startsWith('/') || repoRef.startsWith('.')) {
+    return { cloneUrl: repoRef, useSsh: false };
+  }
+  return { cloneUrl: normalizeRepoUrls(repoRef).httpsUrl, useSsh: false };
 }
 
 /**
@@ -408,11 +435,11 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
    */
   protected async fetchSkillsFromRepo(
     skillsDir: string,
-    repoUrl: string,
+    repoRef: string,
     commit: string,
     repoToken?: string,
   ): Promise<string> {
-    const hash = createHash('sha256').update(`${repoUrl}\0${commit}\0${skillsDir}`).digest('hex').slice(0, 16);
+    const hash = createHash('sha256').update(`${repoRef}\0${commit}\0${skillsDir}`).digest('hex').slice(0, 16);
     const cacheDir = join(SKILLS_CACHE_DIR, hash);
 
     // Cache hit
@@ -423,15 +450,17 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
     }
 
     // Cache miss — clone, copy, delete clone
-    console.log(`[container-plugin] Fetching skills from ${repoUrl}@${commit.slice(0, 8)} path=${skillsDir}`);
+    console.log(`[container-plugin] Fetching skills from ${repoRef}@${commit.slice(0, 8)} path=${skillsDir}`);
     const cloneDir = mkdtempSync(join(tmpdir(), 'mediforce-skills-clone-'));
 
     try {
-      const cloneUrl = repoToken ? toHttpsWithToken(repoUrl, repoToken) : repoUrl;
-      const deployKeyPath = prepareDeployKeyPath();
+      const { cloneUrl, useSsh } = resolveSkillsCloneUrl(repoRef, repoToken);
+      // SSH refs need a deploy key + GIT_SSH_COMMAND; HTTPS and local paths must not set it.
       const execOpts = {
         stdio: 'pipe' as const,
-        env: { ...process.env, GIT_SSH_COMMAND: `ssh -i ${deployKeyPath} -o StrictHostKeyChecking=no -o IdentitiesOnly=yes` },
+        env: useSsh
+          ? { ...process.env, GIT_SSH_COMMAND: `ssh -i ${prepareDeployKeyPath()} -o StrictHostKeyChecking=no -o IdentitiesOnly=yes` }
+          : { ...process.env },
       };
 
       execSync(`git init "${cloneDir}"`, execOpts);
@@ -442,7 +471,7 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
       const sourceDir = join(cloneDir, skillsDir);
       if (!existsSync(sourceDir)) {
         throw new Error(
-          `Skills directory "${skillsDir}" not found in repo ${repoUrl}@${commit.slice(0, 8)}`,
+          `Skills directory "${skillsDir}" not found in repo ${repoRef}@${commit.slice(0, 8)}`,
         );
       }
 

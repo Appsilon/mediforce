@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatExitInfo, deriveBuildTag } from '../container-plugin';
+import { formatExitInfo, deriveBuildTag, resolveSkillsCloneUrl } from '../container-plugin';
 
 describe('formatExitInfo', () => {
   it('[DATA] reports the exit code when the process exited normally', () => {
@@ -60,5 +60,43 @@ describe('deriveBuildTag', () => {
     const withUndefined = deriveBuildTag('git@github.com:org/repo.git', 'abc1234', undefined);
     const withEmpty = deriveBuildTag('git@github.com:org/repo.git', 'abc1234', '');
     expect(withUndefined).toBe(withEmpty);
+  });
+});
+
+describe('resolveSkillsCloneUrl', () => {
+  it('[DATA] clones an https ref over HTTPS as given, no SSH', () => {
+    const { cloneUrl, useSsh } = resolveSkillsCloneUrl('https://github.com/Appsilon/mediforce');
+    expect(cloneUrl).toBe('https://github.com/Appsilon/mediforce');
+    expect(useSsh).toBe(false);
+  });
+
+  it('[DATA] clones a git@ ref over SSH as given, never converting to HTTPS', () => {
+    const { cloneUrl, useSsh } = resolveSkillsCloneUrl('git@github.com:Appsilon/mediforce.git');
+    expect(cloneUrl).toBe('git@github.com:Appsilon/mediforce.git');
+    expect(useSsh).toBe(true);
+  });
+
+  it('[DATA] clones an owner/repo shorthand over anonymous HTTPS', () => {
+    const { cloneUrl, useSsh } = resolveSkillsCloneUrl('Appsilon/mediforce');
+    expect(cloneUrl).toBe('https://github.com/Appsilon/mediforce');
+    expect(useSsh).toBe(false);
+  });
+
+  it('[DATA] uses authenticated HTTPS (PAT) when a token is provided, even for an https ref', () => {
+    const { cloneUrl, useSsh } = resolveSkillsCloneUrl('https://github.com/Appsilon/mediforce', 'TOK');
+    expect(cloneUrl).toBe('https://x-access-token:TOK@github.com/Appsilon/mediforce.git');
+    expect(useSsh).toBe(false);
+  });
+
+  it('[DATA] a token forces HTTPS even when the ref is given in SSH form', () => {
+    const { cloneUrl, useSsh } = resolveSkillsCloneUrl('git@github.com:Appsilon/mediforce.git', 'TOK');
+    expect(cloneUrl).toBe('https://x-access-token:TOK@github.com/Appsilon/mediforce.git');
+    expect(useSsh).toBe(false);
+  });
+
+  it('[DATA] clones a local path directly, no SSH', () => {
+    const { cloneUrl, useSsh } = resolveSkillsCloneUrl('/path/to/bare.git');
+    expect(cloneUrl).toBe('/path/to/bare.git');
+    expect(useSsh).toBe(false);
   });
 });
