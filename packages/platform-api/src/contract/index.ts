@@ -29,6 +29,12 @@ export {
 export {
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
+  ValidateWorkflowInputSchema,
+  ValidateWorkflowOutputSchema,
+  WorkflowValidationIssueSchema,
+  type ValidateWorkflowInput,
+  type ValidateWorkflowOutput,
+  type WorkflowValidationIssue,
   WorkflowDefinitionGroupSchema,
   ListWorkflowsInputSchema,
   ListWorkflowsOutputSchema,

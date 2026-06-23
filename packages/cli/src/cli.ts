@@ -13,6 +13,7 @@
  */
 
 import { workflowRegisterCommand } from './commands/workflow-register';
+import { workflowValidateCommand } from './commands/workflow-validate';
 import { workflowListCommand } from './commands/workflow-list';
 import { workflowListVersionsCommand } from './commands/workflow-list-versions';
 import { workflowGetCommand } from './commands/workflow-get';
@@ -97,6 +98,7 @@ export const TREE: Record<string, BranchEntry> = {
     description: 'Workflow definitions (register, list, get, copy, archive, delete, visibility)',
     leaves: {
       register: { description: 'Register a workflow definition from a JSON file', fn: workflowRegisterCommand },
+      validate: { description: 'Validate a workflow definition JSON file against the schema', fn: workflowValidateCommand },
       list: { description: 'List registered workflow definitions', fn: workflowListCommand },
       'list-versions': {
         description: 'List metadata for every version of a workflow',

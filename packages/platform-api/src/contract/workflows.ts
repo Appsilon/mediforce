@@ -42,6 +42,28 @@ export const RegisterWorkflowOutputSchema = z.object({
 });
 
 /**
+ * Contract for `POST /api/workflow-definitions/validate` — a dry run of the
+ * canonical schema validation that `register` performs, without persisting.
+ *
+ * The input is intentionally permissive (any object) so a malformed candidate
+ * is reported as `{ valid: false, errors }` data rather than rejected with a
+ * 400 by the route adapter — callers (the workflow-designer `validate` step,
+ * the `mediforce workflow validate` CLI) route on `valid` and surface `errors`.
+ * The handler runs `parseWorkflowTemplate`, the single source of truth.
+ */
+export const ValidateWorkflowInputSchema = z.record(z.string(), z.unknown());
+
+export const WorkflowValidationIssueSchema = z.object({
+  path: z.string(),
+  message: z.string(),
+});
+
+export const ValidateWorkflowOutputSchema = z.object({
+  valid: z.boolean(),
+  errors: z.array(WorkflowValidationIssueSchema),
+});
+
+/**
  * Per-workflow run aggregate attached to each card on the workspace home page.
  * Computed server-side via count aggregations + a bounded `latest` query so the
  * page never ships the whole run collection to the client (the pre-cutover
@@ -148,6 +170,9 @@ export type RegisterWorkflowInput = z.infer<typeof RegisterWorkflowInputSchema>;
 export type RegisterWorkflowBody = z.input<typeof RegisterWorkflowInputSchema>;
 export type RegisterWorkflowOutput = z.infer<typeof RegisterWorkflowOutputSchema>;
 export type RegistrationWarning = z.infer<typeof RegistrationWarningSchema>;
+export type ValidateWorkflowInput = z.infer<typeof ValidateWorkflowInputSchema>;
+export type ValidateWorkflowOutput = z.infer<typeof ValidateWorkflowOutputSchema>;
+export type WorkflowValidationIssue = z.infer<typeof WorkflowValidationIssueSchema>;
 export type WorkflowRunSummary = z.infer<typeof WorkflowRunSummarySchema>;
 export type WorkflowDefinitionGroupSummary = z.infer<typeof WorkflowDefinitionGroupSchema>;
 export type ListWorkflowsInput = z.infer<typeof ListWorkflowsInputSchema>;

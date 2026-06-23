@@ -36,6 +36,7 @@ export { listWorkflows } from './workflows/list-workflows';
 export { listWorkflowVersions } from './workflows/list-workflow-versions';
 export { getWorkflow } from './workflows/get-workflow';
 export { registerWorkflow } from './workflows/register-workflow';
+export { validateWorkflow } from './workflows/validate-workflow';
 export { setWorkflowVisibility } from './workflows/set-visibility';
 export {
   archiveWorkflow,
