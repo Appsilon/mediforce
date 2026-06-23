@@ -1,9 +1,40 @@
 import { BatchV1Api, CoreV1Api, KubeConfig } from '@kubernetes/client-node';
 import type { V1Job } from '@kubernetes/client-node';
+import { readdir, readFile, access } from 'node:fs/promises';
+import { join, relative } from 'node:path';
 import type { DockerSpawnStrategy, DockerSpawnRequest, DockerSpawnResult } from './docker-spawn-strategy';
-import { buildV1JobSpec, safeJobName, type KubeSpawnConfig } from './kubernetes-job-spec-builder';
+import { buildV1JobSpec, buildOutputConfigMap, safeJobName, type KubeSpawnConfig } from './kubernetes-job-spec-builder';
 import { PodLogStream } from './pod-log-stream';
 import { KjssImagePullError, KjssSchedulingError, KjssAuthError, KjssApiError } from './kjss-errors';
+
+/** Read every file under `dir` recursively, returning a Map keyed by the
+ *  path relative to `dir`. Used by KJSS to assemble the outputDir → ConfigMap
+ *  payload. Returns an empty Map when `dir` doesn't exist or isn't readable
+ *  (the plugin may not have written anything yet — that's fine, KJSS will
+ *  then skip the configMap dance entirely). */
+export type OutputDirReader = (dir: string) => Promise<Map<string, Buffer>>;
+
+async function defaultOutputDirReader(dir: string): Promise<Map<string, Buffer>> {
+  const out = new Map<string, Buffer>();
+  try {
+    await access(dir);
+  } catch {
+    return out;
+  }
+  const entries = await readdir(dir, { recursive: true, withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    // Node 20.12+ surfaces the parent path on Dirent; fall back to dir for
+    // top-level entries when the property is absent (older runtimes).
+    const parent = (entry as unknown as { parentPath?: string; path?: string }).parentPath
+      ?? (entry as unknown as { path?: string }).path
+      ?? dir;
+    const full = join(parent, entry.name);
+    const rel = relative(dir, full);
+    out.set(rel, await readFile(full));
+  }
+  return out;
+}
 
 // ─── K8s API error classifier ─────────────────────────────────────────────────
 
@@ -107,20 +138,67 @@ export class KubernetesJobSpawnStrategy implements DockerSpawnStrategy {
     private readonly logStreamFactory: (api: CoreV1Api) => PodLogStream = (api) => new PodLogStream(api),
     /** Grace period (ms) before a Pending pod is treated as a scheduling failure. */
     private readonly schedulingGraceMs: number = 30_000,
+    /** Reads the plugin's outputDir into an in-memory map. The default walks
+     *  the real filesystem; tests inject a Map directly to stay hermetic. */
+    private readonly outputDirReader: OutputDirReader = defaultOutputDirReader,
   ) {}
 
   async spawn(req: DockerSpawnRequest): Promise<DockerSpawnResult> {
     const { namespace } = this.config;
-
-    // Step 1-2: build V1Job spec
-    const job = buildV1JobSpec(req, this.config);
     const jobName = safeJobName(req.containerName);
+
+    // Step 1: read the plugin's outputDir. If it has any files, ship them
+    // to the spawned Job via a per-step ConfigMap + initContainer (see
+    // buildV1JobSpec). Empty/missing dir → no configMap, skip the dance.
+    // This is the KJSS equivalent of docker-mode's `-v outputDir:/output`
+    // bind-mount that the agent plugins' commands assume.
+    const outputFiles = await this.outputDirReader(req.outputDir);
+    let outputConfigMapName: string | undefined;
+    if (outputFiles.size > 0) {
+      outputConfigMapName = `${jobName}-output`;
+      const cm = buildOutputConfigMap(outputConfigMapName, outputFiles);
+      await callK8s(() =>
+        this.coreApi.createNamespacedConfigMap({ namespace, body: cm }),
+      );
+    }
+
+    // Step 2: build the V1Job spec, wiring the configMap mount + initContainer
+    // when we created one above.
+    const job = buildV1JobSpec(req, this.config, { outputConfigMapName });
 
     // Step 3: create the Job — failure mode #6 (403 RBAC) and #7 (network)
     // If createNamespacedJob throws, the Job was never created — no cleanup needed.
+    // (The configMap from step 1 is left behind; a later periodic GC by label
+    // can sweep orphans. The owner-ref patch below would have linked them.)
     const createdJob = await callK8s(() =>
       this.batchApi.createNamespacedJob({ namespace, body: job }),
     );
+
+    // Step 4: link the ConfigMap to the Job via an ownerReference so K8s GC
+    // cascade-deletes the configMap when the Job is reaped (whether by
+    // ttlSecondsAfterFinished on success or by Foreground delete on failure).
+    if (outputConfigMapName && createdJob.metadata?.uid) {
+      await callK8s(() =>
+        this.coreApi.patchNamespacedConfigMap({
+          namespace,
+          name: outputConfigMapName!,
+          body: [
+            {
+              op: 'add',
+              path: '/metadata/ownerReferences',
+              value: [{
+                apiVersion: 'batch/v1',
+                kind: 'Job',
+                name: createdJob.metadata!.name!,
+                uid: createdJob.metadata!.uid,
+                controller: true,
+                blockOwnerDeletion: true,
+              }],
+            },
+          ],
+        }),
+      );
+    }
 
     let succeeded = false;
     try {

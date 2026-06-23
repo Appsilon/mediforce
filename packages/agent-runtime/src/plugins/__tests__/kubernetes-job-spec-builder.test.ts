@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { parseDockerArgs, safeJobName, buildV1JobSpec } from '../kubernetes-job-spec-builder';
+import { gunzipSync } from 'node:zlib';
+import { randomFillSync } from 'node:crypto';
+import { parseDockerArgs, safeJobName, buildV1JobSpec, buildOutputConfigMap, OUTPUT_PAYLOAD_LIMIT_BYTES } from '../kubernetes-job-spec-builder';
 import type { KubeSpawnConfig } from '../kubernetes-job-spec-builder';
 import type { DockerSpawnRequest } from '../docker-spawn-strategy';
+import { KjssOutputDirTooLargeError } from '../kjss-errors';
 
 describe('parseDockerArgs', () => {
   it('extracts image as the first positional after flags', () => {
@@ -191,5 +194,168 @@ describe('buildV1JobSpec', () => {
     const job = buildV1JobSpec(req, minimalConfig);
     expect(job.metadata?.name?.length).toBeLessThanOrEqual(63);
     expect(job.metadata?.name).toMatch(/-[a-f0-9]{8}$/);
+  });
+});
+
+// ─── output delivery (configMap + initContainer) ──────────────────────────────
+// The plugin's outputDir (prompt.txt, opencode.json, nested .local/share/...)
+// is shipped to the spawned container as a tar.gz.base64 blob inside a per-Job
+// configMap; an initContainer base64-decodes + untars it into an emptyDir
+// mounted at /output on the main container. This mirrors the docker-mode
+// `-v <hostOutputDir>:/output` semantics that every agent plugin's command
+// already assumes.
+
+describe('buildV1JobSpec — output delivery', () => {
+  it('omits output volumes + initContainer when outputConfigMapName is not set', () => {
+    const job = buildV1JobSpec(minimalReq, minimalConfig);
+    const podSpec = job.spec?.template.spec;
+    // No output-cm or output volumes
+    expect(podSpec?.volumes?.map((v) => v.name)).toEqual(['tmp']);
+    // No init containers
+    expect(podSpec?.initContainers).toBeUndefined();
+    // Main container has only /tmp mount
+    expect(podSpec?.containers[0].volumeMounts?.map((m) => m.mountPath)).toEqual(['/tmp']);
+  });
+
+  it('adds output-cm configMap volume + output emptyDir + prep-output initContainer when outputConfigMapName is set', () => {
+    const job = buildV1JobSpec(minimalReq, minimalConfig, {
+      outputConfigMapName: 'my-job-output',
+    });
+    const podSpec = job.spec?.template.spec;
+
+    expect(podSpec?.volumes).toEqual(expect.arrayContaining([
+      { name: 'tmp', emptyDir: {} },
+      { name: 'output-cm', configMap: { name: 'my-job-output' } },
+      { name: 'output', emptyDir: {} },
+    ]));
+
+    expect(podSpec?.initContainers).toHaveLength(1);
+    const init = podSpec!.initContainers![0];
+    expect(init.name).toBe('prep-output');
+    expect(init.image).toBe('public.ecr.aws/docker/library/busybox:1.36'); // default
+    expect(init.command).toEqual([
+      'sh', '-c',
+      'base64 -d < /cm/payload.tar.gz.b64 | tar -xzC /output --no-same-owner',
+    ]);
+    expect(init.volumeMounts).toEqual([
+      { name: 'output-cm', mountPath: '/cm', readOnly: true },
+      { name: 'output',    mountPath: '/output' },
+    ]);
+
+    // Main container gets the /output mount too
+    expect(podSpec?.containers[0].volumeMounts).toEqual(expect.arrayContaining([
+      { name: 'output', mountPath: '/output' },
+    ]));
+  });
+
+  it('respects a custom initContainerImage when supplied', () => {
+    const job = buildV1JobSpec(minimalReq, minimalConfig, {
+      outputConfigMapName: 'my-job-output',
+      initContainerImage: 'my-registry.example.com/internal-mirror/busybox@sha256:deadbeef',
+    });
+    expect(job.spec?.template.spec?.initContainers?.[0].image).toBe(
+      'my-registry.example.com/internal-mirror/busybox@sha256:deadbeef',
+    );
+  });
+
+  it('init container inherits the same security stance as the main container (non-root, locked-down)', () => {
+    const job = buildV1JobSpec(minimalReq, minimalConfig, {
+      outputConfigMapName: 'my-job-output',
+    });
+    const initSc = job.spec?.template.spec?.initContainers?.[0].securityContext;
+    // Same baseline as main container — readOnly root, no priv escalation,
+    // dropped caps. (UID/GID/runAsNonRoot inherited from podSecurityContext.)
+    expect(initSc?.readOnlyRootFilesystem).toBe(true);
+    expect(initSc?.allowPrivilegeEscalation).toBe(false);
+    expect(initSc?.capabilities?.drop).toEqual(['ALL']);
+  });
+});
+
+// ─── buildOutputConfigMap — turns a {path → Buffer} into a V1ConfigMap ─────────
+// Held as a pure function so tests don't touch the filesystem. The
+// KubernetesJobSpawnStrategy is responsible for walking outputDir and
+// assembling the Map; this helper just renders the configMap payload.
+
+describe('buildOutputConfigMap', () => {
+  const cmName = 'mediforce-step-abc-output';
+
+  it('returns a V1ConfigMap with the configured name and the standard payload key', () => {
+    const files = new Map<string, Buffer>([['prompt.txt', Buffer.from('hello\n', 'utf-8')]]);
+    const cm = buildOutputConfigMap(cmName, files);
+    expect(cm.metadata?.name).toBe(cmName);
+    expect(cm.data).toBeUndefined();
+    expect(cm.binaryData?.['payload.tar.gz.b64']).toBeDefined();
+  });
+
+  it('the payload decodes back to a tarball containing the original files (text)', () => {
+    const files = new Map<string, Buffer>([
+      ['prompt.txt', Buffer.from('Hello, agent!', 'utf-8')],
+      ['opencode.json', Buffer.from('{"k":1}', 'utf-8')],
+    ]);
+    const cm = buildOutputConfigMap(cmName, files);
+    const b64 = cm.binaryData!['payload.tar.gz.b64'];
+    const gzipped = Buffer.from(b64, 'base64');
+    const tarball = gunzipSync(gzipped);
+
+    // Parse the tar minimally: read 512-byte headers, look for our filenames.
+    // Each header starts at a 512-byte boundary; name is bytes 0..99.
+    const names = new Set<string>();
+    for (let offset = 0; offset < tarball.length; offset += 512) {
+      const nameBytes = tarball.subarray(offset, offset + 100);
+      const name = nameBytes.toString('utf-8').replace(/\0.*$/, '');
+      if (!name) break;     // end-of-archive marker
+      names.add(name);
+      // Skip past the file content blocks
+      const sizeStr = tarball.subarray(offset + 124, offset + 124 + 12).toString('utf-8').replace(/[\0 ]/g, '');
+      const size = parseInt(sizeStr, 8) || 0;
+      const padded = Math.ceil(size / 512) * 512;
+      offset += padded;
+    }
+    expect(names).toEqual(new Set(['prompt.txt', 'opencode.json']));
+  });
+
+  it('the payload preserves nested paths (e.g. .local/share/opencode/auth.json)', () => {
+    const files = new Map<string, Buffer>([
+      ['prompt.txt', Buffer.from('x', 'utf-8')],
+      ['.local/share/opencode/auth.json', Buffer.from('{"k":1}', 'utf-8')],
+    ]);
+    const cm = buildOutputConfigMap(cmName, files);
+    const tarball = gunzipSync(Buffer.from(cm.binaryData!['payload.tar.gz.b64'], 'base64'));
+    expect(tarball.toString('utf-8')).toContain('.local/share/opencode/auth.json');
+  });
+
+  it('handles binary content (arbitrary bytes including NULs)', () => {
+    const binary = Buffer.from([0x00, 0xff, 0x7f, 0x80, 0x00, 0x12]);
+    const files = new Map<string, Buffer>([['blob.bin', binary]]);
+    const cm = buildOutputConfigMap(cmName, files);
+    const tarball = gunzipSync(Buffer.from(cm.binaryData!['payload.tar.gz.b64'], 'base64'));
+    // Find the file content after the 512-byte header
+    const fileStart = 512;
+    expect(tarball.subarray(fileStart, fileStart + 6).equals(binary)).toBe(true);
+  });
+
+  it('returns an empty-payload configMap when the file map is empty', () => {
+    const cm = buildOutputConfigMap(cmName, new Map());
+    expect(cm.metadata?.name).toBe(cmName);
+    expect(cm.binaryData?.['payload.tar.gz.b64']).toBeDefined();
+    // Round-trip should still decode to a valid (empty) tarball
+    const tarball = gunzipSync(Buffer.from(cm.binaryData!['payload.tar.gz.b64'], 'base64'));
+    // End-of-archive marker = 1024 zero bytes
+    expect(tarball.length).toBeGreaterThanOrEqual(1024);
+  });
+
+  it('throws KjssOutputDirTooLargeError when the base64 blob exceeds the budget', () => {
+    // Real CSPRNG output is essentially incompressible — gzip overhead
+    // makes the output slightly LARGER than the input. 1 MiB random →
+    // ~1.4 MiB base64 → well over the 900 KiB cap.
+    const incompressible = Buffer.alloc(1_024 * 1024);
+    randomFillSync(incompressible);
+    const files = new Map<string, Buffer>([['big.bin', incompressible]]);
+    expect(() => buildOutputConfigMap(cmName, files)).toThrow(KjssOutputDirTooLargeError);
+  });
+
+  it('exposes OUTPUT_PAYLOAD_LIMIT_BYTES (sanity-bounded under the 1 MiB ConfigMap cap)', () => {
+    expect(OUTPUT_PAYLOAD_LIMIT_BYTES).toBeGreaterThan(0);
+    expect(OUTPUT_PAYLOAD_LIMIT_BYTES).toBeLessThan(1024 * 1024);
   });
 });
