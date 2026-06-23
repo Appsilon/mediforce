@@ -612,4 +612,149 @@ describe('KubernetesJobSpawnStrategy', () => {
       warnSpy.mockRestore();
     });
   });
+
+  // ─── Output-delivery wiring (configMap + ownerRef patch) ────────────────────
+  // KJSS reads the plugin's outputDir via an injected reader, creates a per-Job
+  // ConfigMap with the tar.gz.b64 payload, then after Job creation patches the
+  // ConfigMap's ownerReferences for cascade GC. See AI/local-13 + the
+  // initContainer in buildV1JobSpec for the consumer side.
+
+  describe('spawn() — output-delivery (configMap + ownerRef)', () => {
+    function makeReader(files: Array<[string, Buffer]>) {
+      return vi.fn().mockResolvedValue(new Map<string, Buffer>(files));
+    }
+
+    function makeMockCoreApiWithCm(overrides: Partial<CoreV1Api> = {}): CoreV1Api {
+      const base = makeMockCoreApi();
+      return {
+        ...base,
+        createNamespacedConfigMap: vi.fn().mockResolvedValue({}),
+        patchNamespacedConfigMap: vi.fn().mockResolvedValue({}),
+        ...overrides,
+      } as unknown as CoreV1Api;
+    }
+
+    it('creates the ConfigMap BEFORE the Job when outputDir has files', async () => {
+      const reader = makeReader([['prompt.txt', Buffer.from('hello')]]);
+      const mockBatchApi = makeMockBatchApi({
+        createNamespacedJob: vi.fn().mockResolvedValue({
+          metadata: { name: 'my-step-container', namespace: 'mediforce', uid: 'job-uid-001' },
+          status: {},
+        }),
+      });
+      const mockCoreApi = makeMockCoreApiWithCm();
+      const { factory } = makeMockLogStreamFactory(['ok']);
+
+      const strategy = new KubernetesJobSpawnStrategy(
+        kubeConfig, config, mockBatchApi, mockCoreApi, () => 0, factory, 30_000, reader,
+      );
+      await strategy.spawn(minimalReq);
+
+      const cmCreate = mockCoreApi.createNamespacedConfigMap as ReturnType<typeof vi.fn>;
+      const jobCreate = mockBatchApi.createNamespacedJob as ReturnType<typeof vi.fn>;
+      expect(cmCreate).toHaveBeenCalledOnce();
+      expect(jobCreate).toHaveBeenCalledOnce();
+      // Order: configMap must come first
+      expect(cmCreate.mock.invocationCallOrder[0]).toBeLessThan(jobCreate.mock.invocationCallOrder[0]);
+
+      // The configMap body carries the binaryData payload key
+      const cmCall = cmCreate.mock.calls[0][0];
+      expect(cmCall.namespace).toBe('mediforce');
+      expect(cmCall.body.binaryData?.['payload.tar.gz.b64']).toBeDefined();
+      expect(cmCall.body.metadata?.name).toMatch(/-output$/);
+    });
+
+    it('patches the ConfigMap ownerReferences with the Job UID after Job creation', async () => {
+      const reader = makeReader([['prompt.txt', Buffer.from('hello')]]);
+      const mockBatchApi = makeMockBatchApi({
+        createNamespacedJob: vi.fn().mockResolvedValue({
+          metadata: { name: 'my-step-container', namespace: 'mediforce', uid: 'job-uid-001' },
+          status: {},
+        }),
+      });
+      const mockCoreApi = makeMockCoreApiWithCm();
+      const { factory } = makeMockLogStreamFactory(['ok']);
+
+      const strategy = new KubernetesJobSpawnStrategy(
+        kubeConfig, config, mockBatchApi, mockCoreApi, () => 0, factory, 30_000, reader,
+      );
+      await strategy.spawn(minimalReq);
+
+      const patch = mockCoreApi.patchNamespacedConfigMap as ReturnType<typeof vi.fn>;
+      expect(patch).toHaveBeenCalledOnce();
+      const patchCall = patch.mock.calls[0][0];
+      expect(patchCall.namespace).toBe('mediforce');
+      expect(patchCall.name).toMatch(/-output$/);
+      // The patch body is a JSON patch op that adds ownerReferences with the Job's UID
+      const opBody = Array.isArray(patchCall.body) ? patchCall.body[0] : patchCall.body;
+      const ownerRefs = opBody.value ?? opBody.metadata?.ownerReferences;
+      expect(ownerRefs[0]).toMatchObject({
+        apiVersion: 'batch/v1',
+        kind: 'Job',
+        name: 'my-step-container',
+        uid: 'job-uid-001',
+        controller: true,
+        blockOwnerDeletion: true,
+      });
+    });
+
+    it('skips ConfigMap creation entirely when outputDir is empty', async () => {
+      const reader = makeReader([]); // empty map
+      const mockBatchApi = makeMockBatchApi();
+      const mockCoreApi = makeMockCoreApiWithCm();
+      const { factory } = makeMockLogStreamFactory(['ok']);
+
+      const strategy = new KubernetesJobSpawnStrategy(
+        kubeConfig, config, mockBatchApi, mockCoreApi, () => 0, factory, 30_000, reader,
+      );
+      await strategy.spawn(minimalReq);
+
+      expect(mockCoreApi.createNamespacedConfigMap).not.toHaveBeenCalled();
+      expect(mockCoreApi.patchNamespacedConfigMap).not.toHaveBeenCalled();
+      // Job still gets created
+      expect(mockBatchApi.createNamespacedJob).toHaveBeenCalledOnce();
+    });
+
+    it('does NOT create the Job if ConfigMap creation fails', async () => {
+      const reader = makeReader([['prompt.txt', Buffer.from('hello')]]);
+      const mockBatchApi = makeMockBatchApi();
+      const mockCoreApi = makeMockCoreApiWithCm({
+        createNamespacedConfigMap: vi.fn().mockRejectedValue(
+          Object.assign(new Error('cm create failed'), { code: 500 }),
+        ),
+      });
+      const { factory } = makeMockLogStreamFactory(['ok']);
+
+      const strategy = new KubernetesJobSpawnStrategy(
+        kubeConfig, config, mockBatchApi, mockCoreApi, () => 0, factory, 30_000, reader,
+      );
+
+      await expect(strategy.spawn(minimalReq)).rejects.toThrow();
+      expect(mockBatchApi.createNamespacedJob).not.toHaveBeenCalled();
+    });
+
+    it('passes outputConfigMapName to buildV1JobSpec so the Job spec mounts /output', async () => {
+      const reader = makeReader([['prompt.txt', Buffer.from('hello')]]);
+      const mockBatchApi = makeMockBatchApi({
+        createNamespacedJob: vi.fn().mockResolvedValue({
+          metadata: { name: 'my-step-container', namespace: 'mediforce', uid: 'job-uid-001' },
+          status: {},
+        }),
+      });
+      const mockCoreApi = makeMockCoreApiWithCm();
+      const { factory } = makeMockLogStreamFactory(['ok']);
+
+      const strategy = new KubernetesJobSpawnStrategy(
+        kubeConfig, config, mockBatchApi, mockCoreApi, () => 0, factory, 30_000, reader,
+      );
+      await strategy.spawn(minimalReq);
+
+      const jobBody = (mockBatchApi.createNamespacedJob as ReturnType<typeof vi.fn>).mock.calls[0][0].body;
+      const volumes = jobBody.spec.template.spec.volumes;
+      expect(volumes.map((v: { name: string }) => v.name)).toEqual(
+        expect.arrayContaining(['output-cm', 'output', 'tmp']),
+      );
+      expect(jobBody.spec.template.spec.initContainers).toHaveLength(1);
+    });
+  });
 });
