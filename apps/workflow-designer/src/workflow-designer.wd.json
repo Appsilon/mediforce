@@ -86,7 +86,6 @@
           "type": "object",
           "required": [
             "name",
-            "version",
             "steps",
             "transitions",
             "triggers"
@@ -95,17 +94,35 @@
             "name": {
               "type": "string"
             },
-            "version": {
-              "type": "number"
+            "visibility": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
             },
             "description": {
               "type": "string"
             },
-            "env": {
+            "preamble": {
+              "type": "string"
+            },
+            "externalSkillsRepo": {
               "type": "object"
+            },
+            "url": {
+              "type": "string"
             },
             "roles": {
               "type": "array"
+            },
+            "env": {
+              "type": "object"
+            },
+            "notifications": {
+              "type": "array"
+            },
+            "workspace": {
+              "type": "object"
             },
             "steps": {
               "type": "array"
@@ -114,6 +131,21 @@
               "type": "array"
             },
             "triggers": {
+              "type": "array"
+            },
+            "metadata": {
+              "type": "object"
+            },
+            "copiedFrom": {
+              "type": "object"
+            },
+            "archived": {
+              "type": "boolean"
+            },
+            "deleted": {
+              "type": "boolean"
+            },
+            "inputForNextRun": {
               "type": "array"
             },
             "triggerInput": {
