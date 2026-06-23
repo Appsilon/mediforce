@@ -3,7 +3,21 @@ import type { V1Job, V1EnvVar } from '@kubernetes/client-node';
 import type { DockerSpawnRequest } from './docker-spawn-strategy';
 
 const DROPPED_FLAGS = new Set(['run', '--rm', '-i', '-t', '--tty']);
-const DROPPED_FLAGS_WITH_VALUE = new Set(['-v', '--volume', '--platform', '--network', '--user']);
+const DROPPED_FLAGS_WITH_VALUE = new Set([
+  '-v', '--volume',
+  '--platform',
+  '--network',
+  '--user',
+  // The agent-runtime callers (base-container-agent-plugin.ts,
+  // script-container-plugin.ts) emit these four. Without them in this
+  // set the flag's value slips into the positional list, with `--name`
+  // consuming the image slot — kubelet then rejects the PodSpec with
+  // `InvalidImageName: "--name"`.
+  '--name',
+  '--memory',
+  '--cpus',
+  '-w',
+]);
 const MAX_K8S_NAME_LEN = 63;
 
 export interface ParsedDockerArgs {
