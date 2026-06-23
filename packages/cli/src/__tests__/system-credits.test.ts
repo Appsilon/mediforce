@@ -7,6 +7,8 @@ const CREDITS_RESPONSE = {
   limit: 30,
   usage: 19.85,
   remaining: 10.15,
+  accountRemaining: 4.5,
+  effectiveRemaining: 4.5,
 };
 
 beforeEach(() => {
@@ -24,9 +26,10 @@ describe('system credits', () => {
     });
     expect(code).toBe(0);
     const text = output.stdoutLines.join('\n');
-    expect(text).toContain('$10.15');
-    expect(text).toContain('$19.85');
-    expect(text).toContain('$30.00');
+    expect(text).toContain('$4.50'); // effective + account credits
+    expect(text).toContain('$10.15'); // key limit remaining
+    expect(text).toContain('$19.85'); // key used
+    expect(text).toContain('$30.00'); // key limit
   });
 
   it('emits JSON when --json', async () => {
@@ -45,7 +48,14 @@ describe('system credits', () => {
 
   it('returns exit 1 when unavailable', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ available: false, limit: 0, usage: 0, remaining: 0, error: 'Not configured' }),
+      jsonResponse({
+        available: false,
+        limit: 0,
+        usage: 0,
+        remaining: 0,
+        effectiveRemaining: 0,
+        error: 'Not configured',
+      }),
     );
     const output = captureOutput();
     const code = await systemCreditsCommand({
