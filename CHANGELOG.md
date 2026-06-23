@@ -20,12 +20,14 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Pre-flight model validation: agent steps with unknown model IDs show an "Unknown model" warning (with Levenshtein-based "did you mean?" suggestions) in the start-run dialog before the run begins.
 - Start-run dialog: selecting a different workflow version from the dropdown no longer skips pre-flight checks — the dialog now waits for the new version's definition and validation to load before allowing start.
 - Extracted `normaliseModelId` to `platform-core` — was duplicated 5 times across 3 packages.
+- OpenRouter credits indicator and the start-run low-credit warning now use the effective spendable balance `min(key limit, account credits)` (indicator shows a `(key limit / credits)` breakdown), instead of the key-limit ceiling alone which overstated available funds.
 - Codex now mirrors Claude's repo-local skill and agent discovery layout via `.codex/skills/*` and `.codex/agents` symlinks, with `AGENTS.md` documenting how Codex should translate Claude-specific skill tool syntax.
 
 ### Removed
 - Dead uploaded-skills feature — dropped `AgentDefinition.skillFileNames` + the `agents.skill_file_names` column, the skill-upload UI, and the Firebase Storage skill download from agent identity resolution; `skillsDir` is now the only skill mechanism (ADR-0003 PR1).
 
 ### Fixed
+- `repo` → `external_skills_repo` migration applies on staging again — the previous `0026`/`0027` pair carried an out-of-order journal `when` timestamp (2025-06-19) that drizzle-kit silently skips on any DB already past it, leaving the new column uncreated and every workflow listing empty. Merged both into a single `0026_external_skills_repo` migration (column add + `repo` copy + invalid-value repair) with a correct timestamp.
 - Image-less build-mode workflow agents now resolve their derived Docker tag before choosing execution mode, so `dockerfile`/`repo`/`commit` agents run in containers instead of falling back to local host execution.
 - Workflow editor agent image fields keep custom Docker tag entry available even when discovered local Docker images are listed.
 - E2E test setup deletes only the workspace handles it owns (`test`, `tenant-a`, `tenant-b`, and journey-specific handles) and resets seeded agent definitions — personal namespaces and their registered workflows are no longer wiped when running `pnpm test:e2e`, while interrupted MCP-binding journeys no longer dirty the next run.
