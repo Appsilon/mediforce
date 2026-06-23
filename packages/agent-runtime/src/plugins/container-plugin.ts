@@ -193,6 +193,17 @@ export function resolveImageBuild(
 
 const SKILLS_CACHE_DIR = join(tmpdir(), 'mediforce-skills-cache');
 
+/**
+ * Content-addressed cache directory for skills fetched from a git repo.
+ * Key: sha256(repoUrl + commit + skillsDir). Pure — computable for free
+ * whenever the path is needed, so nothing about it has to be stored on
+ * shared instance state.
+ */
+export function skillsCacheDir(repoUrl: string, commit: string, skillsDir: string): string {
+  const hash = createHash('sha256').update(`${repoUrl}\0${commit}\0${skillsDir}`).digest('hex').slice(0, 16);
+  return join(SKILLS_CACHE_DIR, hash);
+}
+
 /** Convert SSH git URL to HTTPS with token for authenticated clone. */
 export function toHttpsWithToken(sshUrl: string, token: string): string {
   const match = sshUrl.match(/git@github\.com:(.+?)(?:\.git)?$/);
@@ -253,8 +264,6 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
   protected context!: AgentContext | WorkflowAgentContext;
   protected resolvedEnv: ResolvedEnv = { vars: {}, injectedKeys: [], sources: {} };
   protected imageBuild: ImageBuildMeta | undefined;
-  /** Cached skills dir path fetched from git repo. */
-  protected repoSkillsDir: string | null = null;
   /** Run-scoped git worktree — populated by `resolveRunWorkspace` at run start. */
   protected runWorkspaceHandle: RunWorkspaceHandle | null = null;
   protected workspaceManager: WorkspaceManagerLike | null = null;
@@ -402,24 +411,23 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
   }
 
   /**
-   * Fetch skills from a git repo into a deterministic cache directory.
-   * Cache key: sha256(repoUrl + commit + skillsDir).
-   * Returns the path to the cached skills directory.
+   * Populate the content-addressed skills cache from a git repo (clone + copy).
+   * Idempotent: a cache hit is a no-op. Stores nothing on instance state — the
+   * cache path is derived on demand by {@link resolveSkillsDir} via
+   * {@link skillsCacheDir}, so concurrent steps can't leak or clobber it.
    */
   protected async fetchSkillsFromRepo(
     skillsDir: string,
     repoUrl: string,
     commit: string,
     repoToken?: string,
-  ): Promise<string> {
-    const hash = createHash('sha256').update(`${repoUrl}\0${commit}\0${skillsDir}`).digest('hex').slice(0, 16);
-    const cacheDir = join(SKILLS_CACHE_DIR, hash);
+  ): Promise<void> {
+    const cacheDir = skillsCacheDir(repoUrl, commit, skillsDir);
 
     // Cache hit
     if (existsSync(cacheDir)) {
-      console.log(`[container-plugin] Skills cache hit for ${skillsDir} (${hash})`);
-      this.repoSkillsDir = cacheDir;
-      return cacheDir;
+      console.log(`[container-plugin] Skills cache hit for ${skillsDir} (${cacheDir})`);
+      return;
     }
 
     // Cache miss — clone, copy, delete clone
@@ -452,17 +460,22 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
     } finally {
       rmSync(cloneDir, { recursive: true, force: true });
     }
-
-    this.repoSkillsDir = cacheDir;
-    return cacheDir;
   }
 
   /**
-   * Resolve skillsDir — uses repo cache if available, otherwise resolveProjectPath.
+   * Resolve the host skills directory for the current step. When the workflow
+   * declares an `externalSkillsRepo`, the path is the content-addressed cache
+   * dir (populated by {@link fetchSkillsFromRepo}); otherwise it's resolved
+   * from disk. Derived fresh from `this.context` per call — no shared field —
+   * so a repo-mode step can't leak its cache dir into a later disk-mode step,
+   * and concurrent steps can't clobber each other.
    */
   protected resolveSkillsDir(skillsDir: string, resolveProjectPath: (p: string) => string): string {
-    if (this.repoSkillsDir) {
-      return this.repoSkillsDir;
+    const wfRepo = isWorkflowAgentContext(this.context)
+      ? this.context.workflowDefinition.externalSkillsRepo
+      : undefined;
+    if (wfRepo?.url && wfRepo?.commit) {
+      return skillsCacheDir(normalizeRepoUrls(wfRepo.url).gitUrl, wfRepo.commit, skillsDir);
     }
     return resolveProjectPath(skillsDir);
   }
