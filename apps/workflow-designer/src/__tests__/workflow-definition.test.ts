@@ -21,9 +21,23 @@ describe('workflow-designer', () => {
       if (!result.success) return;
 
       expect(result.data.name).toBe('workflow-designer');
-      expect(result.data.steps).toHaveLength(7);
-      expect(result.data.transitions).toHaveLength(7);
+      expect(result.data.steps).toHaveLength(8);
+      expect(result.data.transitions).toHaveLength(8);
       expect(result.data.triggers).toHaveLength(1);
+    });
+
+    it('fetches the live schema before designing', () => {
+      const result = loadDefinition();
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      // The first step must fetch the schema so the design step works against
+      // the live schema rather than a baked snapshot.
+      expect(result.data.steps[0].id).toBe('fetch-schema');
+      expect(result.data.steps[0].executor).toBe('script');
+      expect(
+        result.data.transitions.some(t => t.from === 'fetch-schema' && t.to === 'choose-mode'),
+      ).toBe(true);
     });
 
     it('has exactly one terminal step', () => {
@@ -100,7 +114,9 @@ describe('workflow-designer', () => {
       expect(coworkSteps).toHaveLength(1);
       expect(coworkSteps[0].id).toBe('design');
       expect(coworkSteps[0].cowork).toBeDefined();
-      expect(coworkSteps[0].cowork?.outputSchema).toBeDefined();
+      // No baked outputSchema — the design step receives the live schema from
+      // the fetch-schema step output instead.
+      expect(coworkSteps[0].cowork?.outputSchema).toBeUndefined();
       expect(coworkSteps[0].cowork?.systemPrompt).toBeDefined();
     });
 

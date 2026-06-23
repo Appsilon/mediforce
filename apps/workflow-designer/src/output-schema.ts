@@ -27,10 +27,17 @@ export interface CoworkOutputSchema {
 }
 
 /**
- * Derive the design step's `cowork.outputSchema` from the live Zod schema. This
- * is the single source of truth: the committed `.wd.json` files embed a
- * generated copy, and `output-schema.test.ts` fails if they drift. Regenerate
- * with `pnpm --filter @mediforce/workflow-designer sync-schema`.
+ * Derive the design step's `cowork.outputSchema` from the live Zod schema.
+ *
+ * Only the **voice** designer bakes this in: the voice realtime/synthesis path
+ * reads `session.outputSchema` directly and cannot consume previous-step
+ * context, so it needs a schema embedded in the definition. The chat designer
+ * instead fetches the live schema at run time via its `fetch-schema` step (see
+ * `GET /api/workflow-definitions/schema`), so it bakes nothing.
+ *
+ * The committed `voice-workflow-designer.wd.json` embeds a generated copy and
+ * `output-schema.test.ts` fails if it drifts. Regenerate with
+ * `pnpm --filter @mediforce/workflow-designer sync-schema`.
  *
  * Uses Zod's native JSON Schema export in `'input'` mode so fields carrying a
  * `.default()` (e.g. `visibility`) are reported as optional — the design step

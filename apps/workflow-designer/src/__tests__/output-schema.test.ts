@@ -5,8 +5,10 @@ import { workflowDesignerOutputSchema } from '../output-schema';
 
 const appDir = resolve(import.meta.dirname, '../..');
 
+// Only the voice designer bakes a schema (its realtime/synthesis path reads
+// session.outputSchema directly). The chat designer fetches the live schema at
+// run time, so it intentionally has none.
 const DEFINITION_FILES = [
-  'workflow-designer.wd.json',
   'voice-workflow-designer.wd.json',
 ];
 
@@ -26,4 +28,9 @@ describe('design step outputSchema stays in sync with the workflow schema', () =
       expect(designStep?.cowork?.outputSchema).toEqual(workflowDesignerOutputSchema);
     });
   }
+
+  it('chat designer bakes no schema — it fetches the live one at run time', () => {
+    const designStep = loadDesignStep('workflow-designer.wd.json');
+    expect(designStep?.cowork?.outputSchema).toBeUndefined();
+  });
 });

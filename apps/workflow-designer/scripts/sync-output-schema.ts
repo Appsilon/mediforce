@@ -3,16 +3,17 @@ import { resolve } from 'path';
 import { workflowDesignerOutputSchema } from '../src/output-schema';
 
 /**
- * Write the derived `cowork.outputSchema` into the design step of every
- * workflow-designer definition. Run after changing the WorkflowDefinition Zod
- * schema so the committed `.wd.json` files stay in sync:
+ * Write the derived `cowork.outputSchema` into the design step of the voice
+ * designer definition. Run after changing the WorkflowDefinition Zod schema so
+ * the committed definition stays in sync:
  *
  *   pnpm --filter @mediforce/workflow-designer sync-schema
  *
- * `output-schema.test.ts` fails until this has been run.
+ * `output-schema.test.ts` fails until this has been run. Only the voice
+ * designer bakes a schema; the chat designer fetches the live schema at run
+ * time, so it is intentionally absent here.
  */
 const DEFINITION_FILES = [
-  'workflow-designer.wd.json',
   'voice-workflow-designer.wd.json',
 ];
 

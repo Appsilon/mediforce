@@ -64,6 +64,20 @@ export const ValidateWorkflowOutputSchema = z.object({
 });
 
 /**
+ * Contract for `GET /api/workflow-definitions/schema` — the live JSON Schema of
+ * the authorable WorkflowDefinition surface, derived from the running server's
+ * Zod schema. Consumers (the workflow-designer `fetch-schema` step, the
+ * `mediforce workflow schema` CLI) get the schema currently in force on the
+ * machine they are connected to, so it never needs re-seeding when the schema
+ * changes. `schema` is an opaque JSON Schema object.
+ */
+export const GetWorkflowSchemaInputSchema = z.object({});
+
+export const GetWorkflowSchemaOutputSchema = z.object({
+  schema: z.record(z.string(), z.unknown()),
+});
+
+/**
  * Per-workflow run aggregate attached to each card on the workspace home page.
  * Computed server-side via count aggregations + a bounded `latest` query so the
  * page never ships the whole run collection to the client (the pre-cutover
@@ -173,6 +187,8 @@ export type RegistrationWarning = z.infer<typeof RegistrationWarningSchema>;
 export type ValidateWorkflowInput = z.infer<typeof ValidateWorkflowInputSchema>;
 export type ValidateWorkflowOutput = z.infer<typeof ValidateWorkflowOutputSchema>;
 export type WorkflowValidationIssue = z.infer<typeof WorkflowValidationIssueSchema>;
+export type GetWorkflowSchemaInput = z.infer<typeof GetWorkflowSchemaInputSchema>;
+export type GetWorkflowSchemaOutput = z.infer<typeof GetWorkflowSchemaOutputSchema>;
 export type WorkflowRunSummary = z.infer<typeof WorkflowRunSummarySchema>;
 export type WorkflowDefinitionGroupSummary = z.infer<typeof WorkflowDefinitionGroupSchema>;
 export type ListWorkflowsInput = z.infer<typeof ListWorkflowsInputSchema>;
