@@ -34,6 +34,42 @@ describe('parseDockerArgs', () => {
     expect(result.command).toEqual(['bash']);
     expect(result.args).toEqual(['-c', 'echo hi']);
   });
+
+  // Regression: the actual dockerArgs shape emitted by
+  // base-container-agent-plugin.ts:1489 and script-container-plugin.ts:293.
+  // Before the fix, --name leaked the containerName into the image slot,
+  // so KJSS rendered a PodSpec container with image = "--name" — kubelet
+  // then rejected it with `InvalidImageName: "--name"`.
+  it('drops --name <containerName> + --memory + --cpus + -w like the real caller emits', () => {
+    const parsed = parseDockerArgs([
+      'run', '--rm', '-i',
+      '--name', 'mediforce-proc-abc-step-xyz',
+      '--memory', '8g',
+      '--cpus', '2',
+      '-v', '/host/output:/output',
+      '-e', 'FOO=bar',
+      '-v', '/host/workspace:/workspace',
+      '-w', '/workspace',
+      'mediforce-agent:protocol-to-tfl',
+      'node', 'agent.js',
+    ]);
+    expect(parsed.image).toBe('mediforce-agent:protocol-to-tfl');
+    expect(parsed.command).toEqual(['node']);
+    expect(parsed.args).toEqual(['agent.js']);
+    expect(parsed.env).toEqual([{ name: 'FOO', value: 'bar' }]);
+  });
+
+  it.each([
+    ['--name',   'some-container-name'],
+    ['--memory', '8g'],
+    ['--cpus',   '2'],
+    ['-w',       '/workspace'],
+  ])('drops docker flag %s with its value', (flag, value) => {
+    const parsed = parseDockerArgs(['run', flag, value, 'theimage:tag']);
+    expect(parsed.image).toBe('theimage:tag');
+    expect(parsed.command).toEqual([]);
+    expect(parsed.args).toEqual([]);
+  });
 });
 
 describe('safeJobName', () => {
