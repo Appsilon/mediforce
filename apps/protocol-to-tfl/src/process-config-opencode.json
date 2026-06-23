@@ -22,7 +22,7 @@
       "agentConfig": {
         "skill": "trial-metadata-extractor",
         "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
-        "image": "mediforce-agent:protocol-to-tfl",
+        "image": "196280209544.dkr.ecr.eu-west-1.amazonaws.com/bioverse/mediforce-agent-protocol-to-tfl:latest",
         "model": "deepseek/deepseek-chat"
       }
     },
@@ -37,7 +37,7 @@
       "agentConfig": {
         "skill": "mock-tlg-generator",
         "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
-        "image": "mediforce-agent:protocol-to-tfl",
+        "image": "196280209544.dkr.ecr.eu-west-1.amazonaws.com/bioverse/mediforce-agent-protocol-to-tfl:latest",
         "model": "deepseek/deepseek-chat"
       }
     },
@@ -56,7 +56,7 @@
       "agentConfig": {
         "skill": "sdtm-to-adam",
         "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
-        "image": "mediforce-agent:protocol-to-tfl",
+        "image": "196280209544.dkr.ecr.eu-west-1.amazonaws.com/bioverse/mediforce-agent-protocol-to-tfl:latest",
         "model": "deepseek/deepseek-chat",
         "repo": "Appsilon/mediforce-clinical-workspace",
         "commit": "4beb1b0ad77872b04bc7ef930def16e555946222"
@@ -73,7 +73,7 @@
       "agentConfig": {
         "skill": "adam-to-tlg",
         "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
-        "image": "mediforce-agent:protocol-to-tfl",
+        "image": "196280209544.dkr.ecr.eu-west-1.amazonaws.com/bioverse/mediforce-agent-protocol-to-tfl:latest",
         "model": "deepseek/deepseek-chat",
         "repo": "Appsilon/mediforce-clinical-workspace",
         "commit": "4beb1b0ad77872b04bc7ef930def16e555946222"
