@@ -24,7 +24,7 @@
         "skill": "trial-metadata-extractor",
         "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
         "model": "sonnet",
-        "image": "mediforce-agent:protocol-to-tfl"
+        "image": "196280209544.dkr.ecr.eu-west-1.amazonaws.com/bioverse/mediforce-agent-protocol-to-tfl:latest"
       }
     },
     {
@@ -39,7 +39,7 @@
         "skill": "mock-tlg-generator",
         "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
         "model": "sonnet",
-        "image": "mediforce-agent:protocol-to-tfl"
+        "image": "196280209544.dkr.ecr.eu-west-1.amazonaws.com/bioverse/mediforce-agent-protocol-to-tfl:latest"
       }
     },
     {
@@ -58,7 +58,7 @@
         "skill": "sdtm-to-adam",
         "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
         "model": "sonnet",
-        "image": "mediforce-agent:protocol-to-tfl",
+        "image": "196280209544.dkr.ecr.eu-west-1.amazonaws.com/bioverse/mediforce-agent-protocol-to-tfl:latest",
         "repo": "Appsilon/mediforce-clinical-workspace",
         "commit": "4beb1b0ad77872b04bc7ef930def16e555946222"
       }
@@ -75,7 +75,7 @@
         "skill": "adam-to-tlg",
         "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
         "model": "sonnet",
-        "image": "mediforce-agent:protocol-to-tfl",
+        "image": "196280209544.dkr.ecr.eu-west-1.amazonaws.com/bioverse/mediforce-agent-protocol-to-tfl:latest",
         "repo": "Appsilon/mediforce-clinical-workspace",
         "commit": "4beb1b0ad77872b04bc7ef930def16e555946222"
       }
