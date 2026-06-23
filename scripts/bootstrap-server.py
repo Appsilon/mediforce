@@ -1421,6 +1421,9 @@ def _render_compose_env(ctx: Context) -> str:
         "# to override.",
         f"POSTGRES_PASSWORD={ctx.collected.get('POSTGRES_PASSWORD', '')}",
         "",
+        "# Redis — staging overlay uses --requirepass; without this Redis crashes.",
+        f"REDIS_PASSWORD={ctx.collected.get('REDIS_PASSWORD', '')}",
+        "",
         "# Caddy — site block matcher (real domain → Let's Encrypt cert, IP → self-signed)",
         f"DOMAIN={_caddy_site(ctx)}",
         "",
@@ -1529,6 +1532,11 @@ def _ensure_api_keys(ctx: Context) -> None:
         # drops into DATABASE_URL without further escaping.
         ctx.collected["POSTGRES_PASSWORD"] = secrets.token_urlsafe(32)
         ok("POSTGRES_PASSWORD auto-generated (32 bytes url-safe) — back this up; losing it locks you out of the Postgres data volume")
+
+    if not ctx.collected.get("REDIS_PASSWORD"):
+        # Staging overlay requires --requirepass; without this Redis crashes.
+        ctx.collected["REDIS_PASSWORD"] = secrets.token_urlsafe(24)
+        ok("REDIS_PASSWORD auto-generated (24 bytes url-safe)")
 
     if "EMAIL_PROVIDER" not in ctx.collected:
         if confirm("Configure email notifications (invite emails, alerts)?", default=False):
