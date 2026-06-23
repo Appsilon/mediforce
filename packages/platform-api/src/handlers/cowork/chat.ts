@@ -28,6 +28,14 @@ import { validateOutputSchema } from '@mediforce/agent-runtime';
 
 const MAX_TOOL_LOOP_ITERATIONS = 10;
 const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
+/**
+ * Output budget per turn. A full WorkflowDefinition artifact (many steps,
+ * transitions, descriptions) is emitted as `update_artifact` tool-call
+ * arguments and routinely exceeds the client's 4096 default — truncation
+ * there yields invalid JSON and a silently dropped artifact. 16k gives the
+ * model room to emit a complete definition in one turn.
+ */
+const CHAT_MAX_TOKENS = 16384;
 const COWORK_DEBUG = process.env.COWORK_DEBUG === 'true';
 
 /**
@@ -230,6 +238,7 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
       messages,
       tools,
       apiKey: ctx.openRouterKey,
+      maxTokens: CHAT_MAX_TOKENS,
     });
     agentText = response.content;
     if (COWORK_DEBUG) console.log(`[cowork-chat] LLM response: text=${agentText.length}chars toolCalls=[${response.toolCalls.map(tc => tc.function.name).join(', ')}]`);
@@ -272,8 +281,11 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
           toolStatus: 'success',
         });
       } else {
+        const toolResult = response.finishReason === 'length'
+          ? `Artifact update failed: model response truncated at the ${CHAT_MAX_TOKENS}-token limit (the workflow is too large to emit in one turn). Build it incrementally across several updates.`
+          : 'Artifact update skipped (parse error).';
         await scope.coworkSessions.updateTurn(ctx.session.id, turn.id, {
-          toolResult: 'Artifact update skipped (parse error).',
+          toolResult,
           toolStatus: 'error',
         });
       }
@@ -308,9 +320,16 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
     messages.push(assistantMessage(agentText, response.toolCalls));
 
     for (const call of artifactCalls) {
-      const validationMsg = ctx.session.outputSchema
-        ? (artifact ? 'Artifact updated and validated.' : 'Artifact update skipped (parse error).')
-        : 'Artifact updated.';
+      let validationMsg: string;
+      if (artifact) {
+        validationMsg = ctx.session.outputSchema
+          ? 'Artifact updated and validated.'
+          : 'Artifact updated.';
+      } else if (response.finishReason === 'length') {
+        validationMsg = `Artifact update failed: your response was truncated at the ${CHAT_MAX_TOKENS}-token limit. Emit a smaller artifact and build it up across several update_artifact calls.`;
+      } else {
+        validationMsg = 'Artifact update skipped (parse error).';
+      }
       messages.push({ role: 'tool', content: validationMsg, tool_call_id: call.id });
     }
     for (const call of presentationCalls) {
@@ -390,10 +409,16 @@ function applyArtifactUpdate(
   call: OpenRouterToolCall,
 ): Record<string, unknown> | null {
   try {
-    const parsed = JSON.parse(call.function.arguments) as {
-      artifact: Record<string, unknown>;
-    };
-    return parsed.artifact;
+    const parsed = JSON.parse(call.function.arguments) as Record<string, unknown>;
+    if (parsed === null || typeof parsed !== 'object') return null;
+    // Prefer the wrapped form { artifact: {...} }; fall back to the top-level
+    // object for models that pass the artifact directly without the wrapper key.
+    const inner = parsed['artifact'];
+    if (inner !== null && inner !== undefined && typeof inner === 'object') {
+      return inner as Record<string, unknown>;
+    }
+    if (Object.keys(parsed).length > 0) return parsed;
+    return null;
   } catch {
     return null;
   }
