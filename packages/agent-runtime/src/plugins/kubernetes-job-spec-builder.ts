@@ -14,10 +14,13 @@ const DEFAULT_INIT_CONTAINER_IMAGE = 'public.ecr.aws/docker/library/busybox:1.36
  *  ship something genuinely huge (binary inputs, multi-MB configs). */
 export const OUTPUT_PAYLOAD_LIMIT_BYTES = 900 * 1024;
 
-/** Standard ConfigMap key under which the tar.gz.base64 payload lives. The
- *  prep-output initContainer hardcodes this path; if you change it here,
- *  update the init container's command in {@link buildV1JobSpec}. */
-const OUTPUT_PAYLOAD_KEY = 'payload.tar.gz.b64';
+/** Standard ConfigMap key under which the tar.gz payload lives. The
+ *  K8s API server base64-decodes `binaryData` values on the wire, so the
+ *  configMap volume mounts the file as the raw gzipped tar bytes — no
+ *  `.b64` suffix and no `base64 -d` step in the init container. If you
+ *  change this constant, update the init container's command in
+ *  {@link buildV1JobSpec} too (the two must match). */
+const OUTPUT_PAYLOAD_KEY = 'payload.tar.gz';
 
 const DROPPED_FLAGS = new Set(['run', '--rm', '-i', '-t', '--tty']);
 const DROPPED_FLAGS_WITH_VALUE = new Set([
@@ -129,7 +132,7 @@ export function buildV1JobSpec(
     initContainers = [{
       name: 'prep-output',
       image: opts.initContainerImage ?? DEFAULT_INIT_CONTAINER_IMAGE,
-      command: ['sh', '-c', 'base64 -d < /cm/payload.tar.gz.b64 | tar -xzC /output --no-same-owner'],
+      command: ['sh', '-c', 'tar -xzC /output --no-same-owner < /cm/payload.tar.gz'],
       securityContext: {
         readOnlyRootFilesystem: true,
         allowPrivilegeEscalation: false,
