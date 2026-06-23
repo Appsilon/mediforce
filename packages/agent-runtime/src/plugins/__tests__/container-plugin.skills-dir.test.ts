@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { ContainerPlugin, skillsCacheDir, normalizeRepoUrls } from '../container-plugin';
+import { ContainerPlugin, skillsCacheDir } from '../container-plugin';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../../interfaces/step-executor-plugin';
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
 
@@ -59,11 +59,7 @@ describe('resolveSkillsDir — no shared mutable state across steps', () => {
     // Step 1: workflow WITH externalSkillsRepo → resolves to the content-addressed cache dir.
     plugin.setContext(repoContext('git@github.com:org/skills-repo.git', 'deadbeef'));
     const repoResolved = plugin.exposeResolveSkillsDir('skills', PROJECT);
-    const expectedCache = skillsCacheDir(
-      normalizeRepoUrls('git@github.com:org/skills-repo.git').gitUrl,
-      'deadbeef',
-      'skills',
-    );
+    const expectedCache = skillsCacheDir('git@github.com:org/skills-repo.git', 'deadbeef', 'skills');
     expect(repoResolved).toBe(expectedCache);
 
     // Step 2 on the SAME plugin instance: workflow WITHOUT externalSkillsRepo →
@@ -84,7 +80,7 @@ describe('resolveSkillsDir — no shared mutable state across steps', () => {
     const b = plugin.exposeResolveSkillsDir('skills', PROJECT);
 
     expect(a).not.toBe(b);
-    expect(a).toBe(skillsCacheDir(normalizeRepoUrls('git@github.com:org/a.git').gitUrl, 'aaa', 'skills'));
-    expect(b).toBe(skillsCacheDir(normalizeRepoUrls('git@github.com:org/b.git').gitUrl, 'bbb', 'skills'));
+    expect(a).toBe(skillsCacheDir('git@github.com:org/a.git', 'aaa', 'skills'));
+    expect(b).toBe(skillsCacheDir('git@github.com:org/b.git', 'bbb', 'skills'));
   });
 });

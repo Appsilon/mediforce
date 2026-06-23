@@ -3,7 +3,7 @@ import { execSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { ContainerPlugin, normalizeRepoUrls } from '../container-plugin';
+import { ContainerPlugin } from '../container-plugin';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../../interfaces/step-executor-plugin';
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
 
@@ -58,7 +58,7 @@ describe('fetchSkillsFromRepo + resolveSkillsDir [integration, real git]', () =>
 
   it('[DATA] populates the cache from a real clone and resolveSkillsDir points at the populated dir', async () => {
     const plugin = new TestPlugin();
-    const gitUrl = normalizeRepoUrls(repoDir).gitUrl;
+    const gitUrl = repoDir;
 
     await plugin.populate('skills', gitUrl, commit);
 
@@ -77,7 +77,7 @@ describe('fetchSkillsFromRepo + resolveSkillsDir [integration, real git]', () =>
 
   it('[DATA] after a repo-mode populate, a disk-mode step on the same instance resolves to disk', async () => {
     const plugin = new TestPlugin();
-    const gitUrl = normalizeRepoUrls(repoDir).gitUrl;
+    const gitUrl = repoDir;
 
     // Step 1: repo-mode — clone + populate cache.
     await plugin.populate('skills', gitUrl, commit);
