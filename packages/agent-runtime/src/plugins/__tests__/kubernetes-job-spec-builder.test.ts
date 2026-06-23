@@ -235,7 +235,7 @@ describe('buildV1JobSpec — output delivery', () => {
     expect(init.image).toBe('public.ecr.aws/docker/library/busybox:1.36'); // default
     expect(init.command).toEqual([
       'sh', '-c',
-      'base64 -d < /cm/payload.tar.gz.b64 | tar -xzC /output --no-same-owner',
+      'tar -xzC /output --no-same-owner < /cm/payload.tar.gz',
     ]);
     expect(init.volumeMounts).toEqual([
       { name: 'output-cm', mountPath: '/cm', readOnly: true },
@@ -284,7 +284,7 @@ describe('buildOutputConfigMap', () => {
     const cm = buildOutputConfigMap(cmName, files);
     expect(cm.metadata?.name).toBe(cmName);
     expect(cm.data).toBeUndefined();
-    expect(cm.binaryData?.['payload.tar.gz.b64']).toBeDefined();
+    expect(cm.binaryData?.['payload.tar.gz']).toBeDefined();
   });
 
   it('the payload decodes back to a tarball containing the original files (text)', () => {
@@ -293,7 +293,7 @@ describe('buildOutputConfigMap', () => {
       ['opencode.json', Buffer.from('{"k":1}', 'utf-8')],
     ]);
     const cm = buildOutputConfigMap(cmName, files);
-    const b64 = cm.binaryData!['payload.tar.gz.b64'];
+    const b64 = cm.binaryData!['payload.tar.gz'];
     const gzipped = Buffer.from(b64, 'base64');
     const tarball = gunzipSync(gzipped);
 
@@ -320,7 +320,7 @@ describe('buildOutputConfigMap', () => {
       ['.local/share/opencode/auth.json', Buffer.from('{"k":1}', 'utf-8')],
     ]);
     const cm = buildOutputConfigMap(cmName, files);
-    const tarball = gunzipSync(Buffer.from(cm.binaryData!['payload.tar.gz.b64'], 'base64'));
+    const tarball = gunzipSync(Buffer.from(cm.binaryData!['payload.tar.gz'], 'base64'));
     expect(tarball.toString('utf-8')).toContain('.local/share/opencode/auth.json');
   });
 
@@ -328,7 +328,7 @@ describe('buildOutputConfigMap', () => {
     const binary = Buffer.from([0x00, 0xff, 0x7f, 0x80, 0x00, 0x12]);
     const files = new Map<string, Buffer>([['blob.bin', binary]]);
     const cm = buildOutputConfigMap(cmName, files);
-    const tarball = gunzipSync(Buffer.from(cm.binaryData!['payload.tar.gz.b64'], 'base64'));
+    const tarball = gunzipSync(Buffer.from(cm.binaryData!['payload.tar.gz'], 'base64'));
     // Find the file content after the 512-byte header
     const fileStart = 512;
     expect(tarball.subarray(fileStart, fileStart + 6).equals(binary)).toBe(true);
@@ -337,9 +337,9 @@ describe('buildOutputConfigMap', () => {
   it('returns an empty-payload configMap when the file map is empty', () => {
     const cm = buildOutputConfigMap(cmName, new Map());
     expect(cm.metadata?.name).toBe(cmName);
-    expect(cm.binaryData?.['payload.tar.gz.b64']).toBeDefined();
+    expect(cm.binaryData?.['payload.tar.gz']).toBeDefined();
     // Round-trip should still decode to a valid (empty) tarball
-    const tarball = gunzipSync(Buffer.from(cm.binaryData!['payload.tar.gz.b64'], 'base64'));
+    const tarball = gunzipSync(Buffer.from(cm.binaryData!['payload.tar.gz'], 'base64'));
     // End-of-archive marker = 1024 zero bytes
     expect(tarball.length).toBeGreaterThanOrEqual(1024);
   });

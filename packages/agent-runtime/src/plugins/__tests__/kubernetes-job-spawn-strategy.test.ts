@@ -660,7 +660,7 @@ describe('KubernetesJobSpawnStrategy', () => {
       // The configMap body carries the binaryData payload key
       const cmCall = cmCreate.mock.calls[0][0];
       expect(cmCall.namespace).toBe('mediforce');
-      expect(cmCall.body.binaryData?.['payload.tar.gz.b64']).toBeDefined();
+      expect(cmCall.body.binaryData?.['payload.tar.gz']).toBeDefined();
       expect(cmCall.body.metadata?.name).toMatch(/-output$/);
     });
 
