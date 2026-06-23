@@ -27,6 +27,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Dead uploaded-skills feature — dropped `AgentDefinition.skillFileNames` + the `agents.skill_file_names` column, the skill-upload UI, and the Firebase Storage skill download from agent identity resolution; `skillsDir` is now the only skill mechanism (ADR-0003 PR1).
 
 ### Fixed
+- Skill-loading steps no longer intermittently fail with "Skill file not found" from another workflow's cache — the container plugin singleton kept the skills-cache dir in a mutable field that leaked across runs; the path is now derived on demand from the workflow's `externalSkillsRepo`.
 - External skills repo now clones public repos over anonymous HTTPS — `fetchSkillsFromRepo` no longer forces an SSH clone (which fails in the agent container, where there is no `ssh` binary) when no auth token is configured; SSH/deploy-key transport is used only for genuine `git@` refs.
 - Deploy-key cache now recovers when the cached path is replaced by a directory (EISDIR); auto-runner stuck-loop errors now surface the underlying step error in `mediforce run get` [#776](https://github.com/Appsilon/mediforce/pull/776).
 - Bootstrap now generates `REDIS_PASSWORD` — staging overlay requires `--requirepass` but the variable was missing, causing Redis to crash-loop on fresh deployments [#777](https://github.com/Appsilon/mediforce/pull/777).
