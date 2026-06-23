@@ -31,9 +31,18 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
 # Install Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
-# Install OpenCode CLI
+# Install OpenCode CLI.
+# The vendor installer is `curl … | bash` and writes everything under
+# $HOME/.opencode, which lands at /root/.opencode when the Dockerfile
+# RUN runs as root. /root is mode 0700, so containers spawned under a
+# non-root UID (e.g. UID 1000 — the KubernetesJobSpawnStrategy default)
+# can't follow the /usr/local/bin/opencode symlink to its target there
+# (`Permission denied`). Relocate the install tree to /opt/opencode and
+# make it world-readable so any UID can reach the binary.
 RUN curl -fsSL https://opencode.ai/install | bash \
-  && ln -s /root/.opencode/bin/opencode /usr/local/bin/opencode
+  && mv /root/.opencode /opt/opencode \
+  && chmod -R a+rX /opt/opencode \
+  && ln -sf /opt/opencode/bin/opencode /usr/local/bin/opencode
 
 # Create standard directories
 RUN mkdir -p /workspace /output /data /plugin
