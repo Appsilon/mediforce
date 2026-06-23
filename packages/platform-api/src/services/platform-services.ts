@@ -432,6 +432,10 @@ export function getPlatformServices(): PlatformServices {
   actionRegistry.register('reshape', reshapeActionHandler);
   const spawnRunKicker = createHttpSelfFetchRunKicker({
     baseUrl: () => process.env.APP_BASE_URL ?? 'http://localhost:9003',
+    // INTERNAL_APP_URL lets K8s deployments self-fetch via the
+    // cluster-internal Service URL instead of the external ALB. Unset
+    // on VM / docker-compose / Vercel → kicker falls back to baseUrl.
+    internalUrl: () => process.env.INTERNAL_APP_URL,
     apiKey: () => process.env.PLATFORM_API_KEY ?? '',
   });
   actionRegistry.register('spawn', createSpawnActionHandler(manualTrigger, processRepo, spawnRunKicker));

@@ -41,6 +41,10 @@ spec:
               value: {{ .Values.config.domain | quote }}
             - name: APP_BASE_URL
               value: {{ .Values.config.appBaseUrl | quote }}
+            {{- if .Values.config.internalUrl }}
+            - name: INTERNAL_APP_URL
+              value: {{ .Values.config.internalUrl | quote }}
+            {{- end }}
             - name: MEDIFORCE_DISABLE_EMAIL
               value: {{ .Values.config.disableEmail | quote }}
             - name: NEXT_PUBLIC_USE_EMULATORS
