@@ -47,6 +47,14 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       OPENCODE_CONFIG: '/output/opencode.json',
       // XDG override so OpenCode writes auth.json where we mount it
       XDG_DATA_HOME: '/output/.local/share',
+      // OpenCode also writes to $HOME/.local/state/opencode at startup (a state
+      // dir not covered by XDG_DATA_HOME). The container's default HOME=/root
+      // is mode 0700, so non-root spawns (notably the KubernetesJobSpawnStrategy
+      // running as UID 1000) hit `EACCES mkdir '/root/.local/state/opencode'`
+      // and exit before the prompt is ever sent. Point HOME at /tmp — the
+      // emptyDir KJSS already provisions with fsGroup access for UID 1000;
+      // docker-mode runs as root so /tmp is writable there too.
+      HOME: '/tmp',
     };
   }
 
