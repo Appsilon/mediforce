@@ -34,6 +34,7 @@
     "@mediforce/agent-runtime": "workspace:*",
     "@mediforce/core-actions": "workspace:*",
     "@mediforce/mcp-client": "workspace:*",
+    "@mediforce/mediforce-mcp": "workspace:*",
     "@mediforce/platform-api": "workspace:*",
     "@mediforce/platform-core": "workspace:*",
     "@mediforce/platform-infra": "workspace:*",

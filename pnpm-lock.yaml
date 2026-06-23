@@ -367,6 +367,9 @@ importers:
       '@mediforce/mcp-client':
         specifier: workspace:*
         version: link:../mcp-client
+      '@mediforce/mediforce-mcp':
+        specifier: workspace:*
+        version: link:../mediforce-mcp
       '@mediforce/platform-api':
         specifier: workspace:*
         version: link:../platform-api
