@@ -24,6 +24,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import type {
   AgentRunRepository,
+  BlobStore,
   EmailProviderInfo,
   ModelRegistryRepository,
   NamespaceRepository,
@@ -164,7 +165,7 @@ export interface TestScopeOverrides {
   readonly instanceRepo?: ProcessInstanceRepository;
   readonly humanTaskRepo?: InMemoryHumanTaskRepository;
   readonly taskAttachmentRepo?: InMemoryTaskAttachmentRepository;
-  readonly blobStore?: InMemoryBlobStore;
+  readonly blobStore?: BlobStore;
   readonly processRepo?: InMemoryProcessRepository;
   readonly auditRepo?: InMemoryAuditRepository;
   readonly agentEventRepo?: InMemoryAgentEventRepository;

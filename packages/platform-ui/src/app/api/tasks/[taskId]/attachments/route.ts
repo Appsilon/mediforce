@@ -5,7 +5,12 @@ import {
   type ListAttachmentsInput,
 } from '@mediforce/platform-api/contract';
 import { HandlerError, ValidationError } from '@mediforce/platform-api/errors';
-import { createRouteAdapter, defaultBuildScope, defaultResolveCaller } from '@/lib/route-adapter';
+import {
+  createRouteAdapter,
+  defaultBuildScope,
+  defaultResolveCaller,
+  type RouteAdapterOptions,
+} from '@/lib/route-adapter';
 
 interface RouteContext {
   params: Promise<{ taskId: string }>;
@@ -18,16 +23,23 @@ interface RouteContext {
  * `scope.attachments` — out-of-scope tasks surface as an empty list / 404,
  * same as the other task routes.
  */
-export const GET = createRouteAdapter<
-  typeof ListAttachmentsInputSchema,
-  ListAttachmentsInput,
-  unknown,
-  RouteContext
->(
-  ListAttachmentsInputSchema,
-  async (_req, ctx) => ({ taskId: (await ctx.params).taskId }),
-  listAttachments,
-);
+export function makeGET(
+  options: Pick<RouteAdapterOptions, 'resolveCaller' | 'buildScope'> = {},
+): (req: NextRequest, ctx: RouteContext) => Promise<NextResponse> {
+  return createRouteAdapter<
+    typeof ListAttachmentsInputSchema,
+    ListAttachmentsInput,
+    unknown,
+    RouteContext
+  >(
+    ListAttachmentsInputSchema,
+    async (_req, ctx) => ({ taskId: (await ctx.params).taskId }),
+    listAttachments,
+    options,
+  );
+}
+
+export const GET = makeGET();
 
 /**
  * POST /api/tasks/:taskId/attachments
@@ -41,39 +53,48 @@ export const GET = createRouteAdapter<
  * live in the handler; the route only turns the multipart form into the
  * handler's `UploadAttachmentInput`.
  */
-export async function POST(req: NextRequest, ctx: RouteContext): Promise<NextResponse> {
-  const callerOrResponse = await defaultResolveCaller(req);
-  if (callerOrResponse instanceof NextResponse) return callerOrResponse;
-  const scope = defaultBuildScope(callerOrResponse);
+export function makePOST(
+  options: Pick<RouteAdapterOptions, 'resolveCaller' | 'buildScope'> = {},
+): (req: NextRequest, ctx: RouteContext) => Promise<NextResponse> {
+  const resolveCaller = options.resolveCaller ?? defaultResolveCaller;
+  const buildScope = options.buildScope ?? defaultBuildScope;
 
-  // Same error tail as createRouteAdapter (src/lib/route-adapter.ts): a
-  // HandlerError maps to the ADR-0005 envelope, anything else is logged and
-  // becomes a 500 'internal' envelope — never Next's default 500 page.
-  try {
-    const { taskId } = await ctx.params;
-    const form = await req.formData();
-    const file = form.get('file');
-    if (file instanceof File === false) {
-      throw new ValidationError('file field is required');
+  return async (req, ctx) => {
+    const callerOrResponse = await resolveCaller(req);
+    if (callerOrResponse instanceof NextResponse) return callerOrResponse;
+    const scope = buildScope(callerOrResponse);
+
+    // Same error tail as createRouteAdapter (src/lib/route-adapter.ts): a
+    // HandlerError maps to the ADR-0005 envelope, anything else is logged and
+    // becomes a 500 'internal' envelope — never Next's default 500 page.
+    try {
+      const { taskId } = await ctx.params;
+      const form = await req.formData();
+      const file = form.get('file');
+      if (file instanceof File === false) {
+        throw new ValidationError('file field is required');
+      }
+
+      const content = Buffer.from(await file.arrayBuffer());
+      const result = await uploadAttachment(
+        {
+          taskId,
+          name: file.name,
+          contentType: file.type.length > 0 ? file.type : 'application/octet-stream',
+          content,
+        },
+        scope,
+      );
+      return NextResponse.json(result, { status: 201 });
+    } catch (err) {
+      if (err instanceof HandlerError) return errorResponse(err);
+      console.error('[task-attachment-upload-route] handler error:', err);
+      return errorResponse(new HandlerError('internal', 'Internal error'));
     }
-
-    const content = Buffer.from(await file.arrayBuffer());
-    const result = await uploadAttachment(
-      {
-        taskId,
-        name: file.name,
-        contentType: file.type.length > 0 ? file.type : 'application/octet-stream',
-        content,
-      },
-      scope,
-    );
-    return NextResponse.json(result, { status: 201 });
-  } catch (err) {
-    if (err instanceof HandlerError) return errorResponse(err);
-    console.error('[task-attachment-upload-route] handler error:', err);
-    return errorResponse(new HandlerError('internal', 'Internal error'));
-  }
+  };
 }
+
+export const POST = makePOST();
 
 function errorResponse(err: HandlerError): NextResponse {
   return NextResponse.json(err.toEnvelope(), { status: err.statusCode });
