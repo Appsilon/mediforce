@@ -1,3 +1,23 @@
+{{- /*
+  Deliberately no migration initContainers on the worker — Drizzle
+  migrations run only on the UI Deployment (see `templates/ui-deployment.yaml`
+  + the `migrations:` block in `values.yaml`).
+
+  Why this is safe today: the worker is a BullMQ consumer. It sits idle
+  reading from Redis until the UI dispatches a job, and the UI cannot
+  dispatch a job until its own `run-migrations` initContainer has
+  succeeded. So by the time the worker actually touches the database
+  via a job, migrations are guaranteed to be applied — even though the
+  worker Pod itself starts in parallel with the UI Pod.
+
+  When to revisit: if the worker ever grows startup-time DB reads
+  (e.g. recovering stale jobs from a state table on boot, loading
+  config from the DB before BullMQ ready), this lazy assumption breaks
+  and the worker would need its own `wait-for-postgres` +
+  `wait-for-ui-ready` initContainers. Cheapest mitigation in that case:
+  busybox + nc against the UI Service before the worker's main
+  container starts.
+*/ -}}
 {{- if .Values.worker.enabled }}
 apiVersion: apps/v1
 kind: Deployment
