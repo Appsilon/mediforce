@@ -94,3 +94,28 @@ RoleBinding templates so the four resources cannot drift apart.
 {{- define "mediforce.uiServiceAccountName" -}}
 {{- default (printf "%s-ui" (include "mediforce.fullname" .)) .Values.ui.serviceAccount.name -}}
 {{- end -}}
+
+{{/*
+Image reference for the migration initContainer. Each field of
+`.Values.migrations.image` falls back to the matching field on the UI
+image — so the default case is "reuse the UI image at the same tag";
+operators can pin any subset by setting non-empty values explicitly.
+*/}}
+{{- define "mediforce.migrate.image" -}}
+{{- $reg := default .Values.ui.image.registry .Values.migrations.image.registry -}}
+{{- $repo := default .Values.ui.image.repository .Values.migrations.image.repository -}}
+{{- $tag := default .Values.ui.image.tag .Values.migrations.image.tag -}}
+{{- if $reg -}}
+{{ $reg }}/{{ $repo }}:{{ $tag }}
+{{- else -}}
+{{ $repo }}:{{ $tag }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+imagePullPolicy for the migration initContainer. Falls back to the UI
+image's pullPolicy.
+*/}}
+{{- define "mediforce.migrate.pullPolicy" -}}
+{{- default .Values.ui.image.pullPolicy .Values.migrations.image.pullPolicy -}}
+{{- end -}}
