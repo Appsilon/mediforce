@@ -14,6 +14,28 @@ const validTemplate = {
 };
 
 test.describe('Workflow definition schema validation API', () => {
+  test('returns valid: true for a conforming definition without persisting', async ({ request }) => {
+    const candidate = { ...validTemplate, name: `api-schema-validation-ok-${Date.now()}` };
+
+    const res = await request.post('/api/workflow-definitions/validate', {
+      headers: authHeaders,
+      data: candidate,
+    });
+
+    expect(res.status(), await res.text()).toBe(200);
+    const body = await res.json() as {
+      valid: boolean;
+      errors: Array<{ path: string; message: string }>;
+    };
+    expect(body.valid).toBe(true);
+    expect(body.errors).toEqual([]);
+
+    const listRes = await request.get('/api/workflow-definitions', { headers: authHeaders });
+    expect(listRes.status(), await listRes.text()).toBe(200);
+    const list = await listRes.json() as { definitions: Array<{ name: string }> };
+    expect(list.definitions.some((definition) => definition.name === candidate.name)).toBe(false);
+  });
+
   test('returns cross-field schema errors as data without persisting', async ({ request }) => {
     const candidate = {
       ...validTemplate,

@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { WorkflowDefinitionSchema } from '@mediforce/platform-core';
+import {
+  WorkflowDefinitionSchema,
+  getWorkflowAuthorableJsonSchema,
+  resolveCoworkOutputSchema,
+  parseWorkflowTemplate,
+  type WorkflowDefinition,
+} from '@mediforce/platform-core';
+import { resolveTransitions } from '@mediforce/workflow-engine';
 
 describe('workflow-designer', () => {
   const appDir = resolve(import.meta.dirname, '../..');
@@ -11,6 +18,17 @@ describe('workflow-designer', () => {
       readFileSync(resolve(appDir, 'src', file), 'utf8'),
     );
     return WorkflowDefinitionSchema.safeParse({ ...raw, version: 1 });
+  }
+
+  function parsedDefinition(file = 'workflow-designer.wd.json'): WorkflowDefinition {
+    const result = loadDefinition(file);
+    if (!result.success) throw new Error(`${file} failed to parse: ${result.error.message}`);
+    return result.data;
+  }
+
+  function route(def: WorkflowDefinition, from: string, output: Record<string, unknown>): string[] {
+    const outgoing = def.transitions.filter((transition) => transition.from === from);
+    return resolveTransitions(outgoing, { output, variables: {} }).map((resolved) => resolved.to);
   }
 
   describe('workflow-designer.wd.json', () => {
@@ -128,6 +146,64 @@ describe('workflow-designer', () => {
 
       const targets = transitions.map(t => t.to).sort();
       expect(targets).toEqual(['design', 'fetch-workflows']);
+    });
+  });
+
+  describe('design → validate → register loop routing', () => {
+    it('routes choose-mode to the create or edit path by selected mode', () => {
+      const def = parsedDefinition();
+      expect(route(def, 'choose-mode', { mode: 'create-new' })).toEqual(['design']);
+      expect(route(def, 'choose-mode', { mode: 'edit-existing' })).toEqual(['fetch-workflows']);
+    });
+
+    it('design always advances to validate', () => {
+      expect(route(parsedDefinition(), 'design', {})).toEqual(['validate']);
+    });
+
+    it('validate advances to register when valid and loops back to design when invalid', () => {
+      const def = parsedDefinition();
+      expect(route(def, 'validate', { valid: true })).toEqual(['register']);
+      expect(route(def, 'validate', { valid: false })).toEqual(['design']);
+    });
+
+    it('register advances to the terminal step', () => {
+      expect(route(parsedDefinition(), 'register', {})).toEqual(['done']);
+    });
+  });
+
+  describe('design and validate steps share one schema', () => {
+    it('design output schema is the live authorable schema the validate step enforces', () => {
+      const def = parsedDefinition();
+      const designStep = def.steps.find((step) => step.id === 'design');
+      const designSchema = resolveCoworkOutputSchema(designStep?.cowork) as {
+        properties?: Record<string, unknown>;
+      };
+
+      // The design step tells the model to produce exactly the schema that
+      // /api/workflow-definitions/schema serves — not a baked inline copy.
+      expect(designSchema).toEqual(getWorkflowAuthorableJsonSchema());
+
+      // The validate step (POST /api/workflow-definitions/validate → parseWorkflowTemplate)
+      // omits the same server-managed keys the authorable schema omits, so a
+      // design-conformant document validates and one carrying an omitted key is
+      // rejected. This is what stops the loop false-rejecting on schema drift.
+      const serverManaged = ['namespace', 'version', 'createdAt'];
+      const designProps = Object.keys(designSchema.properties ?? {});
+      for (const key of serverManaged) {
+        expect(designProps).not.toContain(key);
+      }
+
+      const candidate = {
+        name: 'loop-parity',
+        steps: [
+          { id: 'start', name: 'Start', type: 'creation', executor: 'human' },
+          { id: 'end', name: 'End', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'start', to: 'end' }],
+        triggers: [{ type: 'manual', name: 'manual' }],
+      };
+      expect(parseWorkflowTemplate(candidate).success).toBe(true);
+      expect(parseWorkflowTemplate({ ...candidate, namespace: 'x' }).success).toBe(false);
     });
   });
 
