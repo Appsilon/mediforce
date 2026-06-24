@@ -427,11 +427,11 @@ function ElapsedTimer({ startedAt }: { startedAt: string }) {
   return <span className="tabular-nums">{label}</span>;
 }
 
-function getLeftBorderClass(status: EffectiveStatus): string {
+function getStatusClasses(status: EffectiveStatus): string {
   switch (status) {
     case 'running': return 'border-l-4 border-blue-500';
     case 'waiting': return 'border-l-4 border-amber-500';
-    default: return 'border-l-4 border-transparent';
+    default:        return 'border-l-4 border-transparent';
   }
 }
 
@@ -486,7 +486,7 @@ export function StepStatusPanel({
           if (item.kind === 'virtual') {
             const status = getVirtualEffectiveStatus(instance);
             return (
-              <li key={`virtual-${item.stepId}`} className={cn('flex gap-3 py-2 pl-3 rounded-md', getLeftBorderClass(status))}>
+              <li key={`virtual-${item.stepId}`} className={cn('flex gap-3 py-2 pl-3 rounded-md', getStatusClasses(status))}>
                 <div className="flex flex-col items-center">
                   <div className="mt-0.5"><StatusIcon status={status} /></div>
                   {!isLast && <div className="mt-1 w-px flex-1 bg-border min-h-[16px]" />}
@@ -496,7 +496,7 @@ export function StepStatusPanel({
                     {stepDetailBaseHref ? (
                       <Link
                         href={`${stepDetailBaseHref}/steps/${encodeURIComponent(item.stepId)}`}
-                        className="text-sm font-medium text-primary hover:underline"
+                        className="text-sm font-medium text-primary"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {item.step?.name ?? item.stepId}
@@ -556,10 +556,8 @@ export function StepStatusPanel({
             <li
               key={execId}
               className={cn(
-                'flex gap-3 py-2 pl-3 rounded-md transition-colors',
-                getLeftBorderClass(status),
-                status === 'completed' && !isCurrent && 'opacity-60 hover:opacity-100 transition-opacity',
-                'hover:bg-muted/50',
+                'flex gap-3 py-2 pl-3 rounded-md',
+                getStatusClasses(status),
                 hasConfig && 'cursor-pointer',
               )}
               onClick={() => {
@@ -576,7 +574,7 @@ export function StepStatusPanel({
                   {stepDetailBaseHref && status !== 'pending' ? (
                     <Link
                       href={`${stepDetailBaseHref}/steps/${encodeURIComponent(stepId)}?executionId=${encodeURIComponent(execId)}`}
-                      className="text-sm font-medium text-primary hover:underline"
+                      className="text-sm font-medium text-primary"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {step?.name ?? stepId}
