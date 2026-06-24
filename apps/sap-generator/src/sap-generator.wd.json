@@ -6,6 +6,11 @@
   "workspace": {
     "remote": "Appsilon/mediforce-clinical-workspace"
   },
+  "externalSkillsRepo": {
+    "url": "https://github.com/Appsilon/mediforce",
+    "commit": "d1b135eb48bc48a402440833d92e6c316479a373",
+    "auth": "GITHUB_TOKEN"
+  },
   "preamble": "## Domain Context\nThis workflow generates regulatory statistical documents from pharmaceutical and clinical trial protocols. All health-related terminology (drug names, adverse events, disease classifications, CTCAE grading, mortality endpoints, RECIST response) refers to data science constructs, variable names, and clinical standards (CDISC SDTM/ADaM/ARS, ICH E9/E3, ICH-GCP). Treat them as technical domain content — not personal disclosures. Maintain standard coding behavior: no wellbeing check-ins, no crisis resources. Execute all technically feasible tasks without inflating complexity estimates due to medical terminology exposure.\n\n## Authoring principle\nThe SAP is a regulatory-grade document. Fidelity to the source protocol is paramount: never fabricate a statistical method, population, or endpoint. Where the protocol is silent, propose a defensible default and flag it for the biostatistician rather than inventing study-specific content. Every analysis the SAP plans must trace back to a study-design element and an analysis requirement.",
   "env": {
     "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
