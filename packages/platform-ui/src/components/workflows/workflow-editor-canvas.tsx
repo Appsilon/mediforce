@@ -301,11 +301,14 @@ export function WorkflowEditorCanvas({
     }
   }, []);
 
-  const addStep = useCallback((payload: NewStepPayload, insertAfterId: string | null = null) => {
+  const stepCounterRef = useRef(0);
+
+  const addStep = useCallback((payload: NewStepPayload, insertAfterId: string | null = null, insertBeforeId: string | null = null) => {
     const terminalStep = editedSteps.find((s) => s.type === 'terminal');
 
     saveSnapshot();
-    const stepNum = editedSteps.length + 1;
+    stepCounterRef.current += 1;
+    const stepNum = stepCounterRef.current;
     const newId = `new-step-${stepNum}`;
     const newStep: WorkflowStep = {
       id: newId,
@@ -338,7 +341,13 @@ export function WorkflowEditorCanvas({
         return next;
       });
       setEditedTransitions((prev) => {
-        // Edges from resolvedInsertAfterId → their targets now go through newStep
+        if (insertBeforeId) {
+          // Edge-button path: only splice into the one clicked edge A→B.
+          // Other outgoing transitions from A (e.g. back-edges) stay on A.
+          const others = prev.filter((t) => !(t.from === resolvedInsertAfterId && t.to === insertBeforeId));
+          return [...others, { from: resolvedInsertAfterId, to: newId }, { from: newId, to: insertBeforeId }];
+        }
+        // Selected-step fallback: rewire all outgoing transitions through newStep.
         const outgoing = prev.filter((t) => t.from === resolvedInsertAfterId);
         const others = prev.filter((t) => t.from !== resolvedInsertAfterId);
         const rewired = outgoing.map((t) => ({ from: newId, to: t.to }));
@@ -576,7 +585,7 @@ export function WorkflowEditorCanvas({
             onNodeDelete={removeStep}
             onNodeMoveUp={(stepId) => moveStep(stepId, 'up')}
             onNodeMoveDown={(stepId) => moveStep(stepId, 'down')}
-            onEdgeAdd={(fromStepId, payload) => addStep(payload, fromStepId)}
+            onEdgeAdd={(fromStepId, payload, toStepId) => addStep(payload, fromStepId, toStepId)}
             onPaneClick={() => { setSelectedStepId(null); setRightPanelView('yaml'); }}
             selectedStepId={selectedStepId}
             errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}

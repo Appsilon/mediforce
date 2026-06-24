@@ -658,7 +658,7 @@ interface WorkflowDiagramProps {
   onNodeDelete?: (stepId: string) => void;
   onNodeMoveUp?: (stepId: string) => void;
   onNodeMoveDown?: (stepId: string) => void;
-  onEdgeAdd?: (fromStepId: string, payload: NewStepPayload) => void;
+  onEdgeAdd?: (fromStepId: string, payload: NewStepPayload, toStepId: string) => void;
   onPaneClick?: () => void;
   selectedStepId?: string | null;
   errorStepIds?: Set<string>;
@@ -746,7 +746,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
           ...e,
           type: 'addStep',
           data: {
-            onAdd: (payload: NewStepPayload) => onEdgeAdd(e.source, payload),
+            onAdd: (payload: NewStepPayload) => onEdgeAdd(e.source, payload, e.target),
             onOpenPopover: (pos: { top: number; left: number }, onAdd: (payload: NewStepPayload) => void) => handleOpenPopover(e.id, pos, onAdd),
             onClosePopover: handleClosePopover,
             popoverEdgeId: popover?.edgeId ?? null,
