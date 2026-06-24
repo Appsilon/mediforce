@@ -333,11 +333,16 @@ the user-facing immutable log.
 
 ## Flagged ambiguities
 
-- **Workflow Definition `source`** *(resolved 2026-06-02)*: A Workflow Definition
-  imported from a git repo carries an optional `source: { repo, path, ref? }`
-  record identifying the git origin (GitHub-only). Informational only — no
-  automatic sync. Distinct from `copiedFrom`, which tracks within-Deployment
-  copies.
+- **Workflow Definition `source`** *(resolved 2026-06-02; commit pinning added
+  2026-06-24)*: A Workflow Definition imported from a git repo carries an
+  optional `source: { url, path, commit }` record identifying the git origin
+  (GitHub-only, public repos only — no auth header is sent). `commit` is the
+  immutable SHA resolved from the requested ref at import time (the import
+  *input* still accepts a branch/tag/SHA `ref`; only the resolved `commit` is
+  stored — `ref` is transient, not durable provenance). The resolve-then-fetch
+  order pins the fetched file to the recorded SHA. Reuses `RepoSchema` (`url`)
+  plus the shared `CommitShaSchema` regex. Informational only — no automatic
+  sync. Distinct from `copiedFrom`, which tracks within-Deployment copies.
 
 - **Namespace vs Workspace** *(active rename in flight)*: Code uses
   `namespace` everywhere — schema fields, repos, Firestore collection,

@@ -1,16 +1,22 @@
-import { parseWorkflowTemplate } from '@mediforce/platform-core';
-import type { ImportWorkflowInput, ImportWorkflowOutput } from '../../contract/workflows';
+import {
+  RegisterWorkflowInputSchema,
+  type ImportWorkflowInput,
+  type ImportWorkflowOutput,
+} from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
 import { ValidationError, HandlerError } from '../../errors';
-import { buildRawUrl } from './_github';
+import { buildRawUrl, resolveCommitSha } from './_github';
 import { registerWorkflow } from './register-workflow';
 
 export async function importWorkflow(
   input: ImportWorkflowInput,
   scope: CallerScope,
 ): Promise<ImportWorkflowOutput> {
-  const ref = input.ref ?? 'main';
-  const rawUrl = buildRawUrl(input.repo, ref, input.path);
+  // Resolve the requested ref to an immutable SHA first, then fetch the file at
+  // that SHA — this pins the imported content to the commit we record, so a
+  // moving branch can't desync the file from its provenance.
+  const commit = await resolveCommitSha(input.repo, input.ref ?? 'main');
+  const rawUrl = buildRawUrl(input.repo, commit, input.path);
 
   let json: unknown;
   try {
@@ -26,7 +32,11 @@ export async function importWorkflow(
     throw new ValidationError(`Failed to fetch workflow definition: ${String(err)}`);
   }
 
-  const parsed = parseWorkflowTemplate(json);
+  // Parse through the same schema `workflow register` uses: it strips the
+  // server-managed `namespace` / `version` / `createdAt` keys, so a file that
+  // declares a `namespace` imports cleanly (the import target wins) instead of
+  // being rejected — keeping import and register behaviourally identical.
+  const parsed = RegisterWorkflowInputSchema.safeParse(json);
   if (!parsed.success) {
     throw new ValidationError(
       parsed.error.issues.map((i) => i.message).join(', '),
@@ -38,7 +48,7 @@ export async function importWorkflow(
     {
       ...parsed.data,
       namespace: input.namespace,
-      source: { repo: input.repo, path: input.path, ref },
+      source: { url: input.repo, path: input.path, commit },
     },
     scope,
   );

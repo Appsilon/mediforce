@@ -33,12 +33,26 @@ export function ImportWorkflowDialog({
   const [repo, setRepo] = React.useState(DEFAULT_REPO);
   const [step, setStep] = React.useState<Step>({ kind: 'idle' });
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  // 'browse' lists workflows from the repo's index.json manifest; 'path' imports
+  // a single .wd.json by its path (mirrors the CLI) for repos with no manifest.
+  const [mode, setMode] = React.useState<'browse' | 'path'>('browse');
+  const [path, setPath] = React.useState('');
+  // Branch, tag, or commit SHA to import from. Empty = default branch (main);
+  // resolved to an immutable commit SHA server-side and recorded as provenance.
+  const [ref, setRef] = React.useState('');
+  // Non-fatal banner shown in the idle view, e.g. after a manifest fetch falls
+  // back to path mode.
+  const [idleError, setIdleError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open) return;
     setRepo(DEFAULT_REPO);
     setStep({ kind: 'idle' });
     setSelected(new Set());
+    setMode('browse');
+    setPath('');
+    setRef('');
+    setIdleError(null);
   }, [open]);
 
   function handleClose() {
@@ -48,15 +62,38 @@ export function ImportWorkflowDialog({
 
   async function fetchManifest() {
     setStep({ kind: 'fetching' });
+    setIdleError(null);
     try {
-      const result = await mediforce.workflows.getManifest({ repo });
-      setSelected(new Set(result.workflows.map((wf) => wf.name)));
+      const result = await mediforce.workflows.getManifest({ repo, ref: ref.trim() || undefined });
+      // Start with nothing selected — the user opts workflows in explicitly.
+      setSelected(new Set());
       setStep({ kind: 'manifest', workflows: result.workflows });
     } catch (err) {
       const message =
         err instanceof ApiError ? err.message
         : err instanceof Error ? err.message
         : 'Failed to fetch manifest.';
+      // No manifest (e.g. repo has no index.json) is not a dead end — drop into
+      // path mode so a single .wd.json can still be imported by its path.
+      setMode('path');
+      setIdleError(`${message} Add an index.json to enable browsing, or import a workflow by its path below.`);
+      setStep({ kind: 'idle' });
+    }
+  }
+
+  async function importByPath() {
+    const trimmed = path.trim();
+    if (trimmed === '') return;
+    setStep({ kind: 'importing', workflows: [], progress: 0, total: 1 });
+    try {
+      await mediforce.workflows.importFromRepo({ repo, path: trimmed, ref: ref.trim() || undefined, namespace });
+      setStep({ kind: 'done', imported: [trimmed] });
+      onImported?.();
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message
+        : err instanceof Error ? err.message
+        : 'Import failed.';
       setStep({ kind: 'error', message });
     }
   }
@@ -89,6 +126,7 @@ export function ImportWorkflowDialog({
         await mediforce.workflows.importFromRepo({
           repo,
           path: wf.path,
+          ref: ref.trim() || undefined,
           namespace,
         });
         imported.push(wf.name);
@@ -147,6 +185,77 @@ export function ImportWorkflowDialog({
                   autoComplete="off"
                 />
               </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="import-ref">
+                  Branch, tag, or commit <span className="font-normal">(optional — defaults to main)</span>
+                </label>
+                <input
+                  id="import-ref"
+                  type="text"
+                  value={ref}
+                  onChange={(e) => setRef(e.target.value)}
+                  disabled={step.kind === 'fetching'}
+                  className={cn(
+                    'w-full rounded-md border px-3 py-2 text-sm outline-none transition-colors',
+                    'focus:ring-2 focus:ring-primary/30 focus:border-primary',
+                    'disabled:opacity-50',
+                  )}
+                  placeholder="main"
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="inline-flex rounded-md border p-0.5 text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={() => { setMode('browse'); setIdleError(null); }}
+                  className={cn(
+                    'rounded px-3 py-1 transition-colors',
+                    mode === 'browse' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  Browse
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMode('path'); setIdleError(null); }}
+                  className={cn(
+                    'rounded px-3 py-1 transition-colors',
+                    mode === 'path' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  Import by path
+                </button>
+              </div>
+
+              {idleError !== null && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 flex items-start gap-2 text-sm text-destructive">
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>{idleError}</span>
+                </div>
+              )}
+
+              {mode === 'path' && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor="import-wf-path">
+                    Path to .wd.json
+                  </label>
+                  <input
+                    id="import-wf-path"
+                    type="text"
+                    value={path}
+                    onChange={(e) => setPath(e.target.value)}
+                    className={cn(
+                      'w-full rounded-md border px-3 py-2 text-sm outline-none transition-colors',
+                      'focus:ring-2 focus:ring-primary/30 focus:border-primary',
+                    )}
+                    placeholder="workflow-name/src/workflow-name.wd.json"
+                    autoComplete="off"
+                  />
+                </div>
+              )}
+
               <div className="flex justify-end gap-2">
                 <button
                   onClick={handleClose}
@@ -154,19 +263,34 @@ export function ImportWorkflowDialog({
                 >
                   Cancel
                 </button>
-                <button
-                  onClick={() => void fetchManifest()}
-                  disabled={repo.trim() === '' || step.kind === 'fetching'}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                    repo.trim() !== '' && step.kind !== 'fetching'
-                      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                      : 'bg-primary/30 text-primary-foreground/50 cursor-not-allowed',
-                  )}
-                >
-                  {step.kind === 'fetching' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  Browse
-                </button>
+                {mode === 'browse' ? (
+                  <button
+                    onClick={() => void fetchManifest()}
+                    disabled={repo.trim() === '' || step.kind === 'fetching'}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-colors',
+                      repo.trim() !== '' && step.kind !== 'fetching'
+                        ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                        : 'bg-primary/30 text-primary-foreground/50 cursor-not-allowed',
+                    )}
+                  >
+                    {step.kind === 'fetching' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    Browse
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => void importByPath()}
+                    disabled={repo.trim() === '' || path.trim() === ''}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-colors',
+                      repo.trim() !== '' && path.trim() !== ''
+                        ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                        : 'bg-primary/30 text-primary-foreground/50 cursor-not-allowed',
+                    )}
+                  >
+                    Import
+                  </button>
+                )}
               </div>
             </div>
           )}

@@ -12,9 +12,11 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Fixed
-- Postgres workflow definitions now persist imported workflow `source` provenance, so get/list calls keep the advertised repo/path/ref after GitHub imports.
+- Postgres workflow definitions now persist imported workflow `source` provenance, so get/list calls keep the advertised url/path/commit after GitHub imports.
+- A malformed or legacy-shaped `source` (e.g. the pre-commit `{ repo, path, ref }`) no longer drops the entire workflow definition on read — the informational provenance is dropped best-effort and the workflow still loads and runs.
 - `pnpm test` is now fully self-contained — Playwright `globalSetup` auto-starts the Firebase Auth emulator when absent and runs pending DB migrations, so E2E tests pass without manual pre-flight steps.
 ### Added
+- Import workflows from git now records the resolved commit SHA as provenance (`source: { url, path, commit }`) by resolving the requested ref to an immutable SHA and fetching the file at that SHA; a `.wd.json` that declares its own `namespace` imports cleanly (the target namespace wins, matching `workflow register`); the import dialog gains a branch/tag/commit field (defaults to main), an "Import by path" mode that also kicks in when a repo has no `index.json` manifest, and no longer pre-selects every browsed workflow. Scope (one-time copy, public GitHub only) documented in [docs/how-to/import-from-git.md](docs/how-to/import-from-git.md) and [ADR-0009](docs/adr/0009-workflow-import-scope-boundary.md).
 - Docker image validation at workflow registration — server warns when a referenced image is not found on the platform, CLI deduplicates server vs local warnings, and the workflow editor shows an amber toast on save [#734](https://github.com/Appsilon/mediforce/pull/734).
 - SMTP email provider as alternative to Mailgun — organisations can now use their own SMTP infrastructure instead of Mailgun by setting `SMTP_*` env vars; `EMAIL_PROVIDER` auto-detects or can be set explicitly; includes read-only admin status page, `mediforce email status` CLI command, and bootstrap script prompts for initial setup [#748](https://github.com/Appsilon/mediforce/issues/748).
 - **Run view UX** — execution history panel (renamed from "Step Status"), scrollable workflow diagram, active step info (started time, live elapsed timer, executor name/claimer for claimed human tasks)
