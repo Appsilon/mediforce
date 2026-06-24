@@ -169,19 +169,17 @@ function ExecutorChip({ executorType, autonomyLevel, plugin, runtime }: {
   type Chip = { icon: React.ReactNode; label: string; className: string };
   let chip: Chip;
 
-  const slate = 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-600';
-
   if (executorType === 'script') {
     const rt = runtime ? (RUNTIME_LABELS[runtime] ?? (runtime.charAt(0).toUpperCase() + runtime.slice(1))) : null;
-    chip = { icon: <Terminal className="h-3 w-3 shrink-0" />, label: rt ? `${rt} script` : 'Script', className: slate };
+    chip = { icon: <Terminal className="h-3 w-3 shrink-0" />, label: rt ? `${rt} script` : 'Script', className: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/20 dark:text-yellow-300 dark:border-yellow-800' };
   } else if (executorType === 'action') {
     const actionLabel = plugin ? plugin.replace(/-/g, ' ').replace(/^\w/, (c) => c.toUpperCase()) : 'Action';
-    chip = { icon: <Zap className="h-3 w-3 shrink-0" />, label: actionLabel, className: slate };
+    chip = { icon: <Zap className="h-3 w-3 shrink-0" />, label: actionLabel, className: 'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950/20 dark:text-pink-300 dark:border-pink-800' };
   } else if (executorType === 'cowork') {
     chip = {
       icon: <span className="inline-flex items-center gap-0.5"><User className="h-3 w-3 shrink-0" /><Bot className="h-3 w-3 shrink-0" /></span>,
       label: 'Cowork',
-      className: 'bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-700',
+      className: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-900/20 dark:text-teal-300 dark:border-teal-800',
     };
   } else if (executorType === 'agent') {
     if (mode === 'human-review') {
@@ -189,7 +187,6 @@ function ExecutorChip({ executorType, autonomyLevel, plugin, runtime }: {
         icon: (
           <span className="inline-flex items-center gap-0.5">
             <Bot className="h-3 w-3 shrink-0" />
-            <ChevronRight className="h-2.5 w-2.5 shrink-0 opacity-40" strokeWidth={1.5} />
             <span className="relative inline-flex shrink-0">
               <User className="h-3 w-3" />
               <Search className="absolute -bottom-0.5 -right-1.5 h-1.5 w-1.5" strokeWidth={2.5} />
@@ -197,15 +194,15 @@ function ExecutorChip({ executorType, autonomyLevel, plugin, runtime }: {
           </span>
         ),
         label: 'Human review',
-        className: 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700',
+        className: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/20 dark:text-indigo-300 dark:border-indigo-800',
       };
     } else if (mode === 'autonomous-agent') {
-      chip = { icon: <Bot className="h-3 w-3 shrink-0" />, label: 'Autonomous agent', className: 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700' };
+      chip = { icon: <Bot className="h-3 w-3 shrink-0" />, label: 'Autonomous agent', className: 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/20 dark:text-violet-300 dark:border-violet-800' };
     } else {
-      chip = { icon: <Bot className="h-3 w-3 shrink-0" />, label: CONTROL_MODE_LABELS[mode], className: 'bg-violet-100 text-violet-700 border-violet-300 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-700' };
+      chip = { icon: <Bot className="h-3 w-3 shrink-0" />, label: CONTROL_MODE_LABELS[mode], className: 'bg-lime-50 text-lime-700 border-lime-200 dark:bg-lime-950/20 dark:text-lime-300 dark:border-lime-800' };
     }
   } else {
-    chip = { icon: <User className="h-3 w-3 shrink-0" />, label: 'Human', className: slate };
+    chip = { icon: <User className="h-3 w-3 shrink-0" />, label: 'Human', className: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/20 dark:text-orange-300 dark:border-orange-800' };
   }
 
   return (

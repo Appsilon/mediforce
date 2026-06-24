@@ -77,8 +77,8 @@ const STEP_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
 
 function ExecutorIcon({ executor, autonomyLevel }: { executor: string; autonomyLevel?: string }) {
   const mode = getControlMode(executor, autonomyLevel);
-  if (executor === 'script') return <Terminal className="h-3.5 w-3.5 shrink-0 text-slate-500 dark:text-slate-400" />;
-  if (executor === 'action') return <Zap className="h-3.5 w-3.5 shrink-0 text-slate-500 dark:text-slate-400" />;
+  if (executor === 'script') return <Terminal className="h-3.5 w-3.5 shrink-0 text-yellow-500 dark:text-yellow-400" />;
+  if (executor === 'action') return <Zap className="h-3.5 w-3.5 shrink-0 text-pink-500 dark:text-pink-400" />;
   if (executor === 'cowork') return (
     <span className="inline-flex items-center gap-0.5">
       <User className="h-3.5 w-3.5 shrink-0 text-teal-500 dark:text-teal-400" />
@@ -88,18 +88,17 @@ function ExecutorIcon({ executor, autonomyLevel }: { executor: string; autonomyL
   if (executor === 'agent') {
     if (mode === 'human-review') return (
       <span className="inline-flex items-center gap-0.5">
-        <Bot className="h-3.5 w-3.5 shrink-0 text-amber-500 dark:text-amber-400" />
-        <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/40" strokeWidth={1.5} />
+        <Bot className="h-3.5 w-3.5 shrink-0 text-indigo-500 dark:text-indigo-400" />
         <span className="relative inline-flex shrink-0">
-          <User className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
-          <Search className="absolute -bottom-0.5 -right-1.5 h-2 w-2 text-amber-500 dark:text-amber-400" strokeWidth={2.5} />
+          <User className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" />
+          <Search className="absolute -bottom-0.5 -right-1.5 h-2 w-2 text-indigo-500 dark:text-indigo-400" strokeWidth={2.5} />
         </span>
       </span>
     );
-    if (mode === 'autonomous-agent') return <Bot className="h-3.5 w-3.5 shrink-0 text-emerald-500 dark:text-emerald-400" />;
-    return <Bot className="h-3.5 w-3.5 shrink-0 text-violet-500 dark:text-violet-400" />;
+    if (mode === 'autonomous-agent') return <Bot className="h-3.5 w-3.5 shrink-0 text-violet-500 dark:text-violet-400" />;
+    return <Bot className="h-3.5 w-3.5 shrink-0 text-lime-500 dark:text-lime-400" />;
   }
-  return <User className="h-3.5 w-3.5 shrink-0 text-slate-500 dark:text-slate-400" />;
+  return <User className="h-3.5 w-3.5 shrink-0 text-orange-500 dark:text-orange-400" />;
 }
 
 function getExecutorLabel(executor: string, mode: ControlMode): string {
@@ -844,26 +843,27 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
             {/* C0 */}
             <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
               <span className="w-14 shrink-0 flex items-center">
-                <User className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                <User className="h-4 w-4 text-orange-400 dark:text-orange-500" />
               </span>
               <div className="flex gap-1.5 shrink-0">
-                {(['human', 'script', 'action'] as const).map((sub) => {
-                  const SubIcon = sub === 'human' ? User : sub === 'script' ? Terminal : Zap;
-                  return (
-                    <button
-                      key={sub}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        popover.onAdd({ type: pendingType, executor: sub });
-                        setPopover(null);
-                      }}
-                      className="inline-flex items-center gap-1 rounded-md py-1 px-2.5 text-xs font-semibold border transition-all capitalize whitespace-nowrap hover:bg-slate-100 hover:text-slate-700 hover:border-slate-400 hover:ring-1 hover:ring-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 dark:hover:border-slate-500 dark:hover:ring-slate-500"
-                    >
-                      <SubIcon className="h-3 w-3 shrink-0" />
-                      {sub}
-                    </button>
-                  );
-                })}
+                <button
+                  onClick={(e) => { e.stopPropagation(); popover.onAdd({ type: pendingType, executor: 'human' }); setPopover(null); }}
+                  className="inline-flex items-center gap-1 rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap hover:bg-orange-50 hover:text-orange-700 hover:border-orange-400 hover:ring-1 hover:ring-orange-200 dark:hover:bg-orange-950/20 dark:hover:text-orange-300 dark:hover:border-orange-500 dark:hover:ring-orange-800"
+                >
+                  <User className="h-3 w-3 shrink-0" />Human
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); popover.onAdd({ type: pendingType, executor: 'script' }); setPopover(null); }}
+                  className="inline-flex items-center gap-1 rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-400 hover:ring-1 hover:ring-yellow-200 dark:hover:bg-yellow-950/20 dark:hover:text-yellow-300 dark:hover:border-yellow-500 dark:hover:ring-yellow-800"
+                >
+                  <Terminal className="h-3 w-3 shrink-0" />Script
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); popover.onAdd({ type: pendingType, executor: 'action' }); setPopover(null); }}
+                  className="inline-flex items-center gap-1 rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap hover:bg-pink-50 hover:text-pink-700 hover:border-pink-400 hover:ring-1 hover:ring-pink-200 dark:hover:bg-pink-950/20 dark:hover:text-pink-300 dark:hover:border-pink-500 dark:hover:ring-pink-800"
+                >
+                  <Zap className="h-3 w-3 shrink-0" />Action
+                </button>
               </div>
               <span className="text-[10px] text-muted-foreground whitespace-nowrap">No AI involved</span>
             </div>
@@ -871,11 +871,10 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
             {/* C1: Assist — disabled, coming soon */}
             <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5 opacity-50">
               <span className="w-14 shrink-0 flex items-center gap-0.5">
-                <User className="h-4 w-4 text-violet-400 shrink-0" />
-                <ChevronRight className="h-3 w-3 text-muted-foreground/50 shrink-0" strokeWidth={1.5} />
+                <User className="h-4 w-4 text-lime-500 dark:text-lime-400 shrink-0" />
                 <span className="relative inline-flex shrink-0">
-                  <Bot className="h-4 w-4 text-violet-400" />
-                  <Search className="absolute -bottom-0.5 -right-1.5 h-2.5 w-2.5 text-violet-400" strokeWidth={2.5} />
+                  <Bot className="h-4 w-4 text-lime-500 dark:text-lime-400" />
+                  <Search className="absolute -bottom-0.5 -right-1.5 h-2.5 w-2.5 text-lime-500 dark:text-lime-400" strokeWidth={2.5} />
                 </span>
               </span>
               <button disabled className="w-36 text-left rounded-md py-1 px-2.5 text-xs font-semibold border cursor-not-allowed whitespace-nowrap shrink-0">
@@ -896,7 +895,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
                   popover.onAdd({ type: pendingType, executor: 'cowork', cowork: { agent: 'chat' } });
                   setPopover(null);
                 }}
-                className="w-36 text-left rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap shrink-0 hover:bg-teal-100 hover:text-teal-700 hover:border-teal-300 hover:ring-1 hover:ring-teal-300 dark:hover:bg-teal-900/30 dark:hover:text-teal-300 dark:hover:border-teal-700 dark:hover:ring-teal-700"
+                className="w-36 text-left rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap shrink-0 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-400 hover:ring-1 hover:ring-teal-200 dark:hover:bg-teal-900/20 dark:hover:text-teal-300 dark:hover:border-teal-600 dark:hover:ring-teal-800"
               >
                 Cowork
               </button>
@@ -906,11 +905,10 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
             {/* C3: Human review */}
             <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
               <span className="w-14 shrink-0 flex items-center gap-0.5">
-                <Bot className="h-4 w-4 text-amber-500 dark:text-amber-400 shrink-0" />
-                <ChevronRight className="h-3 w-3 text-muted-foreground/50 shrink-0" strokeWidth={1.5} />
+                <Bot className="h-4 w-4 text-indigo-500 dark:text-indigo-400 shrink-0" />
                 <span className="relative inline-flex shrink-0">
-                  <User className="h-4 w-4 text-amber-500 dark:text-amber-400" />
-                  <Search className="absolute -bottom-0.5 -right-1.5 h-2.5 w-2.5 text-amber-500 dark:text-amber-400" strokeWidth={2.5} />
+                  <User className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />
+                  <Search className="absolute -bottom-0.5 -right-1.5 h-2.5 w-2.5 text-indigo-500 dark:text-indigo-400" strokeWidth={2.5} />
                 </span>
               </span>
               <button
@@ -919,7 +917,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
                   popover.onAdd({ type: pendingType, executor: 'agent', autonomyLevel: 'L3' });
                   setPopover(null);
                 }}
-                className="w-36 text-left rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap shrink-0 hover:bg-amber-100 hover:text-amber-700 hover:border-amber-300 hover:ring-1 hover:ring-amber-300 dark:hover:bg-amber-900/30 dark:hover:text-amber-300 dark:hover:border-amber-700 dark:hover:ring-amber-700"
+                className="w-36 text-left rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap shrink-0 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-400 hover:ring-1 hover:ring-indigo-200 dark:hover:bg-indigo-950/20 dark:hover:text-indigo-300 dark:hover:border-indigo-500 dark:hover:ring-indigo-800"
               >
                 Human review
               </button>
@@ -929,7 +927,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
             {/* C4: Autonomous agent */}
             <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
               <span className="w-14 shrink-0 flex items-center">
-                <Bot className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
+                <Bot className="h-4 w-4 text-violet-500 dark:text-violet-400" />
               </span>
               <button
                 onClick={(e) => {
@@ -937,7 +935,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
                   popover.onAdd({ type: pendingType, executor: 'agent', autonomyLevel: 'L4' });
                   setPopover(null);
                 }}
-                className="w-36 text-left rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap shrink-0 hover:bg-emerald-100 hover:text-emerald-700 hover:border-emerald-300 hover:ring-1 hover:ring-emerald-300 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-300 dark:hover:border-emerald-700 dark:hover:ring-emerald-700"
+                className="w-36 text-left rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap shrink-0 hover:bg-violet-50 hover:text-violet-700 hover:border-violet-400 hover:ring-1 hover:ring-violet-200 dark:hover:bg-violet-950/20 dark:hover:text-violet-300 dark:hover:border-violet-500 dark:hover:ring-violet-800"
               >
                 Autonomous agent
               </button>
