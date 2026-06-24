@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useCallback, useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ReactFlow,
@@ -17,7 +17,7 @@ import {
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { User, Bot, Terminal, Trash2, Plus, PenLine, Search, GitBranch, ArrowUp, ArrowDown, ChevronRight, ChevronDown, AlertTriangle, Zap, Eye, EyeOff } from 'lucide-react';
+import { User, Bot, Terminal, Trash2, Plus, PenLine, Search, GitBranch, ArrowUp, ArrowDown, ArrowRight, ChevronRight, ChevronDown, AlertTriangle, Zap, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import {
@@ -141,6 +141,17 @@ const ROW_GAP = 58;
 const HANDLE_CLASS = '!bg-transparent !border-0 !w-px !h-px';
 
 function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
+  // Measure the actual offsetTop of the branch section so the right-out handle
+  // is anchored to the visual center of the revise row, not a pixel estimate.
+  const branchSectionRef = useRef<HTMLDivElement>(null);
+  const [branchSectionTop, setBranchSectionTop] = useState(NODE_INNER_HEIGHT);
+  useLayoutEffect(() => {
+    if (branchSectionRef.current) {
+      const top = branchSectionRef.current.offsetTop;
+      if (top !== branchSectionTop) setBranchSectionTop(top);
+    }
+  });
+
   const isTerminal = data.stepType === 'terminal';
 
   if (isTerminal) {
@@ -166,11 +177,17 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   const typeConfig = STEP_TYPE_CONFIG[data.stepType] ?? STEP_TYPE_CONFIG.creation;
   const mode = getControlMode(data.executor, data.autonomyLevel);
 
+  const firstBackEdgeIdx = data.branches?.findIndex((b) => b.isBackEdge) ?? -1;
+  // branchSectionTop is measured via ref; firstBackEdgeIdx is always 0 (revise rows come first)
+  const rightOutTop = firstBackEdgeIdx >= 0
+    ? branchSectionTop + firstBackEdgeIdx * BRANCH_ROW_HEIGHT + BRANCH_ROW_HEIGHT / 2
+    : undefined;
+
   return (
     <>
       <Handle id="top" type="target" position={Position.Top} className={HANDLE_CLASS} />
       <Handle id="bottom" type="source" position={Position.Bottom} className={HANDLE_CLASS} />
-      <Handle id="right-out" type="source" position={Position.Right} className={HANDLE_CLASS} />
+      <Handle id="right-out" type="source" position={Position.Right} className={HANDLE_CLASS} style={rightOutTop !== undefined ? { top: rightOutTop } : undefined} />
       <Handle id="right-in" type="target" position={Position.Right} className={HANDLE_CLASS} />
 
       <div
@@ -255,7 +272,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
         )}
 
         {data.branches && data.branches.length > 0 && (
-          <div className="-mx-4 mt-3 border-t border-border/40">
+          <div ref={branchSectionRef} className="-mx-4 mt-3 border-t border-border/40">
             {data.branches.map((branch, i) => (
               <button
                 key={branch.branchIdx}
@@ -266,22 +283,18 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
                   'w-full flex items-center gap-2 px-4 text-left text-[11px] transition-all',
                   i < data.branches!.length - 1 && 'border-b border-border/20',
                   branch.isActive
-                    ? 'bg-green-100/80 text-green-700 font-semibold dark:bg-green-900/30 dark:text-green-300 cursor-default'
+                    ? 'bg-blue-100/80 text-blue-700 font-semibold dark:bg-blue-900/30 dark:text-blue-300 cursor-default'
                     : branch.isBackEdge
                     ? 'bg-slate-50/60 text-slate-500 dark:bg-slate-800/30 dark:text-slate-400 cursor-default'
                     : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer',
                 )}
               >
-                {branch.isActive
-                  ? <Eye className="h-3 w-3 shrink-0 text-green-500 dark:text-green-400" />
-                  : <EyeOff className="h-3 w-3 shrink-0 text-slate-400 dark:text-slate-500" />
-                }
                 <span className="truncate flex-1">{branch.label}</span>
                 {branch.isBackEdge
-                  ? <ArrowUp className="h-3 w-3 shrink-0 text-slate-400 dark:text-slate-500" />
+                  ? <ArrowRight className="h-3 w-3 shrink-0 text-amber-500 dark:text-amber-400" />
                   : branch.isActive
-                  ? <ChevronDown className="h-3 w-3 shrink-0 text-green-500 dark:text-green-400" />
-                  : <ChevronRight className="h-3 w-3 shrink-0 text-slate-300 dark:text-slate-600" />
+                  ? <Eye className="h-3 w-3 shrink-0 text-blue-500 dark:text-blue-400" />
+                  : <EyeOff className="h-3 w-3 shrink-0 text-slate-400 dark:text-slate-500" />
                 }
               </button>
             ))}
@@ -500,21 +513,24 @@ function buildLayout(
 
       const branches: BranchInfo[] = [];
 
+      // Back-edge (revise) branches displayed first so the right-out handle
+      // and the orange arc always originate from the top branch row.
+      for (let bi = 0; bi < backOuts.length; bi++) {
+        const { to, label } = backOuts[bi];
+        const backTargetName = to ? stepMap.get(to)?.name : undefined;
+        branches.push({ branchIdx: forwardOuts.length + bi, label: shortenCondition(label) ?? `Revise`, isActive: false, isBackEdge: true, backTargetName });
+        if (to) decisionStepToBackTarget.push({ stepId: current, targetStepId: to });
+      }
+
       for (let fi = 0; fi < forwardOuts.length; fi++) {
         const { to, label } = forwardOuts[fi];
         const isActive = fi === expandedIdx;
+        // branchIdx stays as the forwardOuts index so expandedBranches state is unaffected
         branches.push({ branchIdx: fi, label: shortenCondition(label) ?? `Branch ${fi + 1}`, isActive, isBackEdge: false });
         if (isActive) {
           if (to) decisionStepToNextStep.push({ stepId: current, nextStepId: to });
           if (to && !visited.has(to)) { visited.add(to); bfsQueue.push(to); }
         }
-      }
-
-      for (let bi = 0; bi < backOuts.length; bi++) {
-        const { to, label } = backOuts[bi];
-        const backTargetName = to ? stepMap.get(to)?.name : undefined;
-        branches.push({ branchIdx: forwardOuts.length + bi, label: shortenCondition(label) ?? `Back ${bi + 1}`, isActive: false, isBackEdge: true, backTargetName });
-        if (to) decisionStepToBackTarget.push({ stepId: current, targetStepId: to });
       }
 
       layoutItems.push({ kind: 'step', stepId: current, branches });
