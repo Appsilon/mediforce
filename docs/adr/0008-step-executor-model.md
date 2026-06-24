@@ -1,5 +1,7 @@
 # ADR-0008: Step Executor Model — Separating Agent from Script Execution
 
+> **Note:** The executor model described here is unchanged. The UI now uses **Control Modes** (0–4) as the user-facing abstraction over `executor` + `autonomyLevel`. See [AUTONOMY-LEVELS-REFACTOR.md](../design/AUTONOMY-LEVELS-REFACTOR.md).
+
 **Status:** Accepted  
 **Date:** 2026-06-11  
 **Deciders:** Filip Stachura  

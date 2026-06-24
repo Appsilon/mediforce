@@ -13,6 +13,7 @@ import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
+import { CONTROL_MODE_LABELS, getControlMode } from '@/lib/control-mode';
 
 interface NextStepCardProps {
   processInstanceId: string;
@@ -100,6 +101,7 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
   const nextStep = definition?.steps.find((s) => s.id === nextStepId) as WorkflowStep | undefined;
   const isTerminal = nextStep?.type === 'terminal';
   const executorType = nextStep?.executor ?? null;
+  const autonomyLevel = nextStep?.autonomyLevel ?? null;
   const processCompleted = instance?.status === 'completed';
 
   const runHref = instance
@@ -137,6 +139,7 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
               <p className="text-xs text-muted-foreground mt-0.5">
                 <StepDescription
                   executorType={executorType}
+                  autonomyLevel={autonomyLevel}
                   nextHumanTask={nextHumanTask}
                   reason={stepExecution.gateResult?.reason}
                 />
@@ -190,17 +193,20 @@ function StepIcon({
 
 function StepDescription({
   executorType,
+  autonomyLevel,
   nextHumanTask,
   reason,
 }: {
   executorType: string | null;
+  autonomyLevel: string | null;
   nextHumanTask: HumanTask | null;
   reason: string | undefined;
 }) {
   const parts: string[] = [];
 
-  if (executorType === 'agent') {
-    parts.push('Running via agent');
+  if (executorType === 'agent' || executorType === 'cowork') {
+    const mode = getControlMode(executorType ?? undefined, autonomyLevel);
+    parts.push(CONTROL_MODE_LABELS[mode]);
   } else if (nextHumanTask) {
     const roleLabel = nextHumanTask.assignedRole;
     if (nextHumanTask.status === 'completed') {

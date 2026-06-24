@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText, FileCode, Paperclip } from 'lucide-react';
 import type { ProcessInstance, StepExecution, Step, HumanTask } from '@mediforce/platform-core';
 import type { RunOutputFileEntry } from '@mediforce/platform-api/contract';
-import { AutonomyBadge } from '../agents/autonomy-badge';
+import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { RetryStepButton } from './retry-step-button';
 import { OutputFileRow } from './run-output-files-panel';
 import { cn } from '@/lib/utils';
@@ -245,7 +245,7 @@ function ExecutedBy({ executedBy = '', executorType, plugin, autonomyLevel, runt
       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
         <Bot className="h-3 w-3 shrink-0" />
         <span>{agentLabel}</span>
-        {autonomyLevel && <AutonomyBadge level={autonomyLevel} />}
+        <ControlModeBadge executor="agent" autonomyLevel={autonomyLevel} />
       </span>
     );
   }
@@ -570,7 +570,7 @@ export function StepStatusPanel({
                     />
                   )}
                   {stepConfig?.executorType === 'agent' && stepConfig.autonomyLevel && (
-                    <AutonomyBadge level={stepConfig.autonomyLevel} />
+                    <ControlModeBadge executor="agent" autonomyLevel={stepConfig.autonomyLevel} />
                   )}
                   <StatusLabel status={status} />
                   {stepOutputFiles.length > 0 && (

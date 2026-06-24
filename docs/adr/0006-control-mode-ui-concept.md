@@ -1,5 +1,7 @@
 # 0006 — Control mode is a UI concept
 
+> **Status: Implemented.** The control mode UI concept described here is now live. See the implementation design: [AUTONOMY-LEVELS-REFACTOR.md](../design/AUTONOMY-LEVELS-REFACTOR.md).
+
 - **Status:** Accepted
 - **Date:** 2026-05-27
 - **Author:** Paweł Przytuła (@przytu1)
@@ -29,13 +31,17 @@ definition schema. The underlying schema fields are unchanged.
 
 ### Mapping table
 
-| Control mode | Label | `executor` | `autonomyLevel` |
-|---|---|---|---|
-| 0 | No agent | `human` OR `script` OR `action` | — |
-| 1 | Ghost | `agent` | `L2` |
-| 2 | Cowork | `cowork` | — |
-| 3 | Human review | `agent` | `L3` |
-| 4 | Full autonomy | `agent` | `L4` |
+C-levels (C0–C4) are the UI labels shown in the step picker. They are a presentational axis only and are unrelated to the `autonomyLevel` L0–L4 schema field.
+
+| C-level | Label | `executor` | `autonomyLevel` | Wizard |
+|---|---|---|---|---|
+| C0 | No agent | `human` OR `script` OR `action` | — | Enabled |
+| C1 | Assist | — | — | **Disabled (coming soon)** |
+| C2 | Cowork | `cowork` | — | Enabled |
+| C3 | Human review | `agent` | `L3` | Enabled |
+| C4 | Autonomous agent | `agent` | `L4` | Enabled |
+
+`executor: 'agent', autonomyLevel: 'L2'` is retained in the schema for backward compat; it maps to the 'assist' control mode for display of existing steps only. No new L2 steps can be created from the wizard.
 
 The mapping is 1:1 and deterministic in both directions. The wizard reads
 stored values → derives the active control mode; on save it maps the selected
@@ -84,3 +90,5 @@ dual-write.
 - The mapping table in this ADR is the single source of truth for the
   control-mode ↔ schema-fields correspondence. Any change to the mapping
   requires amending this ADR.
+- "Full autonomy" was renamed to "Autonomous agent" (C4) in June 2026.
+  Schema value `L4` is unchanged. See AUTONOMY-LEVELS-REFACTOR.md.

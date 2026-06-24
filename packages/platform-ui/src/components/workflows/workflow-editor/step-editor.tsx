@@ -7,11 +7,12 @@ import { usePlugins } from '@/hooks/use-plugins';
 import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
+import { getControlMode, CONTROL_MODE_LABELS } from '@/lib/control-mode';
 import type { WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import {
-  AUTONOMY_LEVELS,
+  AGENT_CONTROL_MODES,
   STEP_TYPE_LABELS,
   FALLBACK_OPTIONS,
   RUNTIME_OPTIONS,
@@ -107,7 +108,7 @@ const TIP = {
   type:                    'Structural role in the workflow: creation, review, decision, or terminal. Fixed at step creation.',
   executor:                'Who performs this step: human, agent, script, cowork, or action. Fixed at step creation.',
 
-  autonomyLevel:           'How much authority the agent has. L0 = human-only, L2 = human approves output, L4 = fully autonomous.',
+  autonomyLevel:           'Assist: agent runs and produces a draft; human approves. Human review: explicit human approval required. Autonomous agent: agent executes without review. L0/L1 are developer-only flags set via raw YAML.',
   plugin:                  'Agent plugin to invoke (e.g. opencode-agent, claude-code-agent). Must be registered in the platform.',
   pluginScript:            'Plugin that runs the script (usually script-container). Must be registered in the platform.',
   agentId:                 'Slug of a saved agent definition. Loads its base model, skills, and MCP server bindings for this step.',
@@ -289,6 +290,13 @@ export function StepEditor({
   return (
     <div className="space-y-4" data-testid="step-editor">
 
+      {/* ── Review deprecation warning ───────────────────────────── */}
+      {step.type === 'review' && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          <strong>Review steps are deprecated.</strong> They will be replaced by Decision steps — where a human explicitly decides if the previous work is satisfactory. You can continue using this step; it will keep working. To migrate, replace it with a Decision step.
+        </div>
+      )}
+
       {/* ── Step type header ─────────────────────────────────────── */}
       <div className="flex items-center gap-3 pb-3 border-b border-border/40">
         <div className={cn('flex items-center justify-center h-9 w-9 rounded-lg shrink-0', execStyle.bg)}>
@@ -300,7 +308,7 @@ export function StepEditor({
             <TypeIcon className={cn('h-3 w-3 shrink-0', typeStyle.color)} strokeWidth={1.5} />
             <span className="text-[10px] text-muted-foreground">{typeStyle.label}</span>
             <span className="text-[10px] text-muted-foreground/30">·</span>
-            <span className="text-[10px] text-muted-foreground">{execStyle.label}</span>
+            <span className="text-[10px] text-muted-foreground">{CONTROL_MODE_LABELS[getControlMode(step.executor, step.autonomyLevel)]}</span>
           </div>
         </div>
       </div>
@@ -343,13 +351,10 @@ export function StepEditor({
           </span>
         </FieldRow>
 
-        <FieldRow label="executor" tooltip={TIP.executor}>
-          <span
-            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5"
-            title="Executor is set at creation. To change, remove this step and add a new one."
-          >
+        <FieldRow label="control mode" tooltip="The control mode determines how much autonomy the agent has. Set at step creation — to change, remove this step and add a new one.">
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5" title="Control mode is set at step creation. To change, remove this step and add a new one.">
             <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-            {step.executor}
+            {CONTROL_MODE_LABELS[getControlMode(step.executor, step.autonomyLevel)]}
           </span>
         </FieldRow>
       </FieldGroup>
@@ -357,14 +362,15 @@ export function StepEditor({
       {/* ── Agent config ─────────────────────────────────────────── */}
       {isAgent && (<>
         <FieldGroup>
-          <FieldRow label="autonomyLevel" tooltip={TIP.autonomyLevel}>
+          <FieldRow label="autonomy level" tooltip="Assist: agent draft, human approves. Human review: explicit approval required. Autonomous agent: executes without review.">
             <select
-              value={step.autonomyLevel ?? ''}
+              value={step.autonomyLevel ?? 'L2'}
               onChange={(e) => onChange({ autonomyLevel: (e.target.value || undefined) as WorkflowStep['autonomyLevel'] })}
               className={rs}
             >
-              <option value="">Default</option>
-              {AUTONOMY_LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+              {AGENT_CONTROL_MODES.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
             </select>
           </FieldRow>
 

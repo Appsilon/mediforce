@@ -13,6 +13,7 @@ import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
 import { WorkflowStepSchema, TransitionSchema } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
+import type { NewStepPayload } from '@/lib/control-mode';
 import { StepEditor } from './workflow-editor/step-editor';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
 import { computeMoveEligibility, ensureTerminalConnected } from './workflow-editor-utils';
@@ -300,11 +301,8 @@ export function WorkflowEditorCanvas({
     }
   }, []);
 
-  const addStep = useCallback((type: WorkflowStep['type'], executor: WorkflowStep['executor'], insertAfterId: string | null = null) => {
+  const addStep = useCallback((payload: NewStepPayload, insertAfterId: string | null = null) => {
     const terminalStep = editedSteps.find((s) => s.type === 'terminal');
-
-    // Only one terminal allowed
-    if (type === 'terminal' && terminalStep) return;
 
     saveSnapshot();
     const stepNum = editedSteps.length + 1;
@@ -312,19 +310,22 @@ export function WorkflowEditorCanvas({
     const newStep: WorkflowStep = {
       id: newId,
       name: `New Step ${stepNum}`,
-      type,
-      executor,
-      ...(executor === 'agent' ? { plugin: 'opencode-agent', autonomyLevel: 'L2' } : {}),
-      ...(executor === 'script' ? { plugin: 'script-container' } : {}),
-      ...(executor === 'cowork' ? { cowork: { agent: 'chat' as const } } : {}),
+      type: payload.type,
+      executor: payload.executor as WorkflowStep['executor'],
+      ...(payload.autonomyLevel ? { autonomyLevel: payload.autonomyLevel as WorkflowStep['autonomyLevel'] } : {}),
+      ...(payload.agentId ? { agentId: payload.agentId } : {}),
+      ...(payload.executor === 'agent' && !payload.autonomyLevel ? { plugin: 'opencode-agent', autonomyLevel: 'L2' } : {}),
+      ...(payload.executor === 'agent' && payload.autonomyLevel ? { plugin: 'opencode-agent' } : {}),
+      ...(payload.executor === 'script' ? { plugin: 'script-container' } : {}),
+      ...(payload.executor === 'cowork' ? { cowork: payload.cowork ?? { agent: 'chat' as const } } : {}),
     };
 
     // When inserting via an edge button, insertAfterId is set explicitly.
     // Otherwise fall back to the currently selected step.
     const resolvedInsertAfterId = insertAfterId ?? selectedStepId;
 
-    if (!terminalStep || type === 'terminal') {
-      // No terminal yet (or we're adding the terminal itself): append at end
+    if (!terminalStep) {
+      // No terminal yet: append at end
       const lastId = editedSteps[editedSteps.length - 1]?.id;
       setEditedSteps((prev) => [...prev, newStep]);
       setEditedTransitions((prev) => lastId ? [...prev, { from: lastId, to: newId }] : prev);
@@ -575,7 +576,7 @@ export function WorkflowEditorCanvas({
             onNodeDelete={removeStep}
             onNodeMoveUp={(stepId) => moveStep(stepId, 'up')}
             onNodeMoveDown={(stepId) => moveStep(stepId, 'down')}
-            onEdgeAdd={(fromStepId, type, executor) => addStep(type, executor, fromStepId)}
+            onEdgeAdd={(fromStepId, payload) => addStep(payload, fromStepId)}
             onPaneClick={() => { setSelectedStepId(null); setRightPanelView('yaml'); }}
             selectedStepId={selectedStepId}
             errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}

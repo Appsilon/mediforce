@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Changed
+- Workflow step labels now use control mode terminology (No agent / Assist / Cowork / Human review / Autonomous agent) instead of raw executor/autonomy-level values across all views — the workflow designer's step-add popover shows two simultaneous sections (step type + C-level executor picker with C0–C4 grouping), read-only badges, agent run tables, step status panel, and the step editor panel all reflect the new language; schema fields (`executor`, `autonomyLevel`) are unchanged and existing workflows are unaffected. "Full autonomy" is renamed to "Autonomous agent" throughout.
+
 ### Added
 - Docker image validation at workflow registration — server warns when a referenced image is not found on the platform, CLI deduplicates server vs local warnings, and the workflow editor shows an amber toast on save [#734](https://github.com/Appsilon/mediforce/pull/734).
 - SMTP email provider as alternative to Mailgun — organisations can now use their own SMTP infrastructure instead of Mailgun by setting `SMTP_*` env vars; `EMAIL_PROVIDER` auto-detects or can be set explicitly; includes read-only admin status page, `mediforce email status` CLI command, and bootstrap script prompts for initial setup [#748](https://github.com/Appsilon/mediforce/issues/748).
