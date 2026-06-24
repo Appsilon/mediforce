@@ -8,6 +8,11 @@
     "remote": "Appsilon/mediforce-landing-zone-study-demo",
     "remoteAuth": "GITHUB_TOKEN"
   },
+  "repo": {
+    "url": "https://github.com/Appsilon/mediforce",
+    "commit": "f3949a69",
+    "auth": "GITHUB_TOKEN"
+  },
   "env": {
     "STUDY_ID": "CDISCPILOT01",
     "SFTP_HOST": "{{SFTP_HOST_CDISCPILOT01}}",
