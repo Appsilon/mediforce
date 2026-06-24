@@ -23,9 +23,16 @@ export const systemCreditsCommand = defineCommand({
 
     output.stdout(`OpenRouter credits for namespace "${args.namespace}":\n`);
     printKv(output, [
-      ['Remaining', `$${data.remaining.toFixed(2)}`],
-      ['Used', `$${data.usage.toFixed(2)}`],
-      ['Limit', `$${data.limit.toFixed(2)}`],
+      ['Effective remaining', `$${data.effectiveRemaining.toFixed(2)}`],
+      ['Key limit remaining', `$${data.remaining.toFixed(2)}`],
+      [
+        'Account credits remaining',
+        data.accountRemaining === undefined
+          ? 'unavailable'
+          : `$${data.accountRemaining.toFixed(2)}`,
+      ],
+      ['Key used', `$${data.usage.toFixed(2)}`],
+      ['Key limit', `$${data.limit.toFixed(2)}`],
     ]);
     return 0;
   },

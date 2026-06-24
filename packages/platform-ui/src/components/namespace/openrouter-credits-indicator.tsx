@@ -56,8 +56,12 @@ export function OpenRouterCreditsIndicator({ handle }: OpenRouterCreditsIndicato
 
   if (loading || !credits?.available) return null;
 
-  const isLow = !hidden && credits.remaining <= LOW_CREDITS_THRESHOLD;
-  const isExhausted = !hidden && credits.remaining <= 0;
+  const isLow = !hidden && credits.effectiveRemaining <= LOW_CREDITS_THRESHOLD;
+  const isExhausted = !hidden && credits.effectiveRemaining <= 0;
+  const accountPart =
+    credits.accountRemaining === undefined
+      ? null
+      : ` / $${credits.accountRemaining.toFixed(2)} credits`;
 
   return (
     <div
@@ -89,13 +93,11 @@ export function OpenRouterCreditsIndicator({ handle }: OpenRouterCreditsIndicato
                     : 'text-foreground',
               )}
             >
-              ${credits.remaining.toFixed(2)}
+              ${credits.effectiveRemaining.toFixed(2)}
             </span>
-            {isLow && (
-              <span className="text-xs text-muted-foreground">
-                / ${credits.limit.toFixed(2)}
-              </span>
-            )}
+            <span className="text-xs text-muted-foreground">
+              (${credits.remaining.toFixed(2)} key limit{accountPart})
+            </span>
           </>
         )}
       </div>
