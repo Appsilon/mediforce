@@ -45,7 +45,7 @@ firestore-debug.log
 playwright-report/
 test-results/
 blob-report/
-
+.pnpm-store/
 coverage/
 .vercel
 packages/platform-ui/.emulator-data

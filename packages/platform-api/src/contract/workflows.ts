@@ -66,9 +66,9 @@ export const ValidateWorkflowOutputSchema = z.object({
 /**
  * Contract for `GET /api/workflow-definitions/schema` — the live JSON Schema of
  * the authorable WorkflowDefinition surface, derived from the running server's
- * Zod schema. Consumers (the workflow-designer `fetch-schema` step, the
- * `mediforce workflow schema` CLI) get the schema currently in force on the
- * machine they are connected to, so it never needs re-seeding when the schema
+ * Zod schema. This endpoint and the cowork runtime schema resolver both share
+ * the same platform-core helper, so clients get the schema currently in force
+ * on the machine they are connected to without re-seeding when the schema
  * changes. `schema` is an opaque JSON Schema object.
  */
 export const GetWorkflowSchemaInputSchema = z.object({});

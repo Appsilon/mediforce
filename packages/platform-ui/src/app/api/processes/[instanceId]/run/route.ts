@@ -4,6 +4,7 @@ import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { checkRetiredModels } from '@mediforce/platform-api/handlers';
+import { resolveCoworkOutputSchema } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -366,7 +367,7 @@ export async function POST(
               agent: agentType,
               model,
               systemPrompt: currentStep.cowork?.systemPrompt ?? null,
-              outputSchema: currentStep.cowork?.outputSchema ?? null,
+              outputSchema: resolveCoworkOutputSchema(currentStep.cowork),
               voiceConfig,
               artifact: null,
               validationResult: null,

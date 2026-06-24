@@ -218,6 +218,7 @@ export const WorkflowCoworkConfigSchema = z.object({
   agent: z.enum(['chat', 'voice-realtime']),
   systemPrompt: z.string().optional(),
   outputSchema: z.record(z.string(), z.unknown()).optional(),
+  outputSchemaRef: z.enum(['workflow-definition-authorable']).optional(),
   chat: CoworkChatConfigSchema.optional(),
   voiceRealtime: CoworkVoiceRealtimeConfigSchema.optional(),
   /** @deprecated Step-level MCP configuration is being removed.
@@ -651,6 +652,31 @@ export const WorkflowDefinitionBaseSchema = z.object({
   inputForNextRun: z.array(InputForNextRunEntrySchema).optional(),
   triggerInput: z.array(TriggerInputFieldSchema).optional(),
 });
+
+export const WorkflowAuthorableSchema = WorkflowDefinitionBaseSchema.omit({
+  namespace: true,
+  version: true,
+  createdAt: true,
+});
+
+export function getWorkflowAuthorableJsonSchema(): Record<string, unknown> {
+  return z.toJSONSchema(WorkflowAuthorableSchema, { io: 'input' }) as Record<string, unknown>;
+}
+
+export function resolveCoworkOutputSchema(
+  cowork: WorkflowCoworkConfig | undefined,
+): Record<string, unknown> | null {
+  if (!cowork) return null;
+  if (cowork.outputSchema) return cowork.outputSchema;
+
+  if (cowork.outputSchemaRef === undefined) return null;
+  if (cowork.outputSchemaRef === 'workflow-definition-authorable') {
+    return getWorkflowAuthorableJsonSchema();
+  }
+
+  const _exhaustive: never = cowork.outputSchemaRef;
+  return _exhaustive;
+}
 
 export const WorkflowDefinitionSchema = WorkflowDefinitionBaseSchema.superRefine(
   (wd, ctx) => {

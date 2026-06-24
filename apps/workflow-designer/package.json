@@ -4,14 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run",
-    "sync-schema": "tsx scripts/sync-output-schema.ts"
+    "test": "vitest run"
   },
   "dependencies": {
-    "@mediforce/platform-core": "workspace:*",
-    "zod": "^4.0.0"
-  },
-  "devDependencies": {
-    "tsx": "^4.22.4"
+    "@mediforce/platform-core": "workspace:*"
   }
 }

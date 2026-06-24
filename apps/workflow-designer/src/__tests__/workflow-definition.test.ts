@@ -6,9 +6,9 @@ import { WorkflowDefinitionSchema } from '@mediforce/platform-core';
 describe('workflow-designer', () => {
   const appDir = resolve(import.meta.dirname, '../..');
 
-  function loadDefinition() {
+  function loadDefinition(file = 'workflow-designer.wd.json') {
     const raw = JSON.parse(
-      readFileSync(resolve(appDir, 'src/workflow-designer.wd.json'), 'utf8'),
+      readFileSync(resolve(appDir, 'src', file), 'utf8'),
     );
     return WorkflowDefinitionSchema.safeParse({ ...raw, version: 1 });
   }
@@ -21,23 +21,22 @@ describe('workflow-designer', () => {
       if (!result.success) return;
 
       expect(result.data.name).toBe('workflow-designer');
-      expect(result.data.steps).toHaveLength(8);
-      expect(result.data.transitions).toHaveLength(8);
+      expect(result.data.steps).toHaveLength(7);
+      expect(result.data.transitions).toHaveLength(7);
       expect(result.data.triggers).toHaveLength(1);
     });
 
-    it('fetches the live schema before designing', () => {
+    it('resolves the live schema when the design session is created', () => {
       const result = loadDefinition();
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      // The first step must fetch the schema so the design step works against
-      // the live schema rather than a baked snapshot.
-      expect(result.data.steps[0].id).toBe('fetch-schema');
-      expect(result.data.steps[0].executor).toBe('script');
+      const designStep = result.data.steps.find(step => step.id === 'design');
+      expect(designStep?.cowork?.outputSchemaRef).toBe('workflow-definition-authorable');
+      expect(designStep?.cowork?.outputSchema).toBeUndefined();
       expect(
-        result.data.transitions.some(t => t.from === 'fetch-schema' && t.to === 'choose-mode'),
-      ).toBe(true);
+        result.data.transitions.some(t => t.from === 'fetch-schema' || t.to === 'fetch-schema'),
+      ).toBe(false);
     });
 
     it('has exactly one terminal step', () => {
@@ -105,7 +104,7 @@ describe('workflow-designer', () => {
       }
     });
 
-    it('has a cowork design step with outputSchema', () => {
+    it('has a cowork design step with a runtime output schema ref', () => {
       const result = loadDefinition();
       expect(result.success).toBe(true);
       if (!result.success) return;
@@ -114,9 +113,8 @@ describe('workflow-designer', () => {
       expect(coworkSteps).toHaveLength(1);
       expect(coworkSteps[0].id).toBe('design');
       expect(coworkSteps[0].cowork).toBeDefined();
-      // No baked outputSchema — the design step receives the live schema from
-      // the fetch-schema step output instead.
       expect(coworkSteps[0].cowork?.outputSchema).toBeUndefined();
+      expect(coworkSteps[0].cowork?.outputSchemaRef).toBe('workflow-definition-authorable');
       expect(coworkSteps[0].cowork?.systemPrompt).toBeDefined();
     });
 
@@ -130,6 +128,18 @@ describe('workflow-designer', () => {
 
       const targets = transitions.map(t => t.to).sort();
       expect(targets).toEqual(['design', 'fetch-workflows']);
+    });
+  });
+
+  describe('voice-workflow-designer.wd.json', () => {
+    it('uses the runtime workflow schema ref instead of a baked output schema', () => {
+      const result = loadDefinition('voice-workflow-designer.wd.json');
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      const designStep = result.data.steps.find(step => step.id === 'design');
+      expect(designStep?.cowork?.outputSchema).toBeUndefined();
+      expect(designStep?.cowork?.outputSchemaRef).toBe('workflow-definition-authorable');
     });
   });
 });

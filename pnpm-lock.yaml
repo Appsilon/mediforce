@@ -115,13 +115,6 @@ importers:
       '@mediforce/platform-core':
         specifier: workspace:*
         version: link:../../packages/platform-core
-      zod:
-        specifier: ^4.0.0
-        version: 4.4.3
-    devDependencies:
-      tsx:
-        specifier: ^4.22.4
-        version: 4.22.4
 
   packages/agent-runtime:
     dependencies:

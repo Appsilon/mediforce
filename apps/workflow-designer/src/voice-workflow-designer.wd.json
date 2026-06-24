@@ -25,84 +25,14 @@
       "cowork": {
         "agent": "voice-realtime",
         "systemPrompt": "You are an expert Mediforce workflow designer. Help the user design a workflow through voice conversation.\n\nYour goal: understand what the user wants to build by asking questions and proposing ideas.\n\nApproach:\n1. Ask what the workflow should accomplish\n2. Propose steps and get feedback\n3. Ask about executors (human, agent, script), review loops, triggers\n4. Confirm the design before the user finalizes\n\nKeep responses concise and conversational — you're speaking, not writing.\nAsk one question at a time. Don't overwhelm with options.\n\nIf a previous validation failed (the context shows a validate step that did not pass), don't start over: walk through the reported errors one at a time, fix the workflow you designed before, and confirm each fix with the user before finalizing.",
-        "outputSchema": {
-          "type": "object",
-          "required": [
-            "name",
-            "steps",
-            "transitions",
-            "triggers"
-          ],
-          "properties": {
-            "name": {
-              "type": "string"
-            },
-            "visibility": {
-              "type": "string"
-            },
-            "title": {
-              "type": "string"
-            },
-            "description": {
-              "type": "string"
-            },
-            "preamble": {
-              "type": "string"
-            },
-            "externalSkillsRepo": {
-              "type": "object"
-            },
-            "url": {
-              "type": "string"
-            },
-            "roles": {
-              "type": "array"
-            },
-            "env": {
-              "type": "object"
-            },
-            "notifications": {
-              "type": "array"
-            },
-            "workspace": {
-              "type": "object"
-            },
-            "steps": {
-              "type": "array"
-            },
-            "transitions": {
-              "type": "array"
-            },
-            "triggers": {
-              "type": "array"
-            },
-            "metadata": {
-              "type": "object"
-            },
-            "copiedFrom": {
-              "type": "object"
-            },
-            "archived": {
-              "type": "boolean"
-            },
-            "deleted": {
-              "type": "boolean"
-            },
-            "inputForNextRun": {
-              "type": "array"
-            },
-            "triggerInput": {
-              "type": "array"
-            }
-          }
-        },
         "voiceRealtime": {
           "model": "gpt-4o-realtime-preview",
           "voice": "alloy",
           "synthesisModel": "anthropic/claude-sonnet-4",
           "maxDurationSeconds": 600,
           "idleTimeoutSeconds": 60
-        }
+        },
+        "outputSchemaRef": "workflow-definition-authorable"
       }
     },
     {

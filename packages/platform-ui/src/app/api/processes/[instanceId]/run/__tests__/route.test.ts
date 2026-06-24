@@ -27,6 +27,8 @@ const mockGetProcessConfig = vi.fn();
 const mockGetLatestWorkflowVersion = vi.fn();
 const mockHumanTaskCreate = vi.fn();
 const mockHumanTaskGetByInstanceId = vi.fn();
+const mockCoworkSessionCreate = vi.fn();
+const mockCoworkSessionGetByInstanceId = vi.fn();
 const mockFireWorkflow = vi.fn();
 const mockAdvanceStep = vi.fn();
 
@@ -51,6 +53,16 @@ vi.mock('@/lib/platform-services', () => ({
     humanTaskRepo: {
       create: mockHumanTaskCreate,
       getByInstanceId: mockHumanTaskGetByInstanceId,
+    },
+    coworkSessionRepo: {
+      create: mockCoworkSessionCreate,
+      getByInstanceId: mockCoworkSessionGetByInstanceId,
+    },
+    agentDefinitionRepo: {
+      getById: vi.fn().mockResolvedValue(null),
+    },
+    toolCatalogRepo: {
+      getById: vi.fn().mockResolvedValue(null),
     },
     namespaceRepo: {},
     pluginRegistry: { list: vi.fn().mockReturnValue([]) },
@@ -126,6 +138,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
     mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
     afterCallback = null;
     mockHumanTaskGetByInstanceId.mockResolvedValue([]);
+    mockCoworkSessionGetByInstanceId.mockResolvedValue([]);
   });
 
   describe('workflow instance (no configName)', () => {
@@ -361,6 +374,54 @@ describe('POST /api/processes/[instanceId]/run', () => {
       // No step execution recorded — terminal exits before any work (was:
       // json.stepsExecuted === 0 before the after() refactor)
       expect(mockInstanceAddStepExecution).not.toHaveBeenCalled();
+    });
+
+    it('[DATA] cowork step resolves workflow schema ref when creating the session', async () => {
+      const coworkWorkflow = {
+        ...workflowDefinition,
+        steps: [
+          {
+            id: 'design',
+            name: 'Design',
+            type: 'creation',
+            executor: 'cowork',
+            allowedRoles: ['workflow-designer'],
+            cowork: {
+              agent: 'chat',
+              outputSchemaRef: 'workflow-definition-authorable',
+            },
+          },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'design', to: 'done' }],
+      };
+
+      mockInstanceGetById.mockResolvedValue({
+        id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
+        status: 'running', currentStepId: 'design', configName: undefined, variables: {}, triggerPayload: {},
+      });
+      mockGetWorkflowDefinition.mockResolvedValue(coworkWorkflow);
+
+      const res = await POST(makeRequest(), { params: makeParams('inst-1') });
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
+
+      expect(mockCoworkSessionCreate).toHaveBeenCalledWith(expect.objectContaining({
+        stepId: 'design',
+        outputSchema: expect.objectContaining({
+          type: 'object',
+          required: expect.arrayContaining(['name', 'steps', 'transitions', 'triggers']),
+          properties: expect.objectContaining({
+            name: expect.objectContaining({ type: 'string' }),
+            steps: expect.objectContaining({ type: 'array' }),
+          }),
+        }),
+      }));
+      expect(mockInstanceUpdate).toHaveBeenCalledWith('inst-1', expect.objectContaining({
+        status: 'paused',
+        pauseReason: 'cowork_in_progress',
+      }));
     });
 
     it('[ERROR] unknown step ID fails the instance', async () => {
