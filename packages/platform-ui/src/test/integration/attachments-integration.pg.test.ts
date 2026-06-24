@@ -108,15 +108,14 @@ describe.skipIf(skipPg)(
       // `createTestScope` fills the full scope (audit, namespace, etc.) with
       // safe stubs; we override only the four collaborators the attachment
       // routes actually persist through with their REAL Postgres / filesystem
-      // backends. The override fields are typed to the in-memory classes, so a
-      // cast is needed — both satisfy the same repository interface.
-      const overrides = {
+      // backends.
+      const overrides: TestScopeOverrides = {
         caller,
         instanceRepo,
         humanTaskRepo,
         taskAttachmentRepo: attachmentRepo,
         blobStore,
-      } as unknown as TestScopeOverrides;
+      };
       return createTestScope(overrides);
     }
 

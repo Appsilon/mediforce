@@ -26,11 +26,13 @@ import type {
   AgentRunRepository,
   BlobStore,
   EmailProviderInfo,
+  HumanTaskRepository,
   ModelRegistryRepository,
   NamespaceRepository,
   NamespaceSecretsRepository,
   PlatformSettingsRepository,
   ProcessInstanceRepository,
+  TaskAttachmentRepository,
   UserDirectoryService,
   UserProfileRepository,
   WorkflowSecretsRepository,
@@ -163,8 +165,8 @@ const stubNamespaceSecrets: NamespaceSecretsRepository = {
 export interface TestScopeOverrides {
   readonly caller?: CallerIdentity;
   readonly instanceRepo?: ProcessInstanceRepository;
-  readonly humanTaskRepo?: InMemoryHumanTaskRepository;
-  readonly taskAttachmentRepo?: InMemoryTaskAttachmentRepository;
+  readonly humanTaskRepo?: HumanTaskRepository;
+  readonly taskAttachmentRepo?: TaskAttachmentRepository;
   readonly blobStore?: BlobStore;
   readonly processRepo?: InMemoryProcessRepository;
   readonly auditRepo?: InMemoryAuditRepository;
