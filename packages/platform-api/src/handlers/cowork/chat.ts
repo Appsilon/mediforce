@@ -38,6 +38,12 @@ const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
 const CHAT_MAX_TOKENS = 16384;
 const COWORK_DEBUG = process.env.COWORK_DEBUG === 'true';
 
+const ARTIFACT_TRUNCATED_MESSAGE =
+  `Artifact update failed: model response truncated at the ${CHAT_MAX_TOKENS}-token limit ` +
+  '(the artifact is too large to emit in one turn). Emit a smaller artifact and build it up ' +
+  'across several update_artifact calls.';
+const ARTIFACT_PARSE_ERROR_MESSAGE = 'Artifact update skipped (parse error).';
+
 /**
  * Chat turn — orchestrates the MCP tool loop server-side. Intermediate tool
  * turns are persisted to the session as they execute so the UI can observe
@@ -282,8 +288,8 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
         });
       } else {
         const toolResult = response.finishReason === 'length'
-          ? `Artifact update failed: model response truncated at the ${CHAT_MAX_TOKENS}-token limit (the workflow is too large to emit in one turn). Build it incrementally across several updates.`
-          : 'Artifact update skipped (parse error).';
+          ? ARTIFACT_TRUNCATED_MESSAGE
+          : ARTIFACT_PARSE_ERROR_MESSAGE;
         await scope.coworkSessions.updateTurn(ctx.session.id, turn.id, {
           toolResult,
           toolStatus: 'error',
@@ -326,9 +332,9 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
           ? 'Artifact updated and validated.'
           : 'Artifact updated.';
       } else if (response.finishReason === 'length') {
-        validationMsg = `Artifact update failed: your response was truncated at the ${CHAT_MAX_TOKENS}-token limit. Emit a smaller artifact and build it up across several update_artifact calls.`;
+        validationMsg = ARTIFACT_TRUNCATED_MESSAGE;
       } else {
-        validationMsg = 'Artifact update skipped (parse error).';
+        validationMsg = ARTIFACT_PARSE_ERROR_MESSAGE;
       }
       messages.push({ role: 'tool', content: validationMsg, tool_call_id: call.id });
     }
