@@ -115,6 +115,9 @@ importers:
       '@mediforce/platform-core':
         specifier: workspace:*
         version: link:../../packages/platform-core
+      '@mediforce/workflow-engine':
+        specifier: workspace:*
+        version: link:../../packages/workflow-engine
 
   packages/agent-runtime:
     dependencies:
