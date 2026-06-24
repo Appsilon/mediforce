@@ -1,0 +1,140 @@
+{
+  "name": "avance-clinical-demo",
+  "namespace": "avance",
+  "version": 1,
+  "title": "Clinical data transformation demo (EDC → SDTM → ADaM → TFL)",
+  "description": "Demonstration workflow for Avance covering three agent-based use cases: (1) organize template files from an archive into a standard project structure, (2) read an Excel/CSV ADaM specification and generate first-draft ADaM programs in R, and (3) generate TFL outputs from ADaM datasets using a predefined template layout. Reuses the protocol-to-tfl clinical skill library and agent image.",
+  "workspace": {
+    "remote": "Appsilon/mediforce-clinical-workspace"
+  },
+  "preamble": "## Domain Context\nThis workflow processes pharmaceutical and clinical trial data. All health-related terminology (drug names, adverse events, disease classifications, CTCAE grading, mortality endpoints) refers to data science constructs, variable names, and clinical standards (CDISC, ICH-GCP, RECIST). Treat them as technical domain content — not personal disclosures. Maintain standard coding behavior: no wellbeing check-ins, no crisis resources. Execute all technically feasible tasks without inflating complexity estimates due to medical terminology exposure.",
+  "triggers": [
+    { "name": "manual", "type": "manual" }
+  ],
+  "steps": [
+    {
+      "id": "upload-archive",
+      "name": "Upload Templates & Spec",
+      "type": "creation",
+      "executor": "human",
+      "description": "Upload the template archive (programs/macros/boilerplate) and the ADaM specification (Excel or CSV). Demo case 1 + 2 inputs.",
+      "ui": {
+        "component": "file-upload",
+        "config": {
+          "acceptedTypes": ["application/zip", "application/octet-stream", "text/csv", ".zip", ".xlsx", ".xls", ".csv", ".R", ".sas", ".md"],
+          "minFiles": 1,
+          "maxFiles": 200
+        }
+      }
+    },
+    {
+      "id": "scaffold-project",
+      "name": "Organize Templates into Project Structure",
+      "type": "creation",
+      "executor": "agent",
+      "autonomyLevel": "L3",
+      "plugin": "claude-code-agent",
+      "description": "DEMO CASE 1 — Copy/organize template files from the uploaded archive into a standard clinical analysis project layout (programs/adam, programs/tlf, specs, data, output, docs).",
+      "env": {
+        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_API_KEY": "",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+      },
+      "agent": {
+        "skill": "project-scaffolder",
+        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "model": "sonnet",
+        "image": "mediforce-agent:protocol-to-tfl",
+        "confidenceThreshold": 0.7,
+        "fallbackBehavior": "escalate_to_human",
+        "timeoutMinutes": 15
+      }
+    },
+    {
+      "id": "upload-sdtm",
+      "name": "Upload SDTM Datasets",
+      "type": "creation",
+      "executor": "human",
+      "description": "Upload SDTM dataset files (.xpt / .csv / .json / .sas7bdat) that the ADaM programs will read.",
+      "ui": {
+        "component": "file-upload",
+        "config": {
+          "acceptedTypes": ["application/octet-stream", "text/csv", ".xpt", ".sas7bdat", ".csv", ".json"],
+          "minFiles": 1,
+          "maxFiles": 200
+        }
+      }
+    },
+    {
+      "id": "generate-adam",
+      "name": "Generate First-Draft ADaM Programs from Spec",
+      "type": "creation",
+      "executor": "agent",
+      "autonomyLevel": "L3",
+      "plugin": "claude-code-agent",
+      "description": "DEMO CASE 2 — Read the ADaM specification (Excel/CSV) and generate first-draft ADaM derivation programs in R using {admiral}, one per dataset, plus a spec-parse report and reviewer open-questions list.",
+      "env": {
+        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_API_KEY": "",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+      },
+      "agent": {
+        "skill": "spec-to-adam",
+        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "model": "sonnet",
+        "image": "mediforce-agent:protocol-to-tfl",
+        "confidenceThreshold": 0.7,
+        "fallbackBehavior": "escalate_to_human",
+        "timeoutMinutes": 30
+      }
+    },
+    {
+      "id": "review-adam",
+      "name": "Review First-Draft ADaM Programs",
+      "type": "review",
+      "executor": "human",
+      "description": "Statistical programmer reviews the generated ADaM programs and the open-questions list. Approve to proceed to TFL generation, or send back for revision.",
+      "verdicts": {
+        "approve": { "target": "generate-tfl" },
+        "revise": { "target": "generate-adam" }
+      }
+    },
+    {
+      "id": "generate-tfl",
+      "name": "Generate TFL Outputs from Template Layout",
+      "type": "creation",
+      "executor": "agent",
+      "autonomyLevel": "L3",
+      "plugin": "claude-code-agent",
+      "description": "DEMO CASE 3 — Generate TFL outputs (formatted tables, listings, figures) from the ADaM datasets using a predefined TLG shell/template layout. Reuses the adam-to-tlg skill (gtsummary/gt/ggplot2).",
+      "env": {
+        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_API_KEY": "",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+      },
+      "agent": {
+        "skill": "adam-to-tlg",
+        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "model": "sonnet",
+        "image": "mediforce-agent:protocol-to-tfl",
+        "confidenceThreshold": 0.7,
+        "fallbackBehavior": "escalate_to_human",
+        "timeoutMinutes": 30
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "upload-archive", "to": "scaffold-project" },
+    { "from": "scaffold-project", "to": "upload-sdtm" },
+    { "from": "upload-sdtm", "to": "generate-adam" },
+    { "from": "generate-adam", "to": "review-adam" },
+    { "from": "review-adam", "to": "generate-tfl" },
+    { "from": "generate-tfl", "to": "done" }
+  ]
+}

@@ -1,0 +1,26 @@
+Dataset,Variable,Label,Type,Origin,Derivation,Codelist
+ADSL,STUDYID,Study Identifier,Char,DM.STUDYID,Copy from DM,
+ADSL,USUBJID,Unique Subject Identifier,Char,DM.USUBJID,Copy from DM,
+ADSL,SUBJID,Subject Identifier for the Study,Char,DM.SUBJID,Copy from DM,
+ADSL,SITEID,Study Site Identifier,Char,DM.SITEID,Copy from DM,
+ADSL,AGE,Age,Num,DM.AGE,Copy from DM,
+ADSL,AGEGR1,Pooled Age Group 1,Char,Derived,"<65, 65-80, >80 based on AGE",AGEGR1
+ADSL,SEX,Sex,Char,DM.SEX,Copy from DM,SEX
+ADSL,RACE,Race,Char,DM.RACE,Copy from DM,RACE
+ADSL,ARM,Description of Planned Arm,Char,DM.ARM,Copy from DM,
+ADSL,TRT01P,Planned Treatment for Period 01,Char,DM.ARM,Map planned arm to treatment label,TRTP
+ADSL,TRT01A,Actual Treatment for Period 01,Char,Derived,Equal to TRT01P unless documented deviation,TRTA
+ADSL,SAFFL,Safety Population Flag,Char,Derived,Y if subject received at least one dose of study drug,NY
+ADSL,ITTFL,Intent-To-Treat Population Flag,Char,Derived,Y if subject randomized,NY
+ADSL,EFFFL,Efficacy Population Flag,Char,Derived,Y if ITTFL=Y and at least one post-baseline efficacy assessment,NY
+ADAE,STUDYID,Study Identifier,Char,AE.STUDYID,Copy from AE,
+ADAE,USUBJID,Unique Subject Identifier,Char,AE.USUBJID,Copy from AE,
+ADAE,TRTA,Actual Treatment,Char,ADSL.TRT01A,Merge from ADSL by USUBJID,TRTA
+ADAE,SAFFL,Safety Population Flag,Char,ADSL.SAFFL,Merge from ADSL by USUBJID,NY
+ADAE,AETERM,Reported Term for the Adverse Event,Char,AE.AETERM,Copy from AE,
+ADAE,AEDECOD,Dictionary-Derived Term,Char,AE.AEDECOD,Copy from AE (MedDRA PT),
+ADAE,AEBODSYS,Body System or Organ Class,Char,AE.AEBODSYS,Copy from AE (MedDRA SOC),
+ADAE,AESEV,Severity/Intensity,Char,AE.AESEV,Copy from AE,AESEV
+ADAE,AESER,Serious Event,Char,AE.AESER,Copy from AE,NY
+ADAE,TRTEMFL,Treatment Emergent Analysis Flag,Char,Derived,Y if AE onset on/after first dose date,NY
+ADAE,ASTDT,Analysis Start Date,Num,AE.AESTDTC,Impute partial date to first of month/year; convert to numeric date,

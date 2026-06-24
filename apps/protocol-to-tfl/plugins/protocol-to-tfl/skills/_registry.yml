@@ -1,12 +1,22 @@
 version: "1.0"
 generated: "2026-03-26"
 standard: "agentskills.io/specification"
-total_skills: 5
+total_skills: 7
 
 domains:
   clinical-reporting:
     description: Clinical trial reporting pipeline skills
     skills:
+      - id: project-scaffolder
+        path: project-scaffolder/SKILL.md
+        complexity: basic
+        language: multi
+        description: Organize template files from an archive into a standard analysis project structure
+      - id: spec-to-adam
+        path: spec-to-adam/SKILL.md
+        complexity: advanced
+        language: R
+        description: Generate first-draft ADaM programs from an Excel/CSV dataset specification
       - id: trial-metadata-extractor
         path: trial-metadata-extractor/SKILL.md
         complexity: advanced

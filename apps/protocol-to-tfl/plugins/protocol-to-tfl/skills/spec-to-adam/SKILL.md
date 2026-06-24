@@ -1,0 +1,171 @@
+---
+name: spec-to-adam
+description: "Read an ADaM dataset specification file (Excel .xlsx/.xls, CSV, or markdown) and generate first-draft ADaM dataset programs in R using {admiral}. Use this skill whenever the user has a written ADaM spec (a variable-level specification with columns like Variable, Label, Type, Origin/Source, Derivation) and wants first-draft programming code generated from it. Also trigger when the user mentions 'spec to ADaM', 'generate ADaM from spec', 'read the Excel spec', 'first-draft ADaM programs', 'ADaM programming from specification', or 'turn the spec into code'. This is the spec-driven counterpart to sdtm-to-adam (which is TLG-shell-driven)."
+---
+
+# Spec-to-ADaM Generator
+
+## Purpose
+
+This skill reads a **dataset specification** — typically an Excel workbook with one sheet per ADaM
+dataset, or a CSV/markdown equivalent — and emits **first-draft ADaM derivation programs**. The
+default output language is **R using `{admiral}`** (the pharmaverse standard); SAS skeletons can be
+emitted on request (see "SAS output").
+
+The generated programs are explicitly **first drafts for a statistical programmer to review and
+complete** — they implement the derivations the spec describes literally, flag anything ambiguous,
+and never silently invent logic.
+
+It produces:
+
+1. One R program per ADaM dataset (`programs/adam/{adam}.R`)
+2. A `spec-parse-report.md` showing exactly how each spec row was interpreted
+3. An `open-questions.md` listing rows the spec left ambiguous (these are review gates, not failures)
+
+## When to use
+
+- User has an ADaM spec (Excel/CSV/markdown) and wants first-draft programs
+- User asks to "generate ADaM from the spec" or "turn the Excel spec into R code"
+- Use **sdtm-to-adam** instead when the driver is mock TLG shells rather than a written spec
+
+## Expected spec shape
+
+The skill is tolerant of column naming, but maps the spec to this canonical model. One row =
+one ADaM variable.
+
+| Canonical field | Common header aliases |
+|-----------------|------------------------|
+| `dataset`       | Dataset, Domain, ADaM (or the Excel sheet name) |
+| `variable`      | Variable, Name, VarName |
+| `label`         | Label, Description |
+| `type`          | Type, DataType (Char/Num) |
+| `origin`        | Origin, Source, SDTM Source |
+| `derivation`    | Derivation, Derivation Logic, Comment, Method |
+| `codelist`      | Codelist, Controlled Terms, CT |
+
+Header matching is case-insensitive and ignores spaces/underscores.
+
+## Workflow
+
+### Step 0: Install required R packages
+
+```r
+required_pkgs <- c("admiral", "dplyr", "lubridate", "stringr",
+                   "haven", "readxl", "datasetjson")
+missing <- required_pkgs[!sapply(required_pkgs, requireNamespace, quietly = TRUE)]
+if (length(missing) > 0) install.packages(missing, repos = "https://cloud.r-project.org")
+```
+
+### Step 1: Read and parse the spec
+
+- **Excel (`.xlsx`/`.xls`)**: read every sheet with `readxl::read_excel()`. Treat each sheet as one
+  ADaM dataset (sheet name → `dataset`), unless a `Dataset` column is present.
+- **CSV**: read with `read.csv()`; the `Dataset` column separates datasets.
+- **Markdown**: parse the variable tables under each `## {DATASET}` heading.
+
+Normalize headers to the canonical model above. Build, per dataset, an ordered list of variable
+specs.
+
+### Step 2: Build the parse report
+
+Write `spec-parse-report.md` so a reviewer can see the skill understood the spec:
+
+```markdown
+## {ADAM} — {N} variables
+| Variable | Type | Origin | Derivation (as read) | Mapped admiral pattern |
+|----------|------|--------|----------------------|------------------------|
+| USUBJID  | Char | DM.USUBJID | Copy from DM | derive_vars_merged() |
+| TRT01P   | Char | DM.ARM | Planned treatment | direct copy |
+| AGEGR1   | Char | Derived | Age groups <65, 65-80, >80 | manual cut() / case_when |
+```
+
+### Step 3: Map derivations to admiral patterns
+
+Read the shared reference guides (same plugin directory):
+
+```
+../sdtm-to-adam/references/adam-dataset-guide.md         # standard ADaM structures + mappings
+../sdtm-to-adam/references/admiral-coding-conventions.md # admiral function reference + templates
+```
+
+For each variable, choose the implementation in this preference order:
+
+1. A standard `{admiral}` function (`derive_vars_dt`, `derive_var_age_years`,
+   `derive_var_base`, `derive_var_chg`, `derive_var_extreme_flag`, `derive_vars_merged_*`, …)
+2. A `dplyr`/`case_when` derivation when the spec describes bespoke logic
+3. A **TODO marker** when the derivation text is too ambiguous to implement — emit a clearly
+   commented `# TODO(reviewer): <quoted spec text>` and log it to `open-questions.md`
+
+**ADSL is always generated first** — every other dataset merges population flags and
+subject-level variables from it.
+
+### Step 4: Generate the R programs
+
+One file per dataset, `programs/adam/{adam}.R`, following the admiral conventions:
+
+```r
+# Name: {adam}.R   |   First-draft ADaM program generated by spec-to-adam
+# Spec source: {spec file}
+# Reviewer: complete TODOs and verify all derivations before use.
+
+library(admiral); library(dplyr); library(lubridate); library(stringr)
+
+# ---- Read source data (auto-detect format) ----
+read_sdtm <- function(domain, sdtm_dir) {
+  for (ext in c(".xpt", ".sas7bdat", ".csv", ".json")) {
+    p <- file.path(sdtm_dir, paste0(tolower(domain), ext))
+    if (file.exists(p)) return(switch(ext,
+      ".xpt" = haven::read_xpt(p), ".sas7bdat" = haven::read_sas(p),
+      ".csv" = read.csv(p), ".json" = datasetjson::read_dataset_json(p)))
+  }
+  stop(paste("SDTM domain", domain, "not found in", sdtm_dir))
+}
+
+# ---- Derivations (one block per spec variable, in spec order) ----
+# ...
+
+# ---- Export ----
+datasetjson::write_dataset_json(adam, file.path(out_dir, "{adam}.json"))
+```
+
+Rules: assign variable labels from the spec; use CDISC controlled terms from the `codelist`
+column; keep variables in spec order.
+
+### Step 5: (Optional) Execute
+
+If SDTM data is available in the project, run each program with `Rscript` in dependency order
+(ADSL first). Capture errors, attempt obvious fixes, and record anything unresolved in
+`open-questions.md`. If no SDTM data is present, **skip execution** — the programs are still the
+deliverable.
+
+### Step 6: Present summary
+
+Report: datasets covered, total variables, how many mapped to admiral functions vs. manual vs.
+TODO, and the count of open questions for the reviewer.
+
+## SAS output
+
+If the user requests SAS, emit `programs/adam/{adam}.sas` skeletons instead of (or alongside) R:
+a `proc sort`/`data` step scaffold per dataset, `%let` macro variables for paths, and the same
+TODO markers. The spec parsing and the parse report are identical — only the code template
+changes. R is the default and the more complete generator; SAS is skeleton-level.
+
+## Output
+
+```
+{output_dir}/
+├── spec-parse-report.md
+├── open-questions.md
+└── programs/adam/
+    ├── adsl.R
+    ├── adae.R
+    └── ...
+```
+
+Set `output_file` to `spec-parse-report.md`; leave `programs/` in the output directory so the
+generated code is captured as workflow output files.
+
+## Reference files (shared with sdtm-to-adam)
+
+- `../sdtm-to-adam/references/adam-dataset-guide.md`
+- `../sdtm-to-adam/references/admiral-coding-conventions.md`
