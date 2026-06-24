@@ -7,6 +7,12 @@ metadata:
     {{- include "mediforce.componentLabels" (dict "context" . "component" "ui") | nindent 4 }}
 spec:
   replicas: {{ .Values.ui.replicaCount }}
+  {{- with .Values.ui.strategy }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      {{- toYaml . | nindent 6 }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "mediforce.componentSelectorLabels" (dict "context" . "component" "ui") | nindent 6 }}
@@ -21,6 +27,50 @@ spec:
     spec:
       {{- if and .Values.rbac.create .Values.ui.serviceAccount.create }}
       serviceAccountName: {{ include "mediforce.uiServiceAccountName" . }}
+      {{- end }}
+      {{- if .Values.migrations.enabled }}
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          # Parse host + port out of DATABASE_URL and poll TCP-reachability.
+          # The standard Postgres URL shape is
+          # `postgres://user:pass@HOST:PORT/db?…`; the sed regexes pull
+          # HOST (between '@' and the next ':' or '/') and PORT
+          # (the digits after the first ':' that follows '@').
+          command:
+            - sh
+            - -c
+            - |
+              host=$(echo "$DATABASE_URL" | sed -E 's|.*@([^:/?]+).*|\1|')
+              port=$(echo "$DATABASE_URL" | sed -nE 's|.*@[^:/?]+:([0-9]+).*|\1|p')
+              [ -z "$port" ] && port=5432
+              echo "waiting for Postgres at $host:$port"
+              until nc -z "$host" "$port"; do
+                echo "still waiting..."
+                sleep 2
+              done
+              echo "Postgres is reachable"
+          {{- if .Values.database.connectionUrlSecretRef.name }}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.connectionUrlSecretRef.name }}
+                  key: {{ .Values.database.connectionUrlSecretRef.key | default "DATABASE_URL" }}
+          {{- end }}
+        - name: run-migrations
+          image: "{{ include "mediforce.migrate.image" . }}"
+          imagePullPolicy: {{ include "mediforce.migrate.pullPolicy" . }}
+          workingDir: /app/packages/platform-infra
+          command: ["./node_modules/.bin/drizzle-kit", "migrate"]
+          {{- if .Values.database.connectionUrlSecretRef.name }}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.connectionUrlSecretRef.name }}
+                  key: {{ .Values.database.connectionUrlSecretRef.key | default "DATABASE_URL" }}
+          {{- end }}
       {{- end }}
       containers:
         - name: ui

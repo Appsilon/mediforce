@@ -86,6 +86,41 @@ config:
   mediforceRoot: "/app"
 
 # ---------------------------------------------------------------------------
+# Database migrations
+# ---------------------------------------------------------------------------
+# An initContainer on the UI Deployment runs Drizzle migrations
+# (`drizzle-kit migrate`) before the main UI container starts. Pattern
+# borrowed from axon-r-backend (see Axon's `main-Deployment.yaml`
+# `run-migrations` initContainer). Idempotent — Drizzle tracks state in
+# the `__drizzle_migrations` table, so re-runs are safe.
+#
+# Opt out (`enabled: false`) when migrations are managed externally —
+# CI-driven, GitOps, separate platform team. With the opt-out the
+# operator MUST run migrations against the configured DATABASE_URL
+# before any release upgrade or the chart will ship a UI that 500s on
+# first login.
+#
+# NOTE on concurrency: drizzle-kit/drizzle-orm do not use Postgres
+# advisory locks during migration. If two Pods start simultaneously
+# during a schema-bumping release they can race, with the loser's
+# transaction failing and the losing Pod briefly going `Init:Error`
+# before kubelet restarts it (self-healing). The UI Deployment's
+# rolling-update strategy below is tuned (`maxSurge: 0,
+# maxUnavailable: 1`) to serialise new Pods during rollout and
+# eliminate this race for the release case. HPA-initiated scale-up
+# is unaffected because by then the schema is already applied.
+migrations:
+  enabled: true
+  # Image used for the migration init container. Default empty for
+  # each field → reuse the UI image (same tag, same registry, same
+  # pullPolicy). Set explicitly to pin a purpose-built migrate image.
+  image:
+    registry: ""    # falls back to .Values.ui.image.registry
+    repository: ""  # falls back to .Values.ui.image.repository
+    tag: ""         # falls back to .Values.ui.image.tag
+    pullPolicy: "" # falls back to .Values.ui.image.pullPolicy
+
+# ---------------------------------------------------------------------------
 # UI (Next.js)
 # ---------------------------------------------------------------------------
 ui:
@@ -96,6 +131,17 @@ ui:
     repository: mediforce-ui
     tag: latest
     pullPolicy: Always
+  # Rolling-update strategy. `maxSurge: 0` + `maxUnavailable: 1` means
+  # the rollout replaces old Pods one at a time without ever creating
+  # a second new Pod in parallel — required when `migrations.enabled`
+  # is on, so two new Pods can't race on `drizzle-kit migrate` during
+  # a schema-bumping release (drizzle does not use advisory locks).
+  # Override only if you've also disabled `migrations.enabled` or
+  # wrapped the migrate step in a Postgres advisory lock externally.
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   service:
     type: ClusterIP
     port: 3000
