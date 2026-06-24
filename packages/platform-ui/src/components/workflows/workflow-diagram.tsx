@@ -17,7 +17,7 @@ import {
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { User, Bot, Terminal, Trash2, Plus, PenLine, Search, GitBranch, ArrowUp, ArrowDown, ChevronRight, ChevronDown, AlertTriangle, Zap } from 'lucide-react';
+import { User, Bot, Terminal, Trash2, Plus, PenLine, Search, GitBranch, ArrowUp, ArrowDown, ChevronRight, ChevronDown, AlertTriangle, Zap, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import {
@@ -109,6 +109,15 @@ function getExecutorLabel(executor: string, mode: ControlMode): string {
   return CONTROL_MODE_LABELS[mode];
 }
 
+type BranchInfo = {
+  branchIdx: number;
+  label: string;
+  isActive: boolean;
+  isBackEdge: boolean;
+  backTargetName?: string;
+  onExpand?: () => void;
+};
+
 type StepNodeData = {
   label: string;
   stepType: string;
@@ -121,27 +130,15 @@ type StepNodeData = {
   onDelete?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
+  branches?: BranchInfo[];
 };
-
-type BranchPlaceholderNodeData = {
-  label: string;
-  fromStepId: string;
-  branchIdx: number;
-  isActive: boolean;
-  isBackEdge?: boolean;
-  backTargetName?: string;
-  onExpand?: () => void;
-};
-
-const PLACEHOLDER_HEIGHT = 38;
-const PLACEHOLDER_ROW_HEIGHT = PLACEHOLDER_HEIGHT + 24;
 
 const NODE_WIDTH = 240;
 const NODE_INNER_HEIGHT = 85;
+const BRANCH_ROW_HEIGHT = 32;
 const ROW_GAP = 58;
 
 const HANDLE_CLASS = '!bg-transparent !border-0 !w-px !h-px';
-const PLACEHOLDER_PREFIX = '__placeholder__';
 
 function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   const isTerminal = data.stepType === 'terminal';
@@ -179,7 +176,8 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
       <div
         style={{ width: NODE_WIDTH, minHeight: NODE_INNER_HEIGHT }}
         className={cn(
-          'group rounded-xl border-[1.5px] px-4 py-3 transition-all cursor-pointer relative',
+          'group rounded-xl border-[1.5px] px-4 pt-3 transition-all cursor-pointer relative overflow-hidden',
+          data.branches?.length ? 'pb-0' : 'pb-3',
           'hover:shadow-md',
           style.bg,
           selected
@@ -255,61 +253,46 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
             <span className="text-[10px] text-amber-600 dark:text-amber-400 truncate">Image not found</span>
           </div>
         )}
+
+        {data.branches && data.branches.length > 0 && (
+          <div className="-mx-4 mt-3 border-t border-border/40">
+            {data.branches.map((branch, i) => (
+              <button
+                key={branch.branchIdx}
+                disabled={branch.isBackEdge || branch.isActive}
+                onClick={(e) => { e.stopPropagation(); branch.onExpand?.(); }}
+                style={{ height: BRANCH_ROW_HEIGHT }}
+                className={cn(
+                  'w-full flex items-center gap-2 px-4 text-left text-[11px] transition-all',
+                  i < data.branches!.length - 1 && 'border-b border-border/20',
+                  branch.isActive
+                    ? 'bg-green-100/80 text-green-700 font-semibold dark:bg-green-900/30 dark:text-green-300 cursor-default'
+                    : branch.isBackEdge
+                    ? 'bg-slate-50/60 text-slate-500 dark:bg-slate-800/30 dark:text-slate-400 cursor-default'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer',
+                )}
+              >
+                {branch.isActive
+                  ? <Eye className="h-3 w-3 shrink-0 text-green-500 dark:text-green-400" />
+                  : <EyeOff className="h-3 w-3 shrink-0 text-slate-400 dark:text-slate-500" />
+                }
+                <span className="truncate flex-1">{branch.label}</span>
+                {branch.isBackEdge
+                  ? <ArrowUp className="h-3 w-3 shrink-0 text-slate-400 dark:text-slate-500" />
+                  : branch.isActive
+                  ? <ChevronDown className="h-3 w-3 shrink-0 text-green-500 dark:text-green-400" />
+                  : <ChevronRight className="h-3 w-3 shrink-0 text-slate-300 dark:text-slate-600" />
+                }
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );
 }
 
-function BranchPlaceholderNode({ data }: NodeProps<Node<BranchPlaceholderNodeData>>) {
-  return (
-    <>
-      <Handle id="top" type="target" position={Position.Top} className={HANDLE_CLASS} />
-      <Handle id="bottom" type="source" position={Position.Bottom} className={HANDLE_CLASS} />
-      <Handle id="right-in" type="target" position={Position.Right} className={HANDLE_CLASS} />
-      <Handle id="right-out" type="source" position={Position.Right} className={HANDLE_CLASS} />
-      <button
-        onClick={() => { if (!data.isBackEdge && !data.isActive) data.onExpand?.(); }}
-        style={{ width: NODE_WIDTH, height: PLACEHOLDER_HEIGHT }}
-        className={cn(
-          'group flex items-center gap-2 px-3 rounded-lg border text-left transition-all',
-          data.isBackEdge
-            ? 'border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20 cursor-default'
-            : data.isActive
-            ? 'border-primary/50 bg-primary/8 cursor-default'
-            : 'border-dashed border-slate-200 dark:border-slate-700 bg-background hover:border-primary/50 hover:bg-primary/5 cursor-pointer',
-        )}
-        title={data.isBackEdge ? `Returns to: ${data.backTargetName ?? data.label}` : data.isActive ? `Active: ${data.label}` : `Show: ${data.label}`}
-      >
-        <div className={cn(
-          'h-2 w-2 rounded-full shrink-0 transition-colors',
-          data.isBackEdge
-            ? 'bg-amber-400 dark:bg-amber-500'
-            : data.isActive
-            ? 'bg-primary'
-            : 'bg-muted-foreground/25 group-hover:bg-primary/50',
-        )} />
-        <span className={cn(
-          'text-[11px] font-mono truncate transition-colors',
-          data.isBackEdge
-            ? 'text-amber-600 dark:text-amber-400 font-semibold'
-            : data.isActive
-            ? 'text-primary font-semibold'
-            : 'text-muted-foreground/70 group-hover:text-primary',
-        )}>
-          {data.label}
-        </span>
-        {data.isBackEdge
-          ? <ArrowUp className="ml-auto h-3 w-3 shrink-0 text-amber-500" />
-          : data.isActive
-          ? <ChevronDown className="ml-auto h-3 w-3 shrink-0 text-primary" />
-          : <ChevronRight className="ml-auto h-3 w-3 shrink-0 text-muted-foreground/30 group-hover:text-primary transition-colors" />
-        }
-      </button>
-    </>
-  );
-}
-
-const nodeTypes = { step: StepNode, branchPlaceholder: BranchPlaceholderNode };
+const nodeTypes = { step: StepNode };
 
 // ---------------------------------------------------------------------------
 // Custom edge — forward edges with a mid-point "add step" button
@@ -410,9 +393,7 @@ const edgeTypes = { addStep: AddStepEdge };
 // Layout engine — single column, branch-accordion
 // ---------------------------------------------------------------------------
 
-type LayoutItem =
-  | { kind: 'step'; stepId: string }
-  | { kind: 'placeholder'; id: string; fromStepId: string; branchIdx: number; label: string; isActive: boolean; isBackEdge?: boolean; backTargetName?: string };
+type LayoutItem = { kind: 'step'; stepId: string; branches?: BranchInfo[] };
 
 function shortenCondition(raw: string | undefined): string | undefined {
   return raw
@@ -495,53 +476,48 @@ function buildLayout(
   for (const r of roots) visited.add(r.id);
 
   // Collected during BFS for edge building after node layout
-  const branchStepToFirstButton: { stepId: string; firstButtonId: string }[] = [];
-  const activeButtonToFirstStep: { buttonId: string; toStepId: string }[] = [];
-  const backEdgeButtonToTarget: { buttonId: string; targetStepId: string }[] = [];
+  const decisionStepToNextStep: { stepId: string; nextStepId: string }[] = [];
+  const decisionStepToBackTarget: { stepId: string; targetStepId: string }[] = [];
   const accordionSteps = new Set<string>();
 
   let head = 0;
   while (head < bfsQueue.length) {
     const current = bfsQueue[head++];
-    layoutItems.push({ kind: 'step', stepId: current });
 
     const outs = outgoing.get(current) ?? [];
     if (outs.length <= 1) {
+      layoutItems.push({ kind: 'step', stepId: current });
       for (const { to } of outs) {
         if (to && !visited.has(to)) { visited.add(to); bfsQueue.push(to); }
       }
     } else {
-      // Multiple branches: create buttons for ALL branches (forward + back-edge alike).
-      // Forward branches use the accordion (active/inactive). Back-edge branches are amber
-      // buttons that source an arc pointing up to an earlier step.
+      // Multiple branches — render inline inside the step card, no separate placeholder nodes.
       accordionSteps.add(current);
       const forwardOuts = outs.filter(({ to }) => !visited.has(to));
       const backOuts = outs.filter(({ to }) => visited.has(to));
       const rawIdx = expandedBranches.get(current) ?? 0;
       const expandedIdx = rawIdx < forwardOuts.length ? rawIdx : 0;
 
-      branchStepToFirstButton.push({ stepId: current, firstButtonId: `${PLACEHOLDER_PREFIX}${current}__0` });
+      const branches: BranchInfo[] = [];
 
-      // Forward buttons first (stable indices for accordion state)
       for (let fi = 0; fi < forwardOuts.length; fi++) {
         const { to, label } = forwardOuts[fi];
         const isActive = fi === expandedIdx;
-        const id = `${PLACEHOLDER_PREFIX}${current}__${fi}`;
-        layoutItems.push({ kind: 'placeholder', id, fromStepId: current, branchIdx: fi, label: shortenCondition(label) ?? `Branch ${fi + 1}`, isActive, isBackEdge: false });
+        branches.push({ branchIdx: fi, label: shortenCondition(label) ?? `Branch ${fi + 1}`, isActive, isBackEdge: false });
         if (isActive) {
-          if (to) activeButtonToFirstStep.push({ buttonId: id, toStepId: to });
+          if (to) decisionStepToNextStep.push({ stepId: current, nextStepId: to });
           if (to && !visited.has(to)) { visited.add(to); bfsQueue.push(to); }
         }
       }
 
-      // Back-edge buttons after forward buttons
       for (let bi = 0; bi < backOuts.length; bi++) {
         const { to, label } = backOuts[bi];
-        const id = `${PLACEHOLDER_PREFIX}${current}__${forwardOuts.length + bi}`;
         const backTargetName = to ? stepMap.get(to)?.name : undefined;
-        layoutItems.push({ kind: 'placeholder', id, fromStepId: current, branchIdx: forwardOuts.length + bi, label: shortenCondition(label) ?? `Back ${bi + 1}`, isActive: false, isBackEdge: true, backTargetName });
-        if (to) backEdgeButtonToTarget.push({ buttonId: id, targetStepId: to });
+        branches.push({ branchIdx: forwardOuts.length + bi, label: shortenCondition(label) ?? `Back ${bi + 1}`, isActive: false, isBackEdge: true, backTargetName });
+        if (to) decisionStepToBackTarget.push({ stepId: current, targetStepId: to });
       }
+
+      layoutItems.push({ kind: 'step', stepId: current, branches });
     }
   }
 
@@ -554,48 +530,32 @@ function buildLayout(
     }
   }
 
-  // Assign sequential positions (placeholder rows are more compact)
-  const STEP_ROW_HEIGHT = NODE_INNER_HEIGHT + ROW_GAP;
+  // Assign sequential positions — compound height for decision steps with branches
   const seqIdxMap = new Map<string, number>();
   const nodes: Node[] = [];
   let seqIdx = 0;
   let currentY = 0;
 
   for (const item of layoutItems) {
-    if (item.kind === 'step') {
-      const step = stepMap.get(item.stepId);
-      if (!step) { seqIdx++; currentY += STEP_ROW_HEIGHT; continue; }
-      seqIdxMap.set(step.id, seqIdx);
-      nodes.push({
-        id: step.id,
-        type: 'step',
-        position: { x: 0, y: currentY },
-        data: {
-          label: step.name,
-          stepType: step.type,
-          executor: step.executor,
-          autonomyLevel: step.autonomyLevel,
-          plugin: step.plugin,
-        } as StepNodeData,
-      });
-      currentY += STEP_ROW_HEIGHT;
-    } else {
-      seqIdxMap.set(item.id, seqIdx);
-      nodes.push({
-        id: item.id,
-        type: 'branchPlaceholder',
-        position: { x: 0, y: currentY },
-        data: {
-          label: item.label,
-          fromStepId: item.fromStepId,
-          branchIdx: item.branchIdx,
-          isActive: item.isActive,
-          isBackEdge: item.isBackEdge ?? false,
-          backTargetName: item.backTargetName,
-        } as BranchPlaceholderNodeData,
-      });
-      currentY += PLACEHOLDER_ROW_HEIGHT;
-    }
+    const step = stepMap.get(item.stepId);
+    const numBranches = item.branches?.length ?? 0;
+    const nodeHeight = NODE_INNER_HEIGHT + numBranches * BRANCH_ROW_HEIGHT;
+    if (!step) { seqIdx++; currentY += nodeHeight + ROW_GAP; continue; }
+    seqIdxMap.set(step.id, seqIdx);
+    nodes.push({
+      id: step.id,
+      type: 'step',
+      position: { x: 0, y: currentY },
+      data: {
+        label: step.name,
+        stepType: step.type,
+        executor: step.executor,
+        autonomyLevel: step.autonomyLevel,
+        plugin: step.plugin,
+        branches: item.branches,
+      } as StepNodeData,
+    });
+    currentY += nodeHeight + ROW_GAP;
     seqIdx++;
   }
 
@@ -637,24 +597,17 @@ function buildLayout(
     });
   }
 
-  // Branching step → its first button (no label — condition lives in the button)
-  for (const { stepId, firstButtonId } of branchStepToFirstButton) {
-    if (seqIdxMap.has(stepId) && seqIdxMap.has(firstButtonId)) {
-      addEdge(stepId, firstButtonId);
+  // Decision step → first step of active branch (direct, no intermediate placeholder)
+  for (const { stepId, nextStepId } of decisionStepToNextStep) {
+    if (seqIdxMap.has(stepId) && seqIdxMap.has(nextStepId)) {
+      addEdge(stepId, nextStepId);
     }
   }
 
-  // Active branch button → first step of that branch
-  for (const { buttonId, toStepId } of activeButtonToFirstStep) {
-    if (seqIdxMap.has(buttonId) && seqIdxMap.has(toStepId)) {
-      addEdge(buttonId, toStepId);
-    }
-  }
-
-  // Back-edge button → target step (amber arc from button's right-out to target's right-in)
-  for (const { buttonId, targetStepId } of backEdgeButtonToTarget) {
-    if (seqIdxMap.has(buttonId) && seqIdxMap.has(targetStepId)) {
-      addEdge(buttonId, targetStepId);
+  // Decision step → back-edge target (amber arc from step's right-out to target's right-in)
+  for (const { stepId, targetStepId } of decisionStepToBackTarget) {
+    if (seqIdxMap.has(stepId) && seqIdxMap.has(targetStepId)) {
+      addEdge(stepId, targetStepId);
     }
   }
 
@@ -746,20 +699,6 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
 
   const { nodes, edges } = useMemo<{ nodes: Node[]; edges: Edge[] }>(() => {
     const styledNodes = layoutNodes.map((n) => {
-      if (n.type === 'branchPlaceholder') {
-        const d = n.data as BranchPlaceholderNodeData;
-        return {
-          ...n,
-          data: {
-            ...d,
-            onExpand: () => setExpandedBranches((prev) => {
-              const next = new Map(prev);
-              next.set(d.fromStepId, d.branchIdx);
-              return next;
-            }),
-          },
-        };
-      }
       const d = n.data as StepNodeData;
       return {
         ...n,
@@ -772,13 +711,22 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
           onDelete: onNodeDelete && d.stepType !== 'terminal' ? () => onNodeDelete(n.id) : undefined,
           onMoveUp: onNodeMoveUp && canMoveUp?.has(n.id) ? () => onNodeMoveUp(n.id) : undefined,
           onMoveDown: onNodeMoveDown && canMoveDown?.has(n.id) ? () => onNodeMoveDown(n.id) : undefined,
+          branches: d.branches?.map((branch) => ({
+            ...branch,
+            onExpand: !branch.isBackEdge && !branch.isActive
+              ? () => setExpandedBranches((prev) => {
+                  const next = new Map(prev);
+                  next.set(n.id, branch.branchIdx);
+                  return next;
+                })
+              : undefined,
+          })),
         },
       };
     });
     const styledEdges: Edge[] = layoutEdges.map((e) => {
       const isForward = e.sourceHandle !== 'right-out';
-      const isPlaceholderEdge = e.target.startsWith(PLACEHOLDER_PREFIX) || e.source.startsWith(PLACEHOLDER_PREFIX);
-      if (isForward && onEdgeAdd && !isPlaceholderEdge) {
+      if (isForward && onEdgeAdd) {
         return {
           ...e,
           type: 'addStep',
