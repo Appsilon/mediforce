@@ -109,6 +109,14 @@ config:
 # maxUnavailable: 1`) to serialise new Pods during rollout and
 # eliminate this race for the release case. HPA-initiated scale-up
 # is unaffected because by then the schema is already applied.
+#
+# NOTE on scope: the initContainer runs on the UI Deployment only,
+# NOT on the worker Deployment. The worker is a BullMQ consumer that
+# only reads the DB after the UI dispatches a job, so by the time it
+# touches the schema the UI's migrations have already completed. If
+# the worker ever grows startup-time DB reads, give it its own
+# `wait-for-ui-ready` initContainer instead — see the comment at the
+# top of `templates/worker-deployment.yaml`.
 migrations:
   enabled: true
   # Image used for the migration init container. Default empty for
