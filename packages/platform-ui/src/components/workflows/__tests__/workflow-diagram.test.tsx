@@ -44,7 +44,7 @@ describe('StepNode (via WorkflowDiagram)', () => {
     expect(screen.getByText('Assist')).toBeInTheDocument();
   });
 
-  it('[RENDER] script step nodes show No agent control mode label', () => {
+  it('[RENDER] script step nodes show Script executor label', () => {
     const definition = buildWorkflowDefinition({
       steps: [
         { id: 'run-script', name: 'Run Script', type: 'creation', executor: 'script' },
@@ -55,6 +55,6 @@ describe('StepNode (via WorkflowDiagram)', () => {
 
     render(<WorkflowDiagram definition={definition} />);
 
-    expect(screen.getAllByText('No agent').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Script').length).toBeGreaterThanOrEqual(1);
   });
 });
