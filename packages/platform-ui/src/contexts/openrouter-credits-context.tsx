@@ -10,6 +10,8 @@ export interface OpenRouterCreditsState {
   remaining: number;
   limit: number;
   usage: number;
+  /** Real spendable budget — `min(key limit remaining, account credits)`. */
+  effectiveRemaining: number;
   isLoading: boolean;
   error?: string;
   refresh: () => void;
@@ -22,6 +24,7 @@ const OpenRouterCreditsContext = createContext<OpenRouterCreditsState>({
   remaining: 0,
   limit: 0,
   usage: 0,
+  effectiveRemaining: 0,
   isLoading: true,
   refresh: () => {},
 });
@@ -32,6 +35,7 @@ export function OpenRouterCreditsProvider({ children }: { children: ReactNode })
   const [remaining, setRemaining] = useState(0);
   const [limit, setLimit] = useState(0);
   const [usage, setUsage] = useState(0);
+  const [effectiveRemaining, setEffectiveRemaining] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | undefined>();
   const [activated, setActivated] = useState(false);
@@ -48,6 +52,7 @@ export function OpenRouterCreditsProvider({ children }: { children: ReactNode })
       setRemaining(data.remaining);
       setLimit(data.limit);
       setUsage(data.usage);
+      setEffectiveRemaining(data.effectiveRemaining);
       setIsLoading(false);
       setError(data.error);
     } catch {
@@ -73,10 +78,11 @@ export function OpenRouterCreditsProvider({ children }: { children: ReactNode })
     remaining,
     limit,
     usage,
+    effectiveRemaining,
     isLoading,
     error,
     refresh: fetchCredits,
-  }), [available, remaining, limit, usage, isLoading, error, fetchCredits]);
+  }), [available, remaining, limit, usage, effectiveRemaining, isLoading, error, fetchCredits]);
 
   return (
     <ActivateContext.Provider value={activate}>

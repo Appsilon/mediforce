@@ -7,7 +7,7 @@ import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/s
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, OutputSchemaShape } from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls, formatExitInfo, type ContainerPluginInit } from './container-plugin';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, formatExitInfo, type ContainerPluginInit } from './container-plugin';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
 import { createLineStreamReader } from '@mediforce/platform-core';
@@ -780,7 +780,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           const repoToken = resolveRepoToken(this.agentConfig, this.context, this.resolvedEnv.vars);
           await this.fetchSkillsFromRepo(
             this.agentConfig.skillsDir,
-            normalizeRepoUrls(wfRepo.url).gitUrl,
+            wfRepo.url,
             wfRepo.commit,
             repoToken,
           );

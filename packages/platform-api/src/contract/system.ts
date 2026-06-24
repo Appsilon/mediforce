@@ -34,9 +34,24 @@ export const OpenRouterCreditsInputSchema = z.object({
 
 export const OpenRouterCreditsOutputSchema = z.object({
   available: z.boolean(),
+  /** Key-level spend cap (OpenRouter `GET /auth/key` `limit`). */
   limit: z.number(),
+  /** Key-level usage so far. */
   usage: z.number(),
+  /** Key-level headroom under the cap (`limit_remaining`). */
   remaining: z.number(),
+  /**
+   * Account prepaid credit remaining (`total_credits - total_usage` from
+   * `GET /credits`). Omitted when the credits call fails but the key call
+   * succeeds.
+   */
+  accountRemaining: z.number().optional(),
+  /**
+   * Real spendable budget the runtime enforces per request:
+   * `min(remaining, accountRemaining)`. Falls back to `remaining` when the
+   * account balance is unknown.
+   */
+  effectiveRemaining: z.number(),
   error: z.string().optional(),
 });
 

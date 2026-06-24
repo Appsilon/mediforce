@@ -127,7 +127,7 @@ export function StartRunButton({
       namespaceSecretKeys,
       openRouterCredits: openRouterCredits.isLoading ? undefined : {
         available: openRouterCredits.available,
-        remaining: openRouterCredits.remaining,
+        effectiveRemaining: openRouterCredits.effectiveRemaining,
       },
       handle,
       workflowName,
@@ -135,7 +135,7 @@ export function StartRunButton({
       adminEmail: adminContact.email ?? undefined,
       modelValidation: modelValidation.isLoading ? undefined : { unknown: modelValidation.unknown },
     });
-  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining, handle, workflowName, adminContact.email, modelValidation.isLoading, modelValidation.unknown]);
+  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.effectiveRemaining, handle, workflowName, adminContact.email, modelValidation.isLoading, modelValidation.unknown]);
 
   const preflightLoading = definitionLoading || dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading || modelValidation.isLoading;
   const hasWarnings = warnings.length > 0;
