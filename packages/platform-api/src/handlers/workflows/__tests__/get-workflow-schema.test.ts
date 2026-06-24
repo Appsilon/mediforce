@@ -18,6 +18,11 @@ describe('getWorkflowSchema handler', () => {
     expect(properties).not.toHaveProperty('namespace');
     expect(properties).not.toHaveProperty('version');
     expect(properties).not.toHaveProperty('createdAt');
+
+    // Lifecycle fields are excluded too — they must not leak to the design LLM.
+    expect(properties).not.toHaveProperty('archived');
+    expect(properties).not.toHaveProperty('deleted');
+    expect(properties).not.toHaveProperty('copiedFrom');
   });
 
   it('exposes nested step structure (deep schema, not just top-level types)', async () => {

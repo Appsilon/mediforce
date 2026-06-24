@@ -59,6 +59,7 @@ export {
   WorkflowStepSchema,
   WorkflowVisibilitySchema,
   WorkflowAuthorableSchema,
+  SERVER_MANAGED_WORKFLOW_FIELDS,
   WorkflowDefinitionSchema,
   WorkflowDefinitionBaseSchema,
   WorkflowTemplateSchema,

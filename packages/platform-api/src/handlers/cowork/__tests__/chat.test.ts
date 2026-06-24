@@ -176,6 +176,68 @@ describe('chatCoworkSession handler', () => {
     expect(result.session.artifact).toEqual({ title: 'v1' });
   });
 
+  it('skips a wrapped update_artifact whose inner artifact is null', async () => {
+    await coworkSessionRepo.create(
+      buildCoworkSession({
+        id: 'sess-1',
+        processInstanceId: 'inst-a',
+        status: 'active',
+        agent: 'chat',
+      }),
+    );
+
+    fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: 'Clearing artifact',
+                  tool_calls: [
+                    {
+                      id: 'call-1',
+                      type: 'function',
+                      function: {
+                        name: 'update_artifact',
+                        arguments: JSON.stringify({ artifact: null }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: 'Done', tool_calls: [] } }],
+          }),
+          { status: 200 },
+        ),
+      );
+
+    const scope = createTestScope({
+      instanceRepo,
+      coworkSessionRepo,
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    const result = await chatCoworkSession(
+      { sessionId: 'sess-1', message: 'Clear it' },
+      scope,
+    );
+
+    // The malformed wrapper must not be persisted as `{ artifact: null }`.
+    expect(result.artifact).toBeUndefined();
+    const session = await coworkSessionRepo.getById('sess-1');
+    expect(session?.artifact ?? null).toBeNull();
+  });
+
   it('requests enough output tokens to emit a full workflow artifact', async () => {
     await coworkSessionRepo.create(
       buildCoworkSession({

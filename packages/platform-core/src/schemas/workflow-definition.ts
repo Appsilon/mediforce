@@ -653,10 +653,45 @@ export const WorkflowDefinitionBaseSchema = z.object({
   triggerInput: z.array(TriggerInputFieldSchema).optional(),
 });
 
-export const WorkflowAuthorableSchema = WorkflowDefinitionBaseSchema.omit({
+/**
+ * Fields the platform injects or manages at registration — never authored by
+ * template files, the design LLM, or `validate` callers. The loader supplies
+ * `namespace`; `version` and `createdAt` are assigned server-side. Single
+ * source for every `.omit()` / strip that drops them, so the three call sites
+ * that used to redeclare this set can no longer drift apart.
+ */
+export const SERVER_MANAGED_WORKFLOW_FIELDS = {
   namespace: true,
   version: true,
   createdAt: true,
+} as const;
+
+/**
+ * The surface a workflow author controls — the design LLM's output schema (via
+ * {@link getWorkflowAuthorableJsonSchema}). Built with `.pick()` rather than
+ * `.omit()` so server-managed (`namespace`/`version`/`createdAt`) and lifecycle
+ * (`copiedFrom`/`archived`/`deleted`) fields are excluded by construction: a
+ * new lifecycle field added to the base schema cannot silently leak into the
+ * authorable contract.
+ */
+export const WorkflowAuthorableSchema = WorkflowDefinitionBaseSchema.pick({
+  name: true,
+  visibility: true,
+  title: true,
+  description: true,
+  preamble: true,
+  externalSkillsRepo: true,
+  url: true,
+  roles: true,
+  env: true,
+  notifications: true,
+  workspace: true,
+  steps: true,
+  transitions: true,
+  triggers: true,
+  metadata: true,
+  inputForNextRun: true,
+  triggerInput: true,
 });
 
 export function getWorkflowAuthorableJsonSchema(): Record<string, unknown> {
@@ -719,11 +754,9 @@ export function parseWorkflowDefinitionForCreation(input: unknown) {
  * would let the author believe their value was honored when the loader
  * actually overwrites it.
  */
-export const WorkflowTemplateSchema = WorkflowDefinitionBaseSchema.omit({
-  namespace: true,
-  version: true,
-  createdAt: true,
-}).superRefine((wd, ctx) => {
+export const WorkflowTemplateSchema = WorkflowDefinitionBaseSchema.omit(
+  SERVER_MANAGED_WORKFLOW_FIELDS,
+).superRefine((wd, ctx) => {
   validateInputForNextRun(wd, ctx);
   validateExecutorAndTriggers(wd, ctx);
   validateVerdicts(wd, ctx);

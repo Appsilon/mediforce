@@ -183,13 +183,23 @@ describe('workflow-designer', () => {
       // /api/workflow-definitions/schema serves — not a baked inline copy.
       expect(designSchema).toEqual(getWorkflowAuthorableJsonSchema());
 
-      // The validate step (POST /api/workflow-definitions/validate → parseWorkflowTemplate)
-      // omits the same server-managed keys the authorable schema omits, so a
-      // design-conformant document validates and one carrying an omitted key is
-      // rejected. This is what stops the loop false-rejecting on schema drift.
-      const serverManaged = ['namespace', 'version', 'createdAt'];
+      // The authorable schema excludes server-managed keys (injected at
+      // registration) and lifecycle keys (managed by the platform), so they
+      // never leak to the design LLM. The validate step
+      // (POST /api/workflow-definitions/validate → parseWorkflowTemplate) strips
+      // the same server-managed keys, so a design-conformant document validates
+      // and one carrying a server-managed key is rejected. This is what stops
+      // the loop false-rejecting on schema drift.
+      const excludedFromAuthoring = [
+        'namespace',
+        'version',
+        'createdAt',
+        'copiedFrom',
+        'archived',
+        'deleted',
+      ];
       const designProps = Object.keys(designSchema.properties ?? {});
-      for (const key of serverManaged) {
+      for (const key of excludedFromAuthoring) {
         expect(designProps).not.toContain(key);
       }
 

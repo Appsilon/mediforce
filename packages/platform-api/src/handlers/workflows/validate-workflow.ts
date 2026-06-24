@@ -1,17 +1,12 @@
-import { parseWorkflowTemplate } from '@mediforce/platform-core';
+import {
+  parseWorkflowTemplate,
+  SERVER_MANAGED_WORKFLOW_FIELDS,
+} from '@mediforce/platform-core';
 import type {
   ValidateWorkflowInput,
   ValidateWorkflowOutput,
 } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
-
-/**
- * Server-managed fields the platform injects at registration. They are stripped
- * before validation so an edit-mode candidate (a full registered definition,
- * which carries `namespace`/`version`/`createdAt`) validates as a template
- * rather than tripping `parseWorkflowTemplate`'s namespace guard.
- */
-const SERVER_MANAGED_KEYS = ['namespace', 'version', 'createdAt'] as const;
 
 /**
  * Dry run of the canonical WorkflowDefinition validation, without persisting.
@@ -30,8 +25,14 @@ export async function validateWorkflow(
   input: ValidateWorkflowInput,
   _scope: CallerScope,
 ): Promise<ValidateWorkflowOutput> {
+  // Strip the platform-managed fields so an edit-mode candidate (a full
+  // registered definition, which carries `namespace`/`version`/`createdAt`)
+  // validates as a template rather than tripping `parseWorkflowTemplate`'s
+  // namespace guard.
   const candidate: Record<string, unknown> = { ...input };
-  for (const key of SERVER_MANAGED_KEYS) delete candidate[key];
+  for (const key of Object.keys(SERVER_MANAGED_WORKFLOW_FIELDS)) {
+    delete candidate[key];
+  }
 
   const parsed = parseWorkflowTemplate(candidate);
   if (parsed.success) return { valid: true, errors: [] };

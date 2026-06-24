@@ -411,12 +411,18 @@ function applyArtifactUpdate(
   try {
     const parsed = JSON.parse(call.function.arguments) as Record<string, unknown>;
     if (parsed === null || typeof parsed !== 'object') return null;
-    // Prefer the wrapped form { artifact: {...} }; fall back to the top-level
-    // object for models that pass the artifact directly without the wrapper key.
-    const inner = parsed['artifact'];
-    if (inner !== null && inner !== undefined && typeof inner === 'object') {
-      return inner as Record<string, unknown>;
+    // Wrapped form { artifact: {...} }: once the wrapper key is present, the
+    // inner value IS the artifact. A null/non-object inner is a malformed
+    // wrapper, not a cue to fall through and persist the wrapper `{ artifact:
+    // null }` itself as the artifact — return null so it's skipped.
+    if ('artifact' in parsed) {
+      const inner = parsed['artifact'];
+      return inner !== null && typeof inner === 'object'
+        ? (inner as Record<string, unknown>)
+        : null;
     }
+    // No wrapper key — models that pass the artifact directly. Treat a
+    // non-empty top-level object as the artifact.
     if (Object.keys(parsed).length > 0) return parsed;
     return null;
   } catch {
