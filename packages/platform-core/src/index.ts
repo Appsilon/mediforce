@@ -58,6 +58,7 @@ export {
   WorkflowWorkspaceSchema,
   WorkflowStepSchema,
   WorkflowVisibilitySchema,
+  WorkflowSourceSchema,
   WorkflowDefinitionSchema,
   WorkflowDefinitionBaseSchema,
   WorkflowTemplateSchema,
@@ -169,6 +170,7 @@ export type {
   WorkflowWorkspace,
   WorkflowStep,
   WorkflowVisibility,
+  WorkflowSource,
   WorkflowDefinition,
   WorkflowTemplate,
   TriggerInputField,
@@ -211,6 +213,13 @@ export type {
   AssignmentItem,
   TableEditorRow,
   CompleteHumanTaskPayload,
+  TaskAttachment,
+  NewTaskAttachment,
+} from './schemas/index';
+export {
+  ATTACHMENT_MAX_BYTES,
+  TaskAttachmentSchema,
+  NewTaskAttachmentSchema,
 } from './schemas/index';
 
 // Interfaces (repository and service contracts)
@@ -226,6 +235,8 @@ export type {
   ListInstancesOptions,
   WorkflowRunSummaryResult,
   HumanTaskRepository,
+  TaskAttachmentRepository,
+  BlobStore,
   HandoffRepository,
   NotificationService,
   NotificationEvent,

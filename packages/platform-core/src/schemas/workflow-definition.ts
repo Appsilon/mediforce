@@ -7,6 +7,7 @@ import {
   TransitionSchema,
   TriggerSchema,
   RepoSchema,
+  CommitShaSchema,
 } from './process-definition';
 import { ProcessNotificationConfigSchema } from './process-config';
 import { McpServerConfigSchema } from './mcp-server-config';
@@ -137,7 +138,7 @@ export const ContainerSchema = z.object({
    * Commit SHA (7–40 hex chars) to check out from `repo`.
    * Must be set whenever `repo` is set — omitting it silently no-ops the build.
    */
-  commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
+  commit: CommitShaSchema.optional(),
   /** Name of a workflow secret containing a token for cloning a private repo. */
   repoAuth: z.string().optional(),
 });
@@ -608,6 +609,20 @@ export type TriggerInputField = z.infer<typeof TriggerInputFieldSchema>;
 export const WorkflowVisibilitySchema = z.enum(['public', 'private']);
 export type WorkflowVisibility = z.infer<typeof WorkflowVisibilitySchema>;
 
+/**
+ * Provenance of a Workflow Definition imported from a git repo. Reuses
+ * `RepoSchema` (`url`) minus `auth` (provenance never clones, so a token would
+ * be meaningless), plus the `path` of the imported `.wd.json`. `commit` is the
+ * immutable SHA resolved from the requested ref at import time — the import
+ * *input* still accepts a branch/tag/SHA, but only the resolved commit is
+ * stored. Informational only — no automatic sync. See ADR-0009.
+ */
+export const WorkflowSourceSchema = RepoSchema.omit({ auth: true }).extend({
+  commit: CommitShaSchema,
+  path: z.string().min(1),
+});
+export type WorkflowSource = z.infer<typeof WorkflowSourceSchema>;
+
 export const WorkflowDefinitionBaseSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
@@ -629,7 +644,7 @@ export const WorkflowDefinitionBaseSchema = z.object({
    * `auth` names a workflow secret that holds the clone token for private repos.
    */
   externalSkillsRepo: RepoSchema.extend({
-    commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)'),
+    commit: CommitShaSchema,
   }).optional(),
   url: z.string().url().optional(),
   roles: z.array(z.string()).optional(),
@@ -645,6 +660,7 @@ export const WorkflowDefinitionBaseSchema = z.object({
     name: z.string().min(1),
     version: z.number().int().positive(),
   }).optional(),
+  source: WorkflowSourceSchema.optional(),
   archived: z.boolean().optional(),
   deleted: z.boolean().optional(),
   createdAt: z.string().datetime().optional(),

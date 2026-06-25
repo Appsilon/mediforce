@@ -69,9 +69,16 @@ export const TriggerSchema = z.object({
   schedule: z.string().optional(),
 });
 
+/** A git commit SHA: 7–40 lowercase hex chars. Shared by every field that pins
+ *  an immutable commit (RepoSchema, externalSkillsRepo, container build source,
+ *  imported-workflow provenance) so the validation lives in one place. */
+export const CommitShaSchema = z
+  .string()
+  .regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)');
+
 export const RepoSchema = z.object({
   url: z.string().url(),
-  commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
+  commit: CommitShaSchema.optional(),
   /** Name of a workflow secret containing a token for repo access (e.g. "GITHUB_TOKEN"). */
   auth: z.string().optional(),
 });

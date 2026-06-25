@@ -5,11 +5,13 @@ import type {
   AgentOAuthTokenRepository,
   AgentRunRepository,
   AuditRepository,
+  BlobStore,
   CoworkSessionRepository,
   CronTriggerStateRepository,
   EmailProviderInfo,
   HandoffRepository,
   HumanTaskRepository,
+  TaskAttachmentRepository,
   ModelRegistryRepository,
   NamespaceRepository,
   NamespaceSecretsRepository,
@@ -42,6 +44,7 @@ import { AuthorizedCoworkSessionRepository } from './authorized-cowork-session-r
 import { AuthorizedHandoffRepository } from './authorized-handoff-repository';
 import { AuthorizedHumanTaskRepository } from './authorized-human-task-repository';
 import { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
+import { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';
 import { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
 import { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository';
 import { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository';
@@ -60,6 +63,8 @@ export interface CallerScopeServices {
   readonly agentEventRepo: AgentEventRepository;
   readonly agentRunRepo: AgentRunRepository;
   readonly humanTaskRepo: HumanTaskRepository;
+  readonly taskAttachmentRepo: TaskAttachmentRepository;
+  readonly blobStore: BlobStore;
   readonly handoffRepo: HandoffRepository;
   readonly agentDefinitionRepo: AgentDefinitionRepository;
   readonly coworkSessionRepo: CoworkSessionRepository;
@@ -100,6 +105,7 @@ export function createCallerScope(
     caller,
 
     tasks: new AuthorizedHumanTaskRepository(caller, services.humanTaskRepo),
+    attachments: new AuthorizedTaskAttachmentRepository(caller, services.taskAttachmentRepo),
     runs: new AuthorizedWorkflowRunRepository(caller, services.instanceRepo),
     workflowDefinitions: new AuthorizedWorkflowDefinitionRepository(
       caller,
@@ -145,6 +151,7 @@ export function createCallerScope(
       cronTrigger: services.cronTrigger,
       webhookRouter: services.webhookRouter,
       agentRunner: services.agentRunner,
+      blobStore: services.blobStore,
       audit: services.auditRepo,
       runKicker: services.runKicker,
       inviteService: services.inviteService,

@@ -14,6 +14,7 @@ export { AuthorizedCoworkSessionRepository } from './authorized-cowork-session-r
 export { AuthorizedAgentRunRepository } from './authorized-agent-run-repository';
 export { AuthorizedAuditEventRepository } from './authorized-audit-event-repository';
 export { AuthorizedHandoffRepository } from './authorized-handoff-repository';
+export { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';
 export { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
 export { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
 export { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository';

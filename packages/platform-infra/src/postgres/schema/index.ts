@@ -6,6 +6,7 @@ export * from './agent-oauth-token';
 export * from './cron-trigger-state';
 export * from './agent-run';
 export * from './human-task';
+export * from './task-attachment';
 export * from './handoff';
 export * from './cowork-session';
 export * from './process-instance';

@@ -38,6 +38,9 @@ import {
   GetWorkflowRunCountOutputSchema,
   TransferWorkflowInputSchema,
   TransferWorkflowOutputSchema,
+  ImportWorkflowInputSchema,
+  GetManifestInputSchema,
+  GetManifestOutputSchema,
   DockerInfoResponseSchema,
   OpenRouterCreditsInputSchema,
   OpenRouterCreditsOutputSchema,
@@ -105,6 +108,16 @@ import {
   ClaimTaskOutputSchema,
   CompleteTaskInputSchema,
   CompleteTaskOutputSchema,
+  ListAttachmentsInputSchema,
+  ListAttachmentsOutputSchema,
+  UploadAttachmentOutputSchema,
+  DeleteAttachmentInputSchema,
+  DeleteAttachmentOutputSchema,
+  type ListAttachmentsInput,
+  type ListAttachmentsOutput,
+  type UploadAttachmentOutput,
+  type DeleteAttachmentInput,
+  type DeleteAttachmentOutput,
   CancelRunInputSchema,
   CancelRunOutputSchema,
   ResumeRunInputSchema,
@@ -245,6 +258,10 @@ import {
   type GetWorkflowRunCountOutput,
   type TransferWorkflowInput,
   type TransferWorkflowOutput,
+  type ImportWorkflowInput,
+  type ImportWorkflowOutput,
+  type GetManifestInput,
+  type GetManifestOutput,
   type GetRunInput,
   type GetRunOutput,
   type StartRunInput,
@@ -456,6 +473,26 @@ export class Mediforce {
     get: (input: GetTaskInput) => Promise<GetTaskOutput>;
     claim: (input: ClaimTaskInput) => Promise<ClaimTaskOutput>;
     complete: (input: CompleteTaskInput) => Promise<CompleteTaskOutput>;
+    attachments: {
+      list: (input: ListAttachmentsInput) => Promise<ListAttachmentsOutput>;
+      upload: (input: {
+        taskId: string;
+        name: string;
+        contentType: string;
+        content: Uint8Array;
+      }) => Promise<UploadAttachmentOutput>;
+      delete: (input: DeleteAttachmentInput) => Promise<DeleteAttachmentOutput>;
+    };
+  };
+
+  /**
+   * Attachment blob helper. `blobUrl(id)` is the authenticated streaming URL
+   * for an attachment's bytes — point an `<a download>` / `<img src>` at it;
+   * the browser sends the session cookie. Server-to-server callers fetch it
+   * via `request` with the configured auth header.
+   */
+  readonly attachments: {
+    blobUrl: (attachmentId: string) => string;
   };
 
   readonly processes: {
@@ -503,6 +540,8 @@ export class Mediforce {
     delete: (input: DeleteWorkflowInput) => Promise<DeleteWorkflowOutput>;
     getRunCount: (input: GetWorkflowRunCountInput) => Promise<GetWorkflowRunCountOutput>;
     transferNamespace: (input: TransferWorkflowInput) => Promise<TransferWorkflowOutput>;
+    importFromRepo: (input: ImportWorkflowInput) => Promise<ImportWorkflowOutput>;
+    getManifest: (input: GetManifestInput) => Promise<GetManifestOutput>;
   };
 
   readonly runs: {
@@ -711,6 +750,51 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.complete');
         return CompleteTaskOutputSchema.parse(body);
+      },
+      attachments: {
+        list: async (input) => {
+          const validated = ListAttachmentsInputSchema.parse(input);
+          const res = await this.request(
+            `/api/tasks/${encodeURIComponent(validated.taskId)}/attachments`,
+          );
+          const body = await parseJsonOrThrow(res, 'mediforce.tasks.attachments.list');
+          return ListAttachmentsOutputSchema.parse(body);
+        },
+        upload: async (input) => {
+          // multipart/form-data — let fetch set the boundary Content-Type.
+          const form = new FormData();
+          // `BlobPart` requires a Uint8Array backed by a plain ArrayBuffer; TS
+          // widens the input's buffer to `ArrayBufferLike`. The bytes are always
+          // a real ArrayBuffer here, so narrow it for the Blob constructor.
+          const blobPart = input.content as unknown as BlobPart;
+          form.append(
+            'file',
+            new Blob([blobPart], { type: input.contentType }),
+            input.name,
+          );
+          const res = await this.request(
+            `/api/tasks/${encodeURIComponent(input.taskId)}/attachments`,
+            { method: 'POST', body: form },
+          );
+          const body = await parseJsonOrThrow(res, 'mediforce.tasks.attachments.upload');
+          return UploadAttachmentOutputSchema.parse(body);
+        },
+        delete: async (input) => {
+          const validated = DeleteAttachmentInputSchema.parse(input);
+          const res = await this.request(
+            `/api/attachments/${encodeURIComponent(validated.attachmentId)}`,
+            { method: 'DELETE' },
+          );
+          const body = await parseJsonOrThrow(res, 'mediforce.tasks.attachments.delete');
+          return DeleteAttachmentOutputSchema.parse(body);
+        },
+      },
+    };
+
+    this.attachments = {
+      blobUrl: (attachmentId) => {
+        const base = this.clientConfig.baseUrl ?? '';
+        return `${base}/api/attachments/${encodeURIComponent(attachmentId)}/blob`;
       },
     };
 
@@ -975,6 +1059,24 @@ export class Mediforce {
           CopyWorkflowOutputSchema,
           'mediforce.workflows.copy',
         );
+      },
+      importFromRepo: async (input) => {
+        const validated = ImportWorkflowInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions/import${qs}`,
+          { repo: validated.repo, path: validated.path, ref: validated.ref },
+          RegisterWorkflowOutputSchema,
+          'mediforce.workflows.importFromRepo',
+        );
+      },
+      getManifest: async (input) => {
+        const validated = GetManifestInputSchema.parse(input);
+        const qs = toSearchParams({ repo: validated.repo, ref: validated.ref });
+        const res = await this.request(`/api/workflow-definitions/manifest${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.getManifest');
+        return GetManifestOutputSchema.parse(body);
       },
     };
 

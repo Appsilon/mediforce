@@ -11,11 +11,17 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Fixed
+- Postgres workflow definitions now persist imported workflow `source` provenance, so get/list calls keep the advertised url/path/commit after GitHub imports.
+- A malformed or legacy-shaped `source` (e.g. the pre-commit `{ repo, path, ref }`) no longer drops the entire workflow definition on read — the informational provenance is dropped best-effort and the workflow still loads and runs.
+- `pnpm test` is now fully self-contained — Playwright `globalSetup` auto-starts the Firebase Auth emulator when absent and runs pending DB migrations, so E2E tests pass without manual pre-flight steps.
 ### Changed
 - Autonomy levels overhaul across workflow designer and execution history — step-add popover is now a two-step wizard (pick step type, then pick executor: human / agent / script / cowork); step editor shows executor identity and L2/L3/L4 autonomy level instead of the "control mode" abstraction; execution history chips and the agent run table surface the raw autonomy level badge; executor identity in step history renders as `agent:<plugin>`; branch icons in the decision diagram updated to chevrons; schema fields (`executor`, `autonomyLevel`) unchanged [#783](https://github.com/Appsilon/mediforce/pull/783).
 
 ### Added
 - Workflow designer now learns the correct schema from 11 CI-tested examples + 6 anti-patterns served via `list_workflow_examples` MCP tool — eliminates stale inline schema that caused script steps to generate with the old `step.agent` config instead of `step.script` [#787](https://github.com/Appsilon/mediforce/pull/787).
+- Import workflows from git now records the resolved commit SHA as provenance (`source: { url, path, commit }`) by resolving the requested ref to an immutable SHA and fetching the file at that SHA; a `.wd.json` that declares its own `namespace` imports cleanly (the target namespace wins, matching `workflow register`); the import dialog gains a branch/tag/commit field (defaults to main), an "Import by path" mode that also kicks in when a repo has no `index.json` manifest, and no longer pre-selects every browsed workflow. Scope (one-time copy, public GitHub only) documented in [docs/how-to/import-from-git.md](docs/how-to/import-from-git.md) and [ADR-0009](docs/adr/0009-workflow-import-scope-boundary.md).
+- Task-attachments backend — `BlobStore` (filesystem impl) + a `task_attachments` table behind a workspace-scoped repository, with headless upload/list/download/delete routes and a typed client; bytes live on the `~/.mediforce` volume, metadata in Postgres, size guarded by `MEDIFORCE_ATTACHMENT_MAX_BYTES` (ADR-0003 PR2) [#765](https://github.com/Appsilon/mediforce/pull/765).
 - Docker image validation at workflow registration — server warns when a referenced image is not found on the platform, CLI deduplicates server vs local warnings, and the workflow editor shows an amber toast on save [#734](https://github.com/Appsilon/mediforce/pull/734).
 - SMTP email provider as alternative to Mailgun — organisations can now use their own SMTP infrastructure instead of Mailgun by setting `SMTP_*` env vars; `EMAIL_PROVIDER` auto-detects or can be set explicitly; includes read-only admin status page, `mediforce email status` CLI command, and bootstrap script prompts for initial setup [#748](https://github.com/Appsilon/mediforce/issues/748).
 - **Run view UX** — execution history panel (renamed from "Step Status"), scrollable workflow diagram, active step info (started time, live elapsed timer, executor name/claimer for claimed human tasks)
@@ -32,6 +38,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ### Fixed
 - Cowork MCP tools now work when env templates (`{{SECRET}}`) reference workspace secrets — `connectMcp` passes the resolved secrets to `McpClientManager` so template interpolation succeeds in both local dev and staging [#787](https://github.com/Appsilon/mediforce/pull/787).
+- Binary file-download routes (task-attachment blob, run output files, agent output file) now send `X-Content-Type-Options: nosniff` — defense-in-depth against MIME-sniffing a user-supplied content-type into an executable type (ADR-0003).
 - Skill-loading steps no longer intermittently fail with "Skill file not found" from another workflow's cache — the container plugin singleton kept the skills-cache dir in a mutable field that leaked across runs; the path is now derived on demand from the workflow's `externalSkillsRepo`.
 - External skills repo now clones public repos over anonymous HTTPS — `fetchSkillsFromRepo` no longer forces an SSH clone (which fails in the agent container, where there is no `ssh` binary) when no auth token is configured; SSH/deploy-key transport is used only for genuine `git@` refs.
 - Deploy-key cache now recovers when the cached path is replaced by a directory (EISDIR); auto-runner stuck-loop errors now surface the underlying step error in `mediforce run get` [#776](https://github.com/Appsilon/mediforce/pull/776).
@@ -82,6 +89,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
   - Artifact panel: collapsible JSON tree explorer replaces raw `JSON.stringify`; tabbed Data/Preview view.
   - Built-in tool calls (`update_artifact`, `update_presentation`) now persist as live tool turns visible in the cowork chat UI.
   - Postgres migration 0018: `validation_result` (jsonb) + `presentation` (text) columns on `cowork_sessions`.
+### Added
+- Workflows can now be imported from a public GitHub repo as a one-time copy: `mediforce workflow import --repo <url> --path <wd.json-path> --namespace <ns>` CLI command, a manifest-browser dialog in the workspace toolbar (fetches `index.json`, multi-select, progress bar), and `POST /api/workflow-definitions/import` + `GET /api/workflow-definitions/manifest` server-side handlers — imported definitions carry `source.{repo,path,ref}` provenance metadata [#561](https://github.com/Appsilon/mediforce/issues/561).
 
 ### Changed
 - **Breaking (schema + data migration 0023):** deterministic script-step config moved from `step.agent` to a typed `step.script` key; `agent`/`autonomyLevel`/`cowork` are now rejected on `executor: 'script'` steps and audit events record `executorType: 'script'` (forward-only). Stored workflow definitions are rewritten in-place by Postgres migration `0023_script_step_config` — it must ship in the same release, because definitions are re-parsed on read.

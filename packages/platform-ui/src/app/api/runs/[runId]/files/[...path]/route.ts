@@ -72,6 +72,7 @@ export async function GET(req: NextRequest, ctx: RouteContext): Promise<NextResp
         'Content-Type': contentTypeForFilePath(fileName),
         'Content-Disposition': attachmentContentDisposition(fileName),
         'Content-Length': String(fileBytes.byteLength),
+        'X-Content-Type-Options': 'nosniff',
       },
     });
   } catch (err) {
