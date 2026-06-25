@@ -209,6 +209,7 @@ function ExecutorChip({ executorType, autonomyLevel, plugin, runtime }: {
     <span className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-md py-0.5 px-2 text-xs font-semibold border', chip.className)}>
       {chip.icon}
       {chip.label}
+      {autonomyLevel && <span className="ml-0.5 opacity-60 font-normal">{autonomyLevel}</span>}
     </span>
   );
 }
@@ -230,7 +231,7 @@ function ExecutorText({ executedBy = '', executorType, plugin, runtime }: {
 
   let label: string;
   if (executorType === 'agent') {
-    label = plugin ?? 'Agent';
+    label = plugin ? `agent:${plugin}` : 'agent';
   } else if (executorType === 'script') {
     const rt = runtime ? (RUNTIME_LABELS[runtime] ?? (runtime.charAt(0).toUpperCase() + runtime.slice(1))) : null;
     label = rt ? `${rt} script` : 'Script';

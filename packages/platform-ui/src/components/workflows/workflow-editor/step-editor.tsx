@@ -7,7 +7,7 @@ import { usePlugins } from '@/hooks/use-plugins';
 import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
-import { getControlMode, CONTROL_MODE_LABELS } from '@/lib/control-mode';
+
 import type { WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
@@ -308,7 +308,7 @@ export function StepEditor({
             <TypeIcon className={cn('h-3 w-3 shrink-0', typeStyle.color)} strokeWidth={1.5} />
             <span className="text-[10px] text-muted-foreground">{typeStyle.label}</span>
             <span className="text-[10px] text-muted-foreground/30">·</span>
-            <span className="text-[10px] text-muted-foreground">{CONTROL_MODE_LABELS[getControlMode(step.executor, step.autonomyLevel)]}</span>
+            <span className="text-[10px] text-muted-foreground">{execStyle.label}</span>
           </div>
         </div>
       </div>
@@ -351,10 +351,10 @@ export function StepEditor({
           </span>
         </FieldRow>
 
-        <FieldRow label="control mode" tooltip="The control mode determines how much autonomy the agent has. Set at step creation — to change, remove this step and add a new one.">
-          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5" title="Control mode is set at step creation. To change, remove this step and add a new one.">
+        <FieldRow label="executor" tooltip={TIP.executor}>
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5" title="executor is set at creation. To change, remove this step and add a new one.">
             <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-            {CONTROL_MODE_LABELS[getControlMode(step.executor, step.autonomyLevel)]}
+            <span>{execStyle.label.toLowerCase()}</span>
           </span>
         </FieldRow>
       </FieldGroup>
