@@ -89,7 +89,7 @@ function ExecutorIcon({ executor, autonomyLevel }: { executor: string; autonomyL
     if (mode === 'human-review') return (
       <span className="inline-flex items-center gap-0.5">
         <Bot className="h-3.5 w-3.5 shrink-0 text-indigo-500 dark:text-indigo-400" />
-        <span className="relative inline-flex shrink-0">
+        <span className="relative inline-flex shrink-0 mr-2">
           <User className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" />
           <Search className="absolute -bottom-0.5 -right-1.5 h-2 w-2 text-indigo-500 dark:text-indigo-400" strokeWidth={2.5} />
         </span>
@@ -872,7 +872,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
             <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5 opacity-50">
               <span className="w-14 shrink-0 flex items-center gap-0.5">
                 <User className="h-4 w-4 text-lime-500 dark:text-lime-400 shrink-0" />
-                <span className="relative inline-flex shrink-0">
+                <span className="relative inline-flex shrink-0 mr-2">
                   <Bot className="h-4 w-4 text-lime-500 dark:text-lime-400" />
                   <Search className="absolute -bottom-0.5 -right-1.5 h-2.5 w-2.5 text-lime-500 dark:text-lime-400" strokeWidth={2.5} />
                 </span>
@@ -906,7 +906,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
             <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
               <span className="w-14 shrink-0 flex items-center gap-0.5">
                 <Bot className="h-4 w-4 text-indigo-500 dark:text-indigo-400 shrink-0" />
-                <span className="relative inline-flex shrink-0">
+                <span className="relative inline-flex shrink-0 mr-2">
                   <User className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />
                   <Search className="absolute -bottom-0.5 -right-1.5 h-2.5 w-2.5 text-indigo-500 dark:text-indigo-400" strokeWidth={2.5} />
                 </span>
