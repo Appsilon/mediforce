@@ -1,0 +1,89 @@
+{
+  "name": "tutorial-conditional-branching",
+  "title": "Conditional Branching",
+  "description": "Route a request to different paths based on data. Demonstrates decision steps, 'when' expressions with comparisons, the 'else' catch-all, and multiple paths converging on a single terminal.",
+  "triggers": [
+    { "type": "manual", "name": "manual" }
+  ],
+  "roles": ["submitter", "reviewer"],
+  "steps": [
+    {
+      "id": "submit-request",
+      "name": "Submit Request",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["submitter"],
+      "description": "Submit a request with a priority level that determines the routing.",
+      "params": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "description": "Request title"
+        },
+        {
+          "name": "priority",
+          "type": "string",
+          "required": true,
+          "description": "Priority level",
+          "options": ["critical", "high", "normal"]
+        }
+      ]
+    },
+    {
+      "id": "route-by-priority",
+      "name": "Route by Priority",
+      "type": "decision",
+      "executor": "human",
+      "description": "Automatic routing — critical/high go to fast-track, normal goes to manual review."
+    },
+    {
+      "id": "fast-track",
+      "name": "Auto-Process (Fast Track)",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Automatically process high-priority requests.",
+      "script": {
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\n\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst title = input.steps?.['submit-request']?.title || 'unknown';\nconst priority = input.steps?.['submit-request']?.priority || 'unknown';\n\nwriteFileSync('/output/result.json', JSON.stringify({\n  processed: true,\n  route: 'fast-track',\n  summary: `Request \"${title}\" (${priority}) auto-processed via fast track.`\n}));\n",
+        "runtime": "javascript"
+      }
+    },
+    {
+      "id": "manual-review",
+      "name": "Manual Review",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["reviewer"],
+      "description": "Manually review normal-priority requests.",
+      "params": [
+        {
+          "name": "disposition",
+          "type": "string",
+          "required": true,
+          "description": "Review outcome",
+          "options": ["approved", "rejected", "needs-info"]
+        },
+        {
+          "name": "notes",
+          "type": "string",
+          "required": false,
+          "description": "Review notes"
+        }
+      ]
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "submit-request", "to": "route-by-priority" },
+    { "from": "route-by-priority", "to": "fast-track", "when": "output.priority == \"critical\" || output.priority == \"high\"" },
+    { "from": "route-by-priority", "to": "manual-review", "when": "else" },
+    { "from": "fast-track", "to": "done" },
+    { "from": "manual-review", "to": "done" }
+  ]
+}

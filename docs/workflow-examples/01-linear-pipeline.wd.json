@@ -1,0 +1,55 @@
+{
+  "name": "tutorial-linear-pipeline",
+  "title": "Linear Pipeline",
+  "description": "Simplest workflow pattern: human fills a form, a script processes it, done. Demonstrates params, script-container with inlineScript, and basic transitions.",
+  "triggers": [
+    { "type": "manual", "name": "manual" }
+  ],
+  "roles": ["operator"],
+  "steps": [
+    {
+      "id": "enter-data",
+      "name": "Enter Project Info",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["operator"],
+      "description": "Fill in the project name and a short description.",
+      "params": [
+        {
+          "name": "projectName",
+          "type": "string",
+          "required": true,
+          "description": "Project name (used to generate a URL-safe slug)"
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false,
+          "description": "One-line project description"
+        }
+      ]
+    },
+    {
+      "id": "generate-summary",
+      "name": "Generate Summary",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Slugify the project name, format a summary, write result.json.",
+      "script": {
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\n\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst projectName = input.steps?.['enter-data']?.projectName || 'untitled';\nconst description = input.steps?.['enter-data']?.description || '';\n\nconst slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');\n\nwriteFileSync('/output/result.json', JSON.stringify({\n  slug,\n  projectName,\n  description,\n  summary: `Project \"${projectName}\" (${slug}) created successfully.`\n}));\n",
+        "runtime": "javascript"
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "enter-data", "to": "generate-summary" },
+    { "from": "generate-summary", "to": "done" }
+  ]
+}

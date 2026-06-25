@@ -1,0 +1,94 @@
+{
+  "name": "tutorial-action-steps",
+  "title": "Action Steps",
+  "description": "Workflow-level side effects without scripts or agents. Demonstrates action executor with http (API call), reshape (data transformation), and email (notification). Actions are declarative — the engine executes them directly.",
+  "triggers": [
+    { "type": "manual", "name": "manual" }
+  ],
+  "roles": ["operator"],
+  "steps": [
+    {
+      "id": "enter-query",
+      "name": "Enter Search Query",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["operator"],
+      "description": "Provide a search query to look up via a public API.",
+      "params": [
+        {
+          "name": "query",
+          "type": "string",
+          "required": true,
+          "description": "Search term"
+        },
+        {
+          "name": "notifyEmail",
+          "type": "string",
+          "required": true,
+          "description": "Email address to receive the results"
+        }
+      ]
+    },
+    {
+      "id": "fetch-data",
+      "name": "Fetch Data (HTTP)",
+      "type": "creation",
+      "executor": "action",
+      "description": "Call a public API to fetch results for the query.",
+      "action": {
+        "kind": "http",
+        "config": {
+          "method": "GET",
+          "url": "https://api.dictionaryapi.dev/api/v2/entries/en/${steps['enter-query'].query}",
+          "headers": {
+            "Accept": "application/json"
+          }
+        }
+      }
+    },
+    {
+      "id": "reshape-results",
+      "name": "Reshape Results",
+      "type": "creation",
+      "executor": "action",
+      "description": "Transform raw API response into a clean summary object.",
+      "action": {
+        "kind": "reshape",
+        "config": {
+          "values": {
+            "query": "${steps['enter-query'].query}",
+            "definition": "${steps['fetch-data'].output[0].meanings[0].definitions[0].definition}",
+            "partOfSpeech": "${steps['fetch-data'].output[0].meanings[0].partOfSpeech}"
+          }
+        }
+      }
+    },
+    {
+      "id": "send-email",
+      "name": "Send Results Email",
+      "type": "creation",
+      "executor": "action",
+      "description": "Email the formatted results to the operator.",
+      "action": {
+        "kind": "email",
+        "config": {
+          "to": "${steps['enter-query'].notifyEmail}",
+          "subject": "Results for: ${steps['enter-query'].query}",
+          "body": "Your query: ${steps['reshape-results'].query}\n\nDefinition (${steps['reshape-results'].partOfSpeech}): ${steps['reshape-results'].definition}"
+        }
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "enter-query", "to": "fetch-data" },
+    { "from": "fetch-data", "to": "reshape-results" },
+    { "from": "reshape-results", "to": "send-email" },
+    { "from": "send-email", "to": "done" }
+  ]
+}

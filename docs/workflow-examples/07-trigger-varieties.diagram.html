@@ -1,0 +1,68 @@
+<div style="max-width:480px;margin:0 auto;font-family:system-ui,-apple-system,sans-serif">
+      <h2 style="font-size:18px;font-weight:700;margin:0 0 4px">tutorial-trigger-varieties</h2>
+      <p style="font-size:13px;color:#6b7280;margin:0 0 12px">Multiple trigger types on one workflow — manual, webhook (with method + path config), and cron (with schedule). Demonstrates triggerInput fields that the user fills at trigger time, accessible as variables.* in when expressions.</p>
+      <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap"><span style="display:inline-block;padding:4px 12px;border-radius:9999px;font-size:12px;background:#f3f4f6;color:#374151">👆 manual</span> <span style="display:inline-block;padding:4px 12px;border-radius:9999px;font-size:12px;background:#f3f4f6;color:#374151">🔗 on-push</span> <span style="display:inline-block;padding:4px 12px;border-radius:9999px;font-size:12px;background:#f3f4f6;color:#374151">⏰ nightly (0 2 * * *)</span></div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+        
+      <div style="width:100%;max-width:420px;border:2px solid #c4b5fd;border-radius:8px;padding:12px 16px;background:#f5f3ff">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span style="font-weight:600;font-size:14px">Route by Priority</span>
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#ede9fe;color:#7c3aed">decision</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#dbeafe;color:#2563eb;font-weight:500">👤 Human</span>
+        </div>
+        <div style="font-size:12px;color:#6b7280;margin-top:4px">Route based on triggerInput priority — urgent skips review.</div>
+        
+      </div>
+    
+<div style="display:flex;gap:24px;justify-content:center"><div style="text-align:center"><div style="font-size:11px;color:#6b7280;margin-bottom:2px">variables.priority == &quot;urgent&quot;</div><div style="color:#9ca3af;font-size:20px">↓ process</div></div><div style="text-align:center"><div style="font-size:11px;color:#6b7280;margin-bottom:2px">else</div><div style="color:#9ca3af;font-size:20px">↓ process</div></div></div>
+
+      <div style="width:100%;max-width:420px;border:2px solid #bfdbfe;border-radius:8px;padding:12px 16px;background:#eff6ff">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span style="font-weight:600;font-size:14px">Process Data</span>
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#dbeafe;color:#1d4ed8">creation</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#fef3c7;color:#d97706;font-weight:500">⚙️ Script</span>
+        </div>
+        <div style="font-size:12px;color:#6b7280;margin-top:4px">Process the data source.</div>
+        
+      </div>
+    
+<div style="display:flex;gap:24px;justify-content:center"><div style="text-align:center"><div style="font-size:11px;color:#6b7280;margin-bottom:2px">variables.priority == &quot;urgent&quot;</div><div style="color:#9ca3af;font-size:20px">↓ done</div></div><div style="text-align:center"><div style="font-size:11px;color:#6b7280;margin-bottom:2px">else</div><div style="color:#9ca3af;font-size:20px">↓ review</div></div></div>
+
+      <div style="width:100%;max-width:420px;border:2px solid #fde68a;border-radius:8px;padding:12px 16px;background:#fffbeb">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span style="font-weight:600;font-size:14px">Review Results</span>
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#fef3c7;color:#b45309">review</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#dbeafe;color:#2563eb;font-weight:500">👤 Human</span>
+        </div>
+        <div style="font-size:12px;color:#6b7280;margin-top:4px">Review processed results before completing.</div>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><span style="display:inline-block;padding:2px 8px;border-radius:9999px;font-size:11px;background:#dcfce7;color:#166534">approve → done</span> <span style="display:inline-block;padding:2px 8px;border-radius:9999px;font-size:11px;background:#fee2e2;color:#991b1b">revise → process</span></div>
+      </div>
+    
+<div style="color:#9ca3af;font-size:18px;text-align:center">⤷ via verdicts</div>
+
+      <div style="width:100%;max-width:420px;border:2px solid #d1d5db;border-radius:8px;padding:12px 16px;background:#f9fafb">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span style="font-weight:600;font-size:14px">Done</span>
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#e5e7eb;color:#374151">terminal</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#dbeafe;color:#2563eb;font-weight:500">👤 Human</span>
+        </div>
+        
+        
+      </div>
+    
+      </div>
+      
+      <div style="margin-top:16px;padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:#fafafa">
+        <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">📝 Trigger input</div>
+        <ul style="margin:0;padding-left:20px;list-style:disc"><li style="font-size:12px;color:#4b5563"><code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">source</code><span style="color:#dc2626">*</span> — Data source identifier</li><li style="font-size:12px;color:#4b5563"><code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">priority</code> — Processing priority: normal or urgent</li></ul>
+      </div>
+    
+    </div>

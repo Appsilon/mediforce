@@ -11,10 +11,14 @@
  *   get_run_logs            — audit events + step executions
  *   list_models             — query the model registry
  *   list_docker_images      — available Docker images on the platform
+ *   list_workflow_examples  — CI-tested workflow examples + anti-patterns
  *
  * API tools require APP_BASE_URL + PLATFORM_API_KEY env vars.
  * Runs via stdio transport.
  */
+import { readdirSync, readFileSync, existsSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -420,6 +424,79 @@ server.registerTool(
       const message = err instanceof Error ? err.message : String(err);
       return mcpText(`Error listing Docker images: ${message}`);
     }
+  },
+);
+
+// --- list_workflow_examples --------------------------------------------------
+
+function loadWorkflowExamples() {
+  const __dir = dirname(fileURLToPath(import.meta.url));
+  const examplesDir = resolve(__dir, '../../../docs/workflow-examples');
+  const antiPatternsDir = resolve(examplesDir, 'anti-patterns');
+
+  const examples = existsSync(examplesDir)
+    ? readdirSync(examplesDir)
+        .filter(f => f.endsWith('.wd.json'))
+        .sort()
+        .map(f => {
+          const def = JSON.parse(readFileSync(resolve(examplesDir, f), 'utf8'));
+          return {
+            file: f,
+            name: def.name,
+            title: def.title,
+            description: def.description,
+            definition: def,
+          };
+        })
+    : [];
+
+  const antiPatterns = existsSync(antiPatternsDir)
+    ? readdirSync(antiPatternsDir)
+        .filter(f => f.endsWith('.json'))
+        .sort()
+        .map(f => {
+          const raw = JSON.parse(readFileSync(resolve(antiPatternsDir, f), 'utf8'));
+          return {
+            name: raw.name,
+            description: raw.description,
+            why: raw.why,
+            fix: raw.fix,
+            definition: raw.definition,
+          };
+        })
+    : [];
+
+  return { examples, antiPatterns };
+}
+
+server.registerTool(
+  'list_workflow_examples',
+  {
+    description:
+      'Get CI-tested workflow examples and anti-patterns. ' +
+      'Examples show correct schema for every executor type, trigger, and pattern. ' +
+      'Anti-patterns show common mistakes with explanation of why they fail and how to fix them. ' +
+      'Call this BEFORE designing a workflow to learn the correct definition format.',
+    inputSchema: {},
+  },
+  async () => {
+    const { examples, antiPatterns } = loadWorkflowExamples();
+    return mcpJson({
+      count: examples.length,
+      examples: examples.map(e => ({
+        name: e.name,
+        title: e.title,
+        description: e.description,
+        definition: e.definition,
+      })),
+      antiPatterns: antiPatterns.map(a => ({
+        name: a.name,
+        description: a.description,
+        why: a.why,
+        fix: a.fix,
+        definition: a.definition,
+      })),
+    });
   },
 );
 

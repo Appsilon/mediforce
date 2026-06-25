@@ -1,0 +1,63 @@
+<div style="max-width:480px;margin:0 auto;font-family:system-ui,-apple-system,sans-serif">
+      <h2 style="font-size:18px;font-weight:700;margin:0 0 4px">tutorial-review-loop</h2>
+      <p style="font-size:13px;color:#6b7280;margin:0 0 12px">Agent generates content, human reviews it. Approve advances to done; revise sends it back to the agent. Demonstrates agent steps, autonomyLevel, review verdicts, and the approve/revise loop pattern.</p>
+      <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap"><span style="display:inline-block;padding:4px 12px;border-radius:9999px;font-size:12px;background:#f3f4f6;color:#374151">👆 manual</span></div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+        
+      <div style="width:100%;max-width:420px;border:2px solid #bfdbfe;border-radius:8px;padding:12px 16px;background:#eff6ff">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span style="font-weight:600;font-size:14px">Describe What to Write</span>
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#dbeafe;color:#1d4ed8">creation</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#dbeafe;color:#2563eb;font-weight:500">👤 Human</span>
+        </div>
+        <div style="font-size:12px;color:#6b7280;margin-top:4px">Describe the document you want the agent to draft.</div>
+        
+      </div>
+    
+<div style="color:#9ca3af;font-size:24px;text-align:center">↓</div>
+
+      <div style="width:100%;max-width:420px;border:2px solid #bfdbfe;border-radius:8px;padding:12px 16px;background:#eff6ff">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span style="font-weight:600;font-size:14px">Generate Draft</span>
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#dbeafe;color:#1d4ed8">creation</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#ede9fe;color:#7c3aed;font-weight:500">🤖 Agent</span><span style="font-size:11px;color:#6b7280;margin-left:4px">(anthropic/claude-sonnet-4)</span>
+        </div>
+        <div style="font-size:12px;color:#6b7280;margin-top:4px">Agent writes a draft based on the topic and instructions. On revise loops, incorporates reviewer fee…</div>
+        
+      </div>
+    
+<div style="color:#9ca3af;font-size:24px;text-align:center">↓</div>
+
+      <div style="width:100%;max-width:420px;border:2px solid #fde68a;border-radius:8px;padding:12px 16px;background:#fffbeb">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span style="font-weight:600;font-size:14px">Review Draft</span>
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#fef3c7;color:#b45309">review</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#dbeafe;color:#2563eb;font-weight:500">👤 Human</span>
+        </div>
+        <div style="font-size:12px;color:#6b7280;margin-top:4px">Review the agent's draft. Approve to finalize, or revise with feedback to send it back.</div>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><span style="display:inline-block;padding:2px 8px;border-radius:9999px;font-size:11px;background:#dcfce7;color:#166534">approve → done</span> <span style="display:inline-block;padding:2px 8px;border-radius:9999px;font-size:11px;background:#fee2e2;color:#991b1b">revise → generate-draft</span></div>
+      </div>
+    
+<div style="color:#9ca3af;font-size:18px;text-align:center">⤷ via verdicts</div>
+
+      <div style="width:100%;max-width:420px;border:2px solid #d1d5db;border-radius:8px;padding:12px 16px;background:#f9fafb">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span style="font-weight:600;font-size:14px">Done</span>
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#e5e7eb;color:#374151">terminal</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+          <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;background:#dbeafe;color:#2563eb;font-weight:500">👤 Human</span>
+        </div>
+        
+        
+      </div>
+    
+      </div>
+      
+    </div>

@@ -41,7 +41,7 @@ export async function chatCoworkSession(
   scope: CallerScope,
 ): Promise<ChatCoworkSessionOutput> {
   const ctx = await loadChatContext(input.sessionId, scope);
-  const mcp = await connectMcp(ctx.session, ctx.namespace);
+  const mcp = await connectMcp(ctx.session, ctx.namespace, ctx.secrets);
   try {
     await addTurn(scope, input.sessionId, humanTurn(input.message));
     const reloaded = await loadOr404(
@@ -72,6 +72,7 @@ export async function chatCoworkSession(
 interface ChatContext {
   readonly session: CoworkSession;
   readonly openRouterKey: string;
+  readonly secrets: Record<string, string>;
   readonly stepContext: Record<string, unknown> | undefined;
   readonly model: string;
   readonly namespace: string;
@@ -116,6 +117,7 @@ async function loadChatContext(
   return {
     session,
     openRouterKey,
+    secrets,
     stepContext: instance.variables as Record<string, unknown> | undefined,
     model: session.model ?? DEFAULT_MODEL,
     namespace,
@@ -127,19 +129,26 @@ interface McpHandle {
   readonly tools: McpToolDefinition[];
 }
 
-async function connectMcp(session: CoworkSession, namespace: string): Promise<McpHandle | null> {
+async function connectMcp(
+  session: CoworkSession,
+  namespace: string,
+  workflowSecrets?: Record<string, string>,
+): Promise<McpHandle | null> {
   if (!session.mcpServers || session.mcpServers.length === 0) return null;
   const serversWithNamespace = session.mcpServers.map((s) => ({
     ...s,
     env: { ...s.env, MEDIFORCE_NAMESPACE: namespace },
   }));
-  const manager = new McpClientManager(serversWithNamespace);
+  const manager = new McpClientManager(serversWithNamespace, {
+    workflowSecrets,
+  });
   try {
     const tools = await manager.connect();
     return { manager, tools };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(`[cowork-chat] MCP connection failed (continuing without MCP tools): ${message}`);
+    if (err instanceof Error && err.stack) console.warn(`[cowork-chat] MCP stack:`, err.stack);
     await manager.disconnect().catch(() => {});
     return null;
   }
