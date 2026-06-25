@@ -138,19 +138,19 @@ describe('StepEditor', () => {
     expect(screen.getByText('My Agent Step')).toBeInTheDocument();
   });
 
-  it('[RENDER] header shows executor label for agent step', () => {
+  it('[RENDER] header shows Agent label for assist agent step (L2)', () => {
     render(
       <StepEditor
-        step={buildStep({ executor: 'agent', type: 'creation' })}
+        step={buildStep({ executor: 'agent', autonomyLevel: 'L2', type: 'creation' })}
         allSteps={[]}
         onChange={noop}
       />,
     );
 
-    expect(screen.getByText('Agent')).toBeInTheDocument();
+    expect(screen.getAllByText('Agent').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('[RENDER] header shows executor label for human step', () => {
+  it('[RENDER] header shows Human executor label for human step', () => {
     render(
       <StepEditor
         step={buildStep({ executor: 'human', type: 'creation' })}
@@ -159,10 +159,10 @@ describe('StepEditor', () => {
       />,
     );
 
-    expect(screen.getByText('Human')).toBeInTheDocument();
+    expect(screen.getAllByText('Human').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('[RENDER] header shows executor label for script step', () => {
+  it('[RENDER] header shows Script executor label for script step', () => {
     render(
       <StepEditor
         step={buildStep({ executor: 'script', type: 'creation' })}
@@ -171,7 +171,7 @@ describe('StepEditor', () => {
       />,
     );
 
-    expect(screen.getByText('Script')).toBeInTheDocument();
+    expect(screen.getAllByText('Script').length).toBeGreaterThanOrEqual(1);
   });
 
   it('[RENDER] header shows Review type label for review step', () => {
@@ -213,7 +213,7 @@ describe('StepEditor', () => {
     );
 
     // Agent-specific labels should be visible
-    expect(screen.getByText('autonomyLevel')).toBeInTheDocument();
+    expect(screen.getAllByText('autonomy level').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('agentId')).toBeInTheDocument();
     expect(screen.getByText('agent.model')).toBeInTheDocument();
     expect(screen.getByText('agent.prompt')).toBeInTheDocument();

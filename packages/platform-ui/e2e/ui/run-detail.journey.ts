@@ -43,7 +43,7 @@ test.describe('Run Detail Journey', () => {
     await expect(completedSteps).toHaveCount(2);
 
     // Duration is visible for a completed run
-    await expect(page.getByText(/duration/i)).toBeVisible();
+    await expect(page.getByText(/^Duration:/i)).toBeVisible();
 
     // Right panel: expand via "Execution Log", then Audit Log tab is visible
     await click(page, page.getByRole('button', { name: /^Execution Log$/i }));

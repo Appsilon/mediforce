@@ -25,13 +25,13 @@ test.describe('Workflow Diagram Journey', () => {
     // Second branch (urgent) is collapsed: Urgent Processing NOT in the diagram
     await expect(page.locator('.react-flow__node').filter({ hasText: 'Urgent Processing' })).not.toBeVisible();
 
-    // The first button is active (has ChevronDown, not ChevronRight)
+    // The first button is active (has Eye icon)
     const standardButton = page.locator('button').filter({ hasText: /type = "standard"/ });
-    await expect(standardButton.locator('svg.lucide-chevron-down')).toBeVisible();
+    await expect(standardButton.locator('svg.lucide-eye')).toBeVisible();
 
-    // The second button is inactive (has ChevronRight)
+    // The second button is inactive (has EyeOff icon)
     const urgentButton = page.locator('button').filter({ hasText: /type = "urgent"/ });
-    await expect(urgentButton.locator('svg.lucide-chevron-right')).toBeVisible();
+    await expect(urgentButton.locator('svg.lucide-eye-off')).toBeVisible();
     await showResult(page);
 
     await endRecording(page);
@@ -57,8 +57,8 @@ test.describe('Workflow Diagram Journey', () => {
     // Standard Processing is now hidden
     await expect(page.locator('.react-flow__node').filter({ hasText: 'Standard Processing' })).not.toBeVisible();
 
-    // Urgent button is now active (ChevronDown)
-    await expect(urgentButton.locator('svg.lucide-chevron-down')).toBeVisible();
+    // Urgent button is now active (Eye icon)
+    await expect(urgentButton.locator('svg.lucide-eye')).toBeVisible();
     await showStep(page);
 
     // Switch back to standard — first branch content reappears
@@ -66,7 +66,7 @@ test.describe('Workflow Diagram Journey', () => {
     await click(page, standardButton);
     await expect(page.locator('.react-flow__node').filter({ hasText: 'Standard Processing' })).toBeVisible({ timeout: 5_000 });
     await expect(page.locator('.react-flow__node').filter({ hasText: 'Urgent Processing' })).not.toBeVisible();
-    await expect(standardButton.locator('svg.lucide-chevron-down')).toBeVisible();
+    await expect(standardButton.locator('svg.lucide-eye')).toBeVisible();
     await showResult(page);
 
     await endRecording(page);
@@ -80,16 +80,16 @@ test.describe('Workflow Diagram Journey', () => {
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
     await showStep(page);
 
-    // Forward branch button "approve" is visible with ChevronDown (active, leads to Done)
+    // Forward branch button "approve" is visible with Eye icon (active branch)
     const approveButton = page.locator('button').filter({ hasText: /^approve$/ });
     await expect(approveButton).toBeVisible();
-    await expect(approveButton.locator('svg.lucide-chevron-down')).toBeVisible();
+    await expect(approveButton.locator('svg.lucide-eye')).toBeVisible();
     await showStep(page);
 
-    // Back-edge button "revise" is visible with amber ArrowUp icon
+    // Back-edge button "revise" is visible with amber ArrowRight icon
     const reviseButton = page.locator('button').filter({ hasText: /^revise$/ });
     await expect(reviseButton).toBeVisible();
-    await expect(reviseButton.locator('svg.lucide-arrow-up')).toBeVisible();
+    await expect(reviseButton.locator('svg.lucide-arrow-right')).toBeVisible();
     await showStep(page);
 
     // The "Done" terminal step is visible (follow-through from approve branch)
