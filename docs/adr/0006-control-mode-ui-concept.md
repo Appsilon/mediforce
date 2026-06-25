@@ -31,15 +31,15 @@ definition schema. The underlying schema fields are unchanged.
 
 ### Mapping table
 
-C-levels (C0–C4) are the UI labels shown in the step picker. They are a presentational axis only and are unrelated to the `autonomyLevel` L0–L4 schema field.
+Control Modes (CM0–CM4) are the UI labels shown in the step picker. They are a presentational axis only and are unrelated to the `autonomyLevel` L0–L4 schema field.
 
-| C-level | Label | `executor` | `autonomyLevel` | Wizard |
+| Control Mode | Label | `executor` | `autonomyLevel` | Wizard |
 |---|---|---|---|---|
-| C0 | No agent | `human` OR `script` OR `action` | — | Enabled |
-| C1 | Assist | — | — | **Disabled (coming soon)** |
-| C2 | Cowork | `cowork` | — | Enabled |
-| C3 | Human review | `agent` | `L3` | Enabled |
-| C4 | Autonomous agent | `agent` | `L4` | Enabled |
+| CM0 | No agent | `human` OR `script` OR `action` | — | Enabled |
+| CM1 | Assist | — | — | **Disabled (coming soon)** |
+| CM2 | Cowork | `cowork` | — | Enabled |
+| CM3 | Human review | `agent` | `L3` | Enabled |
+| CM4 | Autonomous agent | `agent` | `L4` | Enabled |
 
 `executor: 'agent', autonomyLevel: 'L2'` is retained in the schema for backward compat; it maps to the 'assist' control mode for display of existing steps only. No new L2 steps can be created from the wizard.
 
@@ -90,5 +90,5 @@ dual-write.
 - The mapping table in this ADR is the single source of truth for the
   control-mode ↔ schema-fields correspondence. Any change to the mapping
   requires amending this ADR.
-- "Full autonomy" was renamed to "Autonomous agent" (C4) in June 2026.
+- "Full autonomy" was renamed to "Autonomous agent" (CM4) in June 2026.
   Schema value `L4` is unchanged. See AUTONOMY-LEVELS-REFACTOR.md.

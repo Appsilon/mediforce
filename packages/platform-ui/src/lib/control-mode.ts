@@ -5,11 +5,11 @@
  * `ControlMode` exists only in the UI layer and is never written to storage.
  *
  * Mapping (ADR-0006: docs/adr/0006-control-mode-ui-concept.md):
- *   C0  No agent          executor: human | script | action
- *   C1  Assist            not yet implemented — disabled in wizard UI
- *   C2  Cowork            executor: cowork
- *   C3  Human review      executor: agent, autonomyLevel: L3
- *   C4  Autonomous agent  executor: agent, autonomyLevel: L4
+ *   CM0  No agent          executor: human | script | action
+ *   CM1  Assist            not yet implemented — disabled in wizard UI
+ *   CM2  Cowork            executor: cowork
+ *   CM3  Human review      executor: agent, autonomyLevel: L3
+ *   CM4  Autonomous agent  executor: agent, autonomyLevel: L4
  *
  * Note: executor: agent, autonomyLevel: L2 (old Ghost/Assist) maps to 'assist' for
  * display of existing steps, but is no longer creatable from the wizard.
@@ -22,13 +22,13 @@ export type ControlMode =
   | 'human-review'
   | 'autonomous-agent';
 
-/** C-level identifier shown to users (C0–C4). */
+/** Control Mode identifier shown to users (CM0–CM4). */
 export const CONTROL_MODE_NUMBER: Record<ControlMode, string> = {
-  'no-agent':         'C0',
-  'assist':            'C1',
-  'cowork':           'C2',
-  'human-review':     'C3',
-  'autonomous-agent': 'C4',
+  'no-agent':         'CM0',
+  'assist':            'CM1',
+  'cowork':           'CM2',
+  'human-review':     'CM3',
+  'autonomous-agent': 'CM4',
 };
 
 export const CONTROL_MODE_LABELS: Record<ControlMode, string> = {
@@ -78,7 +78,7 @@ export function getControlMode(
 /**
  * Map a control mode back to the executor/autonomyLevel values to write.
  * For 'no-agent', `subExecutor` selects between human/script/action.
- * 'assist' (C1) is disabled in the wizard; this is kept for completeness.
+ * 'assist' (CM1) is disabled in the wizard; this is kept for completeness.
  */
 export function controlModeToSchema(
   mode: ControlMode,

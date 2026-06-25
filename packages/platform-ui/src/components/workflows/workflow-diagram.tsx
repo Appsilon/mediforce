@@ -836,11 +836,11 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
             </div>
           </div>
 
-          {/* Section 2: executor — one row per C-level */}
+          {/* Section 2: executor — one row per Control Mode */}
           <div className="space-y-1">
             <p className="text-[11px] font-medium text-muted-foreground">Who executes this step?</p>
 
-            {/* C0 */}
+            {/* CM0 */}
             <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
               <span className="w-14 shrink-0 flex items-center">
                 <User className="h-4 w-4 text-orange-400 dark:text-orange-500" />
@@ -868,7 +868,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
               <span className="text-[10px] text-muted-foreground whitespace-nowrap">No AI involved</span>
             </div>
 
-            {/* C1: Assist — disabled, coming soon */}
+            {/* CM1: Assist — disabled, coming soon */}
             <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5 opacity-50">
               <span className="w-14 shrink-0 flex items-center gap-0.5">
                 <User className="h-4 w-4 text-lime-500 dark:text-lime-400 shrink-0" />
@@ -883,7 +883,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
               <span className="text-[10px] text-muted-foreground whitespace-nowrap">Human executes, AI reviews — <em>coming soon</em></span>
             </div>
 
-            {/* C2: Cowork */}
+            {/* CM2: Cowork */}
             <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
               <span className="w-14 shrink-0 flex items-center gap-0.5">
                 <User className="h-4 w-4 text-teal-500 dark:text-teal-400 shrink-0" />
@@ -902,7 +902,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
               <span className="text-[10px] text-muted-foreground whitespace-nowrap">Human and AI collaborate in real time</span>
             </div>
 
-            {/* C3: Human review */}
+            {/* CM3: Human review */}
             <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
               <span className="w-14 shrink-0 flex items-center gap-0.5">
                 <Bot className="h-4 w-4 text-indigo-500 dark:text-indigo-400 shrink-0" />
@@ -924,7 +924,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
               <span className="text-[10px] text-muted-foreground whitespace-nowrap">AI executes, human reviews before proceeding</span>
             </div>
 
-            {/* C4: Autonomous agent */}
+            {/* CM4: Autonomous agent */}
             <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
               <span className="w-14 shrink-0 flex items-center">
                 <Bot className="h-4 w-4 text-violet-500 dark:text-violet-400" />
