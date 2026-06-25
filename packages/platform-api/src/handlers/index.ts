@@ -45,6 +45,8 @@ export { copyWorkflow } from './workflows/copy-workflow';
 export { setDefaultWorkflowVersion } from './workflows/set-default-version';
 export { deleteWorkflow } from './workflows/delete-workflow';
 export { transferWorkflowNamespace } from './workflows/transfer-workflow';
+export { importWorkflow } from './workflows/import-workflow';
+export { getManifest } from './workflows/get-manifest';
 export { getWorkflowRunCount } from './workflows/get-run-count';
 export { checkRetiredModels } from './workflows/retired-model-check';
 

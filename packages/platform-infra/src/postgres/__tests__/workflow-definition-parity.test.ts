@@ -60,6 +60,11 @@ function contract(
       const def = definitionFor('ws-1', {
         title: 'My WD',
         metadata: { owner: 'team-x' },
+        source: {
+          url: 'https://github.com/Appsilon/mediforce-workflows',
+          path: 'workflows/adverse-event-review.wd.json',
+          commit: 'abc1234abc1234abc1234abc1234abc1234abc12',
+        },
       });
       await repo.saveWorkflowDefinition(def);
 
@@ -70,6 +75,11 @@ function contract(
       expect(fetched?.version).toBe(1);
       expect(fetched?.title).toBe('My WD');
       expect(fetched?.metadata).toEqual({ owner: 'team-x' });
+      expect(fetched?.source).toEqual({
+        url: 'https://github.com/Appsilon/mediforce-workflows',
+        path: 'workflows/adverse-event-review.wd.json',
+        commit: 'abc1234abc1234abc1234abc1234abc1234abc12',
+      });
     });
 
     it('getWorkflowDefinition returns null for unknown triple', async () => {
@@ -367,6 +377,40 @@ describe.skipIf(skipPg)('PostgresProcessRepository (parity)', () => {
     const bogus = definitionFor(ns);
     (bogus as unknown as { steps: unknown }).steps = [];
     await expect(repo.saveWorkflowDefinition(bogus)).rejects.toThrow();
+  });
+
+  it('reads a row with a legacy-shaped source by dropping the source, not the whole definition', async () => {
+    const db = drizzle(testClient, { schema });
+    const repo = new PostgresProcessRepository(db);
+    const nsRepo = new PostgresNamespaceRepository(db);
+    const ns = `ws-legacy-${randomBytes(4).toString('hex')}`;
+    await nsRepo.createNamespace({
+      handle: ns,
+      type: 'organization',
+      displayName: ns,
+      createdAt: '2026-05-27T00:00:00.000Z',
+    });
+
+    // Insert a row carrying the pre-commit `{ repo, path, ref }` source shape
+    // directly, bypassing save-time validation, to mimic a row written before
+    // the commit-pinned `source` schema landed.
+    await testClient.unsafe(
+      `INSERT INTO "${schemaName}"."workflow_definitions"
+        (workspace, name, version, visibility, steps, transitions, triggers, source)
+       VALUES ($1, $2, 1, 'private', $3::jsonb, '[]'::jsonb, $4::jsonb, $5::jsonb)`,
+      [
+        ns,
+        'legacy-src',
+        JSON.stringify([{ id: 'intake', name: 'Intake', type: 'creation', executor: 'human' }]),
+        JSON.stringify([{ type: 'manual', name: 'manual' }]),
+        JSON.stringify({ repo: 'https://github.com/Appsilon/x', path: 'a.wd.json', ref: 'main' }),
+      ],
+    );
+
+    const fetched = await repo.getWorkflowDefinition(ns, 'legacy-src', 1);
+    expect(fetched).not.toBeNull();
+    expect(fetched?.name).toBe('legacy-src');
+    expect(fetched?.source).toBeUndefined();
   });
 
   contract('PostgresProcessRepository', async () => {
