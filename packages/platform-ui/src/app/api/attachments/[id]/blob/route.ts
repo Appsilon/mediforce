@@ -50,6 +50,9 @@ export function makeGET(
           'Content-Type': attachment.contentType,
           'Content-Length': String(attachment.sizeBytes),
           'Content-Disposition': attachmentContentDisposition(attachment.name),
+          // Defense-in-depth: the content-type is browser-supplied at upload,
+          // so forbid MIME sniffing on top of the forced attachment disposition.
+          'X-Content-Type-Options': 'nosniff',
         },
       });
     } catch (err) {

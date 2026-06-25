@@ -158,6 +158,7 @@ describe('attachments routes ↔ FilesystemBlobStore (route-level integration)',
     expect(res.headers.get('Content-Type')).toBe('text/plain');
     expect(res.headers.get('Content-Length')).toBe(String(bytes.length));
     expect(res.headers.get('Content-Disposition')).toContain('report.txt');
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
 
     const received = Buffer.from(await res.arrayBuffer());
     expect(received.equals(bytes)).toBe(true);
