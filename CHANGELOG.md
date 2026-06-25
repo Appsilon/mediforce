@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Changed
+- Autonomy levels overhaul across workflow designer and execution history — step-add popover is now a two-step wizard (pick step type, then pick executor: human / agent / script / cowork); step editor shows executor identity and L2/L3/L4 autonomy level instead of the "control mode" abstraction; execution history chips and the agent run table surface the raw autonomy level badge; executor identity in step history renders as `agent:<plugin>`; branch icons in the decision diagram updated to chevrons; schema fields (`executor`, `autonomyLevel`) unchanged [#783](https://github.com/Appsilon/mediforce/pull/783).
+
 ### Added
 - Docker image validation at workflow registration — server warns when a referenced image is not found on the platform, CLI deduplicates server vs local warnings, and the workflow editor shows an amber toast on save [#734](https://github.com/Appsilon/mediforce/pull/734).
 - SMTP email provider as alternative to Mailgun — organisations can now use their own SMTP infrastructure instead of Mailgun by setting `SMTP_*` env vars; `EMAIL_PROVIDER` auto-detects or can be set explicitly; includes read-only admin status page, `mediforce email status` CLI command, and bootstrap script prompts for initial setup [#748](https://github.com/Appsilon/mediforce/issues/748).
