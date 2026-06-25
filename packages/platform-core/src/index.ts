@@ -403,6 +403,6 @@ export { formatBytes } from './utils/format';
 export { compact, parseRow } from './utils/compact';
 export { normaliseModelId } from './utils/normalise-model-id';
 
-// Workflow examples — shared loader for MCP tool, tests, and build scripts
-export { loadWorkflowExamples } from './workflow-examples';
-export type { WorkflowExample, WorkflowAntiPattern } from './workflow-examples';
+// Workflow examples — shared loader for MCP tool, tests, and build scripts.
+// Uses Node.js fs/path so NOT exported from this barrel (breaks browser bundles).
+// Import directly: import { loadWorkflowExamples } from '@mediforce/platform-core/src/workflow-examples'

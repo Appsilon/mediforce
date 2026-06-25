@@ -26,7 +26,7 @@ import {
   RenderWorkflowDiagramInputSchema,
 } from '@mediforce/platform-api/handlers';
 import { Mediforce } from '@mediforce/platform-api/client';
-import { loadWorkflowExamples } from '@mediforce/platform-core';
+import { loadWorkflowExamples } from '@mediforce/platform-core/src/workflow-examples';
 
 const server = new McpServer({
   name: 'mediforce-mcp',
