@@ -236,6 +236,9 @@ importers:
       '@mediforce/platform-api':
         specifier: workspace:*
         version: link:../platform-api
+      '@mediforce/platform-core':
+        specifier: workspace:*
+        version: link:../platform-core
       '@modelcontextprotocol/sdk':
         specifier: ^1.12.1
         version: 1.29.0(zod@4.4.3)
