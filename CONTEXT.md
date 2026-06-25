@@ -47,6 +47,13 @@ a Workflow Run is instantiated from one specific Workflow Definition (version).
 _Avoid_: Process Definition (legacy schema name, replaced by Workflow
 Definition), conflating with the parent Workflow.
 
+**Workflow Package**:
+Externally maintained authoring bundle for a Workflow Definition and its
+supporting assets, treated as the source material from which Workflow
+Definitions are registered.
+_Avoid_: treating the registered Workflow Definition as the authoring source of
+truth.
+
 **Workflow Run** *(today's `ProcessInstance` — rename to `WorkflowRun` proposed)*:
 One execution of a Workflow Definition. Tracks current step, status,
 accumulated variables, trigger payload, total cost, deleted/archived flags.
@@ -64,6 +71,11 @@ A node in a Workflow Definition's DAG. Defines `executor: human | agent |
 script | cowork | action`, optional autonomy level (agent steps),
 allowed roles, verdicts, params.
 _Avoid_: "Step" alone (ambiguous — config or runtime instance?).
+
+**Step Kind**:
+The graph/UI role of a Workflow Step: creation, review, decision, or terminal.
+_Avoid_: "Step type" when meaning executor; `type` is the JSON field name for
+Step Kind, while `executor` selects the runtime.
 
 **Step Execution** *(runtime; one attempt)*:
 One attempt to execute one Workflow Step inside a Workflow Run. Captures
@@ -322,6 +334,8 @@ the user-facing immutable log.
   **Tool Catalog**.
 - A **Workflow** has many versioned **Workflow Definitions**; its `visibility`
   controls cross-Namespace read access.
+- A **Workflow Package** can produce many registered **Workflow Definitions** over
+  time, one per registered version.
 - A **Workflow Run** belongs to exactly one **Workflow Definition**
   (`name`+`version` identifies which version of which Workflow).
 - A **Workflow Run** has many **Step Executions**.
