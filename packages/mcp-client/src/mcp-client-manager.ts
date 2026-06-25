@@ -134,9 +134,8 @@ export class McpClientManager {
     });
 
     const stderrChunks: Buffer[] = [];
-    const stderrStream = (transport as { _stderrStream?: NodeJS.ReadableStream })._stderrStream;
-    if (stderrStream) {
-      stderrStream.on('data', (c: Buffer) => stderrChunks.push(c));
+    if (transport instanceof StdioClientTransport && transport.stderr) {
+      transport.stderr.on('data', (c: Buffer) => stderrChunks.push(c));
     }
 
     try {
@@ -144,7 +143,7 @@ export class McpClientManager {
     } catch (err) {
       await new Promise((r) => setTimeout(r, 300));
       const stderrText = Buffer.concat(stderrChunks).toString().trim();
-      if (stderrText) console.error(`[MCP] stderr from '${serverConfig.name}':\n${stderrText}`);
+      if (MCP_DEBUG && stderrText) console.error(`[MCP] stderr from '${serverConfig.name}':\n${stderrText}`);
       throw err;
     }
 
