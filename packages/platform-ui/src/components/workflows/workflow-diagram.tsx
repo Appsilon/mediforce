@@ -17,7 +17,7 @@ import {
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { User, Bot, Terminal, Trash2, Plus, PenLine, Search, GitBranch, ArrowUp, ArrowDown, ChevronRight, ChevronDown, AlertTriangle, Zap } from 'lucide-react';
+import { User, Bot, Terminal, Trash2, Plus, PenLine, Search, GitBranch, ArrowUp, ArrowDown, ArrowRight, ChevronRight, ChevronDown, AlertTriangle, Zap, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import {
@@ -290,10 +290,10 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
               >
                 <span className="truncate flex-1">{branch.label}</span>
                 {branch.isBackEdge
-                  ? <ArrowUp className="h-3 w-3 shrink-0 text-amber-500 dark:text-amber-400" />
+                  ? <ArrowRight className="h-3 w-3 shrink-0 text-amber-500 dark:text-amber-400" />
                   : branch.isActive
-                  ? <ChevronDown className="h-3 w-3 shrink-0 text-blue-500 dark:text-blue-400" />
-                  : <ChevronRight className="h-3 w-3 shrink-0 text-slate-400 dark:text-slate-500" />
+                  ? <Eye className="h-3 w-3 shrink-0 text-blue-500 dark:text-blue-400" />
+                  : <EyeOff className="h-3 w-3 shrink-0 text-slate-400 dark:text-slate-500" />
                 }
               </button>
             ))}
@@ -674,11 +674,11 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
     onAdd: (payload: NewStepPayload) => void;
     edgeId: string;
   } | null>(null);
-  const [pendingType, setPendingType] = useState<'creation' | 'review' | 'decision' | null>(null);
+  const [pendingType, setPendingType] = useState<'creation' | 'decision'>('creation');
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const resetWizard = useCallback(() => {
-    setPendingType(null);
+    setPendingType('creation');
   }, []);
 
   useEffect(() => {
@@ -803,64 +803,146 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
           }}
           className="bg-background border rounded-xl shadow-xl p-3 w-[500px] space-y-3"
         >
-          {pendingType === null ? (
-            <>
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Step Type</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={(e) => { e.stopPropagation(); setPendingType('creation'); }}
-                  className="flex-1 flex flex-col items-start gap-1 rounded-lg py-2 px-3 text-xs font-semibold border transition-all hover:bg-blue-50 hover:border-blue-300 dark:hover:bg-blue-900/20 dark:hover:border-blue-700"
-                >
-                  <span className="flex items-center gap-1.5"><PenLine className="h-3.5 w-3.5 shrink-0 text-blue-500" strokeWidth={1.5} />Creation</span>
-                  <p className="font-normal text-muted-foreground text-left">A step where content or data is produced — by a human, an AI agent, or a script.</p>
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setPendingType('review'); }}
-                  className="flex-1 flex flex-col items-start gap-1 rounded-lg py-2 px-3 text-xs font-semibold border transition-all hover:bg-amber-50 hover:border-amber-300 dark:hover:bg-amber-900/20 dark:hover:border-amber-700"
-                >
-                  <span className="flex items-center gap-1.5"><Search className="h-3.5 w-3.5 shrink-0 text-amber-500" strokeWidth={1.5} />Review</span>
-                  <p className="font-normal text-muted-foreground text-left">A step where someone evaluates work and gives a verdict such as approve or reject.</p>
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setPendingType('decision'); }}
-                  className="flex-1 flex flex-col items-start gap-1 rounded-lg py-2 px-3 text-xs font-semibold border transition-all hover:bg-purple-50 hover:border-purple-300 dark:hover:bg-purple-900/20 dark:hover:border-purple-700"
-                >
-                  <span className="flex items-center gap-1.5"><GitBranch className="h-3.5 w-3.5 shrink-0 text-purple-500" strokeWidth={1.5} />Decision</span>
-                  <p className="font-normal text-muted-foreground text-left">A branching step that routes the workflow to different paths based on a condition.</p>
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Who handles this step?</p>
-              <div className="flex gap-2">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Add new step</p>
+
+          {/* Section 1: step type */}
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-medium text-muted-foreground">What do you want to do in this step?</p>
+            <div className="flex gap-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); setPendingType('creation'); }}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-lg py-1.5 px-3 text-xs font-semibold border transition-all whitespace-nowrap',
+                  pendingType === 'creation'
+                    ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700'
+                    : 'hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 hover:ring-1 hover:ring-blue-300 dark:hover:bg-blue-900/20 dark:hover:text-blue-300 dark:hover:ring-blue-700',
+                )}
+              >
+                <PenLine className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+                Create new result
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setPendingType('decision'); }}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-lg py-1.5 px-3 text-xs font-semibold border transition-all whitespace-nowrap',
+                  pendingType === 'decision'
+                    ? 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700'
+                    : 'hover:bg-purple-50 hover:text-purple-700 hover:border-purple-300 hover:ring-1 hover:ring-purple-300 dark:hover:bg-purple-900/20 dark:hover:text-purple-300 dark:hover:ring-purple-700',
+                )}
+              >
+                <GitBranch className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+                Make a decision
+              </button>
+            </div>
+          </div>
+
+          {/* Section 2: executor — one row per C-level */}
+          <div className="space-y-1">
+            <p className="text-[11px] font-medium text-muted-foreground">Who executes this step?</p>
+
+            {/* C0 */}
+            <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
+              <span className="w-14 shrink-0 flex items-center">
+                <User className="h-4 w-4 text-orange-400 dark:text-orange-500" />
+              </span>
+              <div className="flex gap-1.5 shrink-0">
                 <button
                   onClick={(e) => { e.stopPropagation(); popover.onAdd({ type: pendingType, executor: 'human' }); setPopover(null); }}
-                  className="inline-flex items-center gap-1 rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap hover:bg-orange-50 hover:text-orange-700 hover:border-orange-400 dark:hover:bg-orange-950/20 dark:hover:text-orange-300"
+                  className="inline-flex items-center gap-1 rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap hover:bg-orange-50 hover:text-orange-700 hover:border-orange-400 hover:ring-1 hover:ring-orange-200 dark:hover:bg-orange-950/20 dark:hover:text-orange-300 dark:hover:border-orange-500 dark:hover:ring-orange-800"
                 >
-                  <User className="h-3 w-3 shrink-0" />human
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); popover.onAdd({ type: pendingType, executor: 'agent' }); setPopover(null); }}
-                  className="inline-flex items-center gap-1 rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap hover:bg-violet-50 hover:text-violet-700 hover:border-violet-400 dark:hover:bg-violet-950/20 dark:hover:text-violet-300"
-                >
-                  <Bot className="h-3 w-3 shrink-0" />agent
+                  <User className="h-3 w-3 shrink-0" />Human
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); popover.onAdd({ type: pendingType, executor: 'script' }); setPopover(null); }}
-                  className="inline-flex items-center gap-1 rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-400 dark:hover:bg-yellow-950/20 dark:hover:text-yellow-300"
+                  className="inline-flex items-center gap-1 rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-400 hover:ring-1 hover:ring-yellow-200 dark:hover:bg-yellow-950/20 dark:hover:text-yellow-300 dark:hover:border-yellow-500 dark:hover:ring-yellow-800"
                 >
-                  <Terminal className="h-3 w-3 shrink-0" />script
+                  <Terminal className="h-3 w-3 shrink-0" />Script
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); popover.onAdd({ type: pendingType, executor: 'cowork', cowork: { agent: 'chat' } }); setPopover(null); }}
-                  className="inline-flex items-center gap-1 rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap hover:bg-teal-50 hover:text-teal-700 hover:border-teal-400 dark:hover:bg-teal-950/20 dark:hover:text-teal-300"
+                  onClick={(e) => { e.stopPropagation(); popover.onAdd({ type: pendingType, executor: 'action' }); setPopover(null); }}
+                  className="inline-flex items-center gap-1 rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap hover:bg-pink-50 hover:text-pink-700 hover:border-pink-400 hover:ring-1 hover:ring-pink-200 dark:hover:bg-pink-950/20 dark:hover:text-pink-300 dark:hover:border-pink-500 dark:hover:ring-pink-800"
                 >
-                  <User className="h-3 w-3 shrink-0" />cowork
+                  <Zap className="h-3 w-3 shrink-0" />Action
                 </button>
               </div>
-            </>
-          )}
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">No AI involved</span>
+            </div>
+
+            {/* C1: Assist — disabled, coming soon */}
+            <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5 opacity-50">
+              <span className="w-14 shrink-0 flex items-center gap-0.5">
+                <User className="h-4 w-4 text-lime-500 dark:text-lime-400 shrink-0" />
+                <span className="relative inline-flex shrink-0">
+                  <Bot className="h-4 w-4 text-lime-500 dark:text-lime-400" />
+                  <Search className="absolute -bottom-0.5 -right-1.5 h-2.5 w-2.5 text-lime-500 dark:text-lime-400" strokeWidth={2.5} />
+                </span>
+              </span>
+              <button disabled className="w-36 text-left rounded-md py-1 px-2.5 text-xs font-semibold border cursor-not-allowed whitespace-nowrap shrink-0">
+                Assist
+              </button>
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">Human executes, AI reviews — <em>coming soon</em></span>
+            </div>
+
+            {/* C2: Cowork */}
+            <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
+              <span className="w-14 shrink-0 flex items-center gap-0.5">
+                <User className="h-4 w-4 text-teal-500 dark:text-teal-400 shrink-0" />
+                <Bot className="h-4 w-4 text-teal-500 dark:text-teal-400 shrink-0" />
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  popover.onAdd({ type: pendingType, executor: 'cowork', cowork: { agent: 'chat' } });
+                  setPopover(null);
+                }}
+                className="w-36 text-left rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap shrink-0 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-400 hover:ring-1 hover:ring-teal-200 dark:hover:bg-teal-900/20 dark:hover:text-teal-300 dark:hover:border-teal-600 dark:hover:ring-teal-800"
+              >
+                Cowork
+              </button>
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">Human and AI collaborate in real time</span>
+            </div>
+
+            {/* C3: Human review */}
+            <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
+              <span className="w-14 shrink-0 flex items-center gap-0.5">
+                <Bot className="h-4 w-4 text-indigo-500 dark:text-indigo-400 shrink-0" />
+                <span className="relative inline-flex shrink-0">
+                  <User className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />
+                  <Search className="absolute -bottom-0.5 -right-1.5 h-2.5 w-2.5 text-indigo-500 dark:text-indigo-400" strokeWidth={2.5} />
+                </span>
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  popover.onAdd({ type: pendingType, executor: 'agent', autonomyLevel: 'L3' });
+                  setPopover(null);
+                }}
+                className="w-36 text-left rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap shrink-0 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-400 hover:ring-1 hover:ring-indigo-200 dark:hover:bg-indigo-950/20 dark:hover:text-indigo-300 dark:hover:border-indigo-500 dark:hover:ring-indigo-800"
+              >
+                Human review
+              </button>
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">AI executes, human reviews before proceeding</span>
+            </div>
+
+            {/* C4: Autonomous agent */}
+            <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
+              <span className="w-14 shrink-0 flex items-center">
+                <Bot className="h-4 w-4 text-violet-500 dark:text-violet-400" />
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  popover.onAdd({ type: pendingType, executor: 'agent', autonomyLevel: 'L4' });
+                  setPopover(null);
+                }}
+                className="w-36 text-left rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap shrink-0 hover:bg-violet-50 hover:text-violet-700 hover:border-violet-400 hover:ring-1 hover:ring-violet-200 dark:hover:bg-violet-950/20 dark:hover:text-violet-300 dark:hover:border-violet-500 dark:hover:ring-violet-800"
+              >
+                Autonomous agent
+              </button>
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">AI executes without waiting for human review</span>
+            </div>
+
+          </div>
         </div>,
         document.body,
       )}

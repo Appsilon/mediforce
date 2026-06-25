@@ -95,7 +95,7 @@ export function controlModeToSchema(
 
 /** Payload for creating a new step from the wizard popover. */
 export type NewStepPayload = {
-  type: 'creation' | 'review' | 'decision';
+  type: 'creation' | 'decision';
   executor: string;
   autonomyLevel?: string;
   agentId?: string;
