@@ -46,6 +46,21 @@ export { PostgresAgentEventLog } from './postgres/agent-event-log';
 // Blob storage (ADR-0003 task attachments).
 export { FilesystemBlobStore } from './storage/filesystem-blob-store';
 
+// One-off Firebase Storage → BlobStore migration (ADR-0003 PR3).
+export {
+  blobKeyForStoragePath,
+  copyFirebaseAttachments,
+  LegacyTaskAttachmentSchema,
+  type CopyDependencies,
+  type CopyOptions,
+  type FailedEntry,
+  type FirebaseAttachmentExport,
+  type LegacyTaskAttachment,
+  type MigratedEntry,
+  type MigrationReport,
+  type SkippedEntry,
+} from './migration/copy-firebase-attachments';
+
 // Crypto + sync
 export { validateSecretsKey } from './crypto/secrets-cipher';
 export { syncFromOpenRouter, syncWithRetry } from './sync/openrouter-sync';

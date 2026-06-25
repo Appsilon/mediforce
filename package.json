@@ -25,7 +25,8 @@
     "start": "pnpm --filter @mediforce/platform-ui start",
     "db:migrate": "pnpm --filter @mediforce/platform-infra exec drizzle-kit migrate",
     "db:generate": "pnpm --filter @mediforce/platform-infra exec drizzle-kit generate",
-    "link:cli": "python3 scripts/link-cli.py"
+    "link:cli": "python3 scripts/link-cli.py",
+    "migrate:attachments": "tsx scripts/migrate-firebase-attachments.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -56,13 +57,16 @@
   },
   "devDependencies": {
     "@mediforce/cli": "workspace:*",
+    "@mediforce/platform-infra": "workspace:*",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^24.12.2",
     "@vitest/coverage-v8": "^4.1.4",
+    "firebase-admin": "^14.0.0",
     "ts-morph": "^28.0.0",
     "tsx": "latest",
     "typescript": "~6.0.0",
     "vite": "8.0.16",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "zod": "^4.0.0"
   }
 }
