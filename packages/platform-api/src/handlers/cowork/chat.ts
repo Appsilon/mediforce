@@ -148,7 +148,6 @@ async function connectMcp(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(`[cowork-chat] MCP connection failed (continuing without MCP tools): ${message}`);
-    if (err instanceof Error && err.stack) console.warn(`[cowork-chat] MCP stack:`, err.stack);
     await manager.disconnect().catch(() => {});
     return null;
   }

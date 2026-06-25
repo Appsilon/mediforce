@@ -16,7 +16,6 @@
  * API tools require APP_BASE_URL + PLATFORM_API_KEY env vars.
  * Runs via stdio transport.
  */
-import { readdirSync, readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { z } from 'zod';
@@ -27,6 +26,7 @@ import {
   RenderWorkflowDiagramInputSchema,
 } from '@mediforce/platform-api/handlers';
 import { Mediforce } from '@mediforce/platform-api/client';
+import { loadWorkflowExamples } from '@mediforce/platform-core';
 
 const server = new McpServer({
   name: 'mediforce-mcp',
@@ -429,45 +429,7 @@ server.registerTool(
 
 // --- list_workflow_examples --------------------------------------------------
 
-function loadWorkflowExamples() {
-  const __dir = dirname(fileURLToPath(import.meta.url));
-  const examplesDir = resolve(__dir, '../../../docs/workflow-examples');
-  const antiPatternsDir = resolve(examplesDir, 'anti-patterns');
-
-  const examples = existsSync(examplesDir)
-    ? readdirSync(examplesDir)
-        .filter(f => f.endsWith('.wd.json'))
-        .sort()
-        .map(f => {
-          const def = JSON.parse(readFileSync(resolve(examplesDir, f), 'utf8'));
-          return {
-            file: f,
-            name: def.name,
-            title: def.title,
-            description: def.description,
-            definition: def,
-          };
-        })
-    : [];
-
-  const antiPatterns = existsSync(antiPatternsDir)
-    ? readdirSync(antiPatternsDir)
-        .filter(f => f.endsWith('.json'))
-        .sort()
-        .map(f => {
-          const raw = JSON.parse(readFileSync(resolve(antiPatternsDir, f), 'utf8'));
-          return {
-            name: raw.name,
-            description: raw.description,
-            why: raw.why,
-            fix: raw.fix,
-            definition: raw.definition,
-          };
-        })
-    : [];
-
-  return { examples, antiPatterns };
-}
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 server.registerTool(
   'list_workflow_examples',
@@ -480,7 +442,7 @@ server.registerTool(
     inputSchema: {},
   },
   async () => {
-    const { examples, antiPatterns } = loadWorkflowExamples();
+    const { examples, antiPatterns } = loadWorkflowExamples(repoRoot);
     return mcpJson({
       count: examples.length,
       examples: examples.map(e => ({
