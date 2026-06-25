@@ -1,0 +1,26 @@
+{
+  "name": "script-config-in-agent",
+  "description": "Putting script runtime/inlineScript in the agent block instead of the script block",
+  "why": "After ADR-0008, script configuration lives in step.script, not step.agent. The agent block is forbidden on script steps — the engine rejects it at registration.",
+  "fix": "Move runtime and inlineScript from step.agent to step.script. Remove the agent block entirely.",
+  "expectedError": "agent config is not allowed on script steps",
+  "definition": {
+    "name": "anti-script-in-agent",
+    "triggers": [{ "type": "manual", "name": "manual" }],
+    "steps": [
+      {
+        "id": "run-script",
+        "name": "Run Script",
+        "type": "creation",
+        "executor": "script",
+        "plugin": "script-container",
+        "agent": {
+          "runtime": "javascript",
+          "inlineScript": "console.log('wrong location')"
+        }
+      },
+      { "id": "done", "name": "Done", "type": "terminal", "executor": "human" }
+    ],
+    "transitions": [{ "from": "run-script", "to": "done" }]
+  }
+}

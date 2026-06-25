@@ -114,6 +114,7 @@ export class McpClientManager {
         command: serverConfig.command,
         args: serverConfig.args ?? [],
         env: spawnEnv,
+        stderr: 'pipe',
         ...(cwd ? { cwd } : {}),
       });
       transport.onerror = (err) => {
@@ -132,17 +133,17 @@ export class McpClientManager {
       version: '1.0.0',
     });
 
+    const stderrChunks: Buffer[] = [];
+    if (transport instanceof StdioClientTransport && transport.stderr) {
+      transport.stderr.on('data', (c: Buffer) => stderrChunks.push(c));
+    }
+
     try {
       await client.connect(transport);
     } catch (err) {
-      const stderr = (transport as { _process?: { stderr?: NodeJS.ReadableStream } })._process?.stderr;
-      if (stderr) {
-        const chunks: Buffer[] = [];
-        stderr.on('data', (c: Buffer) => chunks.push(c));
-        await new Promise((r) => setTimeout(r, 500));
-        const stderrText = Buffer.concat(chunks).toString().trim();
-        if (MCP_DEBUG && stderrText) console.error(`[MCP] stderr from '${serverConfig.name}':\n${stderrText}`);
-      }
+      await new Promise((r) => setTimeout(r, 300));
+      const stderrText = Buffer.concat(stderrChunks).toString().trim();
+      if (MCP_DEBUG && stderrText) console.error(`[MCP] stderr from '${serverConfig.name}':\n${stderrText}`);
       throw err;
     }
 

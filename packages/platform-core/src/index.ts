@@ -402,3 +402,7 @@ export { calculateEstimatedCost } from './utils/cost';
 export { formatBytes } from './utils/format';
 export { compact, parseRow } from './utils/compact';
 export { normaliseModelId } from './utils/normalise-model-id';
+
+// Workflow examples — shared loader for MCP tool, tests, and build scripts
+export { loadWorkflowExamples } from './workflow-examples';
+export type { WorkflowExample, WorkflowAntiPattern } from './workflow-examples';

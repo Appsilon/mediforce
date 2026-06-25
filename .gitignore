@@ -47,6 +47,9 @@ test-results/
 blob-report/
 
 coverage/
+
+# generated diagram snippets (regenerate with: node --import tsx docs/workflow-examples/build-diagrams.mjs)
+docs/workflow-examples/*.diagram.html
 .vercel
 packages/platform-ui/.emulator-data
 .claude/scheduled_tasks.lock

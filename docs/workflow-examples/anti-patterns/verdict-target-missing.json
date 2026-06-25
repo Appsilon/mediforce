@@ -1,0 +1,28 @@
+{
+  "name": "verdict-target-missing",
+  "description": "Verdict target pointing to a step ID that doesn't exist",
+  "why": "Every verdict target must reference an existing step ID. A typo or renamed step causes the workflow to break at runtime — the engine cannot find the target step to advance to.",
+  "fix": "Check that all verdict targets match actual step IDs. Use the same kebab-case naming consistently.",
+  "expectedError": "does not match any step",
+  "definition": {
+    "name": "anti-verdict-bad-target",
+    "triggers": [{ "type": "manual", "name": "manual" }],
+    "steps": [
+      { "id": "create", "name": "Create", "type": "creation", "executor": "human" },
+      {
+        "id": "review",
+        "name": "Review",
+        "type": "review",
+        "executor": "human",
+        "verdicts": {
+          "approve": { "target": "nonexistent-step" },
+          "revise": { "target": "create" }
+        }
+      },
+      { "id": "done", "name": "Done", "type": "terminal", "executor": "human" }
+    ],
+    "transitions": [
+      { "from": "create", "to": "review" }
+    ]
+  }
+}
