@@ -22,10 +22,10 @@ test.describe('Agent Oversight Journey', () => {
     await click(page, page.getByRole('tab', { name: 'Run History' }));
     await expect(page.getByText('Narrative Summary').first()).toBeVisible({ timeout: 10_000 });
 
-    // Autonomy column and badges
+    // Autonomy column shows control mode labels, not raw L-level codes
     await expect(page.getByRole('columnheader', { name: 'Autonomy' })).toBeVisible();
-    await expect(page.getByText('L2').first()).toBeVisible();
-    await expect(page.getByText('L4').first()).toBeVisible();
+    await expect(page.getByText('Assist').first()).toBeVisible();
+    await expect(page.getByText('Autonomous agent').first()).toBeVisible();
 
     // Link to detail page
     const link = page.locator(`a[href*="/agents/${RUN_COMPLETED_1_ID}"]`);
