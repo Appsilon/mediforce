@@ -9,6 +9,7 @@ import { ConfidenceBadge } from './confidence-badge';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
+import { getControlMode, CONTROL_MODE_LABELS } from '@/lib/control-mode';
 import type { LucideIcon } from 'lucide-react';
 
 function getPluginDisplay(pluginId: string): { Icon: LucideIcon; colorClass: string; label: string } {
@@ -98,7 +99,7 @@ export function AgentRunListTable({
                 </td>
                 <td className="px-4 py-3">
                   {run.autonomyLevel
-                    ? <span className="inline-flex rounded px-1.5 py-0.5 text-xs font-medium bg-muted text-muted-foreground">{run.autonomyLevel}</span>
+                    ? <span className="inline-flex rounded px-1.5 py-0.5 text-xs font-medium bg-muted text-muted-foreground">{CONTROL_MODE_LABELS[getControlMode('agent', run.autonomyLevel)]}</span>
                     : <span className="text-xs text-muted-foreground">—</span>}
                 </td>
                 <td className="px-4 py-3">

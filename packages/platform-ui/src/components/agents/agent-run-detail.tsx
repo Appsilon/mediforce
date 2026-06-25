@@ -230,9 +230,7 @@ export function AgentRunDetail({
             <LightFormattedData data={envelope.result} />
           ) : (
             <p className="text-xs text-muted-foreground italic">
-              {run.autonomyLevel === 'L0' || run.autonomyLevel === 'L1'
-                ? `No structured output — ${run.autonomyLevel} agents are annotation-only`
-                : 'No output produced'}
+              {'No output produced'}
             </p>
           )}
         </CollapsibleSection>
