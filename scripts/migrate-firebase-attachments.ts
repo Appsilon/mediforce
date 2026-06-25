@@ -12,25 +12,33 @@
  * deleted in PR1) — listed and counted, never copied.
  *
  * The copy logic is the pure, unit-tested `copyFirebaseAttachments`
- * (platform-infra) — this file is only the Firebase + Postgres shell around it.
+ * (platform-infra `migration/`, deep-imported — deliberately NOT on the shipped
+ * package surface) — this file is only the Firebase + Postgres shell around it.
  *
  * Run (staging only — never production):
  *   DATABASE_URL=… NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=… MEDIFORCE_DATA_DIR=… \
- *     pnpm tsx scripts/migrate-firebase-attachments.ts [--dry-run]
+ *     pnpm migrate:attachments [--dry-run]
+ *
+ * Throwaway: this script, the `migrate:attachments` npm script, the root
+ * `firebase-admin` / `zod` / `@mediforce/platform-infra` devDependencies, and
+ * `platform-infra/src/migration/` are all removed in ADR-0003 PR4 (the UI flip
+ * that deletes Firebase Storage) once the staging run has completed.
  */
 
 import { getApps, initializeApp, getApp, type App } from 'firebase-admin/app';
 import { getStorage } from 'firebase-admin/storage';
 import { z } from 'zod';
 import {
-  copyFirebaseAttachments,
   createPostgresClient,
   FilesystemBlobStore,
   PostgresTaskAttachmentRepository,
+} from '@mediforce/platform-infra';
+import {
+  copyFirebaseAttachments,
   type FirebaseAttachmentExport,
   type LegacyTaskAttachment,
   type MigrationReport,
-} from '@mediforce/platform-infra';
+} from '../packages/platform-infra/src/migration/copy-firebase-attachments';
 
 const SYSTEM_UPLOADER = 'firebase-storage-migration';
 const TASK_PREFIX = 'tasks/';

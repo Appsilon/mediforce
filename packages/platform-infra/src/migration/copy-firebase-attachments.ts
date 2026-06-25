@@ -7,7 +7,7 @@ import type { BlobStore, TaskAttachmentRepository } from '@mediforce/platform-co
  * metadata recovered from the owning Human Task's completion payload
  * (`human_tasks.completion_data.files[]` — name / size / type / storagePath)
  * plus `completedBy` (the uploader's Firebase uid) and the task's workspace
- * (resolved via the parent Process Instance by the migrator shell).
+ * (the `human_tasks.workspace` column, read directly by the migrator shell).
  */
 export const LegacyTaskAttachmentSchema = z.object({
   storagePath: z.string().min(1),
