@@ -405,4 +405,4 @@ export { normaliseModelId } from './utils/normalise-model-id';
 
 // Workflow examples — shared loader for MCP tool, tests, and build scripts.
 // Uses Node.js fs/path so NOT exported from this barrel (breaks browser bundles).
-// Import directly: import { loadWorkflowExamples } from '@mediforce/platform-core/src/workflow-examples'
+// Import directly: import { loadWorkflowExamples } from '@mediforce/platform-core/workflow-examples'
