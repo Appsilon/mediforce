@@ -187,7 +187,7 @@ function ExecutorChip({ executorType, autonomyLevel, plugin, runtime }: {
         icon: (
           <span className="inline-flex items-center gap-0.5">
             <Bot className="h-3 w-3 shrink-0" />
-            <span className="relative inline-flex shrink-0">
+            <span className="relative inline-flex shrink-0 mr-2">
               <User className="h-3 w-3" />
               <Search className="absolute -bottom-0.5 -right-1.5 h-1.5 w-1.5" strokeWidth={2.5} />
             </span>
