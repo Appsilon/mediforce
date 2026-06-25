@@ -1,8 +1,8 @@
 import type { GetManifestInput, GetManifestOutput } from '../../contract/workflows';
 import { GetManifestOutputSchema } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
-import { ValidationError, HandlerError } from '../../errors';
-import { buildRawUrl } from './_github';
+import { ValidationError } from '../../errors';
+import { buildRawUrl, fetchJsonOrThrow } from './_github';
 
 export async function getManifest(
   input: GetManifestInput,
@@ -11,19 +11,7 @@ export async function getManifest(
   const ref = input.ref ?? 'main';
   const rawUrl = buildRawUrl(input.repo, ref, 'index.json');
 
-  let json: unknown;
-  try {
-    const res = await fetch(rawUrl);
-    if (!res.ok) {
-      throw new ValidationError(
-        `Failed to fetch manifest: ${res.status} ${res.statusText} (${rawUrl})`,
-      );
-    }
-    json = (await res.json()) as unknown;
-  } catch (err) {
-    if (err instanceof HandlerError) throw err;
-    throw new ValidationError(`Failed to fetch manifest: ${String(err)}`);
-  }
+  const json = await fetchJsonOrThrow(rawUrl, 'manifest');
 
   const parsed = GetManifestOutputSchema.safeParse(json);
   if (!parsed.success) {

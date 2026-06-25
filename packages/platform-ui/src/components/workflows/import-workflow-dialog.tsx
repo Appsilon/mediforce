@@ -9,6 +9,12 @@ import type { ManifestEntry } from '@mediforce/platform-api/contract';
 
 const DEFAULT_REPO = 'https://github.com/Appsilon/mediforce-workflows';
 
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) return err.message;
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
+
 type Step =
   | { kind: 'idle' }
   | { kind: 'fetching' }
@@ -69,10 +75,7 @@ export function ImportWorkflowDialog({
       setSelected(new Set());
       setStep({ kind: 'manifest', workflows: result.workflows });
     } catch (err) {
-      const message =
-        err instanceof ApiError ? err.message
-        : err instanceof Error ? err.message
-        : 'Failed to fetch manifest.';
+      const message = extractErrorMessage(err, 'Failed to fetch manifest.');
       // No manifest (e.g. repo has no index.json) is not a dead end — drop into
       // path mode so a single .wd.json can still be imported by its path.
       setMode('path');
@@ -90,11 +93,7 @@ export function ImportWorkflowDialog({
       setStep({ kind: 'done', imported: [trimmed] });
       onImported?.();
     } catch (err) {
-      const message =
-        err instanceof ApiError ? err.message
-        : err instanceof Error ? err.message
-        : 'Import failed.';
-      setStep({ kind: 'error', message });
+      setStep({ kind: 'error', message: extractErrorMessage(err, 'Import failed.') });
     }
   }
 
@@ -132,11 +131,7 @@ export function ImportWorkflowDialog({
         imported.push(wf.name);
         setStep({ kind: 'importing', workflows, progress: i + 1, total: toImport.length });
       } catch (err) {
-        const message =
-          err instanceof ApiError ? err.message
-          : err instanceof Error ? err.message
-          : 'Import failed.';
-        setStep({ kind: 'error', message, workflows });
+        setStep({ kind: 'error', message: extractErrorMessage(err, 'Import failed.'), workflows });
         return;
       }
     }

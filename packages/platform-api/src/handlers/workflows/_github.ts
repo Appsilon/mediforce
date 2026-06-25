@@ -1,4 +1,4 @@
-import { ValidationError } from '../../errors';
+import { ValidationError, HandlerError } from '../../errors';
 
 const GITHUB_HOST = 'github.com';
 /** A fully-qualified commit SHA (exactly 40 hex chars) — already immutable, so
@@ -9,7 +9,7 @@ const FULL_COMMIT_SHA = /^[a-f0-9]{40}$/;
 /** Parse a canonical `https://github.com/owner/repo` URL into its parts.
  *  Rejects non-GitHub hosts and any URL that is not exactly `/owner/repo`
  *  (e.g. `/org/repo/tree/main`, bare owner). */
-export function parseGitHubRepo(repo: string): { owner: string; name: string } {
+function parseGitHubRepo(repo: string): { owner: string; name: string } {
   let url: URL;
   try {
     url = new URL(repo);
@@ -30,6 +30,27 @@ export function parseGitHubRepo(repo: string): { owner: string; name: string } {
 export function buildRawUrl(repo: string, ref: string, path: string): string {
   const { owner, name } = parseGitHubRepo(repo);
   return `https://raw.githubusercontent.com/${owner}/${name}/${ref}/${path}`;
+}
+
+/**
+ * Fetch JSON from `url`, throwing a `ValidationError` whose message names
+ * `label` (e.g. "manifest", "workflow definition") on any non-OK status or
+ * network failure. An already-typed `HandlerError` from the request is
+ * re-thrown unchanged so callers keep the original status.
+ */
+export async function fetchJsonOrThrow(url: string, label: string): Promise<unknown> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new ValidationError(
+        `Failed to fetch ${label}: ${res.status} ${res.statusText} (${url})`,
+      );
+    }
+    return (await res.json()) as unknown;
+  } catch (err) {
+    if (err instanceof HandlerError) throw err;
+    throw new ValidationError(`Failed to fetch ${label}: ${String(err)}`);
+  }
 }
 
 /**

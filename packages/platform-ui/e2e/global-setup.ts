@@ -5,11 +5,20 @@ import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import type { FullConfig } from '@playwright/test';
 import { startMockOAuthServer, type MockOAuthServerHandle } from './helpers/mock-oauth-server';
 
+/** PATH for spawned tooling (firebase, java wrappers, pnpm). Homebrew installs
+ *  these under /opt/homebrew/bin on Apple Silicon macOS, but that directory is
+ *  absent on Linux CI, where pnpm already puts the binaries on PATH — so the
+ *  prefix is macOS-only. */
+function spawnPath(): string {
+  const base = process.env.PATH ?? '';
+  return process.platform === 'darwin' ? `/opt/homebrew/bin:${base}` : base;
+}
+
 function runMigrations(): void {
   const infraDir = path.resolve(__dirname, '..', '..', '..', 'packages', 'platform-infra');
   const result = spawnSync('pnpm', ['exec', 'drizzle-kit', 'migrate'], {
     cwd: infraDir,
-    env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH ?? ''}` },
+    env: { ...process.env, PATH: spawnPath() },
     stdio: ['ignore', 'pipe', 'pipe'],
     encoding: 'utf8',
   });
@@ -70,8 +79,7 @@ async function ensureFirebaseEmulator(): Promise<void> {
 
   const proc = spawn('firebase', args, {
     cwd: uiDir,
-    // Ensure Homebrew's bin (firebase, java wrappers) is in PATH.
-    env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH ?? ''}` },
+    env: { ...process.env, PATH: spawnPath() },
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
   });

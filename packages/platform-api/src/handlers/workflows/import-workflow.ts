@@ -4,8 +4,8 @@ import {
   type ImportWorkflowOutput,
 } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
-import { ValidationError, HandlerError } from '../../errors';
-import { buildRawUrl, resolveCommitSha } from './_github';
+import { ValidationError } from '../../errors';
+import { buildRawUrl, fetchJsonOrThrow, resolveCommitSha } from './_github';
 import { registerWorkflow } from './register-workflow';
 
 export async function importWorkflow(
@@ -18,19 +18,7 @@ export async function importWorkflow(
   const commit = await resolveCommitSha(input.repo, input.ref ?? 'main');
   const rawUrl = buildRawUrl(input.repo, commit, input.path);
 
-  let json: unknown;
-  try {
-    const res = await fetch(rawUrl);
-    if (!res.ok) {
-      throw new ValidationError(
-        `Failed to fetch workflow definition: ${res.status} ${res.statusText} (${rawUrl})`,
-      );
-    }
-    json = (await res.json()) as unknown;
-  } catch (err) {
-    if (err instanceof HandlerError) throw err;
-    throw new ValidationError(`Failed to fetch workflow definition: ${String(err)}`);
-  }
+  const json = await fetchJsonOrThrow(rawUrl, 'workflow definition');
 
   // Parse through the same schema `workflow register` uses: it strips the
   // server-managed `namespace` / `version` / `createdAt` keys, so a file that
