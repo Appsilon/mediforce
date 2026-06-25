@@ -342,3 +342,34 @@ export const TransferWorkflowOutputSchema = z.object({
 
 export type TransferWorkflowInput = z.infer<typeof TransferWorkflowInputSchema>;
 export type TransferWorkflowOutput = z.infer<typeof TransferWorkflowOutputSchema>;
+
+// --- Import from git ---
+
+export const ImportWorkflowInputSchema = z.object({
+  repo: z.string().url(),
+  path: z.string().min(1),
+  ref: z.string().optional(),
+  namespace: z.string().min(1),
+});
+export type ImportWorkflowInput = z.infer<typeof ImportWorkflowInputSchema>;
+export type ImportWorkflowOutput = RegisterWorkflowOutput;
+
+// --- Manifest ---
+
+export const ManifestEntrySchema = z.object({
+  name: z.string().min(1),
+  path: z.string().min(1),
+  description: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  builtin: z.boolean().optional(),
+});
+export const GetManifestInputSchema = z.object({
+  repo: z.string().url(),
+  ref: z.string().optional(),
+});
+export const GetManifestOutputSchema = z.object({
+  workflows: z.array(ManifestEntrySchema),
+});
+export type ManifestEntry = z.infer<typeof ManifestEntrySchema>;
+export type GetManifestInput = z.infer<typeof GetManifestInputSchema>;
+export type GetManifestOutput = z.infer<typeof GetManifestOutputSchema>;

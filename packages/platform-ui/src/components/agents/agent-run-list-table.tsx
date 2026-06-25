@@ -5,7 +5,7 @@ import { format, differenceInMilliseconds } from 'date-fns';
 import { Bot, Cpu, Terminal, BarChart3 } from 'lucide-react';
 import type { AgentRun } from '@mediforce/platform-core';
 import { ConfidenceBadge } from './confidence-badge';
-import { AutonomyBadge } from './autonomy-badge';
+
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
@@ -97,7 +97,9 @@ export function AgentRunListTable({
                   })()}
                 </td>
                 <td className="px-4 py-3">
-                  <AutonomyBadge level={run.autonomyLevel} />
+                  {run.autonomyLevel
+                    ? <span className="inline-flex rounded px-1.5 py-0.5 text-xs font-medium bg-muted text-muted-foreground">{run.autonomyLevel}</span>
+                    : <span className="text-xs text-muted-foreground">—</span>}
                 </td>
                 <td className="px-4 py-3">
                   <Link href={`/${handle}/workflows/${run.processInstanceId}`} className="text-xs text-muted-foreground hover:text-primary transition-colors">

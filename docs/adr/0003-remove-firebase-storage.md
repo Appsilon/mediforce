@@ -56,7 +56,7 @@ filesystem implementation now.
 
 2. **Task attachments → `BlobStore` interface; filesystem impl now,
    S3-compatible later.** Bytes go through a `BlobStore` port
-   (`put` / `get` / `getStream` / `delete` by key). The default implementation
+   (`put` / `getStream` / `delete` by key). The default implementation
    writes under the **`~/.mediforce` data volume the API host already mounts
    for ADR-0007** — no new service, no new operational requirement. An
    S3-compatible implementation is an env-selected drop-in for deployments

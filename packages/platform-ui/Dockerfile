@@ -93,6 +93,9 @@ COPY --from=builder /app/packages/platform-ui/public ./packages/platform-ui/publ
 # Not reliably picked up by Next.js output file tracing in this build, so copy explicitly.
 COPY --from=builder /app/data ./data
 
+# Workflow examples — CI-tested definitions served by mediforce-mcp list_workflow_examples tool
+COPY --from=builder /app/docs/workflow-examples ./docs/workflow-examples
+
 # mediforce-mcp — stdio MCP server providing platform tools to cowork agents.
 # Linked globally so `mediforce-mcp` command is on PATH (same pattern as
 # tealflow-mcp). Copies workspace source + node_modules from builder.

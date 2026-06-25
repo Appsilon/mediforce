@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workflow Examples - Mediforce</title>
+  <meta name="description" content="Ready-to-use workflow patterns. Each example is CI-tested and demonstrates a building block you can combine and adapt." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #FFFFFF; --bg-dark: #F8F9FA; --bg-card: #F8F9FA;
+      --accent: #0D9488; --accent-dim: rgba(13,148,136,0.08); --accent-dark: #0F766E;
+      --text: #111827; --text-80: #374151; --text-60: #6B7280; --text-50: #9CA3AF;
+      --text-30: #E5E7EB; --border: #E5E7EB;
+      --human: #EA580C; --human-dim: rgba(234,88,12,0.1);
+      --script: #B45309; --script-dim: rgba(251,191,36,0.15);
+      --agent: #7C3AED; --agent-dim: rgba(124,58,237,0.1);
+      --action: #2563EB; --action-dim: rgba(37,99,235,0.08);
+      --code-bg: #1E293B; --code-text: #E2E8F0;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+    .container { max-width: 68rem; margin: 0 auto; padding: 0 1.5rem; }
+
+    .page-hero {
+      padding: 5rem 0 3rem;
+      text-align: center;
+      background: var(--bg-dark);
+      border-bottom: 1px solid var(--border);
+    }
+    .page-hero h1 {
+      font-size: 2.5rem; font-weight: 800; letter-spacing: -0.03em;
+    }
+    .page-hero p {
+      max-width: 36rem; margin: 0.75rem auto 0; color: var(--text-60); font-size: 1.0625rem;
+    }
+
+    .examples-grid {
+      display: grid; grid-template-columns: 1fr; gap: 2rem;
+      padding: 3rem 0 5rem;
+    }
+    @media (min-width: 768px) { .examples-grid { grid-template-columns: 1fr 1fr; } }
+
+    .tutorial-card {
+      border: 1px solid var(--border); border-radius: 0.75rem;
+      overflow: hidden; background: var(--bg); transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .tutorial-card:hover { border-color: var(--accent); box-shadow: 0 4px 24px rgba(13,148,136,0.08); }
+
+    .card-header {
+      padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid var(--border);
+    }
+    .card-number {
+      font-size: 0.6875rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--text-50); margin-bottom: 0.375rem;
+    }
+    .card-header h2 { font-size: 1.125rem; font-weight: 700; letter-spacing: -0.01em; }
+    .card-header p { font-size: 0.8125rem; color: var(--text-60); margin-top: 0.375rem; line-height: 1.5; }
+
+    .card-tags { display: flex; flex-wrap: wrap; gap: 0.375rem; padding: 0.75rem 1.5rem 0; }
+    .tag {
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      font-size: 0.6875rem; font-weight: 600; padding: 0.1875rem 0.5rem;
+      border-radius: 0.25rem; white-space: nowrap;
+    }
+    .tag--human   { background: var(--human-dim); color: var(--human); }
+    .tag--script  { background: var(--script-dim); color: var(--script); }
+    .tag--agent   { background: var(--agent-dim); color: var(--agent); }
+    .tag--action  { background: var(--action-dim); color: var(--action); }
+    .tag--pattern { background: rgba(0,0,0,0.05); color: var(--text-80); }
+
+    .card-diagram {
+      padding: 1rem; border-top: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .card-diagram > div { transform-origin: top left; }
+
+    .card-code {
+      margin: 0 1rem 1rem; border-radius: 0.5rem; overflow: hidden;
+      background: var(--code-bg); max-height: 16rem; overflow-y: auto;
+    }
+    .card-code pre {
+      padding: 1rem; margin: 0; font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6875rem; line-height: 1.6; color: var(--code-text);
+      white-space: pre; overflow-x: auto;
+    }
+    .card-code .key { color: #93C5FD; }
+    .card-code .str { color: #86EFAC; }
+    .card-code .num { color: #FCD34D; }
+    .card-code .punct { color: #94A3B8; }
+
+    .card-toggle {
+      display: flex; align-items: center; gap: 0.375rem;
+      padding: 0.5rem 1.5rem; font-size: 0.75rem; font-weight: 500;
+      color: var(--accent); cursor: pointer; border: none; background: none;
+      transition: color 0.15s;
+    }
+    .card-toggle:hover { color: var(--accent-dark); }
+    .card-toggle svg { width: 0.75rem; height: 0.75rem; transition: transform 0.2s; }
+    .card-toggle.is-open svg { transform: rotate(90deg); }
+
+    .card-code-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.5rem 0.75rem; background: #0F172A; border-bottom: 1px solid #334155;
+      font-size: 0.6875rem; color: #94A3B8; font-family: 'JetBrains Mono', monospace;
+    }
+    .copy-btn {
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      padding: 0.25rem 0.5rem; border-radius: 0.25rem;
+      border: 1px solid #334155; background: #1E293B; color: #94A3B8;
+      font-size: 0.6875rem; font-family: 'Inter', sans-serif; cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .copy-btn:hover { background: #334155; color: #E2E8F0; }
+    .copy-btn.copied { background: rgba(13,148,136,0.2); color: var(--accent); border-color: rgba(13,148,136,0.3); }
+    .copy-btn svg { width: 0.75rem; height: 0.75rem; }
+
+    .feature-flag-banner {
+      background: #FEF3C7; border-bottom: 1px solid #F59E0B; padding: 0.5rem 1rem;
+      text-align: center; font-size: 0.8125rem; font-weight: 500; color: #92400E;
+    }
+  </style>
+</head>
+<body>
+  <script src="nav.js"></script>
+
+  <div class="feature-flag-banner">
+    Preview — this page is not linked from navigation yet. Share the URL to get feedback.
+  </div>
+
+  <section class="page-hero">
+    <div class="container">
+      <h1>Workflow Examples</h1>
+      <p>Ready-to-use workflow patterns. Each example is CI-tested — copy, adapt, register.</p>
+    </div>
+  </section>
+
+  <section class="container">
+    <div class="examples-grid" id="examples-grid"></div>
+  </section>
+
+  <script>
+  // Feature flag: only render tutorials when explicitly enabled or when loaded directly.
+  // Gate on ?examples=0 to hide; visible by default on this page.
+  (function() {
+    const params = new URLSearchParams(location.search);
+    if (params.get('examples') === '0') {
+      document.getElementById('examples-grid').innerHTML =
+        '<p style="text-align:center;color:#9CA3AF;padding:4rem 0;">Examples are disabled. Remove <code>?examples=0</code> to view.</p>';
+      return;
+    }
+
+    const TUTORIALS = [
+      {
+        file: 'workflow-examples/01-linear-pipeline.wd.json',
+        number: '01',
+        tags: [
+          { label: 'human', type: 'human' },
+          { label: 'script', type: 'script' },
+          { label: 'params', type: 'pattern' },
+          { label: 'inlineScript', type: 'pattern' },
+        ],
+      },
+      {
+        file: 'workflow-examples/02-review-loop.wd.json',
+        number: '02',
+        tags: [
+          { label: 'agent', type: 'agent' },
+          { label: 'review', type: 'human' },
+          { label: 'verdicts', type: 'pattern' },
+          { label: 'approve/revise', type: 'pattern' },
+        ],
+      },
+      {
+        file: 'workflow-examples/03-conditional-branching.wd.json',
+        number: '03',
+        tags: [
+          { label: 'decision', type: 'pattern' },
+          { label: 'when', type: 'pattern' },
+          { label: 'else', type: 'pattern' },
+          { label: 'human', type: 'human' },
+          { label: 'script', type: 'script' },
+        ],
+      },
+      {
+        file: 'workflow-examples/04-script-variants.wd.json',
+        number: '04',
+        tags: [
+          { label: 'javascript', type: 'script' },
+          { label: 'python', type: 'script' },
+          { label: 'bash', type: 'script' },
+          { label: 'data passing', type: 'pattern' },
+        ],
+      },
+      {
+        file: 'workflow-examples/04b-script-r-clinical.wd.json',
+        number: '04b',
+        tags: [
+          { label: 'R', type: 'script' },
+          { label: 'clinical stats', type: 'pattern' },
+          { label: 'review loop', type: 'human' },
+          { label: 'ULN thresholds', type: 'pattern' },
+        ],
+      },
+      {
+        file: 'workflow-examples/05-action-steps.wd.json',
+        number: '05',
+        tags: [
+          { label: 'http', type: 'action' },
+          { label: 'reshape', type: 'action' },
+          { label: 'email', type: 'action' },
+          { label: 'declarative', type: 'pattern' },
+        ],
+      },
+      {
+        file: 'workflow-examples/06-env-secrets-databricks.wd.json',
+        number: '06',
+        tags: [
+          { label: 'secrets', type: 'pattern' },
+          { label: 'env', type: 'pattern' },
+          { label: 'databricks', type: 'script' },
+          { label: 'email', type: 'action' },
+        ],
+      },
+      {
+        file: 'workflow-examples/07-trigger-varieties.wd.json',
+        number: '07',
+        tags: [
+          { label: 'webhook', type: 'pattern' },
+          { label: 'cron', type: 'pattern' },
+          { label: 'triggerInput', type: 'pattern' },
+          { label: 'variables.*', type: 'pattern' },
+        ],
+      },
+      {
+        file: 'workflow-examples/08-selection-review.wd.json',
+        number: '08',
+        tags: [
+          { label: 'selection', type: 'human' },
+          { label: 'options array', type: 'script' },
+          { label: 'review pick', type: 'human' },
+        ],
+      },
+      {
+        file: 'workflow-examples/09-cowork-step.wd.json',
+        number: '09',
+        tags: [
+          { label: 'cowork', type: 'agent' },
+          { label: 'outputSchema', type: 'pattern' },
+          { label: 'systemPrompt', type: 'pattern' },
+          { label: 'review loop', type: 'human' },
+        ],
+      },
+      {
+        file: 'workflow-examples/10-validation-gate.wd.json',
+        number: '10',
+        tags: [
+          { label: 'validation', type: 'script' },
+          { label: 'pass/fail', type: 'pattern' },
+          { label: 'fix loop', type: 'human' },
+        ],
+      },
+    ];
+
+    const grid = document.getElementById('examples-grid');
+
+    function escapeHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function syntaxHighlight(json) {
+      const str = JSON.stringify(json, null, 2);
+      return str.replace(
+        /("(?:\\.|[^"\\])*")\s*:/g,
+        '<span class="key">$1</span><span class="punct">:</span>'
+      ).replace(
+        /:\s*("(?:\\.|[^"\\])*")/g,
+        ': <span class="str">$1</span>'
+      ).replace(
+        /:\s*(\d+(?:\.\d+)?)/g,
+        ': <span class="num">$1</span>'
+      ).replace(
+        /([[\]{}])/g,
+        '<span class="punct">$1</span>'
+      );
+    }
+
+    function renderCard(tutorial, definition, diagramHtml) {
+      const tags = tutorial.tags.map(t =>
+        `<span class="tag tag--${t.type}">${escapeHtml(t.label)}</span>`
+      ).join('');
+
+      const cardId = `card-${tutorial.number}`;
+      rawJsonStore[cardId] = JSON.stringify(definition, null, 2);
+
+      return `
+        <div class="tutorial-card">
+          <div class="card-header">
+            <div class="card-number">Example ${tutorial.number}</div>
+            <h2>${escapeHtml(definition.title || definition.name)}</h2>
+            <p>${escapeHtml(definition.description)}</p>
+          </div>
+          <div class="card-tags">${tags}</div>
+          ${diagramHtml ? `<div class="card-diagram">${diagramHtml}</div>` : ''}
+          <button class="card-toggle" onclick="toggleCode('${cardId}', this)">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg>
+            View definition JSON
+          </button>
+          <div class="card-code" id="${cardId}" style="display:none">
+            <div class="card-code-header">
+              <span>${definition.name}.wd.json</span>
+              <button class="copy-btn" onclick="copyJson('${cardId}', this)">
+                <svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg>
+                Copy
+              </button>
+            </div>
+            <pre>${syntaxHighlight(definition)}</pre>
+          </div>
+        </div>
+      `;
+    }
+
+    const rawJsonStore = {};
+
+    window.toggleCode = function(id, btn) {
+      const el = document.getElementById(id);
+      const isOpen = el.style.display !== 'none';
+      el.style.display = isOpen ? 'none' : 'block';
+      btn.classList.toggle('is-open', !isOpen);
+    };
+
+    window.copyJson = function(id, btn) {
+      const json = rawJsonStore[id];
+      if (!json) return;
+      navigator.clipboard.writeText(json).then(() => {
+        btn.classList.add('copied');
+        btn.innerHTML = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/></svg> Copied!';
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.innerHTML = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg> Copy';
+        }, 2000);
+      });
+    };
+
+    // Load tutorials and render
+    Promise.all(
+      TUTORIALS.map(t => {
+        const diagramFile = t.file.replace('.wd.json', '.diagram.html');
+        return Promise.all([
+          fetch(t.file).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch(diagramFile).then(r => r.ok ? r.text() : '').catch(() => ''),
+        ]).then(([def, diagram]) => def ? { tutorial: t, definition: def, diagram } : null);
+      })
+    ).then(results => {
+      const cards = results.filter(Boolean).map(r => renderCard(r.tutorial, r.definition, r.diagram));
+      grid.innerHTML = cards.join('');
+    });
+  })();
+  </script>
+</body>
+</html>

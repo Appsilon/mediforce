@@ -98,6 +98,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       headers: {
         'Content-Type': contentType,
         'Content-Disposition': contentDisposition,
+        // This route serves inline (iframe-embeddable), so pin the declared
+        // content-type and forbid MIME sniffing to close the sniff-to-execute gap.
+        'X-Content-Type-Options': 'nosniff',
       },
     });
   } catch {

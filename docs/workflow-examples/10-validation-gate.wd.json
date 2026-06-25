@@ -1,0 +1,79 @@
+{
+  "name": "tutorial-validation-gate",
+  "title": "Validation Gate",
+  "description": "Script validates data, then conditional routing passes or loops back for fixes. Demonstrates the validation gate pattern: a script step outputs {valid: true/false, errors: [...]}, transitions branch on output.valid, and the fix step feeds corrections back.",
+  "triggers": [
+    { "type": "manual", "name": "manual" }
+  ],
+  "roles": ["submitter", "reviewer"],
+  "steps": [
+    {
+      "id": "upload-data",
+      "name": "Upload Data",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["submitter"],
+      "description": "Paste or upload the data payload to validate.",
+      "params": [
+        {
+          "name": "payload",
+          "type": "string",
+          "required": true,
+          "description": "JSON data payload to validate"
+        }
+      ]
+    },
+    {
+      "id": "validate",
+      "name": "Validate Payload",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Run structural and business-rule validation on the uploaded payload.",
+      "script": {
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\n\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst raw = input.steps?.['upload-data']?.payload || input.steps?.['fix-errors']?.payload || '';\nconst errors = [];\n\ntry {\n  const data = JSON.parse(raw);\n  if (!data.id) errors.push('Missing required field: id');\n  if (!data.name) errors.push('Missing required field: name');\n  if (data.value !== undefined && typeof data.value !== 'number') errors.push('Field \"value\" must be a number');\n} catch (e) {\n  errors.push(`Invalid JSON: ${e.message}`);\n}\n\nwriteFileSync('/output/result.json', JSON.stringify({\n  valid: errors.length === 0,\n  errors,\n  summary: errors.length === 0 ? 'Validation passed' : `${errors.length} error(s) found`\n}));\n",
+        "runtime": "javascript"
+      }
+    },
+    {
+      "id": "fix-errors",
+      "name": "Fix Validation Errors",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["submitter"],
+      "description": "Review the validation errors and submit a corrected payload.",
+      "params": [
+        {
+          "name": "payload",
+          "type": "string",
+          "required": true,
+          "description": "Corrected JSON data payload"
+        }
+      ]
+    },
+    {
+      "id": "confirm",
+      "name": "Confirm Valid Data",
+      "type": "review",
+      "executor": "human",
+      "allowedRoles": ["reviewer"],
+      "description": "Confirm the validated data is ready to proceed.",
+      "verdicts": {
+        "approve": { "target": "done" },
+        "revise": { "target": "upload-data" }
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "upload-data", "to": "validate" },
+    { "from": "validate", "to": "confirm", "when": "output.valid == true" },
+    { "from": "validate", "to": "fix-errors", "when": "output.valid == false" },
+    { "from": "fix-errors", "to": "validate" }
+  ]
+}

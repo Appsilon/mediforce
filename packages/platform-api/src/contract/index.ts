@@ -27,6 +27,23 @@ export {
 } from './tasks';
 
 export {
+  ListAttachmentsInputSchema,
+  ListAttachmentsOutputSchema,
+  UploadAttachmentInputSchema,
+  UploadAttachmentOutputSchema,
+  DeleteAttachmentInputSchema,
+  DeleteAttachmentOutputSchema,
+  GetAttachmentBlobInputSchema,
+  type ListAttachmentsInput,
+  type ListAttachmentsOutput,
+  type UploadAttachmentInput,
+  type UploadAttachmentOutput,
+  type DeleteAttachmentInput,
+  type DeleteAttachmentOutput,
+  type GetAttachmentBlobInput,
+} from './task-attachment';
+
+export {
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
   ValidateWorkflowInputSchema,
@@ -86,6 +103,10 @@ export {
   GetWorkflowRunCountOutputSchema,
   TransferWorkflowInputSchema,
   TransferWorkflowOutputSchema,
+  ImportWorkflowInputSchema,
+  ManifestEntrySchema,
+  GetManifestInputSchema,
+  GetManifestOutputSchema,
   type CopyWorkflowInput,
   type CopyWorkflowOutput,
   type CopyWorkflowOptions,
@@ -97,6 +118,11 @@ export {
   type GetWorkflowRunCountOutput,
   type TransferWorkflowInput,
   type TransferWorkflowOutput,
+  type ImportWorkflowInput,
+  type ImportWorkflowOutput,
+  type ManifestEntry,
+  type GetManifestInput,
+  type GetManifestOutput,
 } from './workflows';
 
 export {

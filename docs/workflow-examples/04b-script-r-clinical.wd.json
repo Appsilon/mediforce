@@ -1,0 +1,73 @@
+{
+  "name": "tutorial-script-r-clinical",
+  "title": "R Script — Clinical Statistics",
+  "description": "Use R for clinical data analysis within a workflow. Demonstrates R runtime in script-container, reading step input, computing summary statistics with base R, and writing structured JSON output. Essential pattern for pharma workflows where R is the validated statistical environment.",
+  "triggers": [
+    { "type": "manual", "name": "manual" }
+  ],
+  "roles": ["biostatistician"],
+  "steps": [
+    {
+      "id": "enter-data",
+      "name": "Enter Lab Values",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["biostatistician"],
+      "description": "Provide comma-separated lab values (e.g. ALT levels in U/L) and the Upper Limit of Normal (ULN) for the analyte.",
+      "params": [
+        {
+          "name": "values",
+          "type": "string",
+          "required": true,
+          "description": "Comma-separated numeric values, e.g. 12,45,78,120,34,56"
+        },
+        {
+          "name": "uln",
+          "type": "string",
+          "required": true,
+          "description": "Upper Limit of Normal (ULN) for this analyte, e.g. 40"
+        },
+        {
+          "name": "analyte",
+          "type": "string",
+          "required": true,
+          "description": "Analyte name, e.g. ALT, AST, bilirubin"
+        }
+      ]
+    },
+    {
+      "id": "analyze-r",
+      "name": "Analyze with R",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Compute clinical statistics: descriptive stats, count of values exceeding ULN thresholds (1x, 3x, 5x, 10x), and flag potential Hy's Law signals.",
+      "script": {
+        "inlineScript": "library(jsonlite)\n\ninput <- fromJSON('/output/input.json')\nraw_values <- input$steps$`enter-data`$values\nuln <- as.numeric(input$steps$`enter-data`$uln)\nanalyte <- input$steps$`enter-data`$analyte\n\nvalues <- as.numeric(trimws(unlist(strsplit(raw_values, ','))))\nvalues <- values[!is.na(values)]\n\nn <- length(values)\nmean_val <- round(mean(values), 2)\nmedian_val <- round(median(values), 2)\nsd_val <- round(sd(values), 2)\nmin_val <- min(values)\nmax_val <- max(values)\n\nxuln <- values / uln\nabove_1x <- sum(xuln > 1)\nabove_3x <- sum(xuln > 3)\nabove_5x <- sum(xuln > 5)\nabove_10x <- sum(xuln > 10)\n\nresult <- list(\n  analyte = analyte,\n  n = n,\n  mean = mean_val,\n  median = median_val,\n  sd = sd_val,\n  min = min_val,\n  max = max_val,\n  uln = uln,\n  above_1xULN = above_1x,\n  above_3xULN = above_3x,\n  above_5xULN = above_5x,\n  above_10xULN = above_10x,\n  max_xULN = round(max(xuln), 2),\n  summary = sprintf('%s: n=%d, mean=%.1f, max=%.1f (%.1fxULN), %d/%d above ULN',\n    analyte, n, mean_val, max_val, max(xuln), above_1x, n)\n)\n\nwrite(toJSON(result, auto_unbox = TRUE), '/output/result.json')\n",
+        "runtime": "r"
+      }
+    },
+    {
+      "id": "review-results",
+      "name": "Review Analysis",
+      "type": "review",
+      "executor": "human",
+      "allowedRoles": ["biostatistician"],
+      "description": "Review the computed statistics. Approve if analysis looks correct, revise to re-enter data.",
+      "verdicts": {
+        "approve": { "target": "done" },
+        "revise": { "target": "enter-data" }
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "enter-data", "to": "analyze-r" },
+    { "from": "analyze-r", "to": "review-results" }
+  ]
+}

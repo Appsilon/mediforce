@@ -1,0 +1,22 @@
+{
+  "name": "script-missing-config",
+  "description": "Script step with plugin script-container but no script config block",
+  "why": "When executor is 'script' and plugin is 'script-container', the step.script block is required. Without it, the engine has nothing to execute — no inlineScript, no command, no runtime.",
+  "fix": "Add a script block: { \"inlineScript\": \"...\", \"runtime\": \"javascript\" } or { \"command\": \"run.sh\" }.",
+  "expectedError": "has plugin 'script-container' but no script config",
+  "definition": {
+    "name": "anti-script-no-config",
+    "triggers": [{ "type": "manual", "name": "manual" }],
+    "steps": [
+      {
+        "id": "run-script",
+        "name": "Run Script",
+        "type": "creation",
+        "executor": "script",
+        "plugin": "script-container"
+      },
+      { "id": "done", "name": "Done", "type": "terminal", "executor": "human" }
+    ],
+    "transitions": [{ "from": "run-script", "to": "done" }]
+  }
+}

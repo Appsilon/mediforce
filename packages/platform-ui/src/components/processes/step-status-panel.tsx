@@ -3,10 +3,10 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText, FileCode, Paperclip } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, Circle, Pause, ChevronDown, ChevronRight, User, Bot, Terminal, Zap, Search, FileText, Paperclip } from 'lucide-react';
 import type { ProcessInstance, StepExecution, Step, HumanTask } from '@mediforce/platform-core';
 import type { RunOutputFileEntry } from '@mediforce/platform-api/contract';
-import { AutonomyBadge } from '../agents/autonomy-badge';
+import { getControlMode, CONTROL_MODE_LABELS } from '@/lib/control-mode';
 import { RetryStepButton } from './retry-step-button';
 import { OutputFileRow } from './run-output-files-panel';
 import { cn } from '@/lib/utils';
@@ -157,35 +157,102 @@ function StatusLabel({ status }: { status: EffectiveStatus }) {
   return <span className={cn('text-xs', styles[status])}>{labels[status]}</span>;
 }
 
-function TypeBadge({ type, executorType }: { type: Step['type']; executorType?: string }) {
-  if (executorType === 'agent') {
-    return (
-      <span className="inline-flex items-center gap-0.5 text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 rounded-full px-1.5 py-0.5">
-        <Bot className="h-3 w-3" />
-        agent
-      </span>
-    );
+// Executor chip — icon + label, matching the icon compositions from workflow-diagram.tsx.
+function ExecutorChip({ executorType, autonomyLevel, plugin, runtime }: {
+  executorType?: string;
+  autonomyLevel?: string;
+  plugin?: string;
+  runtime?: string;
+}) {
+  const mode = getControlMode(executorType, autonomyLevel);
+
+  type Chip = { icon: React.ReactNode; label: string; className: string };
+  let chip: Chip;
+
+  if (executorType === 'script') {
+    const rt = runtime ? (RUNTIME_LABELS[runtime] ?? (runtime.charAt(0).toUpperCase() + runtime.slice(1))) : null;
+    chip = { icon: <Terminal className="h-3 w-3 shrink-0" />, label: rt ? `${rt} script` : 'Script', className: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/20 dark:text-yellow-300 dark:border-yellow-800' };
+  } else if (executorType === 'action') {
+    const actionLabel = plugin ? plugin.replace(/-/g, ' ').replace(/^\w/, (c) => c.toUpperCase()) : 'Action';
+    chip = { icon: <Zap className="h-3 w-3 shrink-0" />, label: actionLabel, className: 'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950/20 dark:text-pink-300 dark:border-pink-800' };
+  } else if (executorType === 'cowork') {
+    chip = {
+      icon: <span className="inline-flex items-center gap-0.5"><User className="h-3 w-3 shrink-0" /><Bot className="h-3 w-3 shrink-0" /></span>,
+      label: 'Cowork',
+      className: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-900/20 dark:text-teal-300 dark:border-teal-800',
+    };
+  } else if (executorType === 'agent') {
+    if (mode === 'human-review') {
+      chip = {
+        icon: (
+          <span className="inline-flex items-center gap-0.5">
+            <Bot className="h-3 w-3 shrink-0" />
+            <span className="relative inline-flex shrink-0">
+              <User className="h-3 w-3" />
+              <Search className="absolute -bottom-0.5 -right-1.5 h-1.5 w-1.5" strokeWidth={2.5} />
+            </span>
+          </span>
+        ),
+        label: 'Human review',
+        className: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/20 dark:text-indigo-300 dark:border-indigo-800',
+      };
+    } else if (mode === 'autonomous-agent') {
+      chip = { icon: <Bot className="h-3 w-3 shrink-0" />, label: 'Autonomous agent', className: 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/20 dark:text-violet-300 dark:border-violet-800' };
+    } else {
+      chip = { icon: <Bot className="h-3 w-3 shrink-0" />, label: CONTROL_MODE_LABELS[mode], className: 'bg-lime-50 text-lime-700 border-lime-200 dark:bg-lime-950/20 dark:text-lime-300 dark:border-lime-800' };
+    }
+  } else {
+    chip = { icon: <User className="h-3 w-3 shrink-0" />, label: 'Human', className: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/20 dark:text-orange-300 dark:border-orange-800' };
   }
-  if (executorType === 'human') {
-    return (
-      <span className="inline-flex items-center gap-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded-full px-1.5 py-0.5">
-        <User className="h-3 w-3" />
-        human
-      </span>
-    );
-  }
-  if (type === 'review') {
-    return (
-      <span className="inline-flex items-center gap-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded-full px-1.5 py-0.5">
-        <User className="h-3 w-3" />
-        review
-      </span>
-    );
-  }
+
   return (
-    <span className="inline-flex items-center gap-0.5 text-xs bg-muted text-muted-foreground rounded-full px-1.5 py-0.5">
-      <Cog className="h-3 w-3" />
-      {type}
+    <span className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-md py-0.5 px-2 text-xs font-semibold border', chip.className)}>
+      {chip.icon}
+      {chip.label}
+      {autonomyLevel && <span className="ml-0.5 opacity-60 font-normal">{autonomyLevel}</span>}
+    </span>
+  );
+}
+
+const RUNTIME_LABELS: Record<string, string> = { python: 'Python', javascript: 'JavaScript', r: 'R', bash: 'Bash' };
+
+// Returns "Executor: {label}" — used in the metadata row of each history entry.
+// For scripts: shows runtime name ("Python script").
+// For actions: formats the plugin slug ("send-email" → "Send email").
+// For agents: shows plugin id.
+// For humans: shows display name from user directory.
+function ExecutorText({ executedBy = '', executorType, plugin, runtime }: {
+  executedBy?: string;
+  executorType?: string;
+  plugin?: string;
+  runtime?: string;
+}) {
+  const userNames = useUserDisplayNames(useHandleFromPath());
+
+  let label: string;
+  if (executorType === 'agent') {
+    label = plugin ? `agent:${plugin}` : 'agent';
+  } else if (executorType === 'script') {
+    const rt = runtime ? (RUNTIME_LABELS[runtime] ?? (runtime.charAt(0).toUpperCase() + runtime.slice(1))) : null;
+    label = rt ? `${rt} script` : 'Script';
+  } else if (executorType === 'cowork') {
+    label = 'Cowork';
+  } else if (executorType === 'action') {
+    label = plugin
+      ? plugin.replace(/-/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
+      : 'Action';
+  } else if (SYSTEM_ACTOR_IDS.has(executedBy)) {
+    label = 'System';
+  } else if (executedBy) {
+    label = userNames.get(executedBy) ?? executedBy;
+  } else {
+    label = 'Human';
+  }
+
+  return (
+    <span className="text-xs text-muted-foreground">
+      <span className="text-muted-foreground/60 mr-1">Executor</span>
+      {label}
     </span>
   );
 }
@@ -211,77 +278,22 @@ function VirtualRowMeta({
           </span>
           <span className="text-muted-foreground/40">·</span>
           <span className="text-xs text-muted-foreground">
+            <span className="text-muted-foreground/60 mr-1">Duration</span>
             <ElapsedTimer startedAt={taskForStep.createdAt} />
           </span>
+          <span className="text-muted-foreground/40">·</span>
         </>
       )}
-      {cfg && (
-        <>
-          {taskForStep && <span className="text-muted-foreground/40">·</span>}
-          <ExecutedBy
-            executedBy={taskForStep?.assignedUserId ?? ''}
-            executorType={cfg.executorType}
-            plugin={cfg.plugin}
-            autonomyLevel={cfg.autonomyLevel}
-            runtime={cfg.agentConfig?.runtime}
-          />
-        </>
-      )}
+      <ExecutorText
+        executedBy={taskForStep?.assignedUserId ?? ''}
+        executorType={cfg?.executorType}
+        plugin={cfg?.plugin}
+        runtime={cfg?.agentConfig?.runtime}
+      />
     </div>
   );
 }
 
-function ExecutedBy({ executedBy = '', executorType, plugin, autonomyLevel, runtime }: {
-  executedBy?: string;
-  executorType?: string;
-  plugin?: string;
-  autonomyLevel?: string;
-  runtime?: string;
-}) {
-  const userNames = useUserDisplayNames(useHandleFromPath());
-  if (executorType === 'agent') {
-    const agentLabel = plugin ? `agent:${plugin}` : 'Agent unknown';
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-        <Bot className="h-3 w-3 shrink-0" />
-        <span>{agentLabel}</span>
-        {autonomyLevel && <AutonomyBadge level={autonomyLevel} />}
-      </span>
-    );
-  }
-  if (executorType === 'script') {
-    const label = runtime ? `${runtime.charAt(0).toUpperCase()}${runtime.slice(1)} script` : 'Script';
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-        <FileCode className="h-3 w-3 shrink-0" />
-        {label}
-      </span>
-    );
-  }
-  if (!executedBy) {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-        <User className="h-3 w-3 shrink-0" />
-        Human
-      </span>
-    );
-  }
-  if (SYSTEM_ACTOR_IDS.has(executedBy)) {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-        <Cog className="h-3 w-3 shrink-0" />
-        System
-      </span>
-    );
-  }
-  const displayName = userNames.get(executedBy) ?? executedBy ?? 'Unknown user';
-  return (
-    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-      <User className="h-3 w-3 shrink-0" />
-      {displayName}
-    </span>
-  );
-}
 
 function StepProgress({ stepId, agentEvents }: { stepId: string; agentEvents: AgentEventItem[] }) {
   const stepEvents = agentEvents
@@ -413,11 +425,11 @@ function ElapsedTimer({ startedAt }: { startedAt: string }) {
   return <span className="tabular-nums">{label}</span>;
 }
 
-function getLeftBorderClass(status: EffectiveStatus): string {
+function getStatusClasses(status: EffectiveStatus): string {
   switch (status) {
     case 'running': return 'border-l-4 border-blue-500';
     case 'waiting': return 'border-l-4 border-amber-500';
-    default: return 'border-l-4 border-transparent';
+    default:        return 'border-l-4 border-transparent';
   }
 }
 
@@ -472,7 +484,7 @@ export function StepStatusPanel({
           if (item.kind === 'virtual') {
             const status = getVirtualEffectiveStatus(instance);
             return (
-              <li key={`virtual-${item.stepId}`} className={cn('flex gap-3 py-2 pl-3 rounded-md', getLeftBorderClass(status))}>
+              <li key={`virtual-${item.stepId}`} className={cn('flex gap-3 py-2 pl-3 rounded-md', getStatusClasses(status))}>
                 <div className="flex flex-col items-center">
                   <div className="mt-0.5"><StatusIcon status={status} /></div>
                   {!isLast && <div className="mt-1 w-px flex-1 bg-border min-h-[16px]" />}
@@ -482,7 +494,7 @@ export function StepStatusPanel({
                     {stepDetailBaseHref ? (
                       <Link
                         href={`${stepDetailBaseHref}/steps/${encodeURIComponent(item.stepId)}`}
-                        className="text-sm font-medium text-primary hover:underline"
+                        className="text-sm font-medium text-primary"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {item.step?.name ?? item.stepId}
@@ -490,8 +502,15 @@ export function StepStatusPanel({
                     ) : (
                       <span className="text-sm font-medium">{item.step?.name ?? item.stepId}</span>
                     )}
-                    {item.step && <TypeBadge type={item.step.type} executorType={stepConfigMap?.get(item.stepId)?.executorType} />}
-                    <StatusLabel status={status} />
+                    <ExecutorChip
+                      executorType={stepConfigMap?.get(item.stepId)?.executorType}
+                      autonomyLevel={stepConfigMap?.get(item.stepId)?.autonomyLevel}
+                      plugin={stepConfigMap?.get(item.stepId)?.plugin}
+                      runtime={stepConfigMap?.get(item.stepId)?.agentConfig?.runtime}
+                    />
+                    {status === 'waiting' && (
+                      <span className="text-xs text-amber-700 dark:text-amber-300">Waiting for action</span>
+                    )}
                     {wfStatus.isRetryable && instance.currentStepId === item.stepId && (
                       <RetryStepButton instanceId={instance.id} stepId={item.stepId} />
                     )}
@@ -535,10 +554,8 @@ export function StepStatusPanel({
             <li
               key={execId}
               className={cn(
-                'flex gap-3 py-2 pl-3 rounded-md transition-colors',
-                getLeftBorderClass(status),
-                status === 'completed' && !isCurrent && 'opacity-60 hover:opacity-100 transition-opacity',
-                'hover:bg-muted/50',
+                'flex gap-3 py-2 pl-3 rounded-md',
+                getStatusClasses(status),
                 hasConfig && 'cursor-pointer',
               )}
               onClick={() => {
@@ -555,7 +572,7 @@ export function StepStatusPanel({
                   {stepDetailBaseHref && status !== 'pending' ? (
                     <Link
                       href={`${stepDetailBaseHref}/steps/${encodeURIComponent(stepId)}?executionId=${encodeURIComponent(execId)}`}
-                      className="text-sm font-medium text-primary hover:underline"
+                      className="text-sm font-medium text-primary"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {step?.name ?? stepId}
@@ -563,16 +580,15 @@ export function StepStatusPanel({
                   ) : (
                     <span className="text-sm font-medium">{step?.name ?? stepId}</span>
                   )}
-                  {step && (
-                    <TypeBadge
-                      type={step.type}
-                      executorType={stepConfig?.executorType}
-                    />
+                  <ExecutorChip
+                    executorType={stepConfig?.executorType}
+                    autonomyLevel={stepConfig?.autonomyLevel}
+                    plugin={stepConfig?.plugin}
+                    runtime={stepConfig?.agentConfig?.runtime}
+                  />
+                  {status === 'waiting' && (
+                    <span className="text-xs text-amber-700 dark:text-amber-300">Waiting for action</span>
                   )}
-                  {stepConfig?.executorType === 'agent' && stepConfig.autonomyLevel && (
-                    <AutonomyBadge level={stepConfig.autonomyLevel} />
-                  )}
-                  <StatusLabel status={status} />
                   {stepOutputFiles.length > 0 && (
                     <button
                       onClick={(e) => {
@@ -604,6 +620,7 @@ export function StepStatusPanel({
                     <>
                       <span className="text-muted-foreground/40">·</span>
                       <span className="text-xs text-muted-foreground">
+                        <span className="text-muted-foreground/60 mr-1">Duration</span>
                         <ElapsedTimer startedAt={execution.startedAt} />
                       </span>
                     </>
@@ -617,12 +634,14 @@ export function StepStatusPanel({
                       </span>
                       <span className="text-muted-foreground/40">·</span>
                       <span className="text-xs text-muted-foreground">
+                        <span className="text-muted-foreground/60 mr-1">Duration</span>
                         {formatDuration(new Date(execution.completedAt).getTime() - new Date(execution.startedAt).getTime())}
                       </span>
                       {execution.agentOutput?.estimatedCostUsd != null && (
                         <>
                           <span className="text-muted-foreground/40">·</span>
                           <span className="text-xs text-muted-foreground">
+                            <span className="text-muted-foreground/60 mr-1">Cost</span>
                             {formatCostUsd(execution.agentOutput.estimatedCostUsd)}
                           </span>
                         </>
@@ -630,11 +649,10 @@ export function StepStatusPanel({
                     </>
                   )}
                   <span className="text-muted-foreground/40">·</span>
-                  <ExecutedBy
+                  <ExecutorText
                     executedBy={execution.executedBy}
                     executorType={stepConfig?.executorType}
                     plugin={stepConfig?.plugin}
-                    autonomyLevel={stepConfig?.autonomyLevel}
                     runtime={stepConfig?.agentConfig?.runtime}
                   />
                 </div>

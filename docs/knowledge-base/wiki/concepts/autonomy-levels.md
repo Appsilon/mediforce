@@ -6,6 +6,8 @@ sources: 2
 tags: [concept, autonomy, agent-runtime, workflow]
 ---
 
+> **Deprecated UI terminology.** The L0–L4 autonomy level labels (Observer, Shadow, Annotator, Advisor, Autopilot) have been replaced by **Control Modes** in the Mediforce UI. The underlying schema fields `executor` and `autonomyLevel` are unchanged. See [AUTONOMY-LEVELS-REFACTOR.md](../../design/AUTONOMY-LEVELS-REFACTOR.md) for the new terminology.
+
 **5-level scale (L0–L4). How much agent can do before human must intervene. Enforced by `AgentRunner`, not plugins.**
 
 ## Levels

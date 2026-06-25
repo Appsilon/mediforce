@@ -4,6 +4,8 @@ export { InMemoryProcessRepository } from './in-memory-process-repository';
 export { InMemoryAuthService } from './in-memory-auth-service';
 export { InMemoryProcessInstanceRepository } from './in-memory-process-instance-repository';
 export { InMemoryHumanTaskRepository } from './in-memory-human-task-repository';
+export { InMemoryTaskAttachmentRepository } from './in-memory-task-attachment-repository';
+export { InMemoryBlobStore } from './in-memory-blob-store';
 export { InMemoryHandoffRepository } from './in-memory-handoff-repository';
 export { NoopNotificationService } from './noop-notification-service';
 export { InMemoryCoworkSessionRepository } from './in-memory-cowork-session-repository';
@@ -30,6 +32,7 @@ export {
   buildProcessInstance,
   buildStepExecution,
   buildHumanTask,
+  buildTaskAttachment,
   buildAgentRun,
   buildAgentEvent,
   buildAuditEvent,

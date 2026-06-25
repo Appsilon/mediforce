@@ -11,10 +11,13 @@
  *   get_run_logs            — audit events + step executions
  *   list_models             — query the model registry
  *   list_docker_images      — available Docker images on the platform
+ *   list_workflow_examples  — CI-tested workflow examples + anti-patterns
  *
  * API tools require APP_BASE_URL + PLATFORM_API_KEY env vars.
  * Runs via stdio transport.
  */
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -23,6 +26,7 @@ import {
   RenderWorkflowDiagramInputSchema,
 } from '@mediforce/platform-api/handlers';
 import { Mediforce } from '@mediforce/platform-api/client';
+import { loadWorkflowExamples } from '@mediforce/platform-core/src/workflow-examples';
 
 const server = new McpServer({
   name: 'mediforce-mcp',
@@ -420,6 +424,41 @@ server.registerTool(
       const message = err instanceof Error ? err.message : String(err);
       return mcpText(`Error listing Docker images: ${message}`);
     }
+  },
+);
+
+// --- list_workflow_examples --------------------------------------------------
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+
+server.registerTool(
+  'list_workflow_examples',
+  {
+    description:
+      'Get CI-tested workflow examples and anti-patterns. ' +
+      'Examples show correct schema for every executor type, trigger, and pattern. ' +
+      'Anti-patterns show common mistakes with explanation of why they fail and how to fix them. ' +
+      'Call this BEFORE designing a workflow to learn the correct definition format.',
+    inputSchema: {},
+  },
+  async () => {
+    const { examples, antiPatterns } = loadWorkflowExamples(repoRoot);
+    return mcpJson({
+      count: examples.length,
+      examples: examples.map(e => ({
+        name: e.name,
+        title: e.title,
+        description: e.description,
+        definition: e.definition,
+      })),
+      antiPatterns: antiPatterns.map(a => ({
+        name: a.name,
+        description: a.description,
+        why: a.why,
+        fix: a.fix,
+        definition: a.definition,
+      })),
+    });
   },
 );
 

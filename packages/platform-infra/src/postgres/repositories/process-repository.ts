@@ -2,12 +2,14 @@ import { and, asc, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 import {
   compact,
   WorkflowDefinitionSchema,
+  WorkflowSourceSchema,
   WorkflowDefinitionVersionAlreadyExistsError,
   WorkflowDefinitionVersionNotFoundError,
   type ProcessRepository,
   type WorkflowDefinition,
   type WorkflowDefinitionGroup,
   type WorkflowDefinitionListResult,
+  type WorkflowSource,
 } from '@mediforce/platform-core';
 import type { Database } from '../client';
 import {
@@ -108,6 +110,7 @@ export class PostgresProcessRepository implements ProcessRepository {
       externalSkillsRepo: parsed.externalSkillsRepo ?? null,
       url: parsed.url ?? null,
       copiedFrom: parsed.copiedFrom ?? null,
+      source: parsed.source ?? null,
       inputForNextRun: parsed.inputForNextRun ?? null,
       archivedAt: parsed.archived === true ? new Date() : null,
       deletedAt: parsed.deleted === true ? new Date() : null,
@@ -398,6 +401,18 @@ export class PostgresProcessRepository implements ProcessRepository {
   }
 }
 
+/**
+ * `source` is informational provenance — a row written before the shape settled
+ * (e.g. the legacy `{ repo, path, ref }`) must not sink the whole definition on
+ * read. Validate it best-effort and drop it when it doesn't match; the workflow
+ * still loads and runs, just without a provenance record.
+ */
+function parseSource(raw: unknown): WorkflowSource | undefined {
+  if (raw === null || raw === undefined) return undefined;
+  const parsed = WorkflowSourceSchema.safeParse(raw);
+  return parsed.success ? parsed.data : undefined;
+}
+
 function toDefinition(
   row: typeof workflowDefinitions.$inferSelect,
 ): WorkflowDefinition {
@@ -421,6 +436,7 @@ function toDefinition(
     externalSkillsRepo: row.externalSkillsRepo ?? undefined,
     url: row.url ?? undefined,
     copiedFrom: row.copiedFrom ?? undefined,
+    source: parseSource(row.source),
     inputForNextRun: row.inputForNextRun ?? undefined,
     archived: row.archivedAt !== null ? true : undefined,
     deleted: row.deletedAt !== null ? true : undefined,
