@@ -1,6 +1,13 @@
 export { listTasks } from './tasks/list-tasks';
 export { claimTask } from './tasks/claim-task';
 export { completeTask } from './tasks/complete-task';
+export { listAttachments } from './tasks/attachments/list';
+export { uploadAttachment } from './tasks/attachments/upload';
+export { deleteAttachment } from './tasks/attachments/delete';
+export {
+  getAttachmentBlob,
+  type GetAttachmentBlobResult,
+} from './tasks/attachments/get-blob';
 export { listModels, type ListModelsDeps } from './models/list-models';
 export { getModel, type GetModelDeps } from './models/get-model';
 export { syncModels, type SyncModelsDeps } from './models/sync-models';

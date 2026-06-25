@@ -112,6 +112,14 @@ export {
 } from './human-task';
 
 export {
+  ATTACHMENT_MAX_BYTES,
+  TaskAttachmentSchema,
+  NewTaskAttachmentSchema,
+  type TaskAttachment,
+  type NewTaskAttachment,
+} from './task-attachment';
+
+export {
   HandoffStatusSchema,
   HandoffEntitySchema,
   type HandoffStatus,

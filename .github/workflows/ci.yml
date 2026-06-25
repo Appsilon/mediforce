@@ -91,6 +91,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @mediforce/platform-infra exec vitest run src/postgres
+      # Route-level integration that drives the real attachment route adapters
+      # through a real PostgresTaskAttachmentRepository + FilesystemBlobStore
+      # (ADR-0003). Lives in platform-ui but needs the Postgres service, so it
+      # runs here rather than in the DB-less unit-tests job.
+      - run: pnpm --filter @mediforce/platform-ui exec vitest run src/test/integration/attachments-integration.pg.test.ts
 
   e2e-tests:
     # ADR-0001: L3 API + L4 UI E2E against Postgres. Runs the `api` Playwright

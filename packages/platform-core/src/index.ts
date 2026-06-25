@@ -213,6 +213,13 @@ export type {
   AssignmentItem,
   TableEditorRow,
   CompleteHumanTaskPayload,
+  TaskAttachment,
+  NewTaskAttachment,
+} from './schemas/index';
+export {
+  ATTACHMENT_MAX_BYTES,
+  TaskAttachmentSchema,
+  NewTaskAttachmentSchema,
 } from './schemas/index';
 
 // Interfaces (repository and service contracts)
@@ -228,6 +235,8 @@ export type {
   ListInstancesOptions,
   WorkflowRunSummaryResult,
   HumanTaskRepository,
+  TaskAttachmentRepository,
+  BlobStore,
   HandoffRepository,
   NotificationService,
   NotificationEvent,
