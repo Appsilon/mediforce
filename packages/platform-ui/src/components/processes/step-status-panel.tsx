@@ -209,7 +209,6 @@ function ExecutorChip({ executorType, autonomyLevel, plugin, runtime }: {
     <span className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-md py-0.5 px-2 text-xs font-semibold border', chip.className)}>
       {chip.icon}
       {chip.label}
-      {autonomyLevel && <span className="ml-0.5 opacity-60 font-normal">{autonomyLevel}</span>}
     </span>
   );
 }
