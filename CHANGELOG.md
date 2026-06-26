@@ -11,11 +11,14 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-06-21]
+
 ### Fixed
 - Workflow-designer cowork chat no longer hangs on its mandatory first step: the `mediforce-mcp` server crashed on startup because `@mediforce/platform-core` was an undeclared (phantom) dependency and its `workflow-examples` loader had no subpath export, so `list_workflow_examples` was silently unavailable (the connection failure is swallowed). Declared the dependency, added the `./workflow-examples` export, and import it via the package specifier.
 - Postgres workflow definitions now persist imported workflow `source` provenance, so get/list calls keep the advertised url/path/commit after GitHub imports.
 - A malformed or legacy-shaped `source` (e.g. the pre-commit `{ repo, path, ref }`) no longer drops the entire workflow definition on read — the informational provenance is dropped best-effort and the workflow still loads and runs.
 - `pnpm test` is now fully self-contained — Playwright `globalSetup` auto-starts the Firebase Auth emulator when absent and runs pending DB migrations, so E2E tests pass without manual pre-flight steps.
+
 ### Changed
 - Autonomy levels overhaul across workflow designer and execution history — step-add popover is now a two-step wizard (pick step type, then pick executor: human / agent / script / cowork); step editor shows executor identity and L2/L3/L4 autonomy level instead of the "control mode" abstraction; execution history chips and the agent run table surface the raw autonomy level badge; executor identity in step history renders as `agent:<plugin>`; branch icons in the decision diagram updated to chevrons; schema fields (`executor`, `autonomyLevel`) unchanged [#783](https://github.com/Appsilon/mediforce/pull/783).
 
