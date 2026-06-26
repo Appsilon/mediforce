@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.24
+# syntax=docker/dockerfile:1.25
 FROM node:24-slim AS base
 RUN corepack enable && corepack prepare pnpm@latest --activate
 ENV PNPM_HOME=/pnpm
