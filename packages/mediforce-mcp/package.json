@@ -9,7 +9,8 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
     "zod": "^4.0.0",
-    "@mediforce/platform-api": "workspace:*"
+    "@mediforce/platform-api": "workspace:*",
+    "@mediforce/platform-core": "workspace:*"
   },
   "devDependencies": {
     "tsx": "^4.21.0"

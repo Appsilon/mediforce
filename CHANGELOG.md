@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Fixed
+- Workflow-designer cowork chat no longer hangs on its mandatory first step: the `mediforce-mcp` server crashed on startup because `@mediforce/platform-core` was an undeclared (phantom) dependency and its `workflow-examples` loader had no subpath export, so `list_workflow_examples` was silently unavailable (the connection failure is swallowed). Declared the dependency, added the `./workflow-examples` export, and import it via the package specifier.
 - Postgres workflow definitions now persist imported workflow `source` provenance, so get/list calls keep the advertised url/path/commit after GitHub imports.
 - A malformed or legacy-shaped `source` (e.g. the pre-commit `{ repo, path, ref }`) no longer drops the entire workflow definition on read — the informational provenance is dropped best-effort and the workflow still loads and runs.
 - `pnpm test` is now fully self-contained — Playwright `globalSetup` auto-starts the Firebase Auth emulator when absent and runs pending DB migrations, so E2E tests pass without manual pre-flight steps.
