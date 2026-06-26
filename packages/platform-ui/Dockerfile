@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.24
+# syntax=docker/dockerfile:1.25
 FROM node:24-slim AS base
 RUN corepack enable && corepack prepare pnpm@latest --activate
 ENV PNPM_HOME=/pnpm
@@ -92,6 +92,9 @@ COPY --from=builder /app/packages/platform-ui/public ./packages/platform-ui/publ
 # Seed JSONs (agent-definitions, tool-catalog) read at platform-services init.
 # Not reliably picked up by Next.js output file tracing in this build, so copy explicitly.
 COPY --from=builder /app/data ./data
+
+# Workflow examples — CI-tested definitions served by mediforce-mcp list_workflow_examples tool
+COPY --from=builder /app/docs/workflow-examples ./docs/workflow-examples
 
 # mediforce-mcp — stdio MCP server providing platform tools to cowork agents.
 # Linked globally so `mediforce-mcp` command is on PATH (same pattern as

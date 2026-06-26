@@ -1,6 +1,7 @@
 import type { AgentRunner, PluginRegistry } from '@mediforce/agent-runtime';
 import type {
   AuditRepository,
+  BlobStore,
   CronTriggerStateRepository,
   EmailProviderInfo,
   ModelRegistryRepository,
@@ -28,6 +29,7 @@ import type { AuthorizedCoworkSessionRepository } from './authorized-cowork-sess
 import type { AuthorizedHandoffRepository } from './authorized-handoff-repository';
 import type { AuthorizedHumanTaskRepository } from './authorized-human-task-repository';
 import type { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
+import type { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';
 import type { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
 import type { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository';
 import type { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository';
@@ -58,6 +60,7 @@ export interface CallerScope {
 
   // Workspace-scoped wrappers
   readonly tasks: AuthorizedHumanTaskRepository;
+  readonly attachments: AuthorizedTaskAttachmentRepository;
   readonly runs: AuthorizedWorkflowRunRepository;
   readonly workflowDefinitions: AuthorizedWorkflowDefinitionRepository;
   readonly agentDefinitions: AuthorizedAgentDefinitionRepository;
@@ -102,6 +105,12 @@ export interface SystemServices {
   readonly cronTrigger: CronTrigger;
   readonly webhookRouter: WebhookRouter;
   readonly agentRunner: AgentRunner;
+  /**
+   * Unscoped byte store for task attachments (ADR-0003). Reached only after a
+   * workspace-gated `scope.attachments` read yields a `blobKey` — the metadata
+   * layer is the authorization boundary, so the store itself needs no gate.
+   */
+  readonly blobStore: BlobStore;
   /**
    * Raw audit-write surface — Phase 2 bridge per ADR-0005 §7. Handler-emitted
    * audit events use this; persistence-layer emission (post-headless-migration

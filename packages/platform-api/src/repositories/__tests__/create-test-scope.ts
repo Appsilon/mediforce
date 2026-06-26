@@ -19,15 +19,20 @@ import {
   InMemoryToolCatalogRepository,
   InMemoryAgentOAuthTokenRepository,
   InMemoryUserProfileRepository,
+  InMemoryTaskAttachmentRepository,
+  InMemoryBlobStore,
 } from '@mediforce/platform-core/testing';
 import type {
   AgentRunRepository,
+  BlobStore,
   EmailProviderInfo,
+  HumanTaskRepository,
   ModelRegistryRepository,
   NamespaceRepository,
   NamespaceSecretsRepository,
   PlatformSettingsRepository,
   ProcessInstanceRepository,
+  TaskAttachmentRepository,
   UserDirectoryService,
   UserProfileRepository,
   WorkflowSecretsRepository,
@@ -160,7 +165,9 @@ const stubNamespaceSecrets: NamespaceSecretsRepository = {
 export interface TestScopeOverrides {
   readonly caller?: CallerIdentity;
   readonly instanceRepo?: ProcessInstanceRepository;
-  readonly humanTaskRepo?: InMemoryHumanTaskRepository;
+  readonly humanTaskRepo?: HumanTaskRepository;
+  readonly taskAttachmentRepo?: TaskAttachmentRepository;
+  readonly blobStore?: BlobStore;
   readonly processRepo?: InMemoryProcessRepository;
   readonly auditRepo?: InMemoryAuditRepository;
   readonly agentEventRepo?: InMemoryAgentEventRepository;
@@ -214,6 +221,8 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
       overrides.agentEventRepo ?? new InMemoryAgentEventRepository(instanceRepo),
     agentRunRepo: overrides.agentRunRepo ?? new InMemoryAgentRunRepository(instanceRepo),
     humanTaskRepo: overrides.humanTaskRepo ?? new InMemoryHumanTaskRepository(instanceRepo),
+    taskAttachmentRepo: overrides.taskAttachmentRepo ?? new InMemoryTaskAttachmentRepository(),
+    blobStore: overrides.blobStore ?? new InMemoryBlobStore(),
     handoffRepo: overrides.handoffRepo ?? new InMemoryHandoffRepository(instanceRepo),
     agentDefinitionRepo: overrides.agentDefinitionRepo ?? new InMemoryAgentDefinitionRepository(),
     coworkSessionRepo: overrides.coworkSessionRepo ?? new InMemoryCoworkSessionRepository(instanceRepo),

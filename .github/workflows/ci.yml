@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -83,7 +83,7 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql://mediforce:mediforce@localhost:5432/mediforce
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -91,6 +91,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @mediforce/platform-infra exec vitest run src/postgres
+      # Route-level integration that drives the real attachment route adapters
+      # through a real PostgresTaskAttachmentRepository + FilesystemBlobStore
+      # (ADR-0003). Lives in platform-ui but needs the Postgres service, so it
+      # runs here rather than in the DB-less unit-tests job.
+      - run: pnpm --filter @mediforce/platform-ui exec vitest run src/test/integration/attachments-integration.pg.test.ts
 
   e2e-tests:
     # ADR-0001: L3 API + L4 UI E2E against Postgres. Runs the `api` Playwright
@@ -118,7 +123,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://mediforce:mediforce@localhost:5432/mediforce
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -226,7 +231,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Check for compromised axios versions
         run: |
           if grep -qE 'axios@(1\.14\.1|0\.30\.4)' pnpm-lock.yaml; then

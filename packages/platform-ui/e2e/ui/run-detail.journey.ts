@@ -43,7 +43,7 @@ test.describe('Run Detail Journey', () => {
     await expect(completedSteps).toHaveCount(2);
 
     // Duration is visible for a completed run
-    await expect(page.getByText(/duration/i)).toBeVisible();
+    await expect(page.getByText(/^Duration:/i)).toBeVisible();
 
     // Right panel: expand via "Execution Log", then Audit Log tab is visible
     await click(page, page.getByRole('button', { name: /^Execution Log$/i }));
@@ -59,9 +59,9 @@ test.describe('Run Detail Journey', () => {
     const historyPanel = page.locator('.bg-card').filter({ has: page.locator('h3', { hasText: 'Execution History' }) });
     await expect(historyPanel.locator('ol > li')).toHaveCount(7, { timeout: 10_000 });
 
-    // Autonomy badges sourced from WorkflowDefinition steps
-    await expect(historyPanel.getByText('L2').first()).toBeVisible();
-    await expect(historyPanel.getByText('L3').first()).toBeVisible();
+    // Executor chips sourced from WorkflowDefinition steps (control mode labels, not raw L-levels)
+    await expect(historyPanel.getByText('Assist').first()).toBeVisible();
+    await expect(historyPanel.getByText('Human review').first()).toBeVisible();
     await showStep(page);
 
     // Executor label uses plugin from the WorkflowDefinition step (vendor-assessment → supply-data-collector)
@@ -76,9 +76,9 @@ test.describe('Run Detail Journey', () => {
     const wfHistoryPanel = page.locator('.bg-card').filter({ has: page.locator('h3', { hasText: 'Execution History' }) });
     await expect(wfHistoryPanel.locator('ol > li').first()).toBeVisible({ timeout: 10_000 });
 
-    // Virtual row shows the current step name and WD-sourced autonomy badge (narrative-summary → L3)
+    // Virtual row shows the current step name and executor chip (narrative-summary → Human review)
     await expect(wfHistoryPanel.getByText('Narrative Summary', { exact: true })).toBeVisible();
-    await expect(wfHistoryPanel.getByText('L3').first()).toBeVisible();
+    await expect(wfHistoryPanel.getByText('Human review').first()).toBeVisible();
     await showResult(page);
     await endRecording(page);
   });

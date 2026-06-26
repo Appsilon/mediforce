@@ -112,6 +112,14 @@ export {
 } from './human-task';
 
 export {
+  ATTACHMENT_MAX_BYTES,
+  TaskAttachmentSchema,
+  NewTaskAttachmentSchema,
+  type TaskAttachment,
+  type NewTaskAttachment,
+} from './task-attachment';
+
+export {
   HandoffStatusSchema,
   HandoffEntitySchema,
   type HandoffStatus,
@@ -158,6 +166,9 @@ export {
   WorkflowWorkspaceSchema,
   WorkflowStepSchema,
   WorkflowVisibilitySchema,
+  WorkflowAuthorableSchema,
+  SERVER_MANAGED_WORKFLOW_FIELDS,
+  WorkflowSourceSchema,
   WorkflowDefinitionSchema,
   WorkflowDefinitionBaseSchema,
   WorkflowTemplateSchema,
@@ -177,6 +188,8 @@ export {
   validateTriggerInput,
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,
+  getWorkflowAuthorableJsonSchema,
+  resolveCoworkOutputSchema,
   resolveStepTimeoutMinutes,
   type ContainerConfig,
   type WorkflowAgentConfig,
@@ -187,6 +200,7 @@ export {
   type WorkflowWorkspace,
   type WorkflowStep,
   type WorkflowVisibility,
+  type WorkflowSource,
   type WorkflowDefinition,
   type WorkflowTemplate,
   type InputForNextRunEntry,

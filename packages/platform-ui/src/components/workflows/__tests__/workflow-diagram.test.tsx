@@ -30,7 +30,7 @@ import { WorkflowDiagram } from '../workflow-diagram';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 
 describe('StepNode (via WorkflowDiagram)', () => {
-  it('[RENDER] autonomy level shown on agent step nodes', () => {
+  it('[RENDER] control mode label shown on agent step nodes', () => {
     const definition = buildWorkflowDefinition({
       steps: [
         { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
@@ -41,13 +41,13 @@ describe('StepNode (via WorkflowDiagram)', () => {
 
     render(<WorkflowDiagram definition={definition} />);
 
-    expect(screen.getByText('L2')).toBeInTheDocument();
+    expect(screen.getByText('Assist')).toBeInTheDocument();
   });
 
-  it('[RENDER] autonomy level not shown on script step nodes', () => {
+  it('[RENDER] script step nodes show Script executor label', () => {
     const definition = buildWorkflowDefinition({
       steps: [
-        { id: 'run-script', name: 'Run Script', type: 'creation', executor: 'script', autonomyLevel: 'L4' },
+        { id: 'run-script', name: 'Run Script', type: 'creation', executor: 'script' },
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'run-script', to: 'done' }],
@@ -55,6 +55,6 @@ describe('StepNode (via WorkflowDiagram)', () => {
 
     render(<WorkflowDiagram definition={definition} />);
 
-    expect(screen.queryByText('L4')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Script').length).toBeGreaterThanOrEqual(1);
   });
 });

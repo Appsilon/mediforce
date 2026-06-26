@@ -8,7 +8,7 @@ import { ArrowLeft, ChevronDown } from 'lucide-react';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import type { AgentRun, ProcessInstance } from '@mediforce/platform-core';
 import { ConfidenceBadge } from './confidence-badge';
-import { AutonomyBadge } from './autonomy-badge';
+import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { cn } from '@/lib/utils';
 import { formatStepName } from '@/lib/format';
 
@@ -147,8 +147,9 @@ export function AgentRunDetail({
 
         {/* Metadata row */}
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
-          <span className="inline-flex items-center gap-1">Autonomy: <AutonomyBadge level={run.autonomyLevel} showLabel /></span>
-          {run.executorType && <span>Executor: <span className="text-foreground font-medium">{run.executorType}</span></span>}
+          <span className="inline-flex items-center gap-1">
+            Control mode: <ControlModeBadge executor={run.executorType ?? 'agent'} autonomyLevel={run.autonomyLevel} />
+          </span>
           {run.reviewerType && <span>Reviewer: <span className="text-foreground font-medium">{run.reviewerType}</span></span>}
           <span>Workflow: <Link href={`/${handle}/workflows/${run.processInstanceId}`} className="text-primary hover:underline font-mono text-xs">{run.processInstanceId.slice(0, 12)}...</Link></span>
           <span>Step: <span className="text-foreground font-medium">{formatStepName(run.stepId)}</span></span>
@@ -229,9 +230,7 @@ export function AgentRunDetail({
             <LightFormattedData data={envelope.result} />
           ) : (
             <p className="text-xs text-muted-foreground italic">
-              {run.autonomyLevel === 'L0' || run.autonomyLevel === 'L1'
-                ? `No structured output — ${run.autonomyLevel} agents are annotation-only`
-                : 'No output produced'}
+              {'No output produced'}
             </p>
           )}
         </CollapsibleSection>

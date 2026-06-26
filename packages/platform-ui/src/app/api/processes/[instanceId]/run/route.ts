@@ -4,6 +4,7 @@ import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { checkRetiredModels } from '@mediforce/platform-api/handlers';
+import { resolveCoworkOutputSchema } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -264,10 +265,16 @@ export async function POST(
           lastActiveStepId = instance.currentStepId;
 
           if (isStuckLoop(instance.currentStepId, loopTracker)) {
-            console.error(`[auto-runner] Safety guard: step '${instance.currentStepId}' looped ${MAX_SAME_STEP_ITERATIONS} times — aborting instance ${instanceId}`);
+            const executions = await instanceRepo.getStepExecutions(instanceId);
+            const lastFailed = executions
+              .filter((e) => e.stepId === instance.currentStepId && e.status === 'failed' && e.error)
+              .at(-1);
+            const cause = lastFailed?.error ? ` — last error: ${lastFailed.error}` : '';
+            const message = `Auto-runner stuck: step '${instance.currentStepId}' looped ${MAX_SAME_STEP_ITERATIONS} times${cause}`;
+            console.error(`[auto-runner] Safety guard: ${message} — aborting instance ${instanceId}`);
             await instanceRepo.update(instanceId, {
               status: 'failed',
-              error: `Auto-runner stuck: step '${instance.currentStepId}' looped ${MAX_SAME_STEP_ITERATIONS} times`,
+              error: message,
               updatedAt: new Date().toISOString(),
             });
             break;
@@ -360,7 +367,7 @@ export async function POST(
               agent: agentType,
               model,
               systemPrompt: currentStep.cowork?.systemPrompt ?? null,
-              outputSchema: currentStep.cowork?.outputSchema ?? null,
+              outputSchema: resolveCoworkOutputSchema(currentStep.cowork),
               voiceConfig,
               artifact: null,
               validationResult: null,

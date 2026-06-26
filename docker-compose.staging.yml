@@ -10,7 +10,7 @@ services:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
 
   stunnel:
-    image: alpine:3.23
+    image: alpine:3.24
     restart: unless-stopped
     mem_limit: ${STUNNEL_MEM_LIMIT:-64m}
     entrypoint: ["sh", "-c", "apk add --no-cache stunnel && exec stunnel /etc/stunnel/stunnel.conf"]

@@ -1,6 +1,13 @@
 export { listTasks } from './tasks/list-tasks';
 export { claimTask } from './tasks/claim-task';
 export { completeTask } from './tasks/complete-task';
+export { listAttachments } from './tasks/attachments/list';
+export { uploadAttachment } from './tasks/attachments/upload';
+export { deleteAttachment } from './tasks/attachments/delete';
+export {
+  getAttachmentBlob,
+  type GetAttachmentBlobResult,
+} from './tasks/attachments/get-blob';
 export { listModels, type ListModelsDeps } from './models/list-models';
 export { getModel, type GetModelDeps } from './models/get-model';
 export { syncModels, type SyncModelsDeps } from './models/sync-models';
@@ -36,6 +43,8 @@ export { listWorkflows } from './workflows/list-workflows';
 export { listWorkflowVersions } from './workflows/list-workflow-versions';
 export { getWorkflow } from './workflows/get-workflow';
 export { registerWorkflow } from './workflows/register-workflow';
+export { validateWorkflow } from './workflows/validate-workflow';
+export { getWorkflowSchema } from './workflows/get-workflow-schema';
 export { setWorkflowVisibility } from './workflows/set-visibility';
 export {
   archiveWorkflow,
@@ -45,6 +54,8 @@ export { copyWorkflow } from './workflows/copy-workflow';
 export { setDefaultWorkflowVersion } from './workflows/set-default-version';
 export { deleteWorkflow } from './workflows/delete-workflow';
 export { transferWorkflowNamespace } from './workflows/transfer-workflow';
+export { importWorkflow } from './workflows/import-workflow';
+export { getManifest } from './workflows/get-manifest';
 export { getWorkflowRunCount } from './workflows/get-run-count';
 export { checkRetiredModels } from './workflows/retired-model-check';
 

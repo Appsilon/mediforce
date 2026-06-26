@@ -16,37 +16,21 @@ function pageHeader(page: import('@playwright/test').Page) {
 }
 
 /**
- * Returns a locator for the step-type button inside the Add Step dropdown.
- * Scopes by the button's unique description paragraph to avoid false matches.
+ * Returns a step-type toggle button in the Add Step popover's Section 1.
+ * 'creation' → "Create new result", 'decision' → "Make a decision".
  */
-const STEP_TYPE_DESCRIPTIONS = {
-  Creation: 'A step where content or data is produced — by a human, an AI agent, or a script.',
-  Review: 'A step where someone evaluates work and gives a verdict such as approve or reject.',
-  Decision: 'A branching step that routes the workflow to different paths based on a condition.',
-} as const;
-
-function stepTypeButton(page: import('@playwright/test').Page, type: keyof typeof STEP_TYPE_DESCRIPTIONS) {
-  return page.locator('button').filter({
-    has: page.locator('p').filter({ hasText: STEP_TYPE_DESCRIPTIONS[type] }),
-  });
+function stepTypeButton(page: import('@playwright/test').Page, type: 'creation' | 'decision') {
+  const label = type === 'creation' ? 'Create new result' : 'Make a decision';
+  return page.getByRole('button', { name: label, exact: true });
 }
 
 /**
- * Returns the executor button inside the Add Step dropdown.
- * Uses strict text matching to avoid matching step descriptions that contain "human".
+ * Returns an executor button in the Add Step popover's Section 2 ("Who executes this step?").
+ * 'agent' maps to "Autonomous agent" (L4).
  */
 function executorButton(page: import('@playwright/test').Page, executor: 'human' | 'agent' | 'script' | 'cowork') {
-  // Executor buttons have exactly the executor name as their full text content.
-  return page.locator('button').filter({ hasText: new RegExp(`^${executor}$`, 'i') });
-}
-
-/**
- * Returns the executor toggle button inside the step editor side panel.
- * Scoped to the side panel to avoid matching the Add Step dropdown buttons.
- */
-function stepEditorExecutorButton(page: import('@playwright/test').Page, executor: 'human' | 'agent' | 'script' | 'cowork') {
-  // The side panel is the right half of the canvas layout (border-l container).
-  return page.locator('div.border-l button').filter({ hasText: new RegExp(`^${executor}$`, 'i') });
+  const labels = { human: 'Human', agent: 'Autonomous agent', script: 'Script', cowork: 'Cowork' } as const;
+  return page.getByRole('button', { name: labels[executor], exact: true });
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -141,25 +125,16 @@ test.describe('Workflow Editor Journey', () => {
 
     // Open Add Step popover via the "+" button on an edge
     await click(page, page.getByLabel('Add step here').first());
-    // Wait for popover to appear
-    await expect(page.getByText(/^step type$/i)).toBeVisible({ timeout: 3_000 });
+    // Both sections visible simultaneously — wait for the executor section header
+    await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
     await showStep(page);
 
-    // Step type labels: Creation, Review, Decision
-    await expect(stepTypeButton(page, 'Creation')).toBeVisible();
-    await expect(stepTypeButton(page, 'Review')).toBeVisible();
-    await expect(stepTypeButton(page, 'Decision')).toBeVisible();
-
-    // Each option shows a description
-    await expect(page.getByText(/A step where content or data is produced/i)).toBeVisible();
-    await expect(page.getByText(/A step where someone evaluates work/i)).toBeVisible();
+    // Section 1: step type toggles (Creation active by default, Decision available)
+    await expect(stepTypeButton(page, 'creation')).toBeVisible();
+    await expect(stepTypeButton(page, 'decision')).toBeVisible();
     await showStep(page);
 
-    // Select "Creation" type → executor options appear
-    await click(page, stepTypeButton(page, 'Creation'));
-    await expect(page.getByText(/who handles this step\?/i)).toBeVisible({ timeout: 3_000 });
-
-    // Executor buttons for creation type: human, agent, script, cowork
+    // Section 2: executor buttons all visible simultaneously
     await expect(executorButton(page, 'human')).toBeVisible();
     await expect(executorButton(page, 'agent')).toBeVisible();
     await expect(executorButton(page, 'script')).toBeVisible();
@@ -188,9 +163,7 @@ test.describe('Workflow Editor Journey', () => {
 
     // Add a step via edge "+" button
     await click(page, page.getByLabel('Add step here').first());
-    await expect(page.getByText(/^step type$/i)).toBeVisible({ timeout: 3_000 });
-    await click(page, stepTypeButton(page, 'Creation'));
-    await expect(page.getByText(/who handles this step\?/i)).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
     await click(page, executorButton(page, 'human'));
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
     await showStep(page);
@@ -226,9 +199,7 @@ test.describe('Workflow Editor Journey', () => {
 
     // Add a step via edge "+" button
     await click(page, page.getByLabel('Add step here').first());
-    await expect(page.getByText(/^step type$/i)).toBeVisible({ timeout: 3_000 });
-    await click(page, stepTypeButton(page, 'Creation'));
-    await expect(page.getByText(/who handles this step\?/i)).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
     await click(page, executorButton(page, 'human'));
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
     await showStep(page);
@@ -437,9 +408,7 @@ test.describe('Workflow Editor Journey', () => {
 
     // Add an agent step via edge "+" button
     await click(page, page.getByLabel('Add step here').first());
-    await expect(page.getByText(/^step type$/i)).toBeVisible({ timeout: 3_000 });
-    await click(page, stepTypeButton(page, 'Creation'));
-    await expect(page.getByText(/who handles this step\?/i)).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
     await click(page, executorButton(page, 'agent'));
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
@@ -478,9 +447,7 @@ test.describe('Workflow Editor Journey', () => {
 
     // Add a cowork step via edge "+" button
     await click(page, page.getByLabel('Add step here').first());
-    await expect(page.getByText(/^step type$/i)).toBeVisible({ timeout: 3_000 });
-    await click(page, stepTypeButton(page, 'Creation'));
-    await expect(page.getByText(/who handles this step\?/i)).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
     await click(page, executorButton(page, 'cowork'));
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
     await showStep(page);
@@ -525,7 +492,7 @@ test.describe('Workflow Editor Journey', () => {
 
     // Add a cowork step
     await click(page, page.getByLabel('Add step here').first());
-    await click(page, stepTypeButton(page, 'Creation'));
+    await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
     await click(page, executorButton(page, 'cowork'));
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 

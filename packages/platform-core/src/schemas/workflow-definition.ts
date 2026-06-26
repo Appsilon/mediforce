@@ -7,6 +7,7 @@ import {
   TransitionSchema,
   TriggerSchema,
   RepoSchema,
+  CommitShaSchema,
 } from './process-definition';
 import { ProcessNotificationConfigSchema } from './process-config';
 import { McpServerConfigSchema } from './mcp-server-config';
@@ -137,7 +138,7 @@ export const ContainerSchema = z.object({
    * Commit SHA (7–40 hex chars) to check out from `repo`.
    * Must be set whenever `repo` is set — omitting it silently no-ops the build.
    */
-  commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
+  commit: CommitShaSchema.optional(),
   /** Name of a workflow secret containing a token for cloning a private repo. */
   repoAuth: z.string().optional(),
 });
@@ -218,6 +219,7 @@ export const WorkflowCoworkConfigSchema = z.object({
   agent: z.enum(['chat', 'voice-realtime']),
   systemPrompt: z.string().optional(),
   outputSchema: z.record(z.string(), z.unknown()).optional(),
+  outputSchemaRef: z.enum(['workflow-definition-authorable']).optional(),
   chat: CoworkChatConfigSchema.optional(),
   voiceRealtime: CoworkVoiceRealtimeConfigSchema.optional(),
   /** @deprecated Step-level MCP configuration is being removed.
@@ -608,6 +610,20 @@ export type TriggerInputField = z.infer<typeof TriggerInputFieldSchema>;
 export const WorkflowVisibilitySchema = z.enum(['public', 'private']);
 export type WorkflowVisibility = z.infer<typeof WorkflowVisibilitySchema>;
 
+/**
+ * Provenance of a Workflow Definition imported from a git repo. Reuses
+ * `RepoSchema` (`url`) minus `auth` (provenance never clones, so a token would
+ * be meaningless), plus the `path` of the imported `.wd.json`. `commit` is the
+ * immutable SHA resolved from the requested ref at import time — the import
+ * *input* still accepts a branch/tag/SHA, but only the resolved commit is
+ * stored. Informational only — no automatic sync. See ADR-0009.
+ */
+export const WorkflowSourceSchema = RepoSchema.omit({ auth: true }).extend({
+  commit: CommitShaSchema,
+  path: z.string().min(1),
+});
+export type WorkflowSource = z.infer<typeof WorkflowSourceSchema>;
+
 export const WorkflowDefinitionBaseSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
@@ -629,7 +645,7 @@ export const WorkflowDefinitionBaseSchema = z.object({
    * `auth` names a workflow secret that holds the clone token for private repos.
    */
   externalSkillsRepo: RepoSchema.extend({
-    commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)'),
+    commit: CommitShaSchema,
   }).optional(),
   url: z.string().url().optional(),
   roles: z.array(z.string()).optional(),
@@ -645,12 +661,73 @@ export const WorkflowDefinitionBaseSchema = z.object({
     name: z.string().min(1),
     version: z.number().int().positive(),
   }).optional(),
+  source: WorkflowSourceSchema.optional(),
   archived: z.boolean().optional(),
   deleted: z.boolean().optional(),
   createdAt: z.string().datetime().optional(),
   inputForNextRun: z.array(InputForNextRunEntrySchema).optional(),
   triggerInput: z.array(TriggerInputFieldSchema).optional(),
 });
+
+/**
+ * Fields the platform injects or manages at registration — never authored by
+ * template files, the design LLM, or `validate` callers. The loader supplies
+ * `namespace`; `version` and `createdAt` are assigned server-side. Single
+ * source for every `.omit()` / strip that drops them, so the three call sites
+ * that used to redeclare this set can no longer drift apart.
+ */
+export const SERVER_MANAGED_WORKFLOW_FIELDS = {
+  namespace: true,
+  version: true,
+  createdAt: true,
+} as const;
+
+/**
+ * The surface a workflow author controls — the design LLM's output schema (via
+ * {@link getWorkflowAuthorableJsonSchema}). Built with `.pick()` rather than
+ * `.omit()` so server-managed (`namespace`/`version`/`createdAt`) and lifecycle
+ * (`copiedFrom`/`archived`/`deleted`) fields are excluded by construction: a
+ * new lifecycle field added to the base schema cannot silently leak into the
+ * authorable contract.
+ */
+export const WorkflowAuthorableSchema = WorkflowDefinitionBaseSchema.pick({
+  name: true,
+  visibility: true,
+  title: true,
+  description: true,
+  preamble: true,
+  externalSkillsRepo: true,
+  url: true,
+  roles: true,
+  env: true,
+  notifications: true,
+  workspace: true,
+  steps: true,
+  transitions: true,
+  triggers: true,
+  metadata: true,
+  inputForNextRun: true,
+  triggerInput: true,
+});
+
+export function getWorkflowAuthorableJsonSchema(): Record<string, unknown> {
+  return z.toJSONSchema(WorkflowAuthorableSchema, { io: 'input' }) as Record<string, unknown>;
+}
+
+export function resolveCoworkOutputSchema(
+  cowork: WorkflowCoworkConfig | undefined,
+): Record<string, unknown> | null {
+  if (!cowork) return null;
+  if (cowork.outputSchema) return cowork.outputSchema;
+
+  if (cowork.outputSchemaRef === undefined) return null;
+  if (cowork.outputSchemaRef === 'workflow-definition-authorable') {
+    return getWorkflowAuthorableJsonSchema();
+  }
+
+  const _exhaustive: never = cowork.outputSchemaRef;
+  return _exhaustive;
+}
 
 export const WorkflowDefinitionSchema = WorkflowDefinitionBaseSchema.superRefine(
   (wd, ctx) => {
@@ -693,11 +770,9 @@ export function parseWorkflowDefinitionForCreation(input: unknown) {
  * would let the author believe their value was honored when the loader
  * actually overwrites it.
  */
-export const WorkflowTemplateSchema = WorkflowDefinitionBaseSchema.omit({
-  namespace: true,
-  version: true,
-  createdAt: true,
-}).superRefine((wd, ctx) => {
+export const WorkflowTemplateSchema = WorkflowDefinitionBaseSchema.omit(
+  SERVER_MANAGED_WORKFLOW_FIELDS,
+).superRefine((wd, ctx) => {
   validateInputForNextRun(wd, ctx);
   validateExecutorAndTriggers(wd, ctx);
   validateVerdicts(wd, ctx);

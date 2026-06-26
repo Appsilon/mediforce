@@ -2,7 +2,7 @@
   "name": "mediforce",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.34.1",
+  "packageManager": "pnpm@10.34.4",
   "scripts": {
     "build": "pnpm -r run build",
     "typecheck": "tsc -b --noEmit",
@@ -40,7 +40,7 @@
       "protobufjs": "8.5.0",
       "hono": "4.12.25",
       "@hono/node-server": "2.0.4",
-      "fast-xml-parser": "5.8.0",
+      "fast-xml-parser": "5.9.3",
       "node-forge": "1.4.0",
       "follow-redirects": "1.16.0",
       "brace-expansion": "5.0.6",

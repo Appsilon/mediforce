@@ -18,7 +18,8 @@ const TEMPLATE_RE = /^\{\{(?:[A-Z]+:)?([A-Za-z0-9_-]+)\}\}$/;
 
 export interface OpenRouterCreditsInfo {
   available: boolean;
-  remaining: number;
+  /** Real spendable budget — `min(key limit remaining, account credits)`. */
+  effectiveRemaining: number;
 }
 
 const LOW_CREDITS_THRESHOLD = 0.5;
@@ -132,12 +133,12 @@ export function runPreflightChecks(
     });
   }
 
-  if (options.openRouterCredits?.available && options.openRouterCredits.remaining <= LOW_CREDITS_THRESHOLD) {
+  if (options.openRouterCredits?.available && options.openRouterCredits.effectiveRemaining <= LOW_CREDITS_THRESHOLD) {
     const agentSteps = steps
       .filter((s) => s.executor === 'agent')
       .map((s) => s.name);
     if (agentSteps.length > 0) {
-      const remaining = options.openRouterCredits.remaining;
+      const remaining = options.openRouterCredits.effectiveRemaining;
       warnings.push({
         category: 'low-credits',
         resource: 'OPENROUTER_API_KEY',

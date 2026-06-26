@@ -89,6 +89,24 @@ describe('callOpenRouter', () => {
     expect(body.max_tokens).toBe(1024);
   });
 
+  it('exposes finishReason so callers can detect truncation', async () => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: 'partial' }, finish_reason: 'length' }],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const result = await callOpenRouter({
+      model: 'model-x',
+      messages: [{ role: 'user', content: 'hi' }],
+      apiKey: 'key-abc',
+    });
+    expect(result.finishReason).toBe('length');
+  });
+
   it('returns empty content + empty toolCalls when the model omits them', async () => {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ choices: [{ message: {} }] }), { status: 200 }),

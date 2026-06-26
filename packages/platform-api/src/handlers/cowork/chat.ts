@@ -28,7 +28,21 @@ import { validateOutputSchema } from '@mediforce/agent-runtime';
 
 const MAX_TOOL_LOOP_ITERATIONS = 10;
 const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
+/**
+ * Output budget per turn. A full WorkflowDefinition artifact (many steps,
+ * transitions, descriptions) is emitted as `update_artifact` tool-call
+ * arguments and routinely exceeds the client's 4096 default — truncation
+ * there yields invalid JSON and a silently dropped artifact. 16k gives the
+ * model room to emit a complete definition in one turn.
+ */
+const CHAT_MAX_TOKENS = 16384;
 const COWORK_DEBUG = process.env.COWORK_DEBUG === 'true';
+
+const ARTIFACT_TRUNCATED_MESSAGE =
+  `Artifact update failed: model response truncated at the ${CHAT_MAX_TOKENS}-token limit ` +
+  '(the artifact is too large to emit in one turn). Emit a smaller artifact and build it up ' +
+  'across several update_artifact calls.';
+const ARTIFACT_PARSE_ERROR_MESSAGE = 'Artifact update skipped (parse error).';
 
 /**
  * Chat turn — orchestrates the MCP tool loop server-side. Intermediate tool
@@ -41,7 +55,7 @@ export async function chatCoworkSession(
   scope: CallerScope,
 ): Promise<ChatCoworkSessionOutput> {
   const ctx = await loadChatContext(input.sessionId, scope);
-  const mcp = await connectMcp(ctx.session, ctx.namespace);
+  const mcp = await connectMcp(ctx.session, ctx.namespace, ctx.secrets);
   try {
     await addTurn(scope, input.sessionId, humanTurn(input.message));
     const reloaded = await loadOr404(
@@ -72,6 +86,7 @@ export async function chatCoworkSession(
 interface ChatContext {
   readonly session: CoworkSession;
   readonly openRouterKey: string;
+  readonly secrets: Record<string, string>;
   readonly stepContext: Record<string, unknown> | undefined;
   readonly model: string;
   readonly namespace: string;
@@ -116,6 +131,7 @@ async function loadChatContext(
   return {
     session,
     openRouterKey,
+    secrets,
     stepContext: instance.variables as Record<string, unknown> | undefined,
     model: session.model ?? DEFAULT_MODEL,
     namespace,
@@ -127,13 +143,19 @@ interface McpHandle {
   readonly tools: McpToolDefinition[];
 }
 
-async function connectMcp(session: CoworkSession, namespace: string): Promise<McpHandle | null> {
+async function connectMcp(
+  session: CoworkSession,
+  namespace: string,
+  workflowSecrets?: Record<string, string>,
+): Promise<McpHandle | null> {
   if (!session.mcpServers || session.mcpServers.length === 0) return null;
   const serversWithNamespace = session.mcpServers.map((s) => ({
     ...s,
     env: { ...s.env, MEDIFORCE_NAMESPACE: namespace },
   }));
-  const manager = new McpClientManager(serversWithNamespace);
+  const manager = new McpClientManager(serversWithNamespace, {
+    workflowSecrets,
+  });
   try {
     const tools = await manager.connect();
     return { manager, tools };
@@ -230,6 +252,7 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
       messages,
       tools,
       apiKey: ctx.openRouterKey,
+      maxTokens: CHAT_MAX_TOKENS,
     });
     agentText = response.content;
     if (COWORK_DEBUG) console.log(`[cowork-chat] LLM response: text=${agentText.length}chars toolCalls=[${response.toolCalls.map(tc => tc.function.name).join(', ')}]`);
@@ -272,8 +295,11 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
           toolStatus: 'success',
         });
       } else {
+        const toolResult = response.finishReason === 'length'
+          ? ARTIFACT_TRUNCATED_MESSAGE
+          : ARTIFACT_PARSE_ERROR_MESSAGE;
         await scope.coworkSessions.updateTurn(ctx.session.id, turn.id, {
-          toolResult: 'Artifact update skipped (parse error).',
+          toolResult,
           toolStatus: 'error',
         });
       }
@@ -308,9 +334,16 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
     messages.push(assistantMessage(agentText, response.toolCalls));
 
     for (const call of artifactCalls) {
-      const validationMsg = ctx.session.outputSchema
-        ? (artifact ? 'Artifact updated and validated.' : 'Artifact update skipped (parse error).')
-        : 'Artifact updated.';
+      let validationMsg: string;
+      if (artifact) {
+        validationMsg = ctx.session.outputSchema
+          ? 'Artifact updated and validated.'
+          : 'Artifact updated.';
+      } else if (response.finishReason === 'length') {
+        validationMsg = ARTIFACT_TRUNCATED_MESSAGE;
+      } else {
+        validationMsg = ARTIFACT_PARSE_ERROR_MESSAGE;
+      }
       messages.push({ role: 'tool', content: validationMsg, tool_call_id: call.id });
     }
     for (const call of presentationCalls) {
@@ -390,10 +423,22 @@ function applyArtifactUpdate(
   call: OpenRouterToolCall,
 ): Record<string, unknown> | null {
   try {
-    const parsed = JSON.parse(call.function.arguments) as {
-      artifact: Record<string, unknown>;
-    };
-    return parsed.artifact;
+    const parsed = JSON.parse(call.function.arguments) as Record<string, unknown>;
+    if (parsed === null || typeof parsed !== 'object') return null;
+    // Wrapped form { artifact: {...} }: once the wrapper key is present, the
+    // inner value IS the artifact. A null/non-object inner is a malformed
+    // wrapper, not a cue to fall through and persist the wrapper `{ artifact:
+    // null }` itself as the artifact — return null so it's skipped.
+    if ('artifact' in parsed) {
+      const inner = parsed['artifact'];
+      return inner !== null && typeof inner === 'object'
+        ? (inner as Record<string, unknown>)
+        : null;
+    }
+    // No wrapper key — models that pass the artifact directly. Treat a
+    // non-empty top-level object as the artifact.
+    if (Object.keys(parsed).length > 0) return parsed;
+    return null;
   } catch {
     return null;
   }

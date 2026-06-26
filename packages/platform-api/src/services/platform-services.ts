@@ -14,6 +14,8 @@ import {
   PostgresCronTriggerStateRepository,
   PostgresAgentRunRepository,
   PostgresHumanTaskRepository,
+  PostgresTaskAttachmentRepository,
+  FilesystemBlobStore,
   PostgresCoworkSessionRepository,
   PostgresProcessInstanceRepository,
   PostgresProcessRepository,
@@ -34,11 +36,13 @@ import type {
   AgentOAuthTokenRepository,
   AgentRunRepository,
   AuditRepository,
+  BlobStore,
   CoworkSessionRepository,
   CronTriggerStateRepository,
   EmailProviderInfo,
   HandoffRepository,
   HumanTaskRepository,
+  TaskAttachmentRepository,
   ModelRegistryRepository,
   NamespaceRepository,
   NamespaceSecretsRepository,
@@ -118,6 +122,8 @@ export interface PlatformServices {
   agentEventRepo: AgentEventRepository;
   agentRunRepo: AgentRunRepository;
   humanTaskRepo: HumanTaskRepository;
+  taskAttachmentRepo: TaskAttachmentRepository;
+  blobStore: BlobStore;
   handoffRepo: HandoffRepository;
   agentDefinitionRepo: AgentDefinitionRepository;
   coworkSessionRepo: CoworkSessionRepository;
@@ -257,6 +263,8 @@ export function getPlatformServices(): PlatformServices {
   const agentEventRepo: AgentEventRepository = new PostgresAgentEventRepository(instanceRepo);
   const agentRunRepo: AgentRunRepository = new PostgresAgentRunRepository(pg, instanceRepo);
   const humanTaskRepo: HumanTaskRepository = new PostgresHumanTaskRepository(pg, instanceRepo);
+  const taskAttachmentRepo: TaskAttachmentRepository = new PostgresTaskAttachmentRepository(pg);
+  const blobStore: BlobStore = new FilesystemBlobStore();
   const handoffRepo: HandoffRepository = new PostgresHandoffRepository(pg, instanceRepo);
   const agentDefinitionRepo: AgentDefinitionRepository = new PostgresAgentDefinitionRepository(pg);
   const coworkSessionRepo: CoworkSessionRepository =
@@ -473,6 +481,8 @@ export function getPlatformServices(): PlatformServices {
     agentEventRepo,
     agentRunRepo,
     humanTaskRepo,
+    taskAttachmentRepo,
+    blobStore,
     handoffRepo,
     agentDefinitionRepo,
     coworkSessionRepo,

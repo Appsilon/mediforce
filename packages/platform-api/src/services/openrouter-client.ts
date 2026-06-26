@@ -34,6 +34,12 @@ export interface OpenRouterToolDefinition {
 export interface OpenRouterResponse {
   content: string;
   toolCalls: OpenRouterToolCall[];
+  /**
+   * OpenRouter/Anthropic completion stop reason. `'length'` means the model
+   * hit `max_tokens` and the output (including any tool-call arguments) is
+   * truncated — callers building large artifacts must treat this as an error.
+   */
+  finishReason: string | null;
 }
 
 export interface OpenRouterRequest {
@@ -74,12 +80,14 @@ export async function callOpenRouter(req: OpenRouterRequest): Promise<OpenRouter
         content?: string | null;
         tool_calls?: OpenRouterToolCall[];
       };
+      finish_reason?: string | null;
     }>;
   };
 
-  const choice = data.choices?.[0]?.message;
+  const choice = data.choices?.[0];
   return {
-    content: choice?.content ?? '',
-    toolCalls: choice?.tool_calls ?? [],
+    content: choice?.message?.content ?? '',
+    toolCalls: choice?.message?.tool_calls ?? [],
+    finishReason: choice?.finish_reason ?? null,
   };
 }

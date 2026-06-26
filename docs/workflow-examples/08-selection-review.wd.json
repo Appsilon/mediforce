@@ -1,0 +1,58 @@
+{
+  "name": "tutorial-selection-review",
+  "title": "Selection Review",
+  "description": "Fetch a list of options via script, then let a human pick one from the results. Demonstrates the selection review pattern: a script outputs an options array, a review step with selection: 1 presents them for picking, and verdicts route the choice.",
+  "triggers": [
+    { "type": "manual", "name": "manual" }
+  ],
+  "roles": ["operator"],
+  "steps": [
+    {
+      "id": "fetch-options",
+      "name": "Fetch Available Templates",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Fetch a list of templates for the user to choose from.",
+      "script": {
+        "inlineScript": "import { writeFileSync } from 'fs';\n\nconst options = [\n  { label: 'Weekly Report', description: 'Standard weekly status report', value: { templateId: 'weekly', sections: ['summary', 'metrics', 'risks'] } },\n  { label: 'Incident Report', description: 'Post-incident analysis template', value: { templateId: 'incident', sections: ['timeline', 'impact', 'root-cause', 'actions'] } },\n  { label: 'Audit Trail', description: 'Compliance audit documentation', value: { templateId: 'audit', sections: ['scope', 'findings', 'evidence', 'recommendations'] } }\n];\n\nwriteFileSync('/output/result.json', JSON.stringify({ options, summary: `Found ${options.length} templates` }));\n",
+        "runtime": "javascript"
+      }
+    },
+    {
+      "id": "pick-template",
+      "name": "Pick a Template",
+      "type": "review",
+      "executor": "human",
+      "allowedRoles": ["operator"],
+      "description": "Select one template from the fetched options.",
+      "selection": 1,
+      "verdicts": {
+        "approve": { "target": "generate" },
+        "revise": { "target": "fetch-options" }
+      }
+    },
+    {
+      "id": "generate",
+      "name": "Generate Document",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Generate a document skeleton from the selected template.",
+      "script": {
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\n\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst selected = input.steps?.['pick-template'];\nconst templateId = selected?.templateId || 'unknown';\nconst sections = selected?.sections || [];\n\nconst doc = sections.map(s => `## ${s.charAt(0).toUpperCase() + s.slice(1)}\\n\\n[To be filled]`).join('\\n\\n');\n\nwriteFileSync('/output/result.json', JSON.stringify({\n  templateId,\n  document: doc,\n  summary: `Generated ${templateId} with ${sections.length} sections`\n}));\n",
+        "runtime": "javascript"
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "fetch-options", "to": "pick-template" },
+    { "from": "generate", "to": "done" }
+  ]
+}

@@ -58,6 +58,9 @@ export {
   WorkflowWorkspaceSchema,
   WorkflowStepSchema,
   WorkflowVisibilitySchema,
+  WorkflowAuthorableSchema,
+  SERVER_MANAGED_WORKFLOW_FIELDS,
+  WorkflowSourceSchema,
   WorkflowDefinitionSchema,
   WorkflowDefinitionBaseSchema,
   WorkflowTemplateSchema,
@@ -77,6 +80,8 @@ export {
   validateTriggerInput,
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,
+  getWorkflowAuthorableJsonSchema,
+  resolveCoworkOutputSchema,
   ConversationTurnSchema,
   CoworkAgentSchema,
   CoworkVoiceConfigSchema,
@@ -169,6 +174,7 @@ export type {
   WorkflowWorkspace,
   WorkflowStep,
   WorkflowVisibility,
+  WorkflowSource,
   WorkflowDefinition,
   WorkflowTemplate,
   TriggerInputField,
@@ -211,6 +217,13 @@ export type {
   AssignmentItem,
   TableEditorRow,
   CompleteHumanTaskPayload,
+  TaskAttachment,
+  NewTaskAttachment,
+} from './schemas/index';
+export {
+  ATTACHMENT_MAX_BYTES,
+  TaskAttachmentSchema,
+  NewTaskAttachmentSchema,
 } from './schemas/index';
 
 // Interfaces (repository and service contracts)
@@ -226,6 +239,8 @@ export type {
   ListInstancesOptions,
   WorkflowRunSummaryResult,
   HumanTaskRepository,
+  TaskAttachmentRepository,
+  BlobStore,
   HandoffRepository,
   NotificationService,
   NotificationEvent,
@@ -391,3 +406,7 @@ export { calculateEstimatedCost } from './utils/cost';
 export { formatBytes } from './utils/format';
 export { compact, parseRow } from './utils/compact';
 export { normaliseModelId } from './utils/normalise-model-id';
+
+// Workflow examples — shared loader for MCP tool, tests, and build scripts.
+// Uses Node.js fs/path so NOT exported from this barrel (breaks browser bundles).
+// Import directly: import { loadWorkflowExamples } from '@mediforce/platform-core/workflow-examples'
