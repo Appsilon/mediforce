@@ -9,7 +9,7 @@ overrides:
   protobufjs: 8.5.0
   hono: 4.12.25
   '@hono/node-server': 2.0.4
-  fast-xml-parser: 5.8.0
+  fast-xml-parser: 5.9.3
   node-forge: 1.4.0
   follow-redirects: 1.16.0
   brace-expansion: 5.0.6
@@ -1770,8 +1770,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@nodable/entities@2.1.0':
-    resolution: {integrity: sha512-nyT7T3nbMyBI/lvr6L5TyWbFJAI9FTgVRakNoBqCD+PmID8DzFrrNdLLtHMwMszOtqZa8PAOV24ZqDnQrhQINA==}
+  '@nodable/entities@2.2.0':
+    resolution: {integrity: sha512-9uGyhaQavEUMC8AIddIjau4NsnsXhou+j5sBAGojCM1oxmQpVKTWR/9JxABD6UAv12vpIms55fPZKFQEhG6uBg==}
 
   '@opentelemetry/api-logs@0.219.0':
     resolution: {integrity: sha512-FFx7YnaYJlIjqWW/AG/yAZ0L/NEY724PipXXXQLdtZPbLwBGbUMTGL1i/esI56TWfTUXxhLfpgrnWJCG8aUJyg==}
@@ -2819,6 +2819,9 @@ packages:
     resolution: {integrity: sha512-4Dj6M28JB+oAH8kFkTLUo+a2jwOFkuqb3yucU0CANcRRUbxS0cP0nZYCGjcc3BNXwRIsUVmDGgzawme7zvJHvg==}
     engines: {node: '>=12'}
 
+  anynum@1.0.1:
+    resolution: {integrity: sha512-N6//FLET/tXYNM/F6ABca1oH6fWB+KlTt909Le28WMDBk8oaT4vY17DCrwg2MvmuqUKt3Ni4N5dGJ/EoBgcO6A==}
+
   aria-hidden@1.2.6:
     resolution: {integrity: sha512-ik3ZgC9dY/lYVVM++OISsaYDeg1tb0VtP5uL3ouh1koGOaUMDPpbFIei4JkFimWUFPn90sbMNMXQAIVOlnYKJA==}
     engines: {node: '>=10'}
@@ -3343,8 +3346,8 @@ packages:
   fast-xml-builder@1.2.0:
     resolution: {integrity: sha512-00aAWieqff+ZJhsXA4g1g7M8k+7AYoMUUHF+/zFb5U6Uv/P0Vl4QZo84/IcufzYalLuEj9928bXN9PbbFzMF0Q==}
 
-  fast-xml-parser@5.8.0:
-    resolution: {integrity: sha512-6bIM7fsJxeo3uXv7OncQYsBAMPJ7V16Slahl/6M98C/i2q+vB1+4a0MtrvYwDFEUrwDSbAmeLDRXsOBwrL7yAg==}
+  fast-xml-parser@5.9.3:
+    resolution: {integrity: sha512-brCNCeScma/kqa54J4PIDriSSSLssRkuYaUCpvHJulGc3HGI/xxKUCTDcYkAdqJsyb//ydpbxecjC3hB9+tb/g==}
     hasBin: true
 
   faye-websocket@0.11.4:
@@ -3620,6 +3623,9 @@ packages:
   is-stream@2.0.1:
     resolution: {integrity: sha512-hFoiJiTl63nn+kstHGBtewWSKnQLpyb155KHheA1l39uvtO9nWIop1p3udqPcUd/xbF1VLMO4n7OI6p7RbngDg==}
     engines: {node: '>=8'}
+
+  is-unsafe@1.0.1:
+    resolution: {integrity: sha512-CLK2+VdgERgD96EYm5lUQssZYlRg2tkZnbsxZoacmSiRxiFJ4Nk4SzjCl+Ur+v3kXIY9dTIdb3IH22y1mZ56LA==}
 
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
@@ -4481,8 +4487,8 @@ packages:
     resolution: {integrity: sha512-laJTa3Jb+VQpaC6DseHhF7dXVqHTfJPCRDaEbid/drOhgitgYku/letMUqOXFoWV0zIIUbjpdH2t+tYj4bQMRQ==}
     engines: {node: '>=8'}
 
-  strnum@2.3.0:
-    resolution: {integrity: sha512-ums3KNd42PGyx5xaoVTO1mjU1bH3NpY4vsrVlnv9PNGqQj8wd7rJ6nEypLrJ7z5vxK5RP0yMLo6J/Gsm62DI5Q==}
+  strnum@2.4.1:
+    resolution: {integrity: sha512-M9eUSMT2dCB2cTNPG7UYj6KuK7RJR2SN2+yCV/fTW3xzTCS6EaGZ5pSMgDIjB7r8zSfTGk+dvvn9rTjpVS9Mwg==}
 
   stubs@3.0.0:
     resolution: {integrity: sha512-PdHt7hHUJKxvTCgbKX9C1V/ftOcjJQgz8BZwNfV5c4B6dcGqlpelTbJ999jBGZ2jYiPAwcX5dP6oBwVlBlUbxw==}
@@ -5668,7 +5674,7 @@ snapshots:
       abort-controller: 3.0.0
       async-retry: 1.3.3
       duplexify: 4.1.3
-      fast-xml-parser: 5.8.0
+      fast-xml-parser: 5.9.3
       gaxios: 6.7.1
       google-auth-library: 9.15.1
       html-entities: 2.6.0
@@ -5953,7 +5959,7 @@ snapshots:
   '@next/swc-win32-x64-msvc@16.2.9':
     optional: true
 
-  '@nodable/entities@2.1.0':
+  '@nodable/entities@2.2.0':
     optional: true
 
   '@opentelemetry/api-logs@0.219.0':
@@ -6985,6 +6991,9 @@ snapshots:
   ansi-styles@6.2.3:
     optional: true
 
+  anynum@1.0.1:
+    optional: true
+
   aria-hidden@1.2.6:
     dependencies:
       tslib: 2.8.1
@@ -7482,12 +7491,13 @@ snapshots:
       xml-naming: 0.1.0
     optional: true
 
-  fast-xml-parser@5.8.0:
+  fast-xml-parser@5.9.3:
     dependencies:
-      '@nodable/entities': 2.1.0
+      '@nodable/entities': 2.2.0
       fast-xml-builder: 1.2.0
+      is-unsafe: 1.0.1
       path-expression-matcher: 1.5.0
-      strnum: 2.3.0
+      strnum: 2.4.1
       xml-naming: 0.1.0
     optional: true
 
@@ -7919,6 +7929,9 @@ snapshots:
   is-promise@4.0.0: {}
 
   is-stream@2.0.1:
+    optional: true
+
+  is-unsafe@1.0.1:
     optional: true
 
   isexe@2.0.0: {}
@@ -9077,7 +9090,9 @@ snapshots:
     dependencies:
       min-indent: 1.0.1
 
-  strnum@2.3.0:
+  strnum@2.4.1:
+    dependencies:
+      anynum: 1.0.1
     optional: true
 
   stubs@3.0.0:
