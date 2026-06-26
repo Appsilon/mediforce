@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.24
+# syntax=docker/dockerfile:1.25
 FROM node:24-slim
 
 # Install Docker CLI so the worker can spawn containers
