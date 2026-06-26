@@ -5,6 +5,8 @@ import {
   GetTaskOutputSchema,
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
+  ValidateWorkflowOutputSchema,
+  GetWorkflowSchemaOutputSchema,
   ListWorkflowsInputSchema,
   ListWorkflowsOutputSchema,
   GetWorkflowInputSchema,
@@ -235,6 +237,9 @@ import {
   type RegisterWorkflowBody,
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
+  type ValidateWorkflowInput,
+  type ValidateWorkflowOutput,
+  type GetWorkflowSchemaOutput,
   type ListWorkflowsRequest,
   type ListWorkflowsOutput,
   type GetWorkflowInput,
@@ -529,6 +534,8 @@ export class Mediforce {
       input: RegisterWorkflowBody,
       options: RegisterWorkflowOptions,
     ) => Promise<RegisterWorkflowOutput>;
+    validate: (input: ValidateWorkflowInput) => Promise<ValidateWorkflowOutput>;
+    schema: () => Promise<GetWorkflowSchemaOutput>;
     list: (input?: ListWorkflowsRequest) => Promise<ListWorkflowsOutput>;
     get: (input: GetWorkflowInput) => Promise<GetWorkflowOutput>;
     versions: (input: ListWorkflowVersionsInput) => Promise<ListWorkflowVersionsOutput>;
@@ -934,6 +941,20 @@ export class Mediforce {
           RegisterWorkflowOutputSchema,
           'mediforce.workflows.register',
         );
+      },
+      validate: async (input) => {
+        return this.sendJson(
+          'POST',
+          '/api/workflow-definitions/validate',
+          { ...input },
+          ValidateWorkflowOutputSchema,
+          'mediforce.workflows.validate',
+        );
+      },
+      schema: async () => {
+        const res = await this.request('/api/workflow-definitions/schema');
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.schema');
+        return GetWorkflowSchemaOutputSchema.parse(body);
       },
       list: async (input) => {
         const validated = input ? ListWorkflowsInputSchema.parse(input) : undefined;

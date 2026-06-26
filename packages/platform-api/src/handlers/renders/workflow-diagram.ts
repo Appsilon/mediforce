@@ -19,7 +19,7 @@ export const RenderWorkflowDiagramInputSchema = z.object({
       from: z.string(),
       to: z.string(),
       when: z.string().optional(),
-    })),
+    })).default([]),
     triggers: z.array(z.object({
       type: z.string(),
       name: z.string(),

@@ -7,6 +7,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@mediforce/platform-core": "workspace:*"
+    "@mediforce/platform-core": "workspace:*",
+    "@mediforce/workflow-engine": "workspace:*"
   }
 }

@@ -74,6 +74,26 @@ describe('renderWorkflowDiagram', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts an in-progress definition routed only via verdicts (no transitions)', () => {
+    const def = {
+      definition: {
+        name: 'wip-flow',
+        steps: [
+          {
+            id: 'draft', name: 'Draft', type: 'creation', executor: 'agent',
+            verdicts: { approve: { target: 'done' } },
+          },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+      },
+    };
+    const parsed = RenderWorkflowDiagramInputSchema.parse(def);
+    expect(parsed.definition.transitions).toEqual([]);
+    const html = renderWorkflowDiagram(parsed);
+    expect(html).toContain('wip-flow');
+    expect(html).toContain('via verdicts');
+  });
+
   it('input schema rejects missing steps', () => {
     const result = RenderWorkflowDiagramInputSchema.safeParse({
       definition: { transitions: [] },

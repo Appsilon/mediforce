@@ -176,6 +176,167 @@ describe('chatCoworkSession handler', () => {
     expect(result.session.artifact).toEqual({ title: 'v1' });
   });
 
+  it('skips a wrapped update_artifact whose inner artifact is null', async () => {
+    await coworkSessionRepo.create(
+      buildCoworkSession({
+        id: 'sess-1',
+        processInstanceId: 'inst-a',
+        status: 'active',
+        agent: 'chat',
+      }),
+    );
+
+    fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: 'Clearing artifact',
+                  tool_calls: [
+                    {
+                      id: 'call-1',
+                      type: 'function',
+                      function: {
+                        name: 'update_artifact',
+                        arguments: JSON.stringify({ artifact: null }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: 'Done', tool_calls: [] } }],
+          }),
+          { status: 200 },
+        ),
+      );
+
+    const scope = createTestScope({
+      instanceRepo,
+      coworkSessionRepo,
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    const result = await chatCoworkSession(
+      { sessionId: 'sess-1', message: 'Clear it' },
+      scope,
+    );
+
+    // The malformed wrapper must not be persisted as `{ artifact: null }`.
+    expect(result.artifact).toBeUndefined();
+    const session = await coworkSessionRepo.getById('sess-1');
+    expect(session?.artifact ?? null).toBeNull();
+  });
+
+  it('requests enough output tokens to emit a full workflow artifact', async () => {
+    await coworkSessionRepo.create(
+      buildCoworkSession({
+        id: 'sess-1',
+        processInstanceId: 'inst-a',
+        status: 'active',
+        agent: 'chat',
+      }),
+    );
+
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: 'hi', tool_calls: [] } }] }),
+        { status: 200 },
+      ),
+    );
+
+    const scope = createTestScope({
+      instanceRepo,
+      coworkSessionRepo,
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    await chatCoworkSession({ sessionId: 'sess-1', message: 'Make it' }, scope);
+
+    const body = JSON.parse(
+      (fetchSpy.mock.calls[0]![1] as RequestInit).body as string,
+    ) as Record<string, unknown>;
+    expect(typeof body.max_tokens).toBe('number');
+    expect(body.max_tokens as number).toBeGreaterThanOrEqual(16384);
+  });
+
+  it('reports truncation (not a parse error) when update_artifact is cut off at the token limit', async () => {
+    await coworkSessionRepo.create(
+      buildCoworkSession({
+        id: 'sess-1',
+        processInstanceId: 'inst-a',
+        status: 'active',
+        agent: 'chat',
+      }),
+    );
+
+    // Model hits max_tokens mid-tool-call: arguments are truncated invalid JSON.
+    // The loop then re-prompts; the second response exits with no tool calls.
+    fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: 'Updating artifact',
+                  tool_calls: [
+                    {
+                      id: 'call-1',
+                      type: 'function',
+                      function: {
+                        name: 'update_artifact',
+                        arguments: '{"artifact": {"steps": [{"id": "s1", "na',
+                      },
+                    },
+                  ],
+                },
+                finish_reason: 'length',
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ choices: [{ message: { content: 'OK', tool_calls: [] } }] }),
+          { status: 200 },
+        ),
+      );
+
+    const scope = createTestScope({
+      instanceRepo,
+      coworkSessionRepo,
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+
+    await chatCoworkSession({ sessionId: 'sess-1', message: 'Make it' }, scope);
+
+    const session = await coworkSessionRepo.getById('sess-1');
+    const toolTurn = session?.turns.find(
+      (t) => t.role === 'tool' && t.toolName === 'update_artifact',
+    );
+    expect(toolTurn?.role).toBe('tool');
+    if (toolTurn?.role !== 'tool') throw new Error('expected tool turn');
+    expect(toolTurn.toolStatus).toBe('error');
+    expect(toolTurn.toolResult).toMatch(/truncat/i);
+    expect(toolTurn.toolResult).not.toMatch(/parse error/i);
+    expect(session?.artifact ?? null).toBeNull();
+  });
+
   it('throws HandlerError when OPENROUTER_API_KEY missing', async () => {
     await coworkSessionRepo.create(
       buildCoworkSession({

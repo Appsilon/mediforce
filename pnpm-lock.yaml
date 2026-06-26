@@ -83,6 +83,12 @@ importers:
         specifier: ^4.0.0
         version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  apps/golden-standard-workflow:
+    dependencies:
+      '@mediforce/platform-core':
+        specifier: workspace:*
+        version: link:../../packages/platform-core
+
   apps/landing-zone:
     dependencies:
       '@mediforce/platform-core':
@@ -115,6 +121,9 @@ importers:
       '@mediforce/platform-core':
         specifier: workspace:*
         version: link:../../packages/platform-core
+      '@mediforce/workflow-engine':
+        specifier: workspace:*
+        version: link:../../packages/workflow-engine
 
   packages/agent-runtime:
     dependencies:
@@ -363,6 +372,9 @@ importers:
       '@mediforce/mcp-client':
         specifier: workspace:*
         version: link:../mcp-client
+      '@mediforce/mediforce-mcp':
+        specifier: workspace:*
+        version: link:../mediforce-mcp
       '@mediforce/platform-api':
         specifier: workspace:*
         version: link:../platform-api
