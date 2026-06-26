@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { deletePostgresAgentOAuthToken } from '../helpers/postgres-seed';
-import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
+import { trackPageErrors } from '../helpers/page-errors';
 
 const OAUTH_AGENT_ID = 'oauth-test-agent';
 const OAUTH_SERVER_NAME = 'github-mcp';
@@ -35,8 +35,8 @@ const OAUTH_SERVER_NAME = 'github-mcp';
  */
 
 test.describe('Agent MCP OAuth Journey', () => {
-  test('connect, disconnect, reconnect, revoke via mock provider', async ({ page }, testInfo) => {
-    await setupRecording(page, 'agent-mcp-oauth', testInfo);
+  test('connect, disconnect, reconnect, revoke via mock provider', async ({ page }) => {
+    trackPageErrors(page);
 
     // Playwright re-runs the full test on retry, but `auth-setup` runs once
     // globally — so a token written by an earlier failed attempt would still
@@ -56,7 +56,6 @@ test.describe('Agent MCP OAuth Journey', () => {
     // fetch on first hit can exceed Playwright's 5s default — give it room.
     await expect(page.getByText('github-mock').first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/github \(mock\)/i).first()).toBeVisible();
-    await showStep(page);
 
     // ── Open the fixture agent with the pre-bound OAuth binding ──────────
     await page.goto(`/${TEST_ORG_HANDLE}/agents/definitions/${OAUTH_AGENT_ID}`);
@@ -71,14 +70,13 @@ test.describe('Agent MCP OAuth Journey', () => {
     // the "Checking connection…" placeholder. The "Not connected" label
     // proves listAgentOAuthTokens resolved with no token (clean state).
     await expect(page.getByText(/not connected/i).first()).toBeVisible({ timeout: 15_000 });
-    await showStep(page);
 
     // ── Connect ───────────────────────────────────────────────────────────
     // `window.location = authorizeUrl` inside the Connect handler triggers
     // a full-page redirect to the mock `/authorize` endpoint, which
     // immediately 302s back to `/api/oauth/github-mock/callback?...`,
     // which 302s to the agent page with `?connected=github-mcp`.
-    await click(page, page.getByRole('button', { name: /^connect$/i }).first());
+    await page.getByRole('button', { name: /^connect$/i }).first().click();
     await page.waitForURL(/\?connected=github-mcp/, { timeout: 20_000 });
     // After the hard navigation back, the OAuthConnectionStatus component
     // re-mounts in `loading` state and refetches the token list. Wait for
@@ -89,10 +87,9 @@ test.describe('Agent MCP OAuth Journey', () => {
     await expect(page.getByText(/connected as @mock-user|connected: @mock-user|@mock-user/i).first()).toBeVisible({
       timeout: 15_000,
     });
-    await showStep(page);
 
     // ── Disconnect (local only) ──────────────────────────────────────────
-    await click(page, page.getByRole('button', { name: /^disconnect$/i }).first());
+    await page.getByRole('button', { name: /^disconnect$/i }).first().click();
     // UI either re-renders immediately or after a server round-trip. Wait
     // for the loading placeholder triggered by `refresh()` to clear before
     // asserting on the post-disconnect state.
@@ -102,30 +99,25 @@ test.describe('Agent MCP OAuth Journey', () => {
       timeout: 10_000,
     });
     await expect(page.getByText(/@mock-user/i)).toHaveCount(0);
-    await showStep(page);
 
     // ── Reconnect ────────────────────────────────────────────────────────
-    await click(page, page.getByRole('button', { name: /^connect$/i }).first());
+    await page.getByRole('button', { name: /^connect$/i }).first().click();
     await page.waitForURL(/\?connected=github-mcp/, { timeout: 20_000 });
     await expect(page.getByText(/checking connection/i)).toHaveCount(0, { timeout: 15_000 });
     await expect(page.getByText(/@mock-user/i).first()).toBeVisible({ timeout: 15_000 });
-    await showStep(page);
 
     // ── Revoke (local + provider) ────────────────────────────────────────
     // Revoke is destructive — confirm dialog, then provider `/revoke` is
     // POSTed, then local token deleted. The mock /revoke returns 200, so
     // the UI should return to "Not connected" without surfacing an error.
-    await click(page, page.getByRole('button', { name: /^revoke$/i }).first());
+    await page.getByRole('button', { name: /^revoke$/i }).first().click();
     await expect(page.getByRole('dialog')).toBeVisible();
-    await click(page, page.getByRole('button', { name: /^(revoke|confirm)$/i }).last());
+    await page.getByRole('button', { name: /^(revoke|confirm)$/i }).last().click();
 
     await expect(page.getByText(/checking connection/i)).toHaveCount(0, { timeout: 15_000 });
     await expect(page.getByRole('button', { name: /^connect$/i }).first()).toBeVisible({
       timeout: 10_000,
     });
     await expect(page.getByText(/@mock-user/i)).toHaveCount(0);
-    await showResult(page);
-
-    await endRecording(page);
   });
 });

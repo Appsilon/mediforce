@@ -180,7 +180,7 @@ Categories: Development, Data Access, Communication, Clinical Data, Research.
 
 Seed catalog: GitHub, Filesystem, PostgreSQL, Slack, CDISC Library, Brave Search.
 
-E2E journey test: `e2e/ui/tool-catalog.journey.ts` — GIF recording at `docs/features/tool-catalog.gif`.
+E2E journey test: `e2e/ui/tool-catalog.journey.ts`.
 
 ### Tool Detail (`/[handle]/tools/[toolId]`)
 
