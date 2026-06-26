@@ -16,7 +16,6 @@
     "test:e2e": "pnpm --filter @mediforce/platform-ui test:e2e",
     "test:e2e:api": "pnpm --filter @mediforce/platform-ui test:e2e --project=api",
     "test:e2e:ui": "pnpm --filter @mediforce/platform-ui test:e2e --project=authenticated",
-    "test:e2e:record": "pnpm --filter @mediforce/platform-ui test:e2e:record",
     "test:watch": "vitest",
     "test:affected": "vitest run --changed",
     "test:coverage": "vitest run --coverage",

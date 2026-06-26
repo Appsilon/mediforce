@@ -60,7 +60,7 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    picks the level (L1 unit / L2 integration / L3 API E2E / L4 UI / L5
    external), scaffolds the file, and walks RED → GREEN. Product features
    MUST land at **L3** (proves storage backend + middleware + auth). For L4 UI
-   journeys with a GIF deliverable, use `/e2e-test`.
+   journeys, use `/e2e-test`.
 
    **Don't test infra/tooling/workflow code.** CI scripts, build glue, dev
    tooling, workflow configs (`apps/*/workflow.yaml`), one-off migrations —

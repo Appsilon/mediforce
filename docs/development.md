@@ -130,7 +130,6 @@ pnpm emulators
 pnpm test:e2e               # all E2E (L3 + L4)
 pnpm test:e2e:api           # L3 only — API E2E, no browser (~30s)
 pnpm test:e2e:ui            # L4 only — UI E2E with real Chromium (~3min)
-pnpm test:e2e:record        # record GIFs of UI journeys
 ```
 
 Variants run from `packages/platform-ui`:

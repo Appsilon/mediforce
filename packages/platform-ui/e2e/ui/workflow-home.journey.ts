@@ -1,17 +1,16 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
+import { trackPageErrors } from '../helpers/page-errors';
 
 test.describe('Workflow Home Journey', () => {
-  test('browse workflows, check run data, and navigate to run detail', async ({ page }, testInfo) => {
-    await setupRecording(page, 'workflow-home', testInfo);
+  test('browse workflows, check run data, and navigate to run detail', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}`);
     await expect(page.getByRole('heading', { name: 'Workflows' })).toBeVisible({ timeout: 10_000 });
 
     // Workflow cards visible
     await expect(page.getByText('Supply Chain Review').first()).toBeVisible();
     await expect(page.getByText('Data Quality Review')).toBeVisible();
-    await showStep(page);
 
     // Run counts visible (exact numbers may vary if other tests mutated state)
     await expect(page.getByText(/\d+ runs/).first()).toBeVisible();
@@ -22,17 +21,14 @@ test.describe('Workflow Home Journey', () => {
     await expect(page.getByText('In Progress').first()).toBeVisible();
 
     // Display popover
-    await click(page, page.getByRole('button', { name: /display/i }));
+    await page.getByRole('button', { name: /display/i }).click();
     await expect(page.getByText('Completed runs')).toBeVisible();
-    await showStep(page);
     // Close popover
     await page.locator('body').click({ position: { x: 0, y: 0 } });
 
     // Navigate to run detail by clicking the first active run row
     // (all running seed instances are Supply Chain Review, so any row works)
-    await click(page, page.getByText('In Progress').first());
+    await page.getByText('In Progress').first().click();
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 30_000 });
-    await showResult(page);
-    await endRecording(page);
   });
 });

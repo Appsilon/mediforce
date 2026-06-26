@@ -479,4 +479,3 @@ images for script-executor steps](#build-images-for-script-executor-steps)).
 - [Postgres local dev](docs/postgres-local-dev.md) — reset, migrations, inspecting the DB
 - [Architecture](docs/architecture.md) — processes, steps, agents, compliance
 - [AGENTS.md](AGENTS.md) — contribution guidelines for AI-assisted development
-- [Features](docs/features/FEATURES.md) — feature gallery with recorded walkthroughs
