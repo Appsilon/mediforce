@@ -42,7 +42,7 @@ jobs:
             --body "🚀 Preview deploy started — [watch the run]($RUN_URL)."
 
       - name: Checkout PR branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.pr.outputs.ref }}
 
