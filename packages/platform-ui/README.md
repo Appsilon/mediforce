@@ -21,7 +21,6 @@ Copy `.env.example` to `.env.local` and fill in values.
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Yes | Firebase API key |
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Yes | Firebase auth domain |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Yes | Firebase project ID |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | No | Firebase storage bucket |
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | No | Firebase messaging sender ID |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | No | Firebase app ID |
 | `OPENROUTER_API_KEY` | Yes | OpenRouter API key for LLM calls |

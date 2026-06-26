@@ -6,7 +6,7 @@ if [ -n "$BREW_OPENJDK" ] && [ -d "$BREW_OPENJDK/libexec/openjdk.jdk/Contents/Ho
   export PATH="$JAVA_HOME/bin:$PATH"
 fi
 
-PORTS=(9099 9199 4000)
+PORTS=(9099 4000)
 blocked=()
 
 kill_port() {
@@ -33,5 +33,5 @@ if [ ${#blocked[@]} -gt 0 ]; then
 fi
 
 DATA_DIR="$(cd "$(dirname "$0")/.." && pwd)/.emulator-data"
-exec firebase emulators:start --project demo-mediforce --only auth,storage \
+exec firebase emulators:start --project demo-mediforce --only auth \
   --import "$DATA_DIR" --export-on-exit "$DATA_DIR" "$@"

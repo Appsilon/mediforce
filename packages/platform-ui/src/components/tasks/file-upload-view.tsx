@@ -2,21 +2,15 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { CheckCircle, FileText, Download, Loader2 } from 'lucide-react';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import type { Attachment } from '@mediforce/platform-core';
 import { FileUploadZone } from './file-upload-zone';
 import { mediforce } from '@/lib/mediforce';
-import { storage } from '@/lib/firebase';
+import { downloadViaApiFetch } from '@/lib/save-blob';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import type { TaskBodyProps } from './task-body-registry';
-
-interface UploadProgress {
-  completed: number;
-  total: number;
-  bytes: number;
-  totalBytes: number;
-}
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -28,77 +22,50 @@ export function FileUploadView({ task }: TaskBodyProps) {
   const [uploadComplete, setUploadComplete] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [uploading, setUploading] = React.useState(false);
-  const [uploadProgress, setUploadProgress] = React.useState<UploadProgress>({
-    completed: 0, total: 0, bytes: 0, totalBytes: 0,
-  });
+  const [uploadCount, setUploadCount] = React.useState({ completed: 0, total: 0 });
 
   const handleFileUpload = React.useCallback(async (files: File[]) => {
     setUploadError(null);
     setUploading(true);
+    setUploadCount({ completed: 0, total: files.length });
 
     try {
-      const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
-      setUploadProgress({ completed: 0, total: files.length, bytes: 0, totalBytes });
-
-      const uploadedFiles: { name: string; size: number; type: string; storagePath: string; downloadUrl: string }[] = [];
-      let bytesCompletedPrevious = 0;
-
+      // Upload each file's bytes to the headless attachments API (ADR-0003),
+      // then complete the task with the resulting descriptors. Completion still
+      // writes `completion_data.files` / `stepOutput.files`, the surface
+      // downstream workflow steps read — the descriptors now point at the blob
+      // endpoint instead of a Firebase download URL.
+      const attachments: Attachment[] = [];
       for (let index = 0; index < files.length; index++) {
         const file = files[index];
-        const storagePath = `tasks/${task.id}/${crypto.randomUUID()}_${file.name}`;
-        const storageRef = ref(storage, storagePath);
-
-        const downloadUrl = await new Promise<string>((resolve, reject) => {
-          const uploadTask = uploadBytesResumable(storageRef, file, { contentType: file.type || 'application/octet-stream' });
-          uploadTask.on('state_changed',
-            (snapshot) => {
-              setUploadProgress((prev) => ({
-                ...prev,
-                bytes: bytesCompletedPrevious + snapshot.bytesTransferred,
-              }));
-            },
-            reject,
-            async () => {
-              try {
-                const url = await getDownloadURL(uploadTask.snapshot.ref);
-                resolve(url);
-              } catch (err) {
-                reject(err);
-              }
-            },
-          );
-        });
-
-        bytesCompletedPrevious += file.size;
-        setUploadProgress((prev) => ({ ...prev, completed: index + 1, bytes: bytesCompletedPrevious }));
-
-        uploadedFiles.push({
-          name: file.name,
-          size: file.size,
-          type: file.type || 'application/octet-stream',
-          storagePath,
-          downloadUrl,
-        });
-      }
-
-      try {
-        await mediforce.tasks.complete({
+        const content = new Uint8Array(await file.arrayBuffer());
+        const { attachment } = await mediforce.tasks.attachments.upload({
           taskId: task.id,
-          payload: { kind: 'upload', attachments: uploadedFiles },
+          name: file.name,
+          contentType: file.type || 'application/octet-stream',
+          content,
         });
-        setUploadComplete(true);
-      } catch (err) {
-        setUploadError(err instanceof Error ? err.message : 'Upload failed');
+        attachments.push({
+          name: attachment.name,
+          size: attachment.sizeBytes,
+          type: attachment.contentType,
+          storagePath: attachment.id,
+          downloadUrl: mediforce.attachments.blobUrl(attachment.id),
+        });
+        setUploadCount({ completed: index + 1, total: files.length });
       }
+
+      await mediforce.tasks.complete({
+        taskId: task.id,
+        payload: { kind: 'upload', attachments },
+      });
+      setUploadComplete(true);
     } catch (err) {
-      const fileIndex = uploadProgress.completed;
-      const failedFileName = fileIndex < files.length ? files[fileIndex].name : 'unknown';
-      const baseMessage = err instanceof Error ? err.message : 'Upload to storage failed';
-      setUploadError(`Failed to upload "${failedFileName}": ${baseMessage}`);
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploading(false);
     }
-  }, [task.id, uploadProgress.completed]);
+  }, [task.id]);
 
   const isActionable = task.status === 'claimed' || task.status === 'pending';
   const isCompleted = task.status === 'completed';
@@ -111,18 +78,9 @@ export function FileUploadView({ task }: TaskBodyProps) {
             <div className="flex items-center gap-3">
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
               <span className="text-sm text-muted-foreground">
-                Uploading {uploadProgress.completed} of {uploadProgress.total} files
+                Uploading {uploadCount.completed} of {uploadCount.total} files
               </span>
             </div>
-            <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full rounded-full bg-primary transition-all duration-300"
-                style={{ width: uploadProgress.totalBytes > 0 ? `${Math.round((uploadProgress.bytes / uploadProgress.totalBytes) * 100)}%` : '0%' }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {formatFileSize(uploadProgress.bytes)} / {formatFileSize(uploadProgress.totalBytes)}
-            </p>
           </div>
         ) : (
           <FileUploadZone
@@ -149,28 +107,28 @@ export function FileUploadView({ task }: TaskBodyProps) {
     );
   }
 
-  if (isCompleted && task.completionData) {
-    return <UploadConfirmationReadOnly completionData={task.completionData} />;
+  if (isCompleted) {
+    const completedAtRaw = (task.completionData as Record<string, unknown> | null)?.completedAt;
+    const completedAt = typeof completedAtRaw === 'string' ? completedAtRaw : undefined;
+    return <UploadConfirmationReadOnly taskId={task.id} completedAt={completedAt} />;
   }
 
   return null;
 }
 
 function UploadConfirmationReadOnly({
-  completionData,
+  taskId,
+  completedAt,
 }: {
-  completionData: Record<string, unknown>;
+  taskId: string;
+  completedAt?: string;
 }) {
   const handle = useHandleFromPath();
-  interface UploadedFile {
-    name?: string;
-    size?: number;
-    type?: string;
-    storagePath?: string;
-    downloadUrl?: string;
-  }
-  const files = (completionData.files as UploadedFile[]) ?? [];
-  const completedAt = completionData.completedAt as string | undefined;
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['task-attachments', taskId],
+    queryFn: () => mediforce.tasks.attachments.list({ taskId }),
+  });
+  const attachments = data?.attachments ?? [];
 
   return (
     <div className="space-y-3">
@@ -178,46 +136,19 @@ function UploadConfirmationReadOnly({
         <div className="flex items-center gap-2 mb-3">
           <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
           <span className="font-medium text-sm text-green-800 dark:text-green-300">
-            {files.length} file{files.length !== 1 ? 's' : ''} uploaded
+            {isLoading
+              ? 'Loading files…'
+              : `${attachments.length} file${attachments.length !== 1 ? 's' : ''} uploaded`}
           </span>
         </div>
 
+        {isError && (
+          <p className="text-sm text-destructive">Failed to load attachments</p>
+        )}
+
         <ul className="space-y-2">
-          {files.map((file, index) => (
-            <li
-              key={index}
-              className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300"
-            >
-              <FileText className="h-4 w-4 shrink-0" />
-              {file.downloadUrl ? (
-                <a
-                  href={file.downloadUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="truncate hover:underline"
-                >
-                  {file.name ?? 'unknown'}
-                </a>
-              ) : (
-                <span className="truncate">{file.name ?? 'unknown'}</span>
-              )}
-              {file.size !== undefined && (
-                <span className="text-xs text-green-600/70 dark:text-green-400/70 shrink-0">
-                  {formatFileSize(file.size)}
-                </span>
-              )}
-              {file.downloadUrl && (
-                <a
-                  href={file.downloadUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0 text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200"
-                  aria-label={`Download ${file.name ?? 'file'}`}
-                >
-                  <Download className="h-4 w-4" />
-                </a>
-              )}
-            </li>
+          {attachments.map((attachment) => (
+            <AttachmentRow key={attachment.id} attachment={attachment} />
           ))}
         </ul>
 
@@ -234,5 +165,55 @@ function UploadConfirmationReadOnly({
         </Link>
       </div>
     </div>
+  );
+}
+
+function AttachmentRow({
+  attachment,
+}: {
+  attachment: { id: string; name: string; sizeBytes: number };
+}) {
+  const [downloading, setDownloading] = React.useState(false);
+  const [downloadError, setDownloadError] = React.useState<string | null>(null);
+
+  async function handleDownload() {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      // A bare `<a href>` would not carry the Firebase Bearer token; the blob
+      // route authenticates it, so fetch through `apiFetch` and hand the browser
+      // a transient object URL — same pattern as run Output Files.
+      await downloadViaApiFetch(mediforce.attachments.blobUrl(attachment.id), attachment.name);
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : 'Download failed');
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <li className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300">
+      <FileText className="h-4 w-4 shrink-0" />
+      <span className="truncate">{attachment.name}</span>
+      <span className="text-xs text-green-600/70 dark:text-green-400/70 shrink-0">
+        {formatFileSize(attachment.sizeBytes)}
+      </span>
+      <button
+        type="button"
+        onClick={handleDownload}
+        disabled={downloading}
+        aria-label={`Download ${attachment.name}`}
+        className="shrink-0 text-green-600 hover:text-green-800 disabled:opacity-50 dark:text-green-400 dark:hover:text-green-200"
+      >
+        {downloading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Download className="h-4 w-4" />
+        )}
+      </button>
+      {downloadError && (
+        <span className="text-xs text-destructive truncate">{downloadError}</span>
+      )}
+    </li>
   );
 }

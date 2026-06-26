@@ -531,7 +531,6 @@ const firebaseConfig = {
   apiKey: "AIzaSy...",
   authDomain: "my-project.firebaseapp.com",
   projectId: "my-project",
-  storageBucket: "my-project.firebasestorage.app",
   messagingSenderId: "123456789012",
   appId: "1:123456789012:web:abc123..."
 };' oninput="parseFirebaseConfig()"></textarea>
@@ -545,7 +544,6 @@ const firebaseConfig = {
     <input type="hidden" id="fb-api-key" />
     <input type="hidden" id="fb-auth-domain" />
     <input type="hidden" id="fb-project-id" />
-    <input type="hidden" id="fb-storage-bucket" />
     <input type="hidden" id="fb-messaging-id" />
     <input type="hidden" id="fb-app-id" />
     <div class="field">
@@ -892,7 +890,6 @@ function parseFirebaseConfig() {
     apiKey: 'fb-api-key',
     authDomain: 'fb-auth-domain',
     projectId: 'fb-project-id',
-    storageBucket: 'fb-storage-bucket',
     messagingSenderId: 'fb-messaging-id',
     appId: 'fb-app-id',
   };
@@ -1174,7 +1171,6 @@ function generateScript() {
   s += `NEXT_PUBLIC_FIREBASE_API_KEY=${shellEscape(val('fb-api-key'))}\n`;
   s += `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${shellEscape(val('fb-auth-domain'))}\n`;
   s += `NEXT_PUBLIC_FIREBASE_PROJECT_ID=${shellEscape(val('fb-project-id'))}\n`;
-  s += `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${shellEscape(val('fb-storage-bucket'))}\n`;
   s += `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${shellEscape(val('fb-messaging-id'))}\n`;
   s += `NEXT_PUBLIC_FIREBASE_APP_ID=${shellEscape(val('fb-app-id'))}\n\n`;
 
@@ -1319,7 +1315,6 @@ function generateScript() {
   s += `NEXT_PUBLIC_FIREBASE_API_KEY=${val('fb-api-key')}\n`;
   s += `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${val('fb-auth-domain')}\n`;
   s += `NEXT_PUBLIC_FIREBASE_PROJECT_ID=${val('fb-project-id')}\n`;
-  s += `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${val('fb-storage-bucket')}\n`;
   s += `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${val('fb-messaging-id')}\n`;
   s += `NEXT_PUBLIC_FIREBASE_APP_ID=${val('fb-app-id')}\n`;
   s += `NEXT_PUBLIC_APP_URL=${baseUrl}\n`;
@@ -1347,7 +1342,6 @@ function generateScript() {
   s += `NEXT_PUBLIC_FIREBASE_API_KEY=${val('fb-api-key')}\n`;
   s += `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${val('fb-auth-domain')}\n`;
   s += `NEXT_PUBLIC_FIREBASE_PROJECT_ID=${val('fb-project-id')}\n`;
-  s += `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${val('fb-storage-bucket')}\n`;
   s += `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${val('fb-messaging-id')}\n`;
   s += `NEXT_PUBLIC_FIREBASE_APP_ID=${val('fb-app-id')}\n`;
   s += `APP_BASE_URL=${baseUrl}\n`;

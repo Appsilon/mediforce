@@ -347,11 +347,11 @@ suite — **not** for the data layer (Postgres covers that).
 
 ### Firebase emulators (for E2E / auth tests)
 
-The Firebase Auth + Storage emulators back authentication in `dev:mock` and the
-Playwright suite. They are **not** a data backend.
+The Firebase Auth emulator backs authentication in `dev:mock` and the
+Playwright suite. It is **not** a data backend.
 
 ```bash
-pnpm emulators     # Auth :9099, Storage :9199
+pnpm emulators     # Auth :9099
 ```
 
 ### Your own Firebase project (cloud Auth)
@@ -461,7 +461,7 @@ images for script-executor steps](#build-images-for-script-executor-steps)).
 | `pnpm dev`             | Full local stack: Postgres + migrate + UI, 9003   |
 | `pnpm dev:no-docker`   | Docker-free; UI + host `claude` agents (needs Postgres on :5432) |
 | `pnpm dev:queue`       | `dev` + Redis + BullMQ queued agent execution     |
-| `pnpm emulators`       | Firebase Auth + Storage emulators                 |
+| `pnpm emulators`       | Firebase Auth emulator                            |
 | `pnpm db:generate`     | Generate a migration (drizzle-kit)                |
 | `pnpm db:migrate`      | Apply migrations                                  |
 | `pnpm test:unit`       | vitest unit + integration                         |
