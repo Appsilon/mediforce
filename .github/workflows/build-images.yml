@@ -41,7 +41,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Sanitise platform slug
         run: echo "PLATFORM_SLUG=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_ENV
@@ -101,7 +101,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Create multi-arch manifest — platform-ui
         run: |
