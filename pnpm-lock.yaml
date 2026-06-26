@@ -8,7 +8,7 @@ overrides:
   axios: '>=1.15.0'
   protobufjs: 8.5.0
   hono: 4.12.25
-  '@hono/node-server': 2.0.4
+  '@hono/node-server': 2.0.5
   fast-xml-parser: 5.9.3
   node-forge: 1.4.0
   follow-redirects: 1.16.0
@@ -1455,8 +1455,8 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
-  '@hono/node-server@2.0.4':
-    resolution: {integrity: sha512-Ut3y0dMMPWy6bZ2kVfx25EOVbZlm15dhF4mOsezMlhpNHy+4MkU1qN9Y6lnruYi4wPmFzimGX2X7LF/FwHli4A==}
+  '@hono/node-server@2.0.5':
+    resolution: {integrity: sha512-yQFvDmyDo3y6rEOJZDUYPJ49DIKTPpIk4kGvm40xx4Ejne0Pu9a1+exxPN+C1UppWK/WGZX9F++/Xs231tE86g==}
     engines: {node: '>=20'}
     peerDependencies:
       hono: 4.12.25
@@ -5714,7 +5714,7 @@ snapshots:
       yargs: 17.7.2
     optional: true
 
-  '@hono/node-server@2.0.4(hono@4.12.25)':
+  '@hono/node-server@2.0.5(hono@4.12.25)':
     dependencies:
       hono: 4.12.25
 
@@ -5888,7 +5888,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.29.0(zod@4.4.3)':
     dependencies:
-      '@hono/node-server': 2.0.4(hono@4.12.25)
+      '@hono/node-server': 2.0.5(hono@4.12.25)
       ajv: 8.18.0
       ajv-formats: 3.0.1(ajv@8.18.0)
       content-type: 1.0.5
