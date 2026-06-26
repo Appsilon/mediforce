@@ -47,7 +47,7 @@ jobs:
         run: echo "PLATFORM_SLUG=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_ENV
 
       - name: Build & push platform-ui (${{ matrix.platform }})
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: packages/platform-ui/Dockerfile
@@ -60,7 +60,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=platform-ui-${{ env.PLATFORM_SLUG }}
 
       - name: Build & push migrate (${{ matrix.platform }})
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: packages/platform-ui/Dockerfile
@@ -73,7 +73,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=migrate-${{ env.PLATFORM_SLUG }}
 
       - name: Build & push container-worker (${{ matrix.platform }})
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: packages/container-worker/Dockerfile.worker
