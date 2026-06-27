@@ -292,7 +292,7 @@ describe('FileUploadView', () => {
   });
 
   it('[ERROR] shows error when upload fails', async () => {
-    uploadMock.mockRejectedValueOnce(new Error('Storage error'));
+    uploadMock.mockRejectedValueOnce(new Error('Upload failed'));
     const user = userEvent.setup();
     const task = createUploadTask();
 
@@ -305,7 +305,7 @@ describe('FileUploadView', () => {
     const uploadButton = screen.getByRole('button', { name: /upload/i });
     await user.click(uploadButton);
 
-    expect(await screen.findByText(/storage error/i)).toBeInTheDocument();
+    expect(await screen.findByText(/upload failed/i)).toBeInTheDocument();
   });
 });
 

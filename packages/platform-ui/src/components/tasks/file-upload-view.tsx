@@ -49,6 +49,8 @@ export function FileUploadView({ task }: TaskBodyProps) {
           name: attachment.name,
           size: attachment.sizeBytes,
           type: attachment.contentType,
+          // `storagePath` now carries the attachment id (not a blob path);
+          // `downloadUrl` is the authenticated blob endpoint.
           storagePath: attachment.id,
           downloadUrl: mediforce.attachments.blobUrl(attachment.id),
         });

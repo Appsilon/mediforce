@@ -2,7 +2,7 @@
 
 Postgres is **the** server data backend — all workflows, processes, agent runs,
 events, tasks, and secrets live here (ADR-0001). There is no Firestore data
-layer; Firebase remains only for Auth/Storage. These are the devloop notes for
+layer; Firebase remains only for Auth. These are the devloop notes for
 working with the local DB.
 
 Zero-to-running setup: [GETTING-STARTED.md](../GETTING-STARTED.md). Terse

@@ -34,7 +34,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Codex now mirrors Claude's repo-local skill and agent discovery layout via `.codex/skills/*` and `.codex/agents` symlinks, with `AGENTS.md` documenting how Codex should translate Claude-specific skill tool syntax.
 
 ### Removed
-- Firebase Storage removed entirely — the task file-upload UI now uploads, lists, and downloads attachments through the headless attachments API instead of `firebase/storage`, and the Storage SDK, emulator, `storage.rules`, and `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` are gone; legacy demo attachments that were never migrated no longer render (ADR-0003 PR4).
+- Firebase Storage removed entirely — the task file-upload UI now uploads, lists, and downloads attachments through the headless attachments API instead of `firebase/storage`, and the Storage SDK, emulator, `storage.rules`, and `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` are gone; the per-byte upload progress bar becomes a per-file spinner (single non-streaming upload) and legacy demo attachments that were never migrated no longer render (ADR-0003 PR4).
 - Dead uploaded-skills feature — dropped `AgentDefinition.skillFileNames` + the `agents.skill_file_names` column, the skill-upload UI, and the Firebase Storage skill download from agent identity resolution; `skillsDir` is now the only skill mechanism (ADR-0003 PR1).
 
 ### Fixed
