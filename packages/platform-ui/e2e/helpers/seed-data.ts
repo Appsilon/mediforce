@@ -418,7 +418,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       id: 'proc-upload-waiting',
       namespace: 'test',
       definitionName: 'Protocol to TFL',
-      definitionVersion: '0.1.0',
+      definitionVersion: '1.0.0',
       configName: 'default',
       configVersion: '1',
       status: 'paused',
@@ -1033,6 +1033,33 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   };
 
   const workflowDefinitions: Record<string, Record<string, unknown>> = {
+    // Backs `proc-upload-waiting` / `task-upload-docs` (the file-upload task).
+    // Trimmed to the human upload step + a terminal so completing the upload
+    // advances the run without spawning the real agent pipeline (ADR-0003 E2E).
+    'test:Protocol to TFL:1': {
+      name: 'Protocol to TFL',
+      namespace: 'test',
+      version: 1,
+      title: 'Protocol to TFL pipeline',
+      description: 'Upload protocol documents (E2E-trimmed to the upload step).',
+      workspace: {},
+      steps: [
+        {
+          id: 'upload-documents',
+          name: 'Upload Documents',
+          type: 'creation',
+          executor: 'human',
+          description: 'Upload protocol PDF and SAP document',
+          ui: {
+            component: 'file-upload',
+            config: { acceptedTypes: ['application/pdf'], minFiles: 1, maxFiles: 5 },
+          },
+        },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'upload-documents', to: 'done' }],
+      triggers: [{ type: 'manual', name: 'start' }],
+    },
     // Example workflow that exercises the run-scoped git workspace with a
     // small real-shaped data pipeline: step 1 generates a CSV dataset, step 2
     // reads it, computes summary stats, and writes a markdown report into a
