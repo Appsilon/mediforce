@@ -41,6 +41,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ### Removed
 - Dead uploaded-skills feature — dropped `AgentDefinition.skillFileNames` + the `agents.skill_file_names` column, the skill-upload UI, and the Firebase Storage skill download from agent identity resolution; `skillsDir` is now the only skill mechanism (ADR-0003 PR1).
+- E2E GIF recording: the recording helper, ffmpeg conversion scripts, `docs/features/` gallery, and `test:e2e:record`/`:gif` scripts. UI journey tests stay as normal L4 e2e (page-error tracking kept in `helpers/page-errors.ts`).
 
 ### Fixed
 - Cowork workflow designer can render diagrams again — nothing depended on `@mediforce/mediforce-mcp`, so pnpm never linked its `mediforce-mcp` bin onto PATH; the chat handler's spawn failed with ENOENT and the MCP tools (including `render_workflow_diagram`) were silently absent, so the designer narrated "let me render the diagram" against a toolset that lacked the tool and the Artifact panel's Preview tab never appeared. Added `@mediforce/mediforce-mcp` as a `platform-ui` dependency so the bin links onto the spawning process's PATH.

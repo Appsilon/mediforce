@@ -1,5 +1,5 @@
 import { test as base, expect } from '@playwright/test';
-import { getPageErrors } from './recording';
+import { getPageErrors } from './page-errors';
 
 /**
  * Custom test fixture that asserts no unexpected page errors after each test.

@@ -24,7 +24,7 @@ metadata:
 
 ## Product context
 
-Do NOT hardcode product context in this skill — it drifts. If you need background on what MediForce is or who the audience is, read `README.md` (project root) and skim `docs/` (especially `docs/architecture.md`, `docs/features/`). Pull only what's needed to make the update specific and accurate.
+Do NOT hardcode product context in this skill — it drifts. If you need background on what MediForce is or who the audience is, read `README.md` (project root) and skim `docs/` (especially `docs/architecture.md`). Pull only what's needed to make the update specific and accurate.
 
 In most cases you do NOT need to re-read context: the user's notes already name the concrete component (workflow, step, plugin, CLI command, dialog) and that's enough. Only fetch context when the notes are ambiguous about what was shipped.
 

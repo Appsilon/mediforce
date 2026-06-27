@@ -59,27 +59,13 @@ Every agent operates under human oversight, with every action recorded in a comp
 
 All your workflows in one place — run counts, active status, and one-click access to any process execution.
 
-<div align="center">
-<img src="docs/features/workflow-home.gif" alt="Workflow dashboard showing process overview" width="720" />
-</div>
-
 ### Human-in-the-Loop Review
 
 The core decision point. Reviewers see full context from the agent's work and submit their verdict — approve, revise, or escalate.
 
-<div align="center">
-<img src="docs/features/task-approve-flow.gif" alt="Task approval flow with agent context" width="720" />
-</div>
-
 ### Autonomy Levels on Every Step
 
 Each step displays its autonomy configuration (L1–L4) so operators always know what's agent-driven and what requires human action.
-
-<div align="center">
-<img src="docs/features/run-detail-autonomy-badges.gif" alt="Process run with autonomy level badges" width="720" />
-</div>
-
-> **[See all features with recordings](docs/features/FEATURES.md)** — task management, workflow editor, run reports, agent catalog, escalation handling, and more.
 
 ## Why Open Source
 
@@ -196,7 +182,7 @@ E2E variants:
 
 ```bash
 pnpm test:e2e:api     # L3 only — API E2E, no browser (~30s)
-pnpm test:e2e:record  # Record GIFs of UI journeys
+pnpm test:e2e:ui      # L4 only — UI E2E with real Chromium
 ```
 
 For UI-only journeys, run `pnpm test:e2e --project=authenticated` from the platform-ui directory (or invoke Playwright's interactive UI mode via `pnpm test:e2e:ui` there).
@@ -302,7 +288,6 @@ migration step in the deploy pipeline.
 | **[Architecture](docs/architecture.md)** | Processes, steps, agents, compliance — the technical foundation |
 | **[How We Work](docs/how-we-work.md)** | Building bottom-up, in public, with real processes |
 | **[Development](docs/development.md)** | Setup, monorepo structure, testing, deployment |
-| **[Features](docs/features/FEATURES.md)** | Full feature gallery with recorded walkthroughs |
 
 ## License
 

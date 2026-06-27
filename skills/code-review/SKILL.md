@@ -151,7 +151,7 @@ Replace the normal verdict with one of:
 - Standards: zero blockers, zero "should fix"
 - Spec: nothing missing / wrong
 - Big Picture: no open questions you couldn't answer with certainty
-- Coverage exists at the right level: new endpoint → L3, new pure logic → L1, new UI journey → L4 with GIF
+- Coverage exists at the right level: new endpoint → L3, new pure logic → L1, new UI journey → L4
 - No finding waved away as "pre-existing" without git-blame evidence (see next section)
 
 ```markdown

@@ -67,5 +67,4 @@ pnpm test:e2e -- --project=api           # L3 only — API E2E, no browser
 pnpm test:e2e -- --project=authenticated # L4 only — UI E2E
 pnpm test:e2e:headed                     # with visible browser
 pnpm test:e2e:ui                         # Playwright UI mode (interactive)
-pnpm test:e2e:record                     # record videos for GIFs
 ```
