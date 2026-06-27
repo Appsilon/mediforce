@@ -19,6 +19,7 @@ import { HumanStepView } from '@/components/tasks/human-step-view';
 import { AgentOutputDisplay } from '@/components/agents/agent-output-display';
 import { agentOutputFromEnvelope } from './agent-output-from-envelope';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
+import { downloadViaApiFetch } from '@/lib/save-blob';
 import { formatBytes, formatDuration, formatStepName, formatCostUsd } from '@/lib/format';
 
 function StatusIcon({ status }: { status: string }) {
@@ -611,17 +612,44 @@ function FileList({ files }: { files: FileItem[] }) {
         {files.map((file) => (
           <li key={file.name} className="flex items-center gap-2 text-sm">
             <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            {file.downloadUrl ? (
-              <a href={file.downloadUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate">
-                {file.name}
-              </a>
-            ) : (
-              <span className="truncate">{file.name}</span>
-            )}
+            <FileNameLink file={file} />
             <span className="text-xs text-muted-foreground shrink-0">{formatBytes(file.size)}</span>
           </li>
         ))}
       </ul>
     </div>
+  );
+}
+
+function FileNameLink({ file }: { file: FileItem }) {
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  if (!file.downloadUrl) {
+    return <span className="truncate">{file.name}</span>;
+  }
+  // Same-origin API URLs (attachment blobs, ADR-0003) need the Bearer token, so
+  // they can't be a bare `<a href>`. Absolute external URLs open directly.
+  if (file.downloadUrl.startsWith('/api/')) {
+    const downloadUrl = file.downloadUrl;
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() =>
+            downloadViaApiFetch(downloadUrl, file.name).catch((err) =>
+              setDownloadError(err instanceof Error ? err.message : 'Download failed'),
+            )
+          }
+          className="text-primary hover:underline truncate text-left"
+        >
+          {file.name}
+        </button>
+        {downloadError && <span className="text-xs text-destructive truncate">{downloadError}</span>}
+      </>
+    );
+  }
+  return (
+    <a href={file.downloadUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate">
+      {file.name}
+    </a>
   );
 }

@@ -72,7 +72,7 @@ async function ensureFirebaseEmulator(): Promise<void> {
   const args = [
     'emulators:start',
     '--project', 'demo-mediforce',
-    '--only', 'auth,storage',
+    '--only', 'auth',
     '--export-on-exit', dataDir,
   ];
   if (fs.existsSync(dataDir)) args.push('--import', dataDir);

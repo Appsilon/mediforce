@@ -119,7 +119,6 @@ Requires SSH access to the staging host (uses `deploy` user by default, override
 | 5432 | Postgres                         |
 | 6379 | Redis (`dev:queue`)             |
 | 9099 | Firebase Auth emulator          |
-| 9199 | Firebase Storage emulator       |
 | 3100 | bull-board (`dev:queue`)        |
 | 6006 | Phoenix trace viewer (opt-in)   |
 

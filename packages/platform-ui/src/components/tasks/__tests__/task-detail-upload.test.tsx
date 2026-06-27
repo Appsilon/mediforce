@@ -10,25 +10,9 @@ function render(ui: React.ReactElement) {
   return rtlRender(ui, { wrapper });
 }
 
-// Mock Firebase — must come before any component imports
+// Firebase Storage is gone (ADR-0003); only Auth init survives in @/lib/firebase.
 vi.mock('@/lib/firebase', () => ({
   auth: {},
-  storage: {},
-}));
-
-vi.mock('firebase/storage', () => ({
-  ref: vi.fn(),
-  uploadBytesResumable: vi.fn().mockImplementation(() => {
-    const task = {
-      snapshot: { ref: {} },
-      on: (_event: string, _progress: unknown, _error: unknown, complete: () => void) => {
-        // Immediately complete the upload
-        complete();
-      },
-    };
-    return task;
-  }),
-  getDownloadURL: vi.fn().mockResolvedValue('https://storage.example.com/file.pdf'),
 }));
 
 // Mock next/link
@@ -42,12 +26,38 @@ vi.mock('@/contexts/auth-context', () => ({
   useAuth: () => ({ firebaseUser: { getIdToken: vi.fn().mockResolvedValue('mock-id-token') } }),
 }));
 
-// Mock typed mediforce client
+// Authenticated blob download — fired on click, stubbed so no real fetch runs.
+vi.mock('@/lib/save-blob', () => ({
+  downloadViaApiFetch: vi.fn(async () => undefined),
+  saveBlobToDevice: vi.fn(),
+}));
+
+// Mock typed mediforce client — attachments upload/list + complete.
 vi.mock('@/lib/mediforce', () => ({
   mediforce: {
     tasks: {
       complete: vi.fn(async () => ({ task: {}, run: {} })),
       list: vi.fn(async () => ({ tasks: [] })),
+      attachments: {
+        upload: vi.fn(async (input: { name: string; contentType: string }) => ({
+          attachment: {
+            id: 'att-1',
+            taskId: 'task-1',
+            workspace: 'demo',
+            name: input.name,
+            contentType: input.contentType,
+            sizeBytes: 7,
+            blobKey: 'blob/att-1',
+            uploadedBy: 'user-1',
+            uploadedAt: '2026-03-10T12:00:00.000Z',
+            deletedAt: null,
+          },
+        })),
+        list: vi.fn(async () => ({ attachments: [] })),
+      },
+    },
+    attachments: {
+      blobUrl: (id: string) => `/api/attachments/${id}/blob`,
     },
   },
   ApiError: class ApiError extends Error {
@@ -59,9 +69,12 @@ vi.mock('@/lib/mediforce', () => ({
 
 import { mediforce } from '@/lib/mediforce';
 import { FileUploadView } from '../file-upload-view';
+import { FileUploadZone } from '../file-upload-zone';
 import { SelectionView } from '../selection-view';
 
 const completeMock = vi.mocked(mediforce.tasks.complete);
+const uploadMock = vi.mocked(mediforce.tasks.attachments.upload);
+const listMock = vi.mocked(mediforce.tasks.attachments.list);
 
 function createUploadTask(overrides?: Partial<HumanTask>): HumanTask {
   return buildHumanTask({
@@ -168,6 +181,14 @@ describe('FileUploadView', () => {
     expect(screen.getByText(/pdf/i)).toBeInTheDocument();
   });
 
+  it('[RENDER] shows the 100 MB size limit hint', () => {
+    const task = createUploadTask();
+
+    render(<FileUploadView task={task} />);
+
+    expect(screen.getByText(/max 100 MB each/i)).toBeInTheDocument();
+  });
+
   it('[RENDER] shows FileUploadZone even when task is pending (auto-assign)', () => {
     const task = createUploadTask({ status: 'pending', assignedUserId: null });
 
@@ -186,7 +207,7 @@ describe('FileUploadView', () => {
     expect(screen.queryByText(/revise/i)).not.toBeInTheDocument();
   });
 
-  it('[CLICK] calls completeUploadTask when files are submitted', async () => {
+  it('[CLICK] uploads bytes via the attachments API then completes the task with blob descriptors', async () => {
     const user = userEvent.setup();
     const task = createUploadTask();
 
@@ -199,12 +220,25 @@ describe('FileUploadView', () => {
     const uploadButton = screen.getByRole('button', { name: /upload/i });
     await user.click(uploadButton);
 
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(uploadMock).toHaveBeenCalledWith(
+      expect.objectContaining({ taskId: task.id, name: 'protocol.pdf', contentType: 'application/pdf' }),
+    );
+
     expect(completeMock).toHaveBeenCalledTimes(1);
     expect(completeMock).toHaveBeenCalledWith({
       taskId: task.id,
       payload: {
         kind: 'upload',
-        attachments: [expect.objectContaining({ name: 'protocol.pdf', downloadUrl: 'https://storage.example.com/file.pdf' })],
+        attachments: [
+          {
+            name: 'protocol.pdf',
+            size: 7,
+            type: 'application/pdf',
+            storagePath: 'att-1',
+            downloadUrl: '/api/attachments/att-1/blob',
+          },
+        ],
       },
     });
   });
@@ -225,33 +259,40 @@ describe('FileUploadView', () => {
     expect(await screen.findByText(/uploaded/i)).toBeInTheDocument();
   });
 
-  it('[RENDER] shows uploaded files with download links in completed upload task', () => {
+  it('[RENDER] lists uploaded files from the attachments API in a completed task', async () => {
+    listMock.mockResolvedValueOnce({
+      attachments: [
+        {
+          id: 'att-a', taskId: 'task-1', workspace: 'demo', name: 'protocol.pdf',
+          contentType: 'application/pdf', sizeBytes: 102400, blobKey: 'blob/a',
+          uploadedBy: 'user-1', uploadedAt: '2026-03-10T12:00:00.000Z', deletedAt: null,
+        },
+        {
+          id: 'att-b', taskId: 'task-1', workspace: 'demo', name: 'appendix.pdf',
+          contentType: 'application/pdf', sizeBytes: 51200, blobKey: 'blob/b',
+          uploadedBy: 'user-1', uploadedAt: '2026-03-10T12:00:00.000Z', deletedAt: null,
+        },
+      ],
+    });
     const task = createUploadTask({
       status: 'completed',
       completedAt: '2026-03-10T12:00:00.000Z',
-      completionData: {
-        files: [
-          { name: 'protocol.pdf', size: 102400, type: 'application/pdf', storagePath: 'tasks/t/a.pdf', downloadUrl: 'https://storage.example.com/protocol.pdf', uploadedAt: '2026-03-10T12:00:00.000Z' },
-          { name: 'appendix.pdf', size: 51200, type: 'application/pdf', storagePath: 'tasks/t/b.pdf', downloadUrl: 'https://storage.example.com/appendix.pdf', uploadedAt: '2026-03-10T12:00:00.000Z' },
-        ],
-        completedAt: '2026-03-10T12:00:00.000Z',
-      },
+      completionData: { completedAt: '2026-03-10T12:00:00.000Z' },
     });
 
     render(<FileUploadView task={task} />);
 
-    expect(screen.getByText(/2 files uploaded/i)).toBeInTheDocument();
-    expect(screen.getByText('protocol.pdf')).toBeInTheDocument();
+    expect(await screen.findByText('protocol.pdf')).toBeInTheDocument();
     expect(screen.getByText('appendix.pdf')).toBeInTheDocument();
+    expect(screen.getByText(/2 files uploaded/i)).toBeInTheDocument();
     expect(screen.getByText(/100(.0)?\s*KB/i)).toBeInTheDocument();
 
-    const downloadLinks = screen.getAllByRole('link', { name: /download/i });
-    expect(downloadLinks).toHaveLength(2);
-    expect(downloadLinks[0]).toHaveAttribute('href', 'https://storage.example.com/protocol.pdf');
+    const downloadButtons = screen.getAllByRole('button', { name: /download/i });
+    expect(downloadButtons).toHaveLength(2);
   });
 
   it('[ERROR] shows error when upload fails', async () => {
-    completeMock.mockRejectedValueOnce(new Error('Storage error'));
+    uploadMock.mockRejectedValueOnce(new Error('Upload failed'));
     const user = userEvent.setup();
     const task = createUploadTask();
 
@@ -264,6 +305,34 @@ describe('FileUploadView', () => {
     const uploadButton = screen.getByRole('button', { name: /upload/i });
     await user.click(uploadButton);
 
-    expect(await screen.findByText(/storage error/i)).toBeInTheDocument();
+    expect(await screen.findByText(/upload failed/i)).toBeInTheDocument();
+  });
+});
+
+// ---- Over-limit guard (FileUploadZone) ----
+
+describe('FileUploadZone over-limit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('[ERROR] rejects a file larger than the size limit with a friendly message', () => {
+    const onSubmit = vi.fn();
+    render(
+      <FileUploadZone
+        acceptedTypes={['application/pdf']}
+        minFiles={1}
+        maxFiles={5}
+        maxFileSizeMB={1}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    const input = screen.getByTestId('file-input');
+    const bigFile = new File([new Uint8Array(2 * 1024 * 1024)], 'huge.pdf', { type: 'application/pdf' });
+    fireEvent.change(input, { target: { files: [bigFile] } });
+
+    expect(screen.getByText(/too large \(max 1 MB\)/i)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });

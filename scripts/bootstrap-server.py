@@ -925,7 +925,7 @@ def step_clone_repo(ctx: Context) -> None:
 
 FIREBASE_CONFIG_FIELDS = [
     "apiKey", "authDomain", "projectId",
-    "storageBucket", "messagingSenderId", "appId",
+    "messagingSenderId", "appId",
 ]
 
 
@@ -1377,7 +1377,6 @@ def _render_env_local(ctx: Context) -> str:
         f"NEXT_PUBLIC_FIREBASE_API_KEY={fb.get('apiKey', '')}",
         f"NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN={fb.get('authDomain', '')}",
         f"NEXT_PUBLIC_FIREBASE_PROJECT_ID={fb.get('projectId', '')}",
-        f"NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET={fb.get('storageBucket', '')}",
         f"NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID={fb.get('messagingSenderId', '')}",
         f"NEXT_PUBLIC_FIREBASE_APP_ID={fb.get('appId', '')}",
         "",
@@ -1405,7 +1404,6 @@ def _render_compose_env(ctx: Context) -> str:
         f"NEXT_PUBLIC_FIREBASE_API_KEY={fb.get('apiKey', '')}",
         f"NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN={fb.get('authDomain', '')}",
         f"NEXT_PUBLIC_FIREBASE_PROJECT_ID={fb.get('projectId', '')}",
-        f"NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET={fb.get('storageBucket', '')}",
         f"NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID={fb.get('messagingSenderId', '')}",
         f"NEXT_PUBLIC_FIREBASE_APP_ID={fb.get('appId', '')}",
         f"NEXT_PUBLIC_APP_URL={_public_base_url(ctx)}",
