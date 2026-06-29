@@ -27,7 +27,7 @@ import {
   createMailgunSender,
   createSmtpSender,
   EmailNotificationService,
-  FirebaseUserDirectoryService,
+  PostgresUserDirectoryService,
   getAdminAuth,
 } from '@mediforce/platform-infra';
 import type {
@@ -393,12 +393,11 @@ export function getPlatformServices(): PlatformServices {
   const notificationService = emailSender
     ? new EmailNotificationService(emailSender)
     : undefined;
-  // Wired whenever Firebase Auth is available — independent of email provider.
-  // Email-disabled deployments still need uid → email/lastSignInTime lookups
-  // for the namespace-members endpoint.
-  const userDirectoryService: UserDirectoryService = new FirebaseUserDirectoryService(
-    getAdminAuth(),
-  );
+  // ADR-0002 PR1: reads the global `user_roles` + `auth_users` from Postgres
+  // (off Firebase Auth) behind the same port. `getUsersByRole` targeting
+  // depends on the one-time `seed-user-roles` having populated `user_roles`.
+  // `lastSignInTime` is null until NextAuth sessions land (PR2).
+  const userDirectoryService: UserDirectoryService = new PostgresUserDirectoryService(pg);
 
   const engine = new WorkflowEngine(
     processRepo,

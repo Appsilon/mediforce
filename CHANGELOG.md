@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Changed
+- User directory + global process-roles now read Postgres (`user_roles` + a minimal `auth_users`) instead of Firebase Admin, behind the unchanged `UserDirectoryService` port; ships a seed-based `PostgresInviteService` and a gated one-time seed of `user_roles` from current Firebase `customClaims.roles` so `getUsersByRole` escalation targeting stays identical. Member-list `lastSignInTime` is `null` until NextAuth sessions land (ADR-0002 PR1).
+
 ## [2026-06-21]
 
 ### Fixed

@@ -2,6 +2,17 @@
 // Firestore is fully removed (ADR-0001 final cutover, #534); only Auth and
 // Storage remain on Firebase.
 export { FirebaseUserDirectoryService } from './auth/firebase-user-directory-service';
+export { PostgresUserDirectoryService } from './auth/postgres-user-directory-service';
+export { PostgresInviteService } from './auth/postgres-invite-service';
+export type { SeedInviteInput, SeededInvite } from './auth/postgres-invite-service';
+export { buildUserRolesSeed } from './auth/seed-user-roles';
+export type {
+  FirebaseUserExport,
+  FirebaseCustomClaims,
+  UserRolesSeed,
+  AuthUserSeedRow,
+  UserRoleSeedRow,
+} from './auth/seed-user-roles';
 export { FirebaseInviteService } from './auth/firebase-invite-service';
 export { getAdminAuth } from './auth/firebase-admin-init';
 export {
