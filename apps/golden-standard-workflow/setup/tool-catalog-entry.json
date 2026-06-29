@@ -1,0 +1,9 @@
+{
+  "id": "golden-standard-readonly-context",
+  "command": "python",
+  "args": ["/opt/golden-standard/mcp/readonly_context_mcp.py"],
+  "env": {
+    "CONTEXT_TOKEN": "{{SECRET:CONTEXT_TOKEN}}"
+  },
+  "description": "Example workflow-owned readonly context MCP command. Register this in the namespace Tool Catalog before binding it to an Agent."
+}

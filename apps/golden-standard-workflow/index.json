@@ -1,0 +1,10 @@
+{
+  "workflows": [
+    {
+      "name": "golden-standard-workflow",
+      "path": "src/golden-standard-workflow.wd.json",
+      "description": "Production-style reference workflow package covering control modes, Docker build mode, skills, MCP governance, env/secrets, review, and validation.",
+      "tags": ["reference", "authoring", "golden-standard"]
+    }
+  ]
+}

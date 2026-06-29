@@ -1,0 +1,13 @@
+{
+  "name": "@mediforce/golden-standard-workflow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "docker:build": "docker build -t mediforce-golden-standard-workflow:latest -f apps/golden-standard-workflow/container/Dockerfile apps/golden-standard-workflow"
+  },
+  "dependencies": {
+    "@mediforce/platform-core": "workspace:*"
+  }
+}

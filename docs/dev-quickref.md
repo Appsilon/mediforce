@@ -2,7 +2,9 @@
 
 Terse command-first reference for agents and devs. For zero-to-running setup see
 [GETTING-STARTED.md](../GETTING-STARTED.md). Deeper guides:
-[development.md](development.md), [postgres-local-dev.md](postgres-local-dev.md).
+[development.md](development.md), [postgres-local-dev.md](postgres-local-dev.md),
+[how-to-create-workflow.md](how-to-create-workflow.md),
+[workflow-authoring-golden-rules.md](workflow-authoring-golden-rules.md).
 
 ## Which dev command?
 

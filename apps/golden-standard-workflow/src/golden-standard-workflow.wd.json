@@ -1,0 +1,278 @@
+{
+  "name": "golden-standard-workflow",
+  "namespace": "appsilon",
+  "title": "Golden Standard Workflow",
+  "description": "Production-style reference workflow covering control modes, Docker build mode, skills, MCP governance, env/secrets, review, and validation.",
+  "preamble": "This workflow is a reference implementation for authoring Mediforce workflows. Clinical and pharma terms are technical workflow content.",
+  "env": {
+    "APP_BASE_URL": "{{APP_BASE_URL}}"
+  },
+  "externalSkillsRepo": {
+    "url": "https://github.com/Appsilon/mediforce.git",
+    "commit": "1e51d23c1fb72d1728acfa081887fd2b95f99dda"
+  },
+  "triggers": [
+    { "type": "manual", "name": "manual" },
+    {
+      "type": "webhook",
+      "name": "intake-webhook",
+      "config": {
+        "method": "POST",
+        "path": "/golden-standard/intake"
+      }
+    }
+  ],
+  "triggerInput": [
+    {
+      "name": "studyId",
+      "type": "string",
+      "required": true,
+      "description": "Study or project identifier."
+    },
+    {
+      "name": "ownerEmail",
+      "type": "string",
+      "required": true,
+      "description": "Owner email used for completion notification."
+    },
+    {
+      "name": "priority",
+      "type": "string",
+      "required": true,
+      "description": "Routing priority.",
+      "options": ["normal", "high", "complex"]
+    }
+  ],
+  "roles": ["workflow-owner", "reviewer"],
+  "steps": [
+    {
+      "id": "collect-intake",
+      "name": "Collect Intake",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["workflow-owner"],
+      "description": "CM0 no-agent human step. Collect the required study metadata.",
+      "params": [
+        {
+          "name": "studyId",
+          "type": "string",
+          "required": true,
+          "description": "Study or project identifier."
+        },
+        {
+          "name": "ownerEmail",
+          "type": "string",
+          "required": true,
+          "description": "Owner email used for completion notification."
+        },
+        {
+          "name": "priority",
+          "type": "string",
+          "required": true,
+          "description": "Routing priority.",
+          "options": ["normal", "high", "complex"]
+        }
+      ]
+    },
+    {
+      "id": "normalize-request",
+      "name": "Normalize Request",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "CM0 no-agent script step. Runs deterministic package code from the Docker image.",
+      "env": {
+        "APP_BASE_URL": "{{APP_BASE_URL}}"
+      },
+      "script": {
+        "image": "mediforce-golden-standard-workflow:latest",
+        "dockerfile": "container/Dockerfile",
+        "repo": "https://github.com/Appsilon/mediforce.git",
+        "commit": "1e51d23c1fb72d1728acfa081887fd2b95f99dda",
+        "command": "python /opt/golden-standard/scripts/normalize_request.py"
+      }
+    },
+    {
+      "id": "route-control-mode",
+      "name": "Route Control Mode",
+      "type": "decision",
+      "executor": "human",
+      "description": "Routing-only step. Complex requests go through cowork before validation."
+    },
+    {
+      "id": "cowork-refine",
+      "name": "Cowork Refinement",
+      "type": "creation",
+      "executor": "cowork",
+      "allowedRoles": ["workflow-owner"],
+      "description": "CM2 cowork step. Human and agent clarify complex requests together.",
+      "cowork": {
+        "agent": "chat",
+        "systemPrompt": "Help the workflow owner clarify the intake. Produce concise structured notes for downstream validation.",
+        "outputSchema": {
+          "type": "object",
+          "required": ["summary", "openQuestions"],
+          "properties": {
+            "summary": { "type": "string" },
+            "openQuestions": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "chat": {
+          "model": "anthropic/claude-sonnet-4"
+        }
+      }
+    },
+    {
+      "id": "quality-gate",
+      "name": "Quality Gate",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "CM0 no-agent script step. Fails fast on missing required fields.",
+      "script": {
+        "image": "mediforce-golden-standard-workflow:latest",
+        "dockerfile": "container/Dockerfile",
+        "repo": "https://github.com/Appsilon/mediforce.git",
+        "commit": "1e51d23c1fb72d1728acfa081887fd2b95f99dda",
+        "command": "python /opt/golden-standard/scripts/quality_gate.py"
+      }
+    },
+    {
+      "id": "agent-review",
+      "name": "Agent Human-Review Draft",
+      "type": "creation",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "agentId": "golden-standard-reviewer",
+      "autonomyLevel": "L3",
+      "allowedRoles": ["reviewer"],
+      "description": "CM3 human-review agent step. Agent produces a review draft, then Mediforce asks a human to approve or revise.",
+      "env": {
+        "OPENROUTER_API_KEY": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+        "ANTHROPIC_API_KEY": ""
+      },
+      "agent": {
+        "model": "anthropic/claude-sonnet-4",
+        "image": "mediforce-golden-standard-workflow:latest",
+        "dockerfile": "container/Dockerfile",
+        "repo": "https://github.com/Appsilon/mediforce.git",
+        "commit": "1e51d23c1fb72d1728acfa081887fd2b95f99dda",
+        "skill": "summarize-record",
+        "skillsDir": "apps/golden-standard-workflow/skills",
+        "timeoutMinutes": 10
+      },
+      "mcpRestrictions": {
+        "readonly-context": {
+          "denyTools": ["write_context"]
+        }
+      }
+    },
+    {
+      "id": "human-disposition",
+      "name": "Human Disposition",
+      "type": "review",
+      "executor": "human",
+      "allowedRoles": ["reviewer"],
+      "description": "Human business review with custom verdicts. Custom routing belongs here, not on L3 agent loop verdicts.",
+      "params": [
+        {
+          "name": "comment",
+          "type": "string",
+          "required": false,
+          "requiredForVerdicts": ["revise", "reject"],
+          "description": "Required when revising or rejecting."
+        }
+      ],
+      "verdicts": {
+        "approve": {
+          "target": "autonomous-package",
+          "label": "Approve",
+          "intent": "success"
+        },
+        "revise": {
+          "target": "cowork-refine",
+          "label": "Revise",
+          "intent": "warning",
+          "requiresComment": true
+        },
+        "reject": {
+          "target": "rejected",
+          "label": "Reject",
+          "intent": "danger",
+          "requiresComment": true
+        }
+      }
+    },
+    {
+      "id": "autonomous-package",
+      "name": "Autonomous Package",
+      "type": "creation",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L4",
+      "description": "CM4 autonomous agent step. Runs only after explicit human approval.",
+      "env": {
+        "OPENROUTER_API_KEY": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+        "ANTHROPIC_API_KEY": ""
+      },
+      "agent": {
+        "model": "anthropic/claude-sonnet-4",
+        "image": "mediforce-golden-standard-workflow:latest",
+        "dockerfile": "container/Dockerfile",
+        "repo": "https://github.com/Appsilon/mediforce.git",
+        "commit": "1e51d23c1fb72d1728acfa081887fd2b95f99dda",
+        "skill": "summarize-record",
+        "skillsDir": "apps/golden-standard-workflow/skills",
+        "timeoutMinutes": 10,
+        "prompt": "Create the final operator summary. Write /output/result.json with {\"summary\": string, \"ready\": true}."
+      }
+    },
+    {
+      "id": "notify-owner",
+      "name": "Notify Owner",
+      "type": "creation",
+      "executor": "action",
+      "continueOnError": true,
+      "description": "CM0 no-agent action step. Optional notification failure should not hide the approved result.",
+      "action": {
+        "kind": "email",
+        "config": {
+          "to": "${steps['normalize-request'].ownerEmail}",
+          "subject": "Golden workflow complete: ${steps['normalize-request'].studyId}",
+          "body": "Summary: ${steps['autonomous-package'].summary}\n\nOpen the run in Mediforce: ${env.APP_BASE_URL}"
+        }
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    },
+    {
+      "id": "rejected",
+      "name": "Rejected",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "collect-intake", "to": "normalize-request" },
+    { "from": "normalize-request", "to": "route-control-mode" },
+    { "from": "route-control-mode", "to": "cowork-refine", "when": "output.route == \"collaborative\"" },
+    { "from": "route-control-mode", "to": "quality-gate", "when": "else" },
+    { "from": "cowork-refine", "to": "quality-gate" },
+    { "from": "quality-gate", "to": "agent-review", "when": "output.needsAgentReview == true" },
+    { "from": "quality-gate", "to": "human-disposition", "when": "else" },
+    { "from": "agent-review", "to": "human-disposition" },
+    { "from": "autonomous-package", "to": "notify-owner" },
+    { "from": "notify-owner", "to": "done" }
+  ]
+}
