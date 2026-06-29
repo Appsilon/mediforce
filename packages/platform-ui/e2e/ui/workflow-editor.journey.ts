@@ -1,6 +1,6 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
+import { trackPageErrors } from '../helpers/page-errors';
 
 const SUPPLY_CHAIN_DEFINITION_URL = `/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/definitions/1`;
 
@@ -38,8 +38,8 @@ function executorButton(page: import('@playwright/test').Page, executor: 'human'
 test.describe('Workflow Editor Journey', () => {
   // ── Browse ─────────────────────────────────────────────────────────────────
 
-  test('workflow detail shows tabs, definitions, and diagram', async ({ page }, testInfo) => {
-    await setupRecording(page, 'workflow-editor-browse', testInfo);
+  test('workflow detail shows tabs, definitions, and diagram', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review`);
 
     // Runs and Definitions tabs visible
@@ -48,24 +48,21 @@ test.describe('Workflow Editor Journey', () => {
 
     // Runs tab is default
     await expect(page.getByRole('tab', { name: /runs/i })).toHaveAttribute('data-state', 'active');
-    await showStep(page);
 
     // Configurations tab does NOT exist
     await expect(page.getByRole('tab', { name: /configurations/i })).not.toBeVisible();
 
     // Click Definitions tab — shows definition links or an empty state
-    await click(page, page.getByRole('tab', { name: /definitions/i }));
+    await page.getByRole('tab', { name: /definitions/i }).click();
     await expect(
       page.locator('a[href*="/definitions/"]').or(page.locator('text=/No definitions|Create first/i')).first(),
     ).toBeVisible({ timeout: 10_000 });
-    await showResult(page);
-    await endRecording(page);
   });
 
   // ── Definition version page ────────────────────────────────────────────────
 
-  test('definition version shows always-edit canvas with header controls', async ({ page }, testInfo) => {
-    await setupRecording(page, 'workflow-editor-canvas', testInfo);
+  test('definition version shows always-edit canvas with header controls', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
 
     const header = pageHeader(page);
@@ -74,7 +71,6 @@ test.describe('Workflow Editor Journey', () => {
     const workflowHeading = header.locator('h1');
     await expect(workflowHeading).toBeVisible({ timeout: 10_000 });
     await expect(workflowHeading).toHaveText('Supply Chain Review');
-    await showStep(page);
 
     // Description field is editable
     const descriptionInput = header.getByPlaceholder('Add a description…');
@@ -89,69 +85,58 @@ test.describe('Workflow Editor Journey', () => {
     const saveButton = page.getByRole('button', { name: /save new version/i });
     await expect(saveButton).toBeVisible();
     await expect(saveButton).toBeEnabled();
-    await showStep(page);
 
     // Clicking Save opens the dialog
-    await click(page, saveButton);
+    await saveButton.click();
     await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 3_000 });
 
     // Cancel closes the dialog without saving
-    await click(page, page.getByRole('button', { name: /^cancel$/i }));
+    await page.getByRole('button', { name: /^cancel$/i }).click();
     await expect(page.getByRole('heading', { name: /name this version/i })).not.toBeVisible();
-    await showStep(page);
 
     // Canvas is always in edit mode — diagram nodes are visible
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 8_000 });
 
     // Clicking a node opens "Edit step" panel
-    await click(page, page.locator('.react-flow__node').first());
+    await page.locator('.react-flow__node').first().click();
     await expect(page.locator('[data-testid="step-editor"]')).toBeVisible({ timeout: 5_000 });
-    await showResult(page);
 
     // No legacy "Edit" button
     await expect(page.getByRole('button', { name: /^edit$/i })).not.toBeVisible();
-
-    await endRecording(page);
   });
 
   // ── Add Step ──────────────────────────────────────────────────────────────
 
-  test('add step dropdown shows correct type labels and inserts before terminal', async ({ page }, testInfo) => {
-    await setupRecording(page, 'workflow-editor-add-step', testInfo);
+  test('add step dropdown shows correct type labels and inserts before terminal', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
 
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
     const initialNodeCount = await page.locator('.react-flow__node').count();
 
     // Open Add Step popover via the "+" button on an edge
-    await click(page, page.getByLabel('Add step here').first());
+    await page.getByLabel('Add step here').first().click();
     // Both sections visible simultaneously — wait for the executor section header
     await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
-    await showStep(page);
 
     // Section 1: step type toggles (Creation active by default, Decision available)
     await expect(stepTypeButton(page, 'creation')).toBeVisible();
     await expect(stepTypeButton(page, 'decision')).toBeVisible();
-    await showStep(page);
 
     // Section 2: executor buttons all visible simultaneously
     await expect(executorButton(page, 'human')).toBeVisible();
     await expect(executorButton(page, 'agent')).toBeVisible();
     await expect(executorButton(page, 'script')).toBeVisible();
-    await showStep(page);
 
     // Choose human executor — step is added to the diagram
-    await click(page, executorButton(page, 'human'));
+    await executorButton(page, 'human').click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
-    await showResult(page);
-
-    await endRecording(page);
   });
 
   // ── Undo ─────────────────────────────────────────────────────────────────
 
-  test('undo reverses last canvas change', async ({ page }, testInfo) => {
-    await setupRecording(page, 'workflow-editor-undo', testInfo);
+  test('undo reverses last canvas change', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
 
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
@@ -162,30 +147,26 @@ test.describe('Workflow Editor Journey', () => {
     await expect(undoButton).toBeDisabled();
 
     // Add a step via edge "+" button
-    await click(page, page.getByLabel('Add step here').first());
+    await page.getByLabel('Add step here').first().click();
     await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
-    await click(page, executorButton(page, 'human'));
+    await executorButton(page, 'human').click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
-    await showStep(page);
 
     // Undo is now enabled
     await expect(undoButton).toBeEnabled();
 
     // Click undo — step is removed
-    await click(page, undoButton);
+    await undoButton.click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount, { timeout: 5_000 });
-    await showResult(page);
 
     // Undo disabled again (stack is now empty)
     await expect(undoButton).toBeDisabled();
-
-    await endRecording(page);
   });
 
   // ── Redo ─────────────────────────────────────────────────────────────────
 
-  test('redo re-applies a step after undo', async ({ page }, testInfo) => {
-    await setupRecording(page, 'workflow-editor-redo', testInfo);
+  test('redo re-applies a step after undo', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
 
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
@@ -198,32 +179,27 @@ test.describe('Workflow Editor Journey', () => {
     await expect(redoButton).toBeDisabled();
 
     // Add a step via edge "+" button
-    await click(page, page.getByLabel('Add step here').first());
+    await page.getByLabel('Add step here').first().click();
     await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
-    await click(page, executorButton(page, 'human'));
+    await executorButton(page, 'human').click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
-    await showStep(page);
 
     // Undo the step addition
-    await click(page, undoButton);
+    await undoButton.click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount, { timeout: 5_000 });
 
     // Redo is now enabled
     await expect(redoButton).toBeEnabled();
-    await showStep(page);
 
     // Redo — step is re-added
-    await click(page, redoButton);
+    await redoButton.click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
-    await showResult(page);
-
-    await endRecording(page);
   });
 
   // ── Hover panel ───────────────────────────────────────────────────────────
 
-  test('step hover panel exposes delete and move actions', async ({ page }, testInfo) => {
-    await setupRecording(page, 'workflow-editor-hover-panel', testInfo);
+  test('step hover panel exposes delete and move actions', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
 
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
@@ -233,7 +209,6 @@ test.describe('Workflow Editor Journey', () => {
     // Hover over the second node (narrative-summary) — it is in the middle so both move buttons are enabled
     const targetNode = page.locator('.react-flow__node').nth(1);
     await targetNode.hover();
-    await showStep(page);
 
     // Delete and move buttons become visible on hover
     const deleteButton = page.getByRole('button', { name: 'Delete step' });
@@ -242,20 +217,16 @@ test.describe('Workflow Editor Journey', () => {
     await expect(deleteButton).toBeVisible({ timeout: 3_000 });
     await expect(moveUpButton).toBeVisible();
     await expect(moveDownButton).toBeVisible();
-    await showStep(page);
 
     // Clicking delete removes the step
     await deleteButton.click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount - 1, { timeout: 5_000 });
-    await showResult(page);
-
-    await endRecording(page);
   });
 
   // ── YAML panel ───────────────────────────────────────────────────────────
 
-  test('yaml panel shows live preview in code editor', async ({ page }, testInfo) => {
-    await setupRecording(page, 'workflow-editor-yaml', testInfo);
+  test('yaml panel shows live preview in code editor', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
 
     // Right panel shows CodeMirror editor when no step is selected
@@ -264,45 +235,35 @@ test.describe('Workflow Editor Journey', () => {
 
     // YAML content contains step IDs from the seeded definition
     const yamlContent = page.locator('.cm-content');
-    await expect(yamlContent).toBeVisible({ timeout: 5_000 });
-    const yamlText = await yamlContent.textContent();
-    expect(yamlText).toContain('vendor-assessment');
-    expect(yamlText).toContain('human-review');
-    await showStep(page);
+    await expect(yamlContent).toContainText('vendor-assessment', { timeout: 5_000 });
+    await expect(yamlContent).toContainText('human-review');
 
     // Apply YAML button and source code label are visible in toolbar when no step is selected
     await expect(page.getByRole('button', { name: /apply yaml/i })).toBeVisible();
     await expect(page.getByText('Workflow source code')).toBeVisible();
-    await showResult(page);
-
-    await endRecording(page);
   });
 
   // ── YAML hidden when step selected ───────────────────────────────────────
 
-  test('yaml editor and save button hide when a step is selected', async ({ page }, testInfo) => {
-    await setupRecording(page, 'workflow-editor-yaml-hidden', testInfo);
+  test('yaml editor and save button hide when a step is selected', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
 
     // YAML editor visible when no step selected
     await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: /apply yaml/i })).toBeVisible();
-    await showStep(page);
 
     // Select a step — YAML editor and Save YAML button are hidden
-    await click(page, page.locator('.react-flow__node').first());
+    await page.locator('.react-flow__node').first().click();
     await expect(page.locator('[data-testid="step-editor"]')).toBeVisible({ timeout: 5_000 });
     await expect(page.locator('.cm-editor')).not.toBeVisible();
     await expect(page.getByRole('button', { name: /apply yaml/i })).not.toBeVisible();
-    await showResult(page);
-
-    await endRecording(page);
   });
 
   // ── Create new workflow ───────────────────────────────────────────────────
 
-  test('create new workflow fills form and publishes', async ({ page }, testInfo) => {
-    await setupRecording(page, 'workflow-new', testInfo);
+  test('create new workflow fills form and publishes', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
 
     // Template canvas already has three steps: draft, ai-review, done
@@ -323,21 +284,19 @@ test.describe('Workflow Editor Journey', () => {
 
     // Name + description filled → save enabled
     await expect(saveButton).toBeEnabled();
-    await showStep(page);
 
     // Clicking Save opens the version-name dialog
-    await click(page, saveButton);
+    await saveButton.click();
     await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 5_000 });
 
     // Fill version title in dialog — live preview updates
     await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('v1 — initial');
     await expect(page.getByText(/will be saved as/i)).toBeVisible();
-    await showStep(page);
 
     // Confirm in dialog → redirect to the new definition page
     // Use .last() because the dialog confirm button is the second "Publish workflow"
     // button in the DOM (the first is the disabled header button behind the overlay).
-    await click(page, page.getByRole('button', { name: /publish workflow/i }).last());
+    await page.getByRole('button', { name: /publish workflow/i }).last().click();
     await page.waitForURL(/\/workflows\/e2e-test-workflow\/definitions\/\d+/, { timeout: 20_000 });
 
     // On the definition page the workflow name is shown as a heading
@@ -345,15 +304,12 @@ test.describe('Workflow Editor Journey', () => {
     const workflowHeading = header.locator('h1');
     await expect(workflowHeading).toBeVisible({ timeout: 10_000 });
     await expect(workflowHeading).toHaveText('e2e-test-workflow');
-    await showResult(page);
-
-    await endRecording(page);
   });
 
   // ── Validation gates ─────────────────────────────────────────────────────
 
-  test('new workflow save blocked when workflow name slugifies to empty', async ({ page }, testInfo) => {
-    await setupRecording(page, 'workflow-new-validation', testInfo);
+  test('new workflow save blocked when workflow name slugifies to empty', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
 
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
@@ -368,62 +324,53 @@ test.describe('Workflow Editor Journey', () => {
 
     // Button must remain disabled — toWorkflowId('---') === ''
     await expect(saveButton).toBeDisabled();
-    await showResult(page);
-
-    await endRecording(page);
   });
 
   // ── Pane click deselects step ─────────────────────────────────────────────
 
-  test('clicking canvas pane deselects step and restores YAML panel', async ({ page }, testInfo) => {
-    await setupRecording(page, 'workflow-editor-pane-deselect', testInfo);
+  test('clicking canvas pane deselects step and restores YAML panel', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
 
     // YAML editor is visible initially (no step selected)
     await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
 
     // Click a node — step editor opens, YAML editor hides
-    await click(page, page.locator('.react-flow__node').first());
+    await page.locator('.react-flow__node').first().click();
     await expect(page.locator('[data-testid="step-editor"]')).toBeVisible({ timeout: 5_000 });
     await expect(page.locator('.cm-editor')).not.toBeVisible();
-    await showStep(page);
 
     // Click empty canvas space — pane click triggers deselect, YAML editor returns
     await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
     await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('[data-testid="step-editor"]')).not.toBeVisible();
-    await showResult(page);
-
-    await endRecording(page);
   });
 
   // ── Executor switching clears stale YAML fields ───────────────────────────
 
-  test('executor chosen at creation is locked in the editor and reflected in YAML', async ({ page }, testInfo) => {
-    await setupRecording(page, 'workflow-editor-executor-switch', testInfo);
+  test('executor chosen at creation is locked in the editor and reflected in YAML', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
 
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
     const initialNodeCount = await page.locator('.react-flow__node').count();
 
     // Add an agent step via edge "+" button
-    await click(page, page.getByLabel('Add step here').first());
+    await page.getByLabel('Add step here').first().click();
     await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
-    await click(page, executorButton(page, 'agent'));
+    await executorButton(page, 'agent').click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
     // Click the new step node — step editor opens showing the icon header
-    await click(page, page.locator('.react-flow__node').filter({ hasText: /New Step/i }));
+    await page.locator('.react-flow__node').filter({ hasText: /New Step/i }).click();
     const stepEditor = page.locator('[data-testid="step-editor"]');
     await expect(stepEditor).toBeVisible({ timeout: 5_000 });
-    await showStep(page);
 
     // Executor is shown as a read-only locked field (no toggle buttons)
     await expect(stepEditor.getByText('executor')).toBeVisible();
     await expect(stepEditor.getByTitle(/executor is set at creation/i)).toBeVisible();
     // The icon header shows the Agent label (exact match avoids tooltip text false positives)
     await expect(stepEditor.getByText('Agent', { exact: true })).toBeVisible();
-    await showStep(page);
 
     // Deselect and verify YAML reflects agent executor with plugin field
     await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
@@ -431,35 +378,30 @@ test.describe('Workflow Editor Journey', () => {
     await expect(yamlContent).toBeVisible({ timeout: 10_000 });
     await expect(yamlContent).toContainText('executor: agent');
     await expect(yamlContent).toContainText('opencode-agent');
-    await showResult(page);
-
-    await endRecording(page);
   });
 
   // ── Cowork step ───────────────────────────────────────────────────────────
 
-  test('cowork step appears in diagram and editor shows configuration', async ({ page }, testInfo) => {
-    await setupRecording(page, 'workflow-editor-cowork', testInfo);
+  test('cowork step appears in diagram and editor shows configuration', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
 
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
     const initialNodeCount = await page.locator('.react-flow__node').count();
 
     // Add a cowork step via edge "+" button
-    await click(page, page.getByLabel('Add step here').first());
+    await page.getByLabel('Add step here').first().click();
     await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
-    await click(page, executorButton(page, 'cowork'));
+    await executorButton(page, 'cowork').click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
-    await showStep(page);
 
     // New node shows "Cowork" executor label in the diagram
     await expect(page.locator('.react-flow__node').getByText('Cowork').first()).toBeVisible({ timeout: 3_000 });
 
     // Click the new step to open the step editor
-    await click(page, page.locator('.react-flow__node').filter({ hasText: /New Step/i }));
+    await page.locator('.react-flow__node').filter({ hasText: /New Step/i }).click();
     // Step editor opens with the cowork explainer for a new step
     await expect(page.getByText(/What is a Cowork step/i)).toBeVisible({ timeout: 3_000 });
-    await showStep(page);
 
     // Chat / Voice toggle is visible, Chat is active by default
     await expect(page.getByRole('button', { name: /^Chat$/i })).toBeVisible();
@@ -471,33 +413,29 @@ test.describe('Workflow Editor Journey', () => {
     await systemPromptTextarea.fill('You are a helpful clinical trial data analyst.');
     // Verify the value was accepted
     await expect(systemPromptTextarea).toHaveValue('You are a helpful clinical trial data analyst.');
-    await showStep(page);
 
     // Deselect to see YAML — verify executor is reflected in source code
     await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
     const yamlContent = page.locator('.cm-content');
     await expect(yamlContent).toBeVisible({ timeout: 10_000 });
     await expect(yamlContent).toContainText('executor: cowork', { timeout: 5_000 });
-    await showResult(page);
-
-    await endRecording(page);
   });
 
-  test('cowork step MCP server editor supports add, fill, transport toggle, and remove', async ({ page }, testInfo) => {
-    await setupRecording(page, 'workflow-editor-cowork-mcp', testInfo);
+  test('cowork step MCP server editor supports add, fill, transport toggle, and remove', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
 
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
     const initialNodeCount = await page.locator('.react-flow__node').count();
 
     // Add a cowork step
-    await click(page, page.getByLabel('Add step here').first());
+    await page.getByLabel('Add step here').first().click();
     await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
-    await click(page, executorButton(page, 'cowork'));
+    await executorButton(page, 'cowork').click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
     // Open the new step editor
-    await click(page, page.locator('.react-flow__node').filter({ hasText: /New Step/i }));
+    await page.locator('.react-flow__node').filter({ hasText: /New Step/i }).click();
     await expect(page.getByText(/What is a Cowork step/i)).toBeVisible({ timeout: 3_000 });
 
     // Scope MCP edits to the step editor side panel.
@@ -508,7 +446,7 @@ test.describe('Workflow Editor Journey', () => {
     await expect(sidePanel.getByText('MCP Servers', { exact: true })).toBeVisible();
 
     // Click Add — a server entry with name/command inputs appears.
-    await click(page, sidePanel.getByRole('button', { name: /^Add$/ }));
+    await sidePanel.getByRole('button', { name: /^Add$/ }).click();
     await expect(sidePanel.getByText(/No MCP servers configured/i)).not.toBeVisible();
 
     // Fill the stdio-mode server fields.
@@ -521,23 +459,18 @@ test.describe('Workflow Editor Journey', () => {
     await expect(commandInput).toBeVisible();
     await commandInput.fill('tealflow-mcp');
     await expect(commandInput).toHaveValue('tealflow-mcp');
-    await showStep(page);
 
     // Transport toggle switches the visible input to URL mode and back.
     const transportToggle = sidePanel.getByRole('button', { name: /^stdio$/ });
-    await click(page, transportToggle);
+    await transportToggle.click();
     await expect(sidePanel.getByPlaceholder(/localhost:8080\/mcp/)).toBeVisible();
     await expect(sidePanel.getByPlaceholder(/e\.g\. tealflow-mcp/)).not.toBeVisible();
 
-    await click(page, sidePanel.getByRole('button', { name: /^http$/ }));
+    await sidePanel.getByRole('button', { name: /^http$/ }).click();
     await expect(sidePanel.getByPlaceholder(/e\.g\. tealflow-mcp/)).toBeVisible();
-    await showStep(page);
 
     // Remove — empty state returns.
-    await click(page, sidePanel.locator('button').filter({ has: page.locator('svg.lucide-trash-2') }));
+    await sidePanel.locator('button').filter({ has: page.locator('svg.lucide-trash-2') }).click();
     await expect(sidePanel.getByText(/No MCP servers configured/i)).toBeVisible();
-    await showResult(page);
-
-    await endRecording(page);
   });
 });

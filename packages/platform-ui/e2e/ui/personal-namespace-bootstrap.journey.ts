@@ -1,6 +1,6 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { createTestUser } from '../helpers/emulator';
-import { setupRecording, click, showStep, showResult, showCaption, endRecording } from '../helpers/recording';
+import { trackPageErrors } from '../helpers/page-errors';
 
 const BOOTSTRAP_EMAIL = 'bootstrap-journey@mediforce.dev';
 const BOOTSTRAP_PASSWORD = 'Journey123!';
@@ -25,31 +25,25 @@ test.describe('Personal namespace lazy bootstrap journey', () => {
     await createTestUser(BOOTSTRAP_EMAIL, BOOTSTRAP_PASSWORD, 'Bootstrap User');
   });
 
-  test('first sign-in bootstraps the personal namespace via /api/users/me', async ({ page }, testInfo) => {
+  test('first sign-in bootstraps the personal namespace via /api/users/me', async ({ page }) => {
     test.setTimeout(60_000);
-    await setupRecording(page, 'personal-namespace-bootstrap', testInfo);
+    trackPageErrors(page);
 
     await page.goto('/login');
     await expect(page.getByRole('heading', { name: 'Mediforce' })).toBeVisible({ timeout: 15_000 });
-    await showCaption(page, 'New user signs in — no Firestore docs yet');
 
-    await click(page, page.getByLabel('Email'));
+    await page.getByLabel('Email').click();
     await page.getByLabel('Email').fill(BOOTSTRAP_EMAIL);
     await page.getByLabel('Password').fill(BOOTSTRAP_PASSWORD);
-    await showStep(page);
 
-    await showCaption(page, 'Submitting credentials…');
-    await click(page, page.getByRole('button', { name: /^sign in$/i }));
+    await page.getByRole('button', { name: /^sign in$/i }).click();
 
     // Single workspace (the lazy-bootstrapped personal one) → picker auto-
     // redirects to it. The handle is derived from the email local part.
     await page.waitForURL(/\/(bootstrap-journey|workspace-selection)/, { timeout: 25_000 });
-    await showCaption(page, 'Personal namespace appears in switcher');
 
     // Sidebar workspace switcher shows the personal entry (label "My profile"
     // in the app shell), proving the GET /api/users/me cache populated.
     await expect(page.getByText(/my profile/i)).toBeVisible({ timeout: 10_000 });
-    await showResult(page);
-    await endRecording(page);
   });
 });

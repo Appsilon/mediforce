@@ -5,7 +5,6 @@ import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/te
 try { process.loadEnvFile('.env.local'); } catch { /* file may not exist in CI */ }
 
 const useEmulators = process.env.NEXT_PUBLIC_USE_EMULATORS === 'true';
-const recording = process.env.E2E_RECORD === 'true';
 
 // When using emulators, run on a separate port so we don't reuse a dev server
 // that connects to production Firebase. This is the #1 cause of "data not found"
@@ -52,18 +51,13 @@ if (useEmulators) {
     use: {
       ...devices['Desktop Chrome'],
       storageState: 'e2e/.auth/user.json',
-      ...(recording ? {
-        channel: 'chromium',
-        video: { mode: 'on', size: { width: 1280, height: 720 } },
-        launchOptions: { slowMo: 500 },
-      } : {}),
     },
   });
 }
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: recording ? 120_000 : 30_000,
+  timeout: 30_000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -94,7 +88,7 @@ export default defineConfig({
     // Default = prebuilt server (`next start`) for CI parity and speed —
     // `next dev`'s JIT compile-on-request dominated e2e wall-clock. Opt into
     // `next dev` via `E2E_DEV_SERVER=true` for interactive iteration where
-    // hot-reload beats suite speed (headed / --ui / recording modes).
+    // hot-reload beats suite speed (headed / --ui).
     // CI pre-builds in a separate step; locally, `start:e2e` auto-builds the
     // first time. `reuseExistingServer: true` connects to a server the build
     // step already started.

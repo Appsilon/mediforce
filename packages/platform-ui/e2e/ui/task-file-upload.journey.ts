@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 // File-upload Human Task, post-ADR-0003: bytes flow through the headless
 // attachments API (Postgres `task_attachments` + FilesystemBlobStore), no
@@ -22,12 +21,9 @@ const PDF_BYTES = Buffer.from(
 );
 
 test.describe('Task File Upload Journey', () => {
-  test('uploads a PDF to a Human Task, lists it, and downloads it byte-identical', async ({ page }, testInfo) => {
-    await setupRecording(page, 'task-file-upload', testInfo);
-
+  test('uploads a PDF to a Human Task, lists it, and downloads it byte-identical', async ({ page }) => {
     await page.goto(UPLOAD_TASK_URL);
     await expect(page.getByText(/drop files here/i)).toBeVisible({ timeout: 15_000 });
-    await showStep(page);
 
     const fileInput = page.getByTestId('file-input');
 
@@ -41,7 +37,6 @@ test.describe('Task File Upload Journey', () => {
     await handle.close();
     await fileInput.setInputFiles(oversizePath);
     await expect(page.getByText(/too large \(max 100 MB\)/i)).toBeVisible({ timeout: 10_000 });
-    await showStep(page);
 
     // Now upload a valid PDF.
     await fileInput.setInputFiles({
@@ -50,9 +45,8 @@ test.describe('Task File Upload Journey', () => {
       buffer: PDF_BYTES,
     });
     await expect(page.getByText('protocol.pdf')).toBeVisible({ timeout: 10_000 });
-    await showStep(page);
 
-    await click(page, page.getByRole('button', { name: /^upload/i }));
+    await page.getByRole('button', { name: /^upload/i }).click();
     // Upload + task completion finished once either the success banner or the
     // completed list shows (the live view can land on either).
     await expect(
@@ -64,18 +58,14 @@ test.describe('Task File Upload Journey', () => {
     await page.reload();
     await expect(page.getByText(/1 file uploaded/i)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('protocol.pdf').first()).toBeVisible({ timeout: 10_000 });
-    await showResult(page);
 
     // Download the attachment and assert the bytes are identical to what we
     // uploaded — proves the full blob round-trip end to end.
     const downloadPromise = page.waitForEvent('download');
-    await click(page, page.getByRole('button', { name: /download protocol\.pdf/i }));
+    await page.getByRole('button', { name: /download protocol\.pdf/i }).click();
     const download = await downloadPromise;
     const downloadedPath = await download.path();
     const downloadedBytes = await readFile(downloadedPath);
     expect(downloadedBytes.equals(PDF_BYTES)).toBe(true);
-    await showResult(page);
-
-    await endRecording(page);
   });
 });
