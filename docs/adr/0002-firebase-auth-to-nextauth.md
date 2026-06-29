@@ -1,7 +1,8 @@
 # 0002 — Move authentication from Firebase Auth to NextAuth (Auth.js v5)
 
-- **Status:** Proposed
-- **Date:** 2026-05-19
+- **Status:** Proposed (grilled & reshaped 2026-06-29; supersedes the
+  2026-06-16 greenfield-uuid + remap draft — see §7)
+- **Date:** 2026-05-19 (reshaped 2026-06-16, 2026-06-29)
 - **Authors:** Marek Rogala (@marekrogala)
 - **Reviewers:** Filip Stachura (@filipstachura), Paweł Przytuła (@przytu1)
 - **Depends on:** [ADR-0001](./0001-firestore-to-postgres.md) (Postgres + Drizzle is the adapter target)
@@ -112,14 +113,32 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
    callback as the personal-workspace bootstrap), never a per-workspace
    in-app setting.
 
+4b. **Account linking by verified email (decision 2026-06-29).** A Google
+   sign-in whose email matches an existing `auth_users` row (a migration-seeded
+   user, §7) **links automatically** onto that user — `allowDangerousEmailAccountLinking:
+   true` set **on the Google provider only**. This is safe precisely because
+   Google emails are verified and `ALLOWED_EMAIL_DOMAINS` (§4a) already gates
+   the domain; it is what makes the seamless re-login work without a remap.
+   **Never** enable it for an unverified-email provider (the "dangerous" case —
+   account takeover). Today's explicit `pendingGoogleLink` password-link dance
+   (sign in with password to attach a same-email Google account) is **dropped** —
+   verified-email auto-link replaces it, and passwords are test-only anyway.
+
 5. **Role / claim resolution.** Firebase custom claims map onto three
    different storage locations:
 
    - `customClaims.role === 'admin'` → `user_profiles.deployment_admin: boolean`
-   - `customClaims.roles: string[]` → **per-workspace** `workspace_members.roles: text[]`
-     (today these claims are global; the migration **copies them onto every
-     workspace membership** the user holds, then admins can fine-tune
-     separately).
+   - `customClaims.roles: string[]` → a **global** `user_roles(uid, role)` table
+     (one indexed row per (user, role)). **These claims are global today and
+     `getUsersByRole(role)` is called with no namespace context**
+     (`workflow-engine.ts` escalation-notification targeting resolves a role to
+     users across the whole deployment). A global table is the faithful port —
+     the PG `UserDirectoryService` reads it with the same global semantics.
+     _(Decision 2026-06-29: rejected the earlier draft's per-workspace
+     `workspace_members.roles[]` — scoping role→user resolution to a workspace
+     would silently change notification targeting, a **regression** dressed as
+     a migration. Per-workspace functional roles can return later as a real
+     product decision if asked.)_
    - Workspace governance (`owner | admin | member`) lives on
      `workspace_members.membership` (renamed from today's `members.role`
      to remove the naming collision with process-domain roles).
@@ -152,41 +171,68 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
    or `SameSite=None; Secure` cookies + a strict CORS allowlist — not by
    reverting the browser to Bearer.
 
-7. **Existing-user migration — greenfield schema, one-time staging remap
-   (decision 2026-06-16).** There are **no production deployments**, so the
-   schema is written **greenfield** (the project default: build it as if from
-   scratch unless a concrete reason forbids it). `auth_users.id` is a fresh
-   adapter-generated `uuid` — no Firebase-uid baggage carried into the new
-   schema. Staging is the only environment with existing users + data, and we
-   keep it:
+7. **Existing-user migration — keep the uid, no remap (decision 2026-06-29).**
+   The Firebase uid is already the **canonical, opaque user id** stored as
+   `text` across the whole schema (`user_profiles.uid` PK, `workspace_members.uid`
+   PK, `workspaces.linked_user_id`, `{human_tasks,cowork_sessions,handoff}.assigned_user_id`,
+   `process_instances.created_by`, `audit_events` actor, `task_attachments.uploaded_by`).
+   Nothing parses a user id as a `uuid`. So `auth_users.id` **is the existing
+   Firebase uid** (the `@auth/drizzle-adapter` schema must declare `id` as
+   `text`, **not** `uuid` — the only impl constraint), and **every reference
+   stays valid with zero data rewrite**:
 
    - **Structural changes ship as Drizzle migrations** (create `auth_*` +
-     `user_profiles` reshape; `workspace_members` rename `role` → `membership`
-     + add `roles text[]`).
-   - **The firebase_uid → uuid remap ships as a one-time script, not a SQL
-     migration** — building the mapping requires reading Firebase Auth
-     (`listUsers`), which a pure SQL migration cannot do. The script reads
-     Firebase Auth, inserts `auth_users` (fresh uuid), builds the map, and
-     rewrites the staging references (`workspace_members.uid`,
-     `audit_events.actor_id`, `human_tasks.*`, `cowork_sessions.*`,
-     `handoff.*`, `workspaces.linked_user_id`, `task_attachments.uploaded_by`
-     — the last added by ADR-0003, which lands first and writes it as a
-     Firebase-uid `text` column).
-   - No "seamless Google pre-seed" is required (zero production users to make
-     seamless). Dev / staging users re-enroll by signing in, or are placed by
-     the reworked seed (§Test infrastructure in PLAN).
+     `user_profiles` reshape; `workspace_members` rename `role` → `membership`;
+     create the global `user_roles` table). The uid columns are **not** touched.
+   - **Migration = a tiny one-time seed**, not a remap: a script reads Firebase
+     Auth (`listUsers`) and inserts one `auth_users` row per existing user
+     (`id = uid`, `email`, `name`) so a Google sign-in **links by verified
+     email** (§4b) onto the pre-existing uid. It also seeds `user_roles` from
+     today's `customClaims.roles` and `user_profiles.deployment_admin` from
+     `customClaims.role === 'admin'`. No uid columns rewritten, no mapping
+     table, no `audit_events`/`human_tasks`/… churn.
+   - New users created after cutover get an adapter-generated `uuid` id —
+     mixed id shapes (Firebase strings + uuids) are harmless: both are opaque
+     `text`, no consumer cares.
+   - Passwords are not migrated (Firebase scrypt is proprietary; passwords are
+     test-only today). Email/password users reset if they want one — **not
+     forced** (§ password ceremony).
 
-   _Supersedes the pre-2026-06-16 draft's seamless-Google-pre-seed +
-   password-re-enroll plan._
+   _(Decision 2026-06-29, after grilling: **supersedes** the 2026-06-16
+   greenfield-uuid + remap-script plan. Keeping the uid was judged the
+   simpler-correct move — the uuid was cosmetic and the remap rewrote ~8
+   columns for no functional gain. This also **supersedes the "remap
+   uploaded_by to fresh uuids" line in [ADR-0003](./0003-remove-firebase-storage.md)
+   §5** — `uploaded_by` simply stays the Firebase-uid `text` it already is.)_
 
-8. **Cutover — straight swap, no dual-backend (decision 2026-06-16).** With
-   no production to protect (§7), there is no `AUTH_BACKEND` flag, no parallel
-   Firebase/NextAuth CI matrix, and no rollback-to-Firebase window. NextAuth
-   replaces Firebase Auth in one PR sequence; the one-time staging remap (§7)
-   preserves staging users; if something breaks, **fix forward**. ADR-0001
-   already landed, so this is simply the next change, not a bundled or flagged
-   cutover. **Lands after ADR-0003** (storage) so client-direct uploads do not
-   break when the Firebase Auth session disappears — see ADR-0003 §5.
+8. **Cutover — two PRs, no dual-run (decision 2026-06-29).** Auth is atomic —
+   you cannot half-authenticate — so there is no dual-backend window, no
+   `AUTH_BACKEND` flag, no parallel Firebase/NextAuth CI matrix, no
+   rollback-to-Firebase scaffolding. With no production to protect (§7) the
+   only cost of a bad cutover is "log in again," and the e2e auth-setup (now on
+   NextAuth) exercises the whole login→session→API flow in CI before deploy;
+   rollback is a redeploy. The work splits at a natural seam:
+
+   - **PR1 — user-management off Firebase-admin (additive, non-breaking).** The
+     global `user_roles` table + PG `UserDirectoryService` + PG invite impl,
+     behind the existing ports; one-time seed of `user_roles` from current
+     Firebase claims so `getUsersByRole` notifications keep working. Firebase
+     stays the auth source. De-risks PR2 by pulling role/directory complexity
+     out of the cutover.
+   - **PR2 — NextAuth atomic cutover.** `auth_*` tables + `user_profiles`
+     reshape + Google/Credentials providers + text-id drizzle adapter +
+     `resolveCallerIdentity`→cookie + client rewrite + login page + the §7
+     user seed on staging + e2e auth-setup → NextAuth + delete Firebase Auth /
+     firebase-admin / emulator. Gate: `grep firebase/auth → 0`.
+
+   A dual-run window (`resolveCallerIdentity` accepting both a Firebase Bearer
+   and a NextAuth cookie at once) was **considered and rejected**: ADR-0003's
+   migrate-before-flip protected data that would *vanish*; auth has no
+   equivalent data-loss risk, so the dual-path scaffolding (plus a teardown PR,
+   plus a wider security surface) buys nothing here.
+
+   **Lands after ADR-0003** (storage) so client-direct uploads do not break
+   when the Firebase Auth session disappears — see ADR-0003 §5.
 
 ## Considered alternatives
 

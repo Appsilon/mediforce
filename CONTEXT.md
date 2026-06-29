@@ -233,18 +233,38 @@ can use the Workspace.
 _Avoid_: "Role" alone — that's overloaded with process-domain roles below.
 
 **Roles** *(process-domain, plural)*:
-Functional roles a User holds inside one Workspace for workflow purposes —
-e.g. `reviewer`, `PI`, `approver`. Stored on `workspace_members.roles` as
-`text[]`. Drive `HumanTask.assignedRole` and `CoworkSession.assignedRole`
-gating, and `WorkflowStep.allowedRoles` access control.
-_Avoid_: confusing with Membership above. Roles are per-workspace today
-(per-deployment in legacy Firebase custom claims; migrated to per-workspace
-in ADR-0002).
+Functional roles a User holds for workflow purposes — e.g. `reviewer`, `PI`,
+`approver`. **Deployment-global**, stored in the `user_roles(uid, role)` table.
+Drive `HumanTask.assignedRole` and `CoworkSession.assignedRole` gating,
+`WorkflowStep.allowedRoles` access control, and `getUsersByRole` notification
+targeting (which resolves a role to Users with **no** Workspace context).
+_Avoid_: confusing with Membership above. Roles are **global**, not
+per-Workspace — they were global Firebase custom claims and ADR-0002 keeps
+that semantics (a `user_roles` table, not a per-membership array; making them
+per-Workspace would silently rescope notification targeting). Per-Workspace
+functional roles can return later as a deliberate product decision.
 
 **Deployment admin**:
 A boolean on `user_profiles.deployment_admin`. The Deployment-wide
 superuser bit (formerly Firebase custom claim `role: 'admin'`). Rare —
 typically one sysadmin per Deployment. Cross-Workspace operational power.
+
+**Caller Identity** *(per-request authorization subject)*:
+The resolved subject of one API request, produced by `resolveCallerIdentity`.
+Two kinds: a **user** caller (a signed-in User — `uid` + Workspace memberships)
+or an **apiKey** caller (a system actor: CLI / agents / cron, full access).
+Browser users resolve from the Session cookie; machine callers from
+`X-Api-Key`. Feeds the caller-set repository base (ADR-0004).
+_Avoid_: conflating with User (the human/account) or Session (the sign-in
+record) — Caller Identity is the per-request derivative used for scoping.
+
+**Account linking** *(by verified email)*:
+Attaching a new sign-in provider (e.g. Google) to an existing User when the
+provider asserts the **same verified email**. Used so migration-seeded Users
+(ADR-0002) log in via Google onto their pre-existing `uid` with no remap.
+Enabled only for verified-email providers (`allowDangerousEmailAccountLinking`
+on Google), gated by the email-domain allowlist.
+_Avoid_: the old `pendingGoogleLink` password-link dance (dropped in ADR-0002).
 
 **OAuth Provider Config** *(per-Namespace)*:
 Authorization-server endpoint + credentials. GitHub / Google built-in; custom

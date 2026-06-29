@@ -81,8 +81,10 @@ filesystem implementation now.
    server-mediated **headless routes** (ADR-0005 / AGENTS.md §8 — never Server
    Actions) → `BlobStore`, severing the Firebase-Auth dependency, so it lands
    first. Consequently `task_attachments.uploaded_by` is a Firebase-uid `text`
-   column (no FK to ADR-0002's not-yet-existing `auth_users`); ADR-0002's
-   staging remap rewrites it when fresh uuids land.
+   column (no FK to ADR-0002's not-yet-existing `auth_users`). _(Update: ADR-0002
+   §7 supersedes the "staging remap rewrites it when fresh uuids land" plan —
+   `auth_users.id` keeps the Firebase uid, so `uploaded_by` stays this `text`
+   uid unchanged, no remap.)_
 
 6. **Firebase Storage removed via a standalone one-time migration.** ADR-0001's
    Firestore → Postgres cutover already shipped (#534), so this is a separate
