@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Added
+- Workflow authoring docs split into a process guide ([docs/how-to-create-workflow.md](docs/how-to-create-workflow.md)) and a production checklist ([docs/workflow-authoring-golden-rules.md](docs/workflow-authoring-golden-rules.md)), backed by the end-to-end `apps/golden-standard-workflow` reference package. A CI doc-lint test re-derives every cross-reference, the `executor`/`type` enum tables, the referenced `mediforce` CLI commands, and the ADR links from source, so the docs fail the build instead of silently drifting [#784](https://github.com/Appsilon/mediforce/pull/784).
+
 ## [2026-06-21]
 
 ### Fixed

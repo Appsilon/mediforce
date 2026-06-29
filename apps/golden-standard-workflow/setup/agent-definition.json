@@ -1,0 +1,23 @@
+{
+  "id": "golden-standard-reviewer",
+  "kind": "plugin",
+  "runtimeId": "claude-code-agent",
+  "name": "Golden Standard Reviewer",
+  "iconName": "sparkles",
+  "description": "Reference Agent Definition showing governable MCP bindings for workflow steps.",
+  "foundationModel": "anthropic/claude-sonnet-4",
+  "systemPrompt": "Review workflow outputs against the packaged skill instructions. Use MCP tools only when required.",
+  "inputDescription": "Workflow run context and output files.",
+  "outputDescription": "Structured review JSON written to /output/result.json.",
+  "mcpServers": {
+    "readonly-context": {
+      "type": "stdio",
+      "catalogId": "golden-standard-readonly-context",
+      "allowedTools": ["read_context", "list_context"]
+    }
+  },
+  "namespace": "appsilon",
+  "visibility": "private",
+  "createdAt": "2026-06-26T00:00:00.000Z",
+  "updatedAt": "2026-06-26T00:00:00.000Z"
+}
