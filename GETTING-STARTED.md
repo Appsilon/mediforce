@@ -14,7 +14,7 @@ Agents / quick lookups: see [docs/dev-quickref.md](docs/dev-quickref.md).
   Docker Desktop (macOS/Windows) bundles Compose. On a Linux engine-only install
   (Ubuntu's `docker.io`) Compose is a separate package — install both:
   `sudo apt install docker.io docker-compose-v2`. Verify with `docker compose version`.
-- **Firebase service account** — only for cloud Auth/Storage (the optional path below).
+- **Firebase service account** — only for cloud Auth (the optional path below).
   **Not** needed for data: all server data lives in Postgres (ADR-0001).
 - **`MEDIFORCE_API_KEY`** — only for the CLI (section 3) or calling the API
   directly. Not needed for `pnpm dev:mock` UI-only exploration.
@@ -34,7 +34,7 @@ pnpm dev:mock
 Open **http://localhost:9007**.
 
 Zero cloud, zero Docker, zero Postgres: the launcher starts local Firebase
-emulators (Auth + Storage), seeds demo data, runs the UI, and mocks agent
+emulator (Auth), seeds demo data, runs the UI, and mocks agent
 execution. Best for UI work and exploring the app before configuring anything
 real.
 
@@ -342,16 +342,16 @@ Create it if you're building a custom plugin, or reference an existing one like
 
 ## Auth & test setup (optional)
 
-You only need this for cloud Firebase Auth/Storage or for running the E2E
+You only need this for cloud Firebase Auth or for running the E2E
 suite — **not** for the data layer (Postgres covers that).
 
 ### Firebase emulators (for E2E / auth tests)
 
-The Firebase Auth + Storage emulators back authentication in `dev:mock` and the
-Playwright suite. They are **not** a data backend.
+The Firebase Auth emulator backs authentication in `dev:mock` and the
+Playwright suite. It is **not** a data backend.
 
 ```bash
-pnpm emulators     # Auth :9099, Storage :9199
+pnpm emulators     # Auth :9099
 ```
 
 ### Your own Firebase project (cloud Auth)
@@ -461,7 +461,7 @@ images for script-executor steps](#build-images-for-script-executor-steps)).
 | `pnpm dev`             | Full local stack: Postgres + migrate + UI, 9003   |
 | `pnpm dev:no-docker`   | Docker-free; UI + host `claude` agents (needs Postgres on :5432) |
 | `pnpm dev:queue`       | `dev` + Redis + BullMQ queued agent execution     |
-| `pnpm emulators`       | Firebase Auth + Storage emulators                 |
+| `pnpm emulators`       | Firebase Auth emulator                            |
 | `pnpm db:generate`     | Generate a migration (drizzle-kit)                |
 | `pnpm db:migrate`      | Apply migrations                                  |
 | `pnpm test:unit`       | vitest unit + integration                         |
