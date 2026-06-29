@@ -18,3 +18,5 @@ export * from './namespace-secret';
 export * from './workflow-secret';
 export * from './user-profile';
 export * from './platform-settings';
+export * from './auth-user';
+export * from './user-role';

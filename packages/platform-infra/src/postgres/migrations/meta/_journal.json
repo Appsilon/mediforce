@@ -218,6 +218,13 @@
       "when": 1782391535834,
       "tag": "0030_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1782391535835,
+      "tag": "0031_user_roles_and_auth_users",
+      "breakpoints": true
     }
   ]
 }

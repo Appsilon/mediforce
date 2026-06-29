@@ -59,6 +59,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Added a composite `(actor_id, timestamp DESC)` index (`audit_events_actor_idx`) to `audit_events` so `PostgresAuditRepository.getByActor` (`WHERE actor_id = ? ORDER BY timestamp DESC LIMIT n`) uses an index scan instead of a full scan + sort on the append-only audit table [#612](https://github.com/Appsilon/mediforce/issues/612).
 - Editing an OAuth provider no longer forces the admin to re-enter the `Client secret` — leaving the field blank on edit omits it from the PATCH body so the stored secret is preserved; the placeholder reads "Leave empty to keep current secret" to make the affordance obvious [#332](https://github.com/Appsilon/mediforce/issues/332).
 
+### Changed
+- User directory + global process-roles now read Postgres (`user_roles` + a minimal `auth_users`) instead of Firebase Admin, behind the unchanged `UserDirectoryService` port; ships a seed-based `PostgresInviteService` and a gated one-time seed of `user_roles` from current Firebase `customClaims.roles` so `getUsersByRole` escalation targeting stays identical. Member-list `lastSignInTime` is `null` until NextAuth sessions land (ADR-0002 PR1).
+
 ## [2026-06-21]
 
 ### Fixed
