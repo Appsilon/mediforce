@@ -15,6 +15,7 @@ const repoRoot = resolve(__dirname, '../../../../..');
 const DOC_PATHS = [
   'docs/how-to-create-workflow.md',
   'docs/workflow-authoring-golden-rules.md',
+  'docs/workflow-capabilities.md',
 ];
 
 const docs = DOC_PATHS.map(rel => {
