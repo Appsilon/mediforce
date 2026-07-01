@@ -1,0 +1,290 @@
+{
+  "name": "mediforce-fullstack",
+  "namespace": "appsilon",
+  "visibility": "private",
+  "title": "MediForce Fullstack (autonomous issue -> PR)",
+  "description": "Every 15 min, picks one un-attempted open issue on Appsilon/mediforce, triages it, asks the human when unclear, implements clear ones, and opens a ready-for-review PR. Idempotent via GitHub labels.",
+  "env": {
+    "APP_BASE_URL": "{{APP_BASE_URL}}",
+    "GITHUB_TOKEN": "{{GITHUB_TOKEN}}",
+    "ANTHROPIC_API_KEY": "",
+    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+    "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}"
+  },
+  "workspace": {
+    "remote": "Appsilon/mediforce",
+    "remoteAuth": "GITHUB_TOKEN"
+  },
+  "steps": [
+    {
+      "id": "fetch-candidates",
+      "name": "Fetch candidate issues",
+      "type": "creation",
+      "description": "Deterministic: list open issues on the repo via public GitHub REST, drop PRs / assigned / already-labelled, prioritise agent:go then oldest. Emits {count, issues}.",
+      "executor": "script",
+      "plugin": "script-container",
+      "script": {
+        "inlineScript": "\nimport { writeFileSync } from 'fs';\nconst REPO = 'Appsilon/mediforce';\nconst SKIP_LABELS = ['agent:attempting', 'agent:skip', 'agent:needs-info', 'agent:pr-open'];\nconst GO_LABEL = 'agent:go';\nconst H = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };\nasync function gh(path) {\n  const res = await fetch(`https://api.github.com${path}`, { headers: H });\n  if (!res.ok) throw new Error(`GitHub ${res.status} ${path}: ${(await res.text()).slice(0, 200)}`);\n  return res.json();\n}\ntry {\n  const collected = [];\n  for (let page = 1; page <= 5; page++) {\n    const batch = await gh(`/repos/${REPO}/issues?state=open&per_page=100&page=${page}`);\n    for (const i of batch) {\n      if (i.pull_request) continue;                      // skip PRs (issues endpoint returns both)\n      const labels = (i.labels || []).map((l) => (typeof l === 'string' ? l : l.name));\n      if (labels.some((l) => SKIP_LABELS.includes(l))) continue;  // claimed / parked / done\n      if (i.assignee) continue;                          // a human is on it\n      collected.push({\n        number: i.number,\n        title: i.title,\n        body: (i.body || '').slice(0, 4000),\n        url: i.html_url,\n        author: (i.user && i.user.login) || null,\n        labels,\n        hasGoLabel: labels.includes(GO_LABEL),\n        comments: i.comments,\n        createdAt: i.created_at,\n      });\n    }\n    if (batch.length < 100) break;\n  }\n  // agent:go first, then oldest-first (FIFO fairness).\n  collected.sort(\n    (a, b) =>\n      (b.hasGoLabel ? 1 : 0) - (a.hasGoLabel ? 1 : 0) ||\n      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),\n  );\n  const issues = collected.slice(0, 30);\n  writeFileSync('/output/result.json', JSON.stringify({ count: issues.length, issues }));\n  console.log(`fetch-candidates: ${issues.length} candidate issue(s): ${issues.map((x) => '#' + x.number).join(', ')}`);\n} catch (err) {\n  console.error('fetch-candidates crashed:', err && err.stack ? err.stack : String(err));\n  process.exit(1);\n}\n",
+        "runtime": "javascript",
+        "image": "mediforce-golden-image:latest"
+      }
+    },
+    {
+      "id": "triage",
+      "name": "Triage + pick one issue",
+      "type": "creation",
+      "description": "GLM picks the single best un-attempted issue and decides skip / gate / implement.",
+      "executor": "agent",
+      "autonomyLevel": "L4",
+      "plugin": "claude-code-agent",
+      "agent": {
+        "model": "z-ai/glm-5.2",
+        "prompt": "## Task\n\nYou are the triage brain of `mediforce-fullstack`, an autonomous PR-writing\nagent for the GitHub repo `Appsilon/mediforce`.\n\nYou receive a list of open, un-attempted candidate issues under\n`## Previous Step Outputs` -> `fetch-candidates.issues`. Pick the SINGLE best\none to attempt now, and decide what to do with it.\n\n### Decide an `action` for the chosen issue\n\n- `implement` — the issue is clear AND its expected outcome is clear: a\n  well-defined bug or small/localised feature, no ambiguous product decision,\n  enough detail to write code + a test. Trivial fixes qualify. Any issue\n  carrying the `agent:go` label ALWAYS gets `implement` (a human already\n  green-lit it) — skip clarification.\n- `gate` — actionable but you should confirm before writing code: real\n  ambiguity, several reasonable approaches, missing acceptance detail, or you\n  want sign-off on a plan. This is the common path. Write a concrete\n  `planSummary` and the specific `questions` a human must answer.\n- `skip` — not suitable for an autonomous agent: needs a product/domain\n  decision, is a large refactor / architectural change, is vague with no clear\n  outcome, needs context you cannot reach, already looks handled (an open PR\n  linked in the body/comments), or is a discussion/question rather than an\n  actionable change. Give a one-line `skipReason`.\n\nPrefer `agent:go`-labelled issues, then the clearest small issue. If NONE of\nthe candidates is worth attempting, return `selected: false`.\n\n## Output Contract (MANDATORY)\n\nHeadless step — no human reads your chat. Write ONLY this JSON to `${output_dir}/result.json`:\n\n```json\n{\n  \"selected\": true,\n  \"issueNumber\": 123,\n  \"title\": \"...\",\n  \"url\": \"https://github.com/Appsilon/mediforce/issues/123\",\n  \"repo\": \"Appsilon/mediforce\",\n  \"action\": \"implement | gate | skip\",\n  \"rationale\": \"why this issue and this action\",\n  \"planSummary\": \"<for implement/gate: the approach you'd take, 2-5 sentences>\",\n  \"questions\": [\"<for gate: specific question>\", \"...\"],\n  \"skipReason\": \"<for skip: one line>\"\n}\n```\n\nIf nothing is worth attempting: `{ \"selected\": false, \"rationale\": \"...\" }`.\nYour FINAL message must be ONLY: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"...\"}`.\n",
+        "timeoutMinutes": 6,
+        "image": "mediforce-golden-image:latest"
+      }
+    },
+    {
+      "id": "claim",
+      "name": "Claim the issue",
+      "type": "creation",
+      "description": "Apply agent:attempting so concurrent runs skip this issue.",
+      "executor": "agent",
+      "autonomyLevel": "L4",
+      "continueOnError": true,
+      "plugin": "claude-code-agent",
+      "agentId": "WJ1LB0n9e2xGV0guSkvy",
+      "agent": {
+        "model": "anthropic/claude-haiku-4.5",
+        "prompt": "## Task\n\nClaim the chosen issue so concurrent runs skip it. The selection is under\n`## Previous Step Outputs` -> `triage` (`triage.issueNumber`).\n\nUsing your GitHub MCP tools on `Appsilon/mediforce`:\n1. Read the issue's current labels with `get_issue`.\n2. `update_issue` with the existing labels PLUS `agent:attempting` (never drop\n   existing labels). If the label does not exist in the repo yet, create it /\n   proceed; if your MCP server cannot, skip silently.\n\n## Output Contract\n\nWrite ONLY to `${output_dir}/result.json`: `{ \"issueNumber\": <n>, \"claimed\": true }`.\nFinal message: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"claimed #<n>\"}`.\n",
+        "timeoutMinutes": 5,
+        "image": "mediforce-golden-image:latest"
+      }
+    },
+    {
+      "id": "notify-gate",
+      "name": "Ping reviewer on GitHub",
+      "type": "creation",
+      "description": "Post the plan + questions as an issue comment linking to the platform gate.",
+      "executor": "agent",
+      "autonomyLevel": "L4",
+      "continueOnError": true,
+      "plugin": "claude-code-agent",
+      "agentId": "WJ1LB0n9e2xGV0guSkvy",
+      "agent": {
+        "model": "anthropic/claude-haiku-4.5",
+        "prompt": "## Task\n\nThe agent needs human input before implementing issue `triage.issueNumber`\n(see `## Previous Step Outputs` -> `triage`). A platform Human Task has been /\nwill be created for the reviewer; your job is to ping them on GitHub so they\nnotice (the platform does not email yet).\n\nUsing `add_issue_comment` on `Appsilon/mediforce`, post EXACTLY one comment:\n\n```\n\\U0001F916 **mediforce-fullstack** wants to attempt this issue, but needs your input first.\n\n**Proposed plan:** <triage.planSummary>\n\n**Questions:**\n- <each triage.questions item as a bullet>\n\nPlease review the plan and answer in Mediforce -> **Human actions**:\n${APP_BASE_URL}\n\ncc @marekrogala\n```\n\nFill the placeholders from the triage output. Post it once; do not duplicate.\n\n## Output Contract\n\nWrite ONLY to `${output_dir}/result.json`: `{ \"issueNumber\": <n>, \"commented\": true }`.\nFinal message: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"pinged reviewer on #<n>\"}`.\n",
+        "timeoutMinutes": 5,
+        "image": "mediforce-golden-image:latest"
+      }
+    },
+    {
+      "id": "clarify-approve",
+      "name": "Human: approve plan / answer questions",
+      "type": "review",
+      "description": "Platform human gate: reviewer approves the plan (with optional guidance) or rejects. Resumes into implement on approve.",
+      "params": [
+        {
+          "name": "guidance",
+          "type": "string",
+          "required": false,
+          "description": "Answers to the agent's questions and any implementation guidance."
+        }
+      ],
+      "verdicts": {
+        "reject": {
+          "target": "mark-needs-info",
+          "label": "Reject / need more info",
+          "intent": "neutral"
+        },
+        "approve": {
+          "target": "implement",
+          "label": "Approve & implement",
+          "intent": "success"
+        }
+      },
+      "executor": "human",
+      "allowedRoles": [
+        "admin"
+      ],
+      "assignedTo": "OiR0rOsY7DNGZwkGFkPV1MnBuXN2"
+    },
+    {
+      "id": "implement",
+      "name": "Implement the fix",
+      "type": "creation",
+      "description": "GLM clones the repo into /tmp, edits, and emits a proposedChanges envelope (no MCP).",
+      "executor": "agent",
+      "autonomyLevel": "L4",
+      "plugin": "claude-code-agent",
+      "agent": {
+        "model": "z-ai/glm-5.2",
+        "prompt": "## Task\n\nYou are a senior engineer on the MediForce platform. Implement a fix for ONE\nGitHub issue and produce a `proposedChanges` envelope. A later step publishes\nit via the GitHub API — you do NOT touch GitHub here and you have NO MCP tools.\n\n### Inputs (under `## Previous Step Outputs`)\n- `triage` — the chosen issue: `issueNumber`, `title`, `url`, `planSummary`.\n- `clarify-approve` — present ONLY if a human gated this: `clarify-approve.guidance`\n  holds their answers / instructions. Honour it. If absent, proceed on the plan.\n\n### Getting the code\nYou have NO pre-mounted repo and NO MCP. Clone the target yourself, OUTSIDE the\nrun workspace, into /tmp:\n\n```\nrm -rf /tmp/repo && git clone --depth 1 https://github.com/Appsilon/mediforce.git /tmp/repo && cd /tmp/repo\n```\n\n(`Appsilon/mediforce` is public; if the clone is rate-limited, retry with\n`https://$GITHUB_TOKEN@github.com/Appsilon/mediforce.git`.) Work entirely inside\n`/tmp/repo` — do NOT write anything under `/workspace`.\n\nExplore with Read / Grep / Glob, find the code relevant to the issue, and make a\nMINIMAL, focused change. Follow existing conventions (read AGENTS.md). Add or\nupdate a test only when it gives real signal. **Do NOT run `pnpm install`,\nbuilds, or the full test suite** — they are slow and generate large artifacts;\nreason about correctness from the source instead. Keep the diff small.\n\n### Branch + PR text\n- branch: `agent/issue-<number>-<short-slug>` (e.g. `agent/issue-42-null-login`)\n- prTitle: `fix: <concise> (#<number>)` or `feat: ...` as appropriate\n- prBody: what changed and why; MUST contain `Closes #<number>`.\n\n## Output Contract (MANDATORY)\n\nCollect every file you created or modified (full final content) and write ONLY\nthis JSON to `${output_dir}/result.json`:\n\n```json\n{\n  \"issueNumber\": <number>,\n  \"repo\": \"Appsilon/mediforce\",\n  \"branch\": \"agent/issue-<number>-<slug>\",\n  \"baseBranch\": \"main\",\n  \"prTitle\": \"...\",\n  \"prBody\": \"... Closes #<number> ...\",\n  \"files\": [ { \"path\": \"packages/.../foo.ts\", \"content\": \"<FULL new file content>\" } ],\n  \"summary\": \"1-3 sentence change summary\",\n  \"testsRun\": \"what you ran and the result, or why not\"\n}\n```\n\nIf after investigation you conclude the issue should NOT be implemented (e.g. it\nis unclear or wrong after all), return `\"files\": []` with a `summary` saying why.\nFinal message: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"...\"}`.\n",
+        "timeoutMinutes": 30,
+        "image": "mediforce-golden-image:latest"
+      }
+    },
+    {
+      "id": "self-review",
+      "name": "Self-review the diff",
+      "type": "creation",
+      "description": "GLM reviews the proposed change; concerns ride along into the PR body.",
+      "executor": "agent",
+      "autonomyLevel": "L4",
+      "plugin": "claude-code-agent",
+      "agent": {
+        "model": "z-ai/glm-5.2",
+        "prompt": "## Task\n\nReview the change `mediforce-fullstack` just produced for issue\n`implement.issueNumber` BEFORE it becomes a PR. The proposed change is under\n`## Previous Step Outputs` -> `implement` (`implement.proposedChanges` fields:\nbranch, prTitle, prBody, files[], summary). The edited clone is under\n`/tmp/repo` if you need to re-read it; otherwise review from the envelope.\n\nCheck: does it actually address the issue? Is it minimal and correct? Does it\nfollow repo conventions? Any obvious bug, missing test, or broken build? You are\nNOT merging — a human reviews the PR on GitHub. Your job is to surface concerns\nthat should ride along in the PR body.\n\n## Output Contract\n\nWrite ONLY this JSON to `${output_dir}/result.json`:\n\n```json\n{\n  \"issueNumber\": <n>,\n  \"verdict\": \"ship | flag\",\n  \"concerns\": [\"<concern that the human reviewer should see>\", \"...\"],\n  \"summary\": \"one-line assessment\"\n}\n```\n\nUse `ship` when you'd approve it; `flag` when it should open but with caveats\nnoted. Either way the PR opens — `flag` just means the concerns get written into\nthe PR body. Final message: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"...\"}`.\n",
+        "timeoutMinutes": 8,
+        "image": "mediforce-golden-image:latest"
+      }
+    },
+    {
+      "id": "open-pr",
+      "name": "Open the PR",
+      "type": "creation",
+      "description": "haiku + MCP: create_branch, push_files, create_pull_request (ready-for-review), swap labels to agent:pr-open, comment the PR link.",
+      "executor": "agent",
+      "autonomyLevel": "L4",
+      "plugin": "claude-code-agent",
+      "agentId": "WJ1LB0n9e2xGV0guSkvy",
+      "agent": {
+        "model": "anthropic/claude-haiku-4.5",
+        "prompt": "## Task\n\nPublish the approved change on `Appsilon/mediforce` via your GitHub MCP tools, and update\nthe issue's labels. Inputs under `## Previous Step Outputs`:\n- `implement` -> the `proposedChanges` envelope (branch, baseBranch, prTitle,\n  prBody, files[]).\n- `self-review` -> `verdict` (\"ship\"/\"flag\") and `concerns[]`.\n- `triage.issueNumber` -> the issue number.\n\n### Short-circuit\nIf `implement.files` is empty or missing, do NOT touch GitHub except to release\nthe claim: `update_issue` to remove `agent:attempting` and add `agent:needs-info`,\nthen write `{ \"prUrl\": null, \"note\": \"no changes proposed\" }` and stop.\n\n### Publish\n1. `create_branch` -> `implement.branch` from `implement.baseBranch`. Idempotent;\n   \"already exists\" is fine.\n2. `push_files` with `implement.files` (path + content each), commit message\n   derived from `implement.prTitle`. If only `create_or_update_file` exists, fall\n   back to one call per file.\n3. Build the PR body: `implement.prBody`, then — if `self-review.verdict` is\n   `flag` — append a section `\\n\\n### \\U0001F916 self-review notes\\n` with each\n   `self-review.concerns` item as a bullet, then append `\\n\\n---\\n🤖 generated by mediforce-fullstack bot`.\n4. `list_pull_requests` (head=`<owner>:<branch>`). If none, `create_pull_request`\n   with owner/repo from `Appsilon/mediforce`, head=`<branch>`, base=`<baseBranch>`,\n   `draft=false` (ready for review), title=`implement.prTitle`, body=<built body>.\n   If one exists, `update_pull_request` to refresh the body. Capture `html_url`\n   and `number`.\n5. Swap the issue labels: `get_issue` for current labels, then `update_issue`\n   with the existing labels minus `agent:attempting` plus `agent:pr-open`.\n6. `add_issue_comment` on the issue: `\\U0001F916 Opened PR <html_url> for this\n   issue. — mediforce-fullstack`.\n\n## Output Contract\n\nWrite ONLY to `${output_dir}/result.json`:\n```json\n{ \"issueNumber\": <n>, \"prUrl\": \"<html_url>\", \"prNumber\": <number>, \"branch\": \"<branch>\" }\n```\nOn any MCP failure, capture the error message in a `failed` field and propagate\nit. Final message: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"...\"}`.\n",
+        "timeoutMinutes": 10,
+        "image": "mediforce-golden-image:latest"
+      }
+    },
+    {
+      "id": "mark-skip",
+      "name": "Mark not-suitable",
+      "type": "creation",
+      "description": "Apply agent:skip + comment why.",
+      "executor": "agent",
+      "autonomyLevel": "L4",
+      "continueOnError": true,
+      "plugin": "claude-code-agent",
+      "agentId": "WJ1LB0n9e2xGV0guSkvy",
+      "agent": {
+        "model": "anthropic/claude-haiku-4.5",
+        "prompt": "## Task\n\nMark the triaged issue as not-suitable so it is never re-attempted. Selection\nunder `## Previous Step Outputs` -> `triage` (`triage.issueNumber`,\n`triage.skipReason`). Using GitHub MCP on `Appsilon/mediforce`:\n1. `get_issue` for current labels, then `update_issue` adding `agent:skip`.\n2. `add_issue_comment`: `\\U0001F916 mediforce-fullstack: skipping for now — <triage.skipReason>. Add the `agent:go` label if you want me to attempt it anyway.`\n\n## Output Contract\nWrite ONLY to `${output_dir}/result.json`: `{ \"issueNumber\": <n>, \"skipped\": true }`.\nFinal message: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"skipped #<n>\"}`.\n",
+        "timeoutMinutes": 5,
+        "image": "mediforce-golden-image:latest"
+      }
+    },
+    {
+      "id": "mark-needs-info",
+      "name": "Park pending clarification",
+      "type": "creation",
+      "description": "Swap agent:attempting -> agent:needs-info + comment.",
+      "executor": "agent",
+      "autonomyLevel": "L4",
+      "continueOnError": true,
+      "plugin": "claude-code-agent",
+      "agentId": "WJ1LB0n9e2xGV0guSkvy",
+      "agent": {
+        "model": "anthropic/claude-haiku-4.5",
+        "prompt": "## Task\n\nThe human rejected / deferred the plan at the clarify-approve gate. Park the\nissue pending more information. `triage.issueNumber` is under\n`## Previous Step Outputs`. Using GitHub MCP on `Appsilon/mediforce`:\n1. `get_issue` for current labels, then `update_issue` to remove\n   `agent:attempting` and add `agent:needs-info`.\n2. `add_issue_comment`: `\\U0001F916 Parked pending clarification — I'll leave this to a human for now.`\n\n## Output Contract\nWrite ONLY to `${output_dir}/result.json`: `{ \"issueNumber\": <n>, \"parked\": true }`.\nFinal message: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"parked #<n>\"}`.\n",
+        "timeoutMinutes": 5,
+        "image": "mediforce-golden-image:latest"
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "description": "Terminal: attempt finished (PR opened, skipped, or parked).",
+      "executor": "action",
+      "action": {
+        "kind": "reshape",
+        "config": {
+          "values": {
+            "done": true
+          }
+        }
+      }
+    },
+    {
+      "id": "done-empty",
+      "name": "Nothing to do",
+      "type": "terminal",
+      "description": "Terminal: no candidate issue this tick.",
+      "executor": "action",
+      "action": {
+        "kind": "reshape",
+        "config": {
+          "values": {
+            "done": true
+          }
+        }
+      }
+    }
+  ],
+  "transitions": [
+    {
+      "from": "fetch-candidates",
+      "to": "triage",
+      "when": "output.count > 0"
+    },
+    {
+      "from": "fetch-candidates",
+      "to": "done-empty",
+      "when": "output.count == 0"
+    },
+    {
+      "from": "triage",
+      "to": "done-empty",
+      "when": "output.selected != true"
+    },
+    {
+      "from": "triage",
+      "to": "mark-skip",
+      "when": "output.selected == true && output.action == \"skip\""
+    },
+    {
+      "from": "triage",
+      "to": "claim",
+      "when": "output.selected == true && output.action != \"skip\""
+    },
+    {
+      "from": "claim",
+      "to": "notify-gate",
+      "when": "variables.triage.action == \"gate\""
+    },
+    {
+      "from": "claim",
+      "to": "implement",
+      "when": "variables.triage.action != \"gate\""
+    },
+    {
+      "from": "notify-gate",
+      "to": "clarify-approve"
+    },
+    {
+      "from": "implement",
+      "to": "self-review"
+    },
+    {
+      "from": "self-review",
+      "to": "open-pr"
+    },
+    {
+      "from": "open-pr",
+      "to": "done"
+    },
+    {
+      "from": "mark-skip",
+      "to": "done"
+    },
+    {
+      "from": "mark-needs-info",
+      "to": "done"
+    }
+  ],
+  "triggers": [
+    {
+      "type": "manual",
+      "name": "manual"
+    }
+  ]
+}
