@@ -7,7 +7,29 @@ script variants, action steps, trigger varieties, or validation gates.
 They are not complete production Workflow Packages. For production package
 standards, use [workflow-authoring-golden-rules.md](../workflow-authoring-golden-rules.md)
 and the production-style reference package in
-[`apps/golden-standard-workflow`](../../apps/golden-standard-workflow).
+[`apps/golden-standard-workflow`](../../apps/golden-standard-workflow). For the
+map of capabilities to the source files that define them, see
+[workflow-capabilities.md](../workflow-capabilities.md).
+
+## Index — what each file teaches
+
+| File | Capability |
+|------|-----------|
+| `01-linear-pipeline.wd.json` | Minimal step → step pipeline |
+| `02-review-loop.wd.json` | CM3/L3 agent approve-revise loop |
+| `03-conditional-branching.wd.json` | Transition `when` expressions and branches |
+| `04-script-variants.wd.json` | Inline vs command scripts; runtimes |
+| `04b-script-r-clinical.wd.json` | R runtime script step |
+| `05-action-steps.wd.json` | `http`, `reshape`, `email` actions |
+| `06-env-secrets-databricks.wd.json` | `env`, secrets, Databricks job step |
+| `07-trigger-varieties.wd.json` | `manual`, webhook, cron triggers |
+| `08-selection-review.wd.json` | `selection` + human review |
+| `09-cowork-step.wd.json` | `cowork` live collaboration step |
+| `10-validation-gate.wd.json` | Validation gate with verdicts |
+| `11-fan-out-orchestration.wd.json` | `spawn` + `forEach` fan-out, child workflows, `wait` |
+
+Read the file whose capability matches what you are building; the set is small
+enough that reading all of them is also fine and gives full schema coverage.
 
 ## How they map to the golden rules
 

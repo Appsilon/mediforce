@@ -11,6 +11,9 @@ Tool Catalog entries, Agent Definition bindings, secrets).
 Learn the schema from the tutorial examples in
 [`docs/workflow-examples`](workflow-examples/README.md) and the end-to-end
 reference package [`apps/golden-standard-workflow`](../apps/golden-standard-workflow).
+For the map of what workflows can do (actions, fan-out, expression languages,
+human UI, scripts, models) to the source files that define each, see
+[workflow-capabilities.md](workflow-capabilities.md).
 Examples are tutorials, not copy-paste templates: production workflows SHOULD
 move substantial runtime code out of inline scripts and into pinned package
 files/images.
@@ -34,6 +37,13 @@ workflow-repo/
 
 `README.md` MUST document: env vars, secrets, Agents, MCPs, Docker images,
 registration/import steps, output contracts, and a known-good input.
+
+The layout above is the **single-workflow repo** case (package == repo root).
+For a repo holding **several** workflows, keep one subfolder per workflow
+(`<workflow-name>/README.md`, `<workflow-name>/src/<workflow-name>.wd.json`,
+`<workflow-name>/Dockerfile`, …) and hoist a single `index.json` to the repo
+root listing every workflow with repo-root-relative `path`s
+(`<workflow-name>/src/…`).
 
 `index.json` SHOULD exist for standalone workflow repos that are imported via
 Git browse mode. Each `path` is relative to the repo root and must point at the

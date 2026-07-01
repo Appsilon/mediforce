@@ -20,14 +20,45 @@ workflow MUST satisfy, see
 5. Register or import the workflow as a new version.
 6. Run a dry run with a known-good input.
 
-### Agent
+### Agent — the `/design-workflow` skill
 
-- Give the agent
-  [workflow-authoring-golden-rules.md](workflow-authoring-golden-rules.md) plus
-  the intended workflow goal.
-- Ask it to produce the `.wd.json` and any package files.
-- Require it to validate against the schema and that checklist before returning
-  the result.
+Run the [`design-workflow`](../skills/design-workflow/SKILL.md) skill. It is the
+agent form of Workflow Designer: same intelligence, driven against the
+checked-out source instead of a live UI. Invoke it with `/design-workflow` (or
+just ask an agent to "design a workflow" / "author a workflow"), then follow the
+interview.
+
+What the skill does for you:
+
+1. **Loads the authority first.** It reads the capability map, `CONTEXT.md`
+   glossary, the golden rules, and the `docs/workflow-examples/` files before
+   proposing structure — so it authors from the source of truth, not from
+   memory.
+2. **Picks a mode.** `create-new` from an idea, or `edit-existing` when you
+   point it at a folder that already contains a `src/*.wd.json` (it recaps the
+   current workflow before touching it).
+3. **Interviews and challenges.** One question at a time, it steers the design
+   toward the golden standards — pushing back when a step should be a `script`
+   or `action` rather than an `agent`, when the whole thing needs no workflow at
+   all, and when substantial script code should move from inline to a pinned
+   command. It ends with a written spec recap you confirm before any files are
+   generated.
+4. **Generates the package.** The `.wd.json` plus `README.md`, `index.json`, and
+   only the `Dockerfile` / `scripts/` / `skills/` / `setup/` the design actually
+   needs, in the canonical repo layout. It is honest about three tiers:
+   schema-validated (`.wd.json`), templated-but-not-runtime-verified (infra),
+   and MANUAL platform setup (Tool Catalog, Agent Definitions, secrets).
+5. **Validates against this checkout.** Runs the `register --dry-run` schema
+   check, verifies the Dockerfile build context, syntax-checks every generated
+   script, and runs a behavior test per non-trivial script (persisting tests
+   under `tests/`).
+6. **Pins runtime sources and hands off.** Fills each `commit` with an all-zeros
+   sentinel until you commit once and give it the real SHA, which it edits in —
+   then reports the files written, the MANUAL setup left, and the register /
+   import / UI commands filled in with your values.
+
+The skill does **not** run `git commit` / `push` for you and never targets
+production — you own the commit and the SHA.
 
 ### Hand-authoring
 
