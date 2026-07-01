@@ -7,17 +7,22 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getSmoothStepPath,
+  Background,
+  BackgroundVariant,
+  useReactFlow,
+  useStore,
+  applyNodeChanges,
   type Node,
   type Edge,
   type EdgeProps,
   type NodeProps,
+  type NodeChange,
   Handle,
   Position,
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { User, Bot, Terminal, Trash2, Plus, Search, ArrowUp, ArrowDown, ArrowRight, ChevronRight, ChevronDown, AlertTriangle, Zap, Eye, EyeOff } from 'lucide-react';
-import { BlockPicker } from '@/components/workflows/block-picker';
+import { User, Bot, Terminal, Trash2, Plus, Search, ArrowUp, ArrowDown, ArrowRight, ChevronRight, ChevronDown, AlertTriangle, Zap, Eye, EyeOff, Wand2, Undo2, Redo2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import {
@@ -192,7 +197,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
       <div
         style={{ width: NODE_WIDTH, minHeight: NODE_INNER_HEIGHT }}
         className={cn(
-          'group rounded-xl border-[1.5px] px-4 pt-3 transition-all cursor-pointer relative overflow-hidden',
+          'group rounded-xl border-[1.5px] px-4 pt-3 transition-shadow cursor-pointer relative overflow-hidden',
           data.branches?.length ? 'pb-0' : 'pb-3',
           'hover:shadow-md',
           style.bg,
@@ -312,11 +317,7 @@ const nodeTypes = { step: StepNode };
 // ---------------------------------------------------------------------------
 
 type AddStepEdgeData = {
-  onAdd?: (payload: NewStepPayload) => void;
-  onOpenPopover?: (pos: { top: number; left: number }, onAdd: (payload: NewStepPayload) => void) => void;
-  onClosePopover?: () => void;
-  popoverEdgeId?: string | null;
-  edgeId?: string;
+  onRequestAdd?: () => void;
 };
 
 function AddStepEdge({
@@ -327,37 +328,11 @@ function AddStepEdge({
   label, labelStyle, labelBgStyle, labelBgPadding, labelBgBorderRadius,
   data,
 }: EdgeProps & { data?: AddStepEdgeData }) {
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
+  const { fitView } = useReactFlow();
   const [path, midX, midY] = getSmoothStepPath({
     sourceX, sourceY, sourcePosition,
     targetX, targetY, targetPosition,
   });
-
-  const buttonX = sourceX + 0.4 * (targetX - sourceX);
-  const buttonY = sourceY + 0.4 * (targetY - sourceY);
-
-  const handleButtonClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (data?.popoverEdgeId === id) {
-      data?.onClosePopover?.();
-    } else {
-      const rect = buttonRef.current?.getBoundingClientRect();
-      if (rect && data?.onAdd) {
-        const POPOVER_WIDTH = 500;
-        const rawLeft = rect.left + window.scrollX + rect.width / 2;
-        const viewportWidth = document.documentElement.clientWidth;
-        const left = Math.max(
-          window.scrollX + POPOVER_WIDTH / 2 + 8,
-          Math.min(rawLeft, window.scrollX + viewportWidth - POPOVER_WIDTH / 2 - 8),
-        );
-        data.onOpenPopover?.({
-          top: rect.bottom + window.scrollY + 8,
-          left,
-        }, data.onAdd);
-      }
-    }
-  };
 
   return (
     <>
@@ -368,26 +343,29 @@ function AddStepEdge({
         markerEnd={markerEnd}
         label={label}
         labelX={midX}
-        labelY={midY}
+        labelY={data?.onRequestAdd && label ? midY - 16 : midY}
         labelStyle={labelStyle}
         labelBgStyle={labelBgStyle}
         labelBgPadding={labelBgPadding}
         labelBgBorderRadius={labelBgBorderRadius}
         labelShowBg={true}
       />
-      {data?.onAdd && (
+      {data?.onRequestAdd && (
         <EdgeLabelRenderer>
           <div
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${buttonX}px, ${buttonY}px)`,
+              transform: `translate(-50%, -50%) translate(${midX}px, ${midY}px)`,
               pointerEvents: 'all',
             }}
             className="nodrag nopan"
           >
             <button
-              ref={buttonRef}
-              onClick={handleButtonClick}
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onRequestAdd?.();
+                setTimeout(() => fitView({ padding: 0.2, duration: 300, maxZoom: 1 }), 60);
+              }}
               className="h-5 w-5 flex items-center justify-center rounded-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-400 hover:text-primary hover:border-primary transition-colors shadow-sm"
               aria-label="Add step here"
             >
@@ -648,6 +626,106 @@ function buildLayout(
 }
 
 // ---------------------------------------------------------------------------
+// Canvas controls — horizontal pill, replaces built-in Controls
+// ---------------------------------------------------------------------------
+
+type CanvasControlsProps = {
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onAddBlock?: () => void;
+  addBlockActive?: boolean;
+  onTidy?: () => void;
+};
+
+function CanvasControls({ onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive, onTidy }: CanvasControlsProps) {
+  const { zoomIn, zoomOut, fitView } = useReactFlow();
+  const zoom = useStore((s) => s.transform[2]);
+
+  return (
+    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-0.5 bg-white dark:bg-background border border-border/60 rounded-xl shadow-sm px-1.5 py-1.5 z-10 whitespace-nowrap">
+      {(onUndo || onRedo) && (
+        <>
+          <button
+            onClick={onUndo}
+            disabled={!canUndo}
+            title="Undo last change (Ctrl+Z)"
+            className={cn(
+              'h-7 w-7 flex items-center justify-center rounded-lg transition-colors',
+              canUndo ? 'text-muted-foreground hover:text-foreground hover:bg-muted' : 'text-muted-foreground/30 cursor-not-allowed',
+            )}
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={onRedo}
+            disabled={!canRedo}
+            title="Redo last change (Ctrl+Shift+Z)"
+            className={cn(
+              'h-7 w-7 flex items-center justify-center rounded-lg transition-colors',
+              canRedo ? 'text-muted-foreground hover:text-foreground hover:bg-muted' : 'text-muted-foreground/30 cursor-not-allowed',
+            )}
+          >
+            <Redo2 className="h-3.5 w-3.5" />
+          </button>
+          <div className="w-px h-4 bg-border mx-1" />
+        </>
+      )}
+      <button
+        onClick={() => zoomOut()}
+        className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors text-base font-medium leading-none"
+        aria-label="Zoom out"
+      >
+        −
+      </button>
+      <span className="text-[11px] font-medium text-muted-foreground tabular-nums w-10 text-center select-none">
+        {Math.round(zoom * 100)}%
+      </span>
+      <button
+        onClick={() => zoomIn()}
+        className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors text-base font-medium leading-none"
+        aria-label="Zoom in"
+      >
+        +
+      </button>
+      <div className="w-px h-4 bg-border mx-1" />
+      <button
+        onClick={() => {
+          onTidy?.();
+          setTimeout(() => fitView({ padding: 0.2, duration: 300, maxZoom: 1 }), 60);
+        }}
+        className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        aria-label="Tidy up"
+        title="Tidy up"
+      >
+        <Wand2 className="h-3.5 w-3.5" />
+      </button>
+      {onAddBlock && (
+        <>
+          <div className="w-px h-4 bg-border mx-1" />
+          <button
+            onClick={() => {
+              onAddBlock?.();
+              setTimeout(() => fitView({ padding: 0.2, duration: 300, maxZoom: 1 }), 60);
+            }}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-lg px-3 h-7 text-sm font-medium transition-colors shrink-0 whitespace-nowrap',
+              addBlockActive
+                ? 'bg-foreground text-background'
+                : 'bg-foreground text-background hover:bg-foreground/90',
+            )}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Block
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -659,40 +737,34 @@ interface WorkflowDiagramProps {
   onNodeDelete?: (stepId: string) => void;
   onNodeMoveUp?: (stepId: string) => void;
   onNodeMoveDown?: (stepId: string) => void;
-  onEdgeAdd?: (fromStepId: string, payload: NewStepPayload, toStepId: string) => void;
+  onRequestAddStep?: (fromStepId: string, toStepId: string) => void;
   onPaneClick?: () => void;
   selectedStepId?: string | null;
   errorStepIds?: Set<string>;
   warningStepIds?: Map<string, string>;
   canMoveUp?: Set<string>;
   canMoveDown?: Set<string>;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onAddBlock?: () => void;
+  addBlockActive?: boolean;
 }
 
-export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, onPaneClick, selectedStepId, errorStepIds, warningStepIds, canMoveUp, canMoveDown }: WorkflowDiagramProps) {
+export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, onPaneClick, selectedStepId, errorStepIds, warningStepIds, canMoveUp, canMoveDown, onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive }: WorkflowDiagramProps) {
   const [expandedBranches, setExpandedBranches] = useState<Map<string, number>>(new Map());
-  const [popover, setPopover] = useState<{
-    pos: { top: number; left: number };
-    onAdd: (payload: NewStepPayload) => void;
-    edgeId: string;
-  } | null>(null);
+
   useEffect(() => {
     setExpandedBranches(new Map());
   }, [definition]);
-
-  const handleOpenPopover = useCallback((edgeId: string, pos: { top: number; left: number }, onAdd: (payload: NewStepPayload) => void) => {
-    setPopover({ pos, onAdd, edgeId });
-  }, []);
-
-  const handleClosePopover = useCallback(() => {
-    setPopover(null);
-  }, []);
 
   const { nodes: layoutNodes, edges: layoutEdges, height } = useMemo(
     () => buildLayout(definition, expandedBranches),
     [definition, expandedBranches],
   );
 
-  const { nodes, edges } = useMemo<{ nodes: Node[]; edges: Edge[] }>(() => {
+  const { nodes: computedNodes, edges } = useMemo<{ nodes: Node[]; edges: Edge[] }>(() => {
     const styledNodes = layoutNodes.map((n) => {
       const d = n.data as StepNodeData;
       return {
@@ -721,63 +793,267 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
     });
     const styledEdges: Edge[] = layoutEdges.map((e) => {
       const isForward = e.sourceHandle !== 'right-out';
-      if (isForward && onEdgeAdd) {
+      if (isForward && onRequestAddStep) {
         return {
           ...e,
           type: 'addStep',
           data: {
-            onAdd: (payload: NewStepPayload) => onEdgeAdd(e.source, payload, e.target),
-            onOpenPopover: (pos: { top: number; left: number }, onAdd: (payload: NewStepPayload) => void) => handleOpenPopover(e.id, pos, onAdd),
-            onClosePopover: handleClosePopover,
-            popoverEdgeId: popover?.edgeId ?? null,
-            edgeId: e.id,
+            onRequestAdd: () => onRequestAddStep(e.source, e.target),
           } satisfies AddStepEdgeData,
         };
       }
       return e;
     });
     return { nodes: styledNodes as Node[], edges: styledEdges };
-  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, warningStepIds, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, canMoveUp, canMoveDown, handleOpenPopover, handleClosePopover, popover?.edgeId]);
+  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, warningStepIds, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, canMoveUp, canMoveDown]);
 
-  const handleNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node<StepNodeData>) => {
-      if (node.data?.stepType !== 'terminal') onNodeClick?.(node.id);
-    },
-    [onNodeClick],
-  );
+  // Controlled node state, lazily seeded from computedNodes so XYFlow never sees an
+  // empty array on first render (an empty seed would throw XYFlow error #015 on drag).
+  const [localNodes, setLocalNodes] = useState<Node[]>(() => computedNodes);
+
+  // Re-sync when the underlying definition/styling changes, but keep whatever
+  // position the user has dragged each node to. Brand-new nodes get anchored
+  // below their actual (possibly dragged) parent position instead of
+  // buildLayout's from-scratch coordinates, and any existing downstream node
+  // (most commonly the terminal/"Done" step) gets pushed further down if the
+  // new node would otherwise land on top of it.
+  useEffect(() => {
+    setLocalNodes((prev) => {
+      const prevById = new Map(prev.map((n) => [n.id, n]));
+
+      const forwardEdges = layoutEdges.filter((e) => e.sourceHandle !== 'right-out');
+      const parentOf = new Map<string, string[]>();
+      const childOf = new Map<string, string[]>();
+      for (const e of forwardEdges) {
+        parentOf.set(e.target, [...(parentOf.get(e.target) ?? []), e.source]);
+        childOf.set(e.source, [...(childOf.get(e.source) ?? []), e.target]);
+      }
+
+      const heightById = new Map(computedNodes.map((n) => {
+        const d = n.data as StepNodeData;
+        const numBranches = d.branches?.length ?? 0;
+        const h = d.stepType === 'terminal' ? 64 : NODE_INNER_HEIGHT + numBranches * BRANCH_ROW_HEIGHT;
+        return [n.id, h];
+      }));
+
+      const positioned = new Map<string, { x: number; y: number }>();
+      for (const n of prev) positioned.set(n.id, n.position);
+
+      const newIds = computedNodes.filter((n) => !prevById.has(n.id)).map((n) => n.id);
+      for (const id of newIds) {
+        const parents = parentOf.get(id) ?? [];
+        const parentPos = parents.length === 1 ? positioned.get(parents[0]) : undefined;
+        if (parentPos) {
+          const parentHeight = heightById.get(parents[0]) ?? NODE_INNER_HEIGHT;
+          positioned.set(id, { x: parentPos.x, y: parentPos.y + parentHeight + ROW_GAP });
+        } else {
+          const fresh = computedNodes.find((n) => n.id === id);
+          if (fresh) positioned.set(id, fresh.position);
+        }
+      }
+
+      // Push existing downstream nodes (e.g. the terminal step) out of the way
+      // if a newly-placed node now overlaps them.
+      for (const id of newIds) {
+        const newPos = positioned.get(id);
+        if (!newPos) continue;
+        const newBottom = newPos.y + (heightById.get(id) ?? NODE_INNER_HEIGHT);
+        for (const childId of childOf.get(id) ?? []) {
+          if (!prevById.has(childId)) continue;
+          const childPos = positioned.get(childId);
+          if (!childPos) continue;
+          const requiredY = newBottom + ROW_GAP;
+          if (childPos.y < requiredY) {
+            positioned.set(childId, { ...childPos, y: requiredY });
+          }
+        }
+      }
+
+      return computedNodes.map((n) => {
+        const pos = positioned.get(n.id);
+        return pos ? { ...n, position: pos } : n;
+      });
+    });
+  }, [computedNodes, layoutEdges]);
+
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    setLocalNodes((nds) => applyNodeChanges(changes, nds));
+  }, []);
+
+  // Layered auto-layout: groups nodes into depth levels (via forward edges only),
+  // then spaces each level evenly — vertically by the tallest node in the level,
+  // horizontally by a fixed node-width + gap — so nothing overlaps. Within a level,
+  // nodes are ordered/centered by their parents' x so simple chains stay straight.
+  const handleTidy = useCallback(() => {
+    const NODE_H_GAP = 40;
+
+    const forwardEdges = layoutEdges.filter((e) => e.sourceHandle !== 'right-out');
+    const incoming = new Map<string, string[]>();
+    const outgoing = new Map<string, string[]>();
+    for (const e of forwardEdges) {
+      incoming.set(e.target, [...(incoming.get(e.target) ?? []), e.source]);
+      outgoing.set(e.source, [...(outgoing.get(e.source) ?? []), e.target]);
+    }
+
+    const allIds = localNodes.map((n) => n.id);
+    const heightById = new Map(localNodes.map((n) => {
+      const d = n.data as StepNodeData;
+      const numBranches = d.branches?.length ?? 0;
+      const h = d.stepType === 'terminal' ? 64 : NODE_INNER_HEIGHT + numBranches * BRANCH_ROW_HEIGHT;
+      return [n.id, h];
+    }));
+
+    // Depth = longest path from any root, computed via Kahn's algorithm so a
+    // node's depth is only finalized once every parent has been processed.
+    const depth = new Map<string, number>();
+    const roots = allIds.filter((id) => !incoming.has(id));
+    for (const r of roots) depth.set(r, 0);
+    const indegree = new Map(allIds.map((id) => [id, (incoming.get(id) ?? []).length]));
+    const queue = [...roots];
+    const queued = new Set(roots);
+    while (queue.length) {
+      const current = queue.shift()!;
+      for (const child of outgoing.get(current) ?? []) {
+        depth.set(child, Math.max(depth.get(child) ?? 0, (depth.get(current) ?? 0) + 1));
+        indegree.set(child, (indegree.get(child) ?? 1) - 1);
+        if ((indegree.get(child) ?? 0) <= 0 && !queued.has(child)) {
+          queued.add(child);
+          queue.push(child);
+        }
+      }
+    }
+    for (const id of allIds) if (!depth.has(id)) depth.set(id, 0);
+
+    const levels = new Map<number, string[]>();
+    for (const id of allIds) {
+      const d = depth.get(id) ?? 0;
+      levels.set(d, [...(levels.get(d) ?? []), id]);
+    }
+    const maxDepth = Math.max(0, ...levels.keys());
+
+    // Vertical position per level, based on the tallest node in each level.
+    const yByLevel = new Map<number, number>();
+    let cumulativeY = 0;
+    for (let d = 0; d <= maxDepth; d++) {
+      yByLevel.set(d, cumulativeY);
+      const ids = levels.get(d) ?? [];
+      const maxH = Math.max(NODE_INNER_HEIGHT, ...ids.map((id) => heightById.get(id) ?? NODE_INNER_HEIGHT));
+      cumulativeY += maxH + ROW_GAP;
+    }
+
+    const posById = new Map(localNodes.map((n) => [n.id, { ...n.position }]));
+
+    // Horizontal position per level: order siblings by their parents' average x
+    // (keeping chains visually aligned), then space them evenly so none overlap.
+    for (let d = 0; d <= maxDepth; d++) {
+      const ids = levels.get(d) ?? [];
+      const targets = ids.map((id) => {
+        const parents = incoming.get(id) ?? [];
+        const x = parents.length > 0
+          ? parents.reduce((sum, p) => sum + (posById.get(p)?.x ?? 0), 0) / parents.length
+          : posById.get(id)?.x ?? 0;
+        return { id, x };
+      });
+      targets.sort((a, b) => a.x - b.x);
+      const gap = NODE_WIDTH + NODE_H_GAP;
+      const avgTarget = targets.reduce((sum, t) => sum + t.x, 0) / targets.length;
+      const startX = avgTarget - ((targets.length - 1) * gap) / 2;
+      targets.forEach((t, i) => {
+        posById.set(t.id, { x: startX + i * gap, y: yByLevel.get(d)! });
+      });
+    }
+
+    setLocalNodes((prev) => prev.map((n) => (posById.has(n.id) ? { ...n, position: posById.get(n.id)! } : n)));
+  }, [layoutEdges, localNodes]);
 
   return (
     <ReactFlowProvider>
-      <div
-        className={cn('rounded-lg', className)}
-        style={{ width: '100%', height: `${Math.max(360, height)}px`, ...style }}
-      >
-        <ReactFlow
-          nodes={nodes as Node<StepNodeData>[]}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          nodesDraggable={false}
-          nodesConnectable={false}
-          elementsSelectable={true}
-          panOnDrag={false}
-          zoomOnScroll={false}
-          zoomOnPinch={false}
-          zoomOnDoubleClick={false}
-          preventScrolling={false}
-          onNodeClick={handleNodeClick}
-          onPaneClick={onPaneClick}
-          defaultViewport={{ x: 16, y: 16, zoom: 1 }}
-          proOptions={{ hideAttribution: true }}
-        />
-      </div>
-      {popover && (
-        <BlockPicker
-          position={popover.pos}
-          onAdd={popover.onAdd}
-          onClose={() => setPopover(null)}
-        />
-      )}
+      <FlowCanvas
+        className={className}
+        style={style}
+        height={height}
+        localNodes={localNodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
+        onUndo={onUndo}
+        onRedo={onRedo}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onAddBlock={onAddBlock}
+        addBlockActive={addBlockActive}
+        onTidy={handleTidy}
+      />
     </ReactFlowProvider>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inner canvas — rendered inside ReactFlowProvider so it can call useReactFlow
+// (needed to recenter the viewport after a node selection changes the layout).
+// ---------------------------------------------------------------------------
+
+type FlowCanvasProps = {
+  className?: string;
+  style?: React.CSSProperties;
+  height: number;
+  localNodes: Node[];
+  edges: Edge[];
+  onNodesChange: (changes: NodeChange[]) => void;
+  onNodeClick?: (stepId: string) => void;
+  onPaneClick?: () => void;
+} & CanvasControlsProps;
+
+function FlowCanvas({ className, style, height, localNodes, edges, onNodesChange, onNodeClick, onPaneClick, onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive, onTidy }: FlowCanvasProps) {
+  const { fitView } = useReactFlow();
+
+  const handleNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node<StepNodeData>) => {
+      if (node.data?.stepType === 'terminal') return;
+      onNodeClick?.(node.id);
+      // Let the settings pane mount/resize the canvas first, then recenter.
+      setTimeout(() => fitView({ padding: 0.2, duration: 300, maxZoom: 1 }), 60);
+    },
+    [onNodeClick, fitView],
+  );
+
+  return (
+    <div
+      className={cn('rounded-lg', className)}
+      style={{ width: '100%', height: `${Math.max(360, height)}px`, ...style }}
+    >
+      <ReactFlow
+        nodes={localNodes as Node<StepNodeData>[]}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        nodesDraggable={true}
+        nodesConnectable={false}
+        elementsSelectable={true}
+        panOnDrag={true}
+        zoomOnScroll={true}
+        zoomOnPinch={true}
+        zoomOnDoubleClick={false}
+        preventScrolling={true}
+        onNodesChange={onNodesChange}
+        onNodeClick={handleNodeClick}
+        onPaneClick={onPaneClick}
+        fitView
+        fitViewOptions={{ minZoom: 0.95, maxZoom: 0.95 }}
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background variant={BackgroundVariant.Dots} gap={24} size={1} className="!bg-white dark:!bg-background" />
+        <CanvasControls
+          onUndo={onUndo}
+          onRedo={onRedo}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onAddBlock={onAddBlock}
+          addBlockActive={addBlockActive}
+          onTidy={onTidy}
+        />
+      </ReactFlow>
+    </div>
   );
 }
