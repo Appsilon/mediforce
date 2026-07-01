@@ -80,8 +80,18 @@ Notes that trip people up:
   `${triggerPayload.*}`, not `${triggerInput.*}`.
 - `${steps.<id>.<path>}` reads a previous step's output; `getPath` supports
   `a.b`, `a.0.x`, and `a[0].x`, and returns empty for missing paths.
-- `${secrets.NAME}` is only resolved inside action url/body/headers and is never
-  written to step output.
+- `${secrets.NAME}` resolves in any action config field (never in transition
+  `when` or human-step config). The runner passes `secrets` into every action
+  dispatch ([`run/route.ts`](../packages/platform-ui/src/app/api/processes/[instanceId]/run/route.ts) —
+  `sources.secrets`), so a secret is **not** automatically scrubbed from output:
+  handlers that echo their interpolated config persist it. `reshape` returns its
+  interpolated `values` as the step output
+  ([`reshape.ts`](../packages/core-actions/src/handlers/reshape.ts)), and `email`
+  writes back interpolated `to`/`subject`
+  ([`email.ts`](../packages/core-actions/src/handlers/email.ts)). Keep
+  `${secrets.*}` in fields that are not echoed — `http` url/headers/body (only the
+  *response* is stored) and `email` `body`/`html` — not in `reshape` values or
+  `email` `to`/`subject`.
 
 ## Human steps — richer than "a form"
 
@@ -157,7 +167,7 @@ runtime that *enforces* each one — the behaviour is not visible from the schem
 | What happens below threshold / on failure | `agent.fallbackBehavior` = `escalate_to_human` \| `continue_with_flag` \| `pause` | [`fallback-handler.ts`](../packages/agent-runtime/src/runner/fallback-handler.ts) |
 | Built-in approve/revise loop | `review` (`type`: `human`/`agent`/`none`, `maxIterations`, `timeBoxDays`) + L3 | iteration cap enforced by [`review-tracker.ts`](../packages/workflow-engine/src/review/review-tracker.ts) + [`workflow-engine.ts`](../packages/workflow-engine/src/engine/workflow-engine.ts); L3 task creation in [`agent-step-executor.ts`](../packages/agent-runtime/src/runner/agent-step-executor.ts) |
 | **Internet / extra tools** | `agent.allowedTools` | base set is `Bash, Read, Write, Edit, Glob, Grep`; add `WebSearch`/`WebFetch` (or any built-in tool) here — merged in [`claude-code-agent-plugin.ts`](../packages/agent-runtime/src/plugins/claude-code-agent-plugin.ts) |
-| Fail-soft (advance despite a step error) | `continueOnError` (any executor) | the run handler marks the step `failed`, advances with `{}` — `processes/[instanceId]/run/route.ts` in `platform-ui` |
+| Fail-soft (advance despite a step error) | `continueOnError` — **`action` steps only** | the only runtime branch that honours it is the action-executor catch ([`run/route.ts`](../packages/platform-ui/src/app/api/processes/[instanceId]/run/route.ts), `currentStep.continueOnError === true`): it marks the step `failed`, logs a warning + audit entry, and advances with `{}`. Agent/script/human/cowork steps ignore the flag — for an `agent` step the equivalent is `fallbackBehavior` (`continue_with_flag`) |
 
 `review.timeBoxDays` is accepted by the schema but **not enforced at runtime** —
 only `maxIterations` is checked. `wait` action `condition` is likewise stored
