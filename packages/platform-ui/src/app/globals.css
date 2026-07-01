@@ -2,7 +2,7 @@
 @config "../../tailwind.config.ts";
 
 :root {
-  --background: 0 0% 96.1%;
+  --background: 0 0% 98%; /* #fafafa */
   --foreground: 222.2 84% 4.9%;
 
   --card: 0 0% 100%;
@@ -11,8 +11,11 @@
   --popover: 0 0% 100%;
   --popover-foreground: 222.2 84% 4.9%;
 
-  --primary: 172 66% 32%;
+  /* Single source of truth for the app's primary action green — every
+     "primary" button/highlight/ring must derive from this, not a one-off hex. */
+  --primary: 161 94% 30%;
   --primary-foreground: 0 0% 98%;
+  --primary-subtle: 152 81% 96%; /* #ecfdf5 — light tint for active/selected states */
 
   --secondary: 210 40% 96.1%;
   --secondary-foreground: 222.2 47.4% 11.2%;
@@ -28,7 +31,7 @@
 
   --border: 214.3 31.8% 91.4%;
   --input: 214.3 31.8% 91.4%;
-  --ring: 172 66% 32%;
+  --ring: 161 94% 30%;
 
   --radius: 0.5rem;
 
@@ -40,12 +43,12 @@
 
   --sidebar-background: 0 0% 100%;
   --sidebar-foreground: 222.2 84% 4.9%;
-  --sidebar-primary: 172 66% 32%;
+  --sidebar-primary: 161 94% 30%;
   --sidebar-primary-foreground: 0 0% 98%;
   --sidebar-accent: 210 40% 96.1%;
   --sidebar-accent-foreground: 222.2 47.4% 11.2%;
   --sidebar-border: 214.3 31.8% 91.4%;
-  --sidebar-ring: 172 66% 32%;
+  --sidebar-ring: 161 94% 30%;
 
   /* Semantic status colors (reserved — do not use for UI chrome) */
   --color-status-ok: 142 71% 45%;
@@ -63,8 +66,9 @@
   --popover: 222.2 84% 4.9%;
   --popover-foreground: 210 40% 98%;
 
-  --primary: 172 60% 60%;
-  --primary-foreground: 172 100% 6%;
+  --primary: 158 64% 52%;
+  --primary-foreground: 161 94% 6%;
+  --primary-subtle: 158 30% 14%; /* dark-mode tint for active/selected states */
 
   --secondary: 217.2 32.6% 17.5%;
   --secondary-foreground: 210 40% 98%;
@@ -80,7 +84,7 @@
 
   --border: 217.2 32.6% 17.5%;
   --input: 217.2 32.6% 17.5%;
-  --ring: 172 60% 60%;
+  --ring: 158 64% 52%;
 
   --chart-1: 220 70% 50%;
   --chart-2: 160 60% 45%;
@@ -90,12 +94,12 @@
 
   --sidebar-background: 222.2 84% 4.9%;
   --sidebar-foreground: 210 40% 98%;
-  --sidebar-primary: 172 60% 60%;
-  --sidebar-primary-foreground: 172 100% 6%;
+  --sidebar-primary: 158 64% 52%;
+  --sidebar-primary-foreground: 161 94% 6%;
   --sidebar-accent: 217.2 32.6% 17.5%;
   --sidebar-accent-foreground: 210 40% 98%;
   --sidebar-border: 217.2 32.6% 17.5%;
-  --sidebar-ring: 172 60% 60%;
+  --sidebar-ring: 158 64% 52%;
 }
 
 * {
