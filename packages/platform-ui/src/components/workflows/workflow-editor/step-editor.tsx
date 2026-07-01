@@ -362,15 +362,15 @@ export function StepEditor({
       {isAgent && (<>
         <FieldGroup>
           <FieldRow label="autonomy level" tooltip="Assist: agent draft, human approves. Human review: explicit approval required. Autonomous agent: executes without review.">
-            <select
+            <PillToggle
               value={step.autonomyLevel ?? 'L2'}
-              onChange={(e) => onChange({ autonomyLevel: (e.target.value || undefined) as WorkflowStep['autonomyLevel'] })}
-              className={rs}
-            >
-              {AGENT_CONTROL_MODES.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
+              onChange={(v) => onChange({ autonomyLevel: v as WorkflowStep['autonomyLevel'] })}
+              options={[
+                { value: 'L2', label: 'Assist', icon: Bot, activeClassName: 'border-lime-400 bg-lime-50 text-lime-700 dark:bg-lime-950/30 dark:text-lime-400' },
+                { value: 'L3', label: 'Human Review', icon: Users, activeClassName: 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-400' },
+                { value: 'L4', label: 'Autonomous', icon: Bot, activeClassName: 'border-violet-400 bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-400' },
+              ]}
+            />
           </FieldRow>
 
           <FieldRow label="plugin" tooltip={TIP.plugin}>
