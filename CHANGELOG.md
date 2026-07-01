@@ -18,6 +18,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ### Fixed
 - Run execution history now shows the correct control-mode badge for agent steps stored without an explicit `autonomyLevel` — previously they fell through to "No agent" (CM0) even though an agent was running; they now display as "Autonomous agent" (CM4), which matches the design intent that CM0 is reserved for `human | script | action` executors only.
+- Content-Security-Policy `frame-ancestors` header now emitted from the `FRAME_ANCESTORS` env var. The Helm chart's `config.frameAncestors` value was already injected as an env var on the UI pod (`deploy/charts/mediforce/templates/ui-deployment.yaml`) but was never consumed by `next.config.mjs`, leaving the chart's iframe-allow-list documentation a no-op. `next.config.mjs` now sets `Content-Security-Policy: frame-ancestors <value>` on all responses when the env var is set; behaviour is unchanged when the env var is unset.
 
 ## [2026-06-21]
 
