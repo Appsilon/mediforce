@@ -1,11 +1,18 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState } from 'react';
 import { User, Bot, Terminal, Zap, PenLine, GitBranch, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { NewStepPayload } from '@/lib/control-mode';
+import { CONTROL_MODE_LABELS, type ControlMode, type NewStepPayload } from '@/lib/control-mode';
 import { CM_ROWS, STEP_TYPE_OPTIONS, type CMRow } from '@/lib/block-presets';
+
+const CM_TO_CONTROL_MODE: Record<CMRow['cm'], ControlMode> = {
+  CM0: 'no-agent',
+  CM1: 'assist',
+  CM2: 'cowork',
+  CM3: 'human-review',
+  CM4: 'autonomous-agent',
+};
 
 // Full Tailwind class strings — must not be constructed dynamically (purge safety).
 const BUTTON_CLASSES: Record<string, string> = {
@@ -28,6 +35,22 @@ const STEP_TYPE_HOVER: Record<string, string> = {
   purple: 'hover:bg-purple-50 hover:text-purple-700 hover:border-purple-300 hover:ring-1 hover:ring-purple-300 dark:hover:bg-purple-900/20 dark:hover:text-purple-300 dark:hover:ring-purple-700',
 };
 
+const CM_BORDER: Record<string, string> = {
+  orange: 'border-orange-200 dark:border-orange-800/60',
+  lime:   'border-lime-200 dark:border-lime-800/60',
+  teal:   'border-teal-200 dark:border-teal-800/60',
+  indigo: 'border-indigo-200 dark:border-indigo-800/60',
+  violet: 'border-violet-200 dark:border-violet-800/60',
+};
+
+const CM_LABEL_COLOR: Record<string, string> = {
+  orange: 'text-orange-600 dark:text-orange-400',
+  lime:   'text-lime-600 dark:text-lime-400',
+  teal:   'text-teal-600 dark:text-teal-400',
+  indigo: 'text-indigo-600 dark:text-indigo-400',
+  violet: 'text-violet-600 dark:text-violet-400',
+};
+
 const ICON_COLOR: Record<string, string> = {
   orange: 'text-orange-400 dark:text-orange-500',
   lime:   'text-lime-500 dark:text-lime-400',
@@ -36,7 +59,6 @@ const ICON_COLOR: Record<string, string> = {
   violet: 'text-violet-500 dark:text-violet-400',
 };
 
-// Icons shown inside CM0 buttons only — other CMs have no per-button icon.
 const EXECUTOR_ICON: Partial<Record<string, React.ReactNode>> = {
   human:  <User className="h-3 w-3 shrink-0" />,
   script: <Terminal className="h-3 w-3 shrink-0" />,
@@ -44,14 +66,14 @@ const EXECUTOR_ICON: Partial<Record<string, React.ReactNode>> = {
 };
 
 function CMRowIcon({ cm, color }: { cm: CMRow['cm']; color: string }) {
-  const iconCls = cn('h-4 w-4', ICON_COLOR[color]);
+  const iconCls = cn('h-3.5 w-3.5', ICON_COLOR[color]);
   if (cm === 'CM0') return <User className={iconCls} />;
   if (cm === 'CM1') return (
     <>
       <User className={cn(iconCls, 'shrink-0')} />
-      <span className="relative inline-flex shrink-0 mr-2">
+      <span className="relative inline-flex shrink-0">
         <Bot className={iconCls} />
-        <Search className={cn('absolute -bottom-0.5 -right-1.5 h-2.5 w-2.5', ICON_COLOR[color])} strokeWidth={2.5} />
+        <Search className={cn('absolute -bottom-0.5 -right-1.5 h-2 w-2', ICON_COLOR[color])} strokeWidth={2.5} />
       </span>
     </>
   );
@@ -64,9 +86,9 @@ function CMRowIcon({ cm, color }: { cm: CMRow['cm']; color: string }) {
   if (cm === 'CM3') return (
     <>
       <Bot className={cn(iconCls, 'shrink-0')} />
-      <span className="relative inline-flex shrink-0 mr-2">
+      <span className="relative inline-flex shrink-0">
         <User className={iconCls} />
-        <Search className={cn('absolute -bottom-0.5 -right-1.5 h-2.5 w-2.5', ICON_COLOR[color])} strokeWidth={2.5} />
+        <Search className={cn('absolute -bottom-0.5 -right-1.5 h-2 w-2', ICON_COLOR[color])} strokeWidth={2.5} />
       </span>
     </>
   );
@@ -74,54 +96,28 @@ function CMRowIcon({ cm, color }: { cm: CMRow['cm']; color: string }) {
 }
 
 type Props = {
-  position: { top: number; left: number };
   onAdd: (payload: NewStepPayload) => void;
-  onClose: () => void;
 };
 
-export function BlockPicker({ position, onAdd, onClose }: Props) {
+export function BlockPicker({ onAdd }: Props) {
   const [pendingType, setPendingType] = useState<'creation' | 'decision'>('creation');
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as HTMLElement)) {
-        onClose();
-      }
-    };
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [onClose]);
 
   const handleAdd = (payload: NewStepPayload) => {
     onAdd({ ...payload, type: pendingType });
-    onClose();
   };
 
-  return createPortal(
-    <div
-      ref={ref}
-      style={{
-        position: 'absolute',
-        top: position.top,
-        left: position.left,
-        transform: 'translateX(-50%)',
-        zIndex: 9999,
-      }}
-      className="bg-background border rounded-xl shadow-xl p-3 w-[500px] space-y-3"
-    >
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Add new step</p>
-
+  return (
+    <div className="flex flex-col gap-5 p-4">
       {/* Step type */}
-      <div className="space-y-1.5">
-        <p className="text-[11px] font-medium text-muted-foreground">What do you want to do in this step?</p>
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Step type</p>
         <div className="flex gap-2">
           {STEP_TYPE_OPTIONS.map((opt) => (
             <button
               key={opt.value}
-              onClick={(e) => { e.stopPropagation(); setPendingType(opt.value); }}
+              onClick={() => setPendingType(opt.value)}
               className={cn(
-                'flex items-center gap-1.5 rounded-lg py-1.5 px-3 text-xs font-semibold border transition-all whitespace-nowrap',
+                'flex items-center gap-1.5 rounded-lg py-1.5 px-3 text-xs font-semibold border transition-all whitespace-nowrap flex-1 justify-center',
                 pendingType === opt.value ? STEP_TYPE_ACTIVE[opt.color] : STEP_TYPE_HOVER[opt.color],
               )}
             >
@@ -134,29 +130,40 @@ export function BlockPicker({ position, onAdd, onClose }: Props) {
         </div>
       </div>
 
-      {/* CM rows */}
-      <div className="space-y-1">
-        <p className="text-[11px] font-medium text-muted-foreground">Who executes this step?</p>
+      {/* CM rows — stacked cards, one per control mode */}
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Executor</p>
         {CM_ROWS.map((row) => (
           <div
             key={row.cm}
             className={cn(
-              'flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5',
+              'rounded-xl border px-3 py-2.5 space-y-2 transition-opacity',
+              CM_BORDER[row.color],
               row.disabled && 'opacity-50',
             )}
           >
-            <span className="w-14 shrink-0 flex items-center gap-0.5">
-              <CMRowIcon cm={row.cm} color={row.color} />
-            </span>
-            <div className="flex gap-1.5 shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex items-center gap-0.5 shrink-0">
+                <CMRowIcon cm={row.cm} color={row.color} />
+              </span>
+              <span className={cn('text-[11px] font-bold shrink-0', CM_LABEL_COLOR[row.color])}>
+                {CONTROL_MODE_LABELS[CM_TO_CONTROL_MODE[row.cm]]}
+              </span>
+              <span className="text-[10px] text-muted-foreground truncate">
+                {row.disabled
+                  ? <>{row.description.replace(' — coming soon', '')} — <em>coming soon</em></>
+                  : row.description}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
               {row.buttons.map((btn) => (
                 <button
                   key={btn.label}
                   disabled={row.disabled}
-                  onClick={(e) => { e.stopPropagation(); handleAdd(btn.payload); }}
+                  onClick={() => handleAdd(btn.payload)}
                   className={cn(
-                    'inline-flex items-center gap-1 rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap',
-                    row.cm !== 'CM0' && 'w-36 text-left',
+                    'inline-flex items-center gap-1 rounded-lg py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap',
                     row.disabled ? 'cursor-not-allowed' : BUTTON_CLASSES[btn.color],
                   )}
                 >
@@ -165,15 +172,9 @@ export function BlockPicker({ position, onAdd, onClose }: Props) {
                 </button>
               ))}
             </div>
-            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-              {row.disabled
-                ? <>{row.description.replace(' — coming soon', '')} — <em>coming soon</em></>
-                : row.description}
-            </span>
           </div>
         ))}
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { X, HelpCircle, Save, Undo2, Redo2, KeyRound, Code2 } from 'lucide-react';
+import { X, HelpCircle, Save, KeyRound, Code2, Sparkles, ChevronRight, ChevronLeft, Plus } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { WorkflowStepSchema, TransitionSchema } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import type { NewStepPayload } from '@/lib/control-mode';
+import { BlockPicker } from './block-picker';
 import { StepEditor } from './workflow-editor/step-editor';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
 import { computeMoveEligibility, ensureTerminalConnected } from './workflow-editor-utils';
@@ -149,7 +150,9 @@ export function WorkflowEditorCanvas({
 }: WorkflowEditorCanvasProps) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
-  const [rightPanelView, setRightPanelView] = useState<'yaml' | 'secrets'>('yaml');
+  const [rightPanelView, setRightPanelView] = useState<'yaml' | 'secrets' | 'add-block' | null>(null);
+  const [addBlockContext, setAddBlockContext] = useState<{ fromId: string; toId: string } | null>(null);
+  const [aiPaneOpen, setAiPaneOpen] = useState(false);
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>(() => structuredClone(initialTransitions));
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [editHistory, setEditHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
@@ -483,178 +486,268 @@ export function WorkflowEditorCanvas({
     }
   };
 
+  const handleRequestAddStep = useCallback((fromId: string, toId: string) => {
+    setSelectedStepId(null);
+    setAddBlockContext({ fromId, toId });
+    setRightPanelView('add-block');
+  }, []);
+
+  const handleBlockAdd = useCallback((payload: NewStepPayload) => {
+    if (addBlockContext) {
+      addStep(payload, addBlockContext.fromId, addBlockContext.toId);
+    } else {
+      addStep(payload);
+    }
+    setAddBlockContext(null);
+    setRightPanelView(null);
+  }, [addBlockContext, addStep]);
+
+  const closeAddBlock = useCallback(() => {
+    setAddBlockContext(null);
+    setRightPanelView(null);
+  }, []);
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-1 flex-col min-h-0">
 
       {/* ── Unified sticky toolbar ── */}
-      <div className="shrink-0 border-b px-4 py-2 flex items-center gap-1.5 flex-wrap bg-background">
+      <div className="shrink-0 border-b px-4 py-1.5 flex items-center gap-1.5 flex-wrap bg-white dark:bg-background">
 
-        {/* Left: undo/redo + panel tabs */}
-        <button
-          onClick={undoEdit}
-          disabled={editHistory.length === 0}
-          title="Undo last change (Ctrl+Z)"
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
-            editHistory.length > 0 ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
-          )}
-        >
-          <Undo2 className="h-3.5 w-3.5" />
-          Undo
-        </button>
-
-        <button
-          onClick={redoEdit}
-          disabled={redoHistory.length === 0}
-          title="Redo last change (Ctrl+Shift+Z)"
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
-            redoHistory.length > 0 ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
-          )}
-        >
-          <Redo2 className="h-3.5 w-3.5" />
-          Redo
-        </button>
-
-        <div className="w-px h-4 bg-border mx-1" />
-
-        {/* Secrets tab */}
-        <button
-          onClick={() => setRightPanelView('secrets')}
-          title="Workflow secrets"
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground',
-            rightPanelView === 'secrets' && !selectedStepId && 'bg-muted border-muted-foreground/30',
-          )}
-        >
-          <KeyRound className="h-3.5 w-3.5" />
-          Secrets
-        </button>
-
-        {/* Workflow source code tab */}
-        <span className="group relative inline-flex">
+        {/* Right-aligned: Secrets + Workflow source code */}
+        <div className="ml-auto flex items-center gap-1.5">
           <button
-            onClick={() => setRightPanelView('yaml')}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground',
-              rightPanelView === 'yaml' && !selectedStepId && 'bg-muted border-muted-foreground/30',
-            )}
+            onClick={() => setRightPanelView('secrets')}
+            title="Workflow secrets"
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground"
           >
-            <Code2 className="h-3.5 w-3.5" />
-            Workflow source code
-            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40 ml-0.5" />
+            <KeyRound className="h-3.5 w-3.5" />
+            Secrets
           </button>
-          <span className="pointer-events-none absolute top-full left-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
-            <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
-            <p>You can author workflows three ways:</p>
-            <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-              <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
-              <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
-              <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
-            </ul>
-          </span>
-        </span>
 
-        {/* Apply YAML — only visible when YAML panel is active and no step is selected */}
-        {!selectedStepId && rightPanelView === 'yaml' && (
-          <div className="ml-auto flex items-center gap-2">
-            {yamlError && (
-              <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>
-            )}
+          <span className="group relative inline-flex">
             <button
-              onClick={applyYaml}
-              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border hover:bg-muted text-foreground transition-colors"
+              onClick={() => setRightPanelView('yaml')}
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground"
             >
-              <Save className="h-3.5 w-3.5" />
-              Apply YAML to canvas
+              <Code2 className="h-3.5 w-3.5" />
+              Workflow source code
+              <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40 ml-0.5" />
             </button>
-          </div>
-        )}
+            <span className="pointer-events-none absolute top-full right-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
+              <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
+              <p>You can author workflows three ways:</p>
+              <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
+                <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
+                <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
+              </ul>
+            </span>
+          </span>
+        </div>
       </div>{/* end unified toolbar */}
 
-      {/* ── Two-column content area ── */}
+      {/* ── Canvas + settings pane + AI pane ── */}
       <div className="flex flex-1 min-h-0">
 
-        {/* Diagram column */}
-        <div className="flex-1 overflow-y-auto p-6 pt-4">
+        {/* Canvas — takes all remaining width, XYFlow owns the height */}
+        <div className="flex-1 min-h-0">
           <WorkflowDiagram
             definition={diagramDefinition}
-            className="border-0"
-            onNodeClick={(stepId) => setSelectedStepId(stepId === selectedStepId ? null : stepId)}
+            className="border-0 h-full"
+            style={{ height: '100%' }}
+            onNodeClick={(stepId) => {
+              setSelectedStepId(stepId === selectedStepId ? null : stepId);
+              if (rightPanelView === 'add-block') closeAddBlock();
+            }}
             onNodeDelete={removeStep}
             onNodeMoveUp={(stepId) => moveStep(stepId, 'up')}
             onNodeMoveDown={(stepId) => moveStep(stepId, 'down')}
-            onEdgeAdd={(fromStepId, payload, toStepId) => addStep(payload, fromStepId, toStepId)}
-            onPaneClick={() => { setSelectedStepId(null); setRightPanelView('yaml'); }}
+            onRequestAddStep={handleRequestAddStep}
+            onPaneClick={() => setSelectedStepId(null)}
             selectedStepId={selectedStepId}
             errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
             warningStepIds={warningStepIds}
             canMoveUp={canMoveUpSet}
             canMoveDown={canMoveDownSet}
+            onUndo={undoEdit}
+            onRedo={redoEdit}
+            canUndo={editHistory.length > 0}
+            canRedo={redoHistory.length > 0}
+            onAddBlock={() => { setSelectedStepId(null); setAddBlockContext(null); setRightPanelView('add-block'); }}
+            addBlockActive={rightPanelView === 'add-block'}
           />
         </div>
 
-        {/* Side panel */}
-        <div className="w-1/2 shrink-0 border-l bg-background flex flex-col min-h-0">
-          {selectedStep ? (
-            <>
-              <div className="shrink-0 flex justify-end px-2 pt-2">
-                <button
-                  onClick={() => setSelectedStepId(null)}
-                  className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
-                <StepEditor
-                  step={selectedStep}
-                  allSteps={editedSteps}
-                  workflowName={workflowName}
-                  onChange={(patch) => updateStep(selectedStep.id, patch)}
-                  errors={stepErrors?.[selectedStep.id]}
-                  imageWarning={warningStepIds?.get(selectedStep.id)}
-                  dockerImages={dockerImages}
-                />
-              </div>
-            </>
-            ) : rightPanelView === 'secrets' ? (
-              <div className="p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold">Secrets</h2>
+        {/* Settings pane — step editor or add-block. Floats above the canvas; closeable; hidden by default. */}
+        {(selectedStep || rightPanelView === 'add-block') && (
+          <div className="w-80 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col min-h-0">
+            {selectedStep ? (
+              <>
+                <div className="shrink-0 flex justify-end px-2 pt-2">
                   <button
-                    onClick={() => setRightPanelView('yaml')}
+                    onClick={() => setSelectedStepId(null)}
                     className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                {namespace && workflowName ? (
-                  <WorkflowSecretsEditor
-                    namespace={namespace}
+                <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
+                  <StepEditor
+                    step={selectedStep}
+                    allSteps={editedSteps}
                     workflowName={workflowName}
+                    onChange={(patch) => updateStep(selectedStep.id, patch)}
+                    errors={stepErrors?.[selectedStep.id]}
+                    imageWarning={warningStepIds?.get(selectedStep.id)}
+                    dockerImages={dockerImages}
                   />
-                ) : (
-                  <p className="text-sm text-muted-foreground">Save the workflow first to manage secrets.</p>
-                )}
-              </div>
+                </div>
+              </>
             ) : (
-              <div className="p-4 space-y-4">
-                <YamlCodeEditor
-                  value={yamlDraft}
-                  onChange={(v) => { setYamlDraft(v); setYamlError(null); }}
-                />
-                {savePanel && (
-                  <div className="border-t pt-4">
-                    {savePanel}
+              <>
+                <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b">
+                  <div className="flex items-center gap-2">
+                    <Plus className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold">
+                      {addBlockContext ? 'Insert step' : 'Add block'}
+                    </span>
+                    {addBlockContext && (
+                      <span className="text-[10px] text-muted-foreground font-normal">on edge</span>
+                    )}
                   </div>
-                )}
-              </div>
+                  <button
+                    onClick={closeAddBlock}
+                    className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  <BlockPicker onAdd={handleBlockAdd} />
+                </div>
+              </>
             )}
-        </div>
+          </div>
+        )}
 
-      </div>{/* end two-column */}
+        {/* AI pane — floats above the canvas, independent of settings pane; collapses to a thin strip */}
+        {aiPaneOpen ? (
+          <div className="w-80 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col min-h-0">
+            <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold">AI Assistant</span>
+              </div>
+              <button
+                onClick={() => setAiPaneOpen(false)}
+                className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                title="Collapse AI Assistant"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 flex items-center justify-center p-6">
+              <p className="text-sm text-muted-foreground text-center">To be implemented</p>
+            </div>
+            <div className="shrink-0 border-t p-3">
+              <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 opacity-50 cursor-not-allowed">
+                <input
+                  disabled
+                  placeholder="Ask AI to build your workflow…"
+                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setAiPaneOpen(true)}
+            className="w-10 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col items-center justify-between py-4 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Expand AI Assistant"
+          >
+            <Sparkles className="h-4 w-4 shrink-0" />
+            <span className="text-[11px] font-semibold tracking-wide [writing-mode:vertical-rl] rotate-180 select-none">
+              AI Assistant
+            </span>
+            <ChevronLeft className="h-4 w-4 shrink-0" />
+          </button>
+        )}
+
+      </div>{/* end canvas + settings pane + AI pane */}
+
+      {/* ── Secrets modal ── */}
+      {rightPanelView === 'secrets' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setRightPanelView(null)} />
+          <div className="relative bg-background border rounded-xl shadow-xl p-6 w-full max-w-md mx-4 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold">Secrets</h2>
+              </div>
+              <button
+                onClick={() => setRightPanelView(null)}
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {namespace && workflowName ? (
+              <WorkflowSecretsEditor
+                namespace={namespace}
+                workflowName={workflowName}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">Save the workflow first to manage secrets.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Workflow source code modal ── */}
+      {rightPanelView === 'yaml' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setRightPanelView(null)} />
+          <div className="relative bg-background border rounded-xl shadow-xl p-6 w-full max-w-2xl mx-4 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="shrink-0 flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Code2 className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold">Workflow source code</h2>
+              </div>
+              <button
+                onClick={() => setRightPanelView(null)}
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-4">
+              <YamlCodeEditor
+                value={yamlDraft}
+                onChange={(v) => { setYamlDraft(v); setYamlError(null); }}
+              />
+              {savePanel && (
+                <div className="border-t pt-4">
+                  {savePanel}
+                </div>
+              )}
+            </div>
+            <div className="shrink-0 flex items-center justify-end gap-2 pt-1">
+              {yamlError && (
+                <p className="text-xs text-red-600 dark:text-red-400 mr-auto">{yamlError}</p>
+              )}
+              <button
+                onClick={applyYaml}
+                className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border hover:bg-muted text-foreground transition-colors"
+              >
+                <Save className="h-3.5 w-3.5" />
+                Apply YAML to canvas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
