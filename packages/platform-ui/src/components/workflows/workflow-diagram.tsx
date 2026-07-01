@@ -245,15 +245,16 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
           </div>
         )}
 
-        {/* Row 1: executor identity (left) + step type (right) */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1 min-w-0">
+        {/* Row 1: executor identity + step type, separated by a dot */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div className="flex items-center gap-1 min-w-0 shrink-0">
             <ExecutorIcon executor={data.executor} autonomyLevel={data.autonomyLevel} />
             <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">
               {getExecutorLabel(data.executor, mode)}
             </span>
           </div>
-          <span className={cn('text-[10px] font-semibold shrink-0', typeConfig.color)}>
+          <span className="text-muted-foreground/40 text-[10px] shrink-0">&middot;</span>
+          <span className={cn('text-[10px] font-semibold truncate', typeConfig.color)}>
             {typeConfig.label}
           </span>
         </div>
