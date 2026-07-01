@@ -36,6 +36,25 @@ const nextConfig = {
     '@hookform/resolvers',
   ],
   serverExternalPackages: ['bullmq', 'ioredis'],
+  // Emit `Content-Security-Policy: frame-ancestors` when FRAME_ANCESTORS
+  // env var is set. The Helm chart's `config.frameAncestors` value flows
+  // in via `deploy/charts/mediforce/templates/ui-deployment.yaml` — see
+  // `deploy/charts/mediforce/values.yaml` for the default and the wire-up.
+  async headers() {
+    const frameAncestors = process.env.FRAME_ANCESTORS?.trim();
+    if (!frameAncestors) return [];
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: `frame-ancestors ${frameAncestors}`,
+          },
+        ],
+      },
+    ];
+  },
   turbopack: {
     resolveAlias: {
       // Pin zod to platform-ui's own copy so `@hookform/resolvers/zod`
