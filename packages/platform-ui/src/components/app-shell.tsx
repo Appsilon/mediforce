@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check, ArrowLeft, ChevronRight, Wrench, Database } from 'lucide-react';
+import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronsUpDown, Building2, Check, ChevronRight, Wrench, Database } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { useAuth } from '@/contexts/auth-context';
@@ -48,10 +48,10 @@ function NavItem({
     <Link
       href={href}
       className={cn(
-        'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+        'flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition-colors',
         active
-          ? 'bg-primary/10 text-primary'
-          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+          ? 'bg-primary-subtle text-primary'
+          : 'text-muted-foreground hover:bg-[#e9ebef] hover:text-foreground',
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
@@ -61,6 +61,18 @@ function NavItem({
           {badge}
         </span>
       )}
+    </Link>
+  );
+}
+
+function ActionItem({ href, label, icon: Icon }: { href: string; label: string; icon: React.ElementType }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-[#e9ebef] hover:text-foreground"
+    >
+      <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+      <span className="flex-1">{label}</span>
     </Link>
   );
 }
@@ -155,26 +167,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
       {/* Logo */}
-      <div className="flex h-16 items-center border-b px-4 gap-2.5">
-        <Image src="/logo.png" alt="Mediforce logo" width={32} height={32} className="shrink-0" />
-        <span className="font-headline text-lg font-semibold text-primary">Mediforce</span>
+      <div className="flex items-center px-4 pt-4 pb-3 gap-2">
+        <Image src="/logo.png" alt="Mediforce logo" width={28} height={28} className="shrink-0" />
+        <span className="font-headline text-lg font-bold text-primary">Mediforce</span>
       </div>
 
       {/* Namespace context switcher — below logo */}
-      <div className="border-b px-3 py-3">
+      <div className="px-3 pb-3">
         <Popover.Root>
           <Popover.Trigger asChild>
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-accent transition-colors"
+              className="flex w-full items-center gap-2 rounded-lg border bg-white dark:bg-background px-2 py-2 text-sm shadow-sm hover:bg-muted/40 transition-colors"
               aria-label="Switch namespace"
             >
               {(() => {
                 const avatarSrc = activeNamespace?.avatarUrl ?? (activeNamespace?.type === 'personal' ? firebaseUser?.photoURL : undefined) ?? undefined;
                 const avatarFallback = (
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-semibold">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary text-xs font-semibold">
                     {activeNamespace !== null && activeNamespace.type === 'organization' ? (
-                      (() => { const Icon = getWorkspaceIcon(activeNamespace.icon); return <Icon className="h-3.5 w-3.5" />; })()
+                      (() => { const Icon = getWorkspaceIcon(activeNamespace.icon); return <Icon className="h-4 w-4" />; })()
                     ) : (
                       firebaseUser?.displayName
                         ? firebaseUser.displayName
@@ -187,14 +199,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 );
                 if (avatarSrc) {
-                  return <ImgWithFallback src={avatarSrc} className="h-7 w-7 shrink-0 rounded-md object-cover" fallback={avatarFallback} />;
+                  return <ImgWithFallback src={avatarSrc} className="h-8 w-8 shrink-0 rounded-lg object-cover" fallback={avatarFallback} />;
                 }
                 return avatarFallback;
               })()}
-              <span className="flex-1 truncate text-left text-sm font-medium">
+              <span className="flex-1 truncate text-left text-sm font-bold">
                 {activeDisplayName}
               </span>
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             </button>
           </Popover.Trigger>
           <Popover.Portal>
@@ -275,18 +287,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="flex-1 space-y-1 px-3 pb-3">
         {ACTION_ITEMS.map((item) => (
-          <NavItem
+          <ActionItem
             key={item.path}
             href={`${handlePrefix}${item.path}`}
             label={item.label}
             icon={item.icon}
-            badge={item.badge}
-            active={pathname.startsWith(`${handlePrefix}${item.path}`)}
           />
         ))}
-        <div className="my-2 border-t" />
+        <div className="h-3" />
         {NAV_ITEMS.map((item) => {
           const fullHref = `${handlePrefix}${item.href}`;
           const isActive = item.exact
@@ -315,7 +325,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </React.Fragment>
           );
         })}
-        <div className="my-2 border-t" />
+        <div className="h-3" />
         <NavItem
           href={`${handlePrefix}${MONITORING_ITEM.path}`}
           label={MONITORING_ITEM.label}
@@ -352,7 +362,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       )}
       <div className="flex flex-1 overflow-hidden">
       {/* Sidebar — desktop */}
-      <aside className="hidden w-[280px] shrink-0 border-r md:flex md:flex-col">
+      <aside className="hidden w-[224px] shrink-0 border-r bg-background md:flex md:flex-col">
         <SidebarContent />
       </aside>
 
@@ -363,16 +373,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="absolute inset-0 bg-black/50"
             onClick={() => setSidebarOpen(false)}
           />
-          <aside className="absolute left-0 top-0 h-full w-[280px] border-r bg-background shadow-xl">
+          <aside className="absolute left-0 top-0 h-full w-[224px] border-r bg-background shadow-xl">
             <SidebarContent />
           </aside>
         </div>
       )}
 
       {/* Main content area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden bg-white dark:bg-background">
         {/* Top bar */}
-        <header className="flex h-16 shrink-0 items-center justify-between border-b px-4 print:hidden">
+        <header className="flex h-12 shrink-0 items-center justify-between border-b px-4 print:hidden">
           <div className="flex items-center gap-3">
             {/* Mobile menu toggle */}
             <button
