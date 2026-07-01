@@ -205,52 +205,59 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className="z-50 w-[260px] rounded-md border bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
             >
               <div className="py-1">
-                {personalNamespace !== null && (
-                  <>
-                    <Popover.Close asChild>
-                      <Link
-                        href={workspaceSwitchHref(pathname, handleFromPath, personalNamespace.handle)}
-                        className={cn(
-                          'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
-                          handleFromPath === personalNamespace.handle ? 'text-foreground' : 'text-muted-foreground',
-                        )}
-                      >
-                        {firebaseUser?.photoURL ? (
-                          <ImgWithFallback src={firebaseUser.photoURL} className="h-5 w-5 shrink-0 rounded-full object-cover" fallback={<User className="h-4 w-4 shrink-0" />} />
-                        ) : (
-                          <User className="h-4 w-4 shrink-0" />
-                        )}
-                        <span className="flex-1 truncate">
-                          <span className="block font-medium text-foreground">My profile</span>
-                          <span className="block text-xs text-muted-foreground">@{personalNamespace.handle}</span>
-                        </span>
-                        {handleFromPath === personalNamespace.handle && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
-                      </Link>
-                    </Popover.Close>
-                    <div className="my-1 border-t" />
-                  </>
-                )}
-                {namespaces.filter((ns) => ns.type === 'organization').map((ns) => {
-                  const isActive = handleFromPath === ns.handle;
+                {(() => {
+                  const orgNamespaces = namespaces.filter((ns) => ns.type === 'organization');
                   return (
-                    <Popover.Close asChild key={ns.handle}>
-                      <Link
-                        href={workspaceSwitchHref(pathname, handleFromPath, ns.handle)}
-                        className={cn(
-                          'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
-                          isActive ? 'text-foreground' : 'text-muted-foreground',
-                        )}
-                      >
-                        {(() => { const Icon = getWorkspaceIcon(ns.icon); return <Icon className="h-4 w-4 shrink-0" />; })()}
-                        <span className="flex-1 truncate">
-                          <span className="block font-medium text-foreground">{ns.displayName}</span>
-                          <span className="block text-xs text-muted-foreground">@{ns.handle}</span>
-                        </span>
-                        {isActive && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
-                      </Link>
-                    </Popover.Close>
+                    <>
+                      {personalNamespace !== null && (
+                        <>
+                          <Popover.Close asChild>
+                            <Link
+                              href={workspaceSwitchHref(pathname, handleFromPath, personalNamespace.handle)}
+                              className={cn(
+                                'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
+                                handleFromPath === personalNamespace.handle ? 'text-foreground' : 'text-muted-foreground',
+                              )}
+                            >
+                              {firebaseUser?.photoURL ? (
+                                <ImgWithFallback src={firebaseUser.photoURL} className="h-5 w-5 shrink-0 rounded-full object-cover" fallback={<User className="h-4 w-4 shrink-0" />} />
+                              ) : (
+                                <User className="h-4 w-4 shrink-0" />
+                              )}
+                              <span className="flex-1 truncate">
+                                <span className="block font-medium text-foreground">My profile</span>
+                                <span className="block text-xs text-muted-foreground">@{personalNamespace.handle}</span>
+                              </span>
+                              {handleFromPath === personalNamespace.handle && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                            </Link>
+                          </Popover.Close>
+                          {orgNamespaces.length > 0 && <div className="my-1 border-t" />}
+                        </>
+                      )}
+                      {orgNamespaces.map((ns) => {
+                        const isActive = handleFromPath === ns.handle;
+                        return (
+                          <Popover.Close asChild key={ns.handle}>
+                            <Link
+                              href={workspaceSwitchHref(pathname, handleFromPath, ns.handle)}
+                              className={cn(
+                                'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
+                                isActive ? 'text-foreground' : 'text-muted-foreground',
+                              )}
+                            >
+                              {(() => { const Icon = getWorkspaceIcon(ns.icon); return <Icon className="h-4 w-4 shrink-0" />; })()}
+                              <span className="flex-1 truncate">
+                                <span className="block font-medium text-foreground">{ns.displayName}</span>
+                                <span className="block text-xs text-muted-foreground">@{ns.handle}</span>
+                              </span>
+                              {isActive && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                            </Link>
+                          </Popover.Close>
+                        );
+                      })}
+                    </>
                   );
-                })}
+                })()}
                 <div className="my-1 border-t" />
                 <Popover.Close asChild>
                   <Link
@@ -376,18 +383,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
             <nav className="flex items-center gap-1 text-sm">
-              {breadcrumbs.length > 1 && (
-                <>
-                  <Link
-                    href={breadcrumbs[breadcrumbs.length - 2].href ?? '#'}
-                    className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors mr-2"
-                  >
-                    <ArrowLeft className="h-3.5 w-3.5" />
-                    Go back
-                  </Link>
-                  <span className="text-muted-foreground/30">|</span>
-                </>
-              )}
               {breadcrumbs.map((crumb, i) => (
                 <React.Fragment key={i}>
                   {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />}
