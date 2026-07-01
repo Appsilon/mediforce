@@ -212,11 +212,11 @@ describe('StepEditor', () => {
       />,
     );
 
-    // Agent-specific labels should be visible
-    expect(screen.getAllByText('autonomy level').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('agentId')).toBeInTheDocument();
-    expect(screen.getByText('agent.model')).toBeInTheDocument();
-    expect(screen.getByText('agent.prompt')).toBeInTheDocument();
+    // Agent-specific labels should be visible (rendered via humanizeToken)
+    expect(screen.getAllByText('Autonomy Level').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Agent ID')).toBeInTheDocument();
+    expect(screen.getByText('Agent Model')).toBeInTheDocument();
+    expect(screen.getByText('Agent Prompt')).toBeInTheDocument();
   });
 
   it('[RENDER] script config fields are shown for script executor', () => {
@@ -228,9 +228,9 @@ describe('StepEditor', () => {
       />,
     );
 
-    expect(screen.getByText('script.runtime')).toBeInTheDocument();
-    expect(screen.getByText('script.command')).toBeInTheDocument();
-    expect(screen.getByText('script.inlineScript')).toBeInTheDocument();
+    expect(screen.getByText('Script Runtime')).toBeInTheDocument();
+    expect(screen.getByText('Script Command')).toBeInTheDocument();
+    expect(screen.getByText('Script Inline Script')).toBeInTheDocument();
   });
 
   it('[RENDER] human config shows allowedRoles field', () => {
@@ -242,7 +242,7 @@ describe('StepEditor', () => {
       />,
     );
 
-    expect(screen.getByText('allowedRoles')).toBeInTheDocument();
+    expect(screen.getByText('Allowed Roles')).toBeInTheDocument();
   });
 
   it('[RENDER] no placeholder text on regular inputs', () => {
