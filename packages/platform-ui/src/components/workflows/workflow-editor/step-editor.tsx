@@ -12,13 +12,12 @@ import type { WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import {
-  AGENT_CONTROL_MODES,
   STEP_TYPE_LABELS,
   FALLBACK_OPTIONS,
   RUNTIME_OPTIONS,
 } from './constants';
 import { CoworkSection } from './cowork-section';
-import { FieldRow, FieldGroup, Section, inputBase, inputBaseMono, selectBase, textareaBase } from './step-editor-fields';
+import { FieldRow, FieldGroup, Section, PillToggle, inputBase, inputBaseMono, selectBase, textareaBase, humanizeToken } from './step-editor-fields';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
 
 // ---------------------------------------------------------------------------
@@ -354,7 +353,7 @@ export function StepEditor({
         <FieldRow label="executor" tooltip={TIP.executor}>
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5" title="executor is set at creation. To change, remove this step and add a new one.">
             <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-            <span>{execStyle.label.toLowerCase()}</span>
+            <span>{execStyle.label}</span>
           </span>
         </FieldRow>
       </FieldGroup>
@@ -381,9 +380,9 @@ export function StepEditor({
               className={rs}
             >
               <option value="">None</option>
-              {plugins.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
+              {plugins.map((p) => <option key={p.name} value={p.name}>{humanizeToken(p.name)}</option>)}
               {step.plugin && !plugins.some((p) => p.name === step.plugin) && (
-                <option value={step.plugin}>{step.plugin}</option>
+                <option value={step.plugin}>{humanizeToken(step.plugin)}</option>
               )}
             </select>
           </FieldRow>
@@ -626,11 +625,11 @@ export function StepEditor({
           {(['notebookParams', 'jobParameters'] as const).map((field) => (
             <div key={field} className="px-3 py-1.5 border-b border-border/30 last:border-0">
               <div
-                className="text-[11px] text-muted-foreground mb-1"
+                className="text-xs font-medium text-muted-foreground mb-1"
                 title={field === 'notebookParams' ? TIP.databricksNotebookParams : TIP.databricksJobParameters}
-              >databricks.{field}</div>
+              >{humanizeToken(`databricks.${field}`)}</div>
               {Object.entries(step.databricks?.[field] ?? {}).map(([key, val], idx) => (
-                <div key={idx} className="grid grid-cols-[184px_1fr_auto] gap-x-3 py-1 items-center">
+                <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-x-2 py-1 items-center">
                   <input
                     value={key}
                     onChange={(e) => updateDatabricksParams(field, (params) => {
@@ -766,9 +765,9 @@ export function StepEditor({
               className={rs}
             >
               <option value="">Default</option>
-              <option value="human">human</option>
-              <option value="agent">agent</option>
-              <option value="none">none</option>
+              <option value="human">Human</option>
+              <option value="agent">Agent</option>
+              <option value="none">None</option>
             </select>
           </FieldRow>
 
@@ -827,7 +826,7 @@ export function StepEditor({
             <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5"
               title="Action kind is set at creation.">
               <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-              {step.action?.kind ?? '—'}
+              {step.action?.kind ? humanizeToken(step.action.kind) : '—'}
             </span>
           </FieldRow>
 
@@ -871,7 +870,7 @@ export function StepEditor({
               {/* action.headers key-value rows */}
               <div className="border-t border-border/30">
                 {Object.entries(httpAction.config.headers ?? {}).map(([hKey, hVal], idx) => (
-                  <div key={idx} className="grid grid-cols-[184px_1fr] gap-x-3 px-3 py-1.5 border-b border-border/30 last:border-0 items-center">
+                  <div key={idx} className="grid grid-cols-[1fr_1fr] gap-x-2 px-3 py-1.5 border-b border-border/30 last:border-0 items-center">
                     <input
                       value={hKey}
                       onChange={(e) => {
@@ -1100,7 +1099,7 @@ export function StepEditor({
                     className={rs}
                   >
                     {(['string', 'number', 'boolean', 'date'] as const).map((t) => (
-                      <option key={t} value={t}>{t}</option>
+                      <option key={t} value={t}>{humanizeToken(t)}</option>
                     ))}
                   </select>
                 </FieldRow>
@@ -1174,7 +1173,7 @@ export function StepEditor({
         <Section title="Environment">
           <FieldGroup>
             {Object.entries(step.env ?? {}).map(([key, val], idx) => (
-              <div key={idx} className="grid grid-cols-[184px_1fr] gap-x-3 px-3 py-1.5 border-b border-border/30 last:border-0 items-center">
+              <div key={idx} className="grid grid-cols-[1fr_1fr] gap-x-2 px-3 py-1.5 border-b border-border/30 last:border-0 items-center">
                 <input
                   value={key}
                   onChange={(e) => {
