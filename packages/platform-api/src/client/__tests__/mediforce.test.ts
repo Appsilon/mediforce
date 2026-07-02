@@ -641,6 +641,51 @@ describe('Mediforce', () => {
     });
   });
 
+  describe('runs.start', () => {
+    it('POSTs the validated body as JSON to /api/processes', async () => {
+      const run = buildProcessInstance({ id: 'inst-a', status: 'running' });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ run }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const result = await mediforce.runs.start({
+        definitionName: 'def-1',
+        triggeredBy: 'user-1',
+      });
+
+      expect(result.run.id).toBe('inst-a');
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(`${TEST_BASE_URL}/api/processes`);
+      const init = fetchSpy.mock.calls[0]?.[1];
+      expect(init?.method).toBe('POST');
+      // Body-bearing mutations serialize the payload and tag it as JSON.
+      expect(new Headers(init?.headers).get('content-type')).toBe('application/json');
+      const body = init?.body !== undefined ? JSON.parse(String(init.body)) : {};
+      expect(body.definitionName).toBe('def-1');
+      expect(body.triggeredBy).toBe('user-1');
+    });
+  });
+
+  describe('cron.heartbeat', () => {
+    it('POSTs to /api/cron/heartbeat with no body or content-type', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ triggered: [], skipped: [] }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const result = await mediforce.cron.heartbeat();
+
+      expect(result.triggered).toEqual([]);
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(`${TEST_BASE_URL}/api/cron/heartbeat`);
+      const init = fetchSpy.mock.calls[0]?.[1];
+      // No-body mutations must not attach a Content-Type header or a body —
+      // the `sendJson` helper skips both when `body` is `undefined`.
+      expect(init?.method).toBe('POST');
+      expect(init?.body).toBeUndefined();
+      expect(new Headers(init?.headers).get('content-type')).toBeNull();
+    });
+  });
+
   describe('error envelope back-compat (legacy `{ error: string }`)', () => {
     it('extracts the message from the legacy string envelope', async () => {
       // Some Phase 1 routes still throw plain HandlerError with a custom

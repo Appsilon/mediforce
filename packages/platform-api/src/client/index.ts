@@ -738,25 +738,23 @@ export class Mediforce {
       },
       claim: async (input) => {
         const validated = ClaimTaskInputSchema.parse(input);
-        const res = await this.request(
+        return this.sendJson(
+          'POST',
           `/api/tasks/${encodeURIComponent(validated.taskId)}/claim`,
-          { method: 'POST' },
+          undefined,
+          ClaimTaskOutputSchema,
+          'mediforce.tasks.claim',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.tasks.claim');
-        return ClaimTaskOutputSchema.parse(body);
       },
       complete: async (input) => {
         const validated = CompleteTaskInputSchema.parse(input);
-        const res = await this.request(
+        return this.sendJson(
+          'POST',
           `/api/tasks/${encodeURIComponent(validated.taskId)}/complete`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(validated.payload),
-          },
+          validated.payload as Record<string, unknown>,
+          CompleteTaskOutputSchema,
+          'mediforce.tasks.complete',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.tasks.complete');
-        return CompleteTaskOutputSchema.parse(body);
       },
       attachments: {
         list: async (input) => {
@@ -1117,12 +1115,13 @@ export class Mediforce {
       },
       delete: async (input) => {
         const validated = DeleteAgentInputSchema.parse(input);
-        const res = await this.request(
+        return this.sendJson(
+          'DELETE',
           `/api/agents/${encodeURIComponent(validated.id)}`,
-          { method: 'DELETE' },
+          undefined,
+          DeleteAgentOutputSchema,
+          'mediforce.agents.delete',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.agents.delete');
-        return DeleteAgentOutputSchema.parse(body);
       },
       update: (input, updateBody) => {
         const validatedInput = UpdateAgentInputSchema.parse(input);
@@ -1311,45 +1310,44 @@ export class Mediforce {
       },
       start: async (input) => {
         const validated = StartRunInputSchema.parse(input);
-        const res = await this.request('/api/processes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(validated),
-        });
-        const body = await parseJsonOrThrow(res, 'mediforce.runs.start');
-        return StartRunOutputSchema.parse(body);
+        return this.sendJson(
+          'POST',
+          '/api/processes',
+          validated as Record<string, unknown>,
+          StartRunOutputSchema,
+          'mediforce.runs.start',
+        );
       },
       cancel: async (input) => {
         const validated = CancelRunInputSchema.parse(input);
         const body = validated.reason !== undefined ? { reason: validated.reason } : {};
-        const res = await this.request(
+        return this.sendJson(
+          'POST',
           `/api/processes/${encodeURIComponent(validated.runId)}/cancel`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          },
+          body,
+          CancelRunOutputSchema,
+          'mediforce.runs.cancel',
         );
-        const parsed = await parseJsonOrThrow(res, 'mediforce.runs.cancel');
-        return CancelRunOutputSchema.parse(parsed);
       },
       resume: async (input) => {
         const validated = ResumeRunInputSchema.parse(input);
-        const res = await this.request(
+        return this.sendJson(
+          'POST',
           `/api/processes/${encodeURIComponent(validated.runId)}/resume`,
-          { method: 'POST' },
+          undefined,
+          ResumeRunOutputSchema,
+          'mediforce.runs.resume',
         );
-        const parsed = await parseJsonOrThrow(res, 'mediforce.runs.resume');
-        return ResumeRunOutputSchema.parse(parsed);
       },
       retryStep: async (input) => {
         const validated = RetryStepInputSchema.parse(input);
-        const res = await this.request(
+        return this.sendJson(
+          'POST',
           `/api/processes/${encodeURIComponent(validated.runId)}/steps/${encodeURIComponent(validated.stepId)}/retry`,
-          { method: 'POST' },
+          undefined,
+          RetryStepOutputSchema,
+          'mediforce.runs.retryStep',
         );
-        const parsed = await parseJsonOrThrow(res, 'mediforce.runs.retryStep');
-        return RetryStepOutputSchema.parse(parsed);
       },
       archive: (input) => {
         const v = ArchiveRunInputSchema.parse(input);
@@ -1389,13 +1387,13 @@ export class Mediforce {
         const params: Record<string, string> = { namespace: validated.namespace };
         if (validated.workflow) params.workflow = validated.workflow;
         const qs = toSearchParams(params);
-        const res = await this.request(`/api/workflow-secrets${qs}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: validated.key, value: validated.value }),
-        });
-        const body = await parseJsonOrThrow(res, 'mediforce.secrets.set');
-        return SetSecretOutputSchema.parse(body);
+        return this.sendJson(
+          'PUT',
+          `/api/workflow-secrets${qs}`,
+          { key: validated.key, value: validated.value },
+          SetSecretOutputSchema,
+          'mediforce.secrets.set',
+        );
       },
       list: async (input) => {
         const validated = ListSecretKeysInputSchema.parse(input);
@@ -1411,9 +1409,13 @@ export class Mediforce {
         const params: Record<string, string> = { namespace: validated.namespace, key: validated.key };
         if (validated.workflow) params.workflow = validated.workflow;
         const qs = toSearchParams(params);
-        const res = await this.request(`/api/workflow-secrets${qs}`, { method: 'DELETE' });
-        const body = await parseJsonOrThrow(res, 'mediforce.secrets.delete');
-        return DeleteSecretOutputSchema.parse(body);
+        return this.sendJson(
+          'DELETE',
+          `/api/workflow-secrets${qs}`,
+          undefined,
+          DeleteSecretOutputSchema,
+          'mediforce.secrets.delete',
+        );
       },
       workspacePreviews: async (input) => {
         const validated = GetWorkspaceSecretPreviewsInputSchema.parse(input);
@@ -1484,9 +1486,13 @@ export class Mediforce {
     this.cron = {
       heartbeat: async (input) => {
         HeartbeatInputSchema.parse(input ?? {});
-        const res = await this.request('/api/cron/heartbeat', { method: 'POST' });
-        const body = await parseJsonOrThrow(res, 'mediforce.cron.heartbeat');
-        return HeartbeatOutputSchema.parse(body);
+        return this.sendJson(
+          'POST',
+          '/api/cron/heartbeat',
+          undefined,
+          HeartbeatOutputSchema,
+          'mediforce.cron.heartbeat',
+        );
       },
     };
 
