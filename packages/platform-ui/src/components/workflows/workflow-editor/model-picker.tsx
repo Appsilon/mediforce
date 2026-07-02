@@ -83,11 +83,12 @@ export function ModelPicker({ value, onChange, defaultModel, className }: ModelP
             value={value ?? ''}
             onChange={(e) => onChange(e.target.value || undefined)}
             placeholder="e.g. tencent/hy3-preview:free"
-            className={className}
+            className={cn(className, 'flex-1 min-w-0')}
             list="model-registry-list"
           />
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => setCustomInput(false)}
             className="shrink-0 rounded-md border px-2 py-1 text-xs hover:bg-accent transition-colors"
           >
