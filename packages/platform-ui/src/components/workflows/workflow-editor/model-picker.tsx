@@ -154,14 +154,17 @@ function defaultModelMeta(models: ModelRegistryEntry[], defaultModel?: string): 
 
 function ModelMeta({ model }: { model: ModelRegistryEntry }) {
   return (
-    <div className="flex gap-3 text-xs text-muted-foreground">
-      <span>{formatContext(model.contextLength)} context</span>
-      <span>in:{formatPrice(model.pricing.input)}</span>
-      <span>out:{formatPrice(model.pricing.output)}</span>
-      {model.supportsTools && <span>tools ✓</span>}
-      {model.supportsVision && <span>vision ✓</span>}
+    <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+      <span className="inline-flex items-center gap-1"><Layers className="h-3.5 w-3.5 shrink-0" />{formatContext(model.contextLength)} context</span>
+      <span className="inline-flex items-center gap-1"><ArrowDownToLine className="h-3.5 w-3.5 shrink-0" />{formatPrice(model.pricing.input)}</span>
+      <span className="inline-flex items-center gap-1"><ArrowUpFromLine className="h-3.5 w-3.5 shrink-0" />{formatPrice(model.pricing.output)}</span>
+      {model.supportsTools && <span className="inline-flex items-center gap-1"><Wrench className="h-3.5 w-3.5 shrink-0" />Tools</span>}
+      {model.supportsVision && <span className="inline-flex items-center gap-1"><Eye className="h-3.5 w-3.5 shrink-0" />Vision</span>}
       {model.requestCount !== null && model.requestCount > 0 && (
-        <span>{model.requestCount >= 1_000_000 ? `${(model.requestCount / 1_000_000).toFixed(1)}M` : `${Math.round(model.requestCount / 1000)}K`} requests</span>
+        <span className="inline-flex items-center gap-1">
+          <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+          {model.requestCount >= 1_000_000 ? `${(model.requestCount / 1_000_000).toFixed(1)}M` : `${Math.round(model.requestCount / 1000)}K`} requests
+        </span>
       )}
     </div>
   );
