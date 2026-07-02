@@ -155,7 +155,7 @@ describe('registerWorkflow handler', () => {
       .resolves.toMatchObject({ success: true, name: 'active-flow' });
   });
 
-  it('rejects agent step without Docker image when not in local agent mode', async () => {
+  it('defaults agent step without Docker image to the golden image when not in local agent mode', async () => {
     const scope = buildScope();
     const body = buildWorkflowDefinition({
       name: 'no-image-flow',
@@ -169,11 +169,10 @@ describe('registerWorkflow handler', () => {
     const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
 
     await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .rejects.toThrow(ValidationError);
-    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .rejects.toThrow(/AI Analysis/);
-    await expect(registerWorkflow({ ...input, namespace: 'team-alpha' }, scope))
-      .rejects.toThrow(/Docker image/i);
+      .resolves.toMatchObject({ success: true, name: 'no-image-flow' });
+    const stored = await processRepo.getWorkflowDefinition('team-alpha', 'no-image-flow', 1);
+    const analyzeStep = stored?.steps.find((s) => s.id === 'analyze');
+    expect(analyzeStep?.agent?.image).toBe('mediforce-golden-image');
   });
 
   it('accepts agent step without image when repo + commit configured (auto-build)', async () => {
