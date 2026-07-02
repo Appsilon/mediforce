@@ -215,6 +215,82 @@ describe('ProviderForm', () => {
     expect(onSubmit.mock.calls[0][0].scopes).toEqual(['repo', 'read:user', 'org:read']);
   });
 
+  it('omits clientSecret from the payload on edit when left empty', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    const provider = makeProvider({ id: 'github', clientSecret: undefined });
+
+    render(
+      <ProviderForm
+        provider={provider}
+        preset={null}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    // Edit a field other than the secret, leave the secret blank.
+    const nameInput = screen.getByLabelText(/^Name$/i) as HTMLInputElement;
+    await user.clear(nameInput);
+    await user.type(nameInput, 'GitHub Enterprise');
+    await user.click(screen.getByRole('button', { name: /^Save$/i }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+
+    const payload = onSubmit.mock.calls[0][0];
+    expect(payload.name).toBe('GitHub Enterprise');
+    expect(payload.clientSecret).toBeUndefined();
+  });
+
+  it('includes clientSecret in the payload on edit when a new value is entered', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    const provider = makeProvider({ id: 'github', clientSecret: undefined });
+
+    render(
+      <ProviderForm
+        provider={provider}
+        preset={null}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await user.type(screen.getByLabelText(/^Client secret$/i), 'rotated-secret');
+    await user.click(screen.getByRole('button', { name: /^Save$/i }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+
+    expect(onSubmit.mock.calls[0][0].clientSecret).toBe('rotated-secret');
+  });
+
+  it('still requires clientSecret when creating a new provider', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <ProviderForm
+        provider={null}
+        preset="github"
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await user.type(screen.getByLabelText(/^Client id$/i), 'cid');
+    // Leave client secret empty on create.
+    await user.click(screen.getByRole('button', { name: /^Create$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Required/i)).toBeInTheDocument();
+    });
+
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it('shows validation error when required fields are missing', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();

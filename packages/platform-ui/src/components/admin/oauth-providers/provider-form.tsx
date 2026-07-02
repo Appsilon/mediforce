@@ -18,7 +18,9 @@ const FormSchema = z.object({
     .regex(idPattern, 'Lowercase letters, digits, or dashes (starting with letter/digit)'),
   name: z.string().min(1, 'Required'),
   clientId: z.string().min(1, 'Required'),
-  clientSecret: z.string().min(1, 'Required'),
+  // `clientSecret` is validated conditionally in `handleSubmit`: required on
+  // create, optional on edit (empty means "keep the existing secret").
+  clientSecret: z.string(),
   authorizeUrl: z.string().url('Must be a valid URL'),
   tokenUrl: z.string().url('Must be a valid URL'),
   userInfoUrl: z.string().url('Must be a valid URL'),
@@ -94,11 +96,17 @@ function valuesToPayload(
   const scopes = tokenizeScopes(values.scopes);
   const revokeUrl = (values.revokeUrl ?? '').trim();
   const iconUrl = (values.iconUrl ?? '').trim();
+  const isEditing = existingId !== undefined;
+  const trimmedSecret = values.clientSecret.trim();
+  // On edit, an empty `clientSecret` means "leave the stored secret untouched"
+  // — omit it from the PATCH body so the handler preserves the existing value.
+  const secretValue =
+    isEditing && trimmedSecret === '' ? undefined : values.clientSecret;
   return {
     id: existingId ?? values.id.trim(),
     name: values.name.trim(),
     clientId: values.clientId.trim(),
-    clientSecret: values.clientSecret,
+    ...(secretValue !== undefined ? { clientSecret: secretValue } : {}),
     authorizeUrl: values.authorizeUrl.trim(),
     tokenUrl: values.tokenUrl.trim(),
     userInfoUrl: values.userInfoUrl.trim(),
@@ -140,6 +148,12 @@ export function ProviderForm({
     const tokens = tokenizeScopes(values.scopes);
     if (tokens.length === 0) {
       form.setError('scopes', { message: 'At least one scope is required' });
+      return;
+    }
+    // `clientSecret` is only required when creating a new provider. On edit,
+    // leaving it blank preserves the stored secret (handled in valuesToPayload).
+    if (!isEditing && values.clientSecret.trim() === '') {
+      form.setError('clientSecret', { message: 'Required' });
       return;
     }
     const payload = valuesToPayload(values, isEditing ? provider!.id : undefined);
@@ -190,7 +204,7 @@ export function ProviderForm({
             id="provider-client-secret"
             type="password"
             {...form.register('clientSecret')}
-            placeholder="••••••••"
+            placeholder={isEditing ? 'Leave empty to keep current secret' : '••••••••'}
             className="rounded-md border bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
             autoComplete="new-password"
           />

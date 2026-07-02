@@ -18,6 +18,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ### Fixed
 - Run execution history now shows the correct control-mode badge for agent steps stored without an explicit `autonomyLevel` — previously they fell through to "No agent" (CM0) even though an agent was running; they now display as "Autonomous agent" (CM4), which matches the design intent that CM0 is reserved for `human | script | action` executors only.
+- Editing an OAuth provider no longer forces the admin to re-enter the `Client secret` — leaving the field blank on edit omits it from the PATCH body so the stored secret is preserved; the placeholder reads "Leave empty to keep current secret" to make the affordance obvious [#332](https://github.com/Appsilon/mediforce/issues/332).
 
 ## [2026-06-21]
 
