@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Layers, ArrowDownToLine, ArrowUpFromLine, Wrench, Eye, TrendingUp } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
+import { cn } from '@/lib/utils';
 import type { ModelRegistryEntry } from '@mediforce/platform-core';
 
 interface ModelPickerProps {
@@ -28,23 +29,38 @@ const TOP_PICKS_COUNT = 20;
 
 export function ModelPicker({ value, onChange, defaultModel, className }: ModelPickerProps) {
   const [models, setModels] = useState<ModelRegistryEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [customInput, setCustomInput] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
     apiFetch('/api/model-registry')
-      .then((res) => res.json())
-      .then((data: { models: ModelRegistryEntry[] }) => setModels(data.models))
-      .catch(() => {});
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to load models (${String(res.status)})`);
+        return res.json();
+      })
+      .then((data: { models: ModelRegistryEntry[] }) => {
+        setModels(data.models);
+        setLoadError(null);
+      })
+      .catch((err: unknown) => {
+        setLoadError(err instanceof Error ? err.message : 'Failed to load models');
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const topPicks = useMemo(() =>
-    models
+  // Prefer models with usage history, but fall back to the full (non-retired)
+  // registry when no usage stats exist yet (e.g. a freshly-synced registry) —
+  // otherwise the picker looks empty/broken even though models are available.
+  const topPicks = useMemo(() => {
+    const withUsage = models
       .filter((m) => m.retiredAt === null)
       .filter((m) => m.requestCount !== null && m.requestCount > 0)
-      .sort((a, b) => (b.requestCount ?? 0) - (a.requestCount ?? 0))
-      .slice(0, TOP_PICKS_COUNT),
-    [models],
-  );
+      .sort((a, b) => (b.requestCount ?? 0) - (a.requestCount ?? 0));
+    if (withUsage.length > 0) return withUsage.slice(0, TOP_PICKS_COUNT);
+    return models.filter((m) => m.retiredAt === null).slice(0, TOP_PICKS_COUNT);
+  }, [models]);
 
   const selectedModel = useMemo(() => {
     if (!value) return null;
@@ -92,6 +108,7 @@ export function ModelPicker({ value, onChange, defaultModel, className }: ModelP
       <div className="flex gap-2">
         <select
           value={value ?? ''}
+          disabled={loading}
           onChange={(e) => {
             if (e.target.value === '__custom__') {
               setCustomInput(true);
@@ -101,18 +118,26 @@ export function ModelPicker({ value, onChange, defaultModel, className }: ModelP
           }}
           className={className}
         >
-          <option value="">Default ({displayDefault})</option>
-          <optgroup label="Top picks">
-            {topPicks.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name} — {formatContext(m.contextLength)}, in:{formatPrice(m.pricing.input)}
-              </option>
-            ))}
-          </optgroup>
+          <option value="">{loading ? 'Loading models…' : `Default (${displayDefault})`}</option>
+          {topPicks.length > 0 && (
+            <optgroup label="Top picks">
+              {topPicks.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name} — {formatContext(m.contextLength)}, in:{formatPrice(m.pricing.input)}
+                </option>
+              ))}
+            </optgroup>
+          )}
           <option value="__custom__">Custom model ID...</option>
           {isCustom && <option value={value}>{value}</option>}
         </select>
       </div>
+      {loadError && (
+        <p className="text-xs text-red-500">Couldn&apos;t load the model registry: {loadError}</p>
+      )}
+      {!loading && !loadError && models.length === 0 && (
+        <p className="text-xs text-muted-foreground">No models in the registry yet. Enter a custom model ID instead.</p>
+      )}
       {(selectedModel ?? (value === '' || value === undefined ? defaultModelMeta(models, defaultModel) : null)) && (
         <ModelMeta model={(selectedModel ?? defaultModelMeta(models, defaultModel))!} />
       )}
