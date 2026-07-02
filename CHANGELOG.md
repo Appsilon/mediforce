@@ -18,6 +18,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ### Fixed
 - Run execution history now shows the correct control-mode badge for agent steps stored without an explicit `autonomyLevel` — previously they fell through to "No agent" (CM0) even though an agent was running; they now display as "Autonomous agent" (CM4), which matches the design intent that CM0 is reserved for `human | script | action` executors only.
+- community-digest `gather-changes` step now fails loudly on GitHub API errors instead of silently emitting an empty digest — non-2xx responses (notably 403/429 rate limits) now throw and exit non-zero via `main().catch`, with a clear message surfacing the `X-RateLimit-Reset` time; the only tolerated non-fatal case is a 409 on branch-commits fetch (branch deleted between listing and fetching) [#622](https://github.com/Appsilon/mediforce/issues/622).
 
 ## [2026-06-21]
 
