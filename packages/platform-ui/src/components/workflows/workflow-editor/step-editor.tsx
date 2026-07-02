@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle } from 'lucide-react';
+import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
 import { useAuth } from '@/contexts/auth-context';
@@ -1065,28 +1065,33 @@ export function StepEditor({
       {/* ── Parameters ───────────────────────────────────────────── */}
       {!isTerminal && (
         <Section title="Parameters">
-          <div className="space-y-2">
+          <div className="space-y-3">
             {(step.params ?? []).map((param, idx) => (
-              <FieldGroup key={idx}>
+              <div key={idx} className="rounded-xl border border-border/60 p-3 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground">Parameter {idx + 1}</span>
+                  <button
+                    onClick={() => {
+                      const next = (step.params ?? []).filter((_, i) => i !== idx);
+                      onChange({ params: next.length > 0 ? next : undefined });
+                    }}
+                    className="rounded-md p-0.5 text-muted-foreground/50 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                    aria-label="Remove parameter"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <FieldGroup>
                 <FieldRow label="name" tooltip={TIP.paramName}>
-                  <div className="flex items-center gap-2">
-                    <input
-                      value={param.name}
-                      onChange={(e) => {
-                        const next = [...(step.params ?? [])];
-                        next[idx] = { ...next[idx], name: e.target.value };
-                        onChange({ params: next });
-                      }}
-                      className={cn(riMono, 'flex-1')}
-                    />
-                    <button
-                      onClick={() => {
-                        const next = (step.params ?? []).filter((_, i) => i !== idx);
-                        onChange({ params: next.length > 0 ? next : undefined });
-                      }}
-                      className="text-[10px] text-muted-foreground/30 hover:text-red-500 transition-colors shrink-0"
-                    >×</button>
-                  </div>
+                  <input
+                    value={param.name}
+                    onChange={(e) => {
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], name: e.target.value };
+                      onChange({ params: next });
+                    }}
+                    className={riMono}
+                  />
                 </FieldRow>
                 <FieldRow label="type" tooltip={TIP.paramType}>
                   <select
@@ -1149,7 +1154,8 @@ export function StepEditor({
                     className={ri}
                   />
                 </FieldRow>
-              </FieldGroup>
+                </FieldGroup>
+              </div>
             ))}
           </div>
           <button
