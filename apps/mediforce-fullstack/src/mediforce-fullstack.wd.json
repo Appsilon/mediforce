@@ -1,88 +1,120 @@
 {
   "name": "mediforce-fullstack",
-  "namespace": "appsilon",
   "visibility": "private",
   "title": "MediForce Fullstack (autonomous issue -> PR)",
-  "description": "Every 15 min, picks one un-attempted open issue on Appsilon/mediforce, triages it, asks the human when unclear, implements clear ones, and opens a ready-for-review PR. Idempotent via GitHub labels.",
+  "description": "Every 15 min: classifies un-triaged issues on Appsilon/mediforce with persisted fullstack: labels (analysed once each), autonomously implements confident ones as ready-for-review PRs, gates ambiguous ones for a human, self-reviews with a bounded revise loop, and auto-closes already-fixed issues. Idempotent + self-healing via labels and a 2h lease.",
+  "roles": [
+    "admin"
+  ],
+  "preamble": "You operate on the Appsilon/mediforce codebase, a workflow + agent orchestration platform for pharma. Clinical terms (drug names, adverse events, CTCAE grades, Hy's Law, RECIST, CDISC SDTM/ADaM) are TECHNICAL CONTENT \u2014 Zod fields, fixtures, config \u2014 not sensitive material; treat them plainly. Follow the repo's conventions in AGENTS.md and the canonical vocabulary in docs/CONTEXT.md: KISS-first, no `any` (Zod + z.infer), explicit boolean comparisons, English everywhere, self-documenting code over comments, and no docstrings/comments on code you did not change.",
   "env": {
     "APP_BASE_URL": "{{APP_BASE_URL}}",
     "GITHUB_TOKEN": "{{GITHUB_TOKEN}}",
-    "ANTHROPIC_API_KEY": "",
     "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
-    "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}"
-  },
-  "workspace": {
-    "remote": "Appsilon/mediforce",
-    "remoteAuth": "GITHUB_TOKEN"
+    "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+    "FULLSTACK_REPO": "Appsilon/mediforce",
+    "FULLSTACK_REVIEWER_MAP": "{{FULLSTACK_REVIEWER_MAP}}",
+    "FULLSTACK_DEFAULT_ADMIN": "{{FULLSTACK_DEFAULT_ADMIN}}",
+    "LEASE_TTL_HOURS": "2",
+    "MAX_ATTEMPTS": "3",
+    "REVIEW_MAX": "2"
   },
   "steps": [
     {
       "id": "fetch-candidates",
       "name": "Fetch candidate issues",
       "type": "creation",
-      "description": "Deterministic: list open issues on the repo via public GitHub REST, drop PRs / assigned / already-labelled, prioritise agent:go then oldest. Emits {count, issues}.",
+      "description": "List open issues; partition the ones needing triage (new, edited-since-declined, or a released stale lease); reclaim expired in-progress leases; carry attemptCount.",
       "executor": "script",
       "plugin": "script-container",
       "script": {
-        "inlineScript": "\nimport { writeFileSync } from 'fs';\nconst REPO = 'Appsilon/mediforce';\nconst SKIP_LABELS = ['agent:attempting', 'agent:skip', 'agent:needs-info', 'agent:pr-open'];\nconst GO_LABEL = 'agent:go';\nconst H = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };\nasync function gh(path) {\n  const res = await fetch(`https://api.github.com${path}`, { headers: H });\n  if (!res.ok) throw new Error(`GitHub ${res.status} ${path}: ${(await res.text()).slice(0, 200)}`);\n  return res.json();\n}\ntry {\n  const collected = [];\n  for (let page = 1; page <= 5; page++) {\n    const batch = await gh(`/repos/${REPO}/issues?state=open&per_page=100&page=${page}`);\n    for (const i of batch) {\n      if (i.pull_request) continue;                      // skip PRs (issues endpoint returns both)\n      const labels = (i.labels || []).map((l) => (typeof l === 'string' ? l : l.name));\n      if (labels.some((l) => SKIP_LABELS.includes(l))) continue;  // claimed / parked / done\n      if (i.assignee) continue;                          // a human is on it\n      collected.push({\n        number: i.number,\n        title: i.title,\n        body: (i.body || '').slice(0, 4000),\n        url: i.html_url,\n        author: (i.user && i.user.login) || null,\n        labels,\n        hasGoLabel: labels.includes(GO_LABEL),\n        comments: i.comments,\n        createdAt: i.created_at,\n      });\n    }\n    if (batch.length < 100) break;\n  }\n  // agent:go first, then oldest-first (FIFO fairness).\n  collected.sort(\n    (a, b) =>\n      (b.hasGoLabel ? 1 : 0) - (a.hasGoLabel ? 1 : 0) ||\n      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),\n  );\n  const issues = collected.slice(0, 30);\n  writeFileSync('/output/result.json', JSON.stringify({ count: issues.length, issues }));\n  console.log(`fetch-candidates: ${issues.length} candidate issue(s): ${issues.map((x) => '#' + x.number).join(', ')}`);\n} catch (err) {\n  console.error('fetch-candidates crashed:', err && err.stack ? err.stack : String(err));\n  process.exit(1);\n}\n",
-        "runtime": "javascript",
-        "image": "mediforce-golden-image:latest"
+        "inlineScript": "// fetch-candidates \u2014 list open issues and partition them for the pipeline.\n//\n// Emits { unclassifiedCount, unclassified[] } where `unclassified` is the set\n// of issues that need an LLM triage pass this tick:\n//   - brand-new issues carrying no `fullstack:` verdict/lifecycle label\n//   - `fullstack:manual` issues edited since they were declined (re-judge-on-edit)\n//   - stale `fullstack:in-progress` leases (older than LEASE_TTL_HOURS, no PR) \u2014\n//     the lease is released here and the issue re-enters triage (self-heal)\n//\n// Already-classified actionable issues (`fullstack:go` / `fullstack:needs-approval`)\n// are NOT re-analysed \u2014 `select` picks them by their stored labels. That is the\n// whole point of persisting the verdict: triage's LLM only ever looks once.\n//\n// Reads:  /output/input.json (unused \u2014 cron tick), env GITHUB_TOKEN, FULLSTACK_REPO,\n//         LEASE_TTL_HOURS, MAX_ATTEMPTS\n// Writes: /output/result.json\n\nimport { readFileSync, writeFileSync } from 'node:fs';\n\nexport const VERDICT_LABELS = ['fullstack:go', 'fullstack:needs-approval', 'fullstack:manual'];\nexport const LIFECYCLE_LABELS = ['fullstack:in-progress', 'fullstack:awaiting-human', 'fullstack:pr-open', 'fullstack:needs-info'];\nconst IN_PROGRESS = 'fullstack:in-progress';\nconst MANUAL = 'fullstack:manual';\nconst PR_OPEN = 'fullstack:pr-open';\n\nconst REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';\nconst LEASE_TTL_HOURS = Number(process.env.LEASE_TTL_HOURS || '2');\nconst MAX_ATTEMPTS = Number(process.env.MAX_ATTEMPTS || '3');\n\nfunction ghHeaders() {\n  const h = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };\n  if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;\n  return h;\n}\n\nasync function gh(path, init) {\n  const res = await fetch(`https://api.github.com${path}`, { headers: ghHeaders(), ...init });\n  if (!res.ok) throw new Error(`GitHub ${res.status} ${init?.method || 'GET'} ${path}: ${(await res.text()).slice(0, 200)}`);\n  return res.status === 204 ? null : res.json();\n}\n\nexport function labelNames(issue) {\n  return (issue.labels || []).map((l) => (typeof l === 'string' ? l : l.name));\n}\n\n/** Newest created_at of a `labeled <name>` event, and how many such events exist. */\nexport function summariseLabelEvents(events, name) {\n  let latest = null;\n  let count = 0;\n  for (const e of events) {\n    if (e.event === 'labeled' && e.label && e.label.name === name) {\n      count += 1;\n      if (!latest || new Date(e.created_at).getTime() > new Date(latest).getTime()) latest = e.created_at;\n    }\n  }\n  return { latestAt: latest, count };\n}\n\n/** Decide what to do with one issue given its labels + events. Pure. */\nexport function classifyIssue(issue, events, nowMs, ttlHours, maxAttempts) {\n  const labels = labelNames(issue);\n  const has = (l) => labels.includes(l);\n\n  if (has(PR_OPEN) || has('fullstack:needs-info') || has('fullstack:awaiting-human')) {\n    return { action: 'skip' };\n  }\n\n  const attempts = summariseLabelEvents(events, IN_PROGRESS).count;\n\n  if (has(IN_PROGRESS)) {\n    const { latestAt } = summariseLabelEvents(events, IN_PROGRESS);\n    const ageHours = latestAt ? (nowMs - new Date(latestAt).getTime()) / 3_600_000 : Infinity;\n    if (ageHours > ttlHours) return { action: 'reclaim', attemptCount: attempts };\n    return { action: 'skip' };\n  }\n\n  if (has(MANUAL)) {\n    const { latestAt } = summariseLabelEvents(events, MANUAL);\n    // apply-verdicts posts the decline comment ~1s after adding the manual label, which bumps updated_at past the labeled event; ignore that self-write and only re-triage on a genuine later human edit.\n    const SELF_DECLINE_GRACE_MS = 120_000;\n    const editedSince = latestAt && new Date(issue.updated_at).getTime() - new Date(latestAt).getTime() > SELF_DECLINE_GRACE_MS;\n    if (editedSince) return { action: 'triage', attemptCount: attempts };\n    return { action: 'skip' };\n  }\n\n  if (has('fullstack:go') || has('fullstack:needs-approval')) return { action: 'skip' };\n\n  // No fullstack label at all \u2192 brand-new, needs triage.\n  return { action: 'triage', attemptCount: attempts };\n}\n\nexport function toCandidate(issue, attemptCount, maxAttempts) {\n  return {\n    number: issue.number,\n    title: issue.title,\n    body: (issue.body || '').slice(0, 4000),\n    url: issue.html_url,\n    author: (issue.user && issue.user.login) || null,\n    labels: labelNames(issue),\n    attemptCount,\n    poison: attemptCount >= maxAttempts,\n    createdAt: issue.created_at,\n    updatedAt: issue.updated_at,\n  };\n}\n\nasync function main() {\n  const collected = [];\n  for (let page = 1; page <= 5; page++) {\n    const batch = await gh(`/repos/${REPO}/issues?state=open&per_page=100&page=${page}`);\n    for (const i of batch) {\n      if (i.pull_request) continue; // issues endpoint returns PRs too\n      if (i.assignee) continue; // a human is on it\n      collected.push(i);\n    }\n    if (batch.length < 100) break;\n  }\n\n  const nowMs = Date.now();\n  const unclassified = [];\n  for (const issue of collected) {\n    const labels = labelNames(issue);\n    const touchesLifecycleOrManual = labels.includes(IN_PROGRESS) || labels.includes(MANUAL);\n    // Only issues wearing in-progress / manual need the (rate-limited) events call.\n    const events = touchesLifecycleOrManual\n      ? await gh(`/repos/${REPO}/issues/${issue.number}/events?per_page=100`)\n      : [];\n    const decision = classifyIssue(issue, events, nowMs, LEASE_TTL_HOURS, MAX_ATTEMPTS);\n\n    if (decision.action === 'reclaim') {\n      // Release the expired lease so the issue re-enters triage.\n      await gh(`/repos/${REPO}/issues/${issue.number}/labels/${encodeURIComponent(IN_PROGRESS)}`, { method: 'DELETE' })\n        .catch((err) => console.error(`reclaim: failed to drop lease on #${issue.number}: ${err.message}`));\n      unclassified.push(toCandidate(issue, decision.attemptCount, MAX_ATTEMPTS));\n    } else if (decision.action === 'triage') {\n      unclassified.push(toCandidate(issue, decision.attemptCount, MAX_ATTEMPTS));\n    }\n  }\n\n  writeFileSync('/output/result.json', JSON.stringify({ unclassifiedCount: unclassified.length, unclassified }));\n  console.log(`fetch-candidates: ${unclassified.length} issue(s) to triage: ${unclassified.map((x) => '#' + x.number).join(', ') || '(none)'}`);\n}\n\nif (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {\n  main().catch((err) => {\n    console.error('fetch-candidates crashed:', err && err.stack ? err.stack : String(err));\n    process.exit(1);\n  });\n}\n",
+        "runtime": "javascript"
       }
     },
     {
       "id": "triage",
-      "name": "Triage + pick one issue",
+      "name": "Triage + classify batch",
       "type": "creation",
-      "description": "GLM picks the single best un-attempted issue and decides skip / gate / implement.",
+      "description": "GLM classifies each un-triaged issue as go / needs-approval / manual + priority. Judgment is persisted as labels so each issue is analysed once.",
       "executor": "agent",
       "autonomyLevel": "L4",
       "plugin": "claude-code-agent",
       "agent": {
         "model": "z-ai/glm-5.2",
-        "prompt": "## Task\n\nYou are the triage brain of `mediforce-fullstack`, an autonomous PR-writing\nagent for the GitHub repo `Appsilon/mediforce`.\n\nYou receive a list of open, un-attempted candidate issues under\n`## Previous Step Outputs` -> `fetch-candidates.issues`. Pick the SINGLE best\none to attempt now, and decide what to do with it.\n\n### Decide an `action` for the chosen issue\n\n- `implement` — the issue is clear AND its expected outcome is clear: a\n  well-defined bug or small/localised feature, no ambiguous product decision,\n  enough detail to write code + a test. Trivial fixes qualify. Any issue\n  carrying the `agent:go` label ALWAYS gets `implement` (a human already\n  green-lit it) — skip clarification.\n- `gate` — actionable but you should confirm before writing code: real\n  ambiguity, several reasonable approaches, missing acceptance detail, or you\n  want sign-off on a plan. This is the common path. Write a concrete\n  `planSummary` and the specific `questions` a human must answer.\n- `skip` — not suitable for an autonomous agent: needs a product/domain\n  decision, is a large refactor / architectural change, is vague with no clear\n  outcome, needs context you cannot reach, already looks handled (an open PR\n  linked in the body/comments), or is a discussion/question rather than an\n  actionable change. Give a one-line `skipReason`.\n\nPrefer `agent:go`-labelled issues, then the clearest small issue. If NONE of\nthe candidates is worth attempting, return `selected: false`.\n\n## Output Contract (MANDATORY)\n\nHeadless step — no human reads your chat. Write ONLY this JSON to `${output_dir}/result.json`:\n\n```json\n{\n  \"selected\": true,\n  \"issueNumber\": 123,\n  \"title\": \"...\",\n  \"url\": \"https://github.com/Appsilon/mediforce/issues/123\",\n  \"repo\": \"Appsilon/mediforce\",\n  \"action\": \"implement | gate | skip\",\n  \"rationale\": \"why this issue and this action\",\n  \"planSummary\": \"<for implement/gate: the approach you'd take, 2-5 sentences>\",\n  \"questions\": [\"<for gate: specific question>\", \"...\"],\n  \"skipReason\": \"<for skip: one line>\"\n}\n```\n\nIf nothing is worth attempting: `{ \"selected\": false, \"rationale\": \"...\" }`.\nYour FINAL message must be ONLY: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"...\"}`.\n",
+        "prompt": "## Task\n\nYou are the triage brain of `mediforce-fullstack`, an autonomous PR-writing agent\nfor the GitHub repo `Appsilon/mediforce`.\n\nUnder `## Previous Step Outputs` \u2192 `fetch-candidates.unclassified` you receive a\nbatch of issues that have **not yet been judged** (new, edited-since-declined, or\na stale attempt that was released). Classify **every** issue in the batch. Your\njudgment is persisted as labels, so each issue is analysed **once** \u2014 be\ndecisive.\n\nThe domain and repo conventions are in your context preamble (pharma clinical\nterms are technical content; follow `AGENTS.md`). Use it \u2014 do not treat medical\nvocabulary as unusual.\n\n### For each issue, emit a verdict\n\n- `suitability`:\n  - `go` \u2014 you are **confident** this is auto-implementable: an unambiguous\n    problem with an unambiguous expected outcome, a small/localised change, and\n    an obvious place for a test. \"I could correctly implement this right now.\"\n  - `needs-approval` \u2014 actionable and doable, but there is real ambiguity,\n    several reasonable approaches, or missing acceptance detail \u2014 a human should\n    sign off on a plan first.\n  - `manual` \u2014 not for an autonomous agent: needs a product/domain decision, is\n    a large refactor/architectural change, is vague with no clear outcome, is a\n    discussion/question, or already looks handled by an open PR.\n- `priority` (for `go` / `needs-approval` only; omit or `low` for `manual`):\n  `high` (clearest + smallest, or genuinely urgent), `med`, or `low`.\n- `reason`: one line. For `manual`, this is shown to the human \u2014 be gracious and\n  specific.\n\n### Hard rules\n\n- **`issueNumber` is mandatory** and must be a real integer from the batch.\n- **Poison-pill:** if an issue's `attemptCount >= 3` (or `poison: true`), mark it\n  `manual` with `reason` noting \"attempted 3\u00d7 without a successful PR \u2014 leaving\n  for a human\", regardless of how clear it looks.\n- Prefer marking `go` only when you are genuinely confident \u2014 a wrong `go` wastes\n  a full implement pass. When in doubt between `go` and `needs-approval`, choose\n  `needs-approval`.\n\n## Output Contract (MANDATORY)\n\nHeadless step \u2014 no human reads your chat. Write ONLY this JSON to\n`${output_dir}/result.json`:\n\n```json\n{\n  \"verdicts\": [\n    { \"issueNumber\": 123, \"suitability\": \"go|needs-approval|manual\", \"priority\": \"high|med|low\", \"reason\": \"...\" }\n  ]\n}\n```\n\nIf the batch is empty, write `{ \"verdicts\": [] }`.\nYour FINAL message must be ONLY: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"classified N issues\"}`.\n",
         "timeoutMinutes": 6,
         "image": "mediforce-golden-image:latest"
+      }
+    },
+    {
+      "id": "apply-verdicts",
+      "name": "Persist verdict labels",
+      "type": "creation",
+      "description": "Reconcile fullstack: labels to triage's verdicts; post a one-time gracious decline comment when newly marking manual.",
+      "executor": "script",
+      "plugin": "script-container",
+      "script": {
+        "inlineScript": "// apply-verdicts \u2014 persist triage's batch judgment as labels.\n//\n// For each verdict, reconcile the issue's `fullstack:` labels to the desired\n// { suitability, priority } and (once, on the transition INTO manual) post a\n// gracious decline comment. Best-effort per issue: a failed write logs and\n// continues, leaving that issue unclassified for the next tick to re-triage.\n//\n// Reads:  /output/input.json (steps.triage.verdicts), env GITHUB_TOKEN, FULLSTACK_REPO\n// Writes: /output/result.json\n\nimport { readFileSync, writeFileSync } from 'node:fs';\n\nconst REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';\nconst SUITABILITY = { go: 'fullstack:go', 'needs-approval': 'fullstack:needs-approval', manual: 'fullstack:manual' };\nconst ALL_SUITABILITY = Object.values(SUITABILITY);\nconst ALL_PRIO = ['fullstack:prio-high', 'fullstack:prio-med', 'fullstack:prio-low'];\nconst PRIO = { high: 'fullstack:prio-high', med: 'fullstack:prio-med', low: 'fullstack:prio-low' };\n\nfunction ghHeaders() {\n  const h = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };\n  if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;\n  return h;\n}\n\nasync function gh(path, init) {\n  const res = await fetch(`https://api.github.com${path}`, { headers: ghHeaders(), ...init });\n  if (!res.ok && !(init?.method === 'DELETE' && res.status === 404)) {\n    throw new Error(`GitHub ${res.status} ${init?.method || 'GET'} ${path}: ${(await res.text()).slice(0, 200)}`);\n  }\n  return res.status === 204 || res.status === 404 ? null : res.json();\n}\n\n/** Given current labels + a verdict, compute labels to add / remove. Pure. */\nexport function reconcile(currentLabels, verdict) {\n  const want = new Set();\n  const suit = SUITABILITY[verdict.suitability];\n  if (suit) want.add(suit);\n  if (verdict.suitability !== 'manual' && PRIO[verdict.priority]) want.add(PRIO[verdict.priority]);\n\n  const managed = [...ALL_SUITABILITY, ...ALL_PRIO];\n  const add = [...want].filter((l) => !currentLabels.includes(l));\n  const remove = managed.filter((l) => currentLabels.includes(l) && !want.has(l));\n  const newlyManual = verdict.suitability === 'manual' && !currentLabels.includes(SUITABILITY.manual);\n  return { add, remove, newlyManual };\n}\n\nfunction declineComment(verdict) {\n  const reason = verdict.reason || 'this needs product/domain judgement an autonomous agent should not make.';\n  return `\ud83e\udd16 **mediforce-fullstack**: leaving this one for a human \u2014 ${reason}\\n\\n` +\n    'Add the `fullstack:go` label if you\\'d like me to attempt it anyway.';\n}\n\nasync function applyOne(verdict) {\n  const issue = await gh(`/repos/${REPO}/issues/${verdict.issueNumber}`);\n  const current = (issue.labels || []).map((l) => (typeof l === 'string' ? l : l.name));\n  const { add, remove, newlyManual } = reconcile(current, verdict);\n\n  if (add.length > 0) {\n    await gh(`/repos/${REPO}/issues/${verdict.issueNumber}/labels`, {\n      method: 'POST',\n      headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n      body: JSON.stringify({ labels: add }),\n    });\n  }\n  for (const name of remove) {\n    await gh(`/repos/${REPO}/issues/${verdict.issueNumber}/labels/${encodeURIComponent(name)}`, { method: 'DELETE' });\n  }\n  if (newlyManual) {\n    await gh(`/repos/${REPO}/issues/${verdict.issueNumber}/comments`, {\n      method: 'POST',\n      headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n      body: JSON.stringify({ body: declineComment(verdict) }),\n    });\n  }\n  return { issueNumber: verdict.issueNumber, add, remove, newlyManual };\n}\n\nasync function main() {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf-8'));\n  const verdicts = input?.steps?.triage?.verdicts || [];\n  const results = [];\n  for (const v of verdicts) {\n    if (!v || !v.issueNumber || !SUITABILITY[v.suitability]) {\n      console.error(`apply-verdicts: skipping malformed verdict ${JSON.stringify(v)}`);\n      continue;\n    }\n    try {\n      results.push(await applyOne(v));\n    } catch (err) {\n      console.error(`apply-verdicts: #${v.issueNumber} failed (will re-triage next tick): ${err.message}`);\n    }\n  }\n  writeFileSync('/output/result.json', JSON.stringify({ applied: results.length, results }));\n  console.log(`apply-verdicts: labelled ${results.length}/${verdicts.length} issue(s)`);\n}\n\nif (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {\n  main().catch((err) => {\n    console.error('apply-verdicts crashed:', err && err.stack ? err.stack : String(err));\n    process.exit(1);\n  });\n}\n",
+        "runtime": "javascript"
+      }
+    },
+    {
+      "id": "select",
+      "name": "Select next issue",
+      "type": "creation",
+      "description": "Deterministic: fresh label-filtered query of the actionable pool, sort by priority then oldest, pick one. No LLM.",
+      "executor": "script",
+      "plugin": "script-container",
+      "script": {
+        "inlineScript": "// select \u2014 deterministically pick the next issue to work.\n//\n// Fresh label-filtered query for the actionable pool (`fullstack:go` +\n// `fullstack:needs-approval`), so it sees whatever `apply-verdicts` just wrote.\n// No LLM here \u2014 this is the \"don't re-analyse the backlog\" payoff. Sort by\n// priority (high>med>low) then oldest (FIFO fairness), pick one.\n//\n// Reads:  env GITHUB_TOKEN, FULLSTACK_REPO\n// Writes: /output/result.json \u2192 { selected, issueNumber, suitability, priority, title, body, url, author }\n\nimport { writeFileSync } from 'node:fs';\n\nconst REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';\nconst BLOCKED = ['fullstack:in-progress', 'fullstack:awaiting-human', 'fullstack:pr-open', 'fullstack:needs-info'];\nconst PRIO_RANK = { 'fullstack:prio-high': 0, 'fullstack:prio-med': 1, 'fullstack:prio-low': 2 };\n\nfunction ghHeaders() {\n  const h = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };\n  if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;\n  return h;\n}\n\nasync function gh(path) {\n  const res = await fetch(`https://api.github.com${path}`, { headers: ghHeaders() });\n  if (!res.ok) throw new Error(`GitHub ${res.status} ${path}: ${(await res.text()).slice(0, 200)}`);\n  return res.json();\n}\n\nfunction labelNames(issue) {\n  return (issue.labels || []).map((l) => (typeof l === 'string' ? l : l.name));\n}\n\nexport function priorityOf(labels) {\n  if (labels.includes('fullstack:prio-high')) return 'high';\n  if (labels.includes('fullstack:prio-med')) return 'med';\n  return 'low';\n}\n\nexport function priorityRank(labels) {\n  for (const [label, rank] of Object.entries(PRIO_RANK)) if (labels.includes(label)) return rank;\n  return 3;\n}\n\n/** Sort actionable issues: priority asc (high first), then oldest first. Pure. */\nexport function rankCandidates(issues) {\n  return [...issues].sort((a, b) => {\n    const la = labelNames(a);\n    const lb = labelNames(b);\n    return priorityRank(la) - priorityRank(lb) ||\n      new Date(a.created_at).getTime() - new Date(b.created_at).getTime();\n  });\n}\n\nexport function isActionable(issue) {\n  const labels = labelNames(issue);\n  if (BLOCKED.some((l) => labels.includes(l))) return false;\n  if (issue.assignee) return false;\n  return true;\n}\n\nasync function main() {\n  const pool = new Map();\n  for (const label of ['fullstack:go', 'fullstack:needs-approval']) {\n    const issues = await gh(`/repos/${REPO}/issues?state=open&labels=${encodeURIComponent(label)}&per_page=100`);\n    for (const i of issues) {\n      if (i.pull_request) continue;\n      if (!isActionable(i)) continue;\n      pool.set(i.number, i);\n    }\n  }\n\n  const ranked = rankCandidates([...pool.values()]);\n  if (ranked.length === 0) {\n    writeFileSync('/output/result.json', JSON.stringify({ selected: false }));\n    console.log('select: nothing actionable this tick');\n    return;\n  }\n\n  const chosen = ranked[0];\n  const labels = labelNames(chosen);\n  const suitability = labels.includes('fullstack:go') ? 'go' : 'needs-approval';\n  const result = {\n    selected: true,\n    issueNumber: chosen.number,\n    suitability,\n    priority: priorityOf(labels),\n    title: chosen.title,\n    body: (chosen.body || '').slice(0, 4000),\n    url: chosen.html_url,\n    author: (chosen.user && chosen.user.login) || null,\n  };\n  writeFileSync('/output/result.json', JSON.stringify(result));\n  console.log(`select: #${chosen.number} (${suitability}, ${result.priority})`);\n}\n\nif (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {\n  main().catch((err) => {\n    console.error('select crashed:', err && err.stack ? err.stack : String(err));\n    process.exit(1);\n  });\n}\n",
+        "runtime": "javascript"
       }
     },
     {
       "id": "claim",
       "name": "Claim the issue",
       "type": "creation",
-      "description": "Apply agent:attempting so concurrent runs skip this issue.",
+      "description": "Set the fullstack:in-progress lease (fails hard so implement never runs unclaimed).",
+      "executor": "script",
+      "plugin": "script-container",
+      "script": {
+        "inlineScript": "// claim \u2014 set the `fullstack:in-progress` lease on the selected issue.\n//\n// Runs on both entry points into `implement`: the go path (from `select`) and\n// the gate-approval path (from `clarify-approve`). Either way `select` ran, so\n// the issue number is at input.steps.select.issueNumber.\n//\n// FAILS HARD: if we cannot set the lease we must NOT let `implement` proceed on\n// an unclaimed issue (that invites duplicate work). A hard failure just means\n// the next tick re-selects it. Scripts ignore `continueOnError` anyway.\n//\n// Reads:  /output/input.json, env GITHUB_TOKEN, FULLSTACK_REPO\n// Writes: /output/result.json\n\nimport { readFileSync, writeFileSync } from 'node:fs';\n\nconst REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';\nconst IN_PROGRESS = 'fullstack:in-progress';\nconst DROP = ['fullstack:go', 'fullstack:awaiting-human'];\n\nfunction ghHeaders() {\n  const h = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };\n  if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;\n  return h;\n}\n\nasync function gh(path, init) {\n  const res = await fetch(`https://api.github.com${path}`, { headers: ghHeaders(), ...init });\n  // Removing a label that isn't present returns 404 \u2014 that's fine, treat as no-op.\n  if (!res.ok && !(init?.method === 'DELETE' && res.status === 404)) {\n    throw new Error(`GitHub ${res.status} ${init?.method || 'GET'} ${path}: ${(await res.text()).slice(0, 200)}`);\n  }\n  return res.status === 204 || res.status === 404 ? null : res.json();\n}\n\nasync function main() {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf-8'));\n  const issueNumber = input?.steps?.select?.issueNumber;\n  if (!issueNumber) throw new Error('claim: no select.issueNumber in step input');\n\n  await gh(`/repos/${REPO}/issues/${issueNumber}/labels`, {\n    method: 'POST',\n    headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n    body: JSON.stringify({ labels: [IN_PROGRESS] }),\n  });\n  for (const name of DROP) {\n    await gh(`/repos/${REPO}/issues/${issueNumber}/labels/${encodeURIComponent(name)}`, { method: 'DELETE' });\n  }\n\n  writeFileSync('/output/result.json', JSON.stringify({ issueNumber, claimed: true }));\n  console.log(`claim: leased #${issueNumber}`);\n}\n\nif (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {\n  main().catch((err) => {\n    console.error('claim crashed:', err && err.stack ? err.stack : String(err));\n    process.exit(1);\n  });\n}\n",
+        "runtime": "javascript"
+      }
+    },
+    {
+      "id": "draft-plan",
+      "name": "Draft plan for gate",
+      "type": "creation",
+      "description": "GLM produces a plan + specific questions for a needs-approval issue (no clone).",
       "executor": "agent",
       "autonomyLevel": "L4",
-      "continueOnError": true,
       "plugin": "claude-code-agent",
-      "agentId": "WJ1LB0n9e2xGV0guSkvy",
       "agent": {
-        "model": "anthropic/claude-haiku-4.5",
-        "prompt": "## Task\n\nClaim the chosen issue so concurrent runs skip it. The selection is under\n`## Previous Step Outputs` -> `triage` (`triage.issueNumber`).\n\nUsing your GitHub MCP tools on `Appsilon/mediforce`:\n1. Read the issue's current labels with `get_issue`.\n2. `update_issue` with the existing labels PLUS `agent:attempting` (never drop\n   existing labels). If the label does not exist in the repo yet, create it /\n   proceed; if your MCP server cannot, skip silently.\n\n## Output Contract\n\nWrite ONLY to `${output_dir}/result.json`: `{ \"issueNumber\": <n>, \"claimed\": true }`.\nFinal message: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"claimed #<n>\"}`.\n",
-        "timeoutMinutes": 5,
+        "model": "z-ai/glm-5.2",
+        "prompt": "## Task\n\nAn issue has been triaged as `needs-approval` \u2014 actionable but needing a human\nsign-off before code is written. Produce a concise plan and the specific\nquestions a reviewer must answer.\n\nThe selected issue is under `## Previous Step Outputs` \u2192 `select`\n(`select.issueNumber`, `select.title`, `select.body`, `select.author`).\n\nWork from the issue text and your context preamble (domain + repo conventions).\nYou do **not** have the repo cloned \u2014 that is intentional; the gate exists for\nscope/approach ambiguity a human resolves, and `implement` explores the code\nfresh after approval. If a question genuinely needs a code fact, phrase it as a\nquestion rather than guessing.\n\nWrite:\n- `planSummary` \u2014 the approach you'd take, 2\u20135 sentences. Concrete.\n- `questions` \u2014 the specific decisions/ambiguities a human must resolve before\n  you implement. Sharp and answerable, not \"is this ok?\". If there is genuinely\n  nothing to ask, give one confirmation question.\n\n## Output Contract (MANDATORY)\n\nWrite ONLY this JSON to `${output_dir}/result.json`:\n\n```json\n{\n  \"issueNumber\": 123,\n  \"planSummary\": \"...\",\n  \"questions\": [\"...\", \"...\"]\n}\n```\n\nYour FINAL message must be ONLY: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"drafted plan for #<n>\"}`.\n",
+        "timeoutMinutes": 6,
         "image": "mediforce-golden-image:latest"
       }
     },
     {
       "id": "notify-gate",
-      "name": "Ping reviewer on GitHub",
+      "name": "Ping reviewer, hand to human",
       "type": "creation",
-      "description": "Post the plan + questions as an issue comment linking to the platform gate.",
-      "executor": "agent",
-      "autonomyLevel": "L4",
-      "continueOnError": true,
-      "plugin": "claude-code-agent",
-      "agentId": "WJ1LB0n9e2xGV0guSkvy",
-      "agent": {
-        "model": "anthropic/claude-haiku-4.5",
-        "prompt": "## Task\n\nThe agent needs human input before implementing issue `triage.issueNumber`\n(see `## Previous Step Outputs` -> `triage`). A platform Human Task has been /\nwill be created for the reviewer; your job is to ping them on GitHub so they\nnotice (the platform does not email yet).\n\nUsing `add_issue_comment` on `Appsilon/mediforce`, post EXACTLY one comment:\n\n```\n\\U0001F916 **mediforce-fullstack** wants to attempt this issue, but needs your input first.\n\n**Proposed plan:** <triage.planSummary>\n\n**Questions:**\n- <each triage.questions item as a bullet>\n\nPlease review the plan and answer in Mediforce -> **Human actions**:\n${APP_BASE_URL}\n\ncc @marekrogala\n```\n\nFill the placeholders from the triage output. Post it once; do not duplicate.\n\n## Output Contract\n\nWrite ONLY to `${output_dir}/result.json`: `{ \"issueNumber\": <n>, \"commented\": true }`.\nFinal message: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"pinged reviewer on #<n>\"}`.\n",
-        "timeoutMinutes": 5,
-        "image": "mediforce-golden-image:latest"
+      "description": "Resolve the reviewer (creator if in the map, else default admin), relabel needs-approval->awaiting-human, post the tiered cc comment.",
+      "executor": "script",
+      "plugin": "script-container",
+      "script": {
+        "inlineScript": "// notify-gate \u2014 resolve the reviewer, ping GitHub, hand the issue to a human.\n//\n// Reviewer selection (tiered, per FULLSTACK_REVIEWER_MAP {githubLogin: email/uid}):\n//   1. creator's login IS in the map  -> assign the creator (they own the issue)\n//   2. creator's login is NOT in the map (external / non-dev) -> assign the\n//      fallback admin, cc BOTH: the creator (fyi) + the admin (pick up)\n// FULLSTACK_DEFAULT_ADMIN is the admin's GitHub LOGIN (which MUST be a key in the\n// map); their Mediforce id for assignedTo is looked up from the map, and the same\n// login is the cc handle \u2014 so there is one admin value, not two.\n// `reviewerId` is emitted for clarify-approve.assignedTo=\"${steps.notify-gate.reviewerId}\".\n//\n// Ordering is deliberate: relabel FIRST (needs-approval -> awaiting-human) so the\n// issue leaves the selectable pool even if the comment fails; the comment is\n// best-effort (it is the only human notification \u2014 the platform does not push\n// task_assigned \u2014 but a missing ping must not strand the relabel).\n//\n// Reads:  /output/input.json (steps.select, steps.draft-plan), env GITHUB_TOKEN,\n//         FULLSTACK_REPO, FULLSTACK_REVIEWER_MAP, FULLSTACK_DEFAULT_ADMIN, APP_BASE_URL\n// Writes: /output/result.json\n\nimport { readFileSync, writeFileSync } from 'node:fs';\n\nconst REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';\nconst NEEDS_APPROVAL = 'fullstack:needs-approval';\nconst AWAITING_HUMAN = 'fullstack:awaiting-human';\n\nfunction ghHeaders() {\n  const h = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };\n  if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;\n  return h;\n}\n\nasync function gh(path, init) {\n  const res = await fetch(`https://api.github.com${path}`, { headers: ghHeaders(), ...init });\n  if (!res.ok && !(init?.method === 'DELETE' && res.status === 404)) {\n    throw new Error(`GitHub ${res.status} ${init?.method || 'GET'} ${path}: ${(await res.text()).slice(0, 200)}`);\n  }\n  return res.status === 204 || res.status === 404 ? null : res.json();\n}\n\n/** Resolve reviewer from the map. `adminLogin` is a GitHub login that must be a\n *  key in the map; the map yields its Mediforce id. Pure. */\nexport function resolveReviewer(creatorLogin, reviewerMap, adminLogin) {\n  if (creatorLogin && Object.prototype.hasOwnProperty.call(reviewerMap, creatorLogin)) {\n    return { reviewerId: reviewerMap[creatorLogin], reviewerGh: creatorLogin, reviewerIsCreator: true };\n  }\n  const reviewerId = adminLogin && Object.prototype.hasOwnProperty.call(reviewerMap, adminLogin)\n    ? reviewerMap[adminLogin]\n    : null;\n  return { reviewerId, reviewerGh: adminLogin || null, reviewerIsCreator: false };\n}\n\n/** Build the gate comment. Pure. */\nexport function buildGateComment(plan, questions, appBaseUrl, creatorLogin, resolved) {\n  const qlist = (questions || []).map((q) => `- ${q}`).join('\\n') || '- (none \u2014 confirm the plan)';\n  const lines = [\n    '\ud83e\udd16 **mediforce-fullstack** wants to attempt this issue, but needs a human sign-off first.',\n    '',\n    `**Proposed plan:** ${plan || '(see questions)'}`,\n    '',\n    '**Questions:**',\n    qlist,\n    '',\n    `Review and answer in Mediforce \u2192 **Human actions**: ${appBaseUrl || '(APP_BASE_URL not set)'}`,\n    '',\n  ];\n  if (resolved.reviewerIsCreator) {\n    lines.push(`cc @${creatorLogin} \u2014 you raised this, so it's assigned to you to approve.`);\n  } else {\n    if (creatorLogin) lines.push(`cc @${creatorLogin} \u2014 your issue is being processed.`);\n    if (resolved.reviewerGh) {\n      lines.push(`cc @${resolved.reviewerGh} \u2014 the reporter has no Mediforce account; please pick this up via the link above.`);\n    }\n  }\n  return lines.join('\\n');\n}\n\nasync function main() {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf-8'));\n  const select = input?.steps?.select || {};\n  const plan = input?.steps?.['draft-plan'] || {};\n  const issueNumber = select.issueNumber;\n  if (!issueNumber) throw new Error('notify-gate: no select.issueNumber');\n\n  let reviewerMap = {};\n  try {\n    reviewerMap = JSON.parse(process.env.FULLSTACK_REVIEWER_MAP || '{}');\n  } catch (err) {\n    console.error(`notify-gate: FULLSTACK_REVIEWER_MAP is not valid JSON: ${err.message}`);\n  }\n  const resolved = resolveReviewer(select.author, reviewerMap, process.env.FULLSTACK_DEFAULT_ADMIN);\n  if (!resolved.reviewerId) {\n    console.error('notify-gate: empty reviewer id \u2014 is FULLSTACK_DEFAULT_ADMIN a key in FULLSTACK_REVIEWER_MAP? assignedTo would fall back to the run creator (a cron phantom).');\n  }\n\n  // 1. Relabel first (hard) \u2014 removes the issue from the selectable pool.\n  await gh(`/repos/${REPO}/issues/${issueNumber}/labels`, {\n    method: 'POST',\n    headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n    body: JSON.stringify({ labels: [AWAITING_HUMAN] }),\n  });\n  await gh(`/repos/${REPO}/issues/${issueNumber}/labels/${encodeURIComponent(NEEDS_APPROVAL)}`, { method: 'DELETE' });\n\n  // 2. Comment (best-effort) \u2014 the actual human ping.\n  let commented = false;\n  try {\n    await gh(`/repos/${REPO}/issues/${issueNumber}/comments`, {\n      method: 'POST',\n      headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n      body: JSON.stringify({ body: buildGateComment(plan.planSummary, plan.questions, process.env.APP_BASE_URL, select.author, resolved) }),\n    });\n    commented = true;\n  } catch (err) {\n    console.error(`notify-gate: comment failed (task still created): ${err.message}`);\n  }\n\n  writeFileSync('/output/result.json', JSON.stringify({\n    issueNumber,\n    reviewerId: resolved.reviewerId,\n    reviewerIsCreator: resolved.reviewerIsCreator,\n    creatorLogin: select.author,\n    commented,\n  }));\n  console.log(`notify-gate: #${issueNumber} \u2192 ${resolved.reviewerIsCreator ? 'creator' : 'admin'} (${resolved.reviewerId})`);\n}\n\nif (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {\n  main().catch((err) => {\n    console.error('notify-gate crashed:', err && err.stack ? err.stack : String(err));\n    process.exit(1);\n  });\n}\n",
+        "runtime": "javascript"
       }
     },
     {
       "id": "clarify-approve",
       "name": "Human: approve plan / answer questions",
       "type": "review",
-      "description": "Platform human gate: reviewer approves the plan (with optional guidance) or rejects. Resumes into implement on approve.",
+      "description": "Platform human gate. Approve -> claim -> implement; reject -> park for a human.",
       "params": [
         {
           "name": "guidance",
@@ -95,10 +127,11 @@
         "reject": {
           "target": "mark-needs-info",
           "label": "Reject / need more info",
-          "intent": "neutral"
+          "intent": "neutral",
+          "requiresComment": true
         },
         "approve": {
-          "target": "implement",
+          "target": "claim",
           "label": "Approve & implement",
           "intent": "success"
         }
@@ -107,19 +140,19 @@
       "allowedRoles": [
         "admin"
       ],
-      "assignedTo": "OiR0rOsY7DNGZwkGFkPV1MnBuXN2"
+      "assignedTo": "${steps.notify-gate.reviewerId}"
     },
     {
       "id": "implement",
       "name": "Implement the fix",
       "type": "creation",
-      "description": "GLM clones the repo into /tmp, edits, and emits a proposedChanges envelope (no MCP).",
+      "description": "GLM clones to /tmp, checks the issue isn't already fixed, makes a minimal change, and pushes a clean fullstack/issue-N branch. Metadata only.",
       "executor": "agent",
       "autonomyLevel": "L4",
       "plugin": "claude-code-agent",
       "agent": {
         "model": "z-ai/glm-5.2",
-        "prompt": "## Task\n\nYou are a senior engineer on the MediForce platform. Implement a fix for ONE\nGitHub issue and produce a `proposedChanges` envelope. A later step publishes\nit via the GitHub API — you do NOT touch GitHub here and you have NO MCP tools.\n\n### Inputs (under `## Previous Step Outputs`)\n- `triage` — the chosen issue: `issueNumber`, `title`, `url`, `planSummary`.\n- `clarify-approve` — present ONLY if a human gated this: `clarify-approve.guidance`\n  holds their answers / instructions. Honour it. If absent, proceed on the plan.\n\n### Getting the code\nYou have NO pre-mounted repo and NO MCP. Clone the target yourself, OUTSIDE the\nrun workspace, into /tmp:\n\n```\nrm -rf /tmp/repo && git clone --depth 1 https://github.com/Appsilon/mediforce.git /tmp/repo && cd /tmp/repo\n```\n\n(`Appsilon/mediforce` is public; if the clone is rate-limited, retry with\n`https://$GITHUB_TOKEN@github.com/Appsilon/mediforce.git`.) Work entirely inside\n`/tmp/repo` — do NOT write anything under `/workspace`.\n\nExplore with Read / Grep / Glob, find the code relevant to the issue, and make a\nMINIMAL, focused change. Follow existing conventions (read AGENTS.md). Add or\nupdate a test only when it gives real signal. **Do NOT run `pnpm install`,\nbuilds, or the full test suite** — they are slow and generate large artifacts;\nreason about correctness from the source instead. Keep the diff small.\n\n### Branch + PR text\n- branch: `agent/issue-<number>-<short-slug>` (e.g. `agent/issue-42-null-login`)\n- prTitle: `fix: <concise> (#<number>)` or `feat: ...` as appropriate\n- prBody: what changed and why; MUST contain `Closes #<number>`.\n\n## Output Contract (MANDATORY)\n\nCollect every file you created or modified (full final content) and write ONLY\nthis JSON to `${output_dir}/result.json`:\n\n```json\n{\n  \"issueNumber\": <number>,\n  \"repo\": \"Appsilon/mediforce\",\n  \"branch\": \"agent/issue-<number>-<slug>\",\n  \"baseBranch\": \"main\",\n  \"prTitle\": \"...\",\n  \"prBody\": \"... Closes #<number> ...\",\n  \"files\": [ { \"path\": \"packages/.../foo.ts\", \"content\": \"<FULL new file content>\" } ],\n  \"summary\": \"1-3 sentence change summary\",\n  \"testsRun\": \"what you ran and the result, or why not\"\n}\n```\n\nIf after investigation you conclude the issue should NOT be implemented (e.g. it\nis unclear or wrong after all), return `\"files\": []` with a `summary` saying why.\nFinal message: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"...\"}`.\n",
+        "prompt": "## Task\n\nYou are a senior engineer on the MediForce platform. Implement a fix for ONE\nGitHub issue on `Appsilon/mediforce` and **push a clean branch** \u2014 a later\ndeterministic step opens the PR.\n\n### Inputs (under `## Previous Step Outputs`)\n- `select` \u2014 the chosen issue: `issueNumber`, `title`, `body`, `url`.\n- `clarify-approve` \u2014 present ONLY if a human gated this: `clarify-approve.guidance`\n  holds their answers. Honour it.\n\n### 1. Get the code\nClone the target OUTSIDE any run workspace, into /tmp:\n\n```\nrm -rf /tmp/repo && git clone --depth 1 https://$GITHUB_TOKEN@github.com/Appsilon/mediforce.git /tmp/repo && cd /tmp/repo\n```\n\nWork entirely inside `/tmp/repo`. **Read `AGENTS.md` and `docs/CONTEXT.md` first**\nand follow them: no `any` (Zod + `z.infer`), explicit boolean comparisons,\nEnglish, self-documenting code, no docstrings/comments on code you didn't change.\n\n### 2. Is it already fixed?\nBEFORE editing, verify the issue still reproduces on current `main`: grep for the\ndescribed symptom, check whether the code path already handles it, look for a\nrecent commit/PR that resolved it. **If it is already fixed**, stop and report\n`changed: false, reason: \"already-fixed\"` with `evidence` (the commit / PR /\n`file:line` that resolves it). Do not push anything.\n\n### 3. Implement\nMake a MINIMAL, focused change addressing ONLY this issue. Follow existing\nconventions. **Add or update a test** where the repo would expect one (L3 for a\nhandler/feature, L1 for pure logic) \u2014 but do NOT run `pnpm install`, builds, or\nthe suite (too slow/heavy for this container); reason about correctness from the\nsource. CI and the human reviewer run the tests. Keep the diff small.\n\n### 4. Push a clean branch\n```\ngit checkout -b fullstack/issue-<number>-<short-slug>\ngit add -A && git commit -m \"<prTitle>\"\ngit push --force https://$GITHUB_TOKEN@github.com/Appsilon/mediforce.git HEAD\n```\n- branch: `fullstack/issue-<number>-<slug>`; prTitle: `fix: <concise> (#<n>)` or `feat: ...`.\n- prBody: what changed and why; MUST contain `Closes #<number>`.\n- NEVER commit secrets or `.env` files.\n\n### Bail-out (last resort only)\nDo not bail just because the change isn't perfect \u2014 make your best complete\nattempt and push; a later review pass annotates concerns. Only report\n`changed: false, reason: \"confused\"` (or `\"broken\"`) when you are genuinely stuck\nor the issue itself is malformed.\n\n## Output Contract (MANDATORY)\n\nWrite ONLY this JSON to `${output_dir}/result.json`:\n\n```json\n{\n  \"issueNumber\": 123,\n  \"repo\": \"Appsilon/mediforce\",\n  \"changed\": true,\n  \"branch\": \"fullstack/issue-123-...\",\n  \"baseBranch\": \"main\",\n  \"prTitle\": \"...\",\n  \"prBody\": \"... Closes #123 ...\",\n  \"summary\": \"1-3 sentence change summary\",\n  \"testsNote\": \"what test was added; not run in-container (CI validates)\",\n  \"reason\": \"already-fixed | confused | broken (only when changed=false)\",\n  \"evidence\": \"for already-fixed: the commit/PR/file:line that resolves it\"\n}\n```\n\nWhen `changed` is false, omit branch/prTitle/prBody and give `reason` (+ `evidence`\nfor already-fixed).\nYour FINAL message must be ONLY: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"...\"}`.\n",
         "timeoutMinutes": 30,
         "image": "mediforce-golden-image:latest"
       }
@@ -128,72 +161,73 @@
       "id": "self-review",
       "name": "Self-review the diff",
       "type": "creation",
-      "description": "GLM reviews the proposed change; concerns ride along into the PR body.",
+      "description": "GLM re-clones the pushed branch and runs the three-axis /code-review methodology. Verdict ship/flag/revise + concerns.",
       "executor": "agent",
       "autonomyLevel": "L4",
       "plugin": "claude-code-agent",
       "agent": {
         "model": "z-ai/glm-5.2",
-        "prompt": "## Task\n\nReview the change `mediforce-fullstack` just produced for issue\n`implement.issueNumber` BEFORE it becomes a PR. The proposed change is under\n`## Previous Step Outputs` -> `implement` (`implement.proposedChanges` fields:\nbranch, prTitle, prBody, files[], summary). The edited clone is under\n`/tmp/repo` if you need to re-read it; otherwise review from the envelope.\n\nCheck: does it actually address the issue? Is it minimal and correct? Does it\nfollow repo conventions? Any obvious bug, missing test, or broken build? You are\nNOT merging — a human reviews the PR on GitHub. Your job is to surface concerns\nthat should ride along in the PR body.\n\n## Output Contract\n\nWrite ONLY this JSON to `${output_dir}/result.json`:\n\n```json\n{\n  \"issueNumber\": <n>,\n  \"verdict\": \"ship | flag\",\n  \"concerns\": [\"<concern that the human reviewer should see>\", \"...\"],\n  \"summary\": \"one-line assessment\"\n}\n```\n\nUse `ship` when you'd approve it; `flag` when it should open but with caveats\nnoted. Either way the PR opens — `flag` just means the concerns get written into\nthe PR body. Final message: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"...\"}`.\n",
+        "prompt": "## Task\n\nReview the change `mediforce-fullstack` just pushed, BEFORE it becomes a PR,\nusing the project's own `/code-review` methodology. You have fresh eyes and clean\ncontext \u2014 that is the point.\n\n### Get the diff\nThe pushed branch is under `## Previous Step Outputs` \u2192 `implement`\n(`implement.branch`, `implement.issueNumber`). Clone it and diff against `main`:\n\n```\nrm -rf /tmp/review && git clone --depth 1 https://$GITHUB_TOKEN@github.com/Appsilon/mediforce.git /tmp/review\ncd /tmp/review && git fetch --depth 50 origin <implement.branch> && git checkout <implement.branch>\ngit fetch --depth 50 origin main && git diff origin/main...HEAD\n```\n\nThe clone carries `AGENTS.md`, `docs/CONTEXT.md`, and\n`.claude/skills/code-review/references/review-checklist.md` \u2014 review **against**\nthem.\n\n### Review along three axes\n- **Standards** \u2014 file-by-file vs `AGENTS.md` + `docs/CONTEXT.md` + the checklist\n  + `docs/adr/`: convention violations (cite the rule), dead code, DRY/KISS,\n  reuse misses (grep before flagging), comment quality.\n- **Spec** \u2014 fetch the issue (`gh`/REST via `$GITHUB_TOKEN`). Does the diff\n  faithfully implement it? Missing/partial requirements, scope creep, wrong\n  implementations.\n- **Big Picture** \u2014 should this exist? Does it duplicate an existing mechanism?\n  Is it reinventing a platform primitive (CLI vs raw fetch, our Zod schemas)?\n\nApply the \"**pre-existing is a smell**\" rule (verify with `git blame` before\nexcusing anything the diff touched) and the **regression** check on every changed\nread/write/endpoint \u2014 call regressions regressions, not \"risk\".\n\n**Limitation (state honestly, do not fake it):** you CANNOT run the Step-0\npre-flight (`pnpm typecheck` / `test:affected`) \u2014 no `node_modules` in a shallow\nclone. This is a **static** review; typecheck and tests remain the CI + human\ngate.\n\n### Verdict\n- `ship` \u2014 you would approve it: no blockers, no should-fix.\n- `revise` \u2014 there are **mechanically fixable** blockers/should-fix a follow-up\n  pass should apply.\n- `flag` \u2014 concerns remain but they are judgement calls (not auto-fixable); the\n  PR should open with them noted.\n\n## Output Contract (MANDATORY)\n\nWrite ONLY this JSON to `${output_dir}/result.json`:\n\n```json\n{\n  \"issueNumber\": 123,\n  \"verdict\": \"ship | revise | flag\",\n  \"concerns\": [\"<axis>: <file:line> \u2014 issue \u2014 suggestion\", \"...\"]\n}\n```\n\n`concerns` may be empty for `ship`. Each concern is one line, prefixed with its\naxis. Your FINAL message must be ONLY: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"...\"}`.\n",
         "timeoutMinutes": 8,
         "image": "mediforce-golden-image:latest"
       }
     },
     {
-      "id": "open-pr",
-      "name": "Open the PR",
+      "id": "revise",
+      "name": "Apply review concerns",
       "type": "creation",
-      "description": "haiku + MCP: create_branch, push_files, create_pull_request (ready-for-review), swap labels to agent:pr-open, comment the PR link.",
+      "description": "GLM applies self-review's fixable concerns and re-pushes. Bounded loop (max 2 passes).",
       "executor": "agent",
       "autonomyLevel": "L4",
       "plugin": "claude-code-agent",
-      "agentId": "WJ1LB0n9e2xGV0guSkvy",
       "agent": {
-        "model": "anthropic/claude-haiku-4.5",
-        "prompt": "## Task\n\nPublish the approved change on `Appsilon/mediforce` via your GitHub MCP tools, and update\nthe issue's labels. Inputs under `## Previous Step Outputs`:\n- `implement` -> the `proposedChanges` envelope (branch, baseBranch, prTitle,\n  prBody, files[]).\n- `self-review` -> `verdict` (\"ship\"/\"flag\") and `concerns[]`.\n- `triage.issueNumber` -> the issue number.\n\n### Short-circuit\nIf `implement.files` is empty or missing, do NOT touch GitHub except to release\nthe claim: `update_issue` to remove `agent:attempting` and add `agent:needs-info`,\nthen write `{ \"prUrl\": null, \"note\": \"no changes proposed\" }` and stop.\n\n### Publish\n1. `create_branch` -> `implement.branch` from `implement.baseBranch`. Idempotent;\n   \"already exists\" is fine.\n2. `push_files` with `implement.files` (path + content each), commit message\n   derived from `implement.prTitle`. If only `create_or_update_file` exists, fall\n   back to one call per file.\n3. Build the PR body: `implement.prBody`, then — if `self-review.verdict` is\n   `flag` — append a section `\\n\\n### \\U0001F916 self-review notes\\n` with each\n   `self-review.concerns` item as a bullet, then append `\\n\\n---\\n🤖 generated by mediforce-fullstack bot`.\n4. `list_pull_requests` (head=`<owner>:<branch>`). If none, `create_pull_request`\n   with owner/repo from `Appsilon/mediforce`, head=`<branch>`, base=`<baseBranch>`,\n   `draft=false` (ready for review), title=`implement.prTitle`, body=<built body>.\n   If one exists, `update_pull_request` to refresh the body. Capture `html_url`\n   and `number`.\n5. Swap the issue labels: `get_issue` for current labels, then `update_issue`\n   with the existing labels minus `agent:attempting` plus `agent:pr-open`.\n6. `add_issue_comment` on the issue: `\\U0001F916 Opened PR <html_url> for this\n   issue. — mediforce-fullstack`.\n\n## Output Contract\n\nWrite ONLY to `${output_dir}/result.json`:\n```json\n{ \"issueNumber\": <n>, \"prUrl\": \"<html_url>\", \"prNumber\": <number>, \"branch\": \"<branch>\" }\n```\nOn any MCP failure, capture the error message in a `failed` field and propagate\nit. Final message: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"...\"}`.\n",
-        "timeoutMinutes": 10,
+        "model": "z-ai/glm-5.2",
+        "prompt": "## Task\n\n`self-review` returned `revise` \u2014 apply its fixable concerns to the pushed branch\nand re-push. This is a bounded loop (max 2 passes); make the concerns count.\n\n### Inputs (under `## Previous Step Outputs`)\n- `implement` \u2014 `branch`, `issueNumber`, `baseBranch`.\n- `self-review` \u2014 `concerns[]` (the findings to address).\n- `revise` \u2014 your OWN previous output, if this is the 2nd pass:\n  `revise.reviewCount` (prior count, default 0) and `revise.reviseLog` (prior log).\n\n### Do\nClone and check out the branch, apply the fixable concerns following repo\nconventions (`AGENTS.md`, `docs/CONTEXT.md`), commit, and re-push the SAME branch:\n\n```\nrm -rf /tmp/revise && git clone --depth 1 https://$GITHUB_TOKEN@github.com/Appsilon/mediforce.git /tmp/revise\ncd /tmp/revise && git fetch --depth 50 origin <implement.branch> && git checkout <implement.branch>\n# ...apply fixes...\ngit add -A && git commit -m \"review: address self-review concerns\"\ngit push https://$GITHUB_TOKEN@github.com/Appsilon/mediforce.git HEAD\n```\n\nAddress what you can mechanically fix. Concerns that are genuine judgement calls\nyou can't resolve, leave for the human \u2014 note them in the log. Do NOT run the\ntest suite (no install in-container).\n\n### Counters\n- `reviewCount` = (`revise.reviewCount` from the input, or 0) **+ 1**.\n- `reviseLog` = the prior `revise.reviseLog` (or `[]`) **with your new pass\n  appended** \u2014 one line summarising what this pass changed.\n\n## Output Contract (MANDATORY)\n\nWrite ONLY this JSON to `${output_dir}/result.json`:\n\n```json\n{\n  \"issueNumber\": 123,\n  \"reviewCount\": 1,\n  \"reviseLog\": [\"pass 1: <what changed>\"],\n  \"applied\": [\"<concern addressed>\", \"...\"]\n}\n```\n\nYour FINAL message must be ONLY: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"revise pass <n>\"}`.\n",
+        "timeoutMinutes": 20,
         "image": "mediforce-golden-image:latest"
       }
     },
     {
-      "id": "mark-skip",
-      "name": "Mark not-suitable",
+      "id": "publish",
+      "name": "Open the PR",
       "type": "creation",
-      "description": "Apply agent:skip + comment why.",
-      "executor": "agent",
-      "autonomyLevel": "L4",
-      "continueOnError": true,
-      "plugin": "claude-code-agent",
-      "agentId": "WJ1LB0n9e2xGV0guSkvy",
-      "agent": {
-        "model": "anthropic/claude-haiku-4.5",
-        "prompt": "## Task\n\nMark the triaged issue as not-suitable so it is never re-attempted. Selection\nunder `## Previous Step Outputs` -> `triage` (`triage.issueNumber`,\n`triage.skipReason`). Using GitHub MCP on `Appsilon/mediforce`:\n1. `get_issue` for current labels, then `update_issue` adding `agent:skip`.\n2. `add_issue_comment`: `\\U0001F916 mediforce-fullstack: skipping for now — <triage.skipReason>. Add the `agent:go` label if you want me to attempt it anyway.`\n\n## Output Contract\nWrite ONLY to `${output_dir}/result.json`: `{ \"issueNumber\": <n>, \"skipped\": true }`.\nFinal message: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"skipped #<n>\"}`.\n",
-        "timeoutMinutes": 5,
-        "image": "mediforce-golden-image:latest"
+      "description": "Assemble the agent-written PR body + review notes, open (or refresh) the PR idempotently, swap in-progress->pr-open, comment the link. Draft when the revise cap was hit with unresolved blockers.",
+      "executor": "script",
+      "plugin": "script-container",
+      "script": {
+        "inlineScript": "// publish \u2014 open (or refresh) the PR for the reviewed change, then relabel.\n//\n// Assembles the PR body from AGENT-authored text (implement.prBody, the\n// revise log, self-review concerns) \u2014 this script writes NO prose, it only\n// concatenates and templates. Draft-vs-ready is decided by the final review\n// state:\n//   ship               -> ready-for-review, clean\n//   flag               -> ready-for-review, FYI notes appended\n//   capped revise       -> DRAFT, \"must fix before merge\" notes appended\n//\n// Idempotent: reuses an existing open PR for the branch instead of erroring.\n//\n// Reads:  /output/input.json (steps.implement, steps.self-review, steps.revise),\n//         env GITHUB_TOKEN, FULLSTACK_REPO, REVIEW_MAX\n// Writes: /output/result.json\n\nimport { readFileSync, writeFileSync } from 'node:fs';\n\nconst REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';\nconst [OWNER, NAME] = REPO.split('/');\nconst REVIEW_MAX = Number(process.env.REVIEW_MAX || '2');\nconst IN_PROGRESS = 'fullstack:in-progress';\nconst PR_OPEN = 'fullstack:pr-open';\n\nfunction ghHeaders() {\n  const h = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };\n  if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;\n  return h;\n}\n\nasync function gh(path, init) {\n  const res = await fetch(`https://api.github.com${path}`, { headers: ghHeaders(), ...init });\n  if (!res.ok && !(init?.method === 'DELETE' && res.status === 404)) {\n    throw new Error(`GitHub ${res.status} ${init?.method || 'GET'} ${path}: ${(await res.text()).slice(0, 200)}`);\n  }\n  return res.status === 204 || res.status === 404 ? null : res.json();\n}\n\n/** Decide draft flag + which notes heading applies. Pure. */\nexport function reviewOutcome(selfReview, reviewCount, reviewMax) {\n  const verdict = selfReview?.verdict;\n  const capped = verdict === 'revise' && (reviewCount ?? 0) >= reviewMax;\n  if (capped) return { draft: true, heading: '### \u26a0\ufe0f Must fix before merge' };\n  if (verdict === 'flag') return { draft: false, heading: '### \ud83e\udd16 self-review notes (FYI)' };\n  return { draft: false, heading: null };\n}\n\n/** Assemble the PR body from agent-written pieces. Pure. */\nexport function buildPrBody(implement, selfReview, revise, outcome) {\n  const parts = [implement.prBody || implement.summary || ''];\n  const log = revise?.reviseLog;\n  if (Array.isArray(log) && log.length > 0) {\n    parts.push('### \ud83d\udd01 Review & revision history', log.map((l) => `- ${l}`).join('\\n'));\n  }\n  const concerns = selfReview?.concerns;\n  if (outcome.heading && Array.isArray(concerns) && concerns.length > 0) {\n    parts.push(outcome.heading, concerns.map((c) => `- ${c}`).join('\\n'));\n  }\n  parts.push('---', '\ud83e\udd16 generated by mediforce-fullstack');\n  return parts.filter(Boolean).join('\\n\\n');\n}\n\nasync function main() {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf-8'));\n  const implement = input?.steps?.implement || {};\n  const selfReview = input?.steps?.['self-review'] || {};\n  const revise = input?.steps?.revise || {};\n  const issueNumber = implement.issueNumber;\n  const branch = implement.branch;\n  const baseBranch = implement.baseBranch || 'main';\n  if (!issueNumber || !branch) throw new Error('publish: missing implement.issueNumber or implement.branch');\n\n  const outcome = reviewOutcome(selfReview, revise.reviewCount, REVIEW_MAX);\n  const body = buildPrBody(implement, selfReview, revise, outcome);\n\n  const existing = await gh(`/repos/${REPO}/pulls?head=${OWNER}:${encodeURIComponent(branch)}&state=open`);\n  let pr;\n  if (Array.isArray(existing) && existing.length > 0) {\n    pr = await gh(`/repos/${REPO}/pulls/${existing[0].number}`, {\n      method: 'PATCH',\n      headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n      body: JSON.stringify({ body }),\n    });\n  } else {\n    pr = await gh(`/repos/${REPO}/pulls`, {\n      method: 'POST',\n      headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n      body: JSON.stringify({ title: implement.prTitle, head: branch, base: baseBranch, body, draft: outcome.draft }),\n    });\n  }\n\n  // Swap the lease for the done-state label, then comment the link.\n  await gh(`/repos/${REPO}/issues/${issueNumber}/labels`, {\n    method: 'POST',\n    headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n    body: JSON.stringify({ labels: [PR_OPEN] }),\n  });\n  await gh(`/repos/${REPO}/issues/${issueNumber}/labels/${encodeURIComponent(IN_PROGRESS)}`, { method: 'DELETE' });\n  await gh(`/repos/${REPO}/issues/${issueNumber}/comments`, {\n    method: 'POST',\n    headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n    body: JSON.stringify({ body: `\ud83e\udd16 Opened ${outcome.draft ? 'draft ' : ''}PR ${pr.html_url} for this issue. \u2014 mediforce-fullstack` }),\n  }).catch((err) => console.error(`publish: link comment failed: ${err.message}`));\n\n  writeFileSync('/output/result.json', JSON.stringify({ issueNumber, prUrl: pr.html_url, prNumber: pr.number, branch, draft: outcome.draft }));\n  console.log(`publish: #${issueNumber} \u2192 ${outcome.draft ? 'draft ' : ''}PR ${pr.html_url}`);\n}\n\nif (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {\n  main().catch((err) => {\n    console.error('publish crashed:', err && err.stack ? err.stack : String(err));\n    process.exit(1);\n  });\n}\n",
+        "runtime": "javascript"
+      }
+    },
+    {
+      "id": "mark-fixed",
+      "name": "Close already-fixed issue",
+      "type": "creation",
+      "description": "Comment the evidence and close an issue implement found already resolved; drop the lease.",
+      "executor": "script",
+      "plugin": "script-container",
+      "script": {
+        "inlineScript": "// mark-fixed \u2014 the issue was already resolved by other changes; close it.\n//\n// Reached when `implement` reports changed=false, reason=\"already-fixed\" with\n// evidence. Posts the evidence, closes the issue (reversible \u2014 a human reopens\n// if wrong), and drops the lease.\n//\n// Reads:  /output/input.json (steps.implement), env GITHUB_TOKEN, FULLSTACK_REPO\n// Writes: /output/result.json\n\nimport { readFileSync, writeFileSync } from 'node:fs';\n\nconst REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';\nconst IN_PROGRESS = 'fullstack:in-progress';\n\nfunction ghHeaders() {\n  const h = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };\n  if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;\n  return h;\n}\n\nasync function gh(path, init) {\n  const res = await fetch(`https://api.github.com${path}`, { headers: ghHeaders(), ...init });\n  if (!res.ok && !(init?.method === 'DELETE' && res.status === 404)) {\n    throw new Error(`GitHub ${res.status} ${init?.method || 'GET'} ${path}: ${(await res.text()).slice(0, 200)}`);\n  }\n  return res.status === 204 || res.status === 404 ? null : res.json();\n}\n\nexport function fixedComment(evidence) {\n  return `\ud83e\udd16 **mediforce-fullstack**: this looks already resolved${evidence ? ` by ${evidence}` : ''} \u2014 closing. ` +\n    'Reopen if I\\'ve got it wrong.';\n}\n\nasync function main() {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf-8'));\n  const impl = input?.steps?.implement || {};\n  const issueNumber = impl.issueNumber;\n  if (!issueNumber) throw new Error('mark-fixed: no implement.issueNumber');\n\n  await gh(`/repos/${REPO}/issues/${issueNumber}/comments`, {\n    method: 'POST',\n    headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n    body: JSON.stringify({ body: fixedComment(impl.evidence) }),\n  });\n  await gh(`/repos/${REPO}/issues/${issueNumber}/labels/${encodeURIComponent(IN_PROGRESS)}`, { method: 'DELETE' });\n  await gh(`/repos/${REPO}/issues/${issueNumber}`, {\n    method: 'PATCH',\n    headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n    body: JSON.stringify({ state: 'closed', state_reason: 'completed' }),\n  });\n\n  writeFileSync('/output/result.json', JSON.stringify({ issueNumber, closed: true }));\n  console.log(`mark-fixed: closed #${issueNumber} (already fixed)`);\n}\n\nif (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {\n  main().catch((err) => {\n    console.error('mark-fixed crashed:', err && err.stack ? err.stack : String(err));\n    process.exit(1);\n  });\n}\n",
+        "runtime": "javascript"
       }
     },
     {
       "id": "mark-needs-info",
       "name": "Park pending clarification",
       "type": "creation",
-      "description": "Swap agent:attempting -> agent:needs-info + comment.",
-      "executor": "agent",
-      "autonomyLevel": "L4",
-      "continueOnError": true,
-      "plugin": "claude-code-agent",
-      "agentId": "WJ1LB0n9e2xGV0guSkvy",
-      "agent": {
-        "model": "anthropic/claude-haiku-4.5",
-        "prompt": "## Task\n\nThe human rejected / deferred the plan at the clarify-approve gate. Park the\nissue pending more information. `triage.issueNumber` is under\n`## Previous Step Outputs`. Using GitHub MCP on `Appsilon/mediforce`:\n1. `get_issue` for current labels, then `update_issue` to remove\n   `agent:attempting` and add `agent:needs-info`.\n2. `add_issue_comment`: `\\U0001F916 Parked pending clarification — I'll leave this to a human for now.`\n\n## Output Contract\nWrite ONLY to `${output_dir}/result.json`: `{ \"issueNumber\": <n>, \"parked\": true }`.\nFinal message: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"parked #<n>\"}`.\n",
-        "timeoutMinutes": 5,
-        "image": "mediforce-golden-image:latest"
+      "description": "Swap working labels for fullstack:needs-info and comment (gate reject, or implement bail).",
+      "executor": "script",
+      "plugin": "script-container",
+      "script": {
+        "inlineScript": "// mark-needs-info \u2014 park an issue for a human.\n//\n// Reached from two places:\n//   - the gate `reject` verdict (human declined the plan)\n//   - `implement` bailing (changed=false, reason=\"confused\"/\"broken\")\n// Swaps the working labels for `fullstack:needs-info` and comments why.\n// Best-effort: a failed write just leaves the lease to expire and be reclaimed.\n//\n// Reads:  /output/input.json (steps.select / steps.implement / steps.clarify-approve),\n//         env GITHUB_TOKEN, FULLSTACK_REPO\n// Writes: /output/result.json\n\nimport { readFileSync, writeFileSync } from 'node:fs';\n\nconst REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';\nconst NEEDS_INFO = 'fullstack:needs-info';\nconst DROP = ['fullstack:in-progress', 'fullstack:awaiting-human'];\n\nfunction ghHeaders() {\n  const h = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };\n  if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;\n  return h;\n}\n\nasync function gh(path, init) {\n  const res = await fetch(`https://api.github.com${path}`, { headers: ghHeaders(), ...init });\n  if (!res.ok && !(init?.method === 'DELETE' && res.status === 404)) {\n    throw new Error(`GitHub ${res.status} ${init?.method || 'GET'} ${path}: ${(await res.text()).slice(0, 200)}`);\n  }\n  return res.status === 204 || res.status === 404 ? null : res.json();\n}\n\nexport function resolveIssueNumber(input) {\n  const s = input?.steps || {};\n  return s.implement?.issueNumber ?? s.select?.issueNumber ?? null;\n}\n\nexport function parkComment(input) {\n  const s = input?.steps || {};\n  const reason = s.implement?.summary || s['clarify-approve']?.guidance;\n  return `\ud83e\udd16 **mediforce-fullstack**: parking this pending clarification${reason ? ` \u2014 ${reason}` : ''}. ` +\n    'Leaving it to a human for now.';\n}\n\nasync function main() {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf-8'));\n  const issueNumber = resolveIssueNumber(input);\n  if (!issueNumber) throw new Error('mark-needs-info: no issue number in step input');\n\n  try {\n    await gh(`/repos/${REPO}/issues/${issueNumber}/labels`, {\n      method: 'POST',\n      headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n      body: JSON.stringify({ labels: [NEEDS_INFO] }),\n    });\n    for (const name of DROP) {\n      await gh(`/repos/${REPO}/issues/${issueNumber}/labels/${encodeURIComponent(name)}`, { method: 'DELETE' });\n    }\n    await gh(`/repos/${REPO}/issues/${issueNumber}/comments`, {\n      method: 'POST',\n      headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n      body: JSON.stringify({ body: parkComment(input) }),\n    });\n  } catch (err) {\n    console.error(`mark-needs-info: best-effort failure on #${issueNumber}: ${err.message}`);\n  }\n\n  writeFileSync('/output/result.json', JSON.stringify({ issueNumber, parked: true }));\n  console.log(`mark-needs-info: parked #${issueNumber}`);\n}\n\nif (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {\n  main().catch((err) => {\n    console.error('mark-needs-info crashed:', err && err.stack ? err.stack : String(err));\n    process.exit(1);\n  });\n}\n",
+        "runtime": "javascript"
       }
     },
     {
       "id": "done",
       "name": "Done",
       "type": "terminal",
-      "description": "Terminal: attempt finished (PR opened, skipped, or parked).",
+      "description": "Terminal: attempt finished (PR opened, closed, or parked).",
       "executor": "action",
       "action": {
         "kind": "reshape",
@@ -208,7 +242,7 @@
       "id": "done-empty",
       "name": "Nothing to do",
       "type": "terminal",
-      "description": "Terminal: no candidate issue this tick.",
+      "description": "Terminal: no new issues to triage and nothing actionable this tick.",
       "executor": "action",
       "action": {
         "kind": "reshape",
@@ -224,37 +258,43 @@
     {
       "from": "fetch-candidates",
       "to": "triage",
-      "when": "output.count > 0"
+      "when": "output.unclassifiedCount > 0"
     },
     {
       "from": "fetch-candidates",
-      "to": "done-empty",
-      "when": "output.count == 0"
+      "to": "select",
+      "when": "output.unclassifiedCount == 0"
     },
     {
       "from": "triage",
+      "to": "apply-verdicts"
+    },
+    {
+      "from": "apply-verdicts",
+      "to": "select"
+    },
+    {
+      "from": "select",
       "to": "done-empty",
       "when": "output.selected != true"
     },
     {
-      "from": "triage",
-      "to": "mark-skip",
-      "when": "output.selected == true && output.action == \"skip\""
-    },
-    {
-      "from": "triage",
+      "from": "select",
       "to": "claim",
-      "when": "output.selected == true && output.action != \"skip\""
+      "when": "output.selected == true && output.suitability == \"go\""
+    },
+    {
+      "from": "select",
+      "to": "draft-plan",
+      "when": "output.selected == true && output.suitability == \"needs-approval\""
     },
     {
       "from": "claim",
-      "to": "notify-gate",
-      "when": "variables.triage.action == \"gate\""
+      "to": "implement"
     },
     {
-      "from": "claim",
-      "to": "implement",
-      "when": "variables.triage.action != \"gate\""
+      "from": "draft-plan",
+      "to": "notify-gate"
     },
     {
       "from": "notify-gate",
@@ -262,18 +302,39 @@
     },
     {
       "from": "implement",
-      "to": "self-review"
+      "to": "self-review",
+      "when": "output.changed == true"
+    },
+    {
+      "from": "implement",
+      "to": "mark-fixed",
+      "when": "output.changed == false && output.reason == \"already-fixed\""
+    },
+    {
+      "from": "implement",
+      "to": "mark-needs-info",
+      "when": "output.changed == false && output.reason != \"already-fixed\""
     },
     {
       "from": "self-review",
-      "to": "open-pr"
+      "to": "revise",
+      "when": "output.verdict == \"revise\" && variables.revise.reviewCount < 2"
     },
     {
-      "from": "open-pr",
+      "from": "self-review",
+      "to": "publish",
+      "when": "output.verdict != \"revise\" || variables.revise.reviewCount >= 2"
+    },
+    {
+      "from": "revise",
+      "to": "self-review"
+    },
+    {
+      "from": "publish",
       "to": "done"
     },
     {
-      "from": "mark-skip",
+      "from": "mark-fixed",
       "to": "done"
     },
     {

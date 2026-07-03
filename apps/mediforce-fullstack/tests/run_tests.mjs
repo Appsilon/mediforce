@@ -1,0 +1,147 @@
+// Behavior tests for the pure logic inside the fullstack scripts.
+// Run: node tests/run_tests.mjs   (no secrets/network needed — pure functions only)
+import assert from 'node:assert/strict';
+import { classifyIssue, summariseLabelEvents } from '../scripts/fetch-candidates.mjs';
+import { reconcile } from '../scripts/apply-verdicts.mjs';
+import { rankCandidates, priorityOf, isActionable } from '../scripts/select.mjs';
+import { resolveReviewer, buildGateComment } from '../scripts/notify-gate.mjs';
+import { reviewOutcome, buildPrBody } from '../scripts/publish.mjs';
+
+let pass = 0;
+let fail = 0;
+function test(name, fn) {
+  try { fn(); pass += 1; console.log(`  ok  ${name}`); }
+  catch (err) { fail += 1; console.log(`FAIL  ${name}\n      ${err.message}`); }
+}
+
+const NOW = new Date('2026-07-01T12:00:00Z').getTime();
+const hoursAgo = (h) => new Date(NOW - h * 3_600_000).toISOString();
+const lbl = (...names) => names.map((name) => ({ name }));
+
+// ---- fetch-candidates.classifyIssue ----
+test('new issue with no labels → triage', () => {
+  assert.equal(classifyIssue({ labels: [] }, [], NOW, 2, 3).action, 'triage');
+});
+test('pr-open issue → skip', () => {
+  assert.equal(classifyIssue({ labels: lbl('fullstack:pr-open') }, [], NOW, 2, 3).action, 'skip');
+});
+test('fresh in-progress lease → skip', () => {
+  const events = [{ event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: hoursAgo(0.5) }];
+  assert.equal(classifyIssue({ labels: lbl('fullstack:in-progress') }, events, NOW, 2, 3).action, 'skip');
+});
+test('stale in-progress lease → reclaim', () => {
+  const events = [{ event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: hoursAgo(5) }];
+  const d = classifyIssue({ labels: lbl('fullstack:in-progress') }, events, NOW, 2, 3);
+  assert.equal(d.action, 'reclaim');
+});
+test('manual, not edited → skip', () => {
+  const events = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: hoursAgo(10) }];
+  const issue = { labels: lbl('fullstack:manual'), updated_at: hoursAgo(20) };
+  assert.equal(classifyIssue(issue, events, NOW, 2, 3).action, 'skip');
+});
+test('manual, edited since decline → triage (re-judge)', () => {
+  const events = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: hoursAgo(10) }];
+  const issue = { labels: lbl('fullstack:manual'), updated_at: hoursAgo(1) };
+  assert.equal(classifyIssue(issue, events, NOW, 2, 3).action, 'triage');
+});
+test('already go-labelled → skip (not re-analysed)', () => {
+  assert.equal(classifyIssue({ labels: lbl('fullstack:go') }, [], NOW, 2, 3).action, 'skip');
+});
+test('attemptCount counts in-progress labelings', () => {
+  const events = [
+    { event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: hoursAgo(9) },
+    { event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: hoursAgo(5) },
+    { event: 'unlabeled', label: { name: 'fullstack:in-progress' }, created_at: hoursAgo(7) },
+  ];
+  assert.equal(summariseLabelEvents(events, 'fullstack:in-progress').count, 2);
+  assert.equal(classifyIssue({ labels: lbl('fullstack:in-progress') }, events, NOW, 2, 3).attemptCount, 2);
+});
+
+// ---- apply-verdicts.reconcile ----
+test('new go/high → add go + prio-high, nothing to remove', () => {
+  const r = reconcile([], { suitability: 'go', priority: 'high' });
+  assert.deepEqual(r.add.sort(), ['fullstack:go', 'fullstack:prio-high'].sort());
+  assert.deepEqual(r.remove, []);
+  assert.equal(r.newlyManual, false);
+});
+test('re-judge manual → go strips manual + swaps prio', () => {
+  const r = reconcile(['fullstack:manual', 'fullstack:prio-low'], { suitability: 'go', priority: 'high' });
+  assert.ok(r.add.includes('fullstack:go'));
+  assert.ok(r.add.includes('fullstack:prio-high'));
+  assert.ok(r.remove.includes('fullstack:manual'));
+  assert.ok(r.remove.includes('fullstack:prio-low'));
+});
+test('newly manual flagged once; already-manual not', () => {
+  assert.equal(reconcile([], { suitability: 'manual' }).newlyManual, true);
+  assert.equal(reconcile(['fullstack:manual'], { suitability: 'manual' }).newlyManual, false);
+});
+test('manual carries no priority label', () => {
+  const r = reconcile([], { suitability: 'manual', priority: 'high' });
+  assert.deepEqual(r.add, ['fullstack:manual']);
+});
+
+// ---- select ranking ----
+test('rankCandidates: priority then oldest', () => {
+  const issues = [
+    { number: 1, labels: lbl('fullstack:prio-low'), created_at: hoursAgo(100) },
+    { number: 2, labels: lbl('fullstack:prio-high'), created_at: hoursAgo(1) },
+    { number: 3, labels: lbl('fullstack:prio-high'), created_at: hoursAgo(50) },
+  ];
+  assert.deepEqual(rankCandidates(issues).map((i) => i.number), [3, 2, 1]);
+});
+test('priorityOf defaults to low', () => {
+  assert.equal(priorityOf([]), 'low');
+  assert.equal(priorityOf(['fullstack:prio-med']), 'med');
+});
+test('isActionable excludes in-progress / assigned', () => {
+  assert.equal(isActionable({ labels: lbl('fullstack:go') }), true);
+  assert.equal(isActionable({ labels: lbl('fullstack:go', 'fullstack:in-progress') }), false);
+  assert.equal(isActionable({ labels: lbl('fullstack:go'), assignee: { login: 'x' } }), false);
+});
+
+// ---- notify-gate reviewer resolution ----
+test('creator in map → assign creator', () => {
+  const r = resolveReviewer('alice', { alice: 'alice@x.com', 'admin-gh': 'admin@x.com' }, 'admin-gh');
+  assert.equal(r.reviewerId, 'alice@x.com');
+  assert.equal(r.reviewerIsCreator, true);
+});
+test('creator not in map → admin id looked up from map by login, cc both', () => {
+  const r = resolveReviewer('ext-user', { alice: 'alice@x.com', 'admin-gh': 'admin@x.com' }, 'admin-gh');
+  assert.equal(r.reviewerId, 'admin@x.com');
+  assert.equal(r.reviewerGh, 'admin-gh');
+  assert.equal(r.reviewerIsCreator, false);
+  const comment = buildGateComment('plan', ['q1'], 'https://app', 'ext-user', r);
+  assert.ok(comment.includes('@ext-user'));
+  assert.ok(comment.includes('@admin-gh'));
+});
+test('admin login missing from map → null reviewerId (misconfig guard)', () => {
+  const r = resolveReviewer('ext-user', { alice: 'alice@x.com' }, 'admin-gh');
+  assert.equal(r.reviewerId, null);
+  assert.equal(r.reviewerGh, 'admin-gh');
+});
+
+// ---- publish review outcome + body ----
+test('reviewOutcome: ship ready, flag FYI, capped-revise draft', () => {
+  assert.deepEqual(reviewOutcome({ verdict: 'ship' }, 0, 2), { draft: false, heading: null });
+  assert.equal(reviewOutcome({ verdict: 'flag' }, 0, 2).draft, false);
+  assert.ok(reviewOutcome({ verdict: 'flag' }, 0, 2).heading.includes('FYI'));
+  const capped = reviewOutcome({ verdict: 'revise' }, 2, 2);
+  assert.equal(capped.draft, true);
+  assert.ok(capped.heading.includes('Must fix'));
+});
+test('buildPrBody includes prBody, revise log, concerns, footer', () => {
+  const body = buildPrBody(
+    { prBody: 'Fixes the thing. Closes #1' },
+    { verdict: 'flag', concerns: ['Standards: foo.ts:2 — nit'] },
+    { reviseLog: ['pass 1: fixed naming'] },
+    reviewOutcome({ verdict: 'flag' }, 0, 2),
+  );
+  assert.ok(body.includes('Closes #1'));
+  assert.ok(body.includes('Review & revision history'));
+  assert.ok(body.includes('pass 1: fixed naming'));
+  assert.ok(body.includes('Standards: foo.ts:2'));
+  assert.ok(body.includes('mediforce-fullstack'));
+});
+
+console.log(`\n${pass} passed, ${fail} failed`);
+process.exit(fail > 0 ? 1 : 0);
