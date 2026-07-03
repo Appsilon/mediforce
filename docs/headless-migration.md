@@ -904,13 +904,15 @@ interface RunKicker {
     description: `Retried failed step '${stepId}' on instance '${instanceId}'`,
     timestamp: new Date().toISOString(),
     inputSnapshot: { instanceId, stepId, previousExecutionId, previousError },
-    outputSnapshot: { resetTo: 'running', currentStepId: stepId, newExecutionId },
+    outputSnapshot: { resetTo: 'running', currentStepId: stepId },
     basis: 'User requested retry of failed step via API',
     entityType: 'processInstance',
     entityId: instanceId,
     processInstanceId: instanceId,
   });
   ```
+
+  (Corrected after the fact: the Phase-3 snippet originally included `newExecutionId` in `outputSnapshot`. The field was affirmatively false — `engine.retryStep` creates no new execution, so the value was always the pre-retry failed execution's id, identical to `inputSnapshot.previousExecutionId`. Removed from the handler; forward linkage is tracked in [#832](https://github.com/Appsilon/mediforce/issues/832).)
 
 - **`unclaimTask` endpoint — NOT added.** PR501 deleted `unclaimTask` Server Action + `UnclaimButton` component as dead code (zero source callers). Phase 3 does not introduce a `POST /api/tasks/:taskId/unclaim` endpoint. If a future use case lands, opens its own ticket.
 
