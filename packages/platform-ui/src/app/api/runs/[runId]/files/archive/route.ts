@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { WorkspaceReader } from '@mediforce/agent-runtime';
 import { HandlerError, NotFoundError } from '@mediforce/platform-api/errors';
 import { defaultBuildScope, defaultResolveCaller } from '@/lib/route-adapter';
+import { attachmentContentDisposition } from '@/lib/file-content-type';
 
 interface RouteContext {
   params: Promise<{ runId: string }>;
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest, ctx: RouteContext): Promise<NextResp
     return new NextResponse(new Uint8Array(archive), {
       headers: {
         'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="${fileName}"`,
+        'Content-Disposition': attachmentContentDisposition(fileName),
         'Content-Length': String(archive.byteLength),
         'X-Content-Type-Options': 'nosniff',
       },

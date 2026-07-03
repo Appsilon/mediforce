@@ -142,7 +142,7 @@ export function RunOutputFilesPanel({
     try {
       const archive = await mediforce.runs.downloadOutputFilesArchive({ runId });
       saveBlobToDevice(
-        new Blob([archive.bytes.slice()], { type: 'application/zip' }),
+        new Blob([archive.bytes], { type: 'application/zip' }),
         archive.fileName,
       );
     } catch (err) {

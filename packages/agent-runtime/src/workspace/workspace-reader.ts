@@ -99,16 +99,13 @@ export class WorkspaceReader {
    * a textual directory listing instead; `cat-file blob` refuses non-blobs).
    * Throws on paths outside `.mediforce/output/` or containing `..` segments.
    */
-  /**
-   * Stream all Output Files as a zip archive via `git archive --format=zip`.
-   * Returns null when the repo, branch, or output directory doesn't exist.
-   */
-  async archiveOutputFiles(workflow: WorkflowIdentity, runId: string): Promise<Buffer | null> {
+  async readOutputFile(workflow: WorkflowIdentity, runId: string, path: string): Promise<Buffer | null> {
+    assertOutputFilePath(path);
     const bareRepoPath = bareRepoPathFor(this.dataDir, workflow);
     try {
       const { stdout } = await execFileAsync(
         'git',
-        ['archive', '--format=zip', '--prefix=output/', runBranchName(runId), '--', OUTPUT_FILES_PATH_PREFIX],
+        ['cat-file', 'blob', `${runBranchName(runId)}:${path}`],
         { cwd: bareRepoPath, encoding: 'buffer', maxBuffer: gitMaxBuffer() },
       );
       return stdout;
@@ -117,13 +114,18 @@ export class WorkspaceReader {
     }
   }
 
-  async readOutputFile(workflow: WorkflowIdentity, runId: string, path: string): Promise<Buffer | null> {
-    assertOutputFilePath(path);
+  /**
+   * All Output Files as a zip archive via `git archive`. Entries are rooted
+   * at the output tree (`<stepId>/<fileName>`) — the `.mediforce/output/`
+   * prefix is stripped by archiving the subtree object directly.
+   * Returns null when the repo, branch, or output directory doesn't exist.
+   */
+  async archiveOutputFiles(workflow: WorkflowIdentity, runId: string): Promise<Buffer | null> {
     const bareRepoPath = bareRepoPathFor(this.dataDir, workflow);
     try {
       const { stdout } = await execFileAsync(
         'git',
-        ['cat-file', 'blob', `${runBranchName(runId)}:${path}`],
+        ['archive', '--format=zip', `${runBranchName(runId)}:${OUTPUT_FILES_REPO_ROOT}`],
         { cwd: bareRepoPath, encoding: 'buffer', maxBuffer: gitMaxBuffer() },
       );
       return stdout;
