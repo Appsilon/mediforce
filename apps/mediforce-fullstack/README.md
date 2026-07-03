@@ -52,10 +52,10 @@ edit) or one a human force-labels `fullstack:go`.
 | `FULLSTACK_REVIEWER_MAP` | **yes** | workflow | `notify-gate` | JSON `{ "githubLogin": "email-or-uid" }` of dev-team reviewers (must include the admin) | Workflow secrets |
 | `FULLSTACK_DEFAULT_ADMIN` | **yes** | workflow | `notify-gate` | Fallback admin's **GitHub login** — must be a key in `FULLSTACK_REVIEWER_MAP` (their Mediforce id + cc handle are derived from it) | Workflow secrets |
 | `APP_BASE_URL` | no | workflow/ns | `notify-gate` | Mediforce base URL for the gate comment link | Workflow/namespace env |
-| `FULLSTACK_REPO` | no | workflow | all scripts | Target repo (default `Appsilon/mediforce`) | `build/env.json` |
-| `LEASE_TTL_HOURS` | no | workflow | `fetch-candidates` | Stale-lease reclaim threshold (default `2`) | `build/env.json` |
-| `MAX_ATTEMPTS` | no | workflow | `triage` | Poison-pill cap — after N failed attempts → `manual` (default `3`) | `build/env.json` |
-| `REVIEW_MAX` | no | workflow | `publish` (+ transition) | Max revise passes before push-as-draft (default `2`) | `build/env.json` |
+| `FULLSTACK_REPO` | no | workflow | all scripts | Target repo (default `Appsilon/mediforce`) | `build/env.example.json` |
+| `LEASE_TTL_HOURS` | no | workflow | `fetch-candidates` | Stale-lease reclaim threshold (default `2`) | `build/env.example.json` |
+| `MAX_ATTEMPTS` | no | workflow | `triage` | Poison-pill cap — after N failed attempts → `manual` (default `3`) | `build/env.example.json` |
+| `REVIEW_MAX` | no | workflow | `publish` (+ transition) | Max revise passes before push-as-draft (default `2`) | `build/env.example.json` |
 
 > **`GITHUB_TOKEN` write scope is the single most important thing to get right.**
 > The whole pipeline pushes branches and opens PRs. A read-only token makes every
@@ -111,14 +111,14 @@ correct JSON escaping) by the assembler:
 
 ```bash
 python3 build/build_wd.py        # regenerates src/mediforce-fullstack.wd.json
-node   tests/run_tests.mjs        # pure-logic tests (19, no secrets)
+node   tests/run_tests.mjs        # pure-logic tests (20, no secrets)
 for f in scripts/*.mjs; do node --check "$f"; done   # syntax
 ```
 
 Non-secret env + tunables (`FULLSTACK_REPO`, `LEASE_TTL_HOURS`, `MAX_ATTEMPTS`,
 `REVIEW_MAX`, and the `{{…}}` secret references) live in
-[`build/env.json`](build/env.json). Edit `scripts/*.mjs` / `prompts/*.md` /
-`build/env.json` and re-run the assembler — do **not** hand-edit the embedded
+[`build/env.example.json`](build/env.example.json). Edit `scripts/*.mjs` / `prompts/*.md` /
+`build/env.example.json` and re-run the assembler — do **not** hand-edit the embedded
 strings in the `.wd.json`.
 
 ## Register
