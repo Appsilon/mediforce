@@ -3,6 +3,7 @@ import {
   InMemoryAuditRepository,
   InMemoryProcessInstanceRepository,
   buildProcessInstance,
+  buildStepExecution,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import type { ProcessInstance } from '@mediforce/platform-core';
@@ -111,10 +112,57 @@ describe('retryStep handler', () => {
       previousExecutionId: null,
       previousError: null,
     });
+    // Exact match: the retried execution's id is unknowable at audit time
+    // (created later by the runner), so no execution id may appear here.
+    expect(event.outputSnapshot).toEqual({
+      resetTo: 'running',
+      currentStepId: 'deploy',
+    });
 
     expect(kicker.kicks).toEqual([
       { instanceId: 'inst-a', triggeredBy: 'u-1' },
     ]);
+  });
+
+  it('snapshots the seeded failed execution as previous, never as new', async () => {
+    const failedExecution = buildStepExecution({
+      instanceId: 'inst-a',
+      stepId: 'deploy',
+      status: 'failed',
+      output: null,
+      error: 'deploy target unreachable',
+    });
+    await instanceRepo.addStepExecution('inst-a', failedExecution);
+
+    const instanceAfter: ProcessInstance = {
+      ...(await instanceRepo.getById('inst-a'))!,
+      status: 'running',
+      error: null,
+    };
+    const engineStub = makeEngineStub({ result: instanceAfter });
+    const scope = createTestScope({
+      instanceRepo,
+      auditRepo,
+      runKicker: noopRunKicker(),
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+    Object.assign(scope.system, { engine: engineStub });
+
+    await retryStep({ runId: 'inst-a', stepId: 'deploy' }, scope);
+
+    const events = await auditRepo.getByProcess('inst-a');
+    expect(events).toHaveLength(1);
+    const event = events[0]!;
+    expect(event.inputSnapshot).toEqual({
+      instanceId: 'inst-a',
+      stepId: 'deploy',
+      previousExecutionId: failedExecution.id,
+      previousError: 'deploy target unreachable',
+    });
+    expect(event.outputSnapshot).toEqual({
+      resetTo: 'running',
+      currentStepId: 'deploy',
+    });
   });
 
   it('maps engine InvalidTransitionError to PreconditionFailedError (409)', async () => {
