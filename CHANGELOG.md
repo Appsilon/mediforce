@@ -17,6 +17,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Workflow authoring docs split into a process guide ([docs/how-to-create-workflow.md](docs/how-to-create-workflow.md)) and a production checklist ([docs/workflow-authoring-golden-rules.md](docs/workflow-authoring-golden-rules.md)), backed by the end-to-end `apps/golden-standard-workflow` reference package. A CI doc-lint test re-derives every cross-reference, the `executor`/`type` enum tables, the referenced `mediforce` CLI commands, and the ADR links from source, so the docs fail the build instead of silently drifting [#784](https://github.com/Appsilon/mediforce/pull/784).
 
 ### Fixed
+- Retrying a failed step no longer writes a false claim into the audit trail: the `instance.retried` event recorded the pre-retry failed execution's id as `newExecutionId`, implying a pre/post linkage that never existed — the retry's real execution is created later by the runner and is unknowable at audit time. The field is removed (`previousExecutionId` stays as the truthful linkage; forward linkage tracked in [#832](https://github.com/Appsilon/mediforce/issues/832)) [#836](https://github.com/Appsilon/mediforce/pull/836).
 - Run execution history now shows the correct control-mode badge for agent steps stored without an explicit `autonomyLevel` — previously they fell through to "No agent" (CM0) even though an agent was running; they now display as "Autonomous agent" (CM4), which matches the design intent that CM0 is reserved for `human | script | action` executors only.
 
 ## [2026-06-21]
