@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Download, File, FileArchive, FileImage, FileSpreadsheet, FileText, type LucideIcon } from 'lucide-react';
+import { Download, DownloadCloud, File, FileArchive, FileImage, FileSpreadsheet, FileText, type LucideIcon } from 'lucide-react';
 import type { Step } from '@mediforce/platform-core';
 import type { RunOutputFileEntry } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
@@ -122,6 +122,9 @@ export function RunOutputFilesPanel({
   files: RunOutputFileEntry[];
   definitionSteps: Step[];
 }) {
+  const [downloadingAll, setDownloadingAll] = React.useState(false);
+  const [downloadAllError, setDownloadAllError] = React.useState<string | null>(null);
+
   const groups = React.useMemo(
     () => groupOutputFilesByStep(files, definitionSteps),
     [files, definitionSteps],
@@ -131,9 +134,42 @@ export function RunOutputFilesPanel({
     return null;
   }
 
+  const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+
+  async function handleDownloadAll() {
+    setDownloadingAll(true);
+    setDownloadAllError(null);
+    try {
+      const archive = await mediforce.runs.downloadOutputFilesArchive({ runId });
+      saveBlobToDevice(
+        new Blob([archive.bytes.slice()], { type: 'application/zip' }),
+        archive.fileName,
+      );
+    } catch (err) {
+      setDownloadAllError(err instanceof Error ? err.message : 'Download failed');
+    } finally {
+      setDownloadingAll(false);
+    }
+  }
+
   return (
     <div className="rounded-lg border bg-card p-4">
-      <h3 className="text-sm font-medium mb-3">Files</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-medium">Files</h3>
+        <div className="flex items-center gap-2">
+          {downloadAllError && (
+            <span className="text-xs text-destructive truncate max-w-48">{downloadAllError}</span>
+          )}
+          <button
+            onClick={handleDownloadAll}
+            disabled={downloadingAll}
+            className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline disabled:opacity-50"
+          >
+            <DownloadCloud className="h-3.5 w-3.5" />
+            {downloadingAll ? 'Downloading...' : `Download all (${formatBytes(totalSize)})`}
+          </button>
+        </div>
+      </div>
       <div className="space-y-3">
         {groups.map((group) => (
           <div key={group.stepId}>

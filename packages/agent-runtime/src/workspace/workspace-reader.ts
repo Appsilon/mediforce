@@ -99,6 +99,24 @@ export class WorkspaceReader {
    * a textual directory listing instead; `cat-file blob` refuses non-blobs).
    * Throws on paths outside `.mediforce/output/` or containing `..` segments.
    */
+  /**
+   * Stream all Output Files as a zip archive via `git archive --format=zip`.
+   * Returns null when the repo, branch, or output directory doesn't exist.
+   */
+  async archiveOutputFiles(workflow: WorkflowIdentity, runId: string): Promise<Buffer | null> {
+    const bareRepoPath = bareRepoPathFor(this.dataDir, workflow);
+    try {
+      const { stdout } = await execFileAsync(
+        'git',
+        ['archive', '--format=zip', '--prefix=output/', runBranchName(runId), '--', OUTPUT_FILES_PATH_PREFIX],
+        { cwd: bareRepoPath, encoding: 'buffer', maxBuffer: gitMaxBuffer() },
+      );
+      return stdout;
+    } catch {
+      return null;
+    }
+  }
+
   async readOutputFile(workflow: WorkflowIdentity, runId: string, path: string): Promise<Buffer | null> {
     assertOutputFilePath(path);
     const bareRepoPath = bareRepoPathFor(this.dataDir, workflow);
