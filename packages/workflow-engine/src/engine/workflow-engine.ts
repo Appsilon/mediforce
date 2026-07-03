@@ -16,6 +16,7 @@ import type {
   UserDirectoryService,
   WorkflowDefinition,
   WorkflowStep,
+  ProcessNotificationConfig,
 } from '@mediforce/platform-core';
 import type { Selection, TaskVerdict } from '@mediforce/platform-core';
 import { RbacService, RbacError, normalizeSelection, buildTaskVerdicts, interpolate } from '@mediforce/platform-core';
@@ -219,30 +220,16 @@ export class WorkflowEngine {
       await this.handoffRepository.create(handoff);
 
       // Send escalation notification using definition.notifications
-      if (this.notificationService && this.userDirectoryService) {
-        const escalationConfig = definition.notifications?.find(
-          (n) => n.event === 'agent_escalation',
-        );
-        if (escalationConfig) {
-          const targets: NotificationTarget[] = [];
-          for (const role of escalationConfig.roles) {
-            const users = await this.userDirectoryService.getUsersByRole(role);
-            for (const user of users) {
-              targets.push({ channel: 'email', address: user.email });
-            }
-          }
-          await this.notificationService.send(
-            {
-              type: 'agent_escalation',
-              processInstanceId: instanceId,
-              stepId: instance.currentStepId!,
-              assignedRole: handoff.assignedRole,
-              entityId: handoff.id,
-              timestamp: new Date().toISOString(),
-            },
-            targets,
-          );
-        }
+      const escalationConfig = definition.notifications?.find(
+        (n) => n.event === 'agent_escalation',
+      );
+      if (escalationConfig) {
+        await this.resolveAndSendNotification('agent_escalation', escalationConfig, {
+          instanceId,
+          stepId: instance.currentStepId!,
+          assignedRole: handoff.assignedRole,
+          entityId: handoff.id,
+        });
       }
 
       return this.loadInstance(instanceId);
@@ -358,40 +345,28 @@ export class WorkflowEngine {
             processDefinitionVersion: String(definition.version),
           });
 
-          // Dispatch task_assigned notification when the workflow declares one,
-          // mirroring the agent_escalation path. Opt-in: workflows without a
-          // task_assigned entry get no notification (no behaviour change).
-          if (this.notificationService && this.userDirectoryService) {
-            const taskAssignedConfig = definition.notifications?.find(
-              (n) => n.event === 'task_assigned',
-            );
-            if (taskAssignedConfig) {
-              const targets: NotificationTarget[] = [];
-              for (const role of taskAssignedConfig.roles) {
-                const users = await this.userDirectoryService.getUsersByRole(role);
-                for (const user of users) {
-                  targets.push({ channel: 'email', address: user.email });
-                }
-              }
-              await this.notificationService.send(
-                {
-                  type: 'task_assigned',
-                  processInstanceId: instanceId,
-                  stepId: nextStep.id,
-                  assignedRole,
-                  entityId: task.id,
-                  timestamp: now,
-                },
-                targets,
-              );
-            }
-          }
-
           await this.instanceRepository.update(instanceId, {
             status: 'paused',
             pauseReason: 'waiting_for_human',
             updatedAt: now,
           });
+
+          // Dispatch task_assigned notification when the workflow declares one,
+          // mirroring the agent_escalation path. Sent after the instance is
+          // paused so a notification failure cannot strand a created task with
+          // a non-paused instance. Opt-in: workflows without a task_assigned
+          // entry get no notification (no behaviour change).
+          const taskAssignedConfig = definition.notifications?.find(
+            (n) => n.event === 'task_assigned',
+          );
+          if (taskAssignedConfig) {
+            await this.resolveAndSendNotification('task_assigned', taskAssignedConfig, {
+              instanceId,
+              stepId: nextStep.id,
+              assignedRole,
+              entityId: task.id,
+            });
+          }
         }
 
         // Note: CoworkSession creation is handled by the auto-runner (route.ts),
@@ -807,6 +782,36 @@ export class WorkflowEngine {
       throw new Error(`Process instance '${instanceId}' not found`);
     }
     return instance;
+  }
+
+  // Resolve a notification config's roles to email targets and dispatch the
+  // event. No-op when notification/user-directory services are not injected.
+  private async resolveAndSendNotification(
+    event: 'task_assigned' | 'agent_escalation',
+    config: ProcessNotificationConfig,
+    context: { instanceId: string; stepId: string; assignedRole: string; entityId: string },
+  ): Promise<void> {
+    if (!this.notificationService || !this.userDirectoryService) {
+      return;
+    }
+    const targets: NotificationTarget[] = [];
+    for (const role of config.roles) {
+      const users = await this.userDirectoryService.getUsersByRole(role);
+      for (const user of users) {
+        targets.push({ channel: 'email', address: user.email });
+      }
+    }
+    await this.notificationService.send(
+      {
+        type: event,
+        processInstanceId: context.instanceId,
+        stepId: context.stepId,
+        assignedRole: context.assignedRole,
+        entityId: context.entityId,
+        timestamp: new Date().toISOString(),
+      },
+      targets,
+    );
   }
 
   /**
