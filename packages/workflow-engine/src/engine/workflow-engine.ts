@@ -358,6 +358,35 @@ export class WorkflowEngine {
             processDefinitionVersion: String(definition.version),
           });
 
+          // Dispatch task_assigned notification when the workflow declares one,
+          // mirroring the agent_escalation path. Opt-in: workflows without a
+          // task_assigned entry get no notification (no behaviour change).
+          if (this.notificationService && this.userDirectoryService) {
+            const taskAssignedConfig = definition.notifications?.find(
+              (n) => n.event === 'task_assigned',
+            );
+            if (taskAssignedConfig) {
+              const targets: NotificationTarget[] = [];
+              for (const role of taskAssignedConfig.roles) {
+                const users = await this.userDirectoryService.getUsersByRole(role);
+                for (const user of users) {
+                  targets.push({ channel: 'email', address: user.email });
+                }
+              }
+              await this.notificationService.send(
+                {
+                  type: 'task_assigned',
+                  processInstanceId: instanceId,
+                  stepId: nextStep.id,
+                  assignedRole,
+                  entityId: task.id,
+                  timestamp: now,
+                },
+                targets,
+              );
+            }
+          }
+
           await this.instanceRepository.update(instanceId, {
             status: 'paused',
             pauseReason: 'waiting_for_human',
