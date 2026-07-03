@@ -2,9 +2,11 @@
  * Tests for WorkspaceReader — read-only access to Output Files on run
  * branches in the bare repo. Real git via WorkspaceManager against temp dirs.
  */
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
+import { promisify } from 'node:util';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { WorkflowWorkspace } from '@mediforce/platform-core';
 import { WorkspaceManager } from '../workspace-manager';
@@ -162,6 +164,86 @@ describe('WorkspaceReader', () => {
       await expect(reader.readOutputFile(workflow, 'run-1', 'tracked-but-not-output.txt')).rejects.toThrow();
       await expect(reader.readOutputFile(workflow, 'run-1', '.mediforce/outputs/step-1/x.txt')).rejects.toThrow();
       await expect(reader.readOutputFile(workflow, 'run-1', '.mediforce/output/')).rejects.toThrow();
+    });
+  });
+
+  describe('archiveOutputFiles', () => {
+    const execFileAsync = promisify(execFile);
+
+    async function unzipEntries(zipBuffer: Buffer): Promise<string[]> {
+      const zipPath = join(dataDir, 'test-archive.zip');
+      await writeFile(zipPath, zipBuffer);
+      const { stdout } = await execFileAsync('zipinfo', ['-1', zipPath], { encoding: 'utf-8' });
+      return stdout.trim().split('\n').filter((e) => e !== '' && e.endsWith('/') === false).sort();
+    }
+
+    async function unzipFileContent(zipBuffer: Buffer, entryPath: string): Promise<Buffer> {
+      const zipPath = join(dataDir, 'test-archive.zip');
+      await writeFile(zipPath, zipBuffer);
+      const extractDir = join(dataDir, 'extracted');
+      await mkdir(extractDir, { recursive: true });
+      await execFileAsync('unzip', ['-o', zipPath, entryPath, '-d', extractDir]);
+      return readFile(join(extractDir, entryPath));
+    }
+
+    it('produces a zip with entries rooted at <stepId>/<fileName>', async () => {
+      const workflow = { name: 'wd-archive' };
+      await commitOutputFiles(workflow, 'run-zip', 'extract', {
+        'report.csv': 'a,b\n1,2\n',
+      });
+      await commitOutputFiles(workflow, 'run-zip', 'summarize', {
+        'summary.md': '# done',
+      });
+
+      const archive = await reader.archiveOutputFiles(workflow, 'run-zip');
+
+      expect(archive).toBeInstanceOf(Buffer);
+      expect(archive!.byteLength).toBeGreaterThan(0);
+      const entries = await unzipEntries(archive!);
+      expect(entries).toEqual([
+        'extract/report.csv',
+        'summarize/summary.md',
+      ]);
+    });
+
+    it('round-trips binary content through the zip', async () => {
+      const binary = Buffer.from(Array.from({ length: 256 }, (_, byteValue) => byteValue));
+      const workflow = { name: 'wd-archive-bin' };
+      await commitOutputFiles(workflow, 'run-zipbin', 'render', { 'data.bin': binary });
+
+      const archive = await reader.archiveOutputFiles(workflow, 'run-zipbin');
+      const extracted = await unzipFileContent(archive!, 'render/data.bin');
+
+      expect(extracted.equals(binary)).toBe(true);
+    });
+
+    it('includes nested directory structure inside steps', async () => {
+      const workflow = { name: 'wd-archive-nested' };
+      await commitOutputFiles(workflow, 'run-nested', 'step-1', {
+        'charts/plot.svg': '<svg/>',
+        'charts/deep/chart.png': 'fake-png',
+        'report.txt': 'hello',
+      });
+
+      const archive = await reader.archiveOutputFiles(workflow, 'run-nested');
+      const entries = await unzipEntries(archive!);
+
+      expect(entries).toEqual([
+        'step-1/charts/deep/chart.png',
+        'step-1/charts/plot.svg',
+        'step-1/report.txt',
+      ]);
+    });
+
+    it('returns null for a nonexistent run on an existing repo', async () => {
+      const workflow = { name: 'wd-archive-miss' };
+      await commitOutputFiles(workflow, 'run-real', 'step-1', { 'out.txt': 'x' });
+
+      expect(await reader.archiveOutputFiles(workflow, 'run-ghost')).toBeNull();
+    });
+
+    it('returns null when the bare repo does not exist', async () => {
+      expect(await reader.archiveOutputFiles({ name: 'never-created' }, 'run-1')).toBeNull();
     });
   });
 });
