@@ -6,6 +6,10 @@ import { reconcile } from '../scripts/apply-verdicts.mjs';
 import { rankCandidates, priorityOf, isActionable } from '../scripts/select.mjs';
 import { resolveReviewer, buildGateComment } from '../scripts/notify-gate.mjs';
 import { reviewOutcome, buildPrBody } from '../scripts/publish.mjs';
+import { resolveWaitMinutes } from '../scripts/arm-timer.mjs';
+import { classifyRuns, decideNextAction, summariseAnnotations } from '../scripts/check-ci.mjs';
+import { withFixHistory } from '../scripts/mark-ci-green.mjs';
+import { buildFailedBody } from '../scripts/mark-ci-failed.mjs';
 
 let pass = 0;
 let fail = 0;
@@ -141,6 +145,69 @@ test('buildPrBody includes prBody, revise log, concerns, footer', () => {
   assert.ok(body.includes('pass 1: fixed naming'));
   assert.ok(body.includes('Standards: foo.ts:2'));
   assert.ok(body.includes('mediforce-fullstack'));
+});
+
+// ---- arm-timer wait length ----
+test('resolveWaitMinutes: parses positive, falls back otherwise', () => {
+  assert.equal(resolveWaitMinutes('20'), 20);
+  assert.equal(resolveWaitMinutes(''), 15);
+  assert.equal(resolveWaitMinutes('{{CI_WAIT_MINUTES}}'), 15);
+  assert.equal(resolveWaitMinutes('0'), 15);
+  assert.equal(resolveWaitMinutes(undefined), 15);
+});
+
+// ---- check-ci.classifyRuns ----
+const run = (status, conclusion) => ({ status, conclusion });
+test('classifyRuns: no runs yet → pending', () => {
+  assert.equal(classifyRuns([]), 'pending');
+});
+test('classifyRuns: any running → pending', () => {
+  assert.equal(classifyRuns([run('completed', 'success'), run('in_progress', null)]), 'pending');
+});
+test('classifyRuns: any failing conclusion → failed', () => {
+  assert.equal(classifyRuns([run('completed', 'success'), run('completed', 'failure')]), 'failed');
+  assert.equal(classifyRuns([run('completed', 'timed_out')]), 'failed');
+});
+test('classifyRuns: all completed, none failing → passed', () => {
+  assert.equal(classifyRuns([run('completed', 'success'), run('completed', 'skipped')]), 'passed');
+});
+
+// ---- check-ci.decideNextAction (caps drive the loop) ----
+test('decideNextAction: passed → green', () => {
+  assert.equal(decideNextAction('passed', 0, 0, 3, 4), 'green');
+});
+test('decideNextAction: failed under cap → fix, at cap → giveup', () => {
+  assert.equal(decideNextAction('failed', 0, 0, 3, 4), 'fix');
+  assert.equal(decideNextAction('failed', 2, 0, 3, 4), 'fix');
+  assert.equal(decideNextAction('failed', 3, 0, 3, 4), 'giveup');
+});
+test('decideNextAction: pending under cap → wait, at cap → giveup', () => {
+  assert.equal(decideNextAction('pending', 0, 1, 3, 4), 'wait');
+  assert.equal(decideNextAction('pending', 0, 3, 3, 4), 'wait');
+  assert.equal(decideNextAction('pending', 0, 4, 3, 4), 'giveup');
+});
+test('summariseAnnotations: trims to path/line/message', () => {
+  const a = summariseAnnotations([{ path: 'x.ts', start_line: 3, end_line: 3, annotation_level: 'failure', message: 'boom' }]);
+  assert.deepEqual(a, [{ path: 'x.ts', startLine: 3, endLine: 3, level: 'failure', message: 'boom' }]);
+});
+
+// ---- PR-body CI history (green + failed) ----
+test('withFixHistory: appends once, skips when empty or already present', () => {
+  assert.equal(withFixHistory('body', []), 'body');
+  assert.equal(withFixHistory('body', undefined), 'body');
+  const once = withFixHistory('body', ['round 1: fixed TS2345']);
+  assert.ok(once.includes('CI fix history'));
+  assert.ok(once.includes('round 1: fixed TS2345'));
+  assert.equal(withFixHistory(once, ['round 1: fixed TS2345']), once);
+});
+test('buildFailedBody: appends history + failing-check summary, idempotent', () => {
+  const failing = [{ name: 'typecheck', url: 'https://gh/checks/1' }];
+  const body = buildFailedBody('base', ['round 1: tried'], failing, 'exhausted after 3 rounds');
+  assert.ok(body.includes('CI fix history'));
+  assert.ok(body.includes('CI failing'));
+  assert.ok(body.includes('typecheck'));
+  assert.ok(body.includes('exhausted after 3 rounds'));
+  assert.equal(buildFailedBody(body, ['round 1: tried'], failing, 'exhausted after 3 rounds'), body);
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

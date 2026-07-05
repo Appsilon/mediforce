@@ -17,7 +17,10 @@
     "FULLSTACK_DEFAULT_ADMIN": "{{FULLSTACK_DEFAULT_ADMIN}}",
     "LEASE_TTL_HOURS": "2",
     "MAX_ATTEMPTS": "3",
-    "REVIEW_MAX": "2"
+    "REVIEW_MAX": "2",
+    "CI_WAIT_MINUTES": "{{CI_WAIT_MINUTES}}",
+    "CI_POLL_MAX": "{{CI_POLL_MAX}}",
+    "CI_FIX_MAX": "{{CI_FIX_MAX}}"
   },
   "steps": [
     {
@@ -200,6 +203,82 @@
       }
     },
     {
+      "id": "arm-timer",
+      "name": "Arm the CI-poll timer",
+      "type": "creation",
+      "description": "Compute an ISO deadline (now + CI_WAIT_MINUTES) for the next wait-ci pause; re-arms each CI loop iteration so the wait deadline is secret-driven and never stale.",
+      "executor": "script",
+      "plugin": "script-container",
+      "script": {
+        "inlineScript": "// arm-timer \u2014 compute the CI-poll deadline for the next `wait-ci` pause.\n//\n// The `wait` action reads `config.duration.{minutes}` as raw NUMBERS and does\n// NOT interpolate them, so a secret-driven wait length must go through the\n// interpolatable `deadline` field instead. This step reads CI_WAIT_MINUTES\n// (secret-backed env, changeable without re-registering) and emits an absolute\n// ISO deadline that `wait-ci` consumes as `${steps.arm-timer.deadline}`.\n//\n// It sits in the CI loop and re-arms on every iteration (publish -> here, and\n// after each fix / pending re-poll), so each pause gets a fresh future deadline\n// \u2014 a single up-front computation would go stale on the 2nd lap.\n//\n// Reads:  env CI_WAIT_MINUTES (default 15)\n// Writes: /output/result.json -> { deadline, waitMinutes }\n\nimport { writeFileSync } from 'node:fs';\n\nconst DEFAULT_MINUTES = 15;\n\n/** Parse the configured wait length, falling back to the default for an unset /\n *  unresolved / non-positive value. Pure. */\nexport function resolveWaitMinutes(raw) {\n  const n = Number(raw);\n  return Number.isFinite(n) && n > 0 ? n : DEFAULT_MINUTES;\n}\n\nfunction main() {\n  const waitMinutes = resolveWaitMinutes(process.env.CI_WAIT_MINUTES);\n  const deadline = new Date(Date.now() + waitMinutes * 60_000).toISOString();\n  writeFileSync('/output/result.json', JSON.stringify({ deadline, waitMinutes }));\n  console.log(`arm-timer: next CI check at ${deadline} (in ${waitMinutes} min)`);\n}\n\nif (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {\n  main();\n}\n",
+        "runtime": "javascript"
+      }
+    },
+    {
+      "id": "wait-ci",
+      "name": "Wait for CI",
+      "type": "creation",
+      "description": "Pause the run until the arm-timer deadline, giving GitHub CI time to run on the pushed branch.",
+      "executor": "action",
+      "action": {
+        "kind": "wait",
+        "config": {
+          "deadline": "${steps.arm-timer.deadline}"
+        }
+      }
+    },
+    {
+      "id": "check-ci",
+      "name": "Check CI + route",
+      "type": "creation",
+      "description": "Read the PR head SHA's check-runs, harvest failing checks + annotations, and emit nextAction (green/fix/wait/giveup). Caps (CI_FIX_MAX/CI_POLL_MAX) live here so secrets drive the loop.",
+      "executor": "script",
+      "plugin": "script-container",
+      "script": {
+        "inlineScript": "// check-ci \u2014 read the PR's CI result and ROUTE the loop.\n//\n// This is the decision node of the CI-fix loop. Transition expressions cannot\n// read env/secrets (the evaluator only sees output/variables/verdict), so the\n// caps live HERE in JS where `process.env` is readable, and the step emits a\n// single `nextAction` the transitions switch on:\n//\n//   green  -> CI passed                              -> mark-ci-green\n//   fix    -> CI failed  and ciRound   < CI_FIX_MAX  -> fix-after-tests\n//   wait   -> CI pending and pollCount < CI_POLL_MAX -> arm-timer (re-poll)\n//   giveup -> caps exhausted (failed or stuck)       -> mark-ci-failed\n//\n// The container cannot `pnpm install` to reproduce a failure, so the whole\n// point of this step is to HARVEST the real error text from GitHub \u2014 failing\n// check names, their output summary, and their annotations (file:line:message)\n// \u2014 and hand it to `fix-after-tests`, which fixes statically from that. CI is\n// the reproduction environment; this step is the eyes.\n//\n// Reads:  /output/input.json (steps.publish, steps.fix-after-tests, steps.check-ci),\n//         env GITHUB_TOKEN, FULLSTACK_REPO, CI_FIX_MAX, CI_POLL_MAX\n// Writes: /output/result.json\n\nimport { readFileSync, writeFileSync } from 'node:fs';\n\nconst REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';\nconst CI_FIX_MAX = Number(process.env.CI_FIX_MAX) > 0 ? Number(process.env.CI_FIX_MAX) : 3;\nconst CI_POLL_MAX = Number(process.env.CI_POLL_MAX) > 0 ? Number(process.env.CI_POLL_MAX) : 4;\nconst FAILED_CONCLUSIONS = ['failure', 'timed_out', 'cancelled', 'action_required', 'stale'];\n\nfunction ghHeaders() {\n  const h = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };\n  if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;\n  return h;\n}\n\nasync function gh(path) {\n  const res = await fetch(`https://api.github.com${path}`, { headers: ghHeaders() });\n  if (!res.ok) throw new Error(`GitHub ${res.status} ${path}: ${(await res.text()).slice(0, 200)}`);\n  return res.json();\n}\n\n/** Collapse the check-runs list into one raw CI state. Pure.\n *  - no runs yet or any run still running -> 'pending'\n *  - any completed run with a failing conclusion -> 'failed'\n *  - all completed and none failing -> 'passed' */\nexport function classifyRuns(runs) {\n  if (!Array.isArray(runs) || runs.length === 0) return 'pending';\n  const failing = runs.filter((r) => r.status === 'completed' && FAILED_CONCLUSIONS.includes(r.conclusion));\n  if (failing.length > 0) return 'failed';\n  const running = runs.filter((r) => r.status !== 'completed');\n  if (running.length > 0) return 'pending';\n  return 'passed';\n}\n\n/** Route from raw state + counters + caps. Pure. */\nexport function decideNextAction(raw, ciRound, pollCount, ciFixMax, ciPollMax) {\n  if (raw === 'passed') return 'green';\n  if (raw === 'failed') return ciRound < ciFixMax ? 'fix' : 'giveup';\n  return pollCount < ciPollMax ? 'wait' : 'giveup';\n}\n\n/** Trim an annotation list down to what an agent needs to locate the error. Pure. */\nexport function summariseAnnotations(annotations) {\n  return (annotations || []).slice(0, 20).map((a) => ({\n    path: a.path,\n    startLine: a.start_line,\n    endLine: a.end_line,\n    level: a.annotation_level,\n    message: (a.message || '').slice(0, 600),\n  }));\n}\n\nasync function collectFailing(runs) {\n  const failing = runs.filter((r) => r.status === 'completed' && FAILED_CONCLUSIONS.includes(r.conclusion));\n  const out = [];\n  for (const run of failing) {\n    let annotations = [];\n    try {\n      annotations = summariseAnnotations(await gh(`/repos/${REPO}/check-runs/${run.id}/annotations`));\n    } catch (err) {\n      console.error(`check-ci: annotations for '${run.name}' failed: ${err.message}`);\n    }\n    out.push({\n      name: run.name,\n      conclusion: run.conclusion,\n      url: run.html_url,\n      title: run.output?.title || null,\n      summary: (run.output?.summary || '').slice(0, 1500),\n      annotations,\n    });\n  }\n  return out;\n}\n\nasync function main() {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf-8'));\n  const publish = input?.steps?.publish || {};\n  const prNumber = publish.prNumber;\n  const branch = publish.branch;\n  if (!prNumber) throw new Error('check-ci: no publish.prNumber in step input');\n\n  const ciRound = Number(input?.steps?.['fix-after-tests']?.ciRound || 0);\n  const prev = input?.steps?.['check-ci'];\n\n  const pr = await gh(`/repos/${REPO}/pulls/${prNumber}`);\n  const headSha = pr.head?.sha;\n  if (!headSha) throw new Error(`check-ci: PR #${prNumber} has no head sha`);\n\n  const checks = await gh(`/repos/${REPO}/commits/${headSha}/check-runs?per_page=100`);\n  const runs = checks?.check_runs || [];\n  const raw = classifyRuns(runs);\n\n  // Consecutive-pending counter: bounds a stuck CI independently of fix rounds;\n  // resets to 0 the moment CI produces a non-pending verdict.\n  const pollCount = raw === 'pending'\n    ? (prev?.raw === 'pending' ? Number(prev.pollCount || 1) + 1 : 1)\n    : 0;\n\n  const nextAction = decideNextAction(raw, ciRound, pollCount, CI_FIX_MAX, CI_POLL_MAX);\n  const failing = raw === 'failed' ? await collectFailing(runs) : [];\n\n  let reason;\n  if (raw === 'passed') reason = `all ${runs.length} check(s) passed`;\n  else if (raw === 'failed') reason = `${failing.map((f) => f.name).join(', ')} failed (round ${ciRound}/${CI_FIX_MAX})`;\n  else reason = `CI still running (poll ${pollCount}/${CI_POLL_MAX})`;\n\n  const giveupReason = nextAction === 'giveup'\n    ? (raw === 'failed'\n      ? `auto-fix exhausted after ${CI_FIX_MAX} round(s); still failing: ${failing.map((f) => f.name).join(', ')}`\n      : `CI never completed after ${CI_POLL_MAX} poll(s)`)\n    : null;\n\n  writeFileSync('/output/result.json', JSON.stringify({\n    prNumber, branch, headSha, raw, nextAction, ciRound, pollCount, failing, reason, giveupReason,\n  }));\n  console.log(`check-ci: PR #${prNumber} ${raw} -> ${nextAction} (${reason})`);\n}\n\nif (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {\n  main().catch((err) => {\n    console.error('check-ci crashed:', err && err.stack ? err.stack : String(err));\n    process.exit(1);\n  });\n}\n",
+        "runtime": "javascript"
+      }
+    },
+    {
+      "id": "fix-after-tests",
+      "name": "Fix CI failures",
+      "type": "creation",
+      "description": "GLM fixes the red checks statically from check-ci's harvested error text (no repro; CI validates), re-pushes the branch, and increments ciRound. Bounded loop.",
+      "executor": "agent",
+      "autonomyLevel": "L4",
+      "plugin": "claude-code-agent",
+      "agent": {
+        "model": "z-ai/glm-5.2",
+        "prompt": "## Task\n\nThe PR you opened has **failing CI**. Fix the failures on the pushed branch and\nre-push. `check-ci` already harvested the real error output from GitHub \u2014 you do\nNOT reproduce anything locally (you cannot `pnpm install` in this container).\nYou fix **statically from the actual CI error text**, push, and CI re-runs to\ntell us if you got it. This is a bounded loop; make each round count.\n\n### Inputs (under `## Previous Step Outputs`)\n- `publish` \u2014 `prNumber`, `branch`, `issueNumber`, `baseBranch`.\n- `check-ci` \u2014 `failing[]`: one entry per red check, each with `name`, `url`,\n  `title`, `summary`, and `annotations[]` (`path`, `startLine`, `message`) \u2014 the\n  concrete `file:line: message` failures (e.g. `tsc` errors, failing assertions).\n  `reason` summarises the round.\n- `fix-after-tests` \u2014 your OWN previous output, if this is a later round:\n  `fix-after-tests.ciRound` (prior count, default 0) and\n  `fix-after-tests.ciFixLog` (prior log).\n\n### Do\n1. **Read the failures.** Work from `check-ci.failing` \u2014 the `annotations` give\n   you the exact file, line, and message for each error. If a summary is too\n   thin to act on, you hold `$GITHUB_TOKEN`; fetch the job's richer detail\n   yourself via the API (`/repos/Appsilon/mediforce/check-runs/<id>/annotations`,\n   or the run logs) rather than guessing.\n2. **Clone and check out the branch:**\n\n   ```\n   rm -rf /tmp/cifix && git clone --depth 1 https://$GITHUB_TOKEN@github.com/Appsilon/mediforce.git /tmp/cifix\n   cd /tmp/cifix && git fetch --depth 50 origin <publish.branch> && git checkout <publish.branch>\n   ```\n3. **Fix the reported failures** following repo conventions (`AGENTS.md`,\n   `docs/CONTEXT.md`): no `any` (Zod + `z.infer`), explicit boolean comparisons,\n   English, self-documenting code, no docstrings/comments on code you did not\n   change. Address the CI errors specifically \u2014 a typecheck error names the file\n   and position; a failing test names the spec. Keep the fix minimal and on-topic\n   for the reported failure. Do NOT run the suite (no install in-container);\n   reason about correctness from the source and the error text.\n4. **Commit and re-push the SAME branch:**\n\n   ```\n   git add -A && git commit -m \"ci-fix: <what you fixed>\"\n   git push https://$GITHUB_TOKEN@github.com/Appsilon/mediforce.git HEAD\n   ```\n\nIf a failure is genuinely not fixable from the error text (flaky infra, a check\nthat needs a decision you cannot make), note it in the log rather than guessing \u2014\nthe loop will hand it to a human once the round budget is spent.\n\n### Counters\n- `ciRound` = (`fix-after-tests.ciRound` from the input, or 0) **+ 1**.\n- `ciFixLog` = the prior `fix-after-tests.ciFixLog` (or `[]`) **with your new\n  round appended** \u2014 one line: `round <n>: fixed <what> (<checks addressed>)`.\n\n## Output Contract (MANDATORY)\n\nWrite ONLY this JSON to `${output_dir}/result.json`:\n\n```json\n{\n  \"issueNumber\": 123,\n  \"prNumber\": 456,\n  \"ciRound\": 1,\n  \"ciFixLog\": [\"round 1: fixed TS2345 in packages/x/y.ts (typecheck)\"],\n  \"pushed\": true,\n  \"addressed\": [\"<check name> \u2014 <what you changed>\", \"...\"]\n}\n```\n\nIf you could not push a fix (nothing actionable), set `pushed: false` and explain\nin `ciFixLog`. Your FINAL message must be ONLY: `{\"output_file\": \"${output_dir}/result.json\", \"summary\": \"ci-fix round <n>\"}`.\n",
+        "timeoutMinutes": 20,
+        "image": "mediforce-golden-image:latest"
+      }
+    },
+    {
+      "id": "mark-ci-green",
+      "name": "CI green",
+      "type": "creation",
+      "description": "Comment CI-green on the PR and append the CI fix history to the PR body.",
+      "executor": "script",
+      "plugin": "script-container",
+      "script": {
+        "inlineScript": "// mark-ci-green \u2014 CI passed on the PR; acknowledge it and record the fix history.\n//\n// Reached when `check-ci` routes `green`. Posts a \"CI green\" comment on the PR\n// and, if the loop had to fix anything, appends a \"CI fix history\" section to\n// the PR body so a human reviewer sees what the bot chased. Does NOT touch the\n// draft flag: `publish` only drafts on capped-revise (unresolved review\n// blockers), and a green CI does not resolve those \u2014 un-drafting is a human call.\n//\n// Reads:  /output/input.json (steps.publish, steps.fix-after-tests, steps.check-ci),\n//         env GITHUB_TOKEN, FULLSTACK_REPO\n// Writes: /output/result.json\n\nimport { readFileSync, writeFileSync } from 'node:fs';\n\nconst REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';\nconst HISTORY_MARKER = '### \ud83d\udd01 CI fix history';\n\nfunction ghHeaders() {\n  const h = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };\n  if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;\n  return h;\n}\n\nasync function gh(path, init) {\n  const res = await fetch(`https://api.github.com${path}`, { headers: ghHeaders(), ...init });\n  if (!res.ok) throw new Error(`GitHub ${res.status} ${init?.method || 'GET'} ${path}: ${(await res.text()).slice(0, 200)}`);\n  return res.status === 204 ? null : res.json();\n}\n\n/** Append a CI-fix-history section to an existing PR body. Idempotent (skips if\n *  already present) and a no-op when nothing was fixed. Pure. */\nexport function withFixHistory(body, ciFixLog) {\n  if (!Array.isArray(ciFixLog) || ciFixLog.length === 0) return body;\n  if ((body || '').includes(HISTORY_MARKER)) return body;\n  const section = `${HISTORY_MARKER}\\n${ciFixLog.map((l) => `- ${l}`).join('\\n')}`;\n  return `${body || ''}\\n\\n${section}`;\n}\n\nasync function main() {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf-8'));\n  const prNumber = input?.steps?.publish?.prNumber;\n  const ciFixLog = input?.steps?.['fix-after-tests']?.ciFixLog;\n  if (!prNumber) throw new Error('mark-ci-green: no publish.prNumber');\n\n  const pr = await gh(`/repos/${REPO}/pulls/${prNumber}`);\n  const newBody = withFixHistory(pr.body || '', ciFixLog);\n  if (newBody !== (pr.body || '')) {\n    await gh(`/repos/${REPO}/pulls/${prNumber}`, {\n      method: 'PATCH',\n      headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n      body: JSON.stringify({ body: newBody }),\n    });\n  }\n\n  await gh(`/repos/${REPO}/issues/${prNumber}/comments`, {\n    method: 'POST',\n    headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n    body: JSON.stringify({ body: '\ud83e\udd16 **mediforce-fullstack**: CI is green \u2705 \u2014 ready for review.' }),\n  }).catch((err) => console.error(`mark-ci-green: comment failed: ${err.message}`));\n\n  writeFileSync('/output/result.json', JSON.stringify({ prNumber, ciGreen: true }));\n  console.log(`mark-ci-green: PR #${prNumber} CI green`);\n}\n\nif (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {\n  main().catch((err) => {\n    console.error('mark-ci-green crashed:', err && err.stack ? err.stack : String(err));\n    process.exit(1);\n  });\n}\n",
+        "runtime": "javascript"
+      }
+    },
+    {
+      "id": "mark-ci-failed",
+      "name": "CI failed -> human",
+      "type": "creation",
+      "description": "Auto-fix budget spent (or CI stuck): convert the PR to draft, append the fix history + failing-check summary, label fullstack:ci-failing, and comment for a human.",
+      "executor": "script",
+      "plugin": "script-container",
+      "script": {
+        "inlineScript": "// mark-ci-failed \u2014 CI is red (or stuck) and the auto-fix budget is spent; hand\n// the PR to a human.\n//\n// Reached when `check-ci` routes `giveup`. Converts the PR to draft (so it is\n// not merged with red CI), appends the CI fix history + the failing-check\n// summary to the PR body, labels the issue `fullstack:ci-failing` for\n// visibility, and comments what a human needs to pick up. Keeps `fullstack:pr-open`\n// (the PR does exist). Best-effort throughout: a failed write leaves the red PR\n// as its own signal.\n//\n// Converting an OPEN PR to draft is not a REST PATCH field \u2014 it needs the\n// GraphQL `convertPullRequestToDraft` mutation, done here best-effort.\n//\n// Reads:  /output/input.json (steps.publish, steps.check-ci, steps.fix-after-tests),\n//         env GITHUB_TOKEN, FULLSTACK_REPO\n// Writes: /output/result.json\n\nimport { readFileSync, writeFileSync } from 'node:fs';\n\nconst REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';\nconst CI_FAILING = 'fullstack:ci-failing';\nconst HISTORY_MARKER = '### \ud83d\udd01 CI fix history';\nconst FAILING_MARKER = '### \u274c CI failing \u2014 needs a human';\n\nfunction ghHeaders() {\n  const h = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };\n  if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;\n  return h;\n}\n\nasync function gh(path, init) {\n  const res = await fetch(`https://api.github.com${path}`, { headers: ghHeaders(), ...init });\n  if (!res.ok && !(init?.method === 'DELETE' && res.status === 404)) {\n    throw new Error(`GitHub ${res.status} ${init?.method || 'GET'} ${path}: ${(await res.text()).slice(0, 200)}`);\n  }\n  return res.status === 204 || res.status === 404 ? null : res.json();\n}\n\nasync function graphql(query, variables) {\n  const res = await fetch('https://api.github.com/graphql', {\n    method: 'POST',\n    headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n    body: JSON.stringify({ query, variables }),\n  });\n  if (!res.ok) throw new Error(`GitHub GraphQL ${res.status}: ${(await res.text()).slice(0, 200)}`);\n  const json = await res.json();\n  if (json.errors) throw new Error(`GitHub GraphQL: ${JSON.stringify(json.errors).slice(0, 200)}`);\n  return json.data;\n}\n\n/** Append the CI-fix-history + failing-check summary to a PR body. Idempotent,\n *  marker-guarded. Pure. */\nexport function buildFailedBody(body, ciFixLog, failing, giveupReason) {\n  let out = body || '';\n  if (Array.isArray(ciFixLog) && ciFixLog.length > 0 && !out.includes(HISTORY_MARKER)) {\n    out += `\\n\\n${HISTORY_MARKER}\\n${ciFixLog.map((l) => `- ${l}`).join('\\n')}`;\n  }\n  if (!out.includes(FAILING_MARKER)) {\n    const checks = (failing || []).map((f) => `- \\`${f.name}\\` \u2014 ${f.url}`).join('\\n') || '- (see the Checks tab)';\n    out += `\\n\\n${FAILING_MARKER}\\n${giveupReason || 'CI did not go green.'}\\n\\n${checks}`;\n  }\n  return out;\n}\n\nexport function failedComment(giveupReason, failing) {\n  const checks = (failing || []).map((f) => `\\`${f.name}\\``).join(', ') || 'the failing checks';\n  return `\ud83e\udd16 **mediforce-fullstack**: I could not get CI green here \u2014 ${giveupReason || 'it stayed red'}. ` +\n    `Converted to draft and leaving it for a human; the failing checks are ${checks}. ` +\n    'Push a fix (or `/code-review` it) and mark ready when it passes.';\n}\n\nasync function main() {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf-8'));\n  const publish = input?.steps?.publish || {};\n  const check = input?.steps?.['check-ci'] || {};\n  const ciFixLog = input?.steps?.['fix-after-tests']?.ciFixLog;\n  const prNumber = publish.prNumber;\n  const issueNumber = publish.issueNumber;\n  if (!prNumber) throw new Error('mark-ci-failed: no publish.prNumber');\n\n  try {\n    const pr = await gh(`/repos/${REPO}/pulls/${prNumber}`);\n\n    if (pr.draft !== true && pr.node_id) {\n      await graphql(\n        'mutation($id:ID!){convertPullRequestToDraft(input:{pullRequestId:$id}){pullRequest{isDraft}}}',\n        { id: pr.node_id },\n      ).catch((err) => console.error(`mark-ci-failed: draft conversion failed: ${err.message}`));\n    }\n\n    const newBody = buildFailedBody(pr.body || '', ciFixLog, check.failing, check.giveupReason);\n    if (newBody !== (pr.body || '')) {\n      await gh(`/repos/${REPO}/pulls/${prNumber}`, {\n        method: 'PATCH',\n        headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n        body: JSON.stringify({ body: newBody }),\n      });\n    }\n\n    if (issueNumber) {\n      await gh(`/repos/${REPO}/issues/${issueNumber}/labels`, {\n        method: 'POST',\n        headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n        body: JSON.stringify({ labels: [CI_FAILING] }),\n      });\n    }\n\n    await gh(`/repos/${REPO}/issues/${prNumber}/comments`, {\n      method: 'POST',\n      headers: { ...ghHeaders(), 'Content-Type': 'application/json' },\n      body: JSON.stringify({ body: failedComment(check.giveupReason, check.failing) }),\n    });\n  } catch (err) {\n    console.error(`mark-ci-failed: best-effort failure on PR #${prNumber}: ${err.message}`);\n  }\n\n  writeFileSync('/output/result.json', JSON.stringify({ prNumber, issueNumber, ciFailed: true, reason: check.giveupReason || null }));\n  console.log(`mark-ci-failed: PR #${prNumber} handed to a human`);\n}\n\nif (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {\n  main().catch((err) => {\n    console.error('mark-ci-failed crashed:', err && err.stack ? err.stack : String(err));\n    process.exit(1);\n  });\n}\n",
+        "runtime": "javascript"
+      }
+    },
+    {
       "id": "mark-fixed",
       "name": "Close already-fixed issue",
       "type": "creation",
@@ -331,6 +410,46 @@
     },
     {
       "from": "publish",
+      "to": "arm-timer"
+    },
+    {
+      "from": "arm-timer",
+      "to": "wait-ci"
+    },
+    {
+      "from": "wait-ci",
+      "to": "check-ci"
+    },
+    {
+      "from": "check-ci",
+      "to": "mark-ci-green",
+      "when": "output.nextAction == \"green\""
+    },
+    {
+      "from": "check-ci",
+      "to": "fix-after-tests",
+      "when": "output.nextAction == \"fix\""
+    },
+    {
+      "from": "check-ci",
+      "to": "arm-timer",
+      "when": "output.nextAction == \"wait\""
+    },
+    {
+      "from": "check-ci",
+      "to": "mark-ci-failed",
+      "when": "output.nextAction == \"giveup\""
+    },
+    {
+      "from": "fix-after-tests",
+      "to": "arm-timer"
+    },
+    {
+      "from": "mark-ci-green",
+      "to": "done"
+    },
+    {
+      "from": "mark-ci-failed",
       "to": "done"
     },
     {

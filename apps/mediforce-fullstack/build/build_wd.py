@@ -66,6 +66,17 @@ def terminal(step_id, name, description):
     }
 
 
+def wait_step(step_id, name, description, deadline):
+    return {
+        "id": step_id,
+        "name": name,
+        "type": "creation",
+        "description": description,
+        "executor": "action",
+        "action": {"kind": "wait", "config": {"deadline": deadline}},
+    }
+
+
 PREAMBLE = (
     "You operate on the Appsilon/mediforce codebase, a workflow + agent orchestration "
     "platform for pharma. Clinical terms (drug names, adverse events, CTCAE grades, Hy's "
@@ -114,6 +125,19 @@ steps = [
                "GLM applies self-review's fixable concerns and re-pushes. Bounded loop (max 2 passes).", 20),
     script_step("publish", "Open the PR",
                 "Assemble the agent-written PR body + review notes, open (or refresh) the PR idempotently, swap in-progress->pr-open, comment the link. Draft when the revise cap was hit with unresolved blockers."),
+    script_step("arm-timer", "Arm the CI-poll timer",
+                "Compute an ISO deadline (now + CI_WAIT_MINUTES) for the next wait-ci pause; re-arms each CI loop iteration so the wait deadline is secret-driven and never stale."),
+    wait_step("wait-ci", "Wait for CI",
+              "Pause the run until the arm-timer deadline, giving GitHub CI time to run on the pushed branch.",
+              "${steps.arm-timer.deadline}"),
+    script_step("check-ci", "Check CI + route",
+                "Read the PR head SHA's check-runs, harvest failing checks + annotations, and emit nextAction (green/fix/wait/giveup). Caps (CI_FIX_MAX/CI_POLL_MAX) live here so secrets drive the loop."),
+    agent_step("fix-after-tests", "Fix CI failures",
+               "GLM fixes the red checks statically from check-ci's harvested error text (no repro; CI validates), re-pushes the branch, and increments ciRound. Bounded loop.", 20),
+    script_step("mark-ci-green", "CI green",
+                "Comment CI-green on the PR and append the CI fix history to the PR body."),
+    script_step("mark-ci-failed", "CI failed -> human",
+                "Auto-fix budget spent (or CI stuck): convert the PR to draft, append the fix history + failing-check summary, label fullstack:ci-failing, and comment for a human."),
     script_step("mark-fixed", "Close already-fixed issue",
                 "Comment the evidence and close an issue implement found already resolved; drop the lease."),
     script_step("mark-needs-info", "Park pending clarification",
@@ -139,7 +163,16 @@ transitions = [
     {"from": "self-review", "to": "revise", "when": "output.verdict == \"revise\" && variables.revise.reviewCount < 2"},
     {"from": "self-review", "to": "publish", "when": "output.verdict != \"revise\" || variables.revise.reviewCount >= 2"},
     {"from": "revise", "to": "self-review"},
-    {"from": "publish", "to": "done"},
+    {"from": "publish", "to": "arm-timer"},
+    {"from": "arm-timer", "to": "wait-ci"},
+    {"from": "wait-ci", "to": "check-ci"},
+    {"from": "check-ci", "to": "mark-ci-green", "when": "output.nextAction == \"green\""},
+    {"from": "check-ci", "to": "fix-after-tests", "when": "output.nextAction == \"fix\""},
+    {"from": "check-ci", "to": "arm-timer", "when": "output.nextAction == \"wait\""},
+    {"from": "check-ci", "to": "mark-ci-failed", "when": "output.nextAction == \"giveup\""},
+    {"from": "fix-after-tests", "to": "arm-timer"},
+    {"from": "mark-ci-green", "to": "done"},
+    {"from": "mark-ci-failed", "to": "done"},
     {"from": "mark-fixed", "to": "done"},
     {"from": "mark-needs-info", "to": "done"},
 ]
