@@ -394,6 +394,19 @@ the user-facing immutable log.
   Output only on cowork finalize). Output Files = files a step leaves
   behind alongside its Output (resolved 2026-06-10, ADR-0007). Keep the
   distinction in storage too.
+- **"Generated Files" (UI label) vs Output Files** *(resolved 2026-07-06)*:
+  The agent-output review/step UI renders a **"Generated Files"** list
+  sourced from `AgentOutputEnvelope.gitMetadata.changedFiles` — the
+  git-provenance list of every path the step's commit touched anywhere in
+  the `/workspace` repo. This is **not** the Output Files listing:
+  changedFiles are bare filenames with **no byte-retrieval route** (clickable
+  only when the repo is a public GitHub URL, dead grey text otherwise),
+  whereas Output Files (`.mediforce/output/<stepId>/`) have `git cat-file`
+  bytes served by `/api/runs/<runId>/files/<path>`. **Output File preview**
+  (in-browser rendering of a file's bytes in a modal) targets **Output Files
+  only**; changedFiles stay provenance metadata. _Avoid_: calling the
+  renderable in-UI files "artifacts" (= Cowork deliverable) or conflating
+  them with the "Generated Files" provenance list.
 - **Workflow visibility (`public` vs `private`)**: Defined in PR #346 — a
   `public` Workflow Definition is **read-discoverable from other
   Namespaces**; `private` is members-only. **Workflow Runs (runs) are
