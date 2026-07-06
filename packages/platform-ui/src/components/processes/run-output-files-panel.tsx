@@ -67,6 +67,16 @@ function fileTypeIcon(fileName: string): LucideIcon {
   return File;
 }
 
+async function downloadOutputFile(runId: string, file: RunOutputFileEntry): Promise<void> {
+  const downloaded = await mediforce.runs.downloadOutputFile({ runId, path: file.path });
+  // `.slice()` re-types the view as Uint8Array<ArrayBuffer> (BlobPart
+  // rejects the wider ArrayBufferLike the client returns).
+  saveBlobToDevice(
+    new Blob([downloaded.bytes.slice()], { type: downloaded.contentType }),
+    downloaded.fileName,
+  );
+}
+
 export function OutputFileRow({ runId, file }: { runId: string; file: RunOutputFileEntry }) {
   const [downloading, setDownloading] = React.useState(false);
   const [downloadError, setDownloadError] = React.useState<string | null>(null);
@@ -78,13 +88,7 @@ export function OutputFileRow({ runId, file }: { runId: string; file: RunOutputF
     setDownloading(true);
     setDownloadError(null);
     try {
-      const downloaded = await mediforce.runs.downloadOutputFile({ runId, path: file.path });
-      // `.slice()` re-types the view as Uint8Array<ArrayBuffer> (BlobPart
-      // rejects the wider ArrayBufferLike the client returns).
-      saveBlobToDevice(
-        new Blob([downloaded.bytes.slice()], { type: downloaded.contentType }),
-        downloaded.fileName,
-      );
+      await downloadOutputFile(runId, file);
     } catch (err) {
       setDownloadError(err instanceof Error ? err.message : 'Download failed');
     } finally {
@@ -140,6 +144,8 @@ export function RunOutputFilesPanel({
   files: RunOutputFileEntry[];
   definitionSteps: Step[];
 }) {
+  const [downloadingAll, setDownloadingAll] = React.useState(false);
+  const [downloadAllError, setDownloadAllError] = React.useState<string | null>(null);
   const groups = React.useMemo(
     () => groupOutputFilesByStep(files, definitionSteps),
     [files, definitionSteps],
@@ -149,9 +155,42 @@ export function RunOutputFilesPanel({
     return null;
   }
 
+  async function handleDownloadAll() {
+    setDownloadingAll(true);
+    setDownloadAllError(null);
+    try {
+      // Sequential so browsers keep every "save file" flow rather than
+      // dropping concurrent ones, and to avoid hammering the API at once.
+      for (const group of groups) {
+        for (const file of group.files) {
+          await downloadOutputFile(runId, file);
+        }
+      }
+    } catch (err) {
+      setDownloadAllError(err instanceof Error ? err.message : 'Download failed');
+    } finally {
+      setDownloadingAll(false);
+    }
+  }
+
   return (
     <div className="rounded-lg border bg-card p-4">
-      <h3 className="text-sm font-medium mb-3">Files</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-medium">Files</h3>
+        <div className="flex items-center gap-2 min-w-0">
+          {downloadAllError && (
+            <span className="text-xs text-destructive truncate">{downloadAllError}</span>
+          )}
+          <button
+            onClick={handleDownloadAll}
+            disabled={downloadingAll}
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50 shrink-0"
+          >
+            <Download className="h-3 w-3" />
+            {downloadingAll ? 'Downloading...' : 'Download all'}
+          </button>
+        </div>
+      </div>
       <div className="space-y-3">
         {groups.map((group) => (
           <div key={group.stepId}>
