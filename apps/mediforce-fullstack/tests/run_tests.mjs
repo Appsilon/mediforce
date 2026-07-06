@@ -61,6 +61,32 @@ test('attemptCount counts in-progress labelings', () => {
   assert.equal(classifyIssue({ labels: lbl('fullstack:in-progress') }, events, NOW, 2, 3).attemptCount, 2);
 });
 
+// ---- fetch-candidates.classifyIssue: FULLSTACK_REASSIGN escape hatch ----
+test('reassign re-judges go / needs-approval / manual → triage', () => {
+  const staleManual = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: hoursAgo(10) }];
+  const notEdited = { labels: lbl('fullstack:manual'), updated_at: hoursAgo(20) };
+  assert.equal(classifyIssue({ labels: lbl('fullstack:go') }, [], NOW, 2, 3, true).action, 'triage');
+  assert.equal(classifyIssue({ labels: lbl('fullstack:needs-approval') }, [], NOW, 2, 3, true).action, 'triage');
+  assert.equal(classifyIssue(notEdited, staleManual, NOW, 2, 3, true).action, 'triage');
+});
+test('reassign re-opens needs-info → reopen (strips label, re-triages)', () => {
+  assert.equal(classifyIssue({ labels: lbl('fullstack:needs-info') }, [], NOW, 2, 3, true).action, 'reopen');
+});
+test('reassign never touches in-flight / human-owned states', () => {
+  assert.equal(classifyIssue({ labels: lbl('fullstack:pr-open') }, [], NOW, 2, 3, true).action, 'skip');
+  assert.equal(classifyIssue({ labels: lbl('fullstack:awaiting-human') }, [], NOW, 2, 3, true).action, 'skip');
+  const freshLease = [{ event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: hoursAgo(0.5) }];
+  assert.equal(classifyIssue({ labels: lbl('fullstack:in-progress') }, freshLease, NOW, 2, 3, true).action, 'skip');
+});
+test('reassign still reclaims a stale lease (self-heal unchanged)', () => {
+  const staleLease = [{ event: 'labeled', label: { name: 'fullstack:in-progress' }, created_at: hoursAgo(5) }];
+  assert.equal(classifyIssue({ labels: lbl('fullstack:in-progress') }, staleLease, NOW, 2, 3, true).action, 'reclaim');
+});
+test('reassign off (default): go / needs-info still skip', () => {
+  assert.equal(classifyIssue({ labels: lbl('fullstack:go') }, [], NOW, 2, 3, false).action, 'skip');
+  assert.equal(classifyIssue({ labels: lbl('fullstack:needs-info') }, [], NOW, 2, 3, false).action, 'skip');
+});
+
 // ---- apply-verdicts.reconcile ----
 test('new go/high → add go + prio-high, nothing to remove', () => {
   const r = reconcile([], { suitability: 'go', priority: 'high' });

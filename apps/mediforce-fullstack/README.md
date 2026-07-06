@@ -56,7 +56,34 @@ GitHub auto-creates these on first use; no pre-setup required.
 
 **Analysed once:** an issue carrying any `fullstack:` verdict label is never
 re-triaged, except a `manual` issue *edited since it was declined* (re-judge on
-edit) or one a human force-labels `fullstack:go`.
+edit), one a human force-labels `fullstack:go`, or a run flagged with
+`FULLSTACK_REASSIGN=true` (see below).
+
+### Re-assigning labels (`FULLSTACK_REASSIGN`)
+
+`FULLSTACK_REASSIGN=true` (default off) is the deliberate escape hatch out of
+"analysed once". While it is on, `fetch-candidates` feeds every issue that is
+carrying **only a verdict or `needs-info` label** back into `triage`, and
+`apply-verdicts` overwrites the stored verdict:
+
+| Issue currently labelled | Reassign behaviour |
+|--------------------------|--------------------|
+| `fullstack:go` / `fullstack:needs-approval` | re-triaged; verdict + prio reconciled |
+| `fullstack:manual` | re-triaged unconditionally (not just on edit) |
+| `fullstack:needs-info` | `needs-info` stripped, then re-triaged |
+| `fullstack:in-progress` (fresh lease) | **untouched** — live implementation work |
+| `fullstack:pr-open`, `fullstack:awaiting-human` | **untouched** — in-flight / human-owned |
+| `fullstack:in-progress` (stale lease) | reclaimed as usual (self-heal, unchanged) |
+
+Reassigned issues re-judge **fresh** — they carry `attemptCount: 0` (the toggle
+deliberately does not spend a rate-limited GitHub `events` call across the whole
+backlog to recompute prior attempts), so the poison-pill count does not carry
+over.
+
+It is wired as a `{{FULLSTACK_REASSIGN}}` env ref, so you flip it from the
+workflow/namespace panel with **no re-registration**. Because it is
+**workflow-global, not per-run**, leave it on and *every* tick re-triages the
+whole backlog — flip it on, let one tick run, flip it off (see Known gaps).
 
 ## Environment & secrets
 
@@ -66,6 +93,7 @@ edit) or one a human force-labels `fullstack:go`.
 | `OPENROUTER_API_KEY` | **yes** | workflow | all agent steps | OpenRouter key; bridged to the Claude Code CLI via `ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL` | Workflow secrets |
 | `FULLSTACK_REVIEWER_MAP` | **yes** | workflow | `notify-gate` | JSON `{ "githubLogin": "email-or-uid" }` of dev-team reviewers (must include the admin) | Workflow secrets |
 | `FULLSTACK_DEFAULT_ADMIN` | **yes** | workflow | `notify-gate` | Fallback admin's **GitHub login** — must be a key in `FULLSTACK_REVIEWER_MAP` (their Mediforce id + cc handle are derived from it) | Workflow secrets |
+| `FULLSTACK_REASSIGN` | no | workflow | `fetch-candidates` | Escape hatch: when `true` (case-insensitive; default off), force a re-judge of every issue carrying only a verdict/`needs-info` label — see [Re-assigning labels](#re-assigning-labels-fullstack_reassign) | Workflow secrets/env |
 | `APP_BASE_URL` | no | workflow/ns | `notify-gate` | Mediforce base URL for the gate comment link | Workflow/namespace env |
 | `FULLSTACK_REPO` | no | workflow | all scripts | Target repo (default `Appsilon/mediforce`) | `build/env.example.json` |
 | `LEASE_TTL_HOURS` | no | workflow | `fetch-candidates` | Stale-lease reclaim threshold (default `2`) | `build/env.example.json` |
@@ -141,7 +169,7 @@ correct JSON escaping) by the assembler:
 
 ```bash
 python3 build/build_wd.py        # regenerates src/mediforce-fullstack.wd.json
-node   tests/run_tests.mjs        # pure-logic tests (31, no secrets)
+node   tests/run_tests.mjs        # pure-logic tests (36, no secrets)
 for f in scripts/*.mjs; do node --check "$f"; done   # syntax
 ```
 
@@ -178,6 +206,12 @@ pinning). Validate first with `--dry-run`.
   admin, alongside the Phase 2 stale-PR shepherd.
 - **Rare duplicate PR** is accepted (the TOCTOU window between `select` and
   `claim`); recoverable by closing one PR.
+- **`FULLSTACK_REASSIGN` is workflow-global, not per-run.** A workflow cannot
+  reset its own secret/env, so the reassign flag is a manual flip-flop: while it
+  is `true`, every cron tick re-triages the whole verdict/`needs-info` backlog and
+  spends LLM budget on `triage` over all of it. Flip it on, let one tick run, flip
+  it off. (A truly per-run flag would need a manual-trigger `triggerInput`, which a
+  cron tick can't set — hence the global toggle.)
 
 ## Deferred (Phase 2 — separate "shepherd" workflow)
 

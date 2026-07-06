@@ -11,8 +11,16 @@
 // are NOT re-analysed — `select` picks them by their stored labels. That is the
 // whole point of persisting the verdict: triage's LLM only ever looks once.
 //
+// ESCAPE HATCH: set FULLSTACK_REASSIGN=true (default off) to force a re-judge of
+// every issue carrying only a verdict/needs-info label (go / needs-approval /
+// manual / needs-info) — it re-enters triage and apply-verdicts overwrites the
+// stored verdict. In-flight/human-owned states (in-progress lease, pr-open,
+// awaiting-human) are always protected. Because this reads a workflow-global env
+// ref, it re-judges the backlog on EVERY tick while enabled — flip it on, let one
+// tick run, flip it off.
+//
 // Reads:  /output/input.json (unused — cron tick), env GITHUB_TOKEN, FULLSTACK_REPO,
-//         LEASE_TTL_HOURS, MAX_ATTEMPTS
+//         LEASE_TTL_HOURS, MAX_ATTEMPTS, FULLSTACK_REASSIGN
 // Writes: /output/result.json
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -22,10 +30,13 @@ export const LIFECYCLE_LABELS = ['fullstack:in-progress', 'fullstack:awaiting-hu
 const IN_PROGRESS = 'fullstack:in-progress';
 const MANUAL = 'fullstack:manual';
 const PR_OPEN = 'fullstack:pr-open';
+const NEEDS_INFO = 'fullstack:needs-info';
+const AWAITING_HUMAN = 'fullstack:awaiting-human';
 
 const REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';
 const LEASE_TTL_HOURS = Number(process.env.LEASE_TTL_HOURS || '2');
 const MAX_ATTEMPTS = Number(process.env.MAX_ATTEMPTS || '3');
+const REASSIGN = /^\s*(true|1|yes|on)\s*$/i.test(process.env.FULLSTACK_REASSIGN || '');
 
 function ghHeaders() {
   const h = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };
@@ -56,21 +67,31 @@ export function summariseLabelEvents(events, name) {
   return { latestAt: latest, count };
 }
 
-/** Decide what to do with one issue given its labels + events. Pure. */
-export function classifyIssue(issue, events, nowMs, ttlHours, maxAttempts) {
+/** Decide what to do with one issue given its labels + events. Pure.
+ *  `reassign === true` forces a re-judge of already-verdicted / parked issues. */
+export function classifyIssue(issue, events, nowMs, ttlHours, maxAttempts, reassign) {
   const labels = labelNames(issue);
   const has = (l) => labels.includes(l);
 
-  if (has(PR_OPEN) || has('fullstack:needs-info') || has('fullstack:awaiting-human')) {
-    return { action: 'skip' };
-  }
+  // Always protected: an open PR or an open human gate is in-flight work that a
+  // reassign must never yank back into triage.
+  if (has(PR_OPEN) || has(AWAITING_HUMAN)) return { action: 'skip' };
 
   const attempts = summariseLabelEvents(events, IN_PROGRESS).count;
 
+  // An active lease is live implementation work; reassign does not interrupt it
+  // (only the stale-lease self-heal reclaims, exactly as before).
   if (has(IN_PROGRESS)) {
     const { latestAt } = summariseLabelEvents(events, IN_PROGRESS);
     const ageHours = latestAt ? (nowMs - new Date(latestAt).getTime()) / 3_600_000 : Infinity;
     if (ageHours > ttlHours) return { action: 'reclaim', attemptCount: attempts };
+    return { action: 'skip' };
+  }
+
+  // Parked for a human. Reassign re-opens it: strip needs-info (a lifecycle label
+  // apply-verdicts does not manage), then re-triage.
+  if (has(NEEDS_INFO)) {
+    if (reassign === true) return { action: 'reopen', attemptCount: attempts };
     return { action: 'skip' };
   }
 
@@ -79,11 +100,14 @@ export function classifyIssue(issue, events, nowMs, ttlHours, maxAttempts) {
     // apply-verdicts posts the decline comment ~1s after adding the manual label, which bumps updated_at past the labeled event; ignore that self-write and only re-triage on a genuine later human edit.
     const SELF_DECLINE_GRACE_MS = 120_000;
     const editedSince = latestAt && new Date(issue.updated_at).getTime() - new Date(latestAt).getTime() > SELF_DECLINE_GRACE_MS;
-    if (editedSince) return { action: 'triage', attemptCount: attempts };
+    if (reassign === true || editedSince) return { action: 'triage', attemptCount: attempts };
     return { action: 'skip' };
   }
 
-  if (has('fullstack:go') || has('fullstack:needs-approval')) return { action: 'skip' };
+  if (has('fullstack:go') || has('fullstack:needs-approval')) {
+    if (reassign === true) return { action: 'triage', attemptCount: attempts };
+    return { action: 'skip' };
+  }
 
   // No fullstack label at all → brand-new, needs triage.
   return { action: 'triage', attemptCount: attempts };
@@ -125,18 +149,25 @@ async function main() {
     const events = touchesLifecycleOrManual
       ? await gh(`/repos/${REPO}/issues/${issue.number}/events?per_page=100`)
       : [];
-    const decision = classifyIssue(issue, events, nowMs, LEASE_TTL_HOURS, MAX_ATTEMPTS);
+    const decision = classifyIssue(issue, events, nowMs, LEASE_TTL_HOURS, MAX_ATTEMPTS, REASSIGN);
 
     if (decision.action === 'reclaim') {
       // Release the expired lease so the issue re-enters triage.
       await gh(`/repos/${REPO}/issues/${issue.number}/labels/${encodeURIComponent(IN_PROGRESS)}`, { method: 'DELETE' })
         .catch((err) => console.error(`reclaim: failed to drop lease on #${issue.number}: ${err.message}`));
       unclassified.push(toCandidate(issue, decision.attemptCount, MAX_ATTEMPTS));
+    } else if (decision.action === 'reopen') {
+      // Reassign re-opens a parked issue: drop needs-info so apply-verdicts can
+      // write a fresh verdict without select's needs-info block stranding it.
+      await gh(`/repos/${REPO}/issues/${issue.number}/labels/${encodeURIComponent(NEEDS_INFO)}`, { method: 'DELETE' })
+        .catch((err) => console.error(`reopen: failed to drop needs-info on #${issue.number}: ${err.message}`));
+      unclassified.push(toCandidate(issue, decision.attemptCount, MAX_ATTEMPTS));
     } else if (decision.action === 'triage') {
       unclassified.push(toCandidate(issue, decision.attemptCount, MAX_ATTEMPTS));
     }
   }
 
+  if (REASSIGN) console.log('fetch-candidates: FULLSTACK_REASSIGN=on — re-judging already-classified issues this tick');
   writeFileSync('/output/result.json', JSON.stringify({ unclassifiedCount: unclassified.length, unclassified }));
   console.log(`fetch-candidates: ${unclassified.length} issue(s) to triage: ${unclassified.map((x) => '#' + x.number).join(', ') || '(none)'}`);
 }
