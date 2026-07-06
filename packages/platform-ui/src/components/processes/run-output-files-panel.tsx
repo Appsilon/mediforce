@@ -1,12 +1,16 @@
 'use client';
 
 import * as React from 'react';
-import { Download, File, FileArchive, FileImage, FileSpreadsheet, FileText, type LucideIcon } from 'lucide-react';
+import { Download, Eye, File, FileArchive, FileImage, FileSpreadsheet, FileText, type LucideIcon } from 'lucide-react';
 import type { Step } from '@mediforce/platform-core';
 import type { RunOutputFileEntry } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { formatBytes, formatStepName } from '@/lib/format';
 import { saveBlobToDevice } from '@/lib/save-blob';
+import { selectViewer } from '@/lib/output-file-viewer';
+import { extensionOf } from '@/lib/file-extension';
+import { cn } from '@/lib/utils';
+import { OutputFilePreview } from './output-file-preview';
 
 export interface OutputFileGroup {
   stepId: string;
@@ -55,10 +59,7 @@ const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp']);
 const ARCHIVE_EXTENSIONS = new Set(['zip', 'tar', 'gz', 'tgz', '7z']);
 
 function fileTypeIcon(fileName: string): LucideIcon {
-  const lastSegment = fileName.split('/').pop() ?? fileName;
-  const extension = lastSegment.includes('.')
-    ? (lastSegment.split('.').pop() ?? '').toLowerCase()
-    : '';
+  const extension = extensionOf(fileName);
   if (DOCUMENT_EXTENSIONS.has(extension)) return FileText;
   if (TABLE_EXTENSIONS.has(extension)) return FileSpreadsheet;
   if (IMAGE_EXTENSIONS.has(extension)) return FileImage;
@@ -69,7 +70,9 @@ function fileTypeIcon(fileName: string): LucideIcon {
 export function OutputFileRow({ runId, file }: { runId: string; file: RunOutputFileEntry }) {
   const [downloading, setDownloading] = React.useState(false);
   const [downloadError, setDownloadError] = React.useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = React.useState(false);
   const Icon = fileTypeIcon(file.name);
+  const canPreview = selectViewer(file.name, file.size).viewer !== 'download';
 
   async function handleDownload() {
     setDownloading(true);
@@ -97,14 +100,29 @@ export function OutputFileRow({ runId, file }: { runId: string; file: RunOutputF
       {downloadError && (
         <span className="text-xs text-destructive truncate">{downloadError}</span>
       )}
+      {canPreview && (
+        <button
+          onClick={() => setPreviewOpen(true)}
+          className="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
+        >
+          <Eye className="h-3 w-3" />
+          View
+        </button>
+      )}
       <button
         onClick={handleDownload}
         disabled={downloading}
-        className="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50 shrink-0"
+        className={cn(
+          'inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50 shrink-0',
+          canPreview ? '' : 'ml-auto',
+        )}
       >
         <Download className="h-3 w-3" />
         {downloading ? 'Downloading...' : 'Download'}
       </button>
+      {canPreview && (
+        <OutputFilePreview runId={runId} file={file} open={previewOpen} onOpenChange={setPreviewOpen} />
+      )}
     </li>
   );
 }
