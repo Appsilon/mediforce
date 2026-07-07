@@ -26,6 +26,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [2026-06-21]
 
 ### Fixed
+- Context-saturation logging now covers the `claude-code-agent` plugin, not just OpenCode. Peak per-turn context occupancy is computed from the stream's per-turn `assistant` usage (summing `input_tokens` + cache-read + cache-creation, since caching hides most of the prompt from `input_tokens`) and folded into the result event's usage as `peak_input_tokens`, so `logContextSaturation` reports a real peak instead of nothing. Previously only the final turn's `usage` was surfaced, which is not the peak — Claude Code steps produced no `[saturation]` line, leaving batch-size tuning blind.
 - Workflow-designer cowork chat no longer hangs on its mandatory first step: the `mediforce-mcp` server crashed on startup because `@mediforce/platform-core` was an undeclared (phantom) dependency and its `workflow-examples` loader had no subpath export, so `list_workflow_examples` was silently unavailable (the connection failure is swallowed). Declared the dependency, added the `./workflow-examples` export, and import it via the package specifier.
 - Postgres workflow definitions now persist imported workflow `source` provenance, so get/list calls keep the advertised url/path/commit after GitHub imports.
 - A malformed or legacy-shaped `source` (e.g. the pre-commit `{ repo, path, ref }`) no longer drops the entire workflow definition on read — the informational provenance is dropped best-effort and the workflow still loads and runs.
