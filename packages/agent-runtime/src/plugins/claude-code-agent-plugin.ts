@@ -12,6 +12,12 @@ interface StreamEvent {
   message?: {
     role?: string;
     content?: Array<{ type: string; name?: string; input?: unknown; text?: string }>;
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_read_input_tokens?: number;
+      cache_creation_input_tokens?: number;
+    };
   };
   result?: string;
   tool_name?: string;
@@ -104,6 +110,21 @@ function formatLogEntries(event: StreamEvent): string[] {
     ...rest,
   });
   return entries.map((entry) => JSON.stringify(entry));
+}
+
+/** Context occupancy for one assistant turn: the whole prompt, not just the
+ *  uncached portion. With prompt caching on, `input_tokens` excludes cached
+ *  tokens (`cache_read`/`cache_creation`), so peak must sum all three or it
+ *  under-reports saturation by orders of magnitude. Pure. */
+export function turnContextTokens(usage: {
+  input_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+} | undefined): number {
+  if (!usage) return 0;
+  return (usage.input_tokens ?? 0)
+    + (usage.cache_read_input_tokens ?? 0)
+    + (usage.cache_creation_input_tokens ?? 0);
 }
 
 /** Extract a human-readable error from a stream-json result line (if any). */
@@ -267,18 +288,41 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
   }
 
   parseAgentOutput(rawStdout: string): string {
-    // Claude CLI outputs NDJSON (stream-json). Scan for the last `result` event.
+    // Claude CLI outputs NDJSON (stream-json). Scan for the last `result` event,
+    // and track the peak per-turn context occupancy across all assistant turns.
+    // The final `result.usage` reports only the last turn, so peak saturation
+    // (what measures context against the model's window) must come from the
+    // per-turn `assistant` events — mirrors the OpenCode plugin.
     let lastResult = '';
+    let peakInputTokens = 0;
     for (const line of rawStdout.split('\n')) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       try {
         const event = JSON.parse(trimmed) as StreamEvent;
+        if (event.type === 'assistant') {
+          peakInputTokens = Math.max(peakInputTokens, turnContextTokens(event.message?.usage));
+        }
         if (event.type === 'result') {
           lastResult = trimmed;
         }
       } catch {
         // Skip non-JSON lines (Docker/entrypoint output)
+      }
+    }
+
+    // Fold the peak into the result event's usage so base-container's token
+    // extraction surfaces it as `peakInputTokens` for logContextSaturation.
+    if (lastResult && peakInputTokens > 0) {
+      try {
+        const event = JSON.parse(lastResult) as Record<string, unknown>;
+        const usage = event.usage;
+        if (usage !== null && typeof usage === 'object') {
+          (usage as Record<string, unknown>).peak_input_tokens = peakInputTokens;
+          return JSON.stringify(event);
+        }
+      } catch {
+        // Fall through to the unmodified result line.
       }
     }
     return lastResult;
