@@ -58,7 +58,7 @@ export interface StepExecutorHumanTaskRepo {
 }
 
 export interface StepExecutorModelRegistryRepo {
-  getById(id: string): Promise<{ pricing: { input: number; output: number; cacheRead?: number } } | null>;
+  getById(id: string): Promise<{ pricing: { input: number; output: number; cacheRead?: number }; contextLength: number } | null>;
 }
 
 export interface StepExecutor {
