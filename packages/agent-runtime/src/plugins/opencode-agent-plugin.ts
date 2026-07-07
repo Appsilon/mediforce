@@ -244,7 +244,12 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       try {
         const event = JSON.parse(trimmed) as {
           type?: string;
-          part?: { type?: string; text?: string; cost?: number; tokens?: { input?: number; output?: number } };
+          part?: {
+            type?: string;
+            text?: string;
+            cost?: number;
+            tokens?: { input?: number; output?: number; cache?: { read?: number; write?: number } };
+          };
           error?: { name?: string; data?: { message?: string } };
         };
 
@@ -253,10 +258,15 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
         }
 
         if (event.type === 'step_finish' && event.part?.tokens) {
-          const turnInputTokens = event.part.tokens.input ?? 0;
-          totalInputTokens += turnInputTokens;
-          totalOutputTokens += event.part.tokens.output ?? 0;
-          peakInputTokens = Math.max(peakInputTokens, turnInputTokens);
+          const turnTokens = event.part.tokens;
+          totalInputTokens += turnTokens.input ?? 0;
+          totalOutputTokens += turnTokens.output ?? 0;
+          // Context occupancy for the turn is the whole prompt, not just the
+          // uncached portion: with prompt caching on, `input` excludes cached
+          // tokens (`cache.read`/`cache.write`), so peak must sum all three or
+          // it under-reports saturation by orders of magnitude.
+          const turnPromptTokens = (turnTokens.input ?? 0) + (turnTokens.cache?.read ?? 0) + (turnTokens.cache?.write ?? 0);
+          peakInputTokens = Math.max(peakInputTokens, turnPromptTokens);
         }
 
         if (event.type === 'error' && event.error?.data?.message) {

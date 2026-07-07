@@ -253,6 +253,21 @@ describe('OpenCodeAgentPlugin', () => {
       expect(parsed.usage.input_tokens).toBe(65000);
     });
 
+    it('[DATA] peak_input_tokens counts cached prompt tokens, not just uncached input', () => {
+      // With prompt caching on, `input` is only the uncached delta; the real
+      // context occupancy is input + cache.read + cache.write.
+      const agentResponse = JSON.stringify({ output_file: '/output/result.json', summary: 'Done' });
+      const stdout = [
+        JSON.stringify({ type: 'step_finish', part: { tokens: { input: 26, output: 100, cache: { read: 8158, write: 0 } }, cost: 0.01 } }),
+        JSON.stringify({ type: 'step_finish', part: { tokens: { input: 40, output: 200, cache: { read: 60000, write: 1200 } }, cost: 0.02 } }),
+        openCodeJsonOutput(agentResponse),
+      ].join('\n');
+
+      const result = plugin.parseAgentOutput(stdout);
+      const parsed = JSON.parse(result);
+      expect(parsed.usage.peak_input_tokens).toBe(61240); // 40 + 60000 + 1200
+    });
+
     it('[DATA] omits usage when no step_finish events have tokens', () => {
       const agentResponse = JSON.stringify({ output_file: '/output/result.json', summary: 'Done' });
       const stdout = openCodeJsonOutput(agentResponse);
