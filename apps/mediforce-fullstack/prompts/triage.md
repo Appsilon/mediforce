@@ -102,7 +102,7 @@ presence proves nothing. Check the actual claim:
 ## Output Contract (MANDATORY)
 
 Headless step — no human reads your chat. Write ONLY this JSON to
-`${output_dir}/result.json`:
+`/output/result.json`:
 
 ```json
 {
@@ -113,4 +113,4 @@ Headless step — no human reads your chat. Write ONLY this JSON to
 ```
 
 If the batch is empty, write `{ "verdicts": [] }`.
-Your FINAL message must be ONLY: `{"output_file": "${output_dir}/result.json", "summary": "classified N issues (M obsolete)"}`.
+Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "classified N issues (M obsolete)"}`.

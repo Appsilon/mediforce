@@ -46,7 +46,7 @@ gate.
 
 ## Output Contract (MANDATORY)
 
-Write ONLY this JSON to `${output_dir}/result.json`:
+Write ONLY this JSON to `/output/result.json`:
 
 ```json
 {
@@ -57,4 +57,4 @@ Write ONLY this JSON to `${output_dir}/result.json`:
 ```
 
 `concerns` may be empty for `ship`. Each concern is one line, prefixed with its
-axis. Your FINAL message must be ONLY: `{"output_file": "${output_dir}/result.json", "summary": "..."}`.
+axis. Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "..."}`.

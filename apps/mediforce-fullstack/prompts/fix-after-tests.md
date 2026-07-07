@@ -53,7 +53,7 @@ the loop will hand it to a human once the round budget is spent.
 
 ## Output Contract (MANDATORY)
 
-Write ONLY this JSON to `${output_dir}/result.json`:
+Write ONLY this JSON to `/output/result.json`:
 
 ```json
 {
@@ -67,4 +67,4 @@ Write ONLY this JSON to `${output_dir}/result.json`:
 ```
 
 If you could not push a fix (nothing actionable), set `pushed: false` and explain
-in `ciFixLog`. Your FINAL message must be ONLY: `{"output_file": "${output_dir}/result.json", "summary": "ci-fix round <n>"}`.
+in `ciFixLog`. Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "ci-fix round <n>"}`.

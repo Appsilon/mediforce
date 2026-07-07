@@ -52,7 +52,7 @@ or the issue itself is malformed.
 
 ## Output Contract (MANDATORY)
 
-Write ONLY this JSON to `${output_dir}/result.json`:
+Write ONLY this JSON to `/output/result.json`:
 
 ```json
 {
@@ -72,4 +72,4 @@ Write ONLY this JSON to `${output_dir}/result.json`:
 
 When `changed` is false, omit branch/prTitle/prBody and give `reason` (+ `evidence`
 for already-fixed).
-Your FINAL message must be ONLY: `{"output_file": "${output_dir}/result.json", "summary": "..."}`.
+Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "..."}`.

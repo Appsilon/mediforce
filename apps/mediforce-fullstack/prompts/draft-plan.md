@@ -21,7 +21,7 @@ Write:
 
 ## Output Contract (MANDATORY)
 
-Write ONLY this JSON to `${output_dir}/result.json`:
+Write ONLY this JSON to `/output/result.json`:
 
 ```json
 {
@@ -31,4 +31,4 @@ Write ONLY this JSON to `${output_dir}/result.json`:
 }
 ```
 
-Your FINAL message must be ONLY: `{"output_file": "${output_dir}/result.json", "summary": "drafted plan for #<n>"}`.
+Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "drafted plan for #<n>"}`.
