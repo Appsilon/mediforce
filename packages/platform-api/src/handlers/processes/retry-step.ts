@@ -47,10 +47,13 @@ export async function retryStep(
       previousExecutionId: latestForStep?.id ?? null,
       previousError: latestForStep?.error ?? null,
     },
+    // No execution id here: engine.retryStep creates no new StepExecution —
+    // the fresh execution is created later by the runner kick, so its id is
+    // unknowable at audit time. latestForStep is the pre-retry FAILED
+    // execution and belongs only in inputSnapshot.
     outputSnapshot: {
       resetTo: 'running',
       currentStepId: input.stepId,
-      newExecutionId: latestForStep?.id ?? null,
     },
     basis: 'User requested retry of failed step via API',
     entityType: 'processInstance',
