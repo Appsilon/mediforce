@@ -90,11 +90,27 @@ handful of issues after a prompt tweak — flip on, let a tick run, flip off.
 
 **Do not use `FULLSTACK_REASSIGN` to drain a large backlog.** Since triage now
 clones `main` and verifies each issue against the code, a batch of ~90 issues
-cannot be judged reliably in one agent call, so `TRIAGE_BATCH_MAX` (default `25`)
+cannot be judged reliably in one agent call, so `TRIAGE_BATCH_MAX` (default `10`)
 caps the per-tick batch. But reassign re-collects the *whole* re-judgeable pool
 every tick and only removes issues from it by closing them — so with the cap on,
-it re-processes the same front-of-list 25 each tick instead of advancing. For a
+it re-processes the same front-of-list 10 each tick instead of advancing. For a
 full re-triage, reset the labels instead (below).
+
+### Triage-only mode (`TRIAGE_ONLY`)
+
+Set `TRIAGE_ONLY=true` (case-insensitive; default off) to run only the triage
+half of the pipeline: classify the batch and **persist the verdict labels**
+(including auto-closing proven-obsolete issues), then stop before `select` picks
+anything to implement. Use it to audit what the triage brain decides — on its
+own, or paired with `FULLSTACK_REASSIGN` to re-label the backlog over several
+ticks without a single PR being opened — then review the labels by hand and flip
+it off to resume implementation.
+
+It is wired as a `{{TRIAGE_ONLY}}` env ref (no re-registration). Because
+transition expressions cannot read env, `fetch-candidates` and `apply-verdicts`
+echo the flag into their output as `triageOnly`; the transitions off both steps
+route to `done-empty` when it is set, so the run ends right after the labels are
+written.
 
 ### Re-triaging the whole backlog (`reset-labels.mjs`)
 
@@ -109,7 +125,7 @@ GITHUB_TOKEN=… node scripts/reset-labels.mjs
 # 2. Apply:
 GITHUB_TOKEN=… DRY_RUN=false node scripts/reset-labels.mjs
 # 3. Run the pipeline ⌈open-issues / TRIAGE_BATCH_MAX⌉ times (≈4 for ~100 issues),
-#    REASSIGN off. Each tick triages 25 fresh issues that never come back.
+#    REASSIGN off. Each tick triages 10 fresh issues that never come back.
 ```
 
 `reset-labels` **preserves** in-flight / human-owned issues wholesale
@@ -126,7 +142,8 @@ pipeline step** — it is not in the workflow definition.
 | `FULLSTACK_REVIEWER_MAP` | **yes** | workflow | `notify-gate` | JSON `{ "githubLogin": "email-or-uid" }` of dev-team reviewers (must include the admin) | Workflow secrets |
 | `FULLSTACK_DEFAULT_ADMIN` | **yes** | workflow | `notify-gate` | Fallback admin's **GitHub login** — must be a key in `FULLSTACK_REVIEWER_MAP` (their Mediforce id + cc handle are derived from it) | Workflow secrets |
 | `FULLSTACK_REASSIGN` | no | workflow | `fetch-candidates` | Escape hatch: when `true` (case-insensitive; default off), force a re-judge of every issue carrying only a verdict/`needs-info` label — see [Re-assigning labels](#re-assigning-labels-fullstack_reassign) | Workflow secrets/env |
-| `TRIAGE_BATCH_MAX` | no | workflow | `fetch-candidates` | Max issues handed to `triage` per tick (default `25`) — caps the grounded (clone + verify) triage pass; overflow re-collects next tick | `build/env.example.json` |
+| `TRIAGE_ONLY` | no | workflow | `fetch-candidates`, `apply-verdicts` | When `true` (case-insensitive; default off), triage + persist verdict labels then stop before `select` — see [Triage-only mode](#triage-only-mode-triage_only) | Workflow secrets/env |
+| `TRIAGE_BATCH_MAX` | no | workflow | `fetch-candidates` | Max issues handed to `triage` per tick (default `10`) — caps the grounded (clone + verify) triage pass; overflow re-collects next tick | Workflow secrets/env |
 | `APP_BASE_URL` | no | workflow/ns | `notify-gate` | Mediforce base URL for the gate comment link | Workflow/namespace env |
 | `FULLSTACK_REPO` | no | workflow | all scripts | Target repo (default `Appsilon/mediforce`) | `build/env.example.json` |
 | `LEASE_TTL_HOURS` | no | workflow | `fetch-candidates` | Stale-lease reclaim threshold (default `2`) | `build/env.example.json` |
@@ -136,12 +153,14 @@ pipeline step** — it is not in the workflow definition.
 | `CI_FIX_MAX` | no | workflow | `check-ci` | Auto-fix rounds before handing a red PR to a human (default `3`) | Workflow secrets/env |
 | `CI_POLL_MAX` | no | workflow | `check-ci` | Consecutive pending polls before giving up on a stuck CI (default `4`) | Workflow secrets/env |
 
-> `CI_WAIT_MINUTES` / `CI_FIX_MAX` / `CI_POLL_MAX` are config, not credentials —
-> they are wired as `{{…}}` env references so they resolve from the workflow /
-> namespace panel and can be re-tuned without re-registering. Transition
-> expressions cannot read env, so the caps are enforced inside `check-ci` (JS),
-> which emits `nextAction` for the transitions to switch on. If unset, each script
-> falls back to the default above.
+> `CI_WAIT_MINUTES` / `CI_FIX_MAX` / `CI_POLL_MAX` / `TRIAGE_BATCH_MAX` /
+> `TRIAGE_ONLY` are config, not credentials — they are wired as `{{…}}` env
+> references so they resolve from the workflow / namespace panel and can be
+> re-tuned without re-registering. Transition expressions cannot read env, so the
+> knobs that gate routing are enforced inside a JS step that echoes the decision
+> into its output — `check-ci` emits `nextAction`; `fetch-candidates` /
+> `apply-verdicts` emit `triageOnly` — for the transitions to switch on. If unset,
+> each script falls back to the default above.
 
 > **`GITHUB_TOKEN` write scope is the single most important thing to get right.**
 > The whole pipeline pushes branches and opens PRs. A read-only token makes every

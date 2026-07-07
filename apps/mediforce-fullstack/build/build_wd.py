@@ -148,9 +148,13 @@ steps = [
 
 transitions = [
     {"from": "fetch-candidates", "to": "triage", "when": "output.unclassifiedCount > 0"},
-    {"from": "fetch-candidates", "to": "select", "when": "output.unclassifiedCount == 0"},
+    # Nothing to triage: normally fall through to select; in TRIAGE_ONLY mode stop.
+    {"from": "fetch-candidates", "to": "done-empty", "when": "output.unclassifiedCount == 0 && output.triageOnly == true"},
+    {"from": "fetch-candidates", "to": "select", "when": "output.unclassifiedCount == 0 && output.triageOnly != true"},
     {"from": "triage", "to": "apply-verdicts"},
-    {"from": "apply-verdicts", "to": "select"},
+    # TRIAGE_ONLY stops after the labels are persisted, before any issue is selected.
+    {"from": "apply-verdicts", "to": "done-empty", "when": "output.triageOnly == true"},
+    {"from": "apply-verdicts", "to": "select", "when": "output.triageOnly != true"},
     {"from": "select", "to": "done-empty", "when": "output.selected != true"},
     {"from": "select", "to": "claim", "when": "output.selected == true && output.suitability == \"go\""},
     {"from": "select", "to": "draft-plan", "when": "output.selected == true && output.suitability == \"needs-approval\""},

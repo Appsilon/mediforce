@@ -1,7 +1,7 @@
 // Behavior tests for the pure logic inside the fullstack scripts.
 // Run: node tests/run_tests.mjs   (no secrets/network needed — pure functions only)
 import assert from 'node:assert/strict';
-import { classifyIssue, summariseLabelEvents } from '../scripts/fetch-candidates.mjs';
+import { classifyIssue, summariseLabelEvents, truthyFlag } from '../scripts/fetch-candidates.mjs';
 import { reconcile, closeReason } from '../scripts/apply-verdicts.mjs';
 import { rankCandidates, priorityOf, isActionable } from '../scripts/select.mjs';
 import { labelsToStrip } from '../scripts/reset-labels.mjs';
@@ -86,6 +86,14 @@ test('reassign still reclaims a stale lease (self-heal unchanged)', () => {
 test('reassign off (default): go / needs-info still skip', () => {
   assert.equal(classifyIssue({ labels: lbl('fullstack:go') }, [], NOW, 2, 3, false).action, 'skip');
   assert.equal(classifyIssue({ labels: lbl('fullstack:needs-info') }, [], NOW, 2, 3, false).action, 'skip');
+});
+
+// ---- fetch-candidates.truthyFlag (TRIAGE_ONLY / FULLSTACK_REASSIGN coercion) ----
+test('truthyFlag: true/1/yes/on (any case, padded) → true', () => {
+  for (const v of ['true', 'TRUE', '1', 'yes', 'on', ' On ', '  true  ']) assert.equal(truthyFlag(v), true);
+});
+test('truthyFlag: unset / empty / false-ish → false', () => {
+  for (const v of [undefined, '', 'false', '0', 'no', 'off', '{{TRIAGE_ONLY}}']) assert.equal(truthyFlag(v), false);
 });
 
 // ---- apply-verdicts.reconcile ----

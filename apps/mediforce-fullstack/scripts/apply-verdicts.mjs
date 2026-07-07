@@ -7,12 +7,20 @@
 // reversible close. Best-effort per issue: a failed write logs and continues,
 // leaving that issue unclassified for the next tick to re-triage.
 //
-// Reads:  /output/input.json (steps.triage.verdicts), env GITHUB_TOKEN, FULLSTACK_REPO
+// TRIAGE-ONLY passthrough: this step re-reads TRIAGE_ONLY and echoes it into its
+// output as `triageOnly` so the apply-verdicts -> select transition can route to
+// done-empty when the flag is set (transition expressions cannot read env). The
+// batch is still labelled first; only the hand-off to `select` is skipped.
+//
+// Reads:  /output/input.json (steps.triage.verdicts), env GITHUB_TOKEN, FULLSTACK_REPO, TRIAGE_ONLY
 // Writes: /output/result.json
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';
+/** Coerce a string env flag (true/1/yes/on, case-insensitive) to a boolean. Pure. */
+export const truthyFlag = (value) => /^\s*(true|1|yes|on)\s*$/i.test(value || '');
+const TRIAGE_ONLY = truthyFlag(process.env.TRIAGE_ONLY);
 const SUITABILITY = {
   go: 'fullstack:go',
   'needs-approval': 'fullstack:needs-approval',
@@ -136,8 +144,8 @@ async function main() {
     }
   }
   const closedCount = results.filter((r) => r.closed === true).length;
-  writeFileSync('/output/result.json', JSON.stringify({ applied: results.length, closed: closedCount, results }));
-  console.log(`apply-verdicts: labelled ${results.length}/${verdicts.length} issue(s), closed ${closedCount} as obsolete`);
+  writeFileSync('/output/result.json', JSON.stringify({ applied: results.length, closed: closedCount, results, triageOnly: TRIAGE_ONLY }));
+  console.log(`apply-verdicts: labelled ${results.length}/${verdicts.length} issue(s), closed ${closedCount} as obsolete${TRIAGE_ONLY ? ' — TRIAGE_ONLY=on, stopping before select' : ''}`);
 }
 
 if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {

@@ -21,13 +21,20 @@
 //
 // BATCH CAP: triage now clones `main` and verifies each issue against the code,
 // so a batch of ~90 backlog issues cannot be judged reliably in one agent call.
-// TRIAGE_BATCH_MAX (default 25) caps how many issues are handed to triage per
+// TRIAGE_BATCH_MAX (default 10) caps how many issues are handed to triage per
 // tick; the rest carry no verdict and are picked up on the next tick. A big
 // reassign backlog therefore drains over several ticks instead of one impossible
-// mega-call — steady-state (a handful of new issues) is unaffected.
+// mega-call — steady-state (a handful of new issues) is unaffected. It is a
+// {{secret-ref}}, so the cap is tunable without re-registering the workflow.
+//
+// TRIAGE-ONLY: set TRIAGE_ONLY=true (default off) to run the triage half only —
+// classify the batch and persist the verdict labels, then stop before `select`
+// picks anything for implementation. Transition expressions cannot read env, so
+// the flag is echoed into this step's output as `triageOnly`; the transitions
+// off fetch-candidates / apply-verdicts route to done-empty when it is set.
 //
 // Reads:  /output/input.json (unused — cron tick), env GITHUB_TOKEN, FULLSTACK_REPO,
-//         LEASE_TTL_HOURS, MAX_ATTEMPTS, FULLSTACK_REASSIGN, TRIAGE_BATCH_MAX
+//         LEASE_TTL_HOURS, MAX_ATTEMPTS, FULLSTACK_REASSIGN, TRIAGE_ONLY, TRIAGE_BATCH_MAX
 // Writes: /output/result.json
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -43,8 +50,11 @@ const AWAITING_HUMAN = 'fullstack:awaiting-human';
 const REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';
 const LEASE_TTL_HOURS = Number(process.env.LEASE_TTL_HOURS || '2');
 const MAX_ATTEMPTS = Number(process.env.MAX_ATTEMPTS || '3');
-const REASSIGN = /^\s*(true|1|yes|on)\s*$/i.test(process.env.FULLSTACK_REASSIGN || '');
-const TRIAGE_BATCH_MAX = Number(process.env.TRIAGE_BATCH_MAX || '25');
+/** Coerce a string env flag (true/1/yes/on, case-insensitive) to a boolean. Pure. */
+export const truthyFlag = (value) => /^\s*(true|1|yes|on)\s*$/i.test(value || '');
+const REASSIGN = truthyFlag(process.env.FULLSTACK_REASSIGN);
+const TRIAGE_ONLY = truthyFlag(process.env.TRIAGE_ONLY);
+const TRIAGE_BATCH_MAX = Number(process.env.TRIAGE_BATCH_MAX || '10');
 
 function ghHeaders() {
   const h = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };
@@ -176,6 +186,7 @@ async function main() {
   }
 
   if (REASSIGN) console.log('fetch-candidates: FULLSTACK_REASSIGN=on — re-judging already-classified issues this tick');
+  if (TRIAGE_ONLY) console.log('fetch-candidates: TRIAGE_ONLY=on — will label the batch then stop before select');
 
   // Cap the batch so triage can clone + verify each issue reliably in one pass.
   // The overflow carries no verdict, so it is re-collected next tick (self-drains).
@@ -183,7 +194,7 @@ async function main() {
   const batch = unclassified.slice(0, TRIAGE_BATCH_MAX);
   if (deferred > 0) console.log(`fetch-candidates: capped batch at ${TRIAGE_BATCH_MAX}; ${deferred} issue(s) deferred to a later tick`);
 
-  writeFileSync('/output/result.json', JSON.stringify({ unclassifiedCount: batch.length, unclassified: batch }));
+  writeFileSync('/output/result.json', JSON.stringify({ unclassifiedCount: batch.length, unclassified: batch, triageOnly: TRIAGE_ONLY }));
   console.log(`fetch-candidates: ${batch.length} issue(s) to triage: ${batch.map((x) => '#' + x.number).join(', ') || '(none)'}`);
 }
 
