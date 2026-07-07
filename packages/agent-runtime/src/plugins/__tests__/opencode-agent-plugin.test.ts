@@ -235,7 +235,22 @@ describe('OpenCodeAgentPlugin', () => {
 
       const result = plugin.parseAgentOutput(stdout);
       const parsed = JSON.parse(result);
-      expect(parsed.usage).toEqual({ input_tokens: 3000, output_tokens: 1300 });
+      expect(parsed.usage).toEqual({ input_tokens: 3000, output_tokens: 1300, peak_input_tokens: 2000 });
+    });
+
+    it('[DATA] reports peak_input_tokens as the max single-turn prompt, not the sum', () => {
+      const agentResponse = JSON.stringify({ output_file: '/output/result.json', summary: 'Done' });
+      const stdout = [
+        JSON.stringify({ type: 'step_finish', part: { tokens: { input: 5000, output: 100 }, cost: 0.01 } }),
+        JSON.stringify({ type: 'step_finish', part: { tokens: { input: 42000, output: 300 }, cost: 0.02 } }),
+        JSON.stringify({ type: 'step_finish', part: { tokens: { input: 18000, output: 200 }, cost: 0.02 } }),
+        openCodeJsonOutput(agentResponse),
+      ].join('\n');
+
+      const result = plugin.parseAgentOutput(stdout);
+      const parsed = JSON.parse(result);
+      expect(parsed.usage.peak_input_tokens).toBe(42000);
+      expect(parsed.usage.input_tokens).toBe(65000);
     });
 
     it('[DATA] omits usage when no step_finish events have tokens', () => {

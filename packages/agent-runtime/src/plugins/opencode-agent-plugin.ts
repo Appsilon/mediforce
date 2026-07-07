@@ -232,6 +232,10 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     const errors: string[] = [];
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
+    // Each step_finish's `tokens.input` is the full prompt for that turn, so the
+    // running context peaks on the last/largest turn. The max (not the sum) is
+    // what measures context saturation against the model's window.
+    let peakInputTokens = 0;
 
     for (const line of lines) {
       const trimmed = line.trim();
@@ -249,8 +253,10 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
         }
 
         if (event.type === 'step_finish' && event.part?.tokens) {
-          totalInputTokens += event.part.tokens.input ?? 0;
+          const turnInputTokens = event.part.tokens.input ?? 0;
+          totalInputTokens += turnInputTokens;
           totalOutputTokens += event.part.tokens.output ?? 0;
+          peakInputTokens = Math.max(peakInputTokens, turnInputTokens);
         }
 
         if (event.type === 'error' && event.error?.data?.message) {
@@ -266,7 +272,11 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     }
 
     const usage = (totalInputTokens > 0 || totalOutputTokens > 0)
-      ? { input_tokens: totalInputTokens, output_tokens: totalOutputTokens }
+      ? {
+          input_tokens: totalInputTokens,
+          output_tokens: totalOutputTokens,
+          ...(peakInputTokens > 0 ? { peak_input_tokens: peakInputTokens } : {}),
+        }
       : undefined;
 
     // Find the contract JSON in text parts (scan from last to first).
