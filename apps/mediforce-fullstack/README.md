@@ -131,9 +131,12 @@ is one admin value, not two. **The admin must therefore be a key in the map**;
 if they aren't, `notify-gate` logs a misconfig warning and `assignedTo` would
 fall back to the cron phantom.
 
-Values in the map may be emails (resolved to a uid via `getUserByEmail`) or a
-Mediforce uid directly. Being in the map == has a Mediforce account and is an
-eligible approver.
+Values in the map may be emails or a Mediforce uid directly. `notify-gate`
+emits the raw value as `reviewerId`; the platform run route resolves an
+email-shaped `assignedTo` to its uid (via the user directory) before persisting
+it as the task's `assignedUserId`, so the gate task lands in the approver's
+queue — an email that matches no user hard-fails the run instead of stranding.
+Being in the map == has a Mediforce account and is an eligible approver.
 
 **Two platform limitations this works around** (file/track separately):
 - The platform does **not** dispatch `task_assigned` notifications — the GitHub
