@@ -2,8 +2,10 @@
 //
 // For each verdict, reconcile the issue's `fullstack:` labels to the desired
 // { suitability, priority } and (once, on the transition INTO manual) post a
-// gracious decline comment. Best-effort per issue: a failed write logs and
-// continues, leaving that issue unclassified for the next tick to re-triage.
+// gracious decline comment. An `obsolete` verdict is closed here in the same
+// batch pass: label + a comment to the author with triage's evidence + a
+// reversible close. Best-effort per issue: a failed write logs and continues,
+// leaving that issue unclassified for the next tick to re-triage.
 //
 // Reads:  /output/input.json (steps.triage.verdicts), env GITHUB_TOKEN, FULLSTACK_REPO
 // Writes: /output/result.json
@@ -11,7 +13,13 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';
-const SUITABILITY = { go: 'fullstack:go', 'needs-approval': 'fullstack:needs-approval', manual: 'fullstack:manual' };
+const SUITABILITY = {
+  go: 'fullstack:go',
+  'needs-approval': 'fullstack:needs-approval',
+  manual: 'fullstack:manual',
+  obsolete: 'fullstack:obsolete',
+};
+const ACTIONABLE = new Set(['go', 'needs-approval']);
 const ALL_SUITABILITY = Object.values(SUITABILITY);
 const ALL_PRIO = ['fullstack:prio-high', 'fullstack:prio-med', 'fullstack:prio-low'];
 const PRIO = { high: 'fullstack:prio-high', med: 'fullstack:prio-med', low: 'fullstack:prio-low' };
@@ -35,7 +43,7 @@ export function reconcile(currentLabels, verdict) {
   const want = new Set();
   const suit = SUITABILITY[verdict.suitability];
   if (suit) want.add(suit);
-  if (verdict.suitability !== 'manual' && PRIO[verdict.priority]) want.add(PRIO[verdict.priority]);
+  if (ACTIONABLE.has(verdict.suitability) && PRIO[verdict.priority]) want.add(PRIO[verdict.priority]);
 
   const managed = [...ALL_SUITABILITY, ...ALL_PRIO];
   const add = [...want].filter((l) => !currentLabels.includes(l));
@@ -48,6 +56,20 @@ function declineComment(verdict) {
   const reason = verdict.reason || 'this needs product/domain judgement an autonomous agent should not make.';
   return `🤖 **mediforce-fullstack**: leaving this one for a human — ${reason}\n\n` +
     'Add the `fullstack:go` label if you\'d like me to attempt it anyway.';
+}
+
+// `not_planned` for a removed/migrated subsystem; `completed` when a fix already
+// shipped (already-fixed) — mirrors mark-fixed's "completed" close.
+export function closeReason(category) {
+  return category === 'already-fixed' ? 'completed' : 'not_planned';
+}
+
+function obsoleteComment(verdict, author) {
+  const reason = verdict.reason || 'the code it describes has changed';
+  const evidence = verdict.evidence ? ` (${verdict.evidence})` : '';
+  const cc = author ? `@${author} ` : '';
+  return `${cc}🤖 **mediforce-fullstack**: closing as no longer applicable — ${reason}${evidence}. ` +
+    'Reopen if I\'ve got this wrong.';
 }
 
 async function applyOne(verdict) {
@@ -72,7 +94,23 @@ async function applyOne(verdict) {
       body: JSON.stringify({ body: declineComment(verdict) }),
     });
   }
-  return { issueNumber: verdict.issueNumber, add, remove, newlyManual };
+
+  let closed = false;
+  if (verdict.suitability === 'obsolete') {
+    const author = (issue.user && issue.user.login) || null;
+    await gh(`/repos/${REPO}/issues/${verdict.issueNumber}/comments`, {
+      method: 'POST',
+      headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body: obsoleteComment(verdict, author) }),
+    });
+    await gh(`/repos/${REPO}/issues/${verdict.issueNumber}`, {
+      method: 'PATCH',
+      headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: 'closed', state_reason: closeReason(verdict.category) }),
+    });
+    closed = true;
+  }
+  return { issueNumber: verdict.issueNumber, add, remove, newlyManual, closed };
 }
 
 async function main() {
@@ -84,14 +122,22 @@ async function main() {
       console.error(`apply-verdicts: skipping malformed verdict ${JSON.stringify(v)}`);
       continue;
     }
+    // Never auto-close on an unproven obsolete verdict — downgrade to manual so a
+    // human sees it instead of it vanishing without evidence.
+    if (v.suitability === 'obsolete' && !v.evidence) {
+      console.error(`apply-verdicts: #${v.issueNumber} obsolete without evidence — downgrading to manual`);
+      v.suitability = 'manual';
+      v.reason = `flagged possibly obsolete but without concrete evidence — ${v.reason || 'needs a human to confirm'}`;
+    }
     try {
       results.push(await applyOne(v));
     } catch (err) {
       console.error(`apply-verdicts: #${v.issueNumber} failed (will re-triage next tick): ${err.message}`);
     }
   }
-  writeFileSync('/output/result.json', JSON.stringify({ applied: results.length, results }));
-  console.log(`apply-verdicts: labelled ${results.length}/${verdicts.length} issue(s)`);
+  const closedCount = results.filter((r) => r.closed === true).length;
+  writeFileSync('/output/result.json', JSON.stringify({ applied: results.length, closed: closedCount, results }));
+  console.log(`apply-verdicts: labelled ${results.length}/${verdicts.length} issue(s), closed ${closedCount} as obsolete`);
 }
 
 if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {

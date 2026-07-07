@@ -4,14 +4,15 @@ Pure-logic coverage lives in `tests/run_tests.mjs`. Run it any time (no secrets,
 no network):
 
 ```bash
-node tests/run_tests.mjs        # 31 assertions, all green
+node tests/run_tests.mjs        # 42 assertions, all green
 ```
 
 | Script | Status | What's covered |
 |--------|--------|----------------|
 | `fetch-candidates` | **tested** | `classifyIssue` (new / pr-open / fresh-lease / stale-reclaim / manual re-judge-on-edit / already-classified) + `summariseLabelEvents` attemptCount |
-| `apply-verdicts` | **tested** | `reconcile` label add/remove diff, re-judge label swap, newly-manual detection, manual carries no priority |
+| `apply-verdicts` | **tested** | `reconcile` label add/remove diff, re-judge label swap, newly-manual detection, manual/obsolete carry no priority, needs-approval→obsolete swap; `closeReason` (already-fixed→completed, else not_planned). Live parts (comment, close) need GitHub |
 | `select` | **tested** | `rankCandidates` (priority then oldest), `priorityOf`, `isActionable` exclusions |
+| `reset-labels` | **tested** | `labelsToStrip` strips verdict/prio/needs-info, preserves in-flight/human-owned wholesale, no-op on clean issue. Live parts (label DELETE) need GitHub. Manual maintenance tool, not a pipeline step |
 | `notify-gate` | **tested** | `resolveReviewer` tiered map lookup, `buildGateComment` cc tiers |
 | `publish` | **tested** | `reviewOutcome` (ship/flag/capped-draft), `buildPrBody` assembly |
 | `arm-timer` | **tested** | `resolveWaitMinutes` parses positive / falls back on empty / unresolved / non-positive |

@@ -91,9 +91,9 @@ steps = [
     script_step("fetch-candidates", "Fetch candidate issues",
                 "List open issues; partition the ones needing triage (new, edited-since-declined, or a released stale lease); reclaim expired in-progress leases; carry attemptCount."),
     agent_step("triage", "Triage + classify batch",
-               "GLM classifies each un-triaged issue as go / needs-approval / manual + priority. Judgment is persisted as labels so each issue is analysed once.", 6),
+               "GLM clones main and verifies each un-triaged issue against the code, classifying it go / needs-approval / manual / obsolete (+ priority). Judgment is persisted as labels so each issue is analysed once; obsolete issues are auto-closed downstream.", 30),
     script_step("apply-verdicts", "Persist verdict labels",
-                "Reconcile fullstack: labels to triage's verdicts; post a one-time gracious decline comment when newly marking manual."),
+                "Reconcile fullstack: labels to triage's verdicts; post a one-time gracious decline comment when newly marking manual; label + comment + reversibly close obsolete issues (with triage's evidence, cc the author)."),
     script_step("select", "Select next issue",
                 "Deterministic: fresh label-filtered query of the actionable pool, sort by priority then oldest, pick one. No LLM."),
     script_step("claim", "Claim the issue",
@@ -182,11 +182,12 @@ wd = {
     "visibility": "private",
     "title": "MediForce Fullstack (autonomous issue -> PR)",
     "description": (
-        "Every 15 min: classifies un-triaged issues on Appsilon/mediforce with persisted "
-        "fullstack: labels (analysed once each), autonomously implements confident ones as "
-        "ready-for-review PRs, gates ambiguous ones for a human, self-reviews with a bounded "
-        "revise loop, and auto-closes already-fixed issues. Idempotent + self-healing via "
-        "labels and a 2h lease."
+        "Every 15 min: triage clones main and classifies un-triaged issues on "
+        "Appsilon/mediforce against the actual code with persisted fullstack: labels "
+        "(analysed once each), auto-closing ones it proves obsolete; then it autonomously "
+        "implements confident ones as ready-for-review PRs, gates ambiguous ones for a "
+        "human, self-reviews with a bounded revise loop, and auto-closes already-fixed "
+        "issues. Idempotent + self-healing via labels and a 2h lease."
     ),
     "roles": ["admin"],
     "preamble": PREAMBLE,

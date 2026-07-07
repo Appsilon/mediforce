@@ -1,21 +1,24 @@
 # mediforce-fullstack
 
 An autonomous **issue → PR** agent for `Appsilon/mediforce`. On a 15-minute cron
-it triages open issues **once** (persisting the verdict as `fullstack:` labels),
-implements the confident ones as ready-for-review PRs, gates the ambiguous ones
-for a human, self-reviews with a bounded revise loop, then **watches CI on the
-PR and auto-fixes red checks** (bounded, handing persistent failures to a human),
-and auto-closes issues it finds already fixed. Idempotent and self-healing via
-labels and a 2-hour lease.
+it triages open issues **once** — cloning `main` and verifying each issue against
+the actual code, then persisting the verdict as `fullstack:` labels and
+**auto-closing the ones it proves obsolete** (already fixed, or targeting a
+removed/migrated subsystem). It implements the confident ones as ready-for-review
+PRs, gates the ambiguous ones for a human, self-reviews with a bounded revise
+loop, then **watches CI on the PR and auto-fixes red checks** (bounded, handing
+persistent failures to a human). Idempotent and self-healing via labels and a
+2-hour lease.
 
 ## Pipeline (22 steps)
 
 ```
-fetch-candidates ─┬─ triage ─ apply-verdicts ─ select ─┬─ (go)             claim ─ implement ─┐
- (list + partition,│  (classify   (write labels) (pick, │                                        │
-  reclaim leases,  │   batch once)                deterministic)                                │
-  attemptCount)    └─ (nothing new) ────────────── select ─┴─ (needs-approval) draft-plan ─ notify-gate ─ clarify-approve(human)
-                                                          └─ (nothing)  done-empty                    approve ┘   reject → mark-needs-info
+fetch-candidates ─┬─ triage ──── apply-verdicts ──── select ─┬─ (go)          claim ─ implement ─┐
+ (list + partition,│  (clone main,  (write labels;    (pick,   │                                     │
+  cap batch,       │   verify +      close obsolete   determin- │                                     │
+  reclaim leases,  │   classify once)  cc author)      istic)   │                                     │
+  attemptCount)    └─ (nothing new) ───────────────── select ─┴─ (needs-approval) draft-plan ─ notify-gate ─ clarify-approve(human)
+                                                             └─ (nothing) done-empty                  approve ┘   reject → mark-needs-info
 
 implement ─┬─ changed        → self-review ⇄ revise (≤2)  → publish ─┐
            ├─ already-fixed  → mark-fixed (comment + close) → done    │
@@ -47,6 +50,7 @@ GitHub auto-creates these on first use; no pre-setup required.
 | `fullstack:go` | Confident → auto-implement (agent verdict **or** human override) | `apply-verdicts` / a human |
 | `fullstack:needs-approval` | Doable, needs human sign-off first | `apply-verdicts` |
 | `fullstack:manual` | Not automatable; needs a human | `apply-verdicts` |
+| `fullstack:obsolete` | Proven no longer applicable → labelled **and closed** (reversibly, cc the author) | `apply-verdicts` |
 | `fullstack:prio-high/med/low` | Selection order (on go / needs-approval) | `apply-verdicts` |
 | `fullstack:in-progress` | Active lease (TTL 2h; reclaimed if stale) | `claim` |
 | `fullstack:awaiting-human` | Gate plan posted; a human owns it (never reclaimed) | `notify-gate` |
@@ -69,7 +73,7 @@ carrying **only a verdict or `needs-info` label** back into `triage`, and
 | Issue currently labelled | Reassign behaviour |
 |--------------------------|--------------------|
 | `fullstack:go` / `fullstack:needs-approval` | re-triaged; verdict + prio reconciled |
-| `fullstack:manual` | re-triaged unconditionally (not just on edit) |
+| `fullstack:manual` | re-triaged unconditionally (not just on edit) — this is how the stale-`manual` graveyard gets re-checked for obsolescence |
 | `fullstack:needs-info` | `needs-info` stripped, then re-triaged |
 | `fullstack:in-progress` (fresh lease) | **untouched** — live implementation work |
 | `fullstack:pr-open`, `fullstack:awaiting-human` | **untouched** — in-flight / human-owned |
@@ -81,9 +85,37 @@ backlog to recompute prior attempts), so the poison-pill count does not carry
 over.
 
 It is wired as a `{{FULLSTACK_REASSIGN}}` env ref, so you flip it from the
-workflow/namespace panel with **no re-registration**. Because it is
-**workflow-global, not per-run**, leave it on and *every* tick re-triages the
-whole backlog — flip it on, let one tick run, flip it off (see Known gaps).
+workflow/namespace panel with **no re-registration**. Use it to re-judge a
+handful of issues after a prompt tweak — flip on, let a tick run, flip off.
+
+**Do not use `FULLSTACK_REASSIGN` to drain a large backlog.** Since triage now
+clones `main` and verifies each issue against the code, a batch of ~90 issues
+cannot be judged reliably in one agent call, so `TRIAGE_BATCH_MAX` (default `25`)
+caps the per-tick batch. But reassign re-collects the *whole* re-judgeable pool
+every tick and only removes issues from it by closing them — so with the cap on,
+it re-processes the same front-of-list 25 each tick instead of advancing. For a
+full re-triage, reset the labels instead (below).
+
+### Re-triaging the whole backlog (`reset-labels.mjs`)
+
+To re-classify every open, not-yet-implemented issue from scratch, strip its
+`fullstack:` verdict/parked labels so it looks brand-new. `fetch-candidates` then
+triages each **once** and never re-collects it, so a capped batch genuinely
+drains over a few ticks — no `FULLSTACK_REASSIGN` needed.
+
+```bash
+# 1. Preview (dry-run is the default — mutates nothing):
+GITHUB_TOKEN=… node scripts/reset-labels.mjs
+# 2. Apply:
+GITHUB_TOKEN=… DRY_RUN=false node scripts/reset-labels.mjs
+# 3. Run the pipeline ⌈open-issues / TRIAGE_BATCH_MAX⌉ times (≈4 for ~100 issues),
+#    REASSIGN off. Each tick triages 25 fresh issues that never come back.
+```
+
+`reset-labels` **preserves** in-flight / human-owned issues wholesale
+(`in-progress`, `pr-open`, `awaiting-human`, `ci-failing`), skips closed issues
+(open query only), and is idempotent. It is a manual maintenance tool, **not a
+pipeline step** — it is not in the workflow definition.
 
 ## Environment & secrets
 
@@ -94,6 +126,7 @@ whole backlog — flip it on, let one tick run, flip it off (see Known gaps).
 | `FULLSTACK_REVIEWER_MAP` | **yes** | workflow | `notify-gate` | JSON `{ "githubLogin": "email-or-uid" }` of dev-team reviewers (must include the admin) | Workflow secrets |
 | `FULLSTACK_DEFAULT_ADMIN` | **yes** | workflow | `notify-gate` | Fallback admin's **GitHub login** — must be a key in `FULLSTACK_REVIEWER_MAP` (their Mediforce id + cc handle are derived from it) | Workflow secrets |
 | `FULLSTACK_REASSIGN` | no | workflow | `fetch-candidates` | Escape hatch: when `true` (case-insensitive; default off), force a re-judge of every issue carrying only a verdict/`needs-info` label — see [Re-assigning labels](#re-assigning-labels-fullstack_reassign) | Workflow secrets/env |
+| `TRIAGE_BATCH_MAX` | no | workflow | `fetch-candidates` | Max issues handed to `triage` per tick (default `25`) — caps the grounded (clone + verify) triage pass; overflow re-collects next tick | `build/env.example.json` |
 | `APP_BASE_URL` | no | workflow/ns | `notify-gate` | Mediforce base URL for the gate comment link | Workflow/namespace env |
 | `FULLSTACK_REPO` | no | workflow | all scripts | Target repo (default `Appsilon/mediforce`) | `build/env.example.json` |
 | `LEASE_TTL_HOURS` | no | workflow | `fetch-candidates` | Stale-lease reclaim threshold (default `2`) | `build/env.example.json` |

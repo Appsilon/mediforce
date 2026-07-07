@@ -16,11 +16,18 @@
 // manual / needs-info) — it re-enters triage and apply-verdicts overwrites the
 // stored verdict. In-flight/human-owned states (in-progress lease, pr-open,
 // awaiting-human) are always protected. Because this reads a workflow-global env
-// ref, it re-judges the backlog on EVERY tick while enabled — flip it on, let one
-// tick run, flip it off.
+// ref, it re-judges the backlog on EVERY tick while enabled — flip it on, let the
+// backlog drain over a few ticks (see the batch cap below), then flip it off.
+//
+// BATCH CAP: triage now clones `main` and verifies each issue against the code,
+// so a batch of ~90 backlog issues cannot be judged reliably in one agent call.
+// TRIAGE_BATCH_MAX (default 25) caps how many issues are handed to triage per
+// tick; the rest carry no verdict and are picked up on the next tick. A big
+// reassign backlog therefore drains over several ticks instead of one impossible
+// mega-call — steady-state (a handful of new issues) is unaffected.
 //
 // Reads:  /output/input.json (unused — cron tick), env GITHUB_TOKEN, FULLSTACK_REPO,
-//         LEASE_TTL_HOURS, MAX_ATTEMPTS, FULLSTACK_REASSIGN
+//         LEASE_TTL_HOURS, MAX_ATTEMPTS, FULLSTACK_REASSIGN, TRIAGE_BATCH_MAX
 // Writes: /output/result.json
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -37,6 +44,7 @@ const REPO = process.env.FULLSTACK_REPO || 'Appsilon/mediforce';
 const LEASE_TTL_HOURS = Number(process.env.LEASE_TTL_HOURS || '2');
 const MAX_ATTEMPTS = Number(process.env.MAX_ATTEMPTS || '3');
 const REASSIGN = /^\s*(true|1|yes|on)\s*$/i.test(process.env.FULLSTACK_REASSIGN || '');
+const TRIAGE_BATCH_MAX = Number(process.env.TRIAGE_BATCH_MAX || '25');
 
 function ghHeaders() {
   const h = { Accept: 'application/vnd.github+json', 'User-Agent': 'mediforce-fullstack-bot' };
@@ -168,8 +176,15 @@ async function main() {
   }
 
   if (REASSIGN) console.log('fetch-candidates: FULLSTACK_REASSIGN=on — re-judging already-classified issues this tick');
-  writeFileSync('/output/result.json', JSON.stringify({ unclassifiedCount: unclassified.length, unclassified }));
-  console.log(`fetch-candidates: ${unclassified.length} issue(s) to triage: ${unclassified.map((x) => '#' + x.number).join(', ') || '(none)'}`);
+
+  // Cap the batch so triage can clone + verify each issue reliably in one pass.
+  // The overflow carries no verdict, so it is re-collected next tick (self-drains).
+  const deferred = unclassified.length - TRIAGE_BATCH_MAX;
+  const batch = unclassified.slice(0, TRIAGE_BATCH_MAX);
+  if (deferred > 0) console.log(`fetch-candidates: capped batch at ${TRIAGE_BATCH_MAX}; ${deferred} issue(s) deferred to a later tick`);
+
+  writeFileSync('/output/result.json', JSON.stringify({ unclassifiedCount: batch.length, unclassified: batch }));
+  console.log(`fetch-candidates: ${batch.length} issue(s) to triage: ${batch.map((x) => '#' + x.number).join(', ') || '(none)'}`);
 }
 
 if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {

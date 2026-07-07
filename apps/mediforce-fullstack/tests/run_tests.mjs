@@ -2,8 +2,9 @@
 // Run: node tests/run_tests.mjs   (no secrets/network needed — pure functions only)
 import assert from 'node:assert/strict';
 import { classifyIssue, summariseLabelEvents } from '../scripts/fetch-candidates.mjs';
-import { reconcile } from '../scripts/apply-verdicts.mjs';
+import { reconcile, closeReason } from '../scripts/apply-verdicts.mjs';
 import { rankCandidates, priorityOf, isActionable } from '../scripts/select.mjs';
+import { labelsToStrip } from '../scripts/reset-labels.mjs';
 import { resolveReviewer, buildGateComment } from '../scripts/notify-gate.mjs';
 import { reviewOutcome, buildPrBody } from '../scripts/publish.mjs';
 import { resolveWaitMinutes } from '../scripts/arm-timer.mjs';
@@ -108,6 +109,43 @@ test('newly manual flagged once; already-manual not', () => {
 test('manual carries no priority label', () => {
   const r = reconcile([], { suitability: 'manual', priority: 'high' });
   assert.deepEqual(r.add, ['fullstack:manual']);
+});
+test('obsolete adds label, no priority', () => {
+  const r = reconcile([], { suitability: 'obsolete', priority: 'high' });
+  assert.deepEqual(r.add, ['fullstack:obsolete']);
+  assert.equal(r.newlyManual, false);
+});
+test('re-judge needs-approval → obsolete strips verdict + prio', () => {
+  const r = reconcile(['fullstack:needs-approval', 'fullstack:prio-med'], { suitability: 'obsolete' });
+  assert.ok(r.add.includes('fullstack:obsolete'));
+  assert.ok(r.remove.includes('fullstack:needs-approval'));
+  assert.ok(r.remove.includes('fullstack:prio-med'));
+});
+
+// ---- reset-labels.labelsToStrip ----
+test('reset strips verdict + prio + needs-info labels', () => {
+  assert.deepEqual(
+    labelsToStrip(['fullstack:needs-approval', 'fullstack:prio-med', 'bug']).sort(),
+    ['fullstack:needs-approval', 'fullstack:prio-med'].sort(),
+  );
+  assert.deepEqual(labelsToStrip(['fullstack:manual']), ['fullstack:manual']);
+});
+test('reset preserves in-flight / human-owned issues wholesale', () => {
+  assert.deepEqual(labelsToStrip(['fullstack:in-progress', 'fullstack:prio-high']), []);
+  assert.deepEqual(labelsToStrip(['fullstack:pr-open', 'fullstack:go']), []);
+  assert.deepEqual(labelsToStrip(['fullstack:awaiting-human']), []);
+  assert.deepEqual(labelsToStrip(['fullstack:ci-failing', 'fullstack:needs-approval']), []);
+});
+test('reset is a no-op on an already-clean issue', () => {
+  assert.deepEqual(labelsToStrip(['bug', 'enhancement']), []);
+});
+
+// ---- apply-verdicts.closeReason ----
+test('closeReason: already-fixed → completed, else not_planned', () => {
+  assert.equal(closeReason('already-fixed'), 'completed');
+  assert.equal(closeReason('no-longer-applicable'), 'not_planned');
+  assert.equal(closeReason('superseded'), 'not_planned');
+  assert.equal(closeReason(undefined), 'not_planned');
 });
 
 // ---- select ranking ----
