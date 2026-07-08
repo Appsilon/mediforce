@@ -1,0 +1,10 @@
+{
+  "workflows": [
+    {
+      "name": "mediforce-fullstack",
+      "path": "src/mediforce-fullstack.wd.json",
+      "description": "Autonomous issue -> PR bot for Appsilon/mediforce: triages issues once into persisted fullstack: labels, implements confident ones as ready-for-review PRs, gates ambiguous ones for a human, self-reviews with a bounded revise loop, auto-closes already-fixed issues.",
+      "tags": ["automation", "github", "self-healing", "code-review"]
+    }
+  ]
+}
