@@ -1,28 +1,30 @@
-import { pgTable, text, timestamp, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, text, boolean, timestamp, primaryKey } from 'drizzle-orm/pg-core';
 
 /**
- * Last-fire bookkeeping for cron triggers (PLAN-0001 §1.2).
- * Original Firestore path: cronTriggerState/{definitionName}:{triggerName}.
+ * Persisted **Cron Trigger** records (ADR-0010) — the live, mutable schedules
+ * attached to workflows. Keyed by `(namespace, definitionName, triggerName)`.
  *
- * No `workspace` column: the row is keyed by `(definitionName, triggerName)`
- * and the cron heartbeat reads across every workspace's definitions in a
- * single system-actor pass (see `packages/platform-api/src/handlers/cron/
- * heartbeat.ts`). The Firestore collection lived at the root for the same
- * reason — there is no workspace FK to declare.
- *
- * No `created_at` / `updated_at` columns: the repo interface exposes only
- * `get` / `set`, and `set` is an unconditional overwrite. The single
- * meaningful timestamp — `last_triggered_at` — comes from the caller and
- * is already on the row. Adding mirror columns would duplicate it.
+ * The physical table keeps its historical name `cron_trigger_state` (renaming it
+ * would force a destructive drop/create under non-interactive drizzle-kit
+ * generate); the domain concept is "Cron Trigger". The row now carries the live
+ * operational config, not just a last-fire cache:
+ *   - `enabled`            — start/stop; the heartbeat fires only enabled rows.
+ *   - `schedule`           — live cadence (Definition schedule is a seed only).
+ *   - `last_triggered_at`  — fire cursor; NULL until the first fire.
  */
 export const cronTriggerState = pgTable(
   'cron_trigger_state',
   {
+    namespace: text('namespace').notNull(),
     definitionName: text('definition_name').notNull(),
     triggerName: text('trigger_name').notNull(),
-    lastTriggeredAt: timestamp('last_triggered_at', { withTimezone: true }).notNull(),
+    schedule: text('schedule').notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    lastTriggeredAt: timestamp('last_triggered_at', { withTimezone: true }),
   },
   (table) => ({
-    pk: primaryKey({ columns: [table.definitionName, table.triggerName] }),
+    pk: primaryKey({
+      columns: [table.namespace, table.definitionName, table.triggerName],
+    }),
   }),
 );

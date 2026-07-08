@@ -132,6 +132,16 @@ import {
   BulkRunOutputSchema,
   HeartbeatInputSchema,
   HeartbeatOutputSchema,
+  ListCronTriggersInputSchema,
+  ListCronTriggersOutputSchema,
+  CreateCronTriggerInputSchema,
+  CreateCronTriggerOutputSchema,
+  UpdateCronTriggerInputSchema,
+  UpdateCronTriggerOutputSchema,
+  SetCronTriggerEnabledInputSchema,
+  SetCronTriggerEnabledOutputSchema,
+  DeleteCronTriggerInputSchema,
+  DeleteCronTriggerOutputSchema,
   ListOAuthProvidersInputSchema,
   ListOAuthProvidersOutputSchema,
   GetOAuthProviderInputSchema,
@@ -246,6 +256,16 @@ import {
   type GetWorkflowOutput,
   type ListWorkflowVersionsInput,
   type ListWorkflowVersionsOutput,
+  type ListCronTriggersInput,
+  type ListCronTriggersOutput,
+  type CreateCronTriggerInput,
+  type CreateCronTriggerOutput,
+  type UpdateCronTriggerInput,
+  type UpdateCronTriggerOutput,
+  type SetCronTriggerEnabledInput,
+  type SetCronTriggerEnabledOutput,
+  type DeleteCronTriggerInput,
+  type DeleteCronTriggerOutput,
   type ArchiveVersionInput,
   type ArchiveVersionOutput,
   type ArchiveAllInput,
@@ -549,6 +569,14 @@ export class Mediforce {
     transferNamespace: (input: TransferWorkflowInput) => Promise<TransferWorkflowOutput>;
     importFromRepo: (input: ImportWorkflowInput) => Promise<ImportWorkflowOutput>;
     getManifest: (input: GetManifestInput) => Promise<GetManifestOutput>;
+  };
+
+  readonly cronTriggers: {
+    list: (input: ListCronTriggersInput) => Promise<ListCronTriggersOutput>;
+    create: (input: CreateCronTriggerInput) => Promise<CreateCronTriggerOutput>;
+    update: (input: UpdateCronTriggerInput) => Promise<UpdateCronTriggerOutput>;
+    setEnabled: (input: SetCronTriggerEnabledInput) => Promise<SetCronTriggerEnabledOutput>;
+    delete: (input: DeleteCronTriggerInput) => Promise<DeleteCronTriggerOutput>;
   };
 
   readonly runs: {
@@ -1098,6 +1126,63 @@ export class Mediforce {
         const res = await this.request(`/api/workflow-definitions/manifest${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.getManifest');
         return GetManifestOutputSchema.parse(body);
+      },
+    };
+
+    this.cronTriggers = {
+      list: async (input) => {
+        const v = ListCronTriggersInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: v.namespace });
+        const res = await this.request(
+          `/api/workflow-definitions/${encodeURIComponent(v.definitionName)}/cron-triggers${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.cronTriggers.list');
+        return ListCronTriggersOutputSchema.parse(body);
+      },
+      create: (input) => {
+        const v = CreateCronTriggerInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions/${encodeURIComponent(v.definitionName)}/cron-triggers`,
+          {
+            namespace: v.namespace,
+            triggerName: v.triggerName,
+            schedule: v.schedule,
+            enabled: v.enabled,
+          },
+          CreateCronTriggerOutputSchema,
+          'mediforce.cronTriggers.create',
+        );
+      },
+      update: (input) => {
+        const v = UpdateCronTriggerInputSchema.parse(input);
+        return this.sendJson(
+          'PATCH',
+          `/api/workflow-definitions/${encodeURIComponent(v.definitionName)}/cron-triggers/${encodeURIComponent(v.triggerName)}`,
+          { namespace: v.namespace, schedule: v.schedule },
+          UpdateCronTriggerOutputSchema,
+          'mediforce.cronTriggers.update',
+        );
+      },
+      setEnabled: (input) => {
+        const v = SetCronTriggerEnabledInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions/${encodeURIComponent(v.definitionName)}/cron-triggers/${encodeURIComponent(v.triggerName)}/enabled`,
+          { namespace: v.namespace, enabled: v.enabled },
+          SetCronTriggerEnabledOutputSchema,
+          'mediforce.cronTriggers.setEnabled',
+        );
+      },
+      delete: async (input) => {
+        const v = DeleteCronTriggerInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: v.namespace });
+        const res = await this.request(
+          `/api/workflow-definitions/${encodeURIComponent(v.definitionName)}/cron-triggers/${encodeURIComponent(v.triggerName)}${qs}`,
+          { method: 'DELETE' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.cronTriggers.delete');
+        return DeleteCronTriggerOutputSchema.parse(body);
       },
     };
 

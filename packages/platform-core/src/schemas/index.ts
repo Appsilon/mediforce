@@ -275,7 +275,9 @@ export {
 
 export {
   CronTriggerStateSchema,
+  CronTriggerStatePatchSchema,
   type CronTriggerState,
+  type CronTriggerStatePatch,
 } from './cron-trigger-state';
 
 export {

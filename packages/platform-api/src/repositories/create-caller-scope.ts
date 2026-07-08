@@ -41,6 +41,7 @@ import { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-to
 import { AuthorizedAgentRunRepository } from './authorized-agent-run-repository';
 import { AuthorizedAuditEventRepository } from './authorized-audit-event-repository';
 import { AuthorizedCoworkSessionRepository } from './authorized-cowork-session-repository';
+import { AuthorizedCronTriggerStateRepository } from './authorized-cron-trigger-state-repository';
 import { AuthorizedHandoffRepository } from './authorized-handoff-repository';
 import { AuthorizedHumanTaskRepository } from './authorized-human-task-repository';
 import { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
@@ -143,12 +144,13 @@ export function createCallerScope(
     plugins: services.pluginRegistry,
     workspaces: services.namespaceRepo,
     userProfiles: services.userProfileRepo,
-    cron: services.cronTriggerStateRepo,
+    cron: new AuthorizedCronTriggerStateRepository(caller, services.cronTriggerStateRepo),
 
     system: {
       engine: services.engine,
       manualTrigger: services.manualTrigger,
       cronTrigger: services.cronTrigger,
+      cron: services.cronTriggerStateRepo,
       webhookRouter: services.webhookRouter,
       agentRunner: services.agentRunner,
       blobStore: services.blobStore,

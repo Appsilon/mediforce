@@ -26,6 +26,7 @@ import type { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oau
 import type { AuthorizedAgentRunRepository } from './authorized-agent-run-repository';
 import type { AuthorizedAuditEventRepository } from './authorized-audit-event-repository';
 import type { AuthorizedCoworkSessionRepository } from './authorized-cowork-session-repository';
+import type { AuthorizedCronTriggerStateRepository } from './authorized-cron-trigger-state-repository';
 import type { AuthorizedHandoffRepository } from './authorized-handoff-repository';
 import type { AuthorizedHumanTaskRepository } from './authorized-human-task-repository';
 import type { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
@@ -80,7 +81,9 @@ export interface CallerScope {
   readonly plugins: PluginsRegistryView;
   readonly workspaces: NamespaceRepository;
   readonly userProfiles: UserProfileRepository;
-  readonly cron: CronTriggerStateRepository;
+  /** Workspace-scoped Cron Trigger management (ADR-0010). The heartbeat's
+   *  cross-namespace access is on `system.cron`. */
+  readonly cron: AuthorizedCronTriggerStateRepository;
 
   // System services (engine, manual trigger, etc.) — handlers use these
   // when delegating to engine machinery (resume, advance, create-run).
@@ -103,6 +106,9 @@ export interface SystemServices {
   readonly engine: WorkflowEngine;
   readonly manualTrigger: ManualTrigger;
   readonly cronTrigger: CronTrigger;
+  /** Raw, cross-namespace Cron Trigger store — heartbeat only (apiKey-gated).
+   *  Workspace-scoped management goes through `scope.cron`. */
+  readonly cron: CronTriggerStateRepository;
   readonly webhookRouter: WebhookRouter;
   readonly agentRunner: AgentRunner;
   /**
