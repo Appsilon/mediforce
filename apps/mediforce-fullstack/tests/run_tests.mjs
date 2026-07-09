@@ -49,6 +49,22 @@ test('manual, edited since decline → triage (re-judge)', () => {
   const issue = { labels: lbl('fullstack:manual'), updated_at: hoursAgo(1) };
   assert.equal(classifyIssue(issue, events, NOW, 2, 3).action, 'triage');
 });
+test('bot-authored manual issue that keeps being edited → skip (no re-triage loop)', () => {
+  // Renovate rewrites its "Dependency Dashboard" constantly, bumping updated_at far
+  // past the manual label event. The edited-since heuristic latched on and re-triaged
+  // it every tick; bot-authored issues must never enter the pipeline.
+  const events = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: hoursAgo(10) }];
+  const issue = { labels: lbl('fullstack:manual'), updated_at: hoursAgo(1), user: { type: 'Bot' } };
+  assert.equal(classifyIssue(issue, events, NOW, 2, 3).action, 'skip');
+});
+test('bot-authored issue with no labels → skip (never triaged)', () => {
+  assert.equal(classifyIssue({ labels: [], user: { type: 'Bot' } }, [], NOW, 2, 3).action, 'skip');
+});
+test('bot-authored issue is protected even under reassign → skip', () => {
+  const events = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: hoursAgo(10) }];
+  const issue = { labels: lbl('fullstack:manual'), updated_at: hoursAgo(1), user: { type: 'Bot' } };
+  assert.equal(classifyIssue(issue, events, NOW, 2, 3, true).action, 'skip');
+});
 test('already go-labelled → skip (not re-analysed)', () => {
   assert.equal(classifyIssue({ labels: lbl('fullstack:go') }, [], NOW, 2, 3).action, 'skip');
 });

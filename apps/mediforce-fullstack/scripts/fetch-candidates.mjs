@@ -7,6 +7,11 @@
 //   - stale `fullstack:in-progress` leases (older than LEASE_TTL_HOURS, no PR) —
 //     the lease is released here and the issue re-enters triage (self-heal)
 //
+// Bot-authored issues (Renovate's "Dependency Dashboard" et al.) are excluded
+// wholesale: they are trackers this pipeline never implements, and the bot's
+// constant body rewrites bump `updated_at` so the edited-since re-judge below
+// would otherwise re-triage them every tick.
+//
 // Already-classified actionable issues (`fullstack:go` / `fullstack:needs-approval`)
 // are NOT re-analysed — `select` picks them by their stored labels. That is the
 // whole point of persisting the verdict: triage's LLM only ever looks once.
@@ -88,6 +93,12 @@ export function summariseLabelEvents(events, name) {
 /** Decide what to do with one issue given its labels + events. Pure.
  *  `reassign === true` forces a re-judge of already-verdicted / parked issues. */
 export function classifyIssue(issue, events, nowMs, ttlHours, maxAttempts, reassign) {
+  // Bot-authored issues (e.g. Renovate's "Dependency Dashboard") are trackers this
+  // pipeline never implements, and the bot rewrites them constantly — bumping
+  // `updated_at` far past the `fullstack:manual` label event, which latched the
+  // edited-since re-judge below into an every-tick triage loop. Never process them.
+  if (issue.user && issue.user.type === 'Bot') return { action: 'skip' };
+
   const labels = labelNames(issue);
   const has = (l) => labels.includes(l);
 
