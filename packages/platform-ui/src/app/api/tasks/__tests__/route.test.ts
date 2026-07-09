@@ -5,15 +5,14 @@ import { NextRequest } from 'next/server';
 // `packages/platform-api/src/handlers/tasks/__tests__/list-tasks.test.ts`
 // (8 tests against `InMemoryHumanTaskRepository`, no mocks). Schema shapes
 // are covered by the contract test. The round-trip (client → adapter →
-// handler → repo) is covered by `src/test/api-integration.test.ts`.
+// handler → repo) is covered by `src/test/integration/api-integration.test.ts`.
 //
 // What remains here is one happy-path smoke that proves the Next.js route
-// file actually wires the schema, services factory, and handler together.
-// Kept deliberately thin — do not grow this file into another coverage
-// layer. Per `docs/headless-migration.md`, avoid duplicate coverage across
-// layers.
+// file actually wires the schema, services factory, and handler together,
+// plus basic namespace filtering for authenticated users.
 
 const mockGetByInstanceId = vi.fn();
+const mockInstanceGetById = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
@@ -21,7 +20,16 @@ vi.mock('@/lib/platform-services', () => ({
       getByInstanceId: mockGetByInstanceId,
       getByRole: vi.fn(),
     },
+    instanceRepo: {
+      getById: mockInstanceGetById,
+    },
+    namespaceRepo: {},
   }),
+}));
+
+vi.mock('@/lib/api-auth', () => ({
+  resolveCallerIdentity: () => ({ kind: 'apiKey', isSystemActor: true }),
+  callerCanAccess: () => true,
 }));
 
 import { GET } from '../route';

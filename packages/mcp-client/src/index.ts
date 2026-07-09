@@ -1,3 +1,3 @@
-export { McpClientManager } from './mcp-client-manager.js';
-export type { McpToolDefinition, McpToolCallResult, McpClientManagerOptions } from './types.js';
-export { resolveValue } from './resolve-env.js';
+export { McpClientManager } from './mcp-client-manager';
+export type { McpToolDefinition, McpToolCallResult, McpClientManagerOptions } from './types';
+export { resolveValue } from './resolve-env';

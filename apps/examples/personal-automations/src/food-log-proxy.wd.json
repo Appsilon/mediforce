@@ -1,0 +1,59 @@
+{
+  "name": "food-log-proxy",
+  "title": "Food Log Proxy",
+  "description": "Webhook -> http proxy -> reshape. Reference template for chained actions + reshape kind.",
+  "preamble": "## Domain Context\nReference workflow. Validates that two chained `executor: 'action'` steps (http + reshape) propagate variables through the engine and that the reshape kind composes cleanly with http output.",
+  "triggers": [
+    {
+      "type": "webhook",
+      "name": "main",
+      "config": {
+        "method": "POST",
+        "path": "/food-log"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "proxy",
+      "name": "Proxy to upstream",
+      "type": "creation",
+      "executor": "action",
+      "action": {
+        "kind": "http",
+        "config": {
+          "method": "POST",
+          "url": "http://localhost:9099/anything",
+          "body": "${triggerPayload.body}"
+        }
+      }
+    },
+    {
+      "id": "shape",
+      "name": "Reshape proxy response",
+      "type": "creation",
+      "executor": "action",
+      "action": {
+        "kind": "reshape",
+        "config": {
+          "values": {
+            "proxyStatus": "${steps.proxy.status}",
+            "echoedPayload": "${steps.proxy.body.json.json}",
+            "echoedMethod": "${steps.proxy.body.json.method}",
+            "source": "food-log-proxy"
+          }
+        }
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "proxy", "to": "shape" },
+    { "from": "shape", "to": "done" }
+  ]
+}

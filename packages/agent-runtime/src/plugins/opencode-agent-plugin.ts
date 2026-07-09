@@ -1,12 +1,13 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
+import { type PluginCapabilityMetadata, normaliseModelId } from '@mediforce/platform-core';
+export { normaliseModelId };
 import {
   BaseContainerAgentPlugin,
   type SpawnCliOptions,
   type AgentCommandSpec,
-} from './base-container-agent-plugin.js';
-import { isWorkflowAgentContext } from './container-plugin.js';
+} from './base-container-agent-plugin';
+import { isWorkflowAgentContext } from './container-plugin';
 
 /** Default model used when agentConfig.model is not set. */
 const DEFAULT_MODEL = 'deepseek/deepseek-chat';
@@ -37,6 +38,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       'Examples: extracted metadata, generated code, analysis reports.',
     roles: ['executor'],
     foundationModel: 'DeepSeek Chat',
+    requiredEnv: [['OPENROUTER_API_KEY']],
   };
 
   protected override getInternalEnvVars(): Record<string, string> {
@@ -80,20 +82,23 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
 
   /** Build the full provider/model string for the --model CLI flag. */
   private resolveModelArg(model: string): string {
-    // Already has a recognised provider prefix — use as-is.
-    if (model.startsWith('openrouter/') || !model.includes('/')) {
-      return model;
+    // Normalise legacy Firestore-encoded IDs: "deepseek__deepseek-chat"
+    // → "deepseek/deepseek-chat".  Firestore doc IDs can't contain "/",
+    // so the model registry used "__" as separator; Postgres has no such
+    // limitation but old IDs may still exist in workflow definitions.
+    const normalised = normaliseModelId(model);
+
+    if (normalised.startsWith('openrouter/') || !normalised.includes('/')) {
+      return normalised;
     }
     const workflowSecrets = isWorkflowAgentContext(this.context)
       ? this.context.workflowSecrets
       : undefined;
     const openrouterKey = this.resolvedEnv.vars.OPENROUTER_API_KEY ?? workflowSecrets?.OPENROUTER_API_KEY;
     if (openrouterKey) {
-      // model is e.g. "deepseek/deepseek-chat" (an OpenRouter model path).
-      // Prefix with "openrouter/" so OpenCode routes to the openrouter provider.
-      return `openrouter/${model}`;
+      return `openrouter/${normalised}`;
     }
-    return model;
+    return normalised;
   }
 
   getMockDockerArgs(stepId: string): string[] {
@@ -225,6 +230,12 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     const lines = rawStdout.trim().split('\n');
     const textParts: string[] = [];
     const errors: string[] = [];
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    // Each step_finish's `tokens.input` is the full prompt for that turn, so the
+    // running context peaks on the last/largest turn. The max (not the sum) is
+    // what measures context saturation against the model's window.
+    let peakInputTokens = 0;
 
     for (const line of lines) {
       const trimmed = line.trim();
@@ -233,12 +244,29 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       try {
         const event = JSON.parse(trimmed) as {
           type?: string;
-          part?: { type?: string; text?: string };
+          part?: {
+            type?: string;
+            text?: string;
+            cost?: number;
+            tokens?: { input?: number; output?: number; cache?: { read?: number; write?: number } };
+          };
           error?: { name?: string; data?: { message?: string } };
         };
 
         if (event.type === 'text' && typeof event.part?.text === 'string') {
           textParts.push(event.part.text);
+        }
+
+        if (event.type === 'step_finish' && event.part?.tokens) {
+          const turnTokens = event.part.tokens;
+          totalInputTokens += turnTokens.input ?? 0;
+          totalOutputTokens += turnTokens.output ?? 0;
+          // Context occupancy for the turn is the whole prompt, not just the
+          // uncached portion: with prompt caching on, `input` excludes cached
+          // tokens (`cache.read`/`cache.write`), so peak must sum all three or
+          // it under-reports saturation by orders of magnitude.
+          const turnPromptTokens = (turnTokens.input ?? 0) + (turnTokens.cache?.read ?? 0) + (turnTokens.cache?.write ?? 0);
+          peakInputTokens = Math.max(peakInputTokens, turnPromptTokens);
         }
 
         if (event.type === 'error' && event.error?.data?.message) {
@@ -253,6 +281,14 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       return '';
     }
 
+    const usage = (totalInputTokens > 0 || totalOutputTokens > 0)
+      ? {
+          input_tokens: totalInputTokens,
+          output_tokens: totalOutputTokens,
+          ...(peakInputTokens > 0 ? { peak_input_tokens: peakInputTokens } : {}),
+        }
+      : undefined;
+
     // Find the contract JSON in text parts (scan from last to first).
     // The contract is: {"output_file": "...", "summary": "..."}
     // The model may wrap it in narration text, so extract just the JSON object.
@@ -262,32 +298,26 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
         // Extract the JSON object from the text (model may add preamble/postamble)
         const jsonMatch = part.match(/\{[^{}]*"output_file"[^{}]*\}/);
         const contractJson = jsonMatch ? jsonMatch[0] : part;
-        return JSON.stringify({ result: contractJson });
+        return JSON.stringify({ result: contractJson, ...(usage ? { usage } : {}) });
       }
     }
 
     // Fallback: use the last text part (most likely the final response)
     if (textParts.length > 0) {
-      return JSON.stringify({ result: textParts[textParts.length - 1] });
+      return JSON.stringify({ result: textParts[textParts.length - 1], ...(usage ? { usage } : {}) });
     }
 
     // Only errors
-    return JSON.stringify({ result: errors.map((e) => `[OpenCode error] ${e}`).join('\n') });
+    return JSON.stringify({ result: errors.map((e) => `[OpenCode error] ${e}`).join('\n'), ...(usage ? { usage } : {}) });
   }
 
   protected override async prepareOutputDir(outputDir: string): Promise<void> {
-    // Write OpenCode config with provider configuration.
-    // Register the model in the appropriate provider so OpenCode can find it.
-    const model = this.agentConfig.model ?? DEFAULT_MODEL;
+    const model = normaliseModelId(this.agentConfig.model ?? DEFAULT_MODEL);
     const config: Record<string, unknown> = {
       $schema: 'https://opencode.ai/config.json',
       permission: 'allow',
     };
 
-    // Auth keys are resolved from two sources with the same priority:
-    // 1. Step/workflow env vars (explicit {{KEY}} references) — already in resolvedEnv.vars
-    // 2. Workflow secrets directly — users can store OPENROUTER_API_KEY / DEEPSEEK_API_KEY
-    //    in workflow secrets without needing to wire them through the env section.
     const workflowSecrets = isWorkflowAgentContext(this.context)
       ? this.context.workflowSecrets
       : undefined;
@@ -295,7 +325,6 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     const openrouterKey = this.resolvedEnv.vars.OPENROUTER_API_KEY ?? workflowSecrets?.OPENROUTER_API_KEY;
     const deepseekKey = this.resolvedEnv.vars.DEEPSEEK_API_KEY ?? workflowSecrets?.DEEPSEEK_API_KEY;
 
-    // Auto-register model in the correct provider based on model ID and available keys.
     if (openrouterKey && model.includes('/')) {
       config.provider = { openrouter: { models: { [model]: {} } } };
     } else if (deepseekKey && model.startsWith('deepseek/')) {

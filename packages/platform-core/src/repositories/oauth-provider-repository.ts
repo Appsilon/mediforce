@@ -2,7 +2,7 @@ import type {
   OAuthProviderConfig,
   CreateOAuthProviderInput,
   UpdateOAuthProviderInput,
-} from '../schemas/oauth-provider.js';
+} from '../schemas/oauth-provider';
 
 /** Namespace-scoped CRUD for OAuth provider configs. Backing store:
  *  `namespaces/{namespace}/oauthProviders/{id}`. */

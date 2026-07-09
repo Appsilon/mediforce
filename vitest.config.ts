@@ -9,7 +9,4 @@ export default defineConfig({
       exclude: ['**/testing/**', '**/index.ts', '**/*.d.ts', '**/e2e/**', '**/__tests__/**'],
     },
   },
-  resolve: {
-    conditions: ['@mediforce/source'],
-  },
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { WorkflowStep } from '@mediforce/platform-core';
+import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 
 // ---- Mocks (must be before component import) ----
 
@@ -38,6 +39,10 @@ function buildStep(overrides: Partial<WorkflowStep> = {}): WorkflowStep {
 
 const noop = () => {};
 
+const dockerImages: DockerImageInfo[] = [
+  { repository: 'mediforce/golden-image', tag: 'latest', id: 'abc', size: '1GB', created: '1d ago' },
+];
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -52,7 +57,9 @@ describe('StepEditor', () => {
       />,
     );
 
-    expect(screen.getByText('Creation')).toBeInTheDocument();
+    // "Creation" appears in both the header icon bar and the locked type field
+    const matches = screen.getAllByText('Creation');
+    expect(matches.length).toBeGreaterThanOrEqual(1);
   });
 
   it('[RENDER] step type label shows Creation not Input', () => {
@@ -64,9 +71,7 @@ describe('StepEditor', () => {
       />,
     );
 
-    // The badge should say "Creation", not "Input"
-    expect(screen.getByText('Creation')).toBeInTheDocument();
-    // "Input" should not appear as a step type label
+    expect(screen.getAllByText('Creation').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('Input')).not.toBeInTheDocument();
   });
 
@@ -80,7 +85,6 @@ describe('StepEditor', () => {
     );
 
     // There should be no buttons that allow changing the step type
-    // (these would be buttons labeled with type names like Creation/Review/Decision/End)
     const allButtons = screen.getAllByRole('button');
     const typeChangeLabels = ['Creation', 'Review', 'Decision', 'End'];
     for (const label of typeChangeLabels) {
@@ -100,7 +104,8 @@ describe('StepEditor', () => {
       />,
     );
 
-    expect(screen.getByText('End')).toBeInTheDocument();
+    // "End" appears in both the header icon bar and the locked type field
+    expect(screen.getAllByText('End').length).toBeGreaterThanOrEqual(1);
   });
 
   it('[RENDER] lock icon present on step type badge', () => {
@@ -112,10 +117,166 @@ describe('StepEditor', () => {
       />,
     );
 
-    // The badge has a title attribute explaining step type is locked
     const badge = screen.getByTitle(
       'Step type is set at creation. To change, remove this step and add a new one.',
     );
     expect(badge).toBeInTheDocument();
+  });
+
+  // ── New: icon header ──────────────────────────────────────────────────────
+
+  it('[RENDER] header shows step name prominently', () => {
+    render(
+      <StepEditor
+        step={buildStep({ name: 'My Agent Step', executor: 'agent', type: 'creation' })}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+
+    // Step name appears in the header
+    expect(screen.getByText('My Agent Step')).toBeInTheDocument();
+  });
+
+  it('[RENDER] header shows Agent label for assist agent step (L2)', () => {
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', autonomyLevel: 'L2', type: 'creation' })}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+
+    expect(screen.getAllByText('Agent').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('[RENDER] header shows Human executor label for human step', () => {
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'human', type: 'creation' })}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+
+    expect(screen.getAllByText('Human').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('[RENDER] header shows Script executor label for script step', () => {
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'script', type: 'creation' })}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+
+    expect(screen.getAllByText('Script').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('[RENDER] header shows Review type label for review step', () => {
+    render(
+      <StepEditor
+        step={buildStep({ type: 'review', executor: 'human' })}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+
+    expect(screen.getAllByText('Review').length).toBeGreaterThanOrEqual(1);
+  });
+
+  // ── New: tooltip info icons ───────────────────────────────────────────────
+
+  it('[RENDER] tooltip info icons are present on identity fields', () => {
+    render(
+      <StepEditor
+        step={buildStep()}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+
+    // Identity fields (name, id, description, type, executor) all have tooltips.
+    // FieldTooltip renders with data-testid="field-tooltip-trigger".
+    const tooltipTriggers = document.querySelectorAll('[data-testid="field-tooltip-trigger"]');
+    expect(tooltipTriggers.length).toBeGreaterThan(0);
+  });
+
+  it('[RENDER] agent config fields are shown for agent executor', () => {
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent' })}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+
+    // Agent-specific labels should be visible
+    expect(screen.getAllByText('autonomy level').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('agentId')).toBeInTheDocument();
+    expect(screen.getByText('agent.model')).toBeInTheDocument();
+    expect(screen.getByText('agent.prompt')).toBeInTheDocument();
+  });
+
+  it('[RENDER] script config fields are shown for script executor', () => {
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'script' })}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+
+    expect(screen.getByText('script.runtime')).toBeInTheDocument();
+    expect(screen.getByText('script.command')).toBeInTheDocument();
+    expect(screen.getByText('script.inlineScript')).toBeInTheDocument();
+  });
+
+  it('[RENDER] human config shows allowedRoles field', () => {
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'human' })}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+
+    expect(screen.getByText('allowedRoles')).toBeInTheDocument();
+  });
+
+  it('[RENDER] no placeholder text on regular inputs', () => {
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent' })}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+
+    // Regular inputs (not textareas) should have no placeholder text
+    const inputs = document.querySelectorAll('input[type="text"], input:not([type])');
+    const inputsWithPlaceholder = Array.from(inputs).filter(
+      (el) => el.getAttribute('placeholder') !== null && el.getAttribute('placeholder') !== '',
+    );
+    expect(inputsWithPlaceholder).toHaveLength(0);
+  });
+
+  it('[REGRESSION] allows custom agent image entry when Docker images are discovered', () => {
+    const onChange = vi.fn();
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent' })}
+        allSteps={[]}
+        onChange={onChange}
+        dockerImages={dockerImages}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Custom Docker image'), {
+      target: { value: 'python:3.11-slim' },
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ agent: { image: 'python:3.11-slim' } });
   });
 });

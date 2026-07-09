@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { CronTrigger } from '../cron-trigger.js';
-import type { WorkflowEngine } from '../../engine/workflow-engine.js';
+import { CronTrigger } from '../cron-trigger';
+import type { WorkflowEngine } from '../../engine/workflow-engine';
 
 function createMockEngine(): WorkflowEngine {
   return {
@@ -15,6 +15,7 @@ describe('CronTrigger', () => {
     const trigger = new CronTrigger(engine);
 
     const result = await trigger.fireWorkflow({
+      namespace: 'test',
       definitionName: 'community-digest',
       definitionVersion: 1,
       triggerName: 'weekly-cron',
@@ -25,6 +26,7 @@ describe('CronTrigger', () => {
     expect(result).toEqual({ instanceId: 'inst-123', status: 'created' });
 
     expect(engine.createInstance).toHaveBeenCalledWith(
+      'test',
       'community-digest',
       1,
       'cron-heartbeat',

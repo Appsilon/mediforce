@@ -1,8 +1,11 @@
+// TODO: rename AgentDefinitionRepository → AgentRepository (and file).
+// Canonical glossary entry is `Agent` (CONTEXT.md). See CONTEXT.md
+// "Agent vs Agent Definition" flagged ambiguity.
 import type {
   AgentDefinition,
   CreateAgentDefinitionInput,
   UpdateAgentDefinitionInput,
-} from '../schemas/agent-definition.js';
+} from '../schemas/agent-definition';
 
 export type { CreateAgentDefinitionInput, UpdateAgentDefinitionInput };
 
@@ -13,7 +16,11 @@ export interface AgentDefinitionRepository {
    *  wd.json files (step.agentId) stay stable across environments. */
   upsert(id: string, input: CreateAgentDefinitionInput): Promise<AgentDefinition>;
   getById(id: string): Promise<AgentDefinition | null>;
-  list(): Promise<AgentDefinition[]>;
+  /** Returns the agent if `visibility: 'public'` OR namespace is in `allowed`; null otherwise. */
+  getByIdVisibleTo(id: string, allowed: readonly string[]): Promise<AgentDefinition | null>;
+  listAll(): Promise<AgentDefinition[]>;
+  /** Returns agents that are `visibility: 'public'` OR whose namespace is in `allowed`. */
+  listVisibleTo(allowed: readonly string[]): Promise<AgentDefinition[]>;
   update(id: string, input: UpdateAgentDefinitionInput): Promise<AgentDefinition>;
   delete(id: string): Promise<void>;
 }

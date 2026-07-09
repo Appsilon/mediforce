@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Eye, EyeOff, Plus, Trash2, Save, Info, ClipboardPaste } from 'lucide-react';
-import { getWorkflowSecrets, saveWorkflowSecrets } from '@/app/actions/workflow-secrets';
+import { mediforce } from '@/lib/mediforce';
 
 /** Parse .env-style text into key-value pairs. Handles KEY=VALUE, KEY="VALUE", KEY='VALUE', comments, blank lines. */
 function parseEnvText(text: string): Array<{ key: string; value: string }> | null {
@@ -30,10 +30,10 @@ function parseEnvText(text: string): Array<{ key: string; value: string }> | nul
 interface WorkflowSecretsEditorProps {
   namespace: string;
   workflowName: string;
-  userId: string;
+  suggestedKeys?: string[];
 }
 
-export function WorkflowSecretsEditor({ namespace, workflowName, userId }: WorkflowSecretsEditorProps) {
+export function WorkflowSecretsEditor({ namespace, workflowName, suggestedKeys }: WorkflowSecretsEditorProps) {
   const [secrets, setSecrets] = React.useState<Array<{ key: string; value: string }>>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
@@ -47,8 +47,9 @@ export function WorkflowSecretsEditor({ namespace, workflowName, userId }: Workf
   React.useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getWorkflowSecrets(namespace, workflowName, userId)
-      .then((data) => {
+    mediforce.workflowSecrets
+      .values({ namespace, workflow: workflowName })
+      .then(({ secrets: data }) => {
         if (cancelled) return;
         const entries = Object.entries(data).map(([key, value]) => ({ key, value }));
         setSecrets(entries);
@@ -60,7 +61,18 @@ export function WorkflowSecretsEditor({ namespace, workflowName, userId }: Workf
         setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [namespace, workflowName, userId]);
+  }, [namespace, workflowName]);
+
+  React.useEffect(() => {
+    if (loading || !suggestedKeys || suggestedKeys.length === 0) return;
+    setSecrets((prev) => {
+      const existingKeys = new Set(prev.map((s) => s.key));
+      const toAdd = suggestedKeys.filter((k) => !existingKeys.has(k));
+      if (toAdd.length === 0) return prev;
+      setDirty(true);
+      return [...prev, ...toAdd.map((key) => ({ key, value: '' }))];
+    });
+  }, [loading, suggestedKeys]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -73,7 +85,7 @@ export function WorkflowSecretsEditor({ namespace, workflowName, userId }: Workf
           record[trimmedKey] = value;
         }
       }
-      await saveWorkflowSecrets(namespace, workflowName, record, userId);
+      await mediforce.workflowSecrets.save({ namespace, workflow: workflowName, secrets: record });
       setDirty(false);
       setSaveMessage('Secrets saved');
       setTimeout(() => setSaveMessage(null), 3000);

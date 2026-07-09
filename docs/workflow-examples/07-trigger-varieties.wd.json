@@ -1,0 +1,73 @@
+{
+  "name": "tutorial-trigger-varieties",
+  "title": "Triggers & Trigger Input",
+  "description": "Multiple trigger types on one workflow — manual, webhook (with method + path config), and cron (with schedule). Demonstrates triggerInput fields that the user fills at trigger time, accessible as variables.* in when expressions.",
+  "env": {
+    "APP_BASE_URL": "{{APP_BASE_URL}}"
+  },
+  "triggers": [
+    { "type": "manual", "name": "manual" },
+    { "type": "webhook", "name": "on-push", "config": { "method": "POST", "path": "/hooks/ingest" } },
+    { "type": "cron", "name": "nightly", "schedule": "0 2 * * *" }
+  ],
+  "triggerInput": [
+    {
+      "name": "source",
+      "type": "string",
+      "required": true,
+      "description": "Data source identifier"
+    },
+    {
+      "name": "priority",
+      "type": "string",
+      "required": false,
+      "description": "Processing priority: normal or urgent"
+    }
+  ],
+  "roles": ["operator"],
+  "steps": [
+    {
+      "id": "route",
+      "name": "Route by Priority",
+      "type": "decision",
+      "executor": "human",
+      "description": "Route based on triggerInput priority — urgent skips review."
+    },
+    {
+      "id": "process",
+      "name": "Process Data",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Process the data source.",
+      "script": {
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst source = input.variables?.source || 'unknown';\nwriteFileSync('/output/result.json', JSON.stringify({ processed: true, source, summary: `Processed ${source}` }));\n",
+        "runtime": "javascript"
+      }
+    },
+    {
+      "id": "review",
+      "name": "Review Results",
+      "type": "review",
+      "executor": "human",
+      "allowedRoles": ["operator"],
+      "description": "Review processed results before completing.",
+      "verdicts": {
+        "approve": { "target": "done" },
+        "revise": { "target": "process" }
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "route", "to": "process", "when": "variables.priority == \"urgent\"" },
+    { "from": "route", "to": "process", "when": "else" },
+    { "from": "process", "to": "done", "when": "variables.priority == \"urgent\"" },
+    { "from": "process", "to": "review", "when": "else" }
+  ]
+}

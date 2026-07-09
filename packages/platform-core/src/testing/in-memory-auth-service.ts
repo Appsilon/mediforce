@@ -1,4 +1,4 @@
-import type { AuthService, AuthUser } from '../index.js';
+import type { AuthService, AuthUser } from '../index';
 
 /**
  * In-memory implementation of AuthService for testing.

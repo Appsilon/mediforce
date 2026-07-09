@@ -21,6 +21,18 @@
 - [ ] Nullable fields handled defensively
 - [ ] No unbounded reads (missing `.limit()`)
 
+## 3a. Regression check — non-negotiable
+
+A behaviour the user could rely on yesterday MUST keep working today. Migrations, refactors, and rewrites are the most common offenders.
+
+- [ ] **Diff the user-observable surface, not just the code.** For every replaced read / write / endpoint / hook: compare OLD vs NEW in terms the user would notice (visible rows, polled freshness, error messages, retry behaviour, ordering, pagination, defaults).
+- [ ] **No silent caps.** If the old code fetched everything and the new code adds `.limit(N)`, that is a regression — even if N is "probably enough". Either keep parity, or ship the pagination that makes the cap correct in the same PR.
+- [ ] **No silent default changes.** If a default flipped (`retry: 2` → `retry: 0`, `polling: 1s` → `polling: 5s`, `showArchived: true` → `false`), call it out explicitly — it's a behaviour change, not a refactor.
+- [ ] **Migration parity sweep.** When replacing hook / endpoint / repo X with Y: enumerate X's call sites and side effects; verify Y covers each. If Y can't, the gap is the regression — flag it, don't ship around it.
+- [ ] Language matters: call a regression a **regression**, never "regression risk". A risk is "might break"; a regression is "does break under inputs Y could already give it". If you'd write "risk", reproduce the failing input first and confirm.
+
+**Regressions are blockers.** SHIP only after every regression is either fixed in the PR or deliberately accepted by the user with a tracked follow-up. Never accept a regression on the implementer's word.
+
 ## 4. API Design
 
 - [ ] RESTful conventions followed
@@ -36,10 +48,49 @@
 - [ ] Explicit boolean comparisons (`=== true`, not just truthy)
 - [ ] Scripts are Python, not bash
 
+## 5a. DRY / KISS — file-by-file, hunk-by-hunk
+
+- [ ] No duplicated logic — same code shape repeated ≥3 times → extract.
+- [ ] No premature abstractions — single-caller wrappers, "future-proof" layers that solve nothing now.
+- [ ] No needless indirection — pass-through functions, re-exports of re-exports, config objects with one field.
+- [ ] Each hunk is a *sensible* change — not a copy-paste of the adjacent file with one symbol renamed.
+- [ ] No half-implemented branches, dangling TODOs, or scaffolding left from intermediate steps.
+- [ ] **No tech debt deferred to follow-up.** If the diff contains handmade code where a standard pattern would fit (custom string format where JSON / Zod / a library does it, per-domain helper where a generic in `platform-core` belongs, inline auth check where the wrapper exists, raw `fetch` where the CLI / client covers it), the refactor lands in **this PR** when it is small + mechanical (≤ ~100 LOC, ≤ ~3 call sites, no behaviour change). "We'll generalise when the second consumer lands" / "will file an issue" / "follow-up PR" for an adjacent ≤100-LOC mechanical refactor = debt accumulation — block. Only acceptable defer reasons: architectural change (new ADR, cross-package surface), genuinely large diff, or behaviour change that needs its own review.
+
+## 5b. Dead code & removal candidates
+
+- [ ] Grep every new export — is it actually called? If not, delete.
+- [ ] Grep every *removed* function — are call sites also gone? Stale references = bug.
+- [ ] When the diff replaces feature A with feature B: is A actually deleted in this PR, or left rotting?
+- [ ] Flag features/endpoints/UI elements that look obsolete now that the new code lands — **ask the user** before deleting.
+- [ ] Old fixtures / mock data / dead config keys removed alongside the code that used them.
+
+## 5c. Reuse existing repo mechanisms
+
+- [ ] HTTP from browser → `@/lib/use-mediforce` / `apiFetch`, never raw `fetch`.
+- [ ] Server-to-server → `Mediforce` client / `mediforce` CLI, never curl REST.
+- [ ] Validation → existing Zod schemas in `platform-core`, not new ad-hoc shapes.
+- [ ] Auth / tenancy / repo access → existing helpers, not hand-rolled.
+- [ ] UI primitives → existing components / shadcn / sonner, not bespoke divs reimplementing what we have.
+- [ ] Background work → BullMQ via `container-worker`, not setTimeout / setInterval.
+- [ ] Workflow / agent orchestration → `workflow-engine` + `agent-runtime` primitives, not parallel implementations.
+- [ ] Before approving any new helper: did you grep for an existing one? Note the search you ran.
+
+## 5d. Comment quality
+
+- [ ] Comments explain **why** — non-obvious constraints, invariants, gotchas, links to incidents/ADRs.
+- [ ] No comments that restate the code (`// increment i`).
+- [ ] No flowery / multi-paragraph prose where one line suffices.
+- [ ] No docstrings added to code the diff didn't change.
+- [ ] Self-documenting code wins: prefer a better name over a comment.
+- [ ] No "Added for X flow" / "Used by Y" / issue-number comments — that belongs in the PR description.
+- [ ] No section-title / banner comments (`// ---- POST /api/foo ----`, `// === Helpers ===`) — symbol names and file structure already delineate sections.
+- [ ] No ephemeral plan numbering or migration history (`// Phase 2.5`, `// added in Phase 2.6`, `// pre-Phase-2.5 Server Action`, `// replaces the old action`). Plan phases are temporary scaffolding; describe the durable behavior/reason instead. Test: would this still make sense to a reader in two years who never saw the plan? If not, cut it — the history belongs in the PR description / changelog.
+
 ## 6. Testing
 
 - [ ] New behavior has unit tests (colocated `__tests__/` or `*.test.ts`)
-- [ ] UI features have E2E journey tests in `packages/platform-ui/e2e/journeys/`
+- [ ] UI features have L4 UI E2E journey tests in `packages/platform-ui/e2e/ui/` (real multi-step flows, not "is button visible")
 - [ ] Tests cover happy path + key error paths
 - [ ] No flaky timing dependencies
 
@@ -54,6 +105,13 @@
 - [ ] No N+1 query patterns
 - [ ] No unbounded data fetches
 - [ ] Heavy operations are async/background where appropriate
+
+## 9. Changelog
+
+- [ ] Non-trivial change adds a bullet under `## [Unreleased]` in `CHANGELOG.md` (skip only for typos / single-line config / comment-only diffs; Renovate batches under `### Dependencies`).
+- [ ] Bullet states the **effect** of the change, not the mechanic. Rejected style: "Refactored X into shared component", "Updated Y handler". Accepted style: "Agent output now consistent across surfaces — L2 steps finally show HTML report". Test: would a year-later reader, with PR link removed, understand why the change mattered?
+- [ ] Placed in the right Keep-a-Changelog category (Added / Changed / Deprecated / Removed / Fixed / Security / Dependencies).
+- [ ] No edits to dated `## [YYYY-MM-DD]` sections — those are historical.
 
 ## Anti-Pattern Quick Scan
 

@@ -10,12 +10,12 @@ tags: [package, platform-infra, firestore, firebase]
 
 ## Purpose
 
-Implements repo interfaces from `platform-core` against Firestore. Wraps Firebase Auth. Owns collection/doc shape, immutable version constraints, dual client-vs-admin SDK init, notification delivery (SendGrid + webhooks). Constructor-injected. No global singletons inside repos.
+Implements repo interfaces from `platform-core` against Firestore. Wraps Firebase Auth. Owns collection/doc shape, immutable version constraints, dual client-vs-admin SDK init, notification delivery (Mailgun/SMTP + webhooks). Constructor-injected. No global singletons inside repos.
 
 ## Dependencies
 
 - Internal: [`platform-core`](./platform-core.md).
-- External: `firebase`, `firebase-admin`, `@sendgrid/mail`.
+- External: `firebase`, `firebase-admin`, `nodemailer`.
 
 ## Key exports
 
@@ -31,7 +31,7 @@ Implements repo interfaces from `platform-core` against Firestore. Wraps Firebas
 - `src/auth/` — Firebase Auth wrappers, user directory, invites.
 - `src/config/firebase-init.ts` — client vs admin SDK init.
 - `src/crypto/secrets-cipher.ts` — HMAC validation.
-- `src/notifications/` — SendGrid + webhooks.
+- `src/notifications/` — email (Mailgun/SMTP) + webhooks.
 - `src/__tests__/` — repo CRUD, versioning, auth, cipher.
 
 ## Relationships

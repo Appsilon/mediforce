@@ -1,5 +1,9 @@
 import type { Auth } from 'firebase-admin/auth';
-import type { UserDirectoryService, DirectoryUser } from '@mediforce/platform-core';
+import type {
+  UserDirectoryService,
+  DirectoryUser,
+  UserAuthMetadata,
+} from '@mediforce/platform-core';
 
 /**
  * Firebase Admin SDK implementation of UserDirectoryService.
@@ -23,5 +27,35 @@ export class FirebaseUserDirectoryService implements UserDirectoryService {
         return claims['role'] === role;
       })
       .map((u) => ({ uid: u.uid, email: u.email ?? '' }));
+  }
+
+  async resolveUser(identifier: string): Promise<DirectoryUser | null> {
+    try {
+      if (identifier.includes('@')) {
+        const user = await this.adminAuth.getUserByEmail(identifier);
+        return { uid: user.uid, email: user.email ?? '', displayName: user.displayName };
+      }
+      const user = await this.adminAuth.getUser(identifier);
+      return { uid: user.uid, email: user.email ?? '', displayName: user.displayName };
+    } catch {
+      return null;
+    }
+  }
+
+  async getUserMetadata(uid: string): Promise<UserAuthMetadata | null> {
+    try {
+      const record = await this.adminAuth.getUser(uid);
+      return {
+        email: typeof record.email === 'string' && record.email !== '' ? record.email : null,
+        displayName:
+          typeof record.displayName === 'string' && record.displayName !== ''
+            ? record.displayName
+            : null,
+        lastSignInTime: record.metadata.lastSignInTime ?? null,
+        photoURL: record.photoURL ?? null,
+      };
+    } catch {
+      return null;
+    }
   }
 }

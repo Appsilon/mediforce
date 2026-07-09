@@ -8,8 +8,8 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { LocalDockerSpawnStrategy } from '../docker-spawn-strategy.js';
-import { createTestRepo, type TestRepo } from './helpers/create-test-repo.js';
+import { LocalDockerSpawnStrategy } from '../docker-spawn-strategy';
+import { createTestRepo, type TestRepo } from './helpers/create-test-repo';
 
 function dockerAvailable(): boolean {
   try {

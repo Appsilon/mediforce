@@ -7,9 +7,10 @@ import {
   Info, ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { sendMessage, finalizeSession } from '@/app/actions/cowork';
+import { mediforce, ApiError } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import type { CoworkSession, ConversationTurn, ProcessInstance } from '@mediforce/platform-core';
+import { useCoworkTurns, useSendCoworkMessage } from '@/hooks/use-cowork';
 import { ArtifactPanel } from './artifact-panel';
 import { ContextPanel } from './context-panel';
 import { ToolCallBubble } from './tool-call-bubble';
@@ -111,19 +112,34 @@ export function ChatCoworkView({
   handle,
   stepDescription,
 }: ChatCoworkViewProps) {
-  // Turns and artifact are driven by Firestore onSnapshot from the parent page.
-  // The server action delegates to the API route which writes turns directly to Firestore,
-  // including intermediate tool turns that appear in real-time.
-  const turns = session.turns;
+  // Chat send + turns polling. `isPending` from the mutation flips the
+  // turns-query polling cadence to 1 s (CRITICAL LIVE) while a message is
+  // in-flight, so tool-call bubbles surface within the polling tick.
+  const sendMessage = useSendCoworkMessage(session.id);
+  const sending = sendMessage.isPending;
+  const { turns: liveTurns } = useCoworkTurns(session.id, sending);
+  // Cache is hydrated from the parent's session query — `liveTurns` becomes
+  // authoritative once the turns query reports, so prefer it; fall back to
+  // the session-embedded turns until then to avoid a flash of empty chat.
+  const turns: ConversationTurn[] = liveTurns.length > 0 ? liveTurns : session.turns;
   const artifact = session.artifact;
 
   const [input, setInput] = React.useState('');
-  const [sending, setSending] = React.useState(false);
   const [finalizing, setFinalizing] = React.useState(false);
   const finalized = session.status === 'finalized';
   const [error, setError] = React.useState<string | null>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
+
+  React.useEffect(() => {
+    if (sendMessage.error !== null) {
+      setError(
+        sendMessage.error instanceof ApiError || sendMessage.error instanceof Error
+          ? sendMessage.error.message
+          : 'Failed to send message',
+      );
+    }
+  }, [sendMessage.error]);
 
   // Auto-focus on mount
   React.useEffect(() => {
@@ -131,6 +147,14 @@ export function ChatCoworkView({
       inputRef.current?.focus();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-resize textarea to fit content (max 8 lines)
+  React.useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
 
   const scrollToBottom = React.useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -146,21 +170,17 @@ export function ChatCoworkView({
 
     setInput('');
     setError(null);
-    setSending(true);
+    sendMessage.reset();
 
     try {
-      const result = await sendMessage(session.id, message);
-
-      if (!result.success) {
-        setError(result.error ?? 'Failed to send message');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
+      await sendMessage.send(message);
+    } catch {
+      // Error surfaces via `sendMessage.error` effect above; restoration of
+      // the optimistic prepend happens inside the mutation's `onError`.
     } finally {
-      setSending(false);
       inputRef.current?.focus();
     }
-  }, [input, sending, finalized, session.id]);
+  }, [input, sending, finalized, sendMessage]);
 
   const handleFinalize = React.useCallback(async () => {
     if (!artifact || finalizing) return;
@@ -169,14 +189,12 @@ export function ChatCoworkView({
     setError(null);
 
     try {
-      const result = await finalizeSession(session.id, artifact);
-
-      if (!result.success) {
-        setError(result.error ?? 'Failed to finalize');
-        return;
-      }
+      await mediforce.cowork.finalize({ sessionId: session.id, artifact });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to finalize');
+      const fallback = err instanceof ApiError || err instanceof Error
+        ? err.message
+        : 'Failed to finalize';
+      setError(fallback);
     } finally {
       setFinalizing(false);
     }
@@ -272,7 +290,7 @@ export function ChatCoworkView({
               placeholder={finalized ? 'Session finalized' : 'Type a message... (Enter to send, Shift+Enter for newline)'}
               rows={1}
               className={cn(
-                'flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm',
+                'flex-1 resize-none overflow-y-auto max-h-[200px] rounded-md border bg-background px-3 py-2 text-sm',
                 'focus:outline-none focus:ring-2 focus:ring-ring',
                 'disabled:cursor-not-allowed disabled:opacity-50',
               )}
@@ -302,6 +320,8 @@ export function ChatCoworkView({
         <ArtifactPanel
           artifact={artifact}
           outputSchema={session.outputSchema}
+          validationResult={session.validationResult ?? null}
+          presentation={session.presentation ?? null}
           onFinalize={handleFinalize}
           finalizing={finalizing}
           finalized={finalized}

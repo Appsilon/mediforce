@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { FileText, Bot, CheckCircle2, Search, FolderOpen, Copy, Check, Circle, ListTodo, Loader2, Clock } from 'lucide-react';
+import { Bot, Terminal, CheckCircle2, Copy, Check, Circle, ListTodo, Loader2, Clock } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 
@@ -22,21 +22,22 @@ interface LogEntry {
 interface AgentLogFile {
   stepId: string;
   file: string;
+  executor: string;
 }
 
 interface AgentLogViewerProps {
   logFiles: AgentLogFile[];
   initialStepId?: string | null;
+  runningStepIds?: Set<string>;
 }
 
 interface AgentLogSection {
   stepId: string;
+  executor: string;
   entries: LogEntry[];
   rawContent: string | null;
   error: string | null;
 }
-
-import type { LucideIcon } from 'lucide-react';
 
 /** Classify a log entry into a display category. Handles both old (kind) and new (type+subtype) formats. */
 function classifyEntry(entry: LogEntry): 'tool_call' | 'tool_result' | 'assistant_text' | 'result' | 'skip' {
@@ -53,11 +54,6 @@ function classifyEntry(entry: LogEntry): 'tool_call' | 'tool_result' | 'assistan
   return 'skip';
 }
 
-const TOOL_ICONS: Record<string, LucideIcon> = {
-  Read: FileText,
-  Glob: FolderOpen,
-  Grep: Search,
-};
 
 /** Shorten temp paths to just the filename for readability. */
 function cleanPath(value: string): string {
@@ -135,10 +131,8 @@ function ToolCallEntry({ entry }: { entry: LogEntry }) {
     return <TodoWriteEntry todos={entry.input.todos} />;
   }
 
-  const IconComponent: LucideIcon = (entry.tool ? TOOL_ICONS[entry.tool] : undefined) ?? Bot;
   const inputStr = entry.input ? cleanPath(JSON.stringify(entry.input)) : '';
 
-  // Extract the most useful info from common tool inputs
   let summary = '';
   if (entry.input) {
     if (entry.tool === 'Read' && typeof entry.input.file_path === 'string') {
@@ -160,9 +154,6 @@ function ToolCallEntry({ entry }: { entry: LogEntry }) {
 
   return (
     <div className="flex items-start gap-2 py-1">
-      <div className="mt-0.5 shrink-0 w-5 h-5 rounded bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-        <IconComponent className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-      </div>
       <div className="min-w-0 flex-1">
         <span className="text-xs font-medium text-purple-700 dark:text-purple-300">{entry.tool}</span>
         {summary && (
@@ -176,10 +167,7 @@ function ToolCallEntry({ entry }: { entry: LogEntry }) {
 function AssistantEntry({ entry }: { entry: LogEntry }) {
   const text = (entry.text ?? '').slice(0, 300).replace(/\n/g, ' ');
   return (
-    <div className="flex items-start gap-2 py-1.5">
-      <div className="mt-0.5 shrink-0 w-5 h-5 rounded bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-        <Bot className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-      </div>
+    <div className="py-1.5">
       <p className="text-xs text-foreground/80 italic">{text}</p>
     </div>
   );
@@ -196,11 +184,8 @@ function ToolResultEntry({ entry }: { entry: LogEntry }) {
   }
 
   return (
-    <div className="flex items-start gap-2 py-1">
-      <div className="mt-0.5 shrink-0 w-5 h-5 rounded bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-        <CheckCircle2 className="h-3 w-3 text-gray-500 dark:text-gray-400" />
-      </div>
-      <div className="min-w-0 flex-1">
+    <div className="py-1">
+      <div className="min-w-0">
         {toolName && (
           <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{toolName} </span>
         )}
@@ -214,10 +199,7 @@ function ToolResultEntry({ entry }: { entry: LogEntry }) {
 
 function ResultEntry({ entry }: { entry: LogEntry }) {
   return (
-    <div className="flex items-start gap-2 py-1.5">
-      <div className="mt-0.5 shrink-0 w-5 h-5 rounded bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-        <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
-      </div>
+    <div className="py-1.5">
       <span className="text-xs font-medium text-green-700 dark:text-green-300">
         Done ({entry.subtype ?? 'completed'})
       </span>
@@ -307,8 +289,27 @@ function LogGroupList({ groups }: { groups: LogGroup[] }) {
 }
 
 async function fetchSingleLog(file: string): Promise<{ entries: LogEntry[]; rawContent: string | null; error: string | null }> {
+  let response: Response;
   try {
-    const response = await apiFetch(`/api/agent-logs?file=${encodeURIComponent(file)}`);
+    response = await apiFetch(`/api/step-logs?file=${encodeURIComponent(file)}`);
+  } catch (fetchError) {
+    const msg = fetchError instanceof Error ? fetchError.message : String(fetchError);
+    return { entries: [], rawContent: null, error: `Network error (token/auth): ${msg}` };
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    let detail: string;
+    try {
+      const parsed = JSON.parse(text) as { error?: string };
+      detail = parsed.error ?? text;
+    } catch {
+      detail = text || response.statusText;
+    }
+    return { entries: [], rawContent: null, error: `HTTP ${response.status} ${response.statusText}: ${detail}` };
+  }
+
+  try {
     const data = await response.json() as { content: string; error?: string };
     if (data.error && !data.content) {
       return { entries: [], rawContent: null, error: data.error };
@@ -320,8 +321,8 @@ async function fetchSingleLog(file: string): Promise<{ entries: LogEntry[]; rawC
       return { entries: [], rawContent: data.content, error: null };
     }
     return { entries: [], rawContent: null, error: null };
-  } catch (fetchError) {
-    return { entries: [], rawContent: null, error: fetchError instanceof Error ? fetchError.message : 'Failed to fetch log' };
+  } catch (parseError) {
+    return { entries: [], rawContent: null, error: `Failed to parse response: ${parseError instanceof Error ? parseError.message : String(parseError)}` };
   }
 }
 
@@ -378,19 +379,21 @@ function serializeSectionToText(section: AgentLogSection): string {
   return lines.join('\n');
 }
 
-function AgentTabContent({ section }: { section: AgentLogSection }) {
+function AgentTabContent({ section, isRunning }: { section: AgentLogSection; isRunning: boolean }) {
   const groups = buildGroups(section.entries);
   const isEmpty = groups.length === 0 && !section.rawContent;
 
   return (
     <>
       {section.error && (
-        <div className="text-xs text-amber-600 dark:text-amber-400 py-1">{section.error}</div>
+        <pre className="text-xs font-mono bg-destructive/8 text-destructive border border-destructive/20 rounded p-2 whitespace-pre-wrap break-all select-text my-1 leading-relaxed">
+          {section.error}
+        </pre>
       )}
 
       {isEmpty && !section.error && (
         <p className="text-xs text-muted-foreground py-2">
-          Initializing agent log...
+          {isRunning ? 'Initializing log...' : 'No log for this step.'}
         </p>
       )}
 
@@ -415,7 +418,7 @@ function isSectionTerminal(section: AgentLogSection): boolean {
   return false;
 }
 
-const THINKING_TEXT = 'Thinking...';
+const THINKING_TEXT = 'Running...';
 
 function ThinkingIndicator() {
   const [charCount, setCharCount] = React.useState(0);
@@ -429,10 +432,10 @@ function ThinkingIndicator() {
 
   return (
     <div className="flex items-center gap-2 py-2 mt-1">
-      <Clock className="h-3.5 w-3.5 text-primary animate-spin shrink-0" />
+      <Clock className="h-3.5 w-3.5 text-blue-500 animate-spin shrink-0" />
       {/* Use visibility:hidden (not display:none) at char 0 so layout height stays constant — prevents scrollbar jump. */}
       <span
-        className={cn('text-xs font-bold text-primary', charCount === 0 && 'invisible')}
+        className={cn('text-xs font-bold text-blue-500', charCount === 0 && 'invisible')}
         style={{ minWidth: '5.5rem' }}
       >
         {THINKING_TEXT.slice(0, Math.max(charCount, 1))}
@@ -441,7 +444,7 @@ function ThinkingIndicator() {
   );
 }
 
-export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps) {
+export function AgentLogViewer({ logFiles, initialStepId, runningStepIds = new Set() }: AgentLogViewerProps) {
   const [sections, setSections] = React.useState<AgentLogSection[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [pollingActive, setPollingActive] = React.useState(logFiles.length > 0);
@@ -477,7 +480,7 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
       const results = await Promise.all(
         logFiles.map(async (logFile) => {
           const result = await fetchSingleLog(logFile.file);
-          return { stepId: logFile.stepId, ...result };
+          return { stepId: logFile.stepId, executor: logFile.executor, ...result };
         }),
       );
       setSections(results);
@@ -514,6 +517,7 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
   }, [sections, activeTab]);
 
   const activeSection = sections[activeTab] ?? null;
+  const initialStepHasLog = !initialStepId || sections.some((s) => s.stepId === initialStepId);
 
   const handleCopy = React.useCallback(async () => {
     if (!activeSection) return;
@@ -571,7 +575,10 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted',
                   )}
                 >
-                  <Bot className={cn('h-3 w-3', isActive ? 'text-blue-500' : 'text-muted-foreground/60')} />
+                  {section.executor === 'script'
+                    ? <Terminal className={cn('h-3 w-3', isActive ? 'text-yellow-500' : 'text-muted-foreground/60')} />
+                    : <Bot className={cn('h-3 w-3', isActive ? 'text-blue-500' : 'text-muted-foreground/60')} />
+                  }
                   {section.stepId}
                   {section.entries.length > 0 && (
                     <span className={cn(
@@ -594,24 +601,30 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
           ref={scrollRef}
           className="p-3 overflow-auto flex-1 min-h-0 space-y-0.5"
         >
-          {sections.length === 0 && (
+          {!initialStepHasLog && (
+            <p className="text-xs text-muted-foreground text-center py-4">
+              No log for this step.
+            </p>
+          )}
+
+          {sections.length === 0 && initialStepHasLog && (
             <p className="text-xs text-muted-foreground text-center py-4">
               {loading ? 'Loading...' : 'Waiting for agent activity...'}
             </p>
           )}
 
           {/* Single agent — show directly */}
-          {sections.length === 1 && activeSection && (
-            <AgentTabContent section={activeSection} />
+          {sections.length === 1 && activeSection && initialStepHasLog && (
+            <AgentTabContent section={activeSection} isRunning={runningStepIds.has(activeSection.stepId)} />
           )}
 
           {/* Multiple agents — show active tab */}
-          {hasTabs && activeSection && (
-            <AgentTabContent section={activeSection} />
+          {hasTabs && activeSection && initialStepHasLog && (
+            <AgentTabContent section={activeSection} isRunning={runningStepIds.has(activeSection.stepId)} />
           )}
 
-          {/* Thinking indicator — only when agent is genuinely still running */}
-          {pollingActive && activeSection && !isSectionTerminal(activeSection) && (
+          {/* Thinking indicator — only while the step is actively running */}
+          {pollingActive && activeSection && activeSection.entries.length > 0 && !isSectionTerminal(activeSection) && runningStepIds.has(activeSection.stepId) && (
             <ThinkingIndicator />
           )}
         </div>

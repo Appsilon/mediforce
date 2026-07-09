@@ -450,9 +450,14 @@ def _generate_ssh_key(host: str) -> Path:
     return target
 
 
+def _has_ssh_key(ctx: Context) -> bool:
+    """True when ctx.ssh_key_path points to a real file (not the unset Path())."""
+    return bool(ctx.state.ssh_key_path) and ctx.ssh_key_path.exists()
+
+
 def step_target_server(ctx: Context) -> None:
     # Resolve the SSH key to use.
-    if not ctx.ssh_key_path or not ctx.ssh_key_path.exists():
+    if not _has_ssh_key(ctx):
         print()
         info("The bootstrap needs an SSH private key that can log into the target server.")
         detected = _list_local_ssh_keys()
@@ -486,12 +491,16 @@ def step_target_server(ctx: Context) -> None:
     result = _test_ssh(ctx)
     if not result.ok:
         warn("SSH probe failed — need to install the key on the server first.")
-        pub_path = ctx.ssh_key_path.with_name(ctx.ssh_key_path.name + ".pub")
-        pub = pub_path.read_text().strip() if pub_path.exists() else "(pub key file missing!)"
-        print()
-        print(f"  {bold('Public key to add:')}")
-        print(f"  {dim(pub)}")
-        print()
+        if _has_ssh_key(ctx):
+            pub_path = ctx.ssh_key_path.with_name(ctx.ssh_key_path.name + ".pub")
+            pub = pub_path.read_text().strip() if pub_path.exists() else "(pub key file missing!)"
+            print()
+            print(f"  {bold('Public key to add:')}")
+            print(f"  {dim(pub)}")
+            print()
+        else:
+            warn("No SSH key selected — go back and pick or generate one first.")
+            raise SystemExit(1)
         def _verify_ssh() -> tuple[bool, str]:
             r = _test_ssh(ctx)
             if r.ok:
@@ -732,7 +741,24 @@ def _gh_auth_ok() -> bool:
     return run(["gh", "auth", "status"], check=False).ok
 
 
+def _is_public_repo(repo: str) -> bool:
+    """Check if a GitHub repo is publicly accessible (no auth needed to clone)."""
+    result = run(["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
+                  f"https://api.github.com/repos/{repo}"], check=False)
+    return result.stdout.strip() == "200"
+
+
+def _clone_url(repo: str, public: bool) -> str:
+    return f"https://github.com/{repo}.git" if public else f"git@github.com:{repo}.git"
+
+
 def step_github_access(ctx: Context) -> None:
+    repo = ctx.state.repo
+    if _is_public_repo(repo):
+        ok(f"{repo} is public — HTTPS clone, no deploy key needed")
+        return
+
+    info(f"{repo} is private — deploy key required for clone")
     # Ensure local gh is authenticated.
     if not shutil.which("gh"):
         error("`gh` CLI missing locally — install it (e.g. `brew install gh`) and re-run step 6.")
@@ -829,7 +855,8 @@ def _deploy_git(ctx: Context, git_cmd: str, *, check: bool = False,
 def step_clone_repo(ctx: Context) -> None:
     repo = ctx.state.repo
     branch = ctx.state.branch or DEFAULT_BRANCH
-    expected_url = f"git@github.com:{repo}.git"
+    public = _is_public_repo(repo)
+    expected_url = _clone_url(repo, public)
 
     probe = ssh(ctx, f"test -d {REMOTE_DEPLOY_DIR}/.git && echo HAVE || echo NONE")
     if "HAVE" in probe.stdout:
@@ -898,7 +925,7 @@ def step_clone_repo(ctx: Context) -> None:
 
 FIREBASE_CONFIG_FIELDS = [
     "apiKey", "authDomain", "projectId",
-    "storageBucket", "messagingSenderId", "appId",
+    "messagingSenderId", "appId",
 ]
 
 
@@ -1017,6 +1044,30 @@ def step_firebase(ctx: Context) -> None:
         sum(1 for k in FIREBASE_CONFIG_FIELDS if config.get(k))
     ))
 
+    # Ensure Email/Password sign-in is enabled — required for user invites.
+    print()
+    info("Firebase Authentication must have Email/Password sign-in enabled.")
+    info(f"  Console: https://console.firebase.google.com/project/{project_id}/authentication/providers")
+    info("  Steps:")
+    info("    1. Click 'Get started' if Authentication isn't enabled yet")
+    info("    2. Go to Sign-in method tab")
+    info("    3. Enable 'Email/Password' provider")
+    if not confirm("Have you enabled Email/Password authentication?", default=False):
+        warn("Skipped — remember to enable it before inviting users.")
+
+    # Authorized domain — Firebase blocks sign-in from domains not on this list.
+    domain = ctx.state.domain or ctx.collected.get("domain", "")
+    if domain:
+        print()
+        info("Firebase must authorize your domain for sign-in to work.")
+        info(f"  Console: https://console.firebase.google.com/project/{project_id}/authentication/settings")
+        info("  Steps:")
+        info(f"    1. Go to Authorized domains")
+        info(f"    2. Click 'Add domain'")
+        info(f"    3. Enter: {domain}")
+        if not confirm(f"Have you added {domain} to Authorized domains?", default=False):
+            warn(f"Skipped — sign-in will fail until {domain} is added to Firebase Authorized domains.")
+
 
 def _firebase_create_project_flow(ctx: Context, account: str) -> str:
     suggested = ask(
@@ -1107,6 +1158,68 @@ def _looks_like_key(value: str, prefix: str) -> Optional[str]:
     return None
 
 
+def step_firebase_sa(ctx: Context) -> None:
+    """Upload Firebase Admin SDK service account key to the server.
+
+    Required for server-side Auth (token verification, user management).
+    docker-compose.prod.yml mounts secrets/firebase-admin-sa.json into
+    the platform-ui container at /run/secrets/firebase-sa.json.
+    """
+    remote_dir = f"{REMOTE_DEPLOY_DIR}/secrets"
+    remote_path = f"{remote_dir}/firebase-admin-sa.json"
+
+    probe = ssh(ctx, f"test -f {shlex.quote(remote_path)} && echo HAVE || echo NONE")
+    if "HAVE" in probe.stdout:
+        ok(f"{remote_path} already present")
+        return
+
+    project_id = ctx.state.firebase_project_id or "(unknown)"
+    console_url = f"https://console.firebase.google.com/project/{project_id}/settings/serviceaccounts/adminsdk"
+
+    print()
+    info("The platform needs a Firebase Admin SDK service account key for server-side Auth.")
+    info(f"  Console: {console_url}")
+    info("  Steps:")
+    info("    1. Go to Project Settings → Service Accounts")
+    info("    2. Click 'Generate new private key'")
+    info("    3. Save the downloaded JSON file somewhere locally")
+
+    if ctx.dry_run:
+        info("[dry-run] would upload service account JSON to server")
+        return
+
+    local_path_str = ask(
+        "Path to the downloaded service account JSON",
+        validate=lambda p: None if Path(p).expanduser().exists() else "file not found",
+    )
+    local_path = Path(local_path_str).expanduser()
+
+    # Validate it looks like a service account key.
+    try:
+        sa_data = json.loads(local_path.read_text())
+        if sa_data.get("type") != "service_account":
+            warn(f"JSON 'type' field is {sa_data.get('type')!r}, expected 'service_account' — are you sure this is the right file?")
+            if not confirm("Upload anyway?", default=False):
+                raise SystemExit("aborted — wrong file type")
+    except json.JSONDecodeError:
+        error("File is not valid JSON.")
+        raise SystemExit(1)
+
+    ssh(ctx, f"mkdir -p {shlex.quote(remote_dir)} && chown deploy:deploy {shlex.quote(remote_dir)}", check=True)
+    scp_upload(ctx, local_path, remote_path, mode="0600")
+    if ctx.user != "deploy":
+        ssh(ctx, f"{_sudo_prefix(ctx)}chown deploy:deploy {shlex.quote(remote_path)}", check=True)
+
+    # Verify.
+    verify = ssh(ctx, f"test -f {shlex.quote(remote_path)} && echo OK || echo MISSING")
+    if "OK" not in verify.stdout:
+        raise RuntimeError(f"upload verification failed — {remote_path} not found on server")
+
+    ctx.state.firebase_sa_path = remote_path
+    ctx.state.save()
+    ok(f"uploaded to {remote_path} (0600, owned by deploy)")
+
+
 def step_api_keys(ctx: Context) -> None:
     _ensure_api_keys(ctx)
 
@@ -1137,11 +1250,57 @@ def step_domain(ctx: Context) -> None:
 
     info("A real domain gives you a Let's Encrypt TLS cert automatically via Caddy.")
     info("Without one, Caddy serves a self-signed cert and browsers will show a warning.")
-    if not confirm("Do you have a domain pointing to this server?", default=True):
+
+    dns_choice = menu(
+        "Domain setup:",
+        [
+            ("mediforce", "Use a *.mediforce.ai subdomain (DNS on Cloudflare)"),
+            ("custom",    "Use a custom domain (I manage DNS myself)"),
+            ("none",      "No domain — use IP with self-signed TLS"),
+        ],
+    )
+
+    if dns_choice == "none":
         ctx.collected["domain"] = ""
         warn("No domain — will use IP with self-signed TLS.")
         return
 
+    if dns_choice == "mediforce":
+        subdomain = ask(
+            "Subdomain (e.g. cdisc → cdisc.mediforce.ai)",
+            validate=lambda s: None if re.fullmatch(r"[a-z0-9]([a-z0-9-]*[a-z0-9])?", s) else "lowercase letters, digits, hyphens only",
+        )
+        domain = f"{subdomain}.mediforce.ai"
+        ips = _resolve_a_records(domain)
+        if not ips:
+            print()
+            print(f"  {bold(yellow('── YOUR TURN ─────────────────────────────────────────'))}")
+            print(f"  {bold('What:')}  Create DNS record for {domain}")
+            print(f"  {bold('Where:')} https://dash.cloudflare.com → mediforce.ai → DNS")
+            print(f"  {bold('Steps:')}")
+            print(f"     1. Click 'Add record'")
+            print(f"     2. Type: A")
+            print(f"     3. Name: {subdomain}")
+            print(f"     4. IPv4 address: {ctx.host}")
+            print(f"     5. Proxy status: DNS only (grey cloud) — Caddy handles TLS")
+            print(f"     6. TTL: Auto")
+            print(f"     7. Save")
+            print()
+            print(f"  Press Enter when done (DNS propagation is usually instant on Cloudflare)")
+            input()
+            # Re-check after user action.
+            ips = _resolve_a_records(domain)
+        if ips:
+            ok(f"{domain} resolves to {ips}")
+        else:
+            warn(f"{domain} still doesn't resolve — Caddy will retry TLS provisioning until DNS propagates.")
+        ctx.state.domain = domain
+        ctx.state.save()
+        ctx.collected["domain"] = domain
+        ok(f"domain set: {domain}")
+        return
+
+    # dns_choice == "custom"
     while True:
         domain = ask(
             "Domain (e.g. app.example.com)",
@@ -1150,6 +1309,7 @@ def step_domain(ctx: Context) -> None:
         ips = _resolve_a_records(domain)
         if not ips:
             warn(f"{domain} doesn't resolve to any A record yet (DNS may be propagating or not set).")
+            info(f"Add an A record pointing {domain} → {ctx.host} at your DNS provider.")
             choice = menu(
                 "What next?",
                 [
@@ -1217,7 +1377,6 @@ def _render_env_local(ctx: Context) -> str:
         f"NEXT_PUBLIC_FIREBASE_API_KEY={fb.get('apiKey', '')}",
         f"NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN={fb.get('authDomain', '')}",
         f"NEXT_PUBLIC_FIREBASE_PROJECT_ID={fb.get('projectId', '')}",
-        f"NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET={fb.get('storageBucket', '')}",
         f"NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID={fb.get('messagingSenderId', '')}",
         f"NEXT_PUBLIC_FIREBASE_APP_ID={fb.get('appId', '')}",
         "",
@@ -1245,7 +1404,6 @@ def _render_compose_env(ctx: Context) -> str:
         f"NEXT_PUBLIC_FIREBASE_API_KEY={fb.get('apiKey', '')}",
         f"NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN={fb.get('authDomain', '')}",
         f"NEXT_PUBLIC_FIREBASE_PROJECT_ID={fb.get('projectId', '')}",
-        f"NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET={fb.get('storageBucket', '')}",
         f"NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID={fb.get('messagingSenderId', '')}",
         f"NEXT_PUBLIC_FIREBASE_APP_ID={fb.get('appId', '')}",
         f"NEXT_PUBLIC_APP_URL={_public_base_url(ctx)}",
@@ -1256,8 +1414,29 @@ def _render_compose_env(ctx: Context) -> str:
         f"DOCKER_OPENROUTER_API_KEY={openrouter}",
         "DOCKER_DEEPSEEK_API_KEY=",
         "",
+        "# Postgres (ADR-0001). POSTGRES_USER + POSTGRES_DB default to",
+        "# 'mediforce' inside docker-compose.prod.yml — only set them here",
+        "# to override.",
+        f"POSTGRES_PASSWORD={ctx.collected.get('POSTGRES_PASSWORD', '')}",
+        "",
+        "# Redis — staging overlay uses --requirepass; without this Redis crashes.",
+        f"REDIS_PASSWORD={ctx.collected.get('REDIS_PASSWORD', '')}",
+        "",
         "# Caddy — site block matcher (real domain → Let's Encrypt cert, IP → self-signed)",
         f"DOMAIN={_caddy_site(ctx)}",
+        "",
+        "# Email — provider + credentials (Mailgun or SMTP)",
+        f"EMAIL_PROVIDER={ctx.collected.get('EMAIL_PROVIDER', '')}",
+        f"MAILGUN_API_KEY={ctx.collected.get('MAILGUN_API_KEY', '')}",
+        f"MAILGUN_DOMAIN={ctx.collected.get('MAILGUN_DOMAIN', '')}",
+        f"MAILGUN_FROM_EMAIL={ctx.collected.get('MAILGUN_FROM_EMAIL', '')}",
+        f"MAILGUN_SENDER_NAME={ctx.collected.get('MAILGUN_SENDER_NAME', 'Mediforce')}",
+        f"SMTP_HOST={ctx.collected.get('SMTP_HOST', '')}",
+        f"SMTP_PORT={ctx.collected.get('SMTP_PORT', '587')}",
+        f"SMTP_USER={ctx.collected.get('SMTP_USER', '')}",
+        f"SMTP_PASS={ctx.collected.get('SMTP_PASS', '')}",
+        f"SMTP_FROM_EMAIL={ctx.collected.get('SMTP_FROM_EMAIL', '')}",
+        f"SMTP_SECURE={ctx.collected.get('SMTP_SECURE', 'true')}",
         "",
     ]
     return "\n".join(lines)
@@ -1346,6 +1525,41 @@ def _ensure_api_keys(ctx: Context) -> None:
         ctx.collected["SECRETS_ENCRYPTION_KEY"] = secrets.token_hex(32)
         ok("SECRETS_ENCRYPTION_KEY auto-generated (32 bytes hex) — back this up; losing it makes stored workflow secrets unrecoverable")
 
+    if not ctx.collected.get("POSTGRES_PASSWORD"):
+        # ADR-0001 — Postgres is the only storage backend. URL-safe so it
+        # drops into DATABASE_URL without further escaping.
+        ctx.collected["POSTGRES_PASSWORD"] = secrets.token_urlsafe(32)
+        ok("POSTGRES_PASSWORD auto-generated (32 bytes url-safe) — back this up; losing it locks you out of the Postgres data volume")
+
+    if not ctx.collected.get("REDIS_PASSWORD"):
+        # Staging overlay requires --requirepass; without this Redis crashes.
+        ctx.collected["REDIS_PASSWORD"] = secrets.token_urlsafe(24)
+        ok("REDIS_PASSWORD auto-generated (24 bytes url-safe)")
+
+    if "EMAIL_PROVIDER" not in ctx.collected:
+        if confirm("Configure email notifications (invite emails, alerts)?", default=False):
+            provider = ask(
+                "Email provider — 'mailgun' or 'smtp'",
+                validate=lambda v: v in ("mailgun", "smtp"),
+            )
+            ctx.collected["EMAIL_PROVIDER"] = provider
+            if provider == "mailgun":
+                ctx.collected["MAILGUN_API_KEY"] = ask("Mailgun API key", secret=True)
+                ctx.collected["MAILGUN_DOMAIN"] = ask("Mailgun domain (e.g. mg.mediforce.ai)")
+                ctx.collected["MAILGUN_FROM_EMAIL"] = ask("From email address (e.g. noreply@mediforce.ai)")
+                ctx.collected["MAILGUN_SENDER_NAME"] = ask("Sender name", default="Mediforce")
+                ok("Mailgun config accepted")
+            else:
+                ctx.collected["SMTP_HOST"] = ask("SMTP host (e.g. smtp.gmail.com)")
+                ctx.collected["SMTP_PORT"] = ask("SMTP port", default="587")
+                ctx.collected["SMTP_USER"] = ask("SMTP username (leave empty if none)", default="")
+                ctx.collected["SMTP_PASS"] = ask("SMTP password", secret=True, default="")
+                ctx.collected["SMTP_FROM_EMAIL"] = ask("From email address (e.g. noreply@example.com)")
+                ctx.collected["SMTP_SECURE"] = ask("Use implicit TLS? (true for port 465, false for STARTTLS on 587)", default="false")
+                ok("SMTP config accepted")
+        else:
+            ctx.collected["EMAIL_PROVIDER"] = ""
+
 
 def step_env_local(ctx: Context) -> None:
     # --- Hydrate firebase config from state on resumed runs ---
@@ -1400,6 +1614,48 @@ def step_env_local(ctx: Context) -> None:
     ok(f"uploaded packages/platform-ui/.env.local (0600, owned by deploy)")
     _upload_env_file(ctx, compose_env, f"{REMOTE_DEPLOY_DIR}/.env")
     ok(f"uploaded /opt/mediforce/.env (0600, owned by deploy)")
+
+
+def step_postgres_dir(ctx: Context) -> None:
+    """Create the Postgres bind-mount data dir at /var/lib/mediforce/postgres-data.
+
+    docker-compose.staging.yml bind-mounts the host path into the postgres
+    container so `docker compose down -v` cannot wipe staging data. The dir
+    must exist and be owned by UID 999 (postgres-alpine's postgres user)
+    before the container starts, or initdb fails.
+
+    Idempotent — verifies existing ownership and exits early if already
+    correct. Uses the same rootful-alpine trick as deploy-staging.sh
+    because the deploy user lacks sudo.
+    """
+    host_dir = "/var/lib/mediforce/postgres-data"
+    probe = ssh(
+        ctx,
+        f"if [ -d {shlex.quote(host_dir)} ]; then stat -c '%u:%g' {shlex.quote(host_dir)}; else echo MISSING; fi",
+    )
+    current = probe.stdout.strip()
+    if current == "999:999":
+        ok(f"{host_dir} exists with correct ownership (999:999)")
+        return
+
+    info(f"{host_dir} state: {current!r} — needs mkdir or chown to 999:999")
+
+    if ctx.dry_run:
+        if current == "MISSING":
+            info(f"[dry-run] would mkdir -p {host_dir} && chown -R 999:999 {host_dir}")
+        else:
+            info(f"[dry-run] would chown -R 999:999 {host_dir}")
+        return
+
+    # Rootful alpine elevates without sudo — deploy is in the docker group.
+    fix_cmd = (
+        "docker run --rm -v /var/lib:/host/var/lib alpine:latest "
+        "sh -c 'mkdir -p /host/var/lib/mediforce/postgres-data && "
+        "chown -R 999:999 /host/var/lib/mediforce/postgres-data'"
+    )
+    result = ssh(ctx, fix_cmd, check=True)
+    if result.rc == 0:
+        ok(f"created {host_dir} owned by 999:999")
 
 
 def step_firewall(ctx: Context) -> None:
@@ -1581,9 +1837,11 @@ STEPS: list[tuple[str, str, Callable[[Context], None]]] = [
     ("github_access",    "GitHub deploy key",                    step_github_access),
     ("clone_repo",       "Clone repo to /opt/mediforce",         step_clone_repo),
     ("firebase",         "Firebase project + web SDK config",    step_firebase),
+    ("firebase_sa",      "Firebase Admin service account key",   step_firebase_sa),
     ("api_keys",         "API keys",                             step_api_keys),
     ("domain",           "Domain",                               step_domain),
     ("env_local",        "Assemble and upload env files",        step_env_local),
+    ("postgres_dir",     "Postgres data dir (bind mount)",       step_postgres_dir),
     ("firewall",         "Firewall (UFW)",                       step_firewall),
     ("first_deploy",     "First deploy (running scripts/deploy.sh)", step_first_deploy),
     ("smoke_test",       "Smoke test",                           step_smoke_test),
@@ -1675,13 +1933,52 @@ def _resolve_repo_and_branch(args: argparse.Namespace, state: State) -> None:
     state.save()
 
 
+def _guided_server_creation() -> str:
+    """Walk the user through creating a server, or let them provide an IP."""
+    choice = menu(
+        "Do you have a server ready, or need to create one?",
+        [
+            ("have",    "I already have a server — enter IP/hostname"),
+            ("hetzner", "Create on Hetzner Cloud (recommended)"),
+            ("other",   "Create elsewhere — just tell me what's needed"),
+        ],
+    )
+    if choice == "have":
+        return ask("Server IP or hostname")
+
+    if choice == "hetzner":
+        print()
+        print(f"  {bold(yellow('── YOUR TURN ─────────────────────────────────────────'))}")
+        print(f"  {bold('What:')}  Create a Hetzner Cloud server")
+        print(f"  {bold('Where:')} https://console.hetzner.cloud")
+        print(f"  {bold('Steps:')}")
+        print("     1. Open https://console.hetzner.cloud → your project (or create one)")
+        print("     2. Click 'Add Server'")
+        print("     3. Location: pick close to your users (e.g. Falkenstein or Helsinki for Europe)")
+        print("     4. Image: Ubuntu 22.04")
+        print("     5. Type: CPX31 (4 vCPU, 8GB RAM) — matches staging")
+        print("     6. SSH keys: add yours (or the bootstrap will generate one)")
+        print("     7. Create & copy the IP address")
+        print()
+        return ask("Server IP (from Hetzner)")
+
+    # choice == "other"
+    print()
+    info("You need a fresh Linux server (Ubuntu 22.04+ recommended) with:")
+    info("  • SSH access (key-based)")
+    info("  • At least 4 vCPU, 8GB RAM, 80GB disk")
+    info("  • Ports 22, 80, 443 reachable from the internet")
+    print()
+    return ask("Server IP or hostname")
+
+
 def main() -> int:
     args = parse_args()
     welcome()
 
     host = args.host
     if not host:
-        host = ask("Target server IP or hostname")
+        host = _guided_server_creation()
     state = State.load(host)
     state.user = args.user
     if args.ssh_key:

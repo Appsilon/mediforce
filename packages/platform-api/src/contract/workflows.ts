@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import {
+  ProcessInstanceSchema,
   WorkflowDefinitionBaseSchema,
   WorkflowDefinitionSchema,
+  WorkflowVisibilitySchema,
 } from '@mediforce/platform-core';
 
 /**
@@ -26,27 +28,247 @@ export const RegisterWorkflowInputSchema = WorkflowDefinitionBaseSchema.omit({
   namespace: true,
 });
 
+export const RegistrationWarningSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  stepName: z.string(),
+});
+
 export const RegisterWorkflowOutputSchema = z.object({
   success: z.literal(true),
   name: z.string().min(1),
   version: z.number().int().positive(),
+  warnings: z.array(RegistrationWarningSchema).optional(),
+});
+
+/**
+ * Contract for `POST /api/workflow-definitions/validate` — a dry run of the
+ * canonical schema validation that `register` performs, without persisting.
+ *
+ * The input is intentionally permissive (any object) so a malformed candidate
+ * is reported as `{ valid: false, errors }` data rather than rejected with a
+ * 400 by the route adapter — callers (the workflow-designer `validate` step,
+ * the `mediforce workflow validate` CLI) route on `valid` and surface `errors`.
+ * The handler runs `parseWorkflowTemplate`, the single source of truth.
+ */
+export const ValidateWorkflowInputSchema = z.record(z.string(), z.unknown());
+
+export const WorkflowValidationIssueSchema = z.object({
+  path: z.string(),
+  message: z.string(),
+});
+
+export const ValidateWorkflowOutputSchema = z.object({
+  valid: z.boolean(),
+  errors: z.array(WorkflowValidationIssueSchema),
+});
+
+/**
+ * Contract for `GET /api/workflow-definitions/schema` — the live JSON Schema of
+ * the authorable WorkflowDefinition surface, derived from the running server's
+ * Zod schema. This endpoint and the cowork runtime schema resolver both share
+ * the same platform-core helper, so clients get the schema currently in force
+ * on the machine they are connected to without re-seeding when the schema
+ * changes. `schema` is an opaque JSON Schema object.
+ */
+export const GetWorkflowSchemaInputSchema = z.object({});
+
+export const GetWorkflowSchemaOutputSchema = z.object({
+  schema: z.record(z.string(), z.unknown()),
+});
+
+/**
+ * Per-workflow run aggregate attached to each card on the workspace home page.
+ * Computed server-side via count aggregations + a bounded `latest` query so the
+ * page never ships the whole run collection to the client (the pre-cutover
+ * `onSnapshot` loaded everything; the naive parity poll re-read up to 10k runs
+ * every 5s). `active` = runs in {running, created, paused}; `total` and
+ * `latest` honour `includeCompletedRuns` on the request. Archived runs are
+ * always excluded — the home cards never show them.
+ */
+export const WorkflowRunSummarySchema = z.object({
+  total: z.number().int().nonnegative(),
+  active: z.number().int().nonnegative(),
+  /** Up to 3 newest-first runs for the card preview. */
+  latest: z.array(ProcessInstanceSchema).max(3),
+  /**
+   * Non-terminal step IDs keyed by definition version (as string), covering
+   * every version present in `latest`. Used by the card preview to render
+   * progress dots against the run's actual definition, not the latest one.
+   * Defaults to {} for backwards-compatibility with clients that pre-date this field.
+   */
+  stepsByVersion: z.record(z.string(), z.array(z.string())).default({}),
 });
 
 export const WorkflowDefinitionGroupSchema = z.object({
+  namespace: z.string().min(1),
   name: z.string().min(1),
   latestVersion: z.number().int().positive(),
   defaultVersion: z.number().int().positive().nullable(),
   definition: WorkflowDefinitionSchema.nullable(),
+  runSummary: WorkflowRunSummarySchema,
+});
+
+export const ListWorkflowsInputSchema = z.object({
+  /** Optional namespace filter (caller must still be a member). */
+  namespace: z.string().min(1).optional(),
+  /**
+   * When false, each `runSummary.total` and `runSummary.latest` exclude
+   * terminal (completed / failed) runs — mirrors the home page's
+   * "show completed" toggle (default on). `active` is unaffected.
+   */
+  includeCompletedRuns: z.boolean().default(true),
 });
 
 export const ListWorkflowsOutputSchema = z.object({
   definitions: z.array(WorkflowDefinitionGroupSchema),
 });
 
+export const GetWorkflowInputSchema = z.object({
+  name: z.string().min(1),
+  namespace: z.string().min(1).optional(),
+  version: z.number().int().positive().optional(),
+});
+
+export const GetWorkflowOutputSchema = z.object({
+  definition: WorkflowDefinitionSchema,
+});
+
+/**
+ * Per-version metadata summary returned by `GET /api/workflow-definitions/:name/versions`.
+ * Deliberately omits the full step / transition / trigger arrays — the version
+ * picker only needs counts to render badges and labels. To fetch the full
+ * definition for a specific version, call `mediforce.workflows.get({ name, namespace, version })`.
+ *
+ * `createdAt` is optional because legacy workflow documents may have been
+ * persisted before the field was added; the schema mirrors the underlying
+ * `WorkflowDefinitionBaseSchema.createdAt` shape.
+ */
+export const WorkflowVersionSummarySchema = z.object({
+  version: z.number().int().positive(),
+  archived: z.boolean(),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  stepCount: z.number().int().nonnegative(),
+  triggerCount: z.number().int().nonnegative(),
+  createdAt: z.string().datetime().optional(),
+});
+
+export const ListWorkflowVersionsInputSchema = z.object({
+  name: z.string().min(1),
+  namespace: z.string().min(1),
+});
+
+/**
+ * Output of `workflows.versions(name, namespace)`. Returns every version's
+ * metadata (no upper bound — workflows accumulate versions over time but
+ * never enough to need pagination here) plus the namespace's pinned default
+ * version. If a future workspace hits a pathological version count, an
+ * additive `limit` parameter can be introduced without breaking this contract.
+ */
+export const ListWorkflowVersionsOutputSchema = z.object({
+  versions: z.array(WorkflowVersionSummarySchema),
+  defaultVersion: z.number().int().positive().nullable(),
+});
+
+export type WorkflowVersionSummary = z.infer<typeof WorkflowVersionSummarySchema>;
+export type ListWorkflowVersionsInput = z.infer<typeof ListWorkflowVersionsInputSchema>;
+export type ListWorkflowVersionsOutput = z.infer<typeof ListWorkflowVersionsOutputSchema>;
+
 export type RegisterWorkflowInput = z.infer<typeof RegisterWorkflowInputSchema>;
+/**
+ * Pre-parse shape accepted by `mediforce.workflows.register()`. Differs from
+ * `RegisterWorkflowInput` in that schema-level defaults (e.g. `visibility`)
+ * are optional — the client runs `.parse()` and fills them in.
+ */
+export type RegisterWorkflowBody = z.input<typeof RegisterWorkflowInputSchema>;
 export type RegisterWorkflowOutput = z.infer<typeof RegisterWorkflowOutputSchema>;
+export type RegistrationWarning = z.infer<typeof RegistrationWarningSchema>;
+export type ValidateWorkflowInput = z.infer<typeof ValidateWorkflowInputSchema>;
+export type ValidateWorkflowOutput = z.infer<typeof ValidateWorkflowOutputSchema>;
+export type WorkflowValidationIssue = z.infer<typeof WorkflowValidationIssueSchema>;
+export type GetWorkflowSchemaInput = z.infer<typeof GetWorkflowSchemaInputSchema>;
+export type GetWorkflowSchemaOutput = z.infer<typeof GetWorkflowSchemaOutputSchema>;
+export type WorkflowRunSummary = z.infer<typeof WorkflowRunSummarySchema>;
 export type WorkflowDefinitionGroupSummary = z.infer<typeof WorkflowDefinitionGroupSchema>;
+export type ListWorkflowsInput = z.infer<typeof ListWorkflowsInputSchema>;
+/**
+ * Pre-parse shape accepted by `mediforce.workflows.list()`. `includeCompletedRuns`
+ * is optional here (the schema default fills it in on `.parse()`), so callers
+ * that don't toggle "show completed" can omit it — mirrors `RegisterWorkflowBody`.
+ */
+export type ListWorkflowsRequest = z.input<typeof ListWorkflowsInputSchema>;
 export type ListWorkflowsOutput = z.infer<typeof ListWorkflowsOutputSchema>;
+export type GetWorkflowInput = z.infer<typeof GetWorkflowInputSchema>;
+export type GetWorkflowOutput = z.infer<typeof GetWorkflowOutputSchema>;
+
+export const ArchiveVersionInputSchema = z.object({
+  name: z.string().min(1),
+  version: z.number().int().positive(),
+  archived: z.boolean(),
+});
+
+export const ArchiveVersionOutputSchema = z.object({
+  success: z.literal(true),
+  name: z.string(),
+  version: z.number(),
+  archived: z.boolean(),
+});
+
+export type ArchiveVersionInput = z.infer<typeof ArchiveVersionInputSchema>;
+export type ArchiveVersionOutput = z.infer<typeof ArchiveVersionOutputSchema>;
+
+export const ArchiveAllInputSchema = z.object({
+  name: z.string().min(1),
+  archived: z.boolean(),
+});
+
+export const ArchiveAllOutputSchema = z.object({
+  success: z.literal(true),
+  name: z.string(),
+  archived: z.boolean(),
+});
+
+export type ArchiveAllInput = z.infer<typeof ArchiveAllInputSchema>;
+export type ArchiveAllOutput = z.infer<typeof ArchiveAllOutputSchema>;
+
+export const SetVisibilityInputSchema = z.object({
+  name: z.string().min(1),
+  visibility: WorkflowVisibilitySchema,
+});
+
+export const SetVisibilityOutputSchema = z.object({
+  success: z.literal(true),
+  name: z.string(),
+  visibility: WorkflowVisibilitySchema,
+});
+
+export type SetVisibilityInput = z.infer<typeof SetVisibilityInputSchema>;
+export type SetVisibilityOutput = z.infer<typeof SetVisibilityOutputSchema>;
+
+export const CopyWorkflowInputSchema = z.object({
+  name: z.string().min(1),
+  version: z.number().int().positive().optional(),
+  targetName: z.string().min(1).optional(),
+});
+
+export const CopyWorkflowOutputSchema = z.object({
+  success: z.literal(true),
+  name: z.string().min(1),
+  version: z.number().int().positive(),
+  copiedFrom: z.object({
+    namespace: z.string().min(1),
+    name: z.string().min(1),
+    version: z.number().int().positive(),
+  }),
+});
+
+export type CopyWorkflowInput = z.infer<typeof CopyWorkflowInputSchema>;
+export type CopyWorkflowOutput = z.infer<typeof CopyWorkflowOutputSchema>;
+
+export interface CopyWorkflowOptions {
+  targetNamespace: string;
+}
 
 /**
  * Options for `mediforce.workflows.register()`. Namespace is a required
@@ -56,3 +278,98 @@ export type ListWorkflowsOutput = z.infer<typeof ListWorkflowsOutputSchema>;
 export interface RegisterWorkflowOptions {
   namespace: string;
 }
+
+export const SetDefaultVersionInputSchema = z.object({
+  name: z.string().min(1),
+  namespace: z.string().min(1),
+  version: z.number().int().positive(),
+});
+
+export const SetDefaultVersionOutputSchema = z.object({
+  success: z.literal(true),
+  name: z.string(),
+  namespace: z.string(),
+  version: z.number().int().positive(),
+});
+
+export type SetDefaultVersionInput = z.infer<typeof SetDefaultVersionInputSchema>;
+export type SetDefaultVersionOutput = z.infer<typeof SetDefaultVersionOutputSchema>;
+
+// `expectedRunCount` is a stale-confirmation guard: the dialog displays a
+// pre-fetched count; this re-checks server-side and rejects if it changed.
+export const DeleteWorkflowInputSchema = z.object({
+  name: z.string().min(1),
+  namespace: z.string().min(1),
+  expectedRunCount: z.number().int().nonnegative(),
+});
+
+export const DeleteWorkflowOutputSchema = z.object({
+  success: z.literal(true),
+  deletedRuns: z.number().int().nonnegative(),
+});
+
+export type DeleteWorkflowInput = z.infer<typeof DeleteWorkflowInputSchema>;
+export type DeleteWorkflowOutput = z.infer<typeof DeleteWorkflowOutputSchema>;
+
+export const GetWorkflowRunCountInputSchema = z.object({
+  name: z.string().min(1),
+  namespace: z.string().min(1),
+});
+
+export const GetWorkflowRunCountOutputSchema = z.object({
+  count: z.number().int().nonnegative(),
+});
+
+export type GetWorkflowRunCountInput = z.infer<typeof GetWorkflowRunCountInputSchema>;
+export type GetWorkflowRunCountOutput = z.infer<typeof GetWorkflowRunCountOutputSchema>;
+
+// Move all versions of a workflow from one workspace to another. Transfer
+// requires membership on BOTH source and target namespaces; the write goes
+// through the repository (not raw Firestore) so namespace scoping and audit
+// are enforced.
+export const TransferWorkflowInputSchema = z.object({
+  name: z.string().min(1),
+  sourceNamespace: z.string().min(1),
+  targetNamespace: z.string().min(1),
+});
+
+export const TransferWorkflowOutputSchema = z.object({
+  success: z.literal(true),
+  name: z.string(),
+  sourceNamespace: z.string(),
+  targetNamespace: z.string(),
+});
+
+export type TransferWorkflowInput = z.infer<typeof TransferWorkflowInputSchema>;
+export type TransferWorkflowOutput = z.infer<typeof TransferWorkflowOutputSchema>;
+
+// --- Import from git ---
+
+export const ImportWorkflowInputSchema = z.object({
+  repo: z.string().url(),
+  path: z.string().min(1),
+  ref: z.string().optional(),
+  namespace: z.string().min(1),
+});
+export type ImportWorkflowInput = z.infer<typeof ImportWorkflowInputSchema>;
+export type ImportWorkflowOutput = RegisterWorkflowOutput;
+
+// --- Manifest ---
+
+export const ManifestEntrySchema = z.object({
+  name: z.string().min(1),
+  path: z.string().min(1),
+  description: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  builtin: z.boolean().optional(),
+});
+export const GetManifestInputSchema = z.object({
+  repo: z.string().url(),
+  ref: z.string().optional(),
+});
+export const GetManifestOutputSchema = z.object({
+  workflows: z.array(ManifestEntrySchema),
+});
+export type ManifestEntry = z.infer<typeof ManifestEntrySchema>;
+export type GetManifestInput = z.infer<typeof GetManifestInputSchema>;
+export type GetManifestOutput = z.infer<typeof GetManifestOutputSchema>;

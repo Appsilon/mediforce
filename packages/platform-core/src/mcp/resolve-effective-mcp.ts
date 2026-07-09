@@ -2,9 +2,9 @@ import type {
   AgentMcpBinding,
   HttpAuthConfig,
   ToolCatalogEntry,
-} from '../schemas/agent-mcp-binding.js';
-import type { AgentDefinition } from '../schemas/agent-definition.js';
-import type { WorkflowStep } from '../schemas/workflow-definition.js';
+} from '../schemas/agent-mcp-binding';
+import type { AgentDefinition } from '../schemas/agent-definition';
+import type { WorkflowStep } from '../schemas/workflow-definition';
 
 /** Raised when a stdio AgentMcpBinding references a catalogId that is
  *  not present in the provided catalog. Carries the server name and the

@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
+  StepOutputEnvelopeSchema,
   AgentOutputEnvelopeSchema,
   AnnotationSchema,
-} from '../agent-output-envelope.js';
+} from '../agent-output-envelope';
 
 const validAnnotation = {
   id: 'ann-1',
@@ -10,13 +11,19 @@ const validAnnotation = {
   timestamp: '2026-02-26T10:00:00Z',
 };
 
+const validStepEnvelope = {
+  duration_ms: 1200,
+  result: { status: 'ok', rows_processed: 42 },
+  annotations: [],
+};
+
 const validEnvelope = {
+  ...validStepEnvelope,
   confidence: 0.87,
   reasoning_summary: 'Analyzed patient data and found potential anomalies',
   reasoning_chain: ['Step 1: Load data', 'Step 2: Apply rules', 'Step 3: Score'],
   annotations: [validAnnotation],
   model: 'anthropic/claude-sonnet-4',
-  duration_ms: 1200,
   result: { flagged: true, score: 0.87 },
 };
 
@@ -41,6 +48,53 @@ describe('AnnotationSchema', () => {
   it('should reject annotation missing required fields', () => {
     const result = AnnotationSchema.safeParse({ id: 'ann-1' });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('StepOutputEnvelopeSchema', () => {
+  it('should parse a valid step envelope', () => {
+    const result = StepOutputEnvelopeSchema.safeParse(validStepEnvelope);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.duration_ms).toBe(1200);
+      expect(result.data.result).toEqual({ status: 'ok', rows_processed: 42 });
+      expect(result.data.annotations).toEqual([]);
+    }
+  });
+
+  it('should accept result: null', () => {
+    const result = StepOutputEnvelopeSchema.safeParse({ ...validStepEnvelope, result: null });
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept optional fields (gitMetadata, presentation, deliverableFile)', () => {
+    const result = StepOutputEnvelopeSchema.safeParse({
+      ...validStepEnvelope,
+      gitMetadata: { commitSha: 'abc', branch: 'main', changedFiles: [], repoUrl: 'https://x' },
+      presentation: { kind: 'markdown', content: '## Done' },
+      deliverableFile: '/tmp/report.pdf',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject negative duration_ms', () => {
+    const result = StepOutputEnvelopeSchema.safeParse({ ...validStepEnvelope, duration_ms: -1 });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing required fields', () => {
+    const result = StepOutputEnvelopeSchema.safeParse({ duration_ms: 100 });
+    expect(result.success).toBe(false);
+  });
+
+  it('should strip agent-only fields from an AgentOutputEnvelope payload', () => {
+    const result = StepOutputEnvelopeSchema.safeParse(validEnvelope);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).not.toHaveProperty('confidence');
+      expect(result.data).not.toHaveProperty('model');
+      expect(result.data).not.toHaveProperty('reasoning_summary');
+    }
   });
 });
 
@@ -191,14 +245,14 @@ describe('AgentOutputEnvelopeSchema', () => {
     }
   });
 
-  it('should accept envelope with presentation HTML string', () => {
+  it('should coerce a raw presentation string into {kind: html} for back-compat', () => {
     const result = AgentOutputEnvelopeSchema.safeParse({
       ...validEnvelope,
       presentation: '<h1>Report</h1>',
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.presentation).toBe('<h1>Report</h1>');
+      expect(result.data.presentation).toEqual({ kind: 'html', content: '<h1>Report</h1>' });
     }
   });
 
@@ -219,5 +273,41 @@ describe('AgentOutputEnvelopeSchema', () => {
     if (result.success) {
       expect(result.data.presentation).toBeNull();
     }
+  });
+
+  it('should accept envelope with structured markdown presentation', () => {
+    const result = AgentOutputEnvelopeSchema.safeParse({
+      ...validEnvelope,
+      presentation: { kind: 'markdown', content: '## Heading\n\n- one\n- two' },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.presentation).toEqual({
+        kind: 'markdown',
+        content: '## Heading\n\n- one\n- two',
+      });
+    }
+  });
+
+  it('should accept envelope with structured html presentation', () => {
+    const result = AgentOutputEnvelopeSchema.safeParse({
+      ...validEnvelope,
+      presentation: { kind: 'html', content: '<section>x</section>' },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.presentation).toEqual({
+        kind: 'html',
+        content: '<section>x</section>',
+      });
+    }
+  });
+
+  it('should reject presentation with unknown kind', () => {
+    const result = AgentOutputEnvelopeSchema.safeParse({
+      ...validEnvelope,
+      presentation: { kind: 'rich', content: 'whatever' },
+    });
+    expect(result.success).toBe(false);
   });
 });

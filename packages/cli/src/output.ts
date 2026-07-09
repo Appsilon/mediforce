@@ -23,10 +23,45 @@ export interface ErrorPayload {
   error: string;
   status?: number;
   body?: unknown;
+  cause?: {
+    code?: string;
+    message: string;
+    address?: string;
+    port?: number;
+    hostname?: string;
+  };
+  hints?: string[];
 }
 
 export function printJson(sink: OutputSink, payload: unknown): void {
   sink.stdout(JSON.stringify(payload, null, 2));
+}
+
+/**
+ * Print a list of `label: value` rows with the labels padded to the widest
+ * label in the array. Used by `*-get` / `*-claim` / `*-cancel` commands to
+ * keep their human-mode output visually consistent across the CLI.
+ *
+ * `undefined` rows are skipped unless `nullDisplay` is set — that lets a
+ * caller opt into "show even when the field is missing". `null` always
+ * renders as `nullDisplay` (default `(none)`).
+ */
+export function printKv(
+  sink: OutputSink,
+  rows: ReadonlyArray<readonly [label: string, value: string | number | null | undefined]>,
+  options?: { nullDisplay?: string; indent?: number },
+): void {
+  const nullDisplay = options?.nullDisplay ?? '(none)';
+  const indent = ' '.repeat(options?.indent ?? 2);
+  const visible = rows.filter(
+    ([, value]) => value !== undefined || options?.nullDisplay !== undefined,
+  );
+  if (visible.length === 0) return;
+  const width = Math.max(...visible.map(([label]) => label.length));
+  for (const [label, value] of visible) {
+    const rendered = value === null || value === undefined ? nullDisplay : String(value);
+    sink.stdout(`${indent}${`${label}:`.padEnd(width + 1)}  ${rendered}`);
+  }
 }
 
 /**
@@ -64,4 +99,25 @@ export function printError(
   const suffix =
     payload.status !== undefined ? ` (HTTP ${String(payload.status)})` : '';
   sink.stderr(`Error${suffix}: ${payload.error}`);
+  if (payload.cause !== undefined) {
+    sink.stderr(`  Reason: ${formatCause(payload.cause)}`);
+  }
+  if (payload.hints !== undefined && payload.hints.length > 0) {
+    sink.stderr('');
+    sink.stderr('Hints:');
+    for (const hint of payload.hints) {
+      sink.stderr(`  - ${hint}`);
+    }
+  }
+}
+
+function formatCause(cause: NonNullable<ErrorPayload['cause']>): string {
+  const details: string[] = [];
+  if (cause.code !== undefined) details.push(cause.code);
+  if (cause.address !== undefined && cause.port !== undefined) {
+    details.push(`${cause.address}:${String(cause.port)}`);
+  } else if (cause.hostname !== undefined) {
+    details.push(cause.hostname);
+  }
+  return details.length > 0 ? `${cause.message} (${details.join(' ')})` : cause.message;
 }

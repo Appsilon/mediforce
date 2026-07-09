@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { workflowRegisterCommand } from '../commands/workflow-register.js';
+import { workflowRegisterCommand } from '../commands/workflow-register';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
-import { captureOutput, jsonResponse } from './test-helpers.js';
+import { captureOutput, jsonResponse } from './test-helpers';
 
 let tempDir: string;
 let wdFile: string;
@@ -14,10 +14,7 @@ beforeEach(async () => {
   tempDir = await mkdtemp(path.join(tmpdir(), 'mediforce-cli-test-'));
   wdFile = path.join(tempDir, 'workflow.json');
   const wd = buildWorkflowDefinition({ name: 'sample-wf' });
-  const { version: _v, namespace: _n, createdAt: _c, ...body } = wd;
-  void _v;
-  void _n;
-  void _c;
+  const { version: _version, namespace: _namespace, createdAt: _createdAt, ...body } = wd;
   await writeFile(wdFile, JSON.stringify(body), 'utf-8');
 });
 
@@ -34,7 +31,7 @@ describe('workflow register command', () => {
       output,
     });
     expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(/--file is required/);
+    expect(output.stderrLines.join('\n')).toMatch(/Missing required argument: --file/);
   });
 
   it('exits 2 with a useful error when --namespace is missing', async () => {
@@ -45,7 +42,7 @@ describe('workflow register command', () => {
       output,
     });
     expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(/--namespace is required/);
+    expect(output.stderrLines.join('\n')).toMatch(/Missing required argument: --namespace/);
   });
 
   it('exits 1 when the file is missing', async () => {
@@ -91,10 +88,7 @@ describe('workflow register command', () => {
     // `parseWorkflowDefinitionForCreation` server-side keeps the two in
     // lockstep — see workflow-register.ts dry-run path.
     const wd = buildWorkflowDefinition({ name: 'sample-wf' });
-    const { version: _v, namespace: _n, createdAt: _c, ...body } = wd;
-    void _v;
-    void _n;
-    void _c;
+    const { version: _version, namespace: _namespace, createdAt: _createdAt, ...body } = wd;
     const malformed = {
       ...body,
       inputForNextRun: [{ stepId: 'does-not-exist', output: 'x', as: 'y' }],
@@ -181,5 +175,30 @@ describe('workflow register command', () => {
     expect(code).toBe(1);
     const parsed: unknown = JSON.parse(output.stdoutLines.join('\n'));
     expect(parsed).toMatchObject({ error: 'Validation failed', status: 400 });
+  });
+
+  it('warns about missing Docker images after successful registration', async () => {
+    const wd = buildWorkflowDefinition({ name: 'img-wf' });
+    wd.steps[0].executor = 'script';
+    wd.steps[0].plugin = 'script-container';
+    wd.steps[0].script = { command: 'run-report', image: 'mediforce/nonexistent-image:v99' };
+    const { version: _v, namespace: _n, createdAt: _c, ...body } = wd;
+    const imgFile = path.join(tempDir, 'img-workflow.json');
+    await writeFile(imgFile, JSON.stringify(body), 'utf-8');
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ success: true, name: 'img-wf', version: 1 }, 201),
+    );
+
+    const output = captureOutput();
+    const code = await workflowRegisterCommand({
+      argv: ['--file', imgFile, '--namespace', 'Appsilon'],
+      env: { MEDIFORCE_API_KEY: 'k' },
+      output,
+    });
+    expect(code).toBe(0);
+    const stderr = output.stderrLines.join('\n');
+    expect(stderr).toContain('Docker image(s) not found locally');
+    expect(stderr).toContain('mediforce/nonexistent-image:v99');
   });
 });

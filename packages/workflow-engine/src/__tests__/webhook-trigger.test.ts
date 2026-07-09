@@ -10,13 +10,14 @@ import {
   WorkflowEngine,
   WebhookTrigger,
   WebhookPayloadValidationError,
-} from '../index.js';
-import type { WorkflowTriggerContext } from '../index.js';
+} from '../index';
+import type { WorkflowTriggerContext } from '../index';
 
 const webhookDef: WorkflowDefinition = {
   name: 'webhook-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
     { id: 'process', name: 'Process', type: 'creation', executor: 'human' },
@@ -70,6 +71,7 @@ describe('WebhookTrigger', () => {
     overrides: Partial<WorkflowTriggerContext> = {},
   ): WorkflowTriggerContext {
     return {
+      namespace: 'test',
       definitionName: 'webhook-process',
       definitionVersion: 1,
       triggerName: 'incoming-webhook',

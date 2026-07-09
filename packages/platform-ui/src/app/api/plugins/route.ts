@@ -1,8 +1,12 @@
-import { NextResponse } from 'next/server';
-import { getPlatformServices } from '@/lib/platform-services';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { listPlugins } from '@mediforce/platform-api/handlers';
+import { ListPluginsInputSchema } from '@mediforce/platform-api/contract';
 
-export async function GET(): Promise<NextResponse> {
-  const { pluginRegistry } = getPlatformServices();
-  const plugins = pluginRegistry.list();
-  return NextResponse.json({ plugins });
-}
+/**
+ * GET /api/plugins
+ *
+ * Returns `{ plugins: PluginSummary[] }`. The registry is platform-wide and
+ * not workspace-scoped; the handler is `@public-handler` — every authenticated
+ * caller sees the same list.
+ */
+export const GET = createRouteAdapter(ListPluginsInputSchema, () => ({}), listPlugins);

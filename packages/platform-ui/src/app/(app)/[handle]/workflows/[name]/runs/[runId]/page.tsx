@@ -2,17 +2,13 @@
 
 import { useParams } from 'next/navigation';
 import { useMemo } from 'react';
-import type { StepExecution, AuditEvent, Step, WorkflowStep } from '@mediforce/platform-core';
-import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
+import { resolveStepTimeoutMinutes, type WorkflowStep } from '@mediforce/platform-core';
+import { useProcessInstance } from '@/hooks/use-process-instances';
+import { useStepExecutions } from '@/hooks/use-step-executions';
+import { useAgentEvents } from '@/hooks/use-agent-events';
 import { useAuditEvents } from '@/hooks/use-audit-events';
-import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
-import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
-import { useProcessConfig } from '@/hooks/use-process-config';
+import { useWorkflowVersion } from '@/hooks/use-workflow-versions';
 import { ProcessDetail } from '@/components/processes/process-detail';
-import { resolveDefinitionSteps } from '@/lib/resolve-definition-steps';
-
-type AuditEventWithId = AuditEvent & { id: string };
-type StepExecutionWithId = StepExecution;
 
 export default function RunDetailPage() {
   const { name, runId, handle } = useParams<{ name: string; runId: string; handle: string }>();
@@ -20,57 +16,26 @@ export default function RunDetailPage() {
   const decodedName = name ? decodeURIComponent(name) : '';
 
   const { data: instance, loading: instanceLoading } = useProcessInstance(runId ?? null);
-  const { data: stepExecutions } = useSubcollection<StepExecutionWithId>(
-    runId ? `processInstances/${runId}` : '',
-    'stepExecutions',
-  );
-  const { data: agentEvents } = useSubcollection<{ id: string; stepId: string; type: string; payload: unknown; sequence: number }>(
-    runId ? `processInstances/${runId}` : '',
-    'agentEvents',
-  );
+  const { data: stepExecutions } = useStepExecutions(runId ?? null, instance?.status);
+  const { data: agentEvents } = useAgentEvents(runId ?? null, null, instance?.status);
   const { data: auditEvents, loading: auditLoading, error: auditError } = useAuditEvents(runId ?? null);
 
-  // Load process definition to get steps for the StepStatusPanel
-  // Try both legacy processDefinitions and new workflowDefinitions
-  const { versions: legacyVersions } = useProcessDefinitionVersions(decodedName);
-  const { definitions: workflowVersions } = useWorkflowDefinitions(decodedName);
-
+  // Load the specific workflow version this run was started against so the
+  // StepStatusPanel can render the static step list. `parseInt` accepts
+  // `'1'` / `'v1'` shapes; the hook short-circuits on `NaN`.
+  const runVersion = instance ? Number.parseInt(instance.definitionVersion, 10) : null;
+  const { definition: runDefinition } = useWorkflowVersion(
+    decodedName,
+    handle,
+    Number.isNaN(runVersion) ? null : runVersion,
+  );
   const definitionSteps = useMemo(
-    () => resolveDefinitionSteps(instance, legacyVersions, workflowVersions),
-    [instance, legacyVersions, workflowVersions],
+    () => runDefinition?.steps ?? [],
+    [runDefinition],
   );
 
-  // Load ProcessConfig to get per-step autonomy levels (3-part key)
-  const { data: processConfig } = useProcessConfig(
-    instance?.definitionName ?? null,
-    instance?.configName ?? null,
-    instance?.configVersion ?? null,
-  );
-
+  // Build step config map from WorkflowStep definitions embedded in WorkflowDefinition.
   const stepConfigMap = useMemo(() => {
-    // Legacy: config stored separately in processConfigs collection
-    if (processConfig?.stepConfigs) {
-      return new Map(
-        processConfig.stepConfigs.map((sc) => [
-          sc.stepId,
-          {
-            executorType: sc.executorType,
-            autonomyLevel: sc.autonomyLevel,
-            plugin: sc.plugin,
-            model: sc.model,
-            confidenceThreshold: sc.confidenceThreshold,
-            fallbackBehavior: sc.fallbackBehavior,
-            timeoutMinutes: sc.timeoutMinutes,
-            reviewerType: sc.reviewerType,
-            agentConfig: sc.agentConfig,
-          },
-        ]),
-      );
-    }
-
-    // New-style: step config is embedded directly in WorkflowStep definitions.
-    // definitionSteps is typed as Step[] but at runtime holds WorkflowStep objects
-    // for new-style workflow runs, so we cast to access the extra fields.
     if (definitionSteps.length > 0) {
       const entries = definitionSteps
         .map((s) => {
@@ -85,9 +50,11 @@ export default function RunDetailPage() {
               model: ws.agent?.model,
               confidenceThreshold: ws.agent?.confidenceThreshold,
               fallbackBehavior: ws.agent?.fallbackBehavior,
-              timeoutMinutes: ws.agent?.timeoutMinutes ?? (ws.agent?.timeoutMs !== undefined ? ws.agent.timeoutMs / 60000 : undefined),
+              timeoutMinutes: resolveStepTimeoutMinutes(ws),
               reviewerType: ws.review?.type,
               agentConfig: ws.agent,
+              scriptConfig: ws.script,
+              databricksConfig: ws.databricks,
             },
           ] as const;
         })
@@ -96,7 +63,7 @@ export default function RunDetailPage() {
     }
 
     return undefined;
-  }, [processConfig, definitionSteps]);
+  }, [definitionSteps]);
 
 
   if (instanceLoading) {
@@ -121,10 +88,11 @@ export default function RunDetailPage() {
     <ProcessDetail
       instance={instance}
       stepExecutions={stepExecutions}
-      auditEvents={auditEvents as AuditEventWithId[]}
+      auditEvents={auditEvents}
       auditEventsLoading={auditLoading}
       auditEventsError={auditError}
       definitionSteps={definitionSteps}
+      definition={runDefinition ?? undefined}
       agentEvents={agentEvents}
       backHref={`/${handle}/workflows/${encodeURIComponent(decodedName)}`}
       stepConfigMap={stepConfigMap}

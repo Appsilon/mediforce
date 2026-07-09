@@ -1,0 +1,18 @@
+{
+  "name": "version-as-string",
+  "description": "Setting version as a string instead of an integer",
+  "why": "The version field must be a positive integer. Strings like \"1\" pass JSON parsing but fail Zod schema validation. The engine uses version for numeric comparison and auto-increment.",
+  "fix": "Use version: 1 (number), not version: \"1\" (string). Note: workflow templates (.wd.json) omit version entirely — it's assigned at registration.",
+  "expectedError": "Expected number, received string",
+  "validatesAs": "full-definition",
+  "definition": {
+    "name": "anti-version-string",
+    "namespace": "test",
+    "version": "1",
+    "triggers": [{ "type": "manual", "name": "manual" }],
+    "steps": [
+      { "id": "done", "name": "Done", "type": "terminal", "executor": "human" }
+    ],
+    "transitions": []
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "review-without-verdicts",
+  "description": "Review step missing the verdicts map",
+  "why": "Review steps MUST have a verdicts map — the engine uses it to determine where to route after the reviewer decides. Without verdicts, the review step has no way to advance the workflow.",
+  "fix": "Add a verdicts map: { \"approve\": { \"target\": \"next-step\" }, \"revise\": { \"target\": \"prev-step\" } }.",
+  "validatesAs": "logic",
+  "expectedError": "review step without verdicts has no routing",
+  "definition": {
+    "name": "anti-review-no-verdicts",
+    "triggers": [{ "type": "manual", "name": "manual" }],
+    "steps": [
+      { "id": "create", "name": "Create", "type": "creation", "executor": "human" },
+      {
+        "id": "review",
+        "name": "Review",
+        "type": "review",
+        "executor": "human"
+      },
+      { "id": "done", "name": "Done", "type": "terminal", "executor": "human" }
+    ],
+    "transitions": [
+      { "from": "create", "to": "review" },
+      { "from": "review", "to": "done" }
+    ]
+  }
+}

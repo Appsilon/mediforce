@@ -9,6 +9,7 @@ interface PluginMetadata {
   inputDescription: string;
   outputDescription: string;
   roles: ('executor' | 'reviewer')[];
+  foundationModel?: string;
 }
 
 interface PluginEntry {

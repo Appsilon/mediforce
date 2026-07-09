@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { PluginRegistry } from './plugin-registry.js';
-import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin.js';
+import { PluginRegistry } from './plugin-registry';
+import type { StepExecutorPlugin, AgentContext, EmitFn } from '../interfaces/step-executor-plugin';
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
 
 // Minimal mock plugin without metadata
-function makeMockPlugin(): AgentPlugin {
+function makeMockPlugin(): StepExecutorPlugin {
   return {
     initialize: async (_ctx: AgentContext) => {},
     run: async (_emit: EmitFn) => {},
@@ -12,7 +12,7 @@ function makeMockPlugin(): AgentPlugin {
 }
 
 // Mock plugin with metadata
-function makeMockPluginWithMetadata(metadata: PluginCapabilityMetadata): AgentPlugin & { metadata: PluginCapabilityMetadata } {
+function makeMockPluginWithMetadata(metadata: PluginCapabilityMetadata): StepExecutorPlugin & { metadata: PluginCapabilityMetadata } {
   return {
     initialize: async (_ctx: AgentContext) => {},
     run: async (_emit: EmitFn) => {},

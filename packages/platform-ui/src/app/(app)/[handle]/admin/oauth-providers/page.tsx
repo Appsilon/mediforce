@@ -7,12 +7,7 @@ import { ArrowLeft, KeyRound, Plus } from 'lucide-react';
 import type { AgentDefinition, OAuthProviderConfig } from '@mediforce/platform-core';
 import { OAUTH_PROVIDER_PRESETS } from '@mediforce/platform-core';
 import { apiFetch } from '@/lib/api-fetch';
-import {
-  createOAuthProvider,
-  deleteOAuthProvider,
-  listOAuthProviders,
-  updateOAuthProvider,
-} from '@/lib/oauth-admin-client';
+import { mediforce } from '@/lib/mediforce';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { ProviderList } from '@/components/admin/oauth-providers/provider-list';
 import { ProviderForm } from '@/components/admin/oauth-providers/provider-form';
@@ -51,13 +46,13 @@ export default function AdminOAuthProvidersPage() {
     setListLoading(true);
     setListError(null);
     try {
-      const [fetched, agentRes] = await Promise.all([
-        listOAuthProviders(handle),
-        apiFetch('/api/agent-definitions').then(async (res) =>
+      const [listRes, agentRes] = await Promise.all([
+        mediforce.oauthProviders.list({ namespace: handle }),
+        apiFetch('/api/agents').then(async (res) =>
           res.ok ? ((await res.json()) as { agents: AgentDefinition[] }).agents : [],
         ),
       ]);
-      setProviders(fetched);
+      setProviders(listRes.providers as OAuthProviderConfig[]);
       setAgents(agentRes);
     } catch (err: unknown) {
       setListError(err instanceof Error ? err.message : 'Failed to load providers.');
@@ -113,9 +108,13 @@ export default function AdminOAuthProvidersPage() {
       try {
         if (mode.kind === 'edit') {
           const { id: _id, ...patch } = payload;
-          await updateOAuthProvider(handle, mode.provider.id, patch);
+          await mediforce.oauthProviders.update({
+            namespace: handle,
+            id: mode.provider.id,
+            ...patch,
+          });
         } else {
-          await createOAuthProvider(handle, payload);
+          await mediforce.oauthProviders.create({ namespace: handle, ...payload });
           const qs = new URLSearchParams(search.toString());
           qs.set('id', payload.id);
           router.replace(`/${handle}/admin/oauth-providers?${qs.toString()}`);
@@ -153,7 +152,7 @@ export default function AdminOAuthProvidersPage() {
     setMode({ kind: 'idle' });
     setDeleteTarget(null);
     try {
-      await deleteOAuthProvider(handle, target.id);
+      await mediforce.oauthProviders.delete({ namespace: handle, id: target.id });
     } catch (err: unknown) {
       setListError(err instanceof Error ? err.message : 'Delete failed.');
     }

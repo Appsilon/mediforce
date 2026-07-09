@@ -1,5 +1,5 @@
-import type { WorkflowEngine } from '../engine/workflow-engine.js';
-import type { TriggerResult, WorkflowTriggerContext } from './trigger-types.js';
+import type { WorkflowEngine } from '../engine/workflow-engine';
+import type { TriggerResult, WorkflowTriggerContext } from './trigger-types';
 
 export class CronTrigger {
   constructor(private readonly engine: WorkflowEngine) {}
@@ -10,6 +10,7 @@ export class CronTrigger {
    */
   async fireWorkflow(context: WorkflowTriggerContext): Promise<TriggerResult> {
     const instance = await this.engine.createInstance(
+      context.namespace,
       context.definitionName,
       context.definitionVersion,
       context.triggeredBy,

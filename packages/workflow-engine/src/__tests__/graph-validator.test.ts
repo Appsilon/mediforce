@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseProcessDefinition } from '@mediforce/platform-core';
 import type { ProcessDefinition } from '@mediforce/platform-core';
-import { validateStepGraph } from '../index.js';
+import { validateStepGraph } from '../index';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const fixturesDir = resolve(__dirname, 'fixtures');

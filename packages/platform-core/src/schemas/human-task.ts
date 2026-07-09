@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { StepParamSchema, StepUiSchema, SelectionSchema } from './process-definition.js';
+import { StepParamSchema, StepUiSchema, SelectionSchema } from './process-definition';
 
 export const HumanTaskStatusSchema = z.enum([
   'pending',    // unassigned, visible to all with matching role
@@ -27,6 +27,15 @@ export const HumanTaskSchema = z.object({
   creationReason: CreationReasonSchema.optional(),  // why this task was created
   selection: SelectionSchema.optional(),  // copied from step definition — enables "pick one" review mode
   options: z.array(z.record(z.string(), z.unknown())).optional(),  // options from previous step output
+  // Resolved verdict descriptors copied from the WD step in WD insertion order
+  // (target stripped, defaults filled). Array — order stable through Firestore
+  // + Web SDK + React. Records do not guarantee key iteration order.
+  verdicts: z.array(z.object({
+    key: z.string().min(1),
+    label: z.string(),
+    intent: z.enum(['success', 'danger', 'warning', 'neutral']),
+    requiresComment: z.boolean(),
+  })).optional(),
   deleted: z.boolean().optional(),
 });
 

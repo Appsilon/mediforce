@@ -1,7 +1,7 @@
 import { parse as parseYaml } from 'yaml';
-import { ProcessDefinitionSchema } from '../schemas/process-definition.js';
-import type { ProcessDefinition } from '../schemas/process-definition.js';
-import { formatZodErrors } from './error-formatter.js';
+import { ProcessDefinitionSchema } from '../schemas/process-definition';
+import type { ProcessDefinition } from '../schemas/process-definition';
+import { formatZodErrors } from './error-formatter';
 
 export type ParseResult<T> =
   | { success: true; data: T }

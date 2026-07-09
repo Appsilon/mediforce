@@ -27,7 +27,6 @@ Fill in your Firebase project values. Get them from: Firebase Console > Project 
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase API key |
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Firebase auth domain |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Firebase project ID |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Firebase storage bucket |
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase app ID |
 | `OPENROUTER_API_KEY` | OpenRouter API key (for agent LLM calls) |
@@ -39,16 +38,39 @@ Fill in your Firebase project values. Get them from: Firebase Console > Project 
 packages/
   platform-core/       # Shared types, domain models, test factories
   platform-ui/         # Next.js UI — the main web application
-  platform-infra/      # Firebase/Firestore infrastructure layer
+  platform-infra/      # Postgres infrastructure (Drizzle ORM) + Firebase Auth
   platform-api/        # API contract schemas + pure handlers (framework-free)
   agent-runtime/       # Agent execution engine
   workflow-engine/     # Process orchestration engine
   example-agent/       # Reference agent implementation
 ```
 
+## Local Postgres dev
+
+All server data lives in a local Postgres (ADR-0001) — there is no Firestore
+data layer. `pnpm dev` starts the container, runs migrations, and boots the UI
+against it. Quick recipes:
+
+```bash
+# Reset local data (wipes the persistent volume, re-migrates)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v && pnpm dev
+
+# Add a migration: edit a schema file under
+#   packages/platform-infra/src/postgres/schema/
+pnpm db:generate    # emit NNNN_*.sql + journal entry
+pnpm db:migrate     # apply locally (pnpm dev auto-runs this)
+
+# Run repo tests against a real Postgres
+TEST_DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce \
+  pnpm --filter @mediforce/platform-infra exec vitest run src/postgres
+```
+
+Deep dive (inspecting migration state, branch-collision renames, connection
+pool, troubleshooting): [postgres-local-dev.md](postgres-local-dev.md).
+
 ## Local agent execution
 
-When running with `ALLOW_LOCAL_AGENTS=true` (via `pnpm dev:local`), the platform spawns agent CLIs directly as local processes instead of Docker containers. The following tools must be installed and on your `PATH`:
+When running with `ALLOW_LOCAL_AGENTS=true` (via `pnpm dev:no-docker`), the platform spawns agent CLIs directly as local processes instead of Docker containers. This mode is docker-free but **still requires Postgres on `:5432`** (`DATABASE_URL` is required at boot) — it does not start the container itself, so run `pnpm dev` once first or point `DATABASE_URL` at your own DB. The following tools must be installed and on your `PATH`:
 
 | Tool | Used by | Install |
 |------|---------|---------|
@@ -76,11 +98,8 @@ cd packages/platform-ui && pnpm dev
 ### Unit & integration tests
 
 ```bash
-# All tests
-pnpm test
-
-# Fast mode (dot reporter)
-pnpm test:fast
+# Unit + integration (vitest)
+pnpm test:unit
 
 # Only tests affected by your changes
 pnpm test:affected
@@ -90,6 +109,9 @@ pnpm test:coverage
 
 # Type checking
 pnpm typecheck
+
+# Everything (unit + e2e)
+pnpm test
 ```
 
 ### Contract tests
@@ -100,25 +122,21 @@ Handlers in `platform-api` are tested against in-memory repositories from `@medi
 
 E2E tests live in `packages/platform-ui/e2e/`.
 
-**Smoke tests** (no emulators needed):
-
-```bash
-cd packages/platform-ui
-pnpm test:e2e              # headless
-pnpm test:e2e:headed       # with browser visible
-pnpm test:e2e:ui           # interactive Playwright UI
-```
-
-**Authenticated tests** (require Firebase Emulators):
-
 ```bash
 # Terminal 1 — start emulators
-cd packages/platform-ui
 pnpm emulators
 
 # Terminal 2 — run tests
-pnpm test:e2e:auth         # headless
-pnpm test:e2e:auth:headed  # with browser visible
+pnpm test:e2e               # all E2E (L3 + L4)
+pnpm test:e2e:api           # L3 only — API E2E, no browser (~30s)
+pnpm test:e2e:ui            # L4 only — UI E2E with real Chromium (~3min)
+```
+
+Variants run from `packages/platform-ui`:
+
+```bash
+pnpm test:e2e:headed        # with browser visible
+pnpm test:e2e:ui            # interactive Playwright UI mode
 ```
 
 The emulator setup automatically:
@@ -127,16 +145,17 @@ The emulator setup automatically:
 3. Authenticates and saves auth state for all tests
 
 **Test structure:**
-- `e2e/smoke.spec.ts` — unauthenticated tests (always run)
-- `e2e/authenticated/*.spec.ts` — tests requiring login (only with emulators)
+- `e2e/smoke.spec.ts` — unauthenticated tests
+- `e2e/api/*.journey.ts` — L3 API E2E
+- `e2e/ui/*.journey.ts` — L4 UI E2E
 - `e2e/helpers/` — emulator REST API helpers and seed data
 
 ### Recommended workflow
 
 1. `pnpm typecheck` — catches type errors (~5s)
 2. `pnpm test:affected` — tests for changed files only (<1s)
-3. `pnpm test` — full suite (~9s)
-4. E2E tests if UI was changed (~15-60s)
+3. `pnpm test:unit` — full L1+L2 (~9s)
+4. `pnpm test:e2e` — if UI/API contract changed (~4min)
 
 ## Build
 
@@ -146,4 +165,12 @@ pnpm build    # builds all packages
 
 ## Deployment
 
-The platform UI deploys via Firebase App Hosting. See `apphosting.yaml` for configuration.
+Staging and production servers are hosted on **Hetzner**.
+
+| Environment | SSH access |
+|-------------|-----------|
+| Staging | `ssh deploy@204.168.165.57` |
+
+The staging machine also has an `sftpuser` account with SFTP enabled, used for the Data Landing Zone workflow demo.
+
+All credentials (SSH passwords, etc.) are stored in **1Password** under the **Mediforce** vault.

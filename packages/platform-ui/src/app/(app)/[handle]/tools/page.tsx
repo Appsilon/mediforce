@@ -21,7 +21,7 @@ import {
 import type { AgentDefinition, ToolCatalogEntry } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api-fetch';
-import { listCatalogEntries } from '@/lib/mcp-admin-client';
+import { mediforce } from '@/lib/mediforce';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useAuth } from '@/contexts/auth-context';
 import {
@@ -176,8 +176,8 @@ export default function ToolsPage() {
     setError(null);
     try {
       const [catalog, agentList] = await Promise.all([
-        listCatalogEntries(handle),
-        apiFetch('/api/agent-definitions').then(async (res) =>
+        mediforce.toolCatalog.list({ namespace: handle }).then((res) => res.entries),
+        apiFetch('/api/agents').then(async (res) =>
           res.ok ? ((await res.json()) as { agents: AgentDefinition[] }).agents : [],
         ),
       ]);

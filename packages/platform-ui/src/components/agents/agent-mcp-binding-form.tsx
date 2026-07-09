@@ -11,7 +11,7 @@ import type {
   ToolCatalogEntry,
 } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
-import { listOAuthProviders } from '@/lib/oauth-admin-client';
+import { mediforce } from '@/lib/mediforce';
 
 const nameRegex = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 
@@ -335,8 +335,8 @@ function HttpFields({
     let cancelled = false;
     (async () => {
       try {
-        const list = await listOAuthProviders(namespace);
-        if (!cancelled) setProviders(list);
+        const { providers: list } = await mediforce.oauthProviders.list({ namespace });
+        if (!cancelled) setProviders(list as OAuthProviderConfig[]);
       } catch (err: unknown) {
         if (!cancelled) {
           setProvidersError(err instanceof Error ? err.message : 'Failed to load providers.');

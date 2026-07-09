@@ -300,8 +300,16 @@ describe('GET /api/oauth/:provider/callback', () => {
 
   it('[ERROR] tampered state returns invalid-state redirect', async () => {
     const state = await mintState();
-    // Replace the last byte of the signature to break HMAC verification.
-    const tampered = `${state.slice(0, -1)}A`;
+    // Flip the first character of the signature (after the dot). The last
+    // character is flaky: a 32-byte HMAC encodes to 43 base64url chars where
+    // the last char has only 4 meaningful bits — when they are already 0,
+    // replacing with 'A' (value 0) is a no-op and verification passes silently.
+    const dot = state.indexOf('.');
+    const firstSigChar = state[dot + 1] ?? 'A';
+    const tampered =
+      state.slice(0, dot + 1) +
+      (firstSigChar === 'A' ? 'B' : 'A') +
+      state.slice(dot + 2);
     const res = await GET(
       makeCallbackRequest('github', { code: 'c', state: tampered }),
       { params: makeParams('github') },

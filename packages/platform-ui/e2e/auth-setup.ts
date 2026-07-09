@@ -2,8 +2,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test as setup } from '@playwright/test';
 import { TEST_ORG_HANDLE } from './helpers/constants';
-import { clearEmulators, createTestUser, seedCollection, seedSubcollection } from './helpers/emulator';
-import { buildSeedData } from './helpers/seed-data';
+import { clearEmulators, createTestUser } from './helpers/emulator';
+import { seedPostgresNamespace } from './helpers/postgres-seed';
 
 /** Read the mock OAuth server's base URL that globalSetup wrote. Falls back
  *  to a placeholder when running without globalSetup (e.g. CI lanes that
@@ -21,42 +21,26 @@ const TEST_DISPLAY_NAME = 'Test User';
 
 setup('authenticate and seed data', async ({ page }) => {
   // First-run Next.js route compilation (test-login + redirect) easily eats
-  // 20-30s in a cold dev server, and we still need time for Firestore seeding
-  // + Firebase auth emulator round trips. The default 30s test timeout races
+  // 20-30s in a cold dev server, and we still need time for Firebase auth
+  // emulator + Postgres seed round trips. The default 30s test timeout races
   // with that. Raise to 120s so the setup is not flaky.
   setup.setTimeout(120_000);
 
-  // 1. Clear all emulator state
+  // 1. Clear Auth emulator state (Firestore is fully removed — ADR-0001 #534)
   await clearEmulators();
 
   // 2. Create test user and get UID
   const testUserId = await createTestUser(TEST_EMAIL, TEST_PASSWORD, TEST_DISPLAY_NAME);
 
-  // 3. Seed Firestore with test data
-  const mockOAuthBaseUrl = readMockOAuthBaseUrl();
-  const data = buildSeedData(testUserId, { mockOAuthBaseUrl });
-  await seedCollection('users', data.users);
-  await seedCollection('humanTasks', data.humanTasks);
-  await seedCollection('processInstances', data.processInstances);
-  await seedCollection('agentRuns', data.agentRuns);
-  await seedCollection('auditEvents', data.auditEvents);
-  await seedSubcollection('processInstances', 'proc-running-1', 'stepExecutions', data.stepExecutions);
-  await seedSubcollection('processInstances', 'proc-human-waiting', 'stepExecutions', data.humanWaitingStepExecutions);
-  await seedSubcollection('processInstances', 'proc-review-target', 'stepExecutions', data.reviewTargetStepExecutions);
-  await seedCollection('processDefinitions', data.processDefinitions);
-  await seedCollection('processConfigs', data.processConfigs);
-  await seedCollection('workflowDefinitions', data.workflowDefinitions);
-  await seedCollection('namespaces', data.namespaces);
-  await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'members', data.namespaceMembers);
-  await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'toolCatalog', data.toolCatalog);
-  await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'oauthProviders', data.oauthProviders);
-  await seedCollection('agentDefinitions', data.agentDefinitions);
-  await seedSubcollection('processInstances', 'proc-completed-1', 'stepExecutions', data.completedProcessStepExecutions);
-  await seedSubcollection('processInstances', 'proc-completed-2', 'stepExecutions', data.completedSupplyChainStepExecutions);
-  await seedSubcollection('processInstances', 'proc-step-failure', 'stepExecutions', data.stepFailureStepExecutions);
-  await seedSubcollection('processInstances', 'proc-retry-test', 'stepExecutions', data.retryTestStepExecutions);
-  await seedSubcollection('processInstances', 'proc-workflow-run-1', 'stepExecutions', data.workflowRunStepExecutions);
-  await seedCollection('coworkSessions', data.coworkSessions);
+  // 3. Seed Postgres — the server-side data layer (user profiles, processes,
+  // instances, tasks, audits, agent runs, cowork, model registry, tool
+  // catalog, oauth, agent defs, namespaces + members) lives entirely in
+  // Postgres after the zero-Firestore cutover. `seedPostgresNamespace` writes
+  // the full fixture (workspaces, members, workflow definitions, …) so
+  // server-side handlers can resolve `?namespace=test`. The mock OAuth base
+  // URL (written by globalSetup) is threaded into the seeded `github-mock`
+  // provider so the per-agent OAuth journey connects through the mock.
+  await seedPostgresNamespace(testUserId, { mockOAuthBaseUrl: readMockOAuthBaseUrl() });
 
   // 4. Sign in via test-login page to capture auth state
   // First load warms up Next.js compilation — allow extra time

@@ -1,12 +1,13 @@
 import {
   ProviderAlreadyExistsError,
   type OAuthProviderRepository,
-} from '../repositories/oauth-provider-repository.js';
-import type {
-  OAuthProviderConfig,
-  CreateOAuthProviderInput,
-  UpdateOAuthProviderInput,
-} from '../schemas/oauth-provider.js';
+} from '../repositories/oauth-provider-repository';
+import {
+  OAuthProviderConfigSchema,
+  type OAuthProviderConfig,
+  type CreateOAuthProviderInput,
+  type UpdateOAuthProviderInput,
+} from '../schemas/oauth-provider';
 
 export class InMemoryOAuthProviderRepository implements OAuthProviderRepository {
   // namespace → id → config
@@ -39,7 +40,11 @@ export class InMemoryOAuthProviderRepository implements OAuthProviderRepository 
       throw new ProviderAlreadyExistsError(namespace, input.id);
     }
     const now = new Date(this.clock++).toISOString();
-    const config: OAuthProviderConfig = { ...input, createdAt: now, updatedAt: now };
+    const config = OAuthProviderConfigSchema.parse({
+      ...input,
+      createdAt: now,
+      updatedAt: now,
+    });
     scope.set(input.id, config);
     this.store.set(namespace, scope);
     return config;
@@ -53,11 +58,11 @@ export class InMemoryOAuthProviderRepository implements OAuthProviderRepository 
     const scope = this.store.get(namespace);
     const existing = scope?.get(id);
     if (!existing || !scope) return null;
-    const updated: OAuthProviderConfig = {
+    const updated = OAuthProviderConfigSchema.parse({
       ...existing,
       ...patch,
       updatedAt: new Date(this.clock++).toISOString(),
-    };
+    });
     scope.set(id, updated);
     return updated;
   }

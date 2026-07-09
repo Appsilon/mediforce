@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Mic, MicOff, Loader2, Phone, PhoneOff, Sparkles, RotateCcw } from 'lucide-react';
 import type { CoworkSession, ProcessInstance } from '@mediforce/platform-core';
-import { createVoiceEphemeralKey, synthesizeArtifact, finalizeSession } from '@/app/actions/cowork';
+import { mediforce, ApiError } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import { ArtifactPanel } from './artifact-panel';
@@ -234,11 +234,8 @@ export function VoiceCoworkView({ session, instance, handle, stepDescription }: 
     setElapsed(0);
 
     try {
-      // 1. Get ephemeral key via server action
-      const result = await createVoiceEphemeralKey(session.id);
-      if (!result.success || !result.ephemeralKey) {
-        throw new Error(result.error ?? 'Failed to create voice session');
-      }
+      // 1. Get ephemeral key via API
+      const result = await mediforce.cowork.voiceEphemeralKey({ sessionId: session.id });
 
       // 2. Get microphone
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -289,7 +286,7 @@ export function VoiceCoworkView({ session, instance, handle, stepDescription }: 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      const model = result.model ?? 'gpt-4o-realtime-preview';
+      const model = result.model;
       const sdpRes = await fetch(`https://api.openai.com/v1/realtime?model=${model}`, {
         method: 'POST',
         headers: {
@@ -341,13 +338,17 @@ export function VoiceCoworkView({ session, instance, handle, stepDescription }: 
     setSynthesizing(true);
     setError(null);
     try {
-      const result = await synthesizeArtifact(session.id, fullTranscript, synthComment || undefined);
-      if (!result.success) {
-        throw new Error(result.error ?? 'Synthesis failed');
-      }
-      setArtifact(result.artifact ?? null);
+      const result = await mediforce.cowork.voiceSynthesize({
+        sessionId: session.id,
+        transcript: fullTranscript,
+        comment: synthComment || undefined,
+      });
+      setArtifact(result.artifact);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Synthesis failed');
+      const fallback = err instanceof ApiError || err instanceof Error
+        ? err.message
+        : 'Synthesis failed';
+      setError(fallback);
     } finally {
       setSynthesizing(false);
     }
@@ -360,13 +361,13 @@ export function VoiceCoworkView({ session, instance, handle, stepDescription }: 
     if (!artifact) return;
     setFinalizing(true);
     try {
-      const result = await finalizeSession(session.id, artifact);
-      if (!result.success) {
-        throw new Error(result.error ?? 'Finalization failed');
-      }
+      await mediforce.cowork.finalize({ sessionId: session.id, artifact });
       setFinalized(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Finalization failed');
+      const fallback = err instanceof ApiError || err instanceof Error
+        ? err.message
+        : 'Finalization failed';
+      setError(fallback);
     } finally {
       setFinalizing(false);
     }
@@ -538,6 +539,8 @@ export function VoiceCoworkView({ session, instance, handle, stepDescription }: 
       <ArtifactPanel
         artifact={artifact}
         outputSchema={session.outputSchema}
+        validationResult={session.validationResult ?? null}
+        presentation={session.presentation ?? null}
         finalized={finalized}
         finalizing={finalizing}
         onFinalize={handleFinalize}

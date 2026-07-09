@@ -37,6 +37,7 @@ interface AgentEntry {
   name: string;
   metadata?: AgentMetadata;
   definitionId?: string;
+  visibility?: 'public' | 'private';
 }
 
 
@@ -88,7 +89,14 @@ function AgentCard({ agent, handle }: { agent: AgentEntry; handle: string }) {
           <Icon className={cn('h-3.5 w-3.5', colorClass)} />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-base">{meta.name}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-base">{meta.name}</h3>
+            {agent.visibility === 'private' && (
+              <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-600">
+                Private
+              </span>
+            )}
+          </div>
           <p
             ref={descRef}
             className={cn('mt-1 text-sm text-muted-foreground', !expanded && 'line-clamp-2')}
@@ -183,6 +191,7 @@ function agentDefinitionToEntry(def: AgentDefinition): AgentEntry {
   return {
     name: def.runtimeId ?? def.id,
     definitionId: def.id,
+    visibility: def.visibility ?? 'private',
     metadata: {
       name: def.name,
       description: def.description,
@@ -206,7 +215,7 @@ function AgentCatalog({ handle }: { handle: string }) {
         if (!res.ok) throw new Error(`Failed to fetch plugins: ${res.status}`);
         return res.json() as Promise<{ plugins: AgentEntry[] }>;
       }),
-      apiFetch('/api/agent-definitions').then((res) => {
+      apiFetch('/api/agents').then((res) => {
         if (!res.ok) throw new Error(`Failed to fetch agent definitions: ${res.status}`);
         return res.json() as Promise<{ agents: AgentDefinition[] }>;
       }),
@@ -297,16 +306,20 @@ function AgentCatalog({ handle }: { handle: string }) {
 
 export default function AgentsPage() {
   const { handle } = useParams<{ handle: string }>();
-  const { data: runs, loading } = useAgentRuns();
-  const processNameMap = useProcessNameMap();
+  const { data: runs, loading } = useAgentRuns(handle);
+  const processNameMap = useProcessNameMap(handle);
 
   const [processFilter, setProcessFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   const processNames = useMemo(() => {
+    // Drop empty / undefined definitionNames so the <select> doesn't end up
+    // with multiple <option key=""> children — that collision is what
+    // surfaces the "Each child in a list should have a unique key" warning
+    // from React when a legacy ProcessInstance lacks its name.
     const names = new Set<string>();
     for (const [, name] of processNameMap) {
-      names.add(name);
+      if (typeof name === 'string' && name.length > 0) names.add(name);
     }
     return Array.from(names).sort();
   }, [processNameMap]);
@@ -369,7 +382,7 @@ export default function AgentsPage() {
               onChange={(e) => setProcessFilter(e.target.value || null)}
               className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
             >
-              <option key="" value="">All Workflows</option>
+              <option key="__all" value="">All Workflows</option>
               {processNames.map((name) => (
                 <option key={name} value={name}>
                   {name}
@@ -382,7 +395,7 @@ export default function AgentsPage() {
               onChange={(e) => setStatusFilter(e.target.value || null)}
               className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
             >
-              <option key="" value="">All Statuses</option>
+              <option key="__all" value="">All Statuses</option>
               {ALL_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {status.replace(/_/g, ' ')}

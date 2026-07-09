@@ -6,7 +6,6 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
   },
   resolve: {
-    conditions: ['@mediforce/source'],
     alias: {
       '@mediforce/platform-core/testing': path.resolve(
         __dirname,
@@ -27,6 +26,10 @@ export default defineConfig({
       '@mediforce/platform-infra': path.resolve(
         __dirname,
         '../platform-infra/src/index.ts',
+      ),
+      '@mediforce/mcp-client': path.resolve(
+        __dirname,
+        '../mcp-client/src/index.ts',
       ),
     },
   },

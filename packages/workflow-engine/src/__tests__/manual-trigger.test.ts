@@ -8,13 +8,15 @@ import type { WorkflowDefinition } from '@mediforce/platform-core';
 import {
   WorkflowEngine,
   ManualTrigger,
-} from '../index.js';
-import type { WorkflowTriggerContext } from '../index.js';
+  ManualTriggerNotDeclaredError,
+} from '../index';
+import type { WorkflowTriggerContext } from '../index';
 
 const linearDef: WorkflowDefinition = {
   name: 'linear-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
     { id: 'process', name: 'Process', type: 'creation', executor: 'human' },
@@ -25,6 +27,19 @@ const linearDef: WorkflowDefinition = {
     { from: 'process', to: 'done' },
   ],
   triggers: [{ type: 'manual', name: 'Start Process' }],
+};
+
+const cronOnlyDef: WorkflowDefinition = {
+  name: 'cron-only-process',
+  version: 1,
+  namespace: 'test',
+  visibility: 'private',
+  steps: [
+    { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
+    { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+  ],
+  transitions: [{ from: 'start', to: 'done' }],
+  triggers: [{ type: 'cron', name: 'Nightly', schedule: '0 0 * * *' }],
 };
 
 describe('ManualTrigger', () => {
@@ -43,15 +58,17 @@ describe('ManualTrigger', () => {
       instanceRepo,
       auditRepo,
     );
-    trigger = new ManualTrigger(engine);
+    trigger = new ManualTrigger(engine, processRepo);
 
     await processRepo.saveWorkflowDefinition(linearDef);
+    await processRepo.saveWorkflowDefinition(cronOnlyDef);
   });
 
   function makeContext(
     overrides: Partial<WorkflowTriggerContext> = {},
   ): WorkflowTriggerContext {
     return {
+      namespace: 'test',
       definitionName: 'linear-process',
       definitionVersion: 1,
       triggerName: 'Start Process',
@@ -90,5 +107,38 @@ describe('ManualTrigger', () => {
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     expect(result.instanceId).toMatch(uuidRegex);
+  });
+
+  describe('manual trigger declaration enforcement', () => {
+    it('rejects workflows that do not declare a manual trigger', async () => {
+      await expect(
+        trigger.fireWorkflow(
+          makeContext({ definitionName: 'cron-only-process' }),
+        ),
+      ).rejects.toThrow(ManualTriggerNotDeclaredError);
+    });
+
+    it('does not create an instance when manual trigger is missing', async () => {
+      try {
+        await trigger.fireWorkflow(
+          makeContext({ definitionName: 'cron-only-process' }),
+        );
+      } catch {
+        // expected
+      }
+      const all = await instanceRepo.getByDefinition('cron-only-process', '1');
+      expect(all).toHaveLength(0);
+    });
+
+    it('error message identifies the workflow and version', async () => {
+      await expect(
+        trigger.fireWorkflow(
+          makeContext({
+            definitionName: 'cron-only-process',
+            definitionVersion: 1,
+          }),
+        ),
+      ).rejects.toThrow(/cron-only-process.*v1/);
+    });
   });
 });

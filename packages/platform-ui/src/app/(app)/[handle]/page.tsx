@@ -3,22 +3,26 @@
 import * as React from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useMemo } from 'react';
-import { collection, doc, getDoc, getDocs, query, orderBy, limit, updateDoc, where } from 'firebase/firestore';
+import { useMemo, useState } from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { Pencil, Check, X, Settings, GitBranch, Plus } from 'lucide-react';
-import { getWorkspaceIcon, WORKSPACE_DEFAULT_KEY } from '@/lib/workspace-icons';
-import { db } from '@/lib/firebase';
-import { useAuth } from '@/contexts/auth-context';
+import { Pencil, Check, X, Settings, GitBranch, Plus, Download } from 'lucide-react';
+import { getWorkspaceIcon } from '@/lib/workspace-icons';
+import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useNamespace } from '@/hooks/use-namespace';
 import { useUserProfiles } from '@/hooks/use-users';
 import { useProcessDefinitions } from '@/hooks/use-process-definitions';
-import { useProcessInstances } from '@/hooks/use-process-instances';
-import { useMyTasks } from '@/hooks/use-tasks';
-import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons, isActiveStatus } from '@/components/processes/process-card';
+import { useWorkflowDefinitionsApi } from '@/hooks/use-workflows-api';
+import { useMyActionableTasks } from '@/hooks/use-tasks';
+import { useQueryClient } from '@tanstack/react-query';
+import { useUserMe } from '@/hooks/use-user-me';
+import { useUpdateNamespace } from '@/hooks/use-namespace-mutations';
+import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons } from '@/components/processes/process-card';
+import { WorkflowProblems } from '@/components/processes/workflow-problems';
+import { OpenRouterCreditsIndicator } from '@/components/namespace/openrouter-credits-indicator';
+import { WorkflowSecretKeysProvider } from '@/hooks/use-workflow-secret-keys';
+import { ImportWorkflowDialog } from '@/components/workflows/import-workflow-dialog';
 import { cn } from '@/lib/utils';
-import { NamespaceSchema } from '@mediforce/platform-core';
-import type { Namespace, ProcessInstance } from '@mediforce/platform-core';
+import type { Namespace } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
 // Hooks
@@ -34,64 +38,27 @@ type MemberPreview = {
 
 const MAX_AVATAR_MEMBERS = 20;
 
-function useWorkspaceMembers(handle: string, enabled: boolean) {
-  const [members, setMembers] = React.useState<MemberPreview[]>([]);
-  const [totalCount, setTotalCount] = React.useState<number | null>(null);
+function useWorkspaceMembers(handle: string, enabled: boolean): { members: MemberPreview[]; totalCount: number | null } {
+  const { members: cachedMembers, loading } = useNamespace(enabled ? handle : null);
 
-  React.useEffect(() => {
-    if (!enabled || !handle) return;
-
-    const membersRef = collection(db, 'namespaces', handle, 'members');
-    const previewQuery = query(membersRef, orderBy('joinedAt', 'asc'), limit(MAX_AVATAR_MEMBERS));
-
-    Promise.all([getDocs(previewQuery), getDocs(membersRef)])
-      .then(([previewSnapshot, fullSnapshot]) => {
-        const roleOrder: Record<string, number> = { owner: 0, admin: 1, member: 2 };
-        const previews = previewSnapshot.docs
-          .map((docSnap) => {
-            const data = docSnap.data();
-            return {
-              uid: docSnap.id,
-              displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
-              avatarUrl: typeof data.avatarUrl === 'string' ? data.avatarUrl : undefined,
-              role: typeof data.role === 'string' ? data.role : 'member',
-              joinedAt: typeof data.joinedAt === 'string' ? data.joinedAt : '',
-            };
-          })
-          .sort((a, b) => (roleOrder[a.role] ?? 3) - (roleOrder[b.role] ?? 3));
-        setMembers(previews);
-        setTotalCount(fullSnapshot.size);
-      })
-      .catch(() => {
-        setMembers([]);
-        setTotalCount(null);
-      });
-  }, [handle, enabled]);
-
-  return { members, totalCount };
-}
-
-function useCurrentUserRole(handle: string, uid: string | undefined): string | null {
-  const [role, setRole] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (!handle || uid === undefined) {
-      setRole(null);
-      return;
-    }
-    getDoc(doc(db, 'namespaces', handle, 'members', uid))
-      .then((snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          setRole(typeof data.role === 'string' ? data.role : null);
-        } else {
-          setRole(null);
-        }
-      })
-      .catch(() => setRole(null));
-  }, [handle, uid]);
-
-  return role;
+  return useMemo(() => {
+    if (!enabled) return { members: [], totalCount: null };
+    if (loading && cachedMembers.length === 0) return { members: [], totalCount: null };
+    const roleOrder: Record<string, number> = { owner: 0, admin: 1, member: 2 };
+    const sorted = [...cachedMembers].sort((memberA, memberB) => {
+      const order = (roleOrder[memberA.role] ?? 3) - (roleOrder[memberB.role] ?? 3);
+      if (order !== 0) return order;
+      return memberA.joinedAt.localeCompare(memberB.joinedAt);
+    });
+    const previews: MemberPreview[] = sorted.slice(0, MAX_AVATAR_MEMBERS).map((member) => ({
+      uid: member.uid,
+      displayName: member.displayName,
+      avatarUrl: member.avatarUrl,
+      role: member.role,
+      joinedAt: member.joinedAt,
+    }));
+    return { members: previews, totalCount: cachedMembers.length };
+  }, [cachedMembers, enabled, loading]);
 }
 
 // ---------------------------------------------------------------------------
@@ -124,6 +91,7 @@ function formatDate(iso: string): string {
 const ROLE_LABELS: Record<string, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' };
 
 function MemberTooltipAvatar({ member, resolvedName, resolvedAvatar }: { member: MemberPreview; resolvedName: string; resolvedAvatar: string | undefined }) {
+  const [imgError, setImgError] = useState(false);
   const parts = resolvedName.split(' ');
   const initials = parts.length >= 2
     ? `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase()
@@ -132,11 +100,13 @@ function MemberTooltipAvatar({ member, resolvedName, resolvedAvatar }: { member:
   return (
     <Tooltip.Root delayDuration={200}>
       <Tooltip.Trigger asChild>
-        {resolvedAvatar !== undefined ? (
+        {resolvedAvatar !== undefined && !imgError ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={resolvedAvatar}
             alt={resolvedName}
+            referrerPolicy="no-referrer"
+            onError={() => setImgError(true)}
             className="h-7 w-7 rounded-full border-2 border-background object-cover cursor-pointer"
           />
         ) : (
@@ -163,48 +133,14 @@ function MemberTooltipAvatar({ member, resolvedName, resolvedAvatar }: { member:
   );
 }
 
-const ALWAYS_KEY = WORKSPACE_DEFAULT_KEY;
-
-function DefaultWorkspaceToggle({ handle }: { handle: string }) {
-  const [isDefault, setIsDefault] = React.useState(false);
-
-  React.useEffect(() => {
-    setIsDefault(localStorage.getItem(ALWAYS_KEY) === handle);
-  }, [handle]);
-
-  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
-    if (event.target.checked) {
-      localStorage.setItem(ALWAYS_KEY, handle);
-      setIsDefault(true);
-    } else {
-      localStorage.removeItem(ALWAYS_KEY);
-      setIsDefault(false);
-    }
-  }
-
-  return (
-    <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
-      <input
-        type="checkbox"
-        checked={isDefault}
-        onChange={handleChange}
-        className="h-3.5 w-3.5 rounded border-input accent-primary cursor-pointer"
-      />
-      <span className="text-xs text-muted-foreground">Open this workspace by default</span>
-    </label>
-  );
-}
-
-function MemberAvatars({ namespace, trailing }: { namespace: Namespace; trailing?: React.ReactNode }) {
+function MemberAvatars({ namespace, isMember }: { namespace: Namespace; isMember: boolean }) {
   const { members, totalCount } = useWorkspaceMembers(
     namespace.handle,
     namespace.type === 'organization',
   );
-  const userProfiles = useUserProfiles();
+  const userProfiles = useUserProfiles(namespace.handle);
 
-  if (namespace.type !== 'organization') {
-    return trailing !== undefined ? <div className="mt-3">{trailing}</div> : null;
-  }
+  if (namespace.type !== 'organization') return null;
   if (totalCount === null) return null;
 
   function resolveName(member: MemberPreview): string {
@@ -215,15 +151,40 @@ function MemberAvatars({ namespace, trailing }: { namespace: Namespace; trailing
     return member.avatarUrl ?? userProfiles.get(member.uid)?.photoURL;
   }
 
+  const memberCountText = `${totalCount} ${totalCount === 1 ? 'member' : 'members'}`;
+
+  if (isMember) {
+    return (
+      <div className="mt-3 flex items-center gap-4 flex-wrap">
+        <Link
+          href={`/${namespace.handle}/settings`}
+          className="group inline-flex items-center gap-2.5"
+        >
+          {members.length > 0 && (
+            <Tooltip.Provider>
+              <div className="flex -space-x-2" onClick={(e) => e.stopPropagation()}>
+                {members.map((member, index) => (
+                  <div key={member.uid} className="relative" style={{ zIndex: members.length - index }}>
+                    <MemberTooltipAvatar member={member} resolvedName={resolveName(member)} resolvedAvatar={resolveAvatar(member)} />
+                  </div>
+                ))}
+              </div>
+            </Tooltip.Provider>
+          )}
+          <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+            {memberCountText}
+          </span>
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-3 flex items-center gap-4 flex-wrap">
-      <Link
-        href={`/${namespace.handle}/settings`}
-        className="group inline-flex items-center gap-2.5"
-      >
+      <div className="inline-flex items-center gap-2.5">
         {members.length > 0 && (
           <Tooltip.Provider>
-            <div className="flex -space-x-2" onClick={(e) => e.stopPropagation()}>
+            <div className="flex -space-x-2">
               {members.map((member, index) => (
                 <div key={member.uid} className="relative" style={{ zIndex: members.length - index }}>
                   <MemberTooltipAvatar member={member} resolvedName={resolveName(member)} resolvedAvatar={resolveAvatar(member)} />
@@ -232,11 +193,10 @@ function MemberAvatars({ namespace, trailing }: { namespace: Namespace; trailing
             </div>
           </Tooltip.Provider>
         )}
-        <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-          {totalCount} {totalCount === 1 ? 'member' : 'members'}
+        <span className="text-sm text-muted-foreground">
+          {memberCountText}
         </span>
-      </Link>
-      {trailing}
+      </div>
     </div>
   );
 }
@@ -250,7 +210,8 @@ function InlineEditableBio({
 }) {
   const [editing, setEditing] = React.useState(false);
   const [value, setValue] = React.useState(namespace.bio ?? '');
-  const [saving, setSaving] = React.useState(false);
+  const updateNamespace = useUpdateNamespace(namespace.handle);
+  const saving = updateNamespace.isPending;
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   React.useEffect(() => {
@@ -261,17 +222,15 @@ function InlineEditableBio({
   }, [editing]);
 
   async function handleSave() {
-    setSaving(true);
     try {
       const trimmed = value.trim();
-      await updateDoc(doc(db, 'namespaces', namespace.handle), {
-        bio: trimmed !== '' ? trimmed : null,
+      await updateNamespace.mutateAsync({
+        handle: namespace.handle,
+        bio: trimmed,
       });
       setEditing(false);
     } catch {
-      // keep editing open on error
-    } finally {
-      setSaving(false);
+      // Hook restored the optimistic snapshot; keep editing open on error.
     }
   }
 
@@ -367,45 +326,26 @@ function InlineEditableBio({
 // User workspaces
 // ---------------------------------------------------------------------------
 
-function useUserWorkspaces(namespace: Namespace) {
-  const [workspaces, setWorkspaces] = React.useState<Namespace[]>([]);
-
-  React.useEffect(() => {
-    if (namespace.type !== 'personal' || namespace.linkedUserId === undefined) {
-      setWorkspaces([]);
-      return;
-    }
-
-    getDoc(doc(db, 'users', namespace.linkedUserId))
-      .then(async (userSnap) => {
-        if (!userSnap.exists()) return;
-        const data = userSnap.data();
-        const handles = Array.isArray(data.organizations) ? data.organizations : [];
-        const workspaceDocs = await Promise.all(
-          handles
-            .filter((h: unknown): h is string => typeof h === 'string')
-            .map((h) => getDoc(doc(db, 'namespaces', h))),
-        );
-        setWorkspaces(
-          workspaceDocs
-            .filter((d) => d.exists())
-            .map((d) => {
-              const parsed = NamespaceSchema.safeParse(d.data());
-              return parsed.success ? parsed.data : null;
-            })
-            .filter((ns): ns is Namespace => ns !== null),
-        );
-      })
-      .catch(() => setWorkspaces([]));
-  }, [namespace]);
-
-  return workspaces;
-}
-
+/**
+ * Show org workspaces the signed-in user belongs to — only when viewing
+ * their own personal namespace. Owner-only until a public "workspaces of
+ * uid X" endpoint exists.
+ */
 function UserWorkspaces({ namespace }: { namespace: Namespace }) {
-  const workspaces = useUserWorkspaces(namespace);
+  const { data } = useUserMe();
+  const isSelf =
+    namespace.type === 'personal' &&
+    namespace.linkedUserId !== undefined &&
+    data?.user.uid === namespace.linkedUserId;
+  const workspaces = useMemo(
+    () =>
+      isSelf
+        ? (data?.namespaces ?? []).filter((ns) => ns.type === 'organization')
+        : [],
+    [data, isSelf],
+  );
 
-  if (namespace.type !== 'personal' || workspaces.length === 0) return null;
+  if (!isSelf || workspaces.length === 0) return null;
 
   return (
     <div className="mt-6">
@@ -431,15 +371,68 @@ function UserWorkspaces({ namespace }: { namespace: Namespace }) {
 // Workflow catalog section
 // ---------------------------------------------------------------------------
 
-function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Namespace }) {
+function WorkflowCatalog({ handle, isMember }: { handle: string; isMember: boolean }) {
+  if (isMember) {
+    return <WorkflowCatalogMember handle={handle} />;
+  }
+  return <WorkflowCatalogPublic handle={handle} />;
+}
+
+function WorkflowCatalogPublic({ handle }: { handle: string }) {
+  const { definitions, loading } = useWorkflowDefinitionsApi(handle);
+
+  const sorted = useMemo(
+    () => [...definitions].filter((d) => d.archived !== true).sort((a, b) => a.name.localeCompare(b.name)),
+    [definitions],
+  );
+
+  const emptyTaskMap = useMemo(() => new Map<string, string>(), []);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Workflows</h2>
+      </div>
+
+      {loading ? (
+        <WorkflowCatalogSkeletons />
+      ) : sorted.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-4 text-center py-16">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+            <GitBranch className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="font-medium">No public workflows yet</p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {sorted.map((definition) => (
+            <ProcessCard
+              key={definition.name}
+              definition={definition}
+              runSummary={definition.runSummary}
+              handle={handle}
+              activeTaskByInstance={emptyTaskMap}
+              isMember={false}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WorkflowCatalogMember({ handle }: { handle: string }) {
   const [showCompleted, setShowCompleted] = React.useState(true);
   const [showArchived, setShowArchived] = React.useState(false);
+  const [importOpen, setImportOpen] = React.useState(false);
+  const queryClient = useQueryClient();
 
-  const { definitions, stepsByDefinition, loading: defsLoading } = useProcessDefinitions();
-  const { data: allInstances, loading: instancesLoading } = useProcessInstances('all');
-  const { data: activeTasks } = useMyTasks(null);
+  const { definitions, stepsByDefinition, latestDocs, loading: defsLoading } = useProcessDefinitions(showCompleted);
+  const { data: activeTasks } = useMyActionableTasks();
 
-  const loading = defsLoading || instancesLoading;
+  const loading = defsLoading;
 
   const activeTaskByInstance = useMemo(() => {
     const map = new Map<string, string>();
@@ -452,6 +445,7 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
   }, [activeTasks]);
 
   const namespacedDefinitions = useMemo(() => definitions.filter((d) => d.namespace === handle), [definitions, handle]);
+  const workflowNames = useMemo(() => namespacedDefinitions.map((d) => d.name), [namespacedDefinitions]);
   const hasArchivedDefinitions = namespacedDefinitions.some((d) => d.archived === true);
 
   const visibleDefinitions = useMemo(() => {
@@ -460,30 +454,22 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
       .filter((d) => showArchived || d.archived !== true);
   }, [definitions, showArchived, handle]);
 
-  const instancesByDefinition = useMemo((): Map<string, ProcessInstance[]> => {
-    const map = new Map<string, ProcessInstance[]>();
-    for (const instance of allInstances) {
-      const existing = map.get(instance.definitionName) ?? [];
-      existing.push(instance);
-      map.set(instance.definitionName, existing);
-    }
-    return map;
-  }, [allInstances]);
-
   const sortedDefinitions = useMemo(() => {
     return [...visibleDefinitions].sort((defA, defB) => {
-      const instancesA = instancesByDefinition.get(defA.name) ?? [];
-      const instancesB = instancesByDefinition.get(defB.name) ?? [];
-      const activeA = instancesA.some((instance) => isActiveStatus(instance.status));
-      const activeB = instancesB.some((instance) => isActiveStatus(instance.status));
+      const activeA = defA.runSummary.active > 0;
+      const activeB = defB.runSummary.active > 0;
       if (activeA && !activeB) return -1;
       if (!activeA && activeB) return 1;
       return defA.name.localeCompare(defB.name);
     });
-  }, [visibleDefinitions, instancesByDefinition]);
+  }, [visibleDefinitions]);
 
   return (
+    <WorkflowSecretKeysProvider handle={handle} workflowNames={workflowNames}>
     <div className="flex flex-col gap-4">
+      <OpenRouterCreditsIndicator handle={handle} />
+      <WorkflowProblems handle={handle} latestDocs={latestDocs} loading={defsLoading} />
+
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Workflows</h2>
         <div className="flex items-center gap-2">
@@ -494,6 +480,16 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
             onToggleArchived={() => setShowArchived((prev) => !prev)}
             hasArchivedDefinitions={hasArchivedDefinitions}
           />
+          <button
+            onClick={() => setImportOpen(true)}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap shrink-0',
+              'border hover:bg-muted transition-colors',
+            )}
+          >
+            <Download className="h-3.5 w-3.5" />
+            Import from git
+          </button>
           <Link
             href={`/${handle}/workflows/new`}
             className={cn(
@@ -506,6 +502,12 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
           </Link>
         </div>
       </div>
+      <ImportWorkflowDialog
+        namespace={handle}
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => void queryClient.invalidateQueries({ queryKey: ['workflows', 'list'] })}
+      />
 
       {loading ? (
         <WorkflowCatalogSkeletons />
@@ -541,16 +543,17 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
             <ProcessCard
               key={definition.name}
               definition={definition}
-              instances={instancesByDefinition.get(definition.name) ?? []}
-              showCompleted={showCompleted}
+              runSummary={definition.runSummary}
               steps={stepsByDefinition.get(definition.name)}
               handle={handle}
               activeTaskByInstance={activeTaskByInstance}
+              isMember={true}
             />
           ))}
         </div>
       )}
     </div>
+    </WorkflowSecretKeysProvider>
   );
 }
 
@@ -563,12 +566,13 @@ export default function ProfilePage() {
   const rawHandle = params.handle;
   const handle = Array.isArray(rawHandle) ? rawHandle[0] : rawHandle;
 
-  const { firebaseUser } = useAuth();
   const { namespace, loading, error } = useNamespace(handle ?? '');
-  const currentRole = useCurrentUserRole(handle ?? '', firebaseUser?.uid);
-  const canEdit = currentRole === 'owner' || currentRole === 'admin';
+  const { role: currentRole, canAdmin: canEdit, loading: roleLoading } = useNamespaceRole(handle ?? '');
+  const isMember = currentRole !== null;
+  const userProfiles = useUserProfiles(handle);
+  const [profileImgError, setProfileImgError] = useState(false);
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="flex flex-1 items-center justify-center p-6">
         <div className="text-sm text-muted-foreground animate-pulse">Loading…</div>
@@ -609,12 +613,17 @@ export default function ProfilePage() {
               </div>
             );
           }
-          const avatarSrc = namespace.avatarUrl ?? firebaseUser?.photoURL ?? undefined;
-          return avatarSrc !== undefined && avatarSrc !== '' ? (
+          const linkedUserPhoto = namespace.linkedUserId !== undefined
+            ? userProfiles.get(namespace.linkedUserId)?.photoURL
+            : undefined;
+          const avatarSrc = namespace.avatarUrl ?? linkedUserPhoto ?? undefined;
+          return avatarSrc !== undefined && avatarSrc !== '' && !profileImgError ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={avatarSrc}
               alt={namespace.displayName}
+              referrerPolicy="no-referrer"
+              onError={() => setProfileImgError(true)}
               className="h-14 w-14 rounded-full object-cover shrink-0"
             />
           ) : (
@@ -635,13 +644,14 @@ export default function ProfilePage() {
             >
               {namespace.type === 'organization' ? 'Workspace' : 'Personal'}
             </span>
-            {currentRole === 'owner' && namespace.type === 'organization' && (
-              <Link
-                href={`/${namespace.handle}/settings`}
-                className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Settings className="h-3.5 w-3.5" />
-              </Link>
+            {isMember && (
+            <Link
+              href={`/${namespace.handle}/settings`}
+              className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              <span>Settings</span>
+            </Link>
             )}
           </div>
 
@@ -649,17 +659,14 @@ export default function ProfilePage() {
 
           <InlineEditableBio namespace={namespace} canEdit={canEdit} />
 
-          <MemberAvatars
-            namespace={namespace}
-            trailing={<DefaultWorkspaceToggle handle={namespace.handle} />}
-          />
+          <MemberAvatars namespace={namespace} isMember={isMember} />
         </div>
       </div>
 
       <UserWorkspaces namespace={namespace} />
 
       {/* Workflow catalog */}
-      <WorkflowCatalog handle={handle ?? ''} namespace={namespace} />
+      <WorkflowCatalog handle={handle ?? ''} isMember={isMember} />
     </div>
   );
 }

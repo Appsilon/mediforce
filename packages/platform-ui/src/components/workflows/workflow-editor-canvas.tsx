@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { X, HelpCircle, Save, Undo2, Redo2, KeyRound, Code2 } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { EditorState } from '@codemirror/state';
@@ -13,9 +13,11 @@ import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
 import { WorkflowStepSchema, TransitionSchema } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
+import type { NewStepPayload } from '@/lib/control-mode';
 import { StepEditor } from './workflow-editor/step-editor';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
 import { computeMoveEligibility, ensureTerminalConnected } from './workflow-editor-utils';
+import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 
 // ---------------------------------------------------------------------------
 // YAML code editor (CodeMirror 6)
@@ -113,8 +115,6 @@ export interface WorkflowEditorCanvasProps {
   workflowName?: string;
   /** Namespace handle — required for the in-editor secrets panel. */
   namespace?: string;
-  /** Authenticated user ID — required for the in-editor secrets panel. */
-  userId?: string;
   /**
    * Render prop for save controls shown at the bottom of the YAML panel.
    * Receives the current steps + transitions + a discard callback.
@@ -143,7 +143,6 @@ export function WorkflowEditorCanvas({
   yamlFields,
   workflowName,
   namespace,
-  userId,
   renderSavePanel,
   onChange,
   stepErrors,
@@ -165,6 +164,20 @@ export function WorkflowEditorCanvas({
 
   // ── Move eligibility (all steps, used by diagram hover buttons) ─────────────
   const { canMoveUp: canMoveUpSet, canMoveDown: canMoveDownSet } = computeMoveEligibility(editedSteps, editedTransitions);
+
+  // ── Docker image warnings ─────────────────────────────────────────────────
+  const { images: dockerImages, isAvailable: dockerAvailable } = useDockerImages();
+  const warningStepIds = useMemo(() => {
+    if (!dockerAvailable) return undefined;
+    const map = new Map<string, string>();
+    for (const step of editedSteps) {
+      const image = step.agent?.image ?? step.script?.image;
+      if (typeof image === 'string' && image.length > 0 && !isImageAvailable(dockerImages, image)) {
+        map.set(step.id, `Image '${image}' not available on platform`);
+      }
+    }
+    return map.size > 0 ? map : undefined;
+  }, [dockerAvailable, dockerImages, editedSteps]);
 
   // ── History ────────────────────────────────────────────────────────────────
   // Keep refs in sync so saveSnapshot can read current state without being
@@ -288,31 +301,34 @@ export function WorkflowEditorCanvas({
     }
   }, []);
 
-  const addStep = useCallback((type: WorkflowStep['type'], executor: WorkflowStep['executor'], insertAfterId: string | null = null) => {
+  const stepCounterRef = useRef(0);
+
+  const addStep = useCallback((payload: NewStepPayload, insertAfterId: string | null = null, insertBeforeId: string | null = null) => {
     const terminalStep = editedSteps.find((s) => s.type === 'terminal');
 
-    // Only one terminal allowed
-    if (type === 'terminal' && terminalStep) return;
-
     saveSnapshot();
-    const stepNum = editedSteps.length + 1;
+    stepCounterRef.current += 1;
+    const stepNum = stepCounterRef.current;
     const newId = `new-step-${stepNum}`;
     const newStep: WorkflowStep = {
       id: newId,
       name: `New Step ${stepNum}`,
-      type,
-      executor,
-      ...(executor === 'agent' ? { plugin: 'opencode-agent', autonomyLevel: 'L2' } : {}),
-      ...(executor === 'script' ? { plugin: 'script-container' } : {}),
-      ...(executor === 'cowork' ? { cowork: { agent: 'chat' as const } } : {}),
+      type: payload.type,
+      executor: payload.executor as WorkflowStep['executor'],
+      ...(payload.autonomyLevel ? { autonomyLevel: payload.autonomyLevel as WorkflowStep['autonomyLevel'] } : {}),
+      ...(payload.agentId ? { agentId: payload.agentId } : {}),
+      ...(payload.executor === 'agent' && !payload.autonomyLevel ? { plugin: 'opencode-agent', autonomyLevel: 'L2' } : {}),
+      ...(payload.executor === 'agent' && payload.autonomyLevel ? { plugin: 'opencode-agent' } : {}),
+      ...(payload.executor === 'script' ? { plugin: 'script-container' } : {}),
+      ...(payload.executor === 'cowork' ? { cowork: payload.cowork ?? { agent: 'chat' as const } } : {}),
     };
 
     // When inserting via an edge button, insertAfterId is set explicitly.
     // Otherwise fall back to the currently selected step.
     const resolvedInsertAfterId = insertAfterId ?? selectedStepId;
 
-    if (!terminalStep || type === 'terminal') {
-      // No terminal yet (or we're adding the terminal itself): append at end
+    if (!terminalStep) {
+      // No terminal yet: append at end
       const lastId = editedSteps[editedSteps.length - 1]?.id;
       setEditedSteps((prev) => [...prev, newStep]);
       setEditedTransitions((prev) => lastId ? [...prev, { from: lastId, to: newId }] : prev);
@@ -325,7 +341,13 @@ export function WorkflowEditorCanvas({
         return next;
       });
       setEditedTransitions((prev) => {
-        // Edges from resolvedInsertAfterId → their targets now go through newStep
+        if (insertBeforeId) {
+          // Edge-button path: only splice into the one clicked edge A→B.
+          // Other outgoing transitions from A (e.g. back-edges) stay on A.
+          const others = prev.filter((t) => !(t.from === resolvedInsertAfterId && t.to === insertBeforeId));
+          return [...others, { from: resolvedInsertAfterId, to: newId }, { from: newId, to: insertBeforeId }];
+        }
+        // Selected-step fallback: rewire all outgoing transitions through newStep.
         const outgoing = prev.filter((t) => t.from === resolvedInsertAfterId);
         const others = prev.filter((t) => t.from !== resolvedInsertAfterId);
         const rewired = outgoing.map((t) => ({ from: newId, to: t.to }));
@@ -427,10 +449,10 @@ export function WorkflowEditorCanvas({
   }, [saveSnapshot]);
 
   // ── Diagram definition ─────────────────────────────────────────────────────
-  const diagramDefinition = {
+  const diagramDefinition = useMemo(() => ({
     steps: editedSteps,
     transitions: editedTransitions,
-  } as WorkflowDefinition;
+  }) as WorkflowDefinition, [editedSteps, editedTransitions]);
 
 
 
@@ -552,10 +574,10 @@ export function WorkflowEditorCanvas({
       </div>{/* end unified toolbar */}
 
       {/* ── Two-column content area ── */}
-      <div className="flex flex-1 overflow-y-auto items-start">
+      <div className="flex flex-1 min-h-0">
 
         {/* Diagram column */}
-        <div className="flex-1 p-6 pt-4">
+        <div className="flex-1 overflow-y-auto p-6 pt-4">
           <WorkflowDiagram
             definition={diagramDefinition}
             className="border-0"
@@ -563,39 +585,42 @@ export function WorkflowEditorCanvas({
             onNodeDelete={removeStep}
             onNodeMoveUp={(stepId) => moveStep(stepId, 'up')}
             onNodeMoveDown={(stepId) => moveStep(stepId, 'down')}
-            onEdgeAdd={(fromStepId, type, executor) => addStep(type, executor, fromStepId)}
+            onEdgeAdd={(fromStepId, payload, toStepId) => addStep(payload, fromStepId, toStepId)}
             onPaneClick={() => { setSelectedStepId(null); setRightPanelView('yaml'); }}
             selectedStepId={selectedStepId}
             errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
+            warningStepIds={warningStepIds}
             canMoveUp={canMoveUpSet}
             canMoveDown={canMoveDownSet}
           />
         </div>
 
         {/* Side panel */}
-        <div className="w-1/2 shrink-0 border-l bg-background">
-          <div className="p-4 space-y-4">
-            {selectedStep ? (
-              <>
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold">Edit step</h2>
-                  <button
-                    onClick={() => setSelectedStepId(null)}
-                    className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
+        <div className="w-1/2 shrink-0 border-l bg-background flex flex-col min-h-0">
+          {selectedStep ? (
+            <>
+              <div className="shrink-0 flex justify-end px-2 pt-2">
+                <button
+                  onClick={() => setSelectedStepId(null)}
+                  className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
                 <StepEditor
                   step={selectedStep}
                   allSteps={editedSteps}
                   workflowName={workflowName}
                   onChange={(patch) => updateStep(selectedStep.id, patch)}
                   errors={stepErrors?.[selectedStep.id]}
+                  imageWarning={warningStepIds?.get(selectedStep.id)}
+                  dockerImages={dockerImages}
                 />
-              </>
+              </div>
+            </>
             ) : rightPanelView === 'secrets' ? (
-              <>
+              <div className="p-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-semibold">Secrets</h2>
                   <button
@@ -605,18 +630,17 @@ export function WorkflowEditorCanvas({
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                {namespace && userId && workflowName ? (
+                {namespace && workflowName ? (
                   <WorkflowSecretsEditor
                     namespace={namespace}
                     workflowName={workflowName}
-                    userId={userId}
                   />
                 ) : (
                   <p className="text-sm text-muted-foreground">Save the workflow first to manage secrets.</p>
                 )}
-              </>
+              </div>
             ) : (
-              <>
+              <div className="p-4 space-y-4">
                 <YamlCodeEditor
                   value={yamlDraft}
                   onChange={(v) => { setYamlDraft(v); setYamlError(null); }}
@@ -626,9 +650,8 @@ export function WorkflowEditorCanvas({
                     {savePanel}
                   </div>
                 )}
-              </>
+              </div>
             )}
-          </div>
         </div>
 
       </div>{/* end two-column */}

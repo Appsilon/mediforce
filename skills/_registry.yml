@@ -1,7 +1,7 @@
 version: "1.0"
-generated: "2026-04-23"
+generated: "2026-06-11"
 standard: "agentskills.io/specification"
-total_skills: 7
+total_skills: 14
 
 # Runtime skills have their own per-app registries:
 #   apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/_registry.yml
@@ -17,8 +17,8 @@ domains:
         complexity: intermediate
         language: multi
         description: Browser automation CLI for AI agents
-      - id: community
-        path: skills/community/SKILL.md
+      - id: discord-update
+        path: skills/discord-update/SKILL.md
         complexity: basic
         language: multi
         description: Write Discord updates for the MediForce community
@@ -47,3 +47,38 @@ domains:
         complexity: basic
         language: multi
         description: Ingest, query, and lint the LLM-compiled wiki (Karpathy LLM Wiki pattern)
+      - id: add-changelog-entry
+        path: skills/add-changelog-entry/SKILL.md
+        complexity: basic
+        language: multi
+        description: Append a one-line entry for a merged PR under [Unreleased] in CHANGELOG.md (Keep-a-Changelog)
+      - id: new-test
+        path: skills/new-test/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Pick the right test level (L1-L5), scaffold the file, and walk the RED-GREEN loop
+      - id: self-review
+        path: skills/self-review/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Pre-PR check — typecheck, affected tests, diff, style, code-review. MUST run as subagent for objectivity
+      - id: use-mediforce
+        path: skills/use-mediforce/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: mediforce CLI, dev environment, platform API, and adding missing CLI commands
+      - id: grill-with-docs
+        path: skills/grill-with-docs/SKILL.md
+        complexity: basic
+        language: multi
+        description: Interview-style plan stress-test against CONTEXT.md and ADRs (vendored from mattpocock/skills)
+      - id: sync-docs
+        path: skills/sync-docs/SKILL.md
+        complexity: moderate
+        language: multi
+        description: Keep monitored docs in sync — auto-fixes Tier 1 (commands/ports/env vars), proposes Tier 2 (narrative) as git diff
+      - id: design-workflow
+        path: skills/design-workflow/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Interview-driven authoring/editing of a Mediforce workflow package; challenges the design toward the golden rules and validates the .wd.json against the checkout

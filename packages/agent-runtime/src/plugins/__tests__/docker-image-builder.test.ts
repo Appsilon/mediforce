@@ -17,7 +17,7 @@ import {
   getImageBuildCommit,
   buildImageFromRepo,
   ensureImage,
-} from '../docker-image-builder.js';
+} from '../docker-image-builder';
 
 const execSyncMock = vi.mocked(execSync);
 const mkdtempMock = vi.mocked(mkdtemp);

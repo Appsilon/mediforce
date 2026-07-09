@@ -26,9 +26,9 @@ test.describe('API auth smoke', () => {
     expect(res.status()).toBe(401);
   });
 
-  test('POST /api/agent-definitions without X-Api-Key returns 401', async ({ request }) => {
+  test('POST /api/agents without X-Api-Key returns 401', async ({ request }) => {
     // Pre-Step-0 this route had no auth check — middleware closes that gap.
-    const res = await request.post('/api/agent-definitions', { data: {} });
+    const res = await request.post('/api/agents', { data: {} });
     expect(res.status()).toBe(401);
   });
 });

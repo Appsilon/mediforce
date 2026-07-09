@@ -4,8 +4,8 @@ import {
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
   ListWorkflowsOutputSchema,
-} from '../workflows.js';
-import { omitServerFields } from './_helpers.js';
+} from '../workflows';
+import { omitServerFields } from './_helpers';
 
 describe('RegisterWorkflowInputSchema', () => {
   it('accepts a workflow definition body without version, createdAt, or namespace', () => {
@@ -74,10 +74,12 @@ describe('ListWorkflowsOutputSchema', () => {
     const result = ListWorkflowsOutputSchema.safeParse({
       definitions: [
         {
+          namespace: wd.namespace,
           name: wd.name,
           latestVersion: 2,
           defaultVersion: 1,
           definition: wd,
+          runSummary: { total: 0, active: 0, latest: [] },
         },
       ],
     });
@@ -88,10 +90,12 @@ describe('ListWorkflowsOutputSchema', () => {
     const result = ListWorkflowsOutputSchema.safeParse({
       definitions: [
         {
+          namespace: 'test',
           name: 'wf',
           latestVersion: 1,
           defaultVersion: null,
           definition: null,
+          runSummary: { total: 0, active: 0, latest: [] },
         },
       ],
     });

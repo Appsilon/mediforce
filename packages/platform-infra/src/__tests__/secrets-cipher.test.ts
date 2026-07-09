@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { validateSecretsKey, encrypt, decrypt } from '../crypto/secrets-cipher.js';
+import { validateSecretsKey, encrypt, decrypt } from '../crypto/secrets-cipher';
 
 const VALID_KEY = 'a'.repeat(64);
 

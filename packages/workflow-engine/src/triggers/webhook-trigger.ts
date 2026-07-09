@@ -1,8 +1,8 @@
 import type { z } from 'zod';
 import { formatZodErrors } from '@mediforce/platform-core';
-import type { WorkflowEngine } from '../engine/workflow-engine.js';
-import type { TriggerResult, WorkflowTriggerContext } from './trigger-types.js';
-import { WebhookPayloadValidationError } from './trigger-errors.js';
+import type { WorkflowEngine } from '../engine/workflow-engine';
+import type { TriggerResult, WorkflowTriggerContext } from './trigger-types';
+import { WebhookPayloadValidationError } from './trigger-errors';
 
 /**
  * WebhookTrigger: validates payload with a Zod schema then creates
@@ -37,6 +37,7 @@ export class WebhookTrigger {
     }
 
     const instance = await this.engine.createInstance(
+      context.namespace,
       context.definitionName,
       context.definitionVersion,
       context.triggeredBy,

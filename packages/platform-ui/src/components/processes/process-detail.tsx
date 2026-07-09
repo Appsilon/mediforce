@@ -2,33 +2,35 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { format } from 'date-fns';
-import { ArrowLeft, FileBarChart, Archive, ArchiveRestore } from 'lucide-react';
-import type { ProcessInstance, StepExecution, AuditEvent, Step } from '@mediforce/platform-core';
+import { ChevronLeft, ChevronRight, FileBarChart, Archive, ArchiveRestore, ScrollText, X, GitBranch } from 'lucide-react';
+import type { ProcessInstance, StepExecution, AuditEvent, Step, WorkflowStep, WorkflowDefinition } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
 import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
 import { AgentLogViewer } from './agent-log-viewer';
 import { RunResultsPanel } from './run-results-panel';
-import { cancelProcessRun, archiveProcessRun } from '@/app/actions/processes';
+import { RunOutputFilesPanel } from './run-output-files-panel';
+import { ApiError } from '@mediforce/platform-api/client';
 import { useActiveCoworkSession } from '@/hooks/use-tasks';
 import { useProcessInstance } from '@/hooks/use-process-instances';
+import { useRunOutputFiles } from '@/hooks/use-run-output-files';
+import { useArchiveRun, useCancelRun } from '@/hooks/use-run-mutations';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
-import { useBackNavigation } from '@/hooks/use-back-navigation';
-import { formatStepName } from '@/components/tasks/task-utils';
+import { cn } from '@/lib/utils';
 import { MissingEnvBanner } from './missing-env-banner';
+import { AgentEscalatedBanner } from './agent-escalated-banner';
 import { PreviousRunBanner } from './previous-run-banner';
-import { formatDuration } from '@/lib/format';
+import { formatDuration, formatCostUsd, formatStepName } from '@/lib/format';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 
-type AuditEventWithId = AuditEvent & { id: string };
-
-function resolveStepLabel(stepId: string, steps: Step[]): string {
-  const found = steps.find((s) => s.id === stepId);
-  return found?.name ?? stepId.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
+const WorkflowDiagram = dynamic(
+  () => import('@/components/workflows/workflow-diagram').then((m) => ({ default: m.WorkflowDiagram })),
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Loading diagram…</div> },
+);
 
 export interface AgentEventItem {
   id: string;
@@ -49,10 +51,11 @@ export function ProcessDetail({
   backHref = '/processes',
   stepConfigMap,
   runDetailHref,
+  definition,
 }: {
   instance: ProcessInstance;
   stepExecutions: StepExecution[];
-  auditEvents: AuditEventWithId[];
+  auditEvents: AuditEvent[];
   auditEventsLoading: boolean;
   auditEventsError?: Error | null;
   definitionSteps?: Step[];
@@ -61,9 +64,10 @@ export function ProcessDetail({
   stepConfigMap?: Map<string, Record<string, unknown>>;
   /** Href for this run's detail page, used to build step detail links. */
   runDetailHref?: string;
+  /** Full workflow definition for the version this run used — powers the diagram tab. */
+  definition?: WorkflowDefinition;
 }) {
   const handle = useHandleFromPath();
-  const { goBack } = useBackNavigation(backHref);
   const wfStatus = getWorkflowStatus(instance);
   const needsHumanTaskAction = wfStatus.rawReason === 'waiting_for_human' || wfStatus.rawReason === 'awaiting_agent_approval';
   const { task: blockingTask } = useActiveTaskForInstance(
@@ -90,11 +94,13 @@ export function ProcessDetail({
     const logEvents = agentEvents.filter(
       (e) => e.type === 'status' && typeof e.payload === 'string' && (e.payload as string).startsWith('agent activity log:'),
     );
+    const stepExecutorMap = new Map(definitionSteps.map((s) => [s.id, (s as unknown as WorkflowStep).executor]));
     const unsorted = logEvents.map((e) => {
       const fullPath = (e.payload as string).replace('agent activity log: ', '');
       return {
         stepId: e.stepId,
         file: fullPath.split('/').pop() ?? '',
+        executor: stepExecutorMap.get(e.stepId) ?? 'agent',
       };
     }).filter((entry) => entry.file.length > 0);
 
@@ -102,7 +108,12 @@ export function ProcessDetail({
     return unsorted.sort((a, b) => (stepOrder.get(a.stepId) ?? 0) - (stepOrder.get(b.stepId) ?? 0));
   }, [agentEvents, definitionSteps]);
 
-  const [rightTab, setRightTab] = React.useState<string>(() =>
+  const runningStepIds = React.useMemo(
+    () => new Set(stepExecutions.filter((e) => e.status === 'running').map((e) => e.stepId)),
+    [stepExecutions],
+  );
+
+  const [rightTab, setRightTab] = React.useState<'agent-log' | 'audit' | 'diagram'>(() =>
     agentLogFiles.length > 0 ? 'agent-log' : 'audit',
   );
 
@@ -120,29 +131,39 @@ export function ProcessDetail({
 
   const [agentLogStepId, setAgentLogStepId] = React.useState<string | null>(null);
 
+  const [logsOpen, setLogsOpen] = React.useState(false);
+
   // Cancel double-confirm: 0 = idle, 1 = first confirm shown, 2 = cancelling in progress
   const [cancelStep, setCancelStep] = React.useState<0 | 1 | 2>(0);
   const [cancelError, setCancelError] = React.useState<string | null>(null);
 
   const canCancel = wfStatus.displayStatus === 'in_progress' || wfStatus.displayStatus === 'waiting_for_human';
-  const canArchive = wfStatus.displayStatus === 'completed' || wfStatus.displayStatus === 'error';
+  const canArchive = wfStatus.displayStatus === 'completed' || wfStatus.displayStatus === 'error' || wfStatus.displayStatus === 'cancelled';
   const [archiving, setArchiving] = React.useState(false);
+
+  const archiveMutation = useArchiveRun();
+  const cancelMutation = useCancelRun();
 
   async function handleArchiveToggle() {
     setArchiving(true);
-    await archiveProcessRun(instance.id, instance.archived !== true);
-    setArchiving(false);
+    try {
+      await archiveMutation.mutateAsync({ runId: instance.id, archived: instance.archived !== true });
+    } finally {
+      setArchiving(false);
+    }
   }
 
   async function handleConfirmCancel() {
     setCancelStep(2);
     setCancelError(null);
-    const result = await cancelProcessRun(instance.id);
-    if (!result.success) {
-      setCancelError(result.error ?? 'Cancel failed');
-      setCancelStep(1);
-    } else {
+    try {
+      await cancelMutation.mutateAsync({ runId: instance.id });
       setCancelStep(0);
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Cancel failed';
+      setCancelError(message);
+      setCancelStep(1);
     }
   }
 
@@ -154,6 +175,26 @@ export function ProcessDetail({
     return end - start;
   }, [instance.createdAt, instance.updatedAt]);
 
+  // Computed from step executions (source of truth on detail page).
+  // List views use the denormalized instance.totalCostUsd instead —
+  // the two can briefly diverge after retries until the next step completes.
+  const totalCostUsd = React.useMemo(() => {
+    if (!stepExecutions || stepExecutions.length === 0) return null;
+    let total = 0;
+    let hasCost = false;
+    for (const exec of stepExecutions) {
+      if (exec.agentOutput?.estimatedCostUsd != null) {
+        total += exec.agentOutput.estimatedCostUsd;
+        hasCost = true;
+      }
+    }
+    return hasCost ? total : null;
+  }, [stepExecutions]);
+
+  const isTerminal = instance.status === 'completed' || instance.status === 'failed';
+
+  const { data: outputFiles } = useRunOutputFiles(instance.id, instance.status);
+
   // Scroll audit log to bottom when events change
   const auditScrollRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
@@ -163,15 +204,8 @@ export function ProcessDetail({
   }, [auditEvents, rightTab]);
 
   return (
-    <div className="flex gap-6 p-6 items-start">
-      {/* Left panel */}
-      <div className="flex-1 min-w-0 space-y-6">
-        {/* Back */}
-        <button onClick={goBack} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </button>
-
+    <div className="flex items-start gap-0 p-6">
+      <div className="flex-1 min-w-0 space-y-6 pr-6">
         {/* Header */}
         <div className="space-y-2">
           <div className="flex items-center gap-3">
@@ -191,9 +225,10 @@ export function ProcessDetail({
             {canCancel && cancelStep === 0 && (
               <button
                 onClick={() => setCancelStep(1)}
-                className="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors shrink-0"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors shrink-0"
               >
-                Cancel
+                <X className="h-3.5 w-3.5" />
+                Cancel Run
               </button>
             )}
             {canCancel && cancelStep === 1 && (
@@ -219,11 +254,46 @@ export function ProcessDetail({
             {cancelError && (
               <span className="text-xs text-destructive shrink-0">{cancelError}</span>
             )}
+            <button
+              onClick={() => {
+                if (logsOpen) {
+                  setLogsOpen(false);
+                } else {
+                  setRightTab(agentLogFiles.length > 0 ? 'agent-log' : 'audit');
+                  setLogsOpen(true);
+                }
+              }}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shrink-0"
+            >
+              <ScrollText className="h-3.5 w-3.5" />
+              {logsOpen ? 'Hide Execution Log' : 'Execution Log'}
+            </button>
+            {definition && (
+              <button
+                onClick={() => {
+                  if (logsOpen && rightTab === 'diagram') {
+                    setLogsOpen(false);
+                  } else {
+                    setRightTab('diagram');
+                    setLogsOpen(true);
+                  }
+                }}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors shrink-0',
+                  logsOpen && rightTab === 'diagram'
+                    ? 'border-primary/40 text-primary bg-primary/5'
+                    : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
+                )}
+              >
+                <GitBranch className="h-3.5 w-3.5" />
+                Workflow Diagram
+              </button>
+            )}
           </div>
 
-          {/* Metadata row — status badge, definition, ID, created, duration, report link */}
+          {/* Metadata row */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground items-center">
-            <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} />
+            <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} error={instance.error} dryRun={instance.dryRun} />
             {instance.archived === true && (
               <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                 <Archive className="h-3 w-3" />
@@ -238,6 +308,9 @@ export function ProcessDetail({
             <span>Created: <span className="text-foreground">{format(new Date(instance.createdAt), 'MMM d, yyyy HH:mm')}</span></span>
             {wfStatus.displayStatus !== 'in_progress' && (
               <span>Duration: <span className="text-foreground">{formatDuration(runDurationMs)}</span></span>
+            )}
+            {totalCostUsd != null && (
+              <span>Cost: <span className={isTerminal ? 'text-foreground' : 'text-amber-600 dark:text-amber-400'}>{formatCostUsd(totalCostUsd)}{isTerminal ? '' : '+'}</span></span>
             )}
             {instance.status === 'completed' && (
               <Link
@@ -255,11 +328,11 @@ export function ProcessDetail({
               <div className="text-sm">
                 <span className="font-medium">Waiting for your input</span>
                 <span className="text-muted-foreground ml-1.5">
-                  — {resolveStepLabel(blockingTask.stepId, definitionSteps)}
+                  — {definitionSteps.find((s) => s.id === blockingTask.stepId)?.name ?? formatStepName(blockingTask.stepId)}
                 </span>
               </div>
               <Link
-                href={routes.task(handle, blockingTask.id)}
+                href={routes.workflowRunStep(handle, instance.definitionName, instance.id, blockingTask.stepId)}
                 className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
               >
                 Open task
@@ -271,7 +344,7 @@ export function ProcessDetail({
               <div className="text-sm">
                 <span className="font-medium">Ready to collaborate</span>
                 <span className="text-muted-foreground ml-1.5">
-                  — {resolveStepLabel(coworkSession.stepId, definitionSteps)}
+                  — {definitionSteps.find((s) => s.id === coworkSession.stepId)?.name ?? formatStepName(coworkSession.stepId)}
                 </span>
               </div>
               <Link
@@ -294,9 +367,14 @@ export function ProcessDetail({
               {wfStatus.reason}
             </div>
           )}
+          {wfStatus.rawReason === 'agent_escalated' && instance.error && instance.currentStepId && (
+            <AgentEscalatedBanner instanceId={instance.id} stepId={instance.currentStepId} />
+          )}
           {wfStatus.displayStatus === 'error' && !wfStatus.hasDedicatedBanner && (
-            <div className="rounded-md bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800 px-3 py-2 text-sm text-red-800 dark:text-red-300">
-              {wfStatus.reason}
+            <div className="rounded-md bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800 px-3 py-2">
+              <pre className="text-sm font-mono text-red-800 dark:text-red-300 whitespace-pre-wrap break-all select-text leading-relaxed">
+                {wfStatus.reason}
+              </pre>
             </div>
           )}
           {instance.previousRun !== undefined && (
@@ -313,10 +391,17 @@ export function ProcessDetail({
           )}
         </div>
 
-        {/* Results — at top of left panel when available */}
+        {/* Results */}
         {instance.status === 'completed' && (
-          <RunResultsPanel stepExecutions={stepExecutions} />
+          <RunResultsPanel stepExecutions={stepExecutions} stepConfigMap={stepConfigMap} />
         )}
+
+        {/* Output Files — hidden until the run has at least one */}
+        <RunOutputFilesPanel
+          runId={instance.id}
+          files={outputFiles}
+          definitionSteps={definitionSteps}
+        />
 
         {/* Step Status Panel */}
         {definitionSteps.length > 0 && (
@@ -326,48 +411,82 @@ export function ProcessDetail({
             stepExecutions={stepExecutions}
             agentEvents={agentEvents}
             stepConfigMap={stepConfigMap}
+            outputFiles={outputFiles}
             stepDetailBaseHref={runDetailHref}
-            onAgentLogClick={agentLogFiles.length > 0 ? (stepId: string) => {
+            currentTask={blockingTask}
+            onAgentLogClick={(stepId: string) => {
               setAgentLogStepId(stepId);
-              setRightTab('agent-log');
-            } : undefined}
+              if (agentLogFiles.length > 0) setRightTab('agent-log');
+              setLogsOpen(true);
+            }}
           />
         )}
       </div>
 
-      {/* Right panel — Agent Log + Audit Log, sticky full-height */}
-      <div className="flex-1 min-w-0 sticky top-4 flex flex-col h-[calc(100vh-2rem)]">
-        {/* Tab bar */}
-        <div className="flex gap-1 border-b shrink-0">
-          {[
-            ...(agentLogFiles.length > 0 ? [{ value: 'agent-log', label: 'Agent Log' }] : []),
-            { value: 'audit', label: 'Audit Log' },
-          ].map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => setRightTab(value)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                rightTab === value
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Agent Log — flex-fills remaining height, internal scroll handles auto-scroll-to-bottom */}
-        <div className={`flex-1 min-h-0 pt-4 ${rightTab === 'agent-log' ? 'flex flex-col overflow-hidden' : 'hidden'}`}>
-          <AgentLogViewer logFiles={agentLogFiles} initialStepId={agentLogStepId} />
-        </div>
-
-        {/* Audit Log — outer div scrolls, effect scrolls to bottom on updates */}
-        <div
-          ref={auditScrollRef}
-          className={`flex-1 min-h-0 overflow-y-auto pt-4 ${rightTab === 'audit' ? '' : 'hidden'}`}
+      {/* Right panel — sticky log sidebar, expands leftward */}
+      <div
+        className={cn(
+          'sticky top-4 h-[calc(100vh-2rem)] shrink-0 flex border-l transition-[width] duration-300 ease-in-out',
+          logsOpen ? 'w-1/2' : 'w-10',
+        )}
+      >
+        {/* Toggle strip — always visible */}
+        <button
+          onClick={() => setLogsOpen((prev) => !prev)}
+          className="w-10 shrink-0 flex flex-col items-center justify-center hover:bg-muted/50 transition-colors"
+          title={logsOpen ? 'Collapse panel' : 'Expand panel'}
         >
-          <AuditLogTab events={auditEvents} loading={auditEventsLoading} error={auditEventsError} />
+          {logsOpen
+            ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            : <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+          }
+        </button>
+
+        {/* Log content — fades in/out with the panel */}
+        <div
+          className={cn(
+            'flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden border-l transition-opacity duration-200',
+            logsOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
+          )}
+        >
+          {/* Tab bar */}
+          <div className="flex gap-1 border-b shrink-0">
+            {[
+              ...(agentLogFiles.length > 0 ? [{ value: 'agent-log' as const, label: 'Step Log' }] : []),
+              { value: 'audit' as const, label: 'Audit Log' },
+              ...(definition ? [{ value: 'diagram' as const, label: 'Diagram' }] : []),
+            ].map(({ value, label }) => (
+              <button
+                key={value}
+                onClick={() => setRightTab(value)}
+                className={cn(
+                  'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+                  rightTab === value
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className={cn('flex-1 min-h-0 p-4 flex flex-col overflow-hidden', rightTab !== 'agent-log' && 'hidden')}>
+            <AgentLogViewer logFiles={agentLogFiles} initialStepId={agentLogStepId} runningStepIds={runningStepIds} />
+          </div>
+
+          <div
+            ref={auditScrollRef}
+            className={cn('flex-1 min-h-0 overflow-y-auto p-4', rightTab !== 'audit' && 'hidden')}
+          >
+            <AuditLogTab events={auditEvents} loading={auditEventsLoading} error={auditEventsError} />
+          </div>
+
+          <div className={cn('flex-1 min-h-0 overflow-y-auto', rightTab !== 'diagram' && 'hidden')}>
+            {definition && rightTab === 'diagram' && (
+              <WorkflowDiagram definition={definition} className="w-full" />
+            )}
+          </div>
         </div>
       </div>
     </div>

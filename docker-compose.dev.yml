@@ -1,0 +1,17 @@
+# Local-dev overlay. Pins a stable compose project name and a named Postgres
+# volume so every git worktree attaches the SAME containers + data instead of
+# the per-directory copy compose creates by default (project name defaults to
+# the working directory, so each worktree otherwise gets its own empty volume).
+#
+# Loaded by `pnpm dev` / `dev:queue`:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up postgres -d
+#
+# Staging/prod NEVER load this file (docker-compose.staging.yml / .prod.yml stay
+# on the base volume), so dev knobs cannot leak into deployed environments.
+name: mediforce-dev
+
+volumes:
+  postgres-data:
+    # Explicit name → shared across worktrees, not prefixed by the project, so
+    # local dev data persists independently of which checkout `pnpm dev` runs in.
+    name: mediforce-dev-pgdata

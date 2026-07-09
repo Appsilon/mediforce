@@ -5,7 +5,6 @@ import { resolve } from 'path';
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    conditions: ['@mediforce/source'],
     alias: {
       '@': resolve(__dirname, './src'),
       '@mediforce/platform-core/testing': resolve(__dirname, '../platform-core/src/testing/index.ts'),
@@ -14,10 +13,15 @@ export default defineConfig({
       '@mediforce/platform-api/handlers': resolve(__dirname, '../platform-api/src/handlers/index.ts'),
       '@mediforce/platform-api/services': resolve(__dirname, '../platform-api/src/services/index.ts'),
       '@mediforce/platform-api/client': resolve(__dirname, '../platform-api/src/client/index.ts'),
+      '@mediforce/platform-api/errors': resolve(__dirname, '../platform-api/src/errors.ts'),
+      '@mediforce/platform-api/auth': resolve(__dirname, '../platform-api/src/auth.ts'),
+      '@mediforce/platform-api/repositories': resolve(__dirname, '../platform-api/src/repositories/index.ts'),
+      '@mediforce/platform-api/testing': resolve(__dirname, '../platform-api/src/testing/index.ts'),
+      '@mediforce/platform-api/runtime': resolve(__dirname, '../platform-api/src/runtime/index.ts'),
       '@mediforce/platform-api': resolve(__dirname, '../platform-api/src/index.ts'),
       '@mediforce/workflow-engine': resolve(__dirname, '../workflow-engine/src/index.ts'),
       '@mediforce/agent-runtime': resolve(__dirname, '../agent-runtime/src/index.ts'),
-      '@mediforce/agent-queue': resolve(__dirname, '../agent-queue/src/index.ts'),
+      '@mediforce/container-worker': resolve(__dirname, '../container-worker/src/index.ts'),
       '@mediforce/platform-infra': resolve(__dirname, '../platform-infra/src/index.ts'),
     },
   },
@@ -25,6 +29,6 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     globals: true,
-    exclude: ['e2e/**', 'node_modules/**'],
+    exclude: ['e2e/**', 'node_modules/**', '.next/**', 'src/test/integration/action-flows/**'],
   },
 });

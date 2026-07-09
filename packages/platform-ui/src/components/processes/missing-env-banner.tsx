@@ -2,15 +2,14 @@
 
 import * as React from 'react';
 import { KeyRound, Play } from 'lucide-react';
-import { useAuth } from '@/contexts/auth-context';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
-import { saveWorkflowSecrets, getWorkflowSecrets } from '@/app/actions/workflow-secrets';
-import { resumeProcessRun } from '@/app/actions/processes';
+import { mediforce } from '@/lib/mediforce';
 
 interface MissingEnvVar {
   secretName: string;
   template: string;
   steps: Array<{ stepId: string; stepName: string }>;
+  hint?: string;
 }
 
 export function MissingEnvBanner({
@@ -22,7 +21,6 @@ export function MissingEnvBanner({
   errorJson: string;
   workflowName: string;
 }) {
-  const { firebaseUser } = useAuth();
   const handle = useHandleFromPath();
   const [values, setValues] = React.useState<Record<string, string>>({});
   const [saving, setSaving] = React.useState(false);
@@ -42,22 +40,30 @@ export function MissingEnvBanner({
   const allFilled = missing.every((m) => values[m.secretName]?.trim());
 
   async function handleSaveAndResume() {
-    if (!firebaseUser || !handle) return;
+    if (!handle) return;
     setSaving(true);
     setStatus(null);
     try {
       // Merge new values with existing secrets (preserve what's already set)
-      const existing = await getWorkflowSecrets(handle, workflowName, firebaseUser.uid);
+      const { secrets: existing } = await mediforce.workflowSecrets.values({
+        namespace: handle,
+        workflow: workflowName,
+      });
       const merged = { ...existing };
       for (const m of missing) {
         const val = values[m.secretName]?.trim();
         if (val) merged[m.secretName] = val;
       }
-      await saveWorkflowSecrets(handle, workflowName, merged, firebaseUser.uid);
+      await mediforce.workflowSecrets.save({
+        namespace: handle,
+        workflow: workflowName,
+        secrets: merged,
+      });
 
-      const result = await resumeProcessRun(instanceId);
-      if (!result.success) {
-        setStatus(result.error ?? 'Resume failed');
+      try {
+        await mediforce.runs.resume({ runId: instanceId });
+      } catch (resumeErr) {
+        setStatus(resumeErr instanceof Error ? resumeErr.message : 'Resume failed');
       }
       // Page will refresh via instance polling — no manual reload needed
     } catch (err) {
@@ -93,6 +99,7 @@ export function MissingEnvBanner({
             </div>
             <p className="text-xs text-amber-600 dark:text-amber-500 pl-[13.5rem]">
               Used by: {m.steps.map((s) => s.stepName).join(', ')}
+              {m.hint && <span className="ml-1">({m.hint})</span>}
             </p>
           </div>
         ))}

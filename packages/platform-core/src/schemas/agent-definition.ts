@@ -1,5 +1,12 @@
+// TODO: rename AgentDefinition* → Agent* (schema, type, file). Canonical
+// glossary entry is `Agent` (CONTEXT.md); Agents are not versioned, so the
+// "Definition" suffix is a historical artifact. See CONTEXT.md
+// "Agent vs Agent Definition" flagged ambiguity.
 import { z } from 'zod';
-import { AgentMcpBindingMapSchema } from './agent-mcp-binding.js';
+import { AgentMcpBindingMapSchema } from './agent-mcp-binding';
+
+export const AgentVisibilitySchema = z.enum(['public', 'private']);
+export type AgentVisibility = z.infer<typeof AgentVisibilitySchema>;
 
 export const AgentDefinitionSchema = z.object({
   id: z.string(),
@@ -18,11 +25,12 @@ export const AgentDefinitionSchema = z.object({
   systemPrompt: z.string(),
   inputDescription: z.string(),
   outputDescription: z.string(),
-  skillFileNames: z.array(z.string()),
   /** Canonical MCP server configuration for this agent. Map of server
    *  name → AgentMcpBinding. Step-level restrictions can only narrow
    *  (disable servers or deny tools) — they cannot broaden. */
   mcpServers: AgentMcpBindingMapSchema.optional(),
+  namespace: z.string().min(1).optional(),
+  visibility: AgentVisibilitySchema.default('private'),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

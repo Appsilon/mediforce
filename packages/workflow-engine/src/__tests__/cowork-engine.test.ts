@@ -8,8 +8,8 @@ import {
   CoworkSessionSchema,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import { WorkflowEngine } from '../index.js';
-import type { StepActor } from '../index.js';
+import { WorkflowEngine } from '../index';
+import type { StepActor } from '../index';
 
 // ---------------------------------------------------------------------------
 // Test definitions
@@ -19,6 +19,7 @@ const coworkDef: WorkflowDefinition = {
   name: 'cowork-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'intake', name: 'Intake', type: 'creation', executor: 'human' },
     {
@@ -47,6 +48,7 @@ const coworkFirstDef: WorkflowDefinition = {
   name: 'cowork-first',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     {
       id: 'brainstorm',
@@ -104,7 +106,7 @@ beforeEach(async () => {
 
 describe('Cowork executor: advanceStep routes to cowork step', () => {
   it('advances to a cowork step (session creation is auto-runner responsibility)', async () => {
-    const instance = await engine.createInstance('cowork-process', 1, 'user-001', 'manual');
+    const instance = await engine.createInstance('test', 'cowork-process', 1, 'user-001', 'manual');
     await engine.startInstance(instance.id);
 
     // Advance past intake → lands on cowork step
@@ -119,7 +121,7 @@ describe('Cowork executor: advanceStep routes to cowork step', () => {
   });
 
   it('cowork step accepts output and advances to next step', async () => {
-    const instance = await engine.createInstance('cowork-process', 1, 'user-001', 'manual');
+    const instance = await engine.createInstance('test', 'cowork-process', 1, 'user-001', 'manual');
     await engine.startInstance(instance.id);
 
     // Advance to cowork step
@@ -149,6 +151,8 @@ describe('CoworkSession schema validation', () => {
       outputSchema: null,
       voiceConfig: null,
       artifact: null,
+      validationResult: null,
+      presentation: null,
       mcpServers: null,
       turns: [],
       createdAt: '2026-01-15T10:00:00Z',
@@ -214,6 +218,8 @@ describe('CoworkSession schema validation', () => {
       outputSchema: null,
       voiceConfig: null,
       artifact: null,
+      validationResult: null,
+      presentation: null,
       mcpServers: null,
       turns: [],
       createdAt: '2026-01-15T10:00:00Z',
@@ -241,6 +247,8 @@ describe('InMemoryCoworkSessionRepository', () => {
       outputSchema: null,
       voiceConfig: null,
       artifact: null,
+      validationResult: null,
+      presentation: null,
       mcpServers: null,
       turns: [],
       createdAt: '2026-01-15T10:00:00Z',
@@ -270,6 +278,8 @@ describe('InMemoryCoworkSessionRepository', () => {
       outputSchema: null,
       voiceConfig: null,
       artifact: null,
+      validationResult: null,
+      presentation: null,
       mcpServers: null,
       turns: [],
       createdAt: '2026-01-15T10:00:00Z',
@@ -305,6 +315,8 @@ describe('InMemoryCoworkSessionRepository', () => {
       outputSchema: null,
       voiceConfig: null,
       artifact: null,
+      validationResult: null,
+      presentation: null,
       mcpServers: null,
       turns: [],
       createdAt: '2026-01-15T10:00:00Z',
@@ -334,6 +346,8 @@ describe('InMemoryCoworkSessionRepository', () => {
       outputSchema: null,
       voiceConfig: null,
       artifact: null,
+      validationResult: null,
+      presentation: null,
       mcpServers: null,
       turns: [],
       createdAt: '2026-01-15T10:00:00Z',

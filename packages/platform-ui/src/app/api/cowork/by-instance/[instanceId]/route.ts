@@ -1,25 +1,26 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices } from '@/lib/platform-services';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { getCoworkSessionByInstance } from '@mediforce/platform-api/handlers';
+import { GetCoworkSessionByInstanceInputSchema } from '@mediforce/platform-api/contract';
+import type { GetCoworkSessionByInstanceInput } from '@mediforce/platform-api/contract';
+
+interface RouteContext {
+  params: Promise<{ instanceId: string }>;
+}
 
 /**
  * GET /api/cowork/by-instance/:instanceId
  *
- * Returns the most recent active cowork session for a given process instance.
+ * Returns the most recent active cowork session for a given process
+ * instance. 404 when the instance is unknown or has no active session.
+ * Workspace gating in `scope.coworkSessions` (gates on the parent run).
  */
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ instanceId: string }> },
-): Promise<NextResponse> {
-  const { instanceId } = await params;
-  const { coworkSessionRepo } = getPlatformServices();
-
-  const session = await coworkSessionRepo.findMostRecentActive(instanceId);
-  if (!session) {
-    return NextResponse.json(
-      { error: `No active cowork session found for instance '${instanceId}'` },
-      { status: 404 },
-    );
-  }
-
-  return NextResponse.json(session);
-}
+export const GET = createRouteAdapter<
+  typeof GetCoworkSessionByInstanceInputSchema,
+  GetCoworkSessionByInstanceInput,
+  unknown,
+  RouteContext
+>(
+  GetCoworkSessionByInstanceInputSchema,
+  async (_req, ctx) => ({ instanceId: (await ctx.params).instanceId }),
+  getCoworkSessionByInstance,
+);

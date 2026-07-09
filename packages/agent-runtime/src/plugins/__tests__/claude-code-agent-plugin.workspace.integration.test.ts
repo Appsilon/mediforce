@@ -12,9 +12,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
-import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin.js';
-import type { EmitPayload, EmitFn, WorkflowAgentContext } from '../../interfaces/agent-plugin.js';
-import type { AgentCommandSpec } from '../base-container-agent-plugin.js';
+import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
+import type { EmitPayload, EmitFn, WorkflowAgentContext } from '../../interfaces/step-executor-plugin';
+import type { AgentCommandSpec } from '../base-container-agent-plugin';
 
 type GetAgentCommandTarget = { getAgentCommand: (promptPath: string, options?: unknown) => AgentCommandSpec };
 type ReadSkillTarget = { readSkillFile: (skillsDir: string, skill: string) => Promise<string> };
@@ -37,6 +37,7 @@ function buildWorkflowContext(overrides: Partial<WorkflowAgentContext> = {}): Wo
     name: `wd-workspace-${Math.random().toString(36).slice(2, 8)}`,
     namespace: '_default',
     version: 1,
+    visibility: 'private',
     steps: [step],
     transitions: [],
     triggers: [{ type: 'manual', name: 'start' }],
@@ -46,6 +47,7 @@ function buildWorkflowContext(overrides: Partial<WorkflowAgentContext> = {}): Wo
   return {
     stepId: 'extract',
     processInstanceId: `pi-${Date.now().toString()}-${Math.random().toString(36).slice(2, 6)}`,
+    runNamespace: 'test',
     definitionVersion: 'v1',
     stepInput: {},
     autonomyLevel: 'L4',

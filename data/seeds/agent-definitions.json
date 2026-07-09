@@ -1,6 +1,7 @@
 {
   "claude-code-agent": {
     "kind": "plugin",
+    "visibility": "public",
     "runtimeId": "claude-code-agent",
     "name": "Claude Code Agent",
     "iconName": "Bot",
@@ -8,11 +9,11 @@
     "inputDescription": "Task description and relevant code context",
     "outputDescription": "Generated code, analysis results, or task completion report",
     "foundationModel": "anthropic/claude-sonnet-4",
-    "systemPrompt": "",
-    "skillFileNames": []
+    "systemPrompt": ""
   },
   "opencode-agent": {
     "kind": "plugin",
+    "visibility": "public",
     "runtimeId": "opencode-agent",
     "name": "OpenCode Agent",
     "iconName": "Cpu",
@@ -20,11 +21,11 @@
     "inputDescription": "Code task description and project context",
     "outputDescription": "Implemented code changes and execution results",
     "foundationModel": "deepseek/deepseek-chat",
-    "systemPrompt": "",
-    "skillFileNames": []
+    "systemPrompt": ""
   },
   "script-container": {
     "kind": "plugin",
+    "visibility": "public",
     "runtimeId": "script-container",
     "name": "Script Container",
     "iconName": "Terminal",
@@ -32,11 +33,11 @@
     "inputDescription": "Script definition and input parameters",
     "outputDescription": "Script execution output and exit status",
     "foundationModel": "anthropic/claude-sonnet-4",
-    "systemPrompt": "",
-    "skillFileNames": []
+    "systemPrompt": ""
   },
   "tealflow-cowork-chat": {
     "kind": "cowork",
+    "visibility": "public",
     "runtimeId": "chat",
     "name": "Tealflow Cowork Chat",
     "iconName": "MessageCircle",
@@ -45,7 +46,6 @@
     "outputDescription": "Teal module selection artifact",
     "foundationModel": "anthropic/claude-sonnet-4",
     "systemPrompt": "",
-    "skillFileNames": [],
     "mcpServers": {
       "tealflow": { "type": "stdio", "catalogId": "tealflow-mcp" }
     }

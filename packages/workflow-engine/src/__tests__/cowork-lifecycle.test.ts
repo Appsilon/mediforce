@@ -7,7 +7,7 @@ import {
   InMemoryCoworkSessionRepository,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import { WorkflowEngine } from '../index.js';
+import { WorkflowEngine } from '../index';
 
 /**
  * Integration test: full cowork lifecycle
@@ -22,6 +22,7 @@ const coworkDesignerDef: WorkflowDefinition = {
   name: 'cowork-designer-test',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     {
       id: 'intake',
@@ -94,7 +95,7 @@ beforeEach(async () => {
 describe('Cowork lifecycle: route → simulate session → finalize → complete', () => {
   it('routes to cowork step, then completes when artifact is provided', async () => {
     // 1. Create and start instance
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'cowork-designer-test',
       1,
       'user-001',
@@ -127,6 +128,8 @@ describe('Cowork lifecycle: route → simulate session → finalize → complete
       outputSchema: coworkDesignerDef.steps[1].cowork!.outputSchema!,
       voiceConfig: null,
       artifact: null,
+      validationResult: null,
+      presentation: null,
       mcpServers: null,
       turns: [],
       createdAt: new Date().toISOString(),
@@ -172,7 +175,7 @@ describe('Cowork lifecycle: route → simulate session → finalize → complete
   });
 
   it('preserves step context in instance variables after cowork finalize', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'cowork-designer-test',
       1,
       'user-001',

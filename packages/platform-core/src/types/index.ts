@@ -11,25 +11,26 @@ export type {
   Transition,
   Trigger,
   ProcessDefinition,
-} from '../schemas/process-definition.js';
+} from '../schemas/process-definition';
 
 export type {
   ReviewConstraints,
   AgentConfig,
   StepConfig,
   ProcessConfig,
-} from '../schemas/process-config.js';
+} from '../schemas/process-config';
 
-export type { FileMetadata } from '../schemas/file-metadata.js';
+export type { FileMetadata } from '../schemas/file-metadata';
 
-export type { AuditEvent } from '../schemas/audit-event.js';
+export type { AuditEvent } from '../schemas/audit-event';
 
-export type { StepInput, StepOutput } from '../schemas/step-contract.js';
+export type { StepInput, StepOutput } from '../schemas/step-contract';
 
 export type {
   InstanceStatus,
   ProcessInstance,
-} from '../schemas/process-instance.js';
+  RunNameEntry,
+} from '../schemas/process-instance';
 
 export type {
   StepExecutionStatus,
@@ -37,31 +38,36 @@ export type {
   ReviewVerdict,
   AgentOutputSnapshot,
   StepExecution,
-} from '../schemas/step-execution.js';
+} from '../schemas/step-execution';
 
 export type {
   Annotation,
   GitMetadata,
+  TokenUsage,
+  Presentation,
+  StepOutputEnvelope,
   AgentOutputEnvelope,
-} from '../schemas/agent-output-envelope.js';
+} from '../schemas/agent-output-envelope';
 
-export type { AgentEvent } from '../schemas/agent-event.js';
+export type { AgentEvent } from '../schemas/agent-event';
 
 export type {
   AgentRunStatus,
   AgentRun,
-} from '../schemas/agent-run.js';
+} from '../schemas/agent-run';
 
 export type {
   WorkflowAgentConfig,
+  ScriptStepConfig,
+  DatabricksJobConfig,
   WorkflowCoworkConfig,
   WorkflowReviewConfig,
   WorkflowStep,
   WorkflowDefinition,
-} from '../schemas/workflow-definition.js';
+} from '../schemas/workflow-definition';
 
 export type {
   ConversationTurn,
   CoworkSessionStatus,
   CoworkSession,
-} from '../schemas/cowork-session.js';
+} from '../schemas/cowork-session';

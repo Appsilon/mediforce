@@ -18,6 +18,13 @@ import {
   InMemoryAgentOAuthTokenRepository,
   InMemoryOAuthProviderRepository,
 } from '@mediforce/platform-core/testing';
+import {
+  PluginNotFoundError,
+  AgentStepExecutor,
+  ScriptStepExecutor,
+  InMemoryAgentEventLog,
+  PluginRunner,
+} from '@mediforce/agent-runtime';
 
 // Mock platform-services module
 const mockProcessRepo = {
@@ -89,13 +96,23 @@ const mockToolCatalogRepo = {
 // them (see the OAuth suite below). The module-scoped defaults only have
 // to exist — executeAgentStep never hits them unless step.agentId + oauth
 // binding are both present, which our non-OAuth tests don't exercise.
+const mockModelRegistryRepo = {
+  getById: vi.fn().mockResolvedValue(null),
+};
 const oauthProviderRepo = new InMemoryOAuthProviderRepository();
 const agentOAuthTokenRepo = new InMemoryAgentOAuthTokenRepository();
+
+const eventLog = new InMemoryAgentEventLog();
+const pluginRunner = new PluginRunner(eventLog);
+const agentStepExecutor = new AgentStepExecutor(mockAgentRunner as never);
+const scriptStepExecutor = new ScriptStepExecutor(pluginRunner);
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
     engine: mockEngine,
     agentRunner: mockAgentRunner,
+    scriptStepExecutor,
+    agentStepExecutor,
     pluginRegistry: mockPluginRegistry,
     instanceRepo: mockInstanceRepo,
     processRepo: mockProcessRepo,
@@ -106,6 +123,7 @@ vi.mock('@/lib/platform-services', () => ({
     toolCatalogRepo: mockToolCatalogRepo,
     oauthProviderRepo,
     agentOAuthTokenRepo,
+    modelRegistryRepo: mockModelRegistryRepo,
   }),
 }));
 
@@ -114,6 +132,14 @@ vi.mock('@/lib/platform-services', () => ({
 // map — template resolution covers secret presence separately.
 vi.mock('@/app/actions/workflow-secrets', () => ({
   getWorkflowSecretsForRuntime: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock('@/app/actions/namespace-secrets', () => ({
+  getNamespaceSecretsForRuntime: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock('@/lib/resolve-agent-identity', () => ({
+  resolveAgentIdentity: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Import after mock setup
@@ -213,6 +239,46 @@ describe('executeAgentStep', () => {
     expect(mockPluginRegistry.get).toHaveBeenCalledWith('gather-data');
   });
 
+  it('[DATA] uses mock Claude plugin when mock dev step plugin is not registered', async () => {
+    const originalMockAgent = process.env.MOCK_AGENT;
+    process.env.MOCK_AGENT = 'true';
+    mockPluginRegistry.get.mockImplementation((name: string) => {
+      if (name === 'verify-data-quality') {
+        throw new PluginNotFoundError(name);
+      }
+      if (name === 'claude-code-agent') {
+        return mockPlugin;
+      }
+      throw new PluginNotFoundError(name);
+    });
+
+    try {
+      const stepNoPlugin: WorkflowStep = {
+        ...firstStep,
+        id: 'verify-data-quality',
+        name: 'Verify Data Quality',
+      };
+
+      await executeAgentStep('inst-wf-001', 'verify-data-quality', stepNoPlugin, {}, 'user-1');
+
+      expect(mockPluginRegistry.get).toHaveBeenCalledWith('verify-data-quality');
+      expect(mockPluginRegistry.get).toHaveBeenCalledWith('claude-code-agent');
+      expect(mockAgentRunner.runWithWorkflowStep).toHaveBeenCalledWith(
+        mockPlugin,
+        expect.objectContaining({ stepId: 'verify-data-quality' }),
+      );
+      expect(mockAuditRepo.append).toHaveBeenCalledWith(
+        expect.objectContaining({ actorId: 'agent:verify-data-quality' }),
+      );
+    } finally {
+      if (originalMockAgent === undefined) {
+        delete process.env.MOCK_AGENT;
+      } else {
+        process.env.MOCK_AGENT = originalMockAgent;
+      }
+    }
+  });
+
   // ---- Autonomy level resolution ----
 
   it('[DATA] resolves autonomy level from workflowStep', async () => {
@@ -231,15 +297,16 @@ describe('executeAgentStep', () => {
     expect(contextArg.autonomyLevel).toBe('L2');
   });
 
-  it('[DATA] script executor always uses L4 autonomy', async () => {
+  it('[DATA] script executor uses ScriptStepExecutor (not AgentRunner)', async () => {
     const scriptStep: WorkflowStep = {
       id: 'gather-data', name: 'Gather Data', type: 'creation', executor: 'script', autonomyLevel: 'L1',
     };
 
     await executeAgentStep('inst-wf-001', 'gather-data', scriptStep, {}, 'user-1');
 
-    const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
-    expect(contextArg.autonomyLevel).toBe('L4');
+    // Script steps now bypass AgentRunner entirely — they go through
+    // ScriptStepExecutor → PluginRunner directly.
+    expect(mockAgentRunner.runWithWorkflowStep).not.toHaveBeenCalled();
   });
 
   // ---- L0/L1/L2 step advancement (THE FIX for "stuck on first step") ----
@@ -874,6 +941,34 @@ describe('executeAgentStep', () => {
         processInstanceId: 'inst-wf-001',
       }),
     );
+  });
+
+  it('[DATA] emits script.step.started audit event for script executor', async () => {
+    const scriptStep: WorkflowStep = {
+      id: 'gather-data', name: 'Gather Data', type: 'creation', executor: 'script',
+    };
+    const updatedInstance = buildProcessInstance({ id: 'inst-wf-001', status: 'running' });
+    mockEngine.advanceStep.mockResolvedValue(updatedInstance);
+
+    await executeAgentStep('inst-wf-001', 'gather-data', scriptStep, { topic: 'test' }, 'user-1');
+
+    expect(mockAuditRepo.append).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'script.step.started',
+        actorId: 'script:gather-data',
+        actorType: 'system',
+        entityId: 'inst-wf-001',
+        processInstanceId: 'inst-wf-001',
+        executorType: 'script',
+      }),
+    );
+
+    // Description must NOT contain autonomy level for scripts
+    const scriptStartedCall = mockAuditRepo.append.mock.calls.find(
+      (call: unknown[]) => (call[0] as Record<string, unknown>).action === 'script.step.started',
+    );
+    expect(scriptStartedCall).toBeDefined();
+    expect((scriptStartedCall![0] as Record<string, unknown>).description).not.toContain('autonomy');
   });
 
   // ---- OAuth token loading + refresh pass-through ----

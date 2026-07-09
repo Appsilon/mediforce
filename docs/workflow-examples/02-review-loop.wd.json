@@ -1,0 +1,83 @@
+{
+  "name": "tutorial-review-loop",
+  "title": "Review Loop",
+  "description": "Agent generates content, human reviews it. Approve advances to done; revise sends it back to the agent. Demonstrates agent steps, autonomyLevel, review verdicts, and the approve/revise loop pattern.",
+  "triggers": [
+    { "type": "manual", "name": "manual" }
+  ],
+  "roles": ["author", "reviewer"],
+  "steps": [
+    {
+      "id": "describe-task",
+      "name": "Describe What to Write",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["author"],
+      "description": "Describe the document you want the agent to draft.",
+      "params": [
+        {
+          "name": "topic",
+          "type": "string",
+          "required": true,
+          "description": "Topic or title of the document"
+        },
+        {
+          "name": "instructions",
+          "type": "string",
+          "required": true,
+          "description": "Detailed instructions for the agent — tone, length, audience, key points"
+        }
+      ]
+    },
+    {
+      "id": "generate-draft",
+      "name": "Generate Draft",
+      "type": "creation",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L3",
+      "description": "Agent writes a draft based on the topic and instructions. On revise loops, incorporates reviewer feedback.",
+      "env": {
+        "OPENROUTER_API_KEY": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_BASE_URL": "{{ANTHROPIC_BASE_URL}}",
+        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_API_KEY": ""
+      },
+      "agent": {
+        "model": "anthropic/claude-sonnet-4",
+        "image": "mediforce-golden-image",
+        "prompt": "You are a professional writer. Draft a document based on the user's topic and instructions.\n\nRead /output/input.json for context:\n- steps['describe-task'].topic — the subject\n- steps['describe-task'].instructions — detailed guidance\n- steps['review-draft'] (if present) — previous reviewer feedback to address\n\n## OUTPUT CONTRACT (MANDATORY)\nYou MUST: 1) Write result JSON to {output_directory}/result.json using bash. 2) Your FINAL message must be ONLY: {\"output_file\": \"{output_directory}/result.json\", \"summary\": \"...\"}\n\nResult JSON shape: { \"draft\": \"<the full document text>\", \"wordCount\": <number> }"
+      }
+    },
+    {
+      "id": "review-draft",
+      "name": "Review Draft",
+      "type": "review",
+      "executor": "human",
+      "allowedRoles": ["reviewer"],
+      "description": "Review the agent's draft. Approve to finalize, or revise with feedback to send it back.",
+      "params": [
+        {
+          "name": "feedback",
+          "type": "string",
+          "required": false,
+          "description": "Feedback for the agent if revising — what to change, add, or remove"
+        }
+      ],
+      "verdicts": {
+        "approve": { "target": "done" },
+        "revise": { "target": "generate-draft" }
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "describe-task", "to": "generate-draft" },
+    { "from": "generate-draft", "to": "review-draft" }
+  ]
+}

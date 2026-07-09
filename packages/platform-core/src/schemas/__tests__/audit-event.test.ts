@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AuditEventSchema } from '../audit-event.js';
+import { AuditEventSchema } from '../audit-event';
 
 const validAuditEvent = {
   actorId: 'user-123',
@@ -143,6 +143,18 @@ describe('AuditEventSchema', () => {
     if (result.success) {
       expect(result.data.executorType).toBe('human');
       expect(result.data.reviewerType).toBe('none');
+    }
+  });
+
+  it('[DATA] should accept executorType "script" (deterministic script steps)', () => {
+    const result = AuditEventSchema.safeParse({
+      ...validAuditEvent,
+      executorType: 'script',
+      reviewerType: 'none',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.executorType).toBe('script');
     }
   });
 

@@ -42,6 +42,7 @@ export const ProcessInstanceSchema = z.object({
    * runs can be archived — active runs must be cancelled first.
    */
   archived: z.boolean().default(false),
+  namespace: z.string().min(1).optional(),
   /**
    * Snapshot of outputs carried over from the last successfully completed
    * run of the same workflow name, per the WD's `inputForNextRun` declarations.
@@ -51,7 +52,28 @@ export const ProcessInstanceSchema = z.object({
   previousRun: z.record(z.string(), z.unknown()).optional(),
   /** ID of the ProcessInstance whose outputs populated `previousRun`. */
   previousRunSourceId: z.string().optional(),
+  totalCostUsd: z.number().optional(),
+  parentInstanceId: z.string().min(1).optional(),
+  parentDefinitionName: z.string().min(1).optional(),
+  dryRun: z.boolean().default(false),
 });
 
 export type InstanceStatus = z.infer<typeof InstanceStatusSchema>;
 export type ProcessInstance = z.infer<typeof ProcessInstanceSchema>;
+
+/**
+ * Projected `{ id, definitionName }` view of a run. Backs the workspace
+ * `id → definitionName` label map (`useProcessNameMap`), which only ever reads
+ * those two fields — the full `ProcessInstance` wire shape was 24 s/request in
+ * dev for a 10k-run workspace (issue #588).
+ *
+ * Both fields are REQUIRED: a row missing `definitionName` is corruption, not a
+ * default. No `.catch()` — parsing fails loud rather than papering over a bad
+ * row (repo "no silent fallbacks" rule).
+ */
+export const RunNameEntrySchema = ProcessInstanceSchema.pick({
+  id: true,
+  definitionName: true,
+});
+
+export type RunNameEntry = z.infer<typeof RunNameEntrySchema>;

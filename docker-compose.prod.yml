@@ -36,7 +36,42 @@ services:
       timeout: 3s
       retries: 5
 
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    mem_limit: ${POSTGRES_MEM_LIMIT:-1g}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mediforce}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-mediforce}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mediforce} -d ${POSTGRES_DB:-mediforce}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ADR-0001 — Drizzle migration init container. Runs once per `up` and
+  # applies any pending Postgres migrations (idempotent via drizzle's
+  # `__drizzle_migrations` ledger). `platform-ui` waits via
+  # service_completed_successfully so the app boot never races a
+  # half-applied schema.
+  migrate:
+    image: ghcr.io/appsilon/mediforce-migrate:latest
+    build:
+      context: .
+      dockerfile: packages/platform-ui/Dockerfile
+      target: migrate
+    restart: "no"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-mediforce}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mediforce}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   platform-ui:
+    image: ghcr.io/appsilon/mediforce-platform-ui:latest
     build:
       context: .
       dockerfile: packages/platform-ui/Dockerfile
@@ -44,7 +79,6 @@ services:
         - NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY}
         - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
         - NEXT_PUBLIC_FIREBASE_PROJECT_ID=${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
-        - NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}
         - NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}
         - NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID}
         - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
@@ -55,31 +89,77 @@ services:
       - "3000"
     environment:
       - REDIS_URL=redis://redis:6379
+      # ADR-0001 — Postgres is the only storage backend. Migrations run in
+      # the `migrate` init container before this service starts
+      # (depends_on: { migrate: { condition: service_completed_successfully } }).
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-mediforce}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mediforce}
+      # NEXT_PUBLIC_* — injected at container start by docker-entrypoint.sh
+      # (replaces __PLACEHOLDER__ values in pre-built registry images).
+      - NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY}
+      - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
+      - NEXT_PUBLIC_FIREBASE_PROJECT_ID=${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
+      - NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}
+      - NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+      - NEXT_PUBLIC_GIT_SHA
       - PLATFORM_API_KEY=${PLATFORM_API_KEY}
       - SECRETS_ENCRYPTION_KEY=${SECRETS_ENCRYPTION_KEY}
       - DOCKER_DEEPSEEK_API_KEY=${DOCKER_DEEPSEEK_API_KEY}
       - DOCKER_OPENROUTER_API_KEY=${DOCKER_OPENROUTER_API_KEY}
       - DOCKER_APP_BASE_URL=http://platform-ui:3000
+      # Public-facing base URL — server uses it to build absolute URLs
+      # (OAuth redirect_uri, post-callback redirects). Falls back to
+      # NEXT_PUBLIC_APP_URL if unset; falls back to request URL only as
+      # a last resort, which is wrong behind Docker/reverse proxies.
+      - APP_BASE_URL=${APP_BASE_URL:-${NEXT_PUBLIC_APP_URL:-}}
       - MEDIFORCE_ROOT=/repo
+      # Per-run worktrees + bare repos live here. Path must be identical
+      # in-container and on the host so `docker run -v <wt>:/workspace` from
+      # the host docker daemon (used by container-worker via docker.sock)
+      # resolves to the same files the orchestrator wrote. The host
+      # directory must exist before first launch:
+      #   sudo mkdir -p /var/lib/mediforce
+      - MEDIFORCE_DATA_DIR=/var/lib/mediforce
+      - EMAIL_PROVIDER=${EMAIL_PROVIDER:-}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY:-}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN:-}
+      - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL:-}
+      - MAILGUN_SENDER_NAME=${MAILGUN_SENDER_NAME:-Mediforce}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
+      - SMTP_SECURE=${SMTP_SECURE:-true}
+      - SMTP_SENDER_NAME=${SMTP_SENDER_NAME:-Mediforce}
       # Firebase Admin SDK credentials for server-side Firestore/Auth access.
       # Mounted read-only from host ./secrets/firebase-admin-sa.json.
       - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-sa.json
     volumes:
       - /tmp:/tmp
+      - /var/lib/mediforce:/var/lib/mediforce
       - .:/repo:ro
       - ./secrets/firebase-admin-sa.json:/run/secrets/firebase-sa.json:ro
     depends_on:
       redis:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
-  agent-worker:
+  container-worker:
+    image: ghcr.io/appsilon/mediforce-container-worker:latest
     build:
       context: .
-      dockerfile: packages/agent-queue/Dockerfile.worker
+      dockerfile: packages/container-worker/Dockerfile.worker
     restart: unless-stopped
     mem_limit: ${AGENT_WORKER_MEM_LIMIT:-1280m}
+    expose:
+      - "3001"
     environment:
       - REDIS_URL=redis://redis:6379
+      - WORKER_HTTP_PORT=3001
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp:/tmp
@@ -92,3 +172,4 @@ volumes:
   redis-data:
   caddy-data:
   caddy-config:
+  postgres-data:

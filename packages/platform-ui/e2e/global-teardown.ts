@@ -16,6 +16,16 @@ async function globalTeardown(_config: FullConfig): Promise<void> {
   } catch {
     // non-fatal
   }
+  const proc = globalThis.__firebaseEmulatorProcess;
+  if (proc?.pid !== undefined && !proc.killed) {
+    try {
+      // Kill the entire process group so the JVM child process also exits.
+      process.kill(-proc.pid, 'SIGTERM');
+    } catch (err: unknown) {
+      // eslint-disable-next-line no-console
+      console.warn(`[global-teardown] Firebase emulator stop failed: ${String(err)}`);
+    }
+  }
 }
 
 export default globalTeardown;

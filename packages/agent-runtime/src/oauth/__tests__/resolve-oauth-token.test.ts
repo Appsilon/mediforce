@@ -6,7 +6,7 @@ import {
   RefreshTokenUnavailableError,
   renderOAuthHeader,
   resolveOAuthToken,
-} from '../resolve-oauth-token.js';
+} from '../resolve-oauth-token';
 
 const NOW = 1_700_000_000_000;
 

@@ -1,179 +1,212 @@
 import type {
   ProcessRepository,
-  ProcessDefinition,
-  ProcessConfig,
-  DefinitionListResult,
   WorkflowDefinitionListResult,
   WorkflowDefinitionGroup,
-} from '../index.js';
-import type { WorkflowDefinition } from '../schemas/workflow-definition.js';
+} from '../index';
+import type { WorkflowDefinition } from '../schemas/workflow-definition';
 
 /**
  * In-memory implementation of ProcessRepository for testing.
- * Uses Maps with composite keys ({name}:{version}) matching Firestore document IDs.
+ * Uses Maps with composite keys ({namespace}:{name}:{version}) matching Firestore document IDs.
  * Reusable by any package that needs test doubles for process operations.
  */
 export class InMemoryProcessRepository implements ProcessRepository {
-  private definitions = new Map<string, ProcessDefinition>();
-  private configs = new Map<string, ProcessConfig>();
   private workflowDefinitions = new Map<string, WorkflowDefinition>();
   private workflowDefaults = new Map<string, number>();
 
-  private compositeKey(name: string, version: string): string {
-    return `${name}:${version}`;
+  private compositeKey(namespace: string, name: string, version: string): string {
+    return `${namespace}:${name}:${version}`;
   }
 
   // ---------------------------------------------------------------------------
-  // WorkflowDefinition methods (new unified schema)
+  // WorkflowDefinition methods (unified schema)
   // ---------------------------------------------------------------------------
 
-  async getWorkflowDefinition(name: string, version: number): Promise<WorkflowDefinition | null> {
-    return this.workflowDefinitions.get(this.compositeKey(name, String(version))) ?? null;
+  async getWorkflowDefinition(namespace: string, name: string, version: number): Promise<WorkflowDefinition | null> {
+    return this.workflowDefinitions.get(this.compositeKey(namespace, name, String(version))) ?? null;
   }
 
   async saveWorkflowDefinition(definition: WorkflowDefinition): Promise<void> {
-    this.workflowDefinitions.set(
-      this.compositeKey(definition.name, String(definition.version)),
-      definition,
+    const key = this.compositeKey(
+      definition.namespace,
+      definition.name,
+      String(definition.version),
     );
+    if (this.workflowDefinitions.has(key)) {
+      // Mirror Firestore + Postgres semantics: versions are immutable.
+      const err = new Error(
+        `Workflow definition "${definition.name}" version "${definition.version}" already exists and cannot be overwritten. ` +
+          `Create a new version to change the definition.`,
+      );
+      err.name = 'WorkflowDefinitionVersionAlreadyExistsError';
+      throw err;
+    }
+    this.workflowDefinitions.set(key, definition);
   }
 
-  async listWorkflowDefinitions(): Promise<WorkflowDefinitionListResult> {
+  async listAllWorkflowDefinitions(
+    includeArchived: boolean,
+  ): Promise<WorkflowDefinitionListResult> {
+    return this.buildListResult(includeArchived, () => true);
+  }
+
+  async listWorkflowDefinitionsVisibleTo(
+    allowed: readonly string[],
+    includeArchived: boolean,
+  ): Promise<WorkflowDefinitionListResult> {
+    return this.buildListResult(includeArchived, (group) => {
+      const latest = group.versions.find((v) => v.version === group.latestVersion);
+      if (latest === undefined) return false;
+      if (latest.visibility === 'public') return true;
+      return allowed.includes(latest.namespace);
+    });
+  }
+
+  private buildListResult(
+    includeArchived: boolean,
+    predicate: (group: WorkflowDefinitionGroup) => boolean,
+  ): WorkflowDefinitionListResult {
     const grouped = new Map<string, WorkflowDefinition[]>();
     for (const definition of this.workflowDefinitions.values()) {
-      const existing = grouped.get(definition.name) ?? [];
+      if (definition.deleted === true) continue;
+      if (!includeArchived && definition.archived === true) continue;
+      const key = this.compositeKey(definition.namespace, definition.name, '');
+      const existing = grouped.get(key) ?? [];
       existing.push(definition);
-      grouped.set(definition.name, existing);
+      grouped.set(key, existing);
     }
-    const definitions: WorkflowDefinitionGroup[] = Array.from(grouped.entries()).map(
-      ([name, versions]) => ({
-        name,
-        versions,
-        latestVersion: Math.max(...versions.map((v) => v.version)),
-        defaultVersion: this.workflowDefaults.get(name) ?? null,
-      }),
-    );
+    const definitions: WorkflowDefinitionGroup[] = Array.from(grouped.entries())
+      .map(([_key, versions]) => {
+        const namespace = versions[0].namespace;
+        const name = versions[0].name;
+        return {
+          namespace,
+          name,
+          versions,
+          latestVersion: Math.max(...versions.map((v) => v.version)),
+          defaultVersion: this.workflowDefaults.get(`${namespace}:${name}`) ?? null,
+        };
+      })
+      .filter(predicate);
     return { definitions };
   }
 
-  async getDefaultWorkflowVersion(name: string): Promise<number | null> {
-    return this.workflowDefaults.get(name) ?? null;
+  async getDefaultWorkflowVersion(namespace: string, name: string): Promise<number | null> {
+    return this.workflowDefaults.get(`${namespace}:${name}`) ?? null;
   }
 
-  async setDefaultWorkflowVersion(name: string, version: number): Promise<void> {
-    this.workflowDefaults.set(name, version);
+  async setDefaultWorkflowVersion(namespace: string, name: string, version: number): Promise<void> {
+    this.workflowDefaults.set(`${namespace}:${name}`, version);
   }
 
-  async getLatestWorkflowVersion(name: string): Promise<number> {
+  async listWorkflowVersions(namespace: string, name: string): Promise<WorkflowDefinition[]> {
+    const versions: WorkflowDefinition[] = [];
+    for (const definition of this.workflowDefinitions.values()) {
+      if (definition.name === name && definition.namespace === namespace) {
+        versions.push(definition);
+      }
+    }
+    versions.sort((a, b) => a.version - b.version);
+    return versions;
+  }
+
+  async getLatestWorkflowVersion(namespace: string, name: string): Promise<number> {
     let latest = 0;
     for (const definition of this.workflowDefinitions.values()) {
-      if (definition.name === name && definition.version > latest) {
+      if (
+        definition.name === name &&
+        definition.namespace === namespace &&
+        definition.version > latest
+      ) {
         latest = definition.version;
       }
     }
     return latest;
   }
 
-  // ---------------------------------------------------------------------------
-  // ProcessDefinition methods (legacy)
-  // ---------------------------------------------------------------------------
-
-  async getProcessDefinition(
-    name: string,
-    version: string,
-  ): Promise<ProcessDefinition | null> {
-    return this.definitions.get(this.compositeKey(name, version)) ?? null;
-  }
-
-  async saveProcessDefinition(definition: ProcessDefinition): Promise<void> {
-    this.definitions.set(
-      this.compositeKey(definition.name, definition.version),
-      definition,
-    );
-  }
-
-  async listProcessDefinitions(): Promise<DefinitionListResult> {
-    return { valid: Array.from(this.definitions.values()), invalid: [] };
-  }
-
-  async getProcessConfig(
-    processName: string,
-    configName: string,
-    configVersion: string,
-  ): Promise<ProcessConfig | null> {
-    return this.configs.get(`${processName}:${configName}:${configVersion}`) ?? null;
-  }
-
-  async saveProcessConfig(config: ProcessConfig): Promise<void> {
-    this.configs.set(
-      `${config.processName}:${config.configName}:${config.configVersion}`,
-      config,
-    );
-  }
-
-  async listProcessConfigs(processName: string): Promise<ProcessConfig[]> {
-    return Array.from(this.configs.values()).filter(
-      (c) => c.processName === processName,
-    );
-  }
-
-  async setProcessArchived(name: string, archived: boolean): Promise<void> {
-    for (const [key, def] of this.definitions) {
-      if (def.name === name) {
-        this.definitions.set(key, { ...def, metadata: { ...def.metadata, archived } });
+  async setProcessArchived(name: string, namespace: string, archived: boolean): Promise<void> {
+    for (const [key, def] of this.workflowDefinitions) {
+      if (def.name === name && def.namespace === namespace) {
+        this.workflowDefinitions.set(key, { ...def, archived });
       }
     }
   }
 
-  async setConfigArchived(
-    processName: string,
-    configName: string,
-    configVersion: string,
-    archived: boolean,
-  ): Promise<void> {
-    const key = `${processName}:${configName}:${configVersion}`;
-    const config = this.configs.get(key);
-    if (config !== undefined) {
-      this.configs.set(key, { ...config, archived });
+  async setVersionArchived(namespace: string, name: string, version: number, archived: boolean): Promise<void> {
+    const key = this.compositeKey(namespace, name, String(version));
+    const def = this.workflowDefinitions.get(key);
+    if (!def) {
+      const err = new Error(`Workflow definition "${name}" version ${version} not found`);
+      err.name = 'WorkflowDefinitionVersionNotFoundError';
+      throw err;
+    }
+    this.workflowDefinitions.set(key, { ...def, archived });
+  }
+
+  async setWorkflowVisibility(name: string, namespace: string, visibility: 'public' | 'private'): Promise<void> {
+    let found = false;
+    for (const [key, def] of this.workflowDefinitions) {
+      if (def.name === name && def.namespace === namespace) {
+        this.workflowDefinitions.set(key, { ...def, visibility });
+        found = true;
+      }
+    }
+    if (!found) throw new Error(`Workflow '${name}' not found`);
+  }
+
+  async setWorkflowDeleted(namespace: string, name: string, deleted: boolean): Promise<void> {
+    for (const [key, def] of this.workflowDefinitions) {
+      if (def.name === name && def.namespace === namespace) {
+        this.workflowDefinitions.set(key, { ...def, deleted });
+      }
     }
   }
 
-  async setDefinitionVersionArchived(
-    name: string,
-    version: string,
-    archived: boolean,
-  ): Promise<void> {
-    const key = this.compositeKey(name, version);
-    const def = this.definitions.get(key);
-    if (def !== undefined) {
-      this.definitions.set(key, { ...def, archived });
+  async isWorkflowNameDeleted(namespace: string, name: string): Promise<boolean> {
+    for (const definition of this.workflowDefinitions.values()) {
+      if (definition.name === name && definition.namespace === namespace && definition.deleted === true) {
+        return true;
+      }
     }
-  }
-
-  async setWorkflowDeleted(_name: string, _deleted: boolean): Promise<void> {
-    // No-op in test double — Firestore uses untyped updateDoc for the `deleted` field
-  }
-
-  async isWorkflowNameDeleted(_name: string): Promise<boolean> {
     return false;
   }
 
-  async countInstancesByDefinitionName(_name: string): Promise<number> {
+  async countInstancesByDefinitionName(_namespace: string, _name: string): Promise<number> {
     return 0;
   }
 
+  async transferWorkflowNamespace(
+    sourceNamespace: string,
+    name: string,
+    targetNamespace: string,
+  ): Promise<void> {
+    const moved: Array<[string, ReturnType<typeof this.workflowDefinitions.get>]> = [];
+    for (const [key, def] of this.workflowDefinitions) {
+      if (def?.name === name && def.namespace === sourceNamespace) {
+        moved.push([key, def]);
+      }
+    }
+    if (moved.length === 0) {
+      throw new Error(`Workflow '${name}' not found in namespace '${sourceNamespace}'`);
+    }
+    for (const [key, def] of moved) {
+      if (def === undefined) continue;
+      this.workflowDefinitions.delete(key);
+      const newDef = { ...def, namespace: targetNamespace };
+      const newKey = `${targetNamespace}:${def.name}:${def.version}`;
+      this.workflowDefinitions.set(newKey, newDef);
+    }
+  }
+
+
   /** Test helper: clear all stored data */
   clear(): void {
-    this.definitions.clear();
-    this.configs.clear();
     this.workflowDefinitions.clear();
   }
 
   /** Test helper: get counts of stored items */
-  count(): { definitions: number; configs: number; workflowDefinitions: number } {
+  count(): { workflowDefinitions: number } {
     return {
-      definitions: this.definitions.size,
-      configs: this.configs.size,
       workflowDefinitions: this.workflowDefinitions.size,
     };
   }

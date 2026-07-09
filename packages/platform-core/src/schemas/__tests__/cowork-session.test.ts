@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { ConversationTurnSchema, CoworkSessionSchema } from '../cowork-session.js';
-import { buildCoworkSession } from '../../testing/factories.js';
+import { ConversationTurnSchema, CoworkSessionSchema } from '../cowork-session';
+import { buildCoworkSession } from '../../testing/factories';
 
 describe('ConversationTurnSchema', () => {
   it('should parse a human turn', () => {
@@ -159,6 +159,18 @@ describe('CoworkSessionSchema with mcpServers', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.mcpServers).toBeNull();
+    }
+  });
+
+  it('should default agent and voiceConfig when omitted (legacy chat-only sessions)', () => {
+    const session = buildCoworkSession();
+    // Remove agent + voiceConfig to simulate sessions created before voice existed
+    const { agent: _a, voiceConfig: _v, ...legacySession } = session;
+    const result = CoworkSessionSchema.safeParse(legacySession);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.agent).toBe('chat');
+      expect(result.data.voiceConfig).toBeNull();
     }
   });
 

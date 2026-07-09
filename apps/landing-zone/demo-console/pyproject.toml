@@ -1,0 +1,11 @@
+[project]
+name = "landing-zone-demo-console"
+version = "0.1.0"
+description = "Demo console for the Landing Zone Hetzner SFTP host"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "pydantic",
+  "paramiko>=3",
+]

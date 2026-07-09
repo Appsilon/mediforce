@@ -11,12 +11,11 @@ tags: [gotcha, e2e, playwright, firebase-emulator, remote]
 ## Symptom
 
 - E2E test fails with "Firebase SDK not initialised", "API key missing", or Playwright "chromium executable not found".
-- `test:e2e:auth` hangs on emulator startup in a proxied environment.
-- `test:e2e:gif` errors on `ffmpeg: command not found`.
+- `test:e2e` hangs on emulator startup in a proxied environment.
 
 ## Cause
 
-Local dev boxes have `.env.local`, Playwright browsers, ffmpeg, and a running Firebase emulator already. Remote agent environments don't. Google Fonts may also fail to download — Next.js falls back to system fonts, tests still work.
+Local dev boxes have `.env.local`, Playwright browsers, and a running Firebase emulator already. Remote agent environments don't. Google Fonts may also fail to download — Next.js falls back to system fonts, tests still work.
 
 ## Fix / workaround
 
@@ -28,7 +27,6 @@ Run the bootstrap script. It handles:
 | `/tmp/firebase-e2e.json` with `"ui": {"enabled": false}` | Emulator UI download crashes in proxied environments. |
 | Start Firebase emulators (Auth 9099, Firestore 8080) | Required by tests. |
 | `npx playwright install --with-deps chromium` | Binary must match `@playwright/test` version. |
-| `apt-get install ffmpeg` | Needed for GIF conversion. |
 | `fuser -k 9007/tcp` | Kill stale dev server. |
 
 ```bash
@@ -38,7 +36,7 @@ python3 packages/platform-ui/scripts/bootstrap_e2e.py
 Then:
 
 ```bash
-cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth
+pnpm test:e2e
 ```
 
 ## How to avoid next time

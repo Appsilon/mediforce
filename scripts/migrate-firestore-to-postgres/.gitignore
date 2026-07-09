@@ -1,0 +1,6 @@
+# Runtime artifacts from cutover runs — never committed.
+.venv/
+__pycache__/
+*.pyc
+migration.json
+dryrun.json

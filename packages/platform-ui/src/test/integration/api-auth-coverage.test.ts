@@ -1,0 +1,61 @@
+// packages/platform-ui/src/test/integration/api-auth-coverage.test.ts
+// Static structural contract from Step 0 of the MCP permissions refactor.
+// Green since proxy.ts (formerly middleware.ts in Next 15) centralized auth
+// and inline validateApiKey() calls were removed from route handlers.
+
+import { describe, it, expect } from 'vitest';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+
+const PLATFORM_UI_ROOT = resolve(__dirname, '..', '..', '..');
+const PROXY_PATH = join(PLATFORM_UI_ROOT, 'src', 'proxy.ts');
+const API_ROOT = join(PLATFORM_UI_ROOT, 'src', 'app', 'api');
+
+function walkRouteFiles(dir: string): string[] {
+  const out: string[] = [];
+  if (!existsSync(dir)) return out;
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    const stat = statSync(full);
+    if (stat.isDirectory()) {
+      out.push(...walkRouteFiles(full));
+    } else if (entry === 'route.ts') {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+describe('API route auth coverage', () => {
+  it('has a proxy file at src/proxy.ts that exports a matcher covering /api/:path*', () => {
+    expect(existsSync(PROXY_PATH)).toBe(true);
+    const source = readFileSync(PROXY_PATH, 'utf8');
+    expect(source).toMatch(/matcher:\s*['"]\/api\/:path\*['"]/);
+  });
+
+  it('declares a PUBLIC_ROUTES constant with exactly the approved public endpoints', () => {
+    expect(existsSync(PROXY_PATH)).toBe(true);
+    const source = readFileSync(PROXY_PATH, 'utf8');
+    expect(source).toMatch(/PUBLIC_ROUTES/);
+    expect(source).toMatch(/\/api\/health/);
+    // Per-provider OAuth callback is public (state HMAC is the sole integrity
+    // check). The middleware matches it via a regex pattern, not a static
+    // string, so assert on the pattern shape.
+    expect(source).toMatch(/\\\/api\\\/oauth\\\/.+callback/);
+  });
+
+  it('does not contain /api/redis-test/route.ts', () => {
+    const redisTestPath = join(API_ROOT, 'redis-test', 'route.ts');
+    expect(existsSync(redisTestPath)).toBe(false);
+  });
+
+  it('does not contain inline validateApiKey() call in any /api/*/route.ts', () => {
+    const routeFiles = walkRouteFiles(API_ROOT);
+    expect(routeFiles.length).toBeGreaterThan(0);
+    const offenders = routeFiles.filter((file) => {
+      const source = readFileSync(file, 'utf8');
+      return source.includes('validateApiKey(');
+    });
+    expect(offenders).toEqual([]);
+  });
+});

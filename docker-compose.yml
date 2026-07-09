@@ -5,7 +5,7 @@
 #   docker compose up               — start Redis + agent worker
 #
 # The platform-ui dev server connects to Redis when REDIS_URL is set:
-#   REDIS_URL=redis://localhost:6379 pnpm dev:ui
+#   docker compose up -d && pnpm dev:queue
 
 services:
   redis:
@@ -14,6 +14,22 @@ services:
       - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: mediforce
+      POSTGRES_PASSWORD: mediforce
+      POSTGRES_DB: mediforce
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mediforce -d mediforce"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -29,12 +45,15 @@ services:
       redis:
         condition: service_healthy
 
-  agent-worker:
+  container-worker:
     build:
       context: .
-      dockerfile: packages/agent-queue/Dockerfile.worker
+      dockerfile: packages/container-worker/Dockerfile.worker
+    expose:
+      - "3001"
     environment:
       - REDIS_URL=redis://redis:6379
+      - WORKER_HTTP_PORT=3001
     volumes:
       # Worker needs Docker socket to spawn containers
       - /var/run/docker.sock:/var/run/docker.sock
@@ -43,3 +62,22 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+
+  # OTel trace viewer (ADR-0007). Receives OTLP HTTP on :6006 (/v1/traces)
+  # and serves the UI on the same port. Opt-in via the `tracing` profile:
+  #   docker compose up -d phoenix
+  #   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:6006 pnpm dev
+  # See docs/dev-quickref.md § Tracing.
+  phoenix:
+    image: arizephoenix/phoenix:version-17
+    profiles: [tracing]
+    ports:
+      - "6006:6006"
+    environment:
+      - PHOENIX_WORKING_DIR=/mnt/data
+    volumes:
+      - phoenix-data:/mnt/data
+
+volumes:
+  postgres-data:
+  phoenix-data:

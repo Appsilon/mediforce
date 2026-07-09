@@ -7,7 +7,7 @@ import {
   TransitionSchema,
   TriggerSchema,
   VerdictSchema,
-} from '../process-definition.js';
+} from '../process-definition';
 
 const minimalStep = {
   id: 'step-1',
@@ -40,6 +40,41 @@ describe('VerdictSchema', () => {
     if (result.success) {
       expect(result.data.target).toBe('complete');
     }
+  });
+
+  it('accepts label/intent/requiresComment as optional overrides', () => {
+    const result = VerdictSchema.safeParse({
+      target: 'complete',
+      label: 'Accept delivery',
+      intent: 'success',
+      requiresComment: false,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.label).toBe('Accept delivery');
+      expect(result.data.intent).toBe('success');
+      expect(result.data.requiresComment).toBe(false);
+    }
+  });
+
+  it('omits optional fields by default', () => {
+    const result = VerdictSchema.safeParse({ target: 'complete' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.label).toBeUndefined();
+      expect(result.data.intent).toBeUndefined();
+      expect(result.data.requiresComment).toBeUndefined();
+    }
+  });
+
+  it('rejects an unknown intent', () => {
+    const result = VerdictSchema.safeParse({ target: 'complete', intent: 'info' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an empty label string', () => {
+    const result = VerdictSchema.safeParse({ target: 'complete', label: '' });
+    expect(result.success).toBe(false);
   });
 });
 
@@ -409,24 +444,22 @@ describe('ProcessDefinitionSchema', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.repo?.url).toBe('https://github.com/org/repo');
-      expect(result.data.repo?.branch).toBeUndefined();
-      expect(result.data.repo?.directory).toBeUndefined();
     }
   });
 
-  it('should accept a definition with repo including branch and directory', () => {
+  it('should accept a definition with repo including commit and auth', () => {
     const result = ProcessDefinitionSchema.safeParse({
       ...minimalDefinition,
       repo: {
         url: 'https://github.com/org/monorepo',
-        branch: 'main',
-        directory: 'packages/my-app',
+        commit: 'abc1234',
+        auth: 'GITHUB_TOKEN',
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.repo?.branch).toBe('main');
-      expect(result.data.repo?.directory).toBe('packages/my-app');
+      expect(result.data.repo?.commit).toBe('abc1234');
+      expect(result.data.repo?.auth).toBe('GITHUB_TOKEN');
     }
   });
 
@@ -441,7 +474,7 @@ describe('ProcessDefinitionSchema', () => {
   it('should reject repo without url field', () => {
     const result = ProcessDefinitionSchema.safeParse({
       ...minimalDefinition,
-      repo: { branch: 'main' },
+      repo: { auth: 'GITHUB_TOKEN' },
     });
     expect(result.success).toBe(false);
   });

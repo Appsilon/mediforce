@@ -1,5 +1,3 @@
 import { defineConfig } from 'vitest/config';
 
-export default defineConfig({
-  resolve: { conditions: ['@mediforce/source'] },
-});
+export default defineConfig({});

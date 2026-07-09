@@ -10,7 +10,7 @@ services:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
 
   stunnel:
-    image: alpine:3.23
+    image: alpine:3.24
     restart: unless-stopped
     mem_limit: ${STUNNEL_MEM_LIMIT:-64m}
     entrypoint: ["sh", "-c", "apk add --no-cache stunnel && exec stunnel /etc/stunnel/stunnel.conf"]
@@ -23,10 +23,55 @@ services:
       redis:
         condition: service_healthy
 
+  phoenix:
+    image: arizephoenix/phoenix:version-17
+    restart: unless-stopped
+    mem_limit: ${PHOENIX_MEM_LIMIT:-512m}
+    ports:
+      - "127.0.0.1:6006:6006"
+    environment:
+      - PHOENIX_WORKING_DIR=/mnt/data
+    volumes:
+      - phoenix-data:/mnt/data
+
   platform-ui:
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://phoenix:6006
+      - MEDIFORCE_OTEL_CAPTURE_CONTENT=${MEDIFORCE_OTEL_CAPTURE_CONTENT:-true}
 
-  agent-worker:
+  container-worker:
+    expose:
+      - "3001"
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+
+  # ADR-0001 — bind mount Postgres data dir on staging so `docker compose
+  # down -v` does NOT wipe production data (named volumes would be).
+  # Operator can see the files in /var/lib/mediforce/postgres-data, back
+  # them up via `tar`, and only an explicit `rm -rf` removes the data.
+  # Host dir must exist with the right ownership before first `up`:
+  #   sudo mkdir -p /var/lib/mediforce/postgres-data
+  #   sudo chown -R 999:999 /var/lib/mediforce/postgres-data   # postgres-alpine UID
+  postgres:
+    # ADR-0001 — staging-only planner tuning. The staging host has only
+    # ~3.7GB total RAM shared across postgres + platform-ui +
+    # container-worker + agent-worker + caddy + redis + stunnel. Postgres
+    # ships with `effective_cache_size = 4GB`, which over-estimates the OS
+    # page cache available on this box and biases the planner toward plans
+    # that assume cached data (e.g. index scans that miss and re-fetch
+    # from disk). 1.5GB is realistic for OS cache headroom on staging
+    # after the other containers' working sets. `shared_buffers` stays at
+    # the default 128MB — fine for dormant + early-cutover load; revisit
+    # once we have real query patterns post-Phase D. Override here
+    # (staging overlay) rather than in docker-compose.prod.yml so
+    # better-provisioned prod hosts keep the more generous defaults.
+    command:
+      - postgres
+      - -c
+      - effective_cache_size=1536MB
+    volumes:
+      - /var/lib/mediforce/postgres-data:/var/lib/postgresql/data
+
+volumes:
+  phoenix-data:

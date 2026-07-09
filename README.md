@@ -79,8 +79,6 @@ Each step displays its autonomy configuration (L1–L4) so operators always know
 <img src="docs/features/run-detail-autonomy-badges.gif" alt="Process run with autonomy level badges" width="720" />
 </div>
 
-> **[See all features with recordings](docs/features/FEATURES.md)** — task management, workflow editor, run reports, agent catalog, escalation handling, and more.
-
 ## Why Open Source
 
 In regulated industries, trust and transparency are non-negotiable. Open source is the right model:
@@ -105,65 +103,203 @@ We're building the standard for human-agent collaboration in pharma — and we'r
 
 **[Getting Started Guide](GETTING-STARTED.md)** — Quick start with emulators and demo data, no setup required.
 
-Quick start:
+> **Datastore (ADR-0001).** Server data layer runs on self-hosted Postgres.
+> See [`docs/postgres-local-dev.md`](docs/postgres-local-dev.md) and
+> [`docs/adr/0001-firestore-to-postgres.md`](docs/adr/0001-firestore-to-postgres.md).
+
+
+### Fastest start (no setup)
 
 ```bash
 pnpm install
-cd packages/platform-ui
-python3 scripts/bootstrap-dev.py     # Create .env.local, start emulators
-pnpm seed:dev                        # Seed demo data
-NEXT_PUBLIC_USE_EMULATORS=true pnpm dev:ui
+pnpm dev:mock        # port 9007, mocked agents, local emulators + demo data
 ```
 
-Demo credentials: `test@mediforce.dev` / `test123456`
+Open `http://localhost:9007`. Use this to click through the UI without configuring a Firebase project, cloud keys, Docker, or real agents.
 
-For production Firebase setup, see the [Getting Started Guide](GETTING-STARTED.md).
+### Dev modes
 
-Run tests:
+| Command | What it gives you |
+|---|---|
+| `pnpm dev` | Default full local stack. Boots a local Postgres via the docker overlay, runs migrations, then starts the UI; agents run inline via Docker (no Redis). Firebase Auth/Storage + the `users/{uid}` profile collection still come from `.env.local`. The main dev loop. |
+| `pnpm dev:mock` | Mocked agents + seeded local emulator data, port 9007. No cloud keys, no Docker, no Firebase project. |
+| `pnpm dev:no-docker` | Docker-free, UI-only. Agents run via host `claude` CLI instead of Docker. |
+| `pnpm dev:queue` | Like `dev`, but agent execution goes through the BullMQ queue (production architecture). Boots `redis` alongside Postgres; requires the worker running — see below. |
+
+### Postgres mode (ADR-0001)
+
+Bring up Postgres and point the app at it. One command does all
+of the above:
 
 ```bash
-pnpm typecheck      # type checking
-pnpm test           # unit + integration
-cd packages/platform-ui && pnpm test:e2e  # E2E (Playwright)
+pnpm dev                                           # docker compose up + migrate + dev
+```
+
+Manual equivalent if you need to wire your own env (e.g. point at an
+external Postgres):
+
+```bash
+docker compose up postgres -d                      # boot Postgres 16
+# in packages/platform-ui/.env.local:
+#   DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce
+pnpm db:migrate                                    # apply Drizzle migrations once
+pnpm dev                                           # start the app
+```
+
+`pnpm db:migrate` is idempotent — re-run after pulling new migrations
+from main. Same script runs inside `pnpm dev` and inside the
+production Dockerfile's CMD, so dev and prod share the migration path.
+See [Staging / production ops](#staging--production-ops-postgres) below.
+
+Firebase Auth is still required (until [ADR-0002](docs/adr/) lands a NextAuth
+replacement); set the `NEXT_PUBLIC_FIREBASE_*` vars in `.env.local` as usual.
+Firebase Emulators are **not** required for the Postgres data path — only for
+the auth flow if you don't want to use a real Firebase project.
+
+Migration mechanics, schema authoring, and troubleshooting live in
+[`docs/postgres-local-dev.md`](docs/postgres-local-dev.md).
+
+### Queue mode (production architecture)
+
+`docker-compose.yml` runs Postgres + Redis + container-worker + bull-board (BullMQ UI on :3100):
+
+```bash
+docker compose up -d       # bring up queue infra
+pnpm dev:queue             # native UI pointed at compose Redis
+docker compose down        # stop infra when you're done
+```
+
+### Emulator + own seed data (legacy Firestore demo path)
+
+```bash
+cp packages/platform-ui/.env.example packages/platform-ui/.env.local
+pnpm emulators                                   # terminal 1
+pnpm seed                                        # terminal 2 — seeds demo workflows + data
+NEXT_PUBLIC_USE_EMULATORS=true pnpm dev          # terminal 2
+```
+
+Demo credentials: `test@mediforce.dev` / `test123456`. For production Firebase setup, see the [Getting Started Guide](GETTING-STARTED.md).
+
+### Tests
+
+```bash
+pnpm typecheck       # type checking (~5s)
+pnpm test:unit       # vitest L1+L2 (~9s)
+pnpm test:affected   # vitest, only files changed since main (<1s)
+pnpm test:e2e        # Playwright L3+L4 (~4min, requires Firebase emulator)
+pnpm test            # everything: test:unit + test:e2e
+```
+
+E2E variants:
+
+```bash
+pnpm test:e2e:api     # L3 only — API E2E, no browser (~30s)
+pnpm test:e2e:ui      # L4 only — UI E2E with real Chromium
+```
+
+For UI-only journeys, run `pnpm test:e2e --project=authenticated` from the platform-ui directory (or invoke Playwright's interactive UI mode via `pnpm test:e2e:ui` there).
+
+### CLI
+
+`@mediforce/cli` is a thin wrapper around the platform API for registering
+workflows, starting runs, and inspecting state from a terminal. The bin
+entry runs `tsx` against `src/`, so changes show up without a build.
+
+Run it from the workspace so it always uses the checked-out source:
+
+```bash
+pnpm exec mediforce --help
+```
+
+Auth + base URL come from env. Add to `~/.zshrc` (or the per-shell
+session) so every invocation picks them up:
+
+```bash
+export MEDIFORCE_API_KEY="<value of PLATFORM_API_KEY in .env.local>"
+export MEDIFORCE_BASE_URL="http://127.0.0.1:9003"
+# Use 127.0.0.1 not localhost — Node prefers IPv6 and the dev server
+# binds IPv4, which surfaces as a misleading "fetch failed".
+```
+
+Common commands:
+
+```bash
+pnpm exec mediforce workflow list                                        # all registered workflows
+pnpm exec mediforce workflow register --file path/to.wd.json --namespace appsilon
+pnpm exec mediforce run start --workflow landing-zone-CDISCPILOT01 --namespace appsilon
+pnpm exec mediforce run get <runId>                                      # current status
+pnpm exec mediforce <command> --help                                     # per-command flags
 ```
 
 ### Building Docker images for script steps
 
-Workflows with `script` executor steps need Docker images built locally:
+Workflows with `script` executor steps need Docker images built locally — none
+are pulled from a registry. Build everything in one go:
 
 ```bash
-# Community Digest workflow
-docker build -t mediforce-agent:community-digest -f apps/community-digest/container/Dockerfile .
-
-# Protocol to TFL workflow
-docker build -t mediforce-agent:protocol-to-tfl -f apps/protocol-to-tfl/container/Dockerfile .
+./scripts/rebuild-docker-images.sh
 ```
+
+This builds `mediforce-golden-image` and `mediforce-node` (used by most inline
+`runtime: javascript` script steps, and as the fallback when a step omits
+`agent.image`), plus the per-app images (`community-digest`, `protocol-to-tfl`,
+`tealflow`, `landing-zone`).
 
 Skip this if you only use `human` or `agent` executor steps, or run with `MOCK_AGENT=true`.
 
-### Running agents locally (without Docker)
+### Running agents without Docker
 
 By default, agents execute inside Docker containers. To run them using your local `claude` CLI instead (useful for development and reducing costs):
 
 ```bash
-pnpm dev:ui:local  # platform UI only
-pnpm dev:local     # platform UI + supply intelligence
+pnpm dev:no-docker
 ```
 
-> Requires `claude` to be available on your `PATH`. Use the `:local` scripts (not `ALLOW_LOCAL_AGENTS=true pnpm dev:ui`) — the env var doesn't propagate reliably through pnpm script aliases.
+> Requires `claude` to be available on your `PATH`. Use this script (not `ALLOW_LOCAL_AGENTS=true pnpm dev`) — the env var doesn't propagate reliably through pnpm script aliases.
 
 > Full guide: **[docs/development.md](docs/development.md)**
+
+## Staging / production ops (Postgres)
+
+`docker-compose.prod.yml` ships a `postgres:16-alpine` service alongside
+Redis. The host needs two things before `platform-ui` will start:
+
+1. `POSTGRES_PASSWORD` set in `/opt/mediforce/.env` (no default — required).
+   `POSTGRES_USER` + `POSTGRES_DB` default to `mediforce`.
+2. `/var/lib/mediforce/postgres-data` exists on the host, owned by UID
+   999 (the postgres-alpine user). `docker-compose.staging.yml` bind-mounts
+   that path so `docker compose down -v` cannot wipe data — only an
+   explicit `rm -rf` removes it. Local dev keeps a named volume, so
+   `docker compose down -v` is still a normal reset workflow on a
+   developer machine.
+
+**Fresh server provisioning** is handled by
+[`scripts/bootstrap-server.py`](scripts/bootstrap-server.py): it
+auto-generates `POSTGRES_PASSWORD` (per ADR-0001, PR #559) and creates
+the bind-mount data dir with the right ownership as part of its
+`step_env_local` + `step_postgres_dir` flow on a new host.
+
+**Already-bootstrapped deployments** (the current staging) — bootstrap
+is not re-run against them. Add `POSTGRES_PASSWORD` + create the dir
+manually via ssh.
+
+Drizzle migrations run in a short-lived `migrate` compose service (init
+container, see [`docker-compose.prod.yml`](docker-compose.prod.yml))
+before `platform-ui` starts. `platform-ui` waits via
+`depends_on: { migrate: { condition: service_completed_successfully } }`.
+Idempotent (drizzle's `__drizzle_migrations` ledger). No separate
+migration step in the deploy pipeline.
+
 
 ## Deep Dives
 
 | | |
 |---|---|
-| **[Getting Started](GETTING-STARTED.md)** | Set up your development environment with Firebase |
+| **[Getting Started](GETTING-STARTED.md)** | Set up your development environment — local Postgres data layer plus Firebase Auth/Storage |
 | **[Vision](docs/vision.md)** | Why this needs to exist, what agents actually do in pharma, and where we're headed |
 | **[Architecture](docs/architecture.md)** | Processes, steps, agents, compliance — the technical foundation |
 | **[How We Work](docs/how-we-work.md)** | Building bottom-up, in public, with real processes |
 | **[Development](docs/development.md)** | Setup, monorepo structure, testing, deployment |
-| **[Features](docs/features/FEATURES.md)** | Full feature gallery with recorded walkthroughs |
 
 ## License
 

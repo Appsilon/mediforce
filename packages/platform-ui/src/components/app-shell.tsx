@@ -4,11 +4,13 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check, ArrowLeft, ChevronRight, Wrench } from 'lucide-react';
+import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check, ArrowLeft, ChevronRight, Wrench, Database } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
+import { useNamespaceRole } from '@/hooks/use-namespace-role';
+import { useRankingsAge } from '@/hooks/use-rankings-age';
 import { ThemeToggle } from './theme-toggle';
 import { CommandPaletteTrigger } from './command-palette';
 import { cn } from '@/lib/utils';
@@ -18,7 +20,7 @@ const NAV_ITEMS = [
   { href: '/runs', label: 'All runs', icon: Play, badge: null, exact: false },
   { href: '/agents', label: 'Agents', icon: Bot, badge: null, exact: false },
   { href: '/tools', label: 'Tools', icon: Wrench, badge: null, exact: false },
-  { href: '/tasks', label: 'New actions', icon: User, badge: null, exact: false },
+  { href: '/tasks', label: 'Human actions', icon: User, badge: null, exact: false },
 ] as const;
 
 const ACTION_ITEMS = [
@@ -83,6 +85,7 @@ function buildBreadcrumbs(pathname: string, handle: string, prefix: string): Cru
     const agents: Crumb = { label: 'Agents', href: `${prefix}/agents` };
     if (!s1) return [{ ...agents, href: null }];
     if (s1 === 'new') return [agents, { label: 'New Agent', href: null }];
+    if (s1 === 'models') return [agents, { label: 'Models', href: null }];
     if (s1 === 'definitions') return [agents, { label: 'Configure Agent', href: null }];
     return [agents];
   }
@@ -142,6 +145,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const handlePrefix = handleFromPath !== '' ? `/${handleFromPath}` : '';
 
   const breadcrumbs = buildBreadcrumbs(pathname, handleFromPath, handlePrefix);
+  const { canAdmin } = useNamespaceRole(handleFromPath);
+  const { daysSinceUpdate, loading: rankingsLoading } = useRankingsAge();
+  const [rankingsBannerDismissed, setRankingsBannerDismissed] = React.useState(false);
+  const showRankingsBanner = canAdmin && !rankingsLoading && !rankingsBannerDismissed
+    && (daysSinceUpdate === null || daysSinceUpdate > 21);
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
@@ -277,14 +285,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ? pathname === fullHref || pathname === `${fullHref}/`
             : pathname.startsWith(fullHref);
           return (
-            <NavItem
-              key={item.label}
-              href={fullHref}
-              label={item.label}
-              icon={item.icon}
-              badge={item.badge}
-              active={isActive}
-            />
+            <React.Fragment key={item.label}>
+              <NavItem
+                href={fullHref}
+                label={item.label}
+                icon={item.icon}
+                badge={item.badge}
+                active={isActive}
+              />
+              {item.href === '/agents' && (
+                <div className="pl-4">
+                  <NavItem
+                    href={`${handlePrefix}/agents/models`}
+                    label="Models"
+                    icon={Database}
+                    badge={null}
+                    active={pathname.startsWith(`${handlePrefix}/agents/models`)}
+                  />
+                </div>
+              )}
+            </React.Fragment>
           );
         })}
         <div className="my-2 border-t" />
@@ -297,11 +317,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         />
       </nav>
 
-      {/* Bottom — git SHA only */}
+      {/* Bottom — git SHA + optional branch */}
       {process.env.NEXT_PUBLIC_GIT_SHA && (
         <div className="border-t px-4 py-2">
           <span className="font-mono text-[10px] text-muted-foreground">
             {process.env.NEXT_PUBLIC_GIT_SHA}
+            {process.env.NEXT_PUBLIC_GIT_BRANCH && (
+              <span> · {process.env.NEXT_PUBLIC_GIT_BRANCH}</span>
+            )}
           </span>
         </div>
       )}
@@ -309,7 +332,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen flex-col bg-background">
+      {showRankingsBanner && (
+        <div className="flex items-center justify-between bg-amber-100 dark:bg-amber-950/50 px-4 py-1.5 text-xs text-amber-800 dark:text-amber-300 border-b border-amber-200 dark:border-amber-900/50">
+          <span>
+            Model rankings {daysSinceUpdate === null ? 'never synced' : `outdated (${daysSinceUpdate}d ago)`}.
+            Run <code className="mx-1 rounded bg-amber-200/60 dark:bg-amber-900/40 px-1 py-0.5 font-mono">python3 scripts/sync-model-rankings.py</code> to update.
+          </span>
+          <button onClick={() => setRankingsBannerDismissed(true)} className="ml-4 hover:text-amber-900 dark:hover:text-amber-100" aria-label="Dismiss">✕</button>
+        </div>
+      )}
+      <div className="flex flex-1 overflow-hidden">
       {/* Sidebar — desktop */}
       <aside className="hidden w-[280px] shrink-0 border-r md:flex md:flex-col">
         <SidebarContent />
@@ -393,6 +426,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-auto">
           {children}
         </main>
+      </div>
       </div>
     </div>
   );

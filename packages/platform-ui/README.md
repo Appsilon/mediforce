@@ -14,14 +14,13 @@ pnpm dev
 
 ## Environment Variables
 
-Copy `.env.local.example` to `.env.local` and fill in values.
+Copy `.env.example` to `.env.local` and fill in values.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Yes | Firebase API key |
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Yes | Firebase auth domain |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Yes | Firebase project ID |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | No | Firebase storage bucket |
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | No | Firebase messaging sender ID |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | No | Firebase app ID |
 | `OPENROUTER_API_KEY` | Yes | OpenRouter API key for LLM calls |
@@ -35,16 +34,11 @@ Copy `.env.local.example` to `.env.local` and fill in values.
 # Standard dev server — port 9003, production/staging Firebase per .env.local
 pnpm dev
 
-# Full local emulator stack — port 9007, Firebase emulators, mock LLM agents,
-# real Docker for script-container steps, MEDIFORCE_DATA_DIR isolated to /tmp.
-# Use this to click through Docker-backed workflows without real credentials.
-# Bootstrap + seed first:
-#   python3 packages/platform-ui/scripts/bootstrap_e2e.py
-#   pnpm seed:dev
-pnpm dev:test
+# Mocked agents + in-memory data — port 9007. No Firebase, no keys, no Docker.
+# Use this to click through the UI without any setup.
+pnpm dev:mock
 
-# Dev with mock agents (no Claude CLI needed, instant fixture responses) but
-# against production/staging Firebase.
+# Dev with mock agents but against production/staging Firebase
 MOCK_AGENT=true pnpm dev
 ```
 
@@ -57,13 +51,19 @@ See `docs/running-workspace-locally.md` for the full step-by-step on exercising 
 ## Testing
 
 ```bash
-# Unit tests
-pnpm test:run
+# Unit + integration (vitest) — runs from repo root
+pnpm test:unit
 
-# E2E smoke tests (no emulators)
-pnpm test:e2e
-
-# E2E with auth (requires Firebase emulators)
+# All E2E (L3 + L4, Playwright) — needs Firebase emulators
 pnpm emulators        # terminal 1
-pnpm test:e2e:auth    # terminal 2
+pnpm test:e2e         # terminal 2
+```
+
+E2E variants (run from this directory):
+
+```bash
+pnpm test:e2e -- --project=api           # L3 only — API E2E, no browser
+pnpm test:e2e -- --project=authenticated # L4 only — UI E2E
+pnpm test:e2e:headed                     # with visible browser
+pnpm test:e2e:ui                         # Playwright UI mode (interactive)
 ```

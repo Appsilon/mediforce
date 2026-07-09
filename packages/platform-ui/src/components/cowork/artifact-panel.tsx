@@ -2,9 +2,78 @@
 
 import * as React from 'react';
 import {
-  Loader2, CheckCircle, Lock, Check, Circle,
+  Loader2, CheckCircle, Lock, Check, Circle, AlertCircle, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+// ---------------------------------------------------------------------------
+// JSON tree explorer
+// ---------------------------------------------------------------------------
+
+function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
+  if (value === null) return <span className="text-muted-foreground">null</span>;
+  if (typeof value === 'boolean') return <span className="text-blue-600 dark:text-blue-400">{String(value)}</span>;
+  if (typeof value === 'number') return <span className="text-emerald-600 dark:text-emerald-400">{value}</span>;
+  if (typeof value === 'string') {
+    if (value.length > 120) {
+      return <span className="text-amber-700 dark:text-amber-300" title={value}>&quot;{value.slice(0, 120)}…&quot;</span>;
+    }
+    return <span className="text-amber-700 dark:text-amber-300">&quot;{value}&quot;</span>;
+  }
+  if (Array.isArray(value)) return <JsonArray items={value} depth={depth} />;
+  if (typeof value === 'object') return <JsonObject obj={value as Record<string, unknown>} depth={depth} />;
+  return <span>{String(value)}</span>;
+}
+
+function JsonObject({ obj, depth }: { obj: Record<string, unknown>; depth: number }) {
+  const entries = Object.entries(obj);
+  const [open, setOpen] = React.useState(depth < 2);
+  if (entries.length === 0) return <span className="text-muted-foreground">{'{}'}</span>;
+
+  return (
+    <div>
+      <button onClick={() => setOpen(!open)} className="inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground">
+        {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        <span className="text-xs">{`{${entries.length}}`}</span>
+      </button>
+      {open && (
+        <div className="ml-4 border-l border-muted pl-2">
+          {entries.map(([key, val]) => (
+            <div key={key} className="py-0.5">
+              <span className="text-violet-600 dark:text-violet-400 font-medium">{key}</span>
+              <span className="text-muted-foreground">: </span>
+              <JsonValue value={val} depth={depth + 1} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function JsonArray({ items, depth }: { items: unknown[]; depth: number }) {
+  const [open, setOpen] = React.useState(depth < 2);
+  if (items.length === 0) return <span className="text-muted-foreground">{'[]'}</span>;
+
+  return (
+    <div>
+      <button onClick={() => setOpen(!open)} className="inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground">
+        {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        <span className="text-xs">{`[${items.length}]`}</span>
+      </button>
+      {open && (
+        <div className="ml-4 border-l border-muted pl-2">
+          {items.map((item, i) => (
+            <div key={i} className="py-0.5">
+              <span className="text-muted-foreground text-xs mr-1">{i}</span>
+              <JsonValue value={item} depth={depth + 1} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Artifact requirements validation
@@ -39,6 +108,8 @@ function checkRequiredFields(
 interface ArtifactPanelProps {
   artifact: Record<string, unknown> | null;
   outputSchema: Record<string, unknown> | null;
+  validationResult: { valid: boolean; errors: string[] } | null;
+  presentation: string | null;
   onFinalize: () => void;
   finalizing: boolean;
   finalized: boolean;
@@ -47,6 +118,8 @@ interface ArtifactPanelProps {
 export function ArtifactPanel({
   artifact,
   outputSchema,
+  validationResult,
+  presentation,
   onFinalize,
   finalizing,
   finalized,
@@ -58,6 +131,28 @@ export function ArtifactPanel({
   );
   const fulfilledCount = [...fieldStatus.values()].filter(Boolean).length;
   const allFulfilled = requiredFields.length === 0 || fulfilledCount === requiredFields.length;
+
+  const [activeTab, setActiveTab] = React.useState<'data' | 'preview'>('data');
+
+  const presentationHtml = React.useMemo(() => {
+    if (!presentation) return '';
+    return `<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdn.tailwindcss.com/3.4.1"></script>
+<style>body { margin: 0; padding: 1rem; font-family: system-ui, sans-serif; }</style>
+</head>
+<body>${presentation}</body>
+</html>`;
+  }, [presentation]);
+
+  React.useEffect(() => {
+    if (presentation && activeTab === 'data') {
+      setActiveTab('preview');
+    }
+  // activeTab intentionally excluded — including it would snap the user back
+  // to preview every time they manually switch to the data tab.
+  }, [presentation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className={cn(
@@ -113,15 +208,87 @@ export function ArtifactPanel({
         </div>
       )}
 
-      <div className={cn('flex-1 overflow-auto p-4', finalized && 'opacity-80')}>
-        {artifact ? (
-          <pre className="rounded-md bg-muted p-3 text-xs overflow-auto whitespace-pre-wrap break-words font-mono">
-            {JSON.stringify(artifact, null, 2)}
-          </pre>
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            No artifact yet. Start a conversation to build one.
+      {/* Validation status */}
+      {validationResult && !finalized && (
+        <div className={cn(
+          'border-b px-4 py-2',
+          validationResult.valid ? 'bg-green-50 dark:bg-green-950/20' : 'bg-red-50 dark:bg-red-950/20',
+        )}>
+          <div className="flex items-center gap-1.5">
+            {validationResult.valid ? (
+              <>
+                <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                <span className="text-xs font-medium text-green-700 dark:text-green-400">Valid</span>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                <span className="text-xs font-medium text-red-700 dark:text-red-400">
+                  {validationResult.errors.length} error{validationResult.errors.length !== 1 ? 's' : ''}
+                </span>
+              </>
+            )}
           </div>
+          {!validationResult.valid && validationResult.errors.length > 0 && (
+            <ul className="mt-1 space-y-0.5">
+              {validationResult.errors.map((error, i) => (
+                <li key={i} className="text-xs text-red-600 dark:text-red-400">
+                  {error}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Tab bar — only show if presentation exists */}
+      {presentation && !finalized && (
+        <div className="flex border-b">
+          <button
+            onClick={() => setActiveTab('data')}
+            className={cn(
+              'px-4 py-2 text-xs font-medium transition-colors',
+              activeTab === 'data'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Data
+          </button>
+          <button
+            onClick={() => setActiveTab('preview')}
+            className={cn(
+              'px-4 py-2 text-xs font-medium transition-colors',
+              activeTab === 'preview'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Preview
+          </button>
+        </div>
+      )}
+
+      <div className={cn('flex-1 overflow-auto', finalized && 'opacity-80')}>
+        {activeTab === 'data' || !presentation ? (
+          <div className="p-4">
+            {artifact ? (
+              <div className="rounded-md bg-muted p-3 text-xs font-mono">
+                <JsonValue value={artifact} />
+              </div>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                No artifact yet. Start a conversation to build one.
+              </div>
+            )}
+          </div>
+        ) : (
+          <iframe
+            srcDoc={presentationHtml}
+            className="h-full w-full border-0"
+            sandbox="allow-scripts"
+            title="Artifact presentation"
+          />
         )}
       </div>
 
@@ -129,7 +296,7 @@ export function ArtifactPanel({
         <div className="border-t p-4">
           <button
             onClick={onFinalize}
-            disabled={!artifact || !allFulfilled || finalizing}
+            disabled={!artifact || !allFulfilled || finalizing || (validationResult !== null && !validationResult.valid)}
             className={cn(
               'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
               artifact && allFulfilled

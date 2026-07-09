@@ -4,24 +4,19 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": {
-      "import": {
-        "@mediforce/source": "./src/index.ts",
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      }
-    }
+    ".": "./src/index.ts"
   },
   "scripts": {
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "@mediforce/platform-core": "workspace:*",
-    "firebase-admin": "^13.6.1"
+    "firebase-admin": "^14.0.0"
   },
   "optionalDependencies": {
-    "@mediforce/agent-queue": "workspace:*"
+    "@mediforce/container-worker": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",

@@ -3,278 +3,289 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { CheckCircle, MessageSquare, X, Loader2 } from 'lucide-react';
-import { completeTask } from '@/app/actions/tasks';
-import { useAuth } from '@/contexts/auth-context';
+import { Loader2 } from 'lucide-react';
+import type { TaskVerdict, StepParam } from '@mediforce/platform-core';
+import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { INTENT_STYLES, type Intent } from './intent-styles';
 
 interface VerdictFormProps {
   taskId: string;
   disabled: boolean; // True when no content to review
   remainingTaskCount?: number;
+  /** Resolved verdict descriptors copied from the WD step in WD insertion
+   *  order. When absent, the form falls back to the legacy approve/revise UI
+   *  for older tasks. */
+  verdicts?: TaskVerdict[];
   onCompleted?: () => void;
 }
 
 interface SubmittedData {
-  verdict: 'approve' | 'revise';
+  verdict: string;
+  intent: Intent;
+  label: string;
   comment: string;
   timestamp: string;
 }
 
+const LEGACY_VERDICTS: TaskVerdict[] = [
+  { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+  { key: 'revise', label: 'Request changes', intent: 'warning', requiresComment: true },
+];
+
+export function RemainingTasksFooter({ remainingTaskCount }: { remainingTaskCount?: number }) {
+  const handle = useHandleFromPath();
+  return (
+    <div className="text-sm text-muted-foreground">
+      {remainingTaskCount !== undefined && remainingTaskCount > 0 ? (
+        <span>
+          You have {remainingTaskCount} more {remainingTaskCount === 1 ? 'task' : 'tasks'} &mdash;{' '}
+          <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
+            View next task
+          </Link>
+        </span>
+      ) : (
+        <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
+          Back to tasks
+        </Link>
+      )}
+    </div>
+  );
+}
+
+export function VerdictButtons({
+  verdicts,
+  submitting,
+  trimmedComment,
+  outerBlocked,
+  outerBlockedHint,
+  isVerdictBlocked,
+  onVerdict,
+}: {
+  verdicts: TaskVerdict[];
+  submitting: string | null;
+  trimmedComment: string;
+  outerBlocked?: boolean;
+  outerBlockedHint?: string;
+  /** Per-verdict param block — overrides `outerBlocked` when provided. */
+  isVerdictBlocked?: (key: string) => boolean;
+  onVerdict: (cfg: TaskVerdict) => void;
+}) {
+  const sorted = [...verdicts].sort((a, b) =>
+    a.intent === 'success' ? 1 : b.intent === 'success' ? -1 : 0,
+  );
+
+  return (
+    <div className="flex flex-col gap-2">
+      {sorted.map((cfg) => {
+        const paramBlocked = isVerdictBlocked ? isVerdictBlocked(cfg.key) : !!outerBlocked;
+        const commentBlocked = cfg.requiresComment && !trimmedComment;
+        const isSubmittingThis = submitting === cfg.key;
+        const isDisabled = submitting !== null || paramBlocked || commentBlocked;
+        return (
+          <div key={cfg.key} className="flex flex-col items-start gap-1">
+            <button
+              type="button"
+              onClick={() => onVerdict(cfg)}
+              disabled={isDisabled}
+              className={cn(
+                'inline-flex items-center justify-center gap-2 rounded-none px-4 py-2 text-sm font-medium transition-colors w-full whitespace-nowrap',
+                INTENT_STYLES[cfg.intent].submit,
+                isDisabled && 'opacity-50 cursor-not-allowed',
+              )}
+            >
+              {isSubmittingThis
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <IntentIcon intent={cfg.intent} className="h-4 w-4" />}
+              {cfg.label}
+            </button>
+            {paramBlocked && outerBlockedHint && (
+              <span className="text-xs text-muted-foreground/70 pl-1">{outerBlockedHint}</span>
+            )}
+            {!paramBlocked && commentBlocked && (
+              <span className="text-xs text-muted-foreground/70 pl-1">Comment required</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
- * Approve/Revise verdict experience styled like GitHub PR review.
- *
- * Pre-submission: Two buttons (Approve, Revise) with optional/mandatory comment.
- * Post-submission: Inline confirmation card with verdict, comment, and timestamp.
+ * Verdict experience styled like GitHub PR review. Renders N buttons from
+ * `verdicts` (resolved server-side from the WD step), one per allowed key.
+ * When `verdicts` is absent (older tasks created before the field existed),
+ * falls back to the legacy approve/revise UI.
  */
 export function VerdictForm({
   taskId,
   disabled,
   remainingTaskCount,
+  verdicts,
   onCompleted,
 }: VerdictFormProps) {
-  const handle = useHandleFromPath();
-  const { firebaseUser } = useAuth();
-  const [verdict, setVerdict] = React.useState<'approve' | 'revise' | null>(null);
+  const resolved = verdicts && verdicts.length > 0 ? verdicts : LEGACY_VERDICTS;
   const [comment, setComment] = React.useState('');
-  const [submitting, setSubmitting] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState<string | null>(null);
   const [submitted, setSubmitted] = React.useState(false);
   const [submittedData, setSubmittedData] = React.useState<SubmittedData | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
-  async function handleSubmit() {
-    if (!verdict) return;
-    if (verdict === 'revise' && !comment.trim()) return;
+  const trimmedComment = comment.trim();
 
-    setSubmitting(true);
+  async function handleSubmit(cfg: TaskVerdict) {
+    if (cfg.requiresComment && !trimmedComment) return;
+    if (submitting) return;
+
+    setSubmitting(cfg.key);
     setError(null);
 
-    const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
-    const result = await completeTask(taskId, verdict, comment.trim(), undefined, idToken);
-
-    if (result.success) {
-      const data: SubmittedData = {
-        verdict,
-        comment: comment.trim(),
+    try {
+      await mediforce.tasks.complete({
+        taskId,
+        payload: { kind: 'verdict', verdict: cfg.key, comment: trimmedComment },
+      });
+      setSubmittedData({
+        verdict: cfg.key,
+        intent: cfg.intent,
+        label: cfg.label,
+        comment: trimmedComment,
         timestamp: new Date().toISOString(),
-      };
-      setSubmittedData(data);
+      });
       setSubmitted(true);
       onCompleted?.();
-    } else {
-      setError(result.error ?? 'Failed to submit verdict');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit verdict');
+      setSubmitting(null);
     }
-
-    setSubmitting(false);
   }
 
-  // --- Post-submission state ---
   if (submitted && submittedData) {
     return <VerdictConfirmation data={submittedData} remainingTaskCount={remainingTaskCount} />;
   }
 
-  // --- Pre-submission state ---
   return (
-    <div className="space-y-4">
-      {/* Verdict buttons */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => { setVerdict('approve'); setError(null); }}
-          disabled={disabled || submitting}
-          className={cn(
-            'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
-            verdict === 'approve'
-              ? 'bg-green-600 text-white ring-2 ring-green-600/30'
-              : 'bg-green-600 text-white hover:bg-green-700',
-            (disabled || submitting) && 'opacity-50 cursor-not-allowed',
-          )}
-        >
-          <CheckCircle className="h-4 w-4" />
-          Approve
-        </button>
+    <div className="space-y-3">
+      <textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        placeholder="Add a comment (optional)..."
+        rows={3}
+        disabled={disabled || submitting !== null}
+        aria-label="Review comment"
+        className={cn(
+          'w-full rounded-md border bg-background px-3 py-2 text-sm',
+          'placeholder:text-muted-foreground',
+          'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary',
+          'resize-y min-h-[72px]',
+          (disabled || submitting !== null) && 'opacity-50 cursor-not-allowed',
+        )}
+      />
 
-        <button
-          onClick={() => { setVerdict('revise'); setError(null); }}
-          disabled={disabled || submitting}
-          className={cn(
-            'inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors',
-            verdict === 'revise'
-              ? 'border-amber-500 text-amber-700 bg-amber-50 ring-2 ring-amber-500/30 dark:bg-amber-900/20 dark:text-amber-300'
-              : 'border-amber-500 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-900/20',
-            (disabled || submitting) && 'opacity-50 cursor-not-allowed',
-          )}
-        >
-          <MessageSquare className="h-4 w-4" />
-          Revise
-        </button>
-      </div>
+      {error && (
+        <p className="text-sm text-destructive">{error}</p>
+      )}
 
-      {/* Disabled hint */}
+      <VerdictButtons
+        verdicts={resolved}
+        submitting={submitting}
+        trimmedComment={trimmedComment}
+        outerBlocked={disabled}
+        onVerdict={handleSubmit}
+      />
+
       {disabled && (
         <p className="text-xs text-muted-foreground">
           Review the step output before submitting a verdict.
         </p>
       )}
-
-      {/* Comment area + submit when verdict is selected */}
-      {verdict && !disabled && (
-        <div className="space-y-3 rounded-lg border p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">
-              {verdict === 'approve' ? 'Approve with comment' : 'Request revisions'}
-            </span>
-            <button
-              onClick={() => { setVerdict(null); setComment(''); setError(null); }}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="h-3 w-3" />
-              Cancel
-            </button>
-          </div>
-
-          <textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder={
-              verdict === 'approve'
-                ? 'Optional: add a comment...'
-                : 'Describe what needs to change...'
-            }
-            rows={3}
-            className={cn(
-              'w-full rounded-md border bg-background px-3 py-2 text-sm',
-              'placeholder:text-muted-foreground',
-              'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary',
-              'resize-y min-h-[72px]',
-            )}
-          />
-
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleSubmit}
-              disabled={submitting || (verdict === 'revise' && !comment.trim())}
-              className={cn(
-                'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                verdict === 'approve'
-                  ? 'bg-green-600 text-white hover:bg-green-700'
-                  : 'bg-amber-600 text-white hover:bg-amber-700',
-                (submitting || (verdict === 'revise' && !comment.trim())) && 'opacity-50 cursor-not-allowed',
-              )}
-            >
-              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {submitting ? 'Submitting...' : 'Submit review'}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-// --- Post-submission inline confirmation ---
+function IntentIcon({ intent, className }: { intent: Intent; className?: string }) {
+  const { Icon } = INTENT_STYLES[intent];
+  return <Icon className={className} />;
+}
 
-function VerdictConfirmation({
+export function VerdictConfirmation({
   data,
   remainingTaskCount,
+  params,
+  paramValues,
 }: {
   data: SubmittedData;
   remainingTaskCount?: number;
+  params?: StepParam[];
+  paramValues?: Record<string, unknown>;
 }) {
-  const handle = useHandleFromPath();
-  const isApprove = data.verdict === 'approve';
+  const styles = INTENT_STYLES[data.intent];
 
   return (
     <div className="space-y-4">
-      {/* Confirmation card */}
-      <div
-        className={cn(
-          'rounded-lg border p-4',
-          isApprove
-            ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800'
-            : 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800',
-        )}
-      >
+      <div className={cn('rounded-lg border p-4', styles.card)}>
         <div className="flex items-center gap-2">
-          {isApprove ? (
-            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-          ) : (
-            <MessageSquare className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-          )}
-          <span
-            className={cn(
-              'font-medium text-sm',
-              isApprove
-                ? 'text-green-800 dark:text-green-300'
-                : 'text-amber-800 dark:text-amber-300',
-            )}
-          >
-            {isApprove ? 'You approved this review' : 'You requested revisions'}
+          <IntentIcon intent={data.intent} className={cn('h-5 w-5', styles.iconColor)} />
+          <span className={cn('font-medium text-sm', styles.text)}>
+            Submitted: {data.label}
           </span>
         </div>
 
+        {params && params.length > 0 && paramValues && (
+          <dl className="space-y-1 mt-2">
+            {params.map((p) => {
+              const val = paramValues[p.name];
+              if (val === undefined || val === '') return null;
+              return (
+                <div key={p.name}>
+                  <dt className={cn('text-xs font-medium opacity-70', styles.text)}>{p.name}</dt>
+                  <dd className={cn('text-sm whitespace-pre-wrap', styles.text)}>{String(val)}</dd>
+                </div>
+              );
+            })}
+          </dl>
+        )}
+
         {data.comment && (
-          <blockquote
-            className={cn(
-              'mt-3 border-l-2 pl-3 text-sm',
-              isApprove
-                ? 'border-green-300 text-green-700 dark:border-green-700 dark:text-green-300'
-                : 'border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300',
-            )}
-          >
+          <blockquote className={cn('mt-3 border-l-2 pl-3 text-sm', styles.blockquote)}>
             {data.comment}
           </blockquote>
         )}
 
-        <p
-          className={cn(
-            'mt-2 text-xs',
-            isApprove
-              ? 'text-green-600/70 dark:text-green-400/70'
-              : 'text-amber-600/70 dark:text-amber-400/70',
-          )}
-        >
+        <p className={cn('mt-2 text-xs', styles.timestamp)}>
           {format(new Date(data.timestamp), 'MMM d, yyyy HH:mm')}
         </p>
       </div>
 
-      {/* Remaining tasks prompt */}
-      <div className="text-sm text-muted-foreground">
-        {remainingTaskCount !== undefined && remainingTaskCount > 0 ? (
-          <span>
-            You have {remainingTaskCount} more {remainingTaskCount === 1 ? 'task' : 'tasks'} &mdash;{' '}
-            <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
-              View next task
-            </Link>
-          </span>
-        ) : (
-          <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
-            Back to tasks
-          </Link>
-        )}
-      </div>
+      <RemainingTasksFooter remainingTaskCount={remainingTaskCount} />
     </div>
   );
 }
 
 /**
- * Read-only verdict confirmation for already completed tasks.
- * Reconstructs the post-submission view from task.completionData.
+ * Read-only verdict confirmation for already completed tasks. Reconstructs
+ * the post-submission view from task.completionData + the task's verdict
+ * descriptors (when available — older tasks fall back to legacy intent
+ * mapping). Pass `params` to also render submitted param values (for the
+ * verdict-with-params kind).
  */
 export function VerdictConfirmationReadOnly({
   completionData,
+  verdicts,
   remainingTaskCount,
+  params,
 }: {
   completionData: Record<string, unknown>;
+  verdicts?: TaskVerdict[];
   remainingTaskCount?: number;
+  params?: StepParam[];
 }) {
-  const verdict = completionData.verdict as 'approve' | 'revise' | undefined;
+  const verdict = completionData.verdict as string | undefined;
   const comment = (completionData.comment as string) ?? '';
   const timestamp = (completionData.completedAt as string) ?? '';
+  const paramValues = completionData.paramValues as Record<string, unknown> | undefined;
 
   if (!verdict) {
     return (
@@ -284,10 +295,16 @@ export function VerdictConfirmationReadOnly({
     );
   }
 
+  const cfg = verdicts?.find((v) => v.key === verdict)
+    ?? LEGACY_VERDICTS.find((v) => v.key === verdict)
+    ?? { key: verdict, label: verdict, intent: 'neutral' as Intent, requiresComment: false };
+
   return (
     <VerdictConfirmation
-      data={{ verdict, comment, timestamp }}
+      data={{ verdict, intent: cfg.intent, label: cfg.label, comment, timestamp }}
       remainingTaskCount={remainingTaskCount}
+      params={params}
+      paramValues={paramValues}
     />
   );
 }

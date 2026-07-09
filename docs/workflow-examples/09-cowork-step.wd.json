@@ -1,0 +1,79 @@
+{
+  "name": "tutorial-cowork-step",
+  "title": "Cowork Step",
+  "description": "Collaborative human+AI step using the cowork executor. A human and a chat agent work together in real time to produce a structured artifact. Demonstrates cowork config: agent type, systemPrompt, outputSchema, and chat model selection.",
+  "triggers": [
+    { "type": "manual", "name": "manual" }
+  ],
+  "roles": ["author"],
+  "steps": [
+    {
+      "id": "set-topic",
+      "name": "Set Topic",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["author"],
+      "description": "Provide the topic and constraints for the collaborative writing session.",
+      "params": [
+        {
+          "name": "topic",
+          "type": "string",
+          "required": true,
+          "description": "What to write about"
+        },
+        {
+          "name": "maxWords",
+          "type": "number",
+          "required": false,
+          "description": "Target word count"
+        }
+      ]
+    },
+    {
+      "id": "write-together",
+      "name": "Write Together",
+      "type": "creation",
+      "executor": "cowork",
+      "allowedRoles": ["author"],
+      "description": "Collaborate with an AI assistant to write and refine the document through conversation.",
+      "cowork": {
+        "agent": "chat",
+        "systemPrompt": "You are a writing assistant. Help the user draft and refine a document on the given topic. Use update_artifact to save the latest version after each revision. Keep the tone professional and concise.",
+        "outputSchema": {
+          "type": "object",
+          "required": ["title", "body"],
+          "properties": {
+            "title": { "type": "string" },
+            "body": { "type": "string" },
+            "wordCount": { "type": "number" }
+          }
+        },
+        "chat": {
+          "model": "anthropic/claude-sonnet-4"
+        }
+      }
+    },
+    {
+      "id": "final-review",
+      "name": "Final Review",
+      "type": "review",
+      "executor": "human",
+      "allowedRoles": ["author"],
+      "description": "Review the finished document. Approve to publish, revise to go back to editing.",
+      "verdicts": {
+        "approve": { "target": "done" },
+        "revise": { "target": "write-together" }
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "set-topic", "to": "write-together" },
+    { "from": "write-together", "to": "final-review" }
+  ]
+}

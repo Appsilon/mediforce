@@ -34,14 +34,15 @@ import {
   computeWallClockDuration,
   computeActiveProcessingTime,
 } from '@/lib/format';
-import { cn } from '@/lib/utils';
+import { cn, isBrowsableRepoUrl } from '@/lib/utils';
+import { saveBlobToDevice } from '@/lib/save-blob';
 
 type DetailLevel = 'brief' | 'full';
 
 interface RunReportProps {
   instance: ProcessInstance;
   stepExecutions: StepExecution[];
-  auditEvents: Array<AuditEvent & { id: string }>;
+  auditEvents: AuditEvent[];
   definitionSteps: Step[];
   runDetailHref: string;
 }
@@ -251,7 +252,7 @@ function ReportHeader({
             Generated: {format(new Date(), 'MMMM d, yyyy')}
           </p>
         </div>
-        <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} />
+        <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} error={instance.error} dryRun={instance.dryRun} />
       </div>
 
       <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
@@ -283,7 +284,7 @@ function StepCard({
   index: number;
   detailLevel: DetailLevel;
   definitionSteps: Step[];
-  auditEvents: Array<AuditEvent & { id: string }>;
+  auditEvents: AuditEvent[];
 }) {
   const duration = getStepDuration(step);
   const stepName = getStepName(step.stepId, definitionSteps);
@@ -380,8 +381,8 @@ function StepCard({
                   Audit Trail
                 </h4>
                 <ul className="space-y-0.5 text-xs">
-                  {stepAuditEvents.map((event) => (
-                    <li key={event.id} className="flex gap-2 text-muted-foreground">
+                  {stepAuditEvents.map((event, i) => (
+                    <li key={`${event.timestamp}-${event.actorId}-${i}`} className="flex gap-2 text-muted-foreground">
                       <span className="shrink-0">{format(new Date(event.timestamp), 'HH:mm:ss')}</span>
                       <span className="font-medium text-foreground">{event.action}</span>
                       <span className="truncate">{event.description}</span>
@@ -446,13 +447,10 @@ function DeliverablesSection({
       { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} },
     );
     if (!response.ok) return;
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = effectiveDeliverableFile.split('/').pop() ?? 'download';
-    a.click();
-    URL.revokeObjectURL(url);
+    saveBlobToDevice(
+      await response.blob(),
+      effectiveDeliverableFile.split('/').pop() ?? 'download',
+    );
   }
 
   return (
@@ -482,24 +480,32 @@ function DeliverablesSection({
                 <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="font-mono text-xs">{git.branch}</span>
               </div>
-              <a
-                href={`${git.repoUrl}/commit/${git.commitSha}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
-              >
-                {git.commitSha.slice(0, 7)}
-                <ExternalLink className="h-3 w-3" />
-              </a>
-              <a
-                href={`${git.repoUrl}/compare/main...${git.branch}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-              >
-                View full diff
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
+              {isBrowsableRepoUrl(git.repoUrl) ? (
+                <>
+                  <a
+                    href={`${git.repoUrl}/commit/${git.commitSha}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
+                  >
+                    {git.commitSha.slice(0, 7)}
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                  <a
+                    href={`${git.repoUrl}/compare/main...${git.branch}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                  >
+                    View full diff
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </>
+              ) : (
+                <span className="font-mono text-xs text-muted-foreground">
+                  {git.commitSha.slice(0, 7)}
+                </span>
+              )}
             </div>
 
             {git.changedFiles.length > 0 && (
@@ -510,16 +516,23 @@ function DeliverablesSection({
                 <ul className="space-y-0.5">
                   {git.changedFiles.map((file: string) => (
                     <li key={file}>
-                      <a
-                        href={`${git.repoUrl}/blob/${git.commitSha}/${file}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-sm font-mono text-primary hover:underline"
-                      >
-                        <FileText className="h-3 w-3" />
-                        {file}
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
+                      {isBrowsableRepoUrl(git.repoUrl) ? (
+                        <a
+                          href={`${git.repoUrl}/blob/${git.commitSha}/${file}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-sm font-mono text-primary hover:underline"
+                        >
+                          <FileText className="h-3 w-3" />
+                          {file}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-sm font-mono text-muted-foreground">
+                          <FileText className="h-3 w-3" />
+                          {file}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>

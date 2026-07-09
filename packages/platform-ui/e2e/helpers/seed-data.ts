@@ -1,3 +1,12 @@
+// Fixed UUID literals for seeded agent_runs. `agent_runs.id` is a Postgres
+// `uuid` column, so the seed ids must be valid uuids (not readable slugs) or the
+// route's `eq(agentRuns.id, ...)` lookup raises `invalid input syntax for type
+// uuid`. Deterministic v4-shaped uuids keep the seed reproducible.
+export const RUN_COMPLETED_1_ID = '00000000-0000-4000-8000-000000000001';
+export const RUN_ESCALATED_1_ID = '00000000-0000-4000-8000-000000000002';
+export const RUN_RUNNING_1_ID = '00000000-0000-4000-8000-000000000003';
+export const RUN_L4_AUTOPILOT_ID = '00000000-0000-4000-8000-000000000004';
+
 const now = new Date().toISOString();
 const oneHourAgo = new Date(Date.now() - 3600_000).toISOString();
 const twoDaysAgo = new Date(Date.now() - 2 * 86400_000).toISOString();
@@ -95,6 +104,56 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       completedAt: null,
       completionData: null,
     },
+    // Dedicated tasks for verdict-with-params.journey.ts — isolated from all
+    // other tests so submitting the pending task never pollutes shared state.
+    'task-param-verdict-target': {
+      id: 'task-param-verdict-target',
+      processInstanceId: 'proc-param-verdict-target',
+      stepId: 'supply-chain-assessment',
+      assignedRole: 'reviewer',
+      assignedUserId: null,
+      status: 'pending',
+      deadline: nextWeek,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      completionData: null,
+      params: [
+        { name: 'findings', type: 'string', required: true, description: 'Summary of assessment findings' },
+        { name: 'riskScore', type: 'number', required: false, description: 'Risk score 1–10' },
+      ],
+      verdicts: [
+        { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+        { key: 'reject', label: 'Reject', intent: 'danger', requiresComment: true },
+      ],
+    },
+    // Already-completed variant — used by the read-only CompletionReadOnly test
+    'task-param-verdict-completed': {
+      id: 'task-param-verdict-completed',
+      processInstanceId: 'proc-completed-1',
+      stepId: 'supply-chain-assessment',
+      assignedRole: 'reviewer',
+      assignedUserId: testUserId,
+      status: 'completed',
+      deadline: null,
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      completedAt: now,
+      completionData: {
+        verdict: 'approve',
+        paramValues: { findings: 'All vendor checks passed', riskScore: 2 },
+        completedBy: testUserId,
+        completedAt: now,
+      },
+      params: [
+        { name: 'findings', type: 'string', required: true, description: 'Summary of assessment findings' },
+        { name: 'riskScore', type: 'number', required: false, description: 'Risk score 1–10' },
+      ],
+      verdicts: [
+        { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+        { key: 'reject', label: 'Reject', intent: 'danger', requiresComment: true },
+      ],
+    },
     'task-upload-docs': {
       id: 'task-upload-docs',
       processInstanceId: 'proc-upload-waiting',
@@ -121,6 +180,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   const processInstances: Record<string, Record<string, unknown>> = {
     'proc-running-1': {
       id: 'proc-running-1',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
       configName: 'all-human',
@@ -140,6 +200,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     // Dedicated instance for cancel-run test — isolated so cancelling doesn't affect other tests
     'proc-cancel-target': {
       id: 'proc-cancel-target',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
       configName: 'all-human',
@@ -158,6 +219,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
     'proc-paused-1': {
       id: 'proc-paused-1',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
       configName: 'all-human',
@@ -176,6 +238,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
     'proc-completed-1': {
       id: 'proc-completed-1',
+      namespace: 'test',
       definitionName: 'Data Quality Review',
       definitionVersion: '2.1.0',
       configName: 'all-human',
@@ -194,6 +257,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
     'proc-failed-1': {
       id: 'proc-failed-1',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
       configName: 'all-human',
@@ -210,8 +274,29 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       error: 'Agent timeout after 30s',
       assignedRoles: [],
     },
+    // Pre-seeded cancelled run — used by status-badges test to verify Cancelled badge
+    'proc-cancelled-1': {
+      id: 'proc-cancelled-1',
+      namespace: 'test',
+      definitionName: 'Supply Chain Review',
+      definitionVersion: '1.0.0',
+      configName: 'all-human',
+      configVersion: '1',
+      status: 'failed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: threeDaysAgo,
+      createdBy: 'system',
+      pauseReason: null,
+      error: 'Cancelled by user',
+      assignedRoles: [],
+    },
     'proc-completed-2': {
       id: 'proc-completed-2',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
       configName: 'all-human',
@@ -228,8 +313,30 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       error: null,
       assignedRoles: ['reviewer'],
     },
+    // Dedicated completed instance for archive-from-list journey — isolated so
+    // archiving doesn't affect other tests that read proc-completed-1/2.
+    'proc-archive-target': {
+      id: 'proc-archive-target',
+      namespace: 'test',
+      definitionName: 'Data Quality Review',
+      definitionVersion: '2.1.0',
+      configName: 'all-human',
+      configVersion: '1',
+      status: 'completed',
+      currentStepId: null,
+      variables: { studyId: 'study-archive' },
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: twoDaysAgo,
+      createdBy: testUserId,
+      pauseReason: null,
+      error: null,
+      assignedRoles: ['reviewer'],
+    },
     'proc-human-waiting': {
       id: 'proc-human-waiting',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
       configName: 'all-human',
@@ -250,6 +357,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     // task does not pollute the proc-human-waiting used by workflow-status-badges.
     'proc-review-target': {
       id: 'proc-review-target',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
       configName: 'all-human',
@@ -266,9 +374,32 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       error: null,
       assignedRoles: ['reviewer'],
     },
+    // Dedicated instance for verdict-with-params.journey.ts — isolated so
+    // submitting task-param-verdict-target does not pollute other tests.
+    // Uses 'Param Verdict Test:1' which contains the supply-chain-assessment
+    // step so advanceStep succeeds after task completion (Supply Chain Review
+    // v1 does not have this step and would throw a 500).
+    'proc-param-verdict-target': {
+      id: 'proc-param-verdict-target',
+      namespace: 'test',
+      definitionName: 'Param Verdict Test',
+      definitionVersion: '1',
+      status: 'paused',
+      currentStepId: 'supply-chain-assessment',
+      variables: { studyId: 'study-pv-target' },
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: 'auto-runner',
+      pauseReason: 'waiting_for_human',
+      error: null,
+      assignedRoles: ['reviewer'],
+    },
     // New-style run — uses WorkflowDefinition (no configName/configVersion)
     'proc-workflow-run-1': {
       id: 'proc-workflow-run-1',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1',
       status: 'running',
@@ -285,8 +416,9 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
     'proc-upload-waiting': {
       id: 'proc-upload-waiting',
+      namespace: 'test',
       definitionName: 'Protocol to TFL',
-      definitionVersion: '0.1.0',
+      definitionVersion: '1.0.0',
       configName: 'default',
       configVersion: '1',
       status: 'paused',
@@ -306,6 +438,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     // button are all visible without triggering any actual retry.
     'proc-step-failure': {
       id: 'proc-step-failure',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1',
       status: 'paused',
@@ -320,14 +453,17 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       error: 'Docker container exited with code 1',
       assignedRoles: ['reviewer'],
     },
-    // Dedicated instance for retry-step test — seeded as failed on a human step
-    // so clicking Retry flips it to running; the auto-runner then creates a
-    // HumanTask and pauses the instance. No plugin or Docker involved.
+    // Dedicated instance for retry-step test — agent escalated on the human-review
+    // step so AgentEscalatedBanner is shown with "Fixed, try again". Clicking it
+    // calls engine.retryStep (paused+agent_escalated is in the allowed list), which
+    // flips status→running; the auto-runner then creates a HumanTask and pauses
+    // with waiting_for_human. No plugin or Docker involved.
     'proc-retry-test': {
       id: 'proc-retry-test',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1',
-      status: 'failed',
+      status: 'paused',
       currentStepId: 'human-review',
       variables: {},
       triggerType: 'manual',
@@ -335,15 +471,91 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       createdAt: threeDaysAgo,
       updatedAt: threeDaysAgo,
       createdBy: testUserId,
-      pauseReason: null,
+      pauseReason: 'agent_escalated',
       error: 'Simulated step failure for retry journey',
       assignedRoles: ['reviewer'],
+    },
+    // Dedicated instance for cancel flow test — isolated from proc-retry-test so
+    // cancelling does not pollute the retry journey.
+    'proc-agent-escalated-cancel': {
+      id: 'proc-agent-escalated-cancel',
+      namespace: 'test',
+      definitionName: 'Supply Chain Review',
+      definitionVersion: '1',
+      status: 'paused',
+      currentStepId: 'human-review',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: testUserId,
+      pauseReason: 'agent_escalated',
+      error: 'API rate limit exceeded — retried 3 times',
+      assignedRoles: ['reviewer'],
+    },
+    // Dedicated runs for runs-names.journey.ts (GET /api/runs/names, #588).
+    // Unique definitionNames + ids so the projected { id, definitionName }
+    // assertions are deterministic. `proc-names-deleted` carries a non-null
+    // `deletedAt` tombstone so the journey can assert soft-deleted runs are
+    // excluded by the `isNull(deletedAt)` filter.
+    'proc-names-journey-1': {
+      id: 'proc-names-journey-1',
+      namespace: 'test',
+      definitionName: 'Names Journey Workflow A',
+      definitionVersion: '1.0.0',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: twoDaysAgo,
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+    },
+    'proc-names-journey-2': {
+      id: 'proc-names-journey-2',
+      namespace: 'test',
+      definitionName: 'Names Journey Workflow B',
+      definitionVersion: '1.0.0',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: twoDaysAgo,
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+    },
+    'proc-names-journey-deleted': {
+      id: 'proc-names-journey-deleted',
+      namespace: 'test',
+      definitionName: 'Names Journey Soft Deleted',
+      definitionVersion: '1.0.0',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: twoDaysAgo,
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+      deletedAt: twoDaysAgo,
     },
   };
 
   const agentRuns: Record<string, Record<string, unknown>> = {
-    'run-completed-1': {
-      id: 'run-completed-1',
+    [RUN_COMPLETED_1_ID]: {
+      id: RUN_COMPLETED_1_ID,
       processInstanceId: 'proc-running-1',
       stepId: 'narrative-summary',
       pluginId: 'narrative-summary',
@@ -365,8 +577,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       executorType: 'agent',
       reviewerType: 'none',
     },
-    'run-escalated-1': {
-      id: 'run-escalated-1',
+    [RUN_ESCALATED_1_ID]: {
+      id: RUN_ESCALATED_1_ID,
       processInstanceId: 'proc-paused-1',
       stepId: 'data-quality-check',
       pluginId: 'data-quality',
@@ -388,8 +600,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       executorType: 'agent',
       reviewerType: 'human',
     },
-    'run-running-1': {
-      id: 'run-running-1',
+    [RUN_RUNNING_1_ID]: {
+      id: RUN_RUNNING_1_ID,
       processInstanceId: 'proc-running-1',
       stepId: 'compliance-check',
       pluginId: 'compliance-check',
@@ -401,8 +613,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       completedAt: null,
       executorType: 'agent',
     },
-    'run-l4-autopilot': {
-      id: 'run-l4-autopilot',
+    [RUN_L4_AUTOPILOT_ID]: {
+      id: RUN_L4_AUTOPILOT_ID,
       processInstanceId: 'proc-completed-2',
       stepId: 'vendor-assessment',
       pluginId: 'vendor-assessment',
@@ -546,6 +758,24 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
   };
 
+  const agentEscalatedCancelStepExecutions: Record<string, Record<string, unknown>> = {
+    'exec-cancel-fail-1': {
+      id: 'exec-cancel-fail-1',
+      instanceId: 'proc-agent-escalated-cancel',
+      stepId: 'human-review',
+      status: 'failed',
+      input: {},
+      output: null,
+      verdict: null,
+      executedBy: 'auto-runner',
+      startedAt: oneHourAgo,
+      completedAt: oneHourAgo,
+      iterationNumber: 0,
+      gateResult: null,
+      error: 'API rate limit exceeded — retried 3 times',
+    },
+  };
+
   const humanWaitingStepExecutions: Record<string, Record<string, unknown>> = {
     'exec-hw-agent-1': {
       id: 'exec-hw-agent-1',
@@ -612,7 +842,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { id: 'data-quality', name: 'Data Quality Analysis', type: 'creation' },
         { id: 'query-status', name: 'Query Status Analysis', type: 'creation' },
         { id: 'human-review', name: 'Human Review', type: 'creation' },
-        { id: 'manager-approval', name: 'Manager Approval', type: 'review', verdicts: { approve: { target: 'archived' }, 'request-actions': { target: 'archived' } } },
+        { id: 'manager-approval', name: 'Manager Approval', type: 'review', verdicts: { approve: { target: 'archived' }, revise: { target: 'archived' } } },
         { id: 'archived', name: 'Archived', type: 'terminal' },
       ],
       transitions: [
@@ -802,22 +1032,34 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
   };
 
-  // User profile document — required by Firestore security rules.
-  // humanTasks and handoffEntities rules call get(/users/{uid}).data.roles
-  // to verify the reader has a matching role.
-  const users: Record<string, Record<string, unknown>> = {
-    [testUserId]: {
-      uid: testUserId,
-      email: 'test@mediforce.dev',
-      displayName: 'Test User',
-      handle: 'test',
-      organizations: [],
-      role: 'admin',
-      roles: ['reviewer', 'analyst', 'operator'],
-    },
-  };
-
   const workflowDefinitions: Record<string, Record<string, unknown>> = {
+    // Backs `proc-upload-waiting` / `task-upload-docs` (the file-upload task).
+    // Trimmed to the human upload step + a terminal so completing the upload
+    // advances the run without spawning the real agent pipeline (ADR-0003 E2E).
+    'test:Protocol to TFL:1': {
+      name: 'Protocol to TFL',
+      namespace: 'test',
+      version: 1,
+      title: 'Protocol to TFL pipeline',
+      description: 'Upload protocol documents (E2E-trimmed to the upload step).',
+      workspace: {},
+      steps: [
+        {
+          id: 'upload-documents',
+          name: 'Upload Documents',
+          type: 'creation',
+          executor: 'human',
+          description: 'Upload protocol PDF and SAP document',
+          ui: {
+            component: 'file-upload',
+            config: { acceptedTypes: ['application/pdf'], minFiles: 1, maxFiles: 5 },
+          },
+        },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'upload-documents', to: 'done' }],
+      triggers: [{ type: 'manual', name: 'start' }],
+    },
     // Example workflow that exercises the run-scoped git workspace with a
     // small real-shaped data pipeline: step 1 generates a CSV dataset, step 2
     // reads it, computes summary stats, and writes a markdown report into a
@@ -829,7 +1071,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     //   summarize       adds report/summary.md
     //
     // You can `git log`, `git diff`, and inspect the per-step artifacts.
-    'Sales CSV Report:1': {
+    'test:Sales CSV Report:1': {
       name: 'Sales CSV Report',
       namespace: 'test',
       version: 1,
@@ -843,8 +1085,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
           type: 'creation',
           executor: 'script',
           plugin: 'script-container',
-          autonomyLevel: 'L4',
-          agent: {
+          script: {
             runtime: 'bash',
             inlineScript: [
               '#!/bin/sh',
@@ -862,8 +1103,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
           type: 'creation',
           executor: 'script',
           plugin: 'script-container',
-          autonomyLevel: 'L4',
-          agent: {
+          script: {
             runtime: 'bash',
             inlineScript: [
               '#!/bin/sh',
@@ -897,7 +1137,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       triggers: [{ type: 'manual', name: 'start' }],
       createdAt: twoDaysAgo,
     },
-    'Supply Chain Review:1': {
+    'test:Supply Chain Review:1': {
       name: 'Supply Chain Review',
       namespace: 'test',
       version: 1,
@@ -907,16 +1147,41 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { id: 'vendor-assessment', name: 'Vendor Assessment', type: 'creation', executor: 'agent', autonomyLevel: 'L2', plugin: 'supply-data-collector', agent: { skill: 'vendor-assessment', mcpServers: [{ name: 'postgres-ro', command: 'npx', args: ['-y', '@modelcontextprotocol/server-postgres'], env: { DATABASE_URL: '{{DB_URL}}' }, allowedTools: ['query'] }, { name: 'filesystem', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/data'] }] } },
         { id: 'narrative-summary', name: 'Narrative Summary', type: 'creation', executor: 'agent', autonomyLevel: 'L3' },
         { id: 'risk-scoring', name: 'Risk Scoring', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
-        { id: 'human-review', name: 'Human Review', type: 'review', executor: 'human', verdicts: { approve: { target: 'done' }, revise: { target: 'vendor-assessment' } } },
-        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        { id: 'data-quality', name: 'Data Quality Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
+        { id: 'query-status', name: 'Query Status Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L1' },
+        { id: 'human-review', name: 'Human Review', type: 'creation', executor: 'human' },
+        { id: 'manager-approval', name: 'Manager Approval', type: 'review', executor: 'human', verdicts: { approve: { target: 'archived' }, revise: { target: 'archived' } } },
+        { id: 'archived', name: 'Archived', type: 'terminal', executor: 'human' },
       ],
       transitions: [
         { from: 'vendor-assessment', to: 'narrative-summary' },
         { from: 'narrative-summary', to: 'risk-scoring' },
-        { from: 'risk-scoring', to: 'human-review' },
+        { from: 'risk-scoring', to: 'data-quality' },
+        { from: 'data-quality', to: 'query-status' },
+        { from: 'query-status', to: 'human-review' },
+        { from: 'human-review', to: 'manager-approval' },
+        { from: 'manager-approval', to: 'archived' },
       ],
       triggers: [{ type: 'manual', name: 'start-review-cycle' }],
       createdAt: twoDaysAgo,
+    },
+    'test:Data Quality Review:2': {
+      name: 'Data Quality Review',
+      namespace: 'test',
+      version: 2,
+      title: 'Data quality check',
+      description: 'Data quality check workflow',
+      steps: [
+        { id: 'verify-data-quality', name: 'Verify Data Quality', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
+        { id: 'review-results', name: 'Review Results', type: 'creation', executor: 'human' },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [
+        { from: 'verify-data-quality', to: 'review-results' },
+        { from: 'review-results', to: 'done' },
+      ],
+      triggers: [{ type: 'manual', name: 'start-review' }],
+      createdAt: threeDaysAgo,
     },
   };
 
@@ -961,7 +1226,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   // Top-level agentDefinitions collection — pre-seed `claude-code-agent` so the
   // agent MCP journey is deterministic. Without this, the page relies on the
   // fire-and-forget `seedBuiltinAgentDefinitions` in platform-services, which
-  // races with the first GET `/api/agent-definitions/:id` request.
+  // races with the first GET `/api/agents/:id` request.
   //
   // `mcp-test-agent` is a fixture consumed by step-mcp-restrictions.journey.ts —
   // it ships with one pre-bound stdio server so the Restrictions section has
@@ -970,6 +1235,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   const agentDefinitions: Record<string, Record<string, unknown>> = {
     'claude-code-agent': {
       kind: 'plugin',
+      visibility: 'public',
       runtimeId: 'claude-code-agent',
       name: 'Claude Code Agent',
       iconName: 'Bot',
@@ -979,12 +1245,12 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       outputDescription: 'Generated code, analysis results, or task completion report',
       foundationModel: 'anthropic/claude-sonnet-4',
       systemPrompt: '',
-      skillFileNames: [],
       createdAt: twoDaysAgo,
       updatedAt: twoDaysAgo,
     },
     'mcp-test-agent': {
       kind: 'plugin',
+      namespace: 'test',
       runtimeId: 'script-container',
       name: 'MCP Test Agent',
       iconName: 'Terminal',
@@ -993,7 +1259,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       outputDescription: 'test output',
       foundationModel: 'anthropic/claude-sonnet-4',
       systemPrompt: '',
-      skillFileNames: [],
       mcpServers: {
         filesystem: { type: 'stdio', catalogId: 'filesystem' },
       },
@@ -1006,6 +1271,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     // straight to "Connect" without first editing the agent.
     'oauth-test-agent': {
       kind: 'plugin',
+      namespace: 'test',
       runtimeId: 'claude-code-agent',
       name: 'OAuth Test Agent',
       iconName: 'Bot',
@@ -1014,7 +1280,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       outputDescription: 'task output',
       foundationModel: 'anthropic/claude-sonnet-4',
       systemPrompt: '',
-      skillFileNames: [],
       mcpServers: {
         'github-mcp': {
           type: 'http',
@@ -1054,7 +1319,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
 
   // Minimal workflow with one agent step referencing `mcp-test-agent`, used
   // only by step-mcp-restrictions.journey.ts.
-  workflowDefinitions['MCP Restrictions Test:1'] = {
+  workflowDefinitions['test:MCP Restrictions Test:1'] = {
     name: 'MCP Restrictions Test',
     namespace: 'test',
     version: 1,
@@ -1066,7 +1331,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         type: 'creation',
         executor: 'agent',
         autonomyLevel: 'L2',
-        plugin: 'script-container',
+        plugin: 'claude-code-agent',
         agentId: 'mcp-test-agent',
       },
       { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
@@ -1143,6 +1408,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   // Process instance paused for cowork
   processInstances['proc-cowork-paused'] = {
     id: 'proc-cowork-paused',
+    namespace: 'test',
     definitionName: 'Workflow Designer',
     definitionVersion: '1',
     status: 'paused',
@@ -1159,7 +1425,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   };
 
   // Workflow definition with a cowork step
-  workflowDefinitions['Workflow Designer:1'] = {
+  workflowDefinitions['test:Workflow Designer:1'] = {
     name: 'Workflow Designer',
     namespace: 'test',
     version: 1,
@@ -1191,6 +1457,92 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     ],
     transitions: [{ from: 'design', to: 'done' }],
     triggers: [{ type: 'manual', name: 'start-design' }],
+    createdAt: twoDaysAgo,
+  };
+
+  workflowDefinitions['test:Diagram Branch Accordion:1'] = {
+    name: 'Diagram Branch Accordion',
+    namespace: 'test',
+    version: 1,
+    description: 'Test workflow for branch accordion diagram feature',
+    steps: [
+      { id: 'classify', name: 'Classify Document', type: 'decision', executor: 'agent', autonomyLevel: 'L2' },
+      { id: 'process-standard', name: 'Standard Processing', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
+      { id: 'process-urgent', name: 'Urgent Processing', type: 'creation', executor: 'human' },
+      { id: 'finalize', name: 'Finalize', type: 'creation', executor: 'human' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [
+      { from: 'classify', to: 'process-standard', when: 'output.type == "standard"' },
+      { from: 'classify', to: 'process-urgent', when: 'output.type == "urgent"' },
+      { from: 'process-standard', to: 'finalize' },
+      { from: 'process-urgent', to: 'finalize' },
+      { from: 'finalize', to: 'done' },
+    ],
+    triggers: [{ type: 'manual', name: 'start' }],
+    createdAt: twoDaysAgo,
+  };
+
+  workflowDefinitions['test:Diagram Back Edge:1'] = {
+    name: 'Diagram Back Edge',
+    namespace: 'test',
+    version: 1,
+    description: 'Test workflow for back-edge diagram feature',
+    steps: [
+      { id: 'draft', name: 'Draft Document', type: 'creation', executor: 'human' },
+      {
+        id: 'review',
+        name: 'Review Document',
+        type: 'review',
+        executor: 'human',
+        verdicts: {
+          approve: { target: 'done' },
+          revise: { target: 'draft' },
+        },
+      },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [
+      { from: 'draft', to: 'review' },
+    ],
+    triggers: [{ type: 'manual', name: 'start' }],
+    createdAt: twoDaysAgo,
+  };
+
+  workflowDefinitions['test:Trigger Input Test:1'] = {
+    name: 'Trigger Input Test',
+    namespace: 'test',
+    version: 1,
+    title: 'Workflow with trigger inputs',
+    description: 'Test workflow that requires trigger input fields at start',
+    steps: [
+      { id: 'process', name: 'Process Data', type: 'creation', executor: 'human' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'process', to: 'done' }],
+    triggers: [{ type: 'manual', name: 'start' }],
+    triggerInput: [
+      { name: 'studyId', type: 'string', required: true, description: 'Study identifier' },
+      { name: 'priority', type: 'select', required: false, options: ['low', 'normal', 'high'], default: 'normal', description: 'Run priority' },
+      { name: 'dryRun', type: 'boolean', required: false, default: false, description: 'Dry run mode' },
+    ],
+    createdAt: twoDaysAgo,
+  };
+
+  // Minimal workflow for verdict-with-params.journey.ts. Contains the
+  // supply-chain-assessment step so advanceStep succeeds when the test submits
+  // the task — Supply Chain Review v1 lacks this step and would 500.
+  workflowDefinitions['test:Param Verdict Test:1'] = {
+    name: 'Param Verdict Test',
+    namespace: 'test',
+    version: 1,
+    description: 'Fixture workflow for verdict-with-params journey',
+    steps: [
+      { id: 'supply-chain-assessment', name: 'Supply Chain Assessment', type: 'creation', executor: 'human' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'supply-chain-assessment', to: 'done' }],
+    triggers: [{ type: 'manual', name: 'start' }],
     createdAt: twoDaysAgo,
   };
 
@@ -1230,5 +1582,80 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions };
+  const modelRegistry: Record<string, Record<string, unknown>> = {
+    'anthropic__claude-sonnet-4': {
+      id: 'anthropic/claude-sonnet-4',
+      name: 'Claude Sonnet 4',
+      provider: 'anthropic',
+      contextLength: 200000,
+      maxCompletionTokens: 64000,
+      pricing: { input: 0.000003, output: 0.000015 },
+      modality: 'text+image->text',
+      inputModalities: ['text', 'image'],
+      outputModalities: ['text'],
+      supportsTools: true,
+      supportsVision: true,
+      source: 'openrouter',
+      canonicalSlug: null,
+      requestCount: 5200000,
+      lastSyncedAt: now,
+      createdAt: oneHourAgo,
+      updatedAt: now,
+    },
+    'deepseek__deepseek-chat': {
+      id: 'deepseek/deepseek-chat',
+      name: 'DeepSeek Chat',
+      provider: 'deepseek',
+      contextLength: 64000,
+      maxCompletionTokens: 8192,
+      pricing: { input: 0.00000014, output: 0.00000028 },
+      modality: 'text->text',
+      inputModalities: ['text'],
+      outputModalities: ['text'],
+      supportsTools: false,
+      supportsVision: false,
+      source: 'openrouter',
+      canonicalSlug: null,
+      requestCount: 890000,
+      lastSyncedAt: now,
+      createdAt: oneHourAgo,
+      updatedAt: now,
+    },
+    'openai__gpt-4o': {
+      id: 'openai/gpt-4o',
+      name: 'GPT-4o',
+      provider: 'openai',
+      contextLength: 128000,
+      maxCompletionTokens: 16384,
+      pricing: { input: 0.0000025, output: 0.00001 },
+      modality: 'text+image->text',
+      inputModalities: ['text', 'image'],
+      outputModalities: ['text'],
+      supportsTools: true,
+      supportsVision: true,
+      source: 'openrouter',
+      canonicalSlug: null,
+      requestCount: 3100000,
+      lastSyncedAt: now,
+      createdAt: oneHourAgo,
+      updatedAt: now,
+    },
+  };
+
+  // Match prod write shape — WorkflowEngine.createInstance writes `deleted: false`
+  // AND `archived: false` on every instance. Both the runs.list query and the
+  // home-card `summarizeRunsByWorkflow` aggregate filter server-side via
+  // `.where('deleted','==',false).where('archived','==',false)`. Firestore
+  // equality where-clauses do not match docs missing the field, so seeded rows
+  // without these fields are hidden (empty run counts + empty card previews).
+  for (const key of Object.keys(processInstances)) {
+    if (processInstances[key].deleted === undefined) {
+      processInstances[key].deleted = false;
+    }
+    if (processInstances[key].archived === undefined) {
+      processInstances[key].archived = false;
+    }
+  }
+
+  return { humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, modelRegistry };
 }

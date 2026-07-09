@@ -3,12 +3,14 @@ import { readFile, readdir, mkdtemp, writeFile, rm, mkdir, appendFile, realpath,
 import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig } from '@mediforce/platform-core';
-import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env.js';
-import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls } from './container-plugin.js';
-import { renderOAuthHeader } from '../oauth/resolve-oauth-token.js';
+import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
+import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, OutputSchemaShape } from '@mediforce/platform-core';
+import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
+import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, formatExitInfo, type ContainerPluginInit } from './container-plugin';
+import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
+import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
+import { createLineStreamReader } from '@mediforce/platform-core';
 
 /** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`
  *  but the agent context carries no OAuth token entry for that server. The
@@ -98,7 +100,7 @@ export interface SpawnCliOptions {
 export interface SpawnDockerResult {
   cliOutput: string;
   gitMetadata: GitMetadata | null;
-  presentation: string | null;
+  presentation: Presentation | null;
   outputDir: string;
   /** Env var names injected into the process (for audit logging) */
   injectedEnvVars: string[];
@@ -202,6 +204,58 @@ function buildHttpHeaders(
   return { [bundle.headerName]: headerValue };
 }
 
+export type OutputSchema = OutputSchemaShape;
+
+export function validateOutputSchema(
+  output: Record<string, unknown>,
+  schema: OutputSchemaShape,
+): string | null {
+  let data = output;
+
+  if ('raw' in output && typeof output.raw === 'string' && Object.keys(output).length === 1) {
+    try {
+      const parsed = JSON.parse(output.raw);
+      if (Array.isArray(parsed)) return 'expected object, got array';
+      if (typeof parsed !== 'object' || parsed === null) return 'output is not valid JSON';
+      data = parsed as Record<string, unknown>;
+    } catch {
+      return 'output is not valid JSON';
+    }
+  }
+
+  if (Object.keys(data).length === 0
+    || (Object.keys(data).length === 1 && 'raw' in data && (data.raw === '' || data.raw == null))) {
+    return 'output is empty';
+  }
+
+  const required = schema.required ?? [];
+  const missing = required.filter((key) => !(key in data));
+  if (missing.length > 0) return `missing required keys: ${missing.join(', ')}`;
+
+  const properties = schema.properties ?? {};
+  for (const [key, spec] of Object.entries(properties)) {
+    if (!(key in data)) continue;
+    const value = data[key];
+    const expectedType = spec.type;
+    if (!expectedType) continue;
+
+    if (expectedType === 'array' && !Array.isArray(value)) {
+      return `property "${key}" expected array, got ${typeof value}`;
+    }
+    if (expectedType === 'object' && (typeof value !== 'object' || value === null || Array.isArray(value))) {
+      return `property "${key}" expected object, got ${Array.isArray(value) ? 'array' : typeof value}`;
+    }
+    if (expectedType === 'string' && typeof value !== 'string') {
+      return `property "${key}" expected string, got ${typeof value}`;
+    }
+    if (expectedType === 'number' && typeof value !== 'number') {
+      return `property "${key}" expected number, got ${typeof value}`;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Abstract base class for container-based agent plugins.
  *
@@ -211,6 +265,10 @@ function buildHttpHeaders(
  */
 export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
   protected agentConfig!: AgentConfig;
+
+  constructor(init: ContainerPluginInit = {}) {
+    super(init);
+  }
 
   /** Human-readable agent name for log/status messages (e.g. "Claude Code", "OpenCode"). */
   abstract readonly agentName: string;
@@ -463,20 +521,18 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *
    * Two-phase logic:
    * 1. Loop over known deliverable extensions, skipping INTERNAL_NAMES.
-   *    `presentation.html` is in INTERNAL_NAMES so it's skipped here.
-   * 2. Fallback: try `presentation.html` separately. It's excluded from the
-   *    loop because it's already read into spawnResult.presentation, but we
-   *    still need a persisted path so the Download Report button can serve it.
+   *    `presentation.{md,html}` are in INTERNAL_NAMES so they're skipped here.
+   * 2. Fallback: try `presentation.md` then `presentation.html` separately.
+   *    They are excluded from the loop because they're already read into
+   *    spawnResult.presentation, but we still need a persisted path so the
+   *    Download Report button can serve them.
    */
   protected async persistDeliverableFile(
     outputDir: string,
     instanceId: string,
     stepId: string,
   ): Promise<string | null> {
-    const INTERNAL_NAMES = new Set([
-      'opencode.json', 'auth.json', 'prompt.txt', 'result.json',
-      'git-result.json', 'mock-result.json', 'presentation.html',
-    ]);
+    const INTERNAL_NAMES = new Set([...INTERNAL_OUTPUT_FILE_NAMES, ...PRESENTATION_FILE_NAMES]);
     const DELIVERABLE_EXTS = new Set(['.html', '.htm', '.pdf', '.csv', '.xlsx', '.md']);
 
     let entries: string[];
@@ -504,17 +560,22 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       }
     }
 
-    // Also handle presentation.html (already read as spawnResult.presentation but path needed)
-    const presentationPath = join(outputDir, 'presentation.html');
-    try {
-      const destDir = join(tmpdir(), 'mediforce-deliverables', instanceId);
-      await mkdir(destDir, { recursive: true });
-      const destPath = join(destDir, `${stepId}-presentation.html`);
-      await cp(presentationPath, destPath);
-      return destPath;
-    } catch {
-      return null;
+    // Also handle presentation.{md,html} — already read into
+    // spawnResult.presentation but a persisted path is needed for the
+    // Download Report button. Markdown wins on tie.
+    for (const filename of PRESENTATION_FILE_NAMES) {
+      const presentationPath = join(outputDir, filename);
+      try {
+        const destDir = join(tmpdir(), 'mediforce-deliverables', instanceId);
+        await mkdir(destDir, { recursive: true });
+        const destPath = join(destDir, `${stepId}-${filename}`);
+        await cp(presentationPath, destPath);
+        return destPath;
+      } catch {
+        continue;
+      }
     }
+    return null;
   }
 
   /** Resolve the host path to the mock-fixtures directory for this step's plugin.
@@ -562,11 +623,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         );
       }
 
-      if (!stepAgent.image && !isLocalExecutionAllowed()) {
+      const agentInBuildMode = !!(stepAgent.dockerfile || stepAgent.repo);
+      if (!stepAgent.image && !agentInBuildMode && !isLocalExecutionAllowed()) {
         throw new Error(
           `No Docker image configured in step.agent for step '${context.stepId}'. ` +
           'Local agent execution requires ALLOW_LOCAL_AGENTS=true. ' +
-          'Either set step.agent.image for Docker execution, or enable local execution.',
+          'Either set step.agent.image for Docker execution, set step.agent.dockerfile + ' +
+          'repo + commit for build mode, or enable local execution.',
         );
       }
 
@@ -577,9 +640,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         prompt: stepAgent.prompt,
         skillsDir: stepAgent.skillsDir,
         timeoutMs: stepAgent.timeoutMs ?? (stepAgent.timeoutMinutes ? stepAgent.timeoutMinutes * 60_000 : undefined),
-        command: stepAgent.command,
-        inlineScript: stepAgent.inlineScript,
-        runtime: stepAgent.runtime,
         image: stepAgent.image,
         repo: stepAgent.repo,
         commit: stepAgent.commit,
@@ -651,6 +711,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         this.context.workflowDefinition.env,
         this.context.step.env,
         this.context.workflowSecrets,
+        this.metadata.requiredEnv,
+        this.context.namespaceSecretKeys,
       );
     } else {
       const stepConfig = this.context.config.stepConfigs.find(
@@ -687,6 +749,16 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         });
       }
 
+      const imageBuild = resolveImageBuild(
+        this.agentConfig.image,
+        this.agentConfig,
+        this.context,
+        this.resolvedEnv.vars,
+      );
+      if (imageBuild?.image) {
+        this.agentConfig.image = imageBuild.image;
+      }
+
       const isLocalMode = !this.agentConfig.image;
       agentLog('run.mode', `execution mode: ${isLocalMode ? 'local' : 'docker'}`, { stepId });
 
@@ -701,14 +773,14 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       await this.resolveRunWorkspace();
       const workingDirForPrompt = isLocalMode ? this.runWorkspaceHandle!.path : '/workspace';
 
-      // Fetch skills from workflow repo if configured
+      // Fetch skills from the workflow's external skills repo if configured.
       if (this.agentConfig.skillsDir && isWorkflowAgentContext(this.context)) {
-        const wfRepo = this.context.workflowDefinition.repo;
+        const wfRepo = this.context.workflowDefinition.externalSkillsRepo;
         if (wfRepo?.url && wfRepo?.commit) {
           const repoToken = resolveRepoToken(this.agentConfig, this.context, this.resolvedEnv.vars);
           await this.fetchSkillsFromRepo(
             this.agentConfig.skillsDir,
-            normalizeRepoUrls(wfRepo.url).gitUrl,
+            wfRepo.url,
             wfRepo.commit,
             repoToken,
           );
@@ -746,7 +818,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       }
 
       // Create activity log file for observability
-      const logsDir = join(tmpdir(), 'mediforce-agent-logs');
+      const logsDir = join(tmpdir(), 'mediforce-step-logs');
       await mkdir(logsDir, { recursive: true });
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const logFile = join(logsDir, `${this.context.processInstanceId}_${this.context.stepId}_${timestamp}.log`);
@@ -801,11 +873,16 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         }
       }
 
-      // Log injected env vars for audit
+      // Log injected env vars with source info for audit
       if (spawnResult.injectedEnvVars.length > 0) {
+        const sources = this.resolvedEnv.sources;
+        const labeled = spawnResult.injectedEnvVars.map((key) => {
+          const src = sources[key];
+          return src && src !== 'literal' ? `${key} (${src})` : key;
+        });
         await emit({
           type: 'status',
-          payload: `injected env vars: ${spawnResult.injectedEnvVars.join(', ')}`,
+          payload: `injected env vars: ${labeled.join(', ')}`,
           timestamp: new Date().toISOString(),
         });
       } else {
@@ -833,8 +910,51 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         ? parsedResult.confidence_rationale
         : undefined;
 
+      let tokenUsage: { inputTokens: number; outputTokens: number; cachedInputTokens?: number; peakInputTokens?: number } | undefined;
+
+      // First: check if agent reported tokenUsage in its result
+      if (parsedResult.tokenUsage !== null
+        && typeof parsedResult.tokenUsage === 'object'
+        && typeof (parsedResult.tokenUsage as Record<string, unknown>).inputTokens === 'number'
+        && typeof (parsedResult.tokenUsage as Record<string, unknown>).outputTokens === 'number') {
+        tokenUsage = parsedResult.tokenUsage as { inputTokens: number; outputTokens: number; cachedInputTokens?: number; peakInputTokens?: number };
+      }
+
+      // Second: check stream event for CLI-reported usage (e.g. Claude Code stream-json result event)
+      // parseAgentOutput() returns a single JSON object for the final result event.
+      // Cache-creation tokens are billed at (roughly) the input rate, so they fold into
+      // inputTokens; cache-read tokens are billed at the cheaper cacheRead rate, so they are
+      // tracked separately. Dropping either — as the previous version did — under-reports cost.
+      if (!tokenUsage) {
+        try {
+          const rawEvent = JSON.parse(spawnResult.cliOutput) as Record<string, unknown>;
+          const usage = rawEvent.usage as Record<string, number> | undefined;
+          if (usage && typeof usage.input_tokens === 'number' && typeof usage.output_tokens === 'number') {
+            const cacheCreationTokens = typeof usage.cache_creation_input_tokens === 'number' ? usage.cache_creation_input_tokens : 0;
+            const cacheReadTokens = typeof usage.cache_read_input_tokens === 'number' ? usage.cache_read_input_tokens : 0;
+            const peakInputTokens = typeof usage.peak_input_tokens === 'number' ? usage.peak_input_tokens : 0;
+            tokenUsage = {
+              inputTokens: usage.input_tokens + cacheCreationTokens,
+              outputTokens: usage.output_tokens,
+              ...(cacheReadTokens > 0 ? { cachedInputTokens: cacheReadTokens } : {}),
+              ...(peakInputTokens > 0 ? { peakInputTokens } : {}),
+            };
+          }
+        } catch {
+          agentLog('cost.tokenExtraction', 'could not extract token usage from CLI output', {
+            stepId, instanceId, cliOutputLength: spawnResult.cliOutput.length,
+          });
+        }
+      }
+
+      if (tokenUsage) {
+        agentLog('cost.tokensExtracted', 'token usage captured', {
+          stepId, instanceId, inputTokens: tokenUsage.inputTokens, outputTokens: tokenUsage.outputTokens,
+        });
+      }
+
       // Strip envelope-level fields from result to avoid duplication in UI
-      const { confidence: _c, confidence_rationale: _cr, ...cleanResult } = parsedResult;
+      const { confidence: _c, confidence_rationale: _cr, tokenUsage: _tu, ...cleanResult } = parsedResult;
 
       // Persist any deliverable file from the output dir before it gets cleaned up
       const deliverableFile = await this.persistDeliverableFile(
@@ -861,12 +981,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
             'CLI execution completed',
           ],
           annotations: [],
-          model: this.agentConfig.model ?? `${this.agentName}-cli`,
+          model: this.agentConfig.model ?? this.metadata?.foundationModel ?? `${this.agentName}-cli`,
           duration_ms,
           result: cleanResult,
           ...(spawnResult.gitMetadata ? { gitMetadata: spawnResult.gitMetadata } : {}),
           ...(spawnResult.presentation ? { presentation: spawnResult.presentation } : {}),
           ...(deliverableFile ? { deliverableFile } : {}),
+          ...(tokenUsage ? { tokenUsage } : {}),
         },
         timestamp: new Date().toISOString(),
       });
@@ -998,7 +1119,12 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       parts.push(this.context.workflowDefinition.preamble);
     }
 
-    // 1. Skill prompt from SKILL.md
+    // 0b. Agent identity + skills from AgentDefinition (resolved by platform-ui)
+    if (isWorkflowAgentContext(this.context) && this.context.agentIdentityPrompt) {
+      parts.push(this.context.agentIdentityPrompt);
+    }
+
+    // 1. Skill prompt from SKILL.md (step-level override — takes precedence over agent skills)
     if (this.agentConfig.skill && this.agentConfig.skillsDir) {
       const skillContent = await this.readSkillFile(
         this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath),
@@ -1233,25 +1359,22 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       }, timeoutMs);
 
       const rawLines: string[] = [];
-      let buffer = '';
 
-      child.stdout.on('data', (chunk: Buffer) => {
-        buffer += chunk.toString('utf-8');
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
+      const stdoutReader = createLineStreamReader((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        rawLines.push(trimmed);
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          rawLines.push(trimmed);
-
-          if (logFile) {
-            const logEntries = this.processOutputLine(trimmed);
-            if (logEntries.length > 0) {
-              appendFile(logFile, logEntries.join('\n') + '\n').catch(() => {});
-            }
+        if (logFile) {
+          const logEntries = this.processOutputLine(trimmed);
+          if (logEntries.length > 0) {
+            appendFile(logFile, logEntries.join('\n') + '\n').catch(() => {});
           }
         }
+      });
+
+      child.stdout.on('data', (chunk: Buffer) => {
+        stdoutReader.push(chunk);
       });
 
       const stderrChunks: Buffer[] = [];
@@ -1267,15 +1390,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         settled = true;
         clearTimeout(timeoutHandle);
 
-        if (buffer.trim()) {
-          rawLines.push(buffer.trim());
-          if (logFile) {
-            const logEntries = this.processOutputLine(buffer.trim());
-            if (logEntries.length > 0) {
-              appendFile(logFile, logEntries.join('\n') + '\n').catch(() => {});
-            }
-          }
-        }
+        // Flush trailing partial line (no newline at EOF) through the same path.
+        stdoutReader.flush();
 
         const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
         const timeoutMinutes = Math.round(timeoutMs / 60_000);
@@ -1317,13 +1433,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       agentImage: this.agentConfig.image,
     });
 
-    // Read presentation.html from local output directory
-    let localPresentation: string | null = null;
-    try {
-      localPresentation = await readFile(join(outputDir, 'presentation.html'), 'utf-8');
-    } catch {
-      // presentation.html is optional
-    }
+    const localPresentation = await readPresentation(outputDir);
 
     return { cliOutput, gitMetadata, presentation: localPresentation, outputDir, injectedEnvVars: [] };
   }
@@ -1332,16 +1442,23 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     prompt: string,
     options?: SpawnCliOptions,
   ): Promise<SpawnDockerResult> {
-    const image = this.agentConfig.image;
-
-    if (!image) {
+    const inBuildMode = !!(this.agentConfig.dockerfile || this.agentConfig.repo);
+    if (!this.agentConfig.image && !inBuildMode) {
       throw new Error(`agentConfig.image is required for Docker container execution`);
     }
     if (!this.runWorkspaceHandle) {
       throw new Error('runWorkspaceHandle is not set — resolveRunWorkspace() must run before spawnDockerContainer()');
     }
 
-    const imageBuild = resolveImageBuild(image, this.agentConfig, this.context, this.resolvedEnv.vars);
+    const imageBuild = resolveImageBuild(this.agentConfig.image, this.agentConfig, this.context, this.resolvedEnv.vars);
+    const image = imageBuild?.image ?? this.agentConfig.image;
+    if (!image) {
+      throw new Error(
+        `No Docker image could be resolved for step '${this.context.stepId}'. ` +
+        'In build mode set dockerfile + repo + commit on the step, or provide ' +
+        'externalSkillsRepo (with commit) on the workflow definition.',
+      );
+    }
 
     // Merge config-driven env vars with plugin-internal env vars
     const internalVars = this.getInternalEnvVars();
@@ -1376,7 +1493,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const dockerArgs: string[] = [
       'run', '--rm', '-i',
       '--name', containerName,
-      '--memory', '4g',
+      '--memory', '8g',
       '--cpus', '2',
       '-v', `${outputDir}:/output`,
     ];
@@ -1474,11 +1591,12 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const timeoutMinutes = Math.round(timeoutMs / 60_000);
 
     if (spawnResult.exitCode !== 0) {
-      const exitInfo = spawnResult.signal
-        ? `killed by ${spawnResult.signal}${spawnResult.signal === 'SIGTERM' ? ` (likely timeout — ${timeoutMinutes} min limit)` : ''}`
-        : `exit code ${spawnResult.exitCode}`;
+      const exitInfo = formatExitInfo(spawnResult, timeoutMinutes);
       const detail = this.extractErrorFromResult(finalResult) || spawnResult.stderr.trim() || 'no stderr output';
-      throw new Error(`Docker container failed (${exitInfo}): ${detail}`);
+      const authHint = /not logged in|please run \/login/i.test(detail)
+        ? ' — Hint: set ANTHROPIC_API_KEY (or OPENROUTER_API_KEY + ANTHROPIC_BASE_URL) in workflow env or secrets'
+        : '';
+      throw new Error(`Docker container failed (${exitInfo}): ${detail}${authHint}`);
     }
 
     let cliOutput: string;
@@ -1497,14 +1615,29 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       agentImage: this.agentConfig.image,
     });
 
-    // Read presentation.html from the output directory (optional agent-provided HTML view)
-    let presentation: string | null = null;
-    try {
-      presentation = await readFile(join(outputDir, 'presentation.html'), 'utf-8');
-    } catch {
-      // presentation.html is optional — agents may not produce one
-    }
+    const presentation = await readPresentation(outputDir);
 
     return { cliOutput, gitMetadata, presentation, outputDir, injectedEnvVars };
+  }
+}
+
+/** Read presentation.md (preferred) or presentation.html from the agent's
+ *  output directory. Returns null when neither file exists. Markdown wins
+ *  on tie — agents that want the iframe path must omit the .md file. */
+async function readPresentation(outputDir: string): Promise<Presentation | null> {
+  try {
+    return {
+      kind: 'markdown',
+      content: await readFile(join(outputDir, 'presentation.md'), 'utf-8'),
+    };
+  } catch {
+    try {
+      return {
+        kind: 'html',
+        content: await readFile(join(outputDir, 'presentation.html'), 'utf-8'),
+      };
+    } catch {
+      return null;
+    }
   }
 }

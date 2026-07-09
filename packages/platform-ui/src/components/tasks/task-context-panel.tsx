@@ -3,47 +3,85 @@
 import * as React from 'react';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import * as Tabs from '@radix-ui/react-tabs';
-import { FileText, Code, ChevronDown } from 'lucide-react';
-import type { StepExecution } from '@mediforce/platform-core';
-import { useSubcollection } from '@/hooks/use-process-instances';
+import { ChevronDown, Code, FileText, MonitorPlay } from 'lucide-react';
+import type { Presentation } from '@mediforce/platform-core';
+import { useProcessInstance } from '@/hooks/use-process-instances';
+import { useStepExecutions } from '@/hooks/use-step-executions';
+import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
+import { SandboxedHtmlIframe } from './sandboxed-html-iframe';
+import { MarkdownPresentation } from './markdown-presentation';
+import { normalizePresentation } from './task-utils';
 
 interface TaskContextPanelProps {
   processInstanceId: string;
   stepId: string; // The human task's stepId — we need the PREVIOUS step's output
-  onContentLoaded?: (hasContent: boolean) => void;
 }
 
 /**
- * Displays the previous step's output in two tabs: Summary and Full Output.
- * Reports content availability via onContentLoaded callback so the parent
- * can disable verdict buttons when no content exists to review.
+ * Displays the previous step's output. When that step produced an HTML
+ * report — either inline (`presentation` field) or as a written file
+ * (`htmlReportPath` field) — the panel renders it inside a sandboxed
+ * iframe under a "Report" tab and selects that tab by default. The
+ * Extracted Data and Raw JSON tabs remain available for the structured JSON.
+ *
+ * Renders nothing if the previous step produced no output to show.
  */
 export function TaskContextPanel({
   processInstanceId,
   stepId,
-  onContentLoaded,
 }: TaskContextPanelProps) {
-  const { data: executions, loading } = useSubcollection<StepExecution & { id: string }>(
-    processInstanceId ? `processInstances/${processInstanceId}` : '',
-    'stepExecutions',
+  const { data: instance } = useProcessInstance(processInstanceId);
+  const { data: executions, loading } = useStepExecutions(
+    processInstanceId,
+    instance?.status,
   );
 
-  // Find the most recent completed step execution that is NOT the current human step
+  // Find the completed step execution that directly precedes this human task's
+  // current entry into the review step. On L3 agent-reviewer iteration loops a
+  // single review stepId may be entered multiple times — for each entry the
+  // reviewer wants to see the output produced just before *that* entry, not
+  // before the very first one. So we use the **most recent** start of this
+  // review stepId as the boundary: the latest completed execution from a
+  // different step with `startedAt <= mostRecentReviewStart` is what triggered
+  // the current review iteration.
   const previousStepOutput = React.useMemo(() => {
     if (!executions.length) return null;
+
+    const currentStepExecs = executions
+      .filter((e) => e.stepId === stepId)
+      .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
+
+    // In a loop revisit, the engine hasn't created an execution record for the
+    // new active visit yet. All known executions for this step are completed
+    // (they belong to past iterations). Use Infinity so the most recent
+    // preceding step from the current loop pass is found as context.
+    const isLoopRevisitWithNoRecord =
+      instance?.currentStepId === stepId &&
+      currentStepExecs.every((e) => e.status === 'completed');
+
+    const currentStepStart =
+      currentStepExecs.length === 0 || isLoopRevisitWithNoRecord
+        ? Infinity
+        : new Date(currentStepExecs[currentStepExecs.length - 1].startedAt).getTime();
+
     const completed = executions
-      .filter((e) => e.stepId !== stepId && e.status === 'completed' && e.output)
+      .filter((e) =>
+        e.stepId !== stepId &&
+        e.status === 'completed' &&
+        (e.output !== null || normalizePresentation(e.agentOutput?.presentation) !== null) &&
+        new Date(e.startedAt).getTime() <= currentStepStart,
+      )
       .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
     return completed.length > 0 ? completed[completed.length - 1] : null;
   }, [executions, stepId]);
 
-  const hasContent = previousStepOutput !== null && previousStepOutput.output !== null;
-
-  // Notify parent about content availability
-  React.useEffect(() => {
-    onContentLoaded?.(hasContent);
-  }, [hasContent, onContentLoaded]);
+  const hasContent =
+    previousStepOutput !== null &&
+    (
+      previousStepOutput.output !== null ||
+      normalizePresentation(previousStepOutput.agentOutput?.presentation) !== null
+    );
 
   if (loading) {
     return (
@@ -57,75 +95,215 @@ export function TaskContextPanel({
   }
 
   if (!hasContent) {
-    return (
-      <div className="rounded-lg border border-dashed p-6 text-center">
-        <p className="text-sm text-muted-foreground">
-          Waiting for step output...
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Verdict buttons will be enabled once there is content to review.
-        </p>
-      </div>
-    );
+    return null;
   }
 
-  const output = previousStepOutput!.output!;
+  const previousStep = previousStepOutput!;
+  const output = previousStep.output;
   const isObject = typeof output === 'object' && output !== null;
 
   return (
-    <Collapsible.Root defaultOpen={false}>
+    <Collapsible.Root defaultOpen={true}>
       <div className="rounded-lg border">
         <Collapsible.Trigger className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Previous Step Output
             <span className="ml-2 font-normal normal-case text-muted-foreground/70">
-              ({previousStepOutput!.stepId})
+              ({previousStep.stepId})
             </span>
           </div>
           <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 data-[state=open]:rotate-180" />
         </Collapsible.Trigger>
         <Collapsible.Content>
-          <Tabs.Root defaultValue="summary">
-            <Tabs.List className="flex gap-1 border-b px-4">
-              {[
-                { value: 'summary', label: 'Summary', icon: FileText },
-                { value: 'full', label: 'Full Output', icon: Code },
-              ].map(({ value, label, icon: Icon }) => (
-                <Tabs.Trigger
-                  key={value}
-                  value={value}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium',
-                    'text-muted-foreground border-b-2 border-transparent -mb-px',
-                    'transition-colors',
-                    'data-[state=active]:border-primary data-[state=active]:text-primary',
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {label}
-                </Tabs.Trigger>
-              ))}
-            </Tabs.List>
-
-            <Tabs.Content value="summary" className="p-4">
-              {isObject ? (
-                <SummaryView output={output as Record<string, unknown>} />
-              ) : (
-                <pre className="text-sm whitespace-pre-wrap break-words">
-                  {String(output)}
-                </pre>
-              )}
-            </Tabs.Content>
-
-            <Tabs.Content value="full" className="p-4">
-              <pre className="rounded-md bg-muted p-4 text-xs overflow-auto max-h-96 whitespace-pre-wrap break-words">
-                {isObject ? JSON.stringify(output, null, 2) : String(output)}
-              </pre>
-            </Tabs.Content>
-          </Tabs.Root>
+          <PreviousStepOutputTabs
+            output={isObject ? (output as Record<string, unknown>) : null}
+            rawOutput={output}
+            instanceId={processInstanceId}
+            previousStepId={previousStep.stepId}
+            agentPresentation={normalizePresentation(previousStep.agentOutput?.presentation)}
+          />
         </Collapsible.Content>
       </div>
     </Collapsible.Root>
+  );
+}
+
+interface PreviousStepOutputTabsProps {
+  output: Record<string, unknown> | null;
+  rawOutput: unknown;
+  instanceId: string;
+  previousStepId: string;
+  agentPresentation: Presentation | null;
+}
+
+function PreviousStepOutputTabs({
+  output,
+  rawOutput,
+  instanceId,
+  previousStepId,
+  agentPresentation,
+}: PreviousStepOutputTabsProps) {
+  // Inline presentation prefers the agentOutput field (structured); falls
+  // back to a string under `output.presentation` from legacy script outputs.
+  const inlinePresentation: Presentation | null = agentPresentation
+    ?? (output !== null && typeof output.presentation === 'string' && output.presentation.length > 0
+      ? { kind: 'html', content: output.presentation }
+      : null);
+
+  // htmlReportPath is the legacy "fetch report from a written file" contract
+  // (used by landing-zone). Always HTML — markdown reports inline directly.
+  const htmlReportPath =
+    output !== null && typeof output.htmlReportPath === 'string' && output.htmlReportPath.length > 0
+      ? output.htmlReportPath
+      : null;
+
+  const reportMode: 'inline' | 'file' | null = inlinePresentation !== null
+    ? 'inline'
+    : htmlReportPath !== null
+      ? 'file'
+      : null;
+
+  const [fetchedReport, setFetchedReport] = React.useState<string | null>(null);
+  const [reportLoading, setReportLoading] = React.useState(false);
+  const [reportError, setReportError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (reportMode !== 'file') return;
+    let cancelled = false;
+    setReportLoading(true);
+    setReportError(null);
+    setFetchedReport(null);
+    apiFetch(
+      `/api/agent-output-file?instanceId=${encodeURIComponent(instanceId)}&stepId=${encodeURIComponent(previousStepId)}&kind=presentation`,
+    )
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        return res.text();
+      })
+      .then((text) => {
+        if (cancelled) return;
+        setFetchedReport(text);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setReportError(err instanceof Error ? err.message : 'Failed to fetch report');
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setReportLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reportMode, instanceId, previousStepId]);
+
+  // Resolved presentation: inline structured payload wins; otherwise a
+  // fetched file becomes an HTML payload.
+  const resolvedPresentation: Presentation | null = inlinePresentation
+    ?? (fetchedReport !== null ? { kind: 'html', content: fetchedReport } : null);
+  const showReportTab = reportMode !== null;
+
+  const defaultTab = showReportTab ? 'report' : 'summary';
+
+  return (
+    <Tabs.Root key={String(showReportTab)} defaultValue={defaultTab}>
+      <Tabs.List className="flex gap-1 border-b px-4">
+        {[
+          ...(showReportTab ? [{ value: 'report', label: 'Report', icon: MonitorPlay }] : []),
+          { value: 'summary', label: 'Extracted Data', icon: FileText },
+          { value: 'full', label: 'Raw JSON', icon: Code },
+        ].map(({ value, label, icon: Icon }) => (
+          <Tabs.Trigger
+            key={value}
+            value={value}
+            className={cn(
+              'inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium',
+              'text-muted-foreground border-b-2 border-transparent -mb-px',
+              'transition-colors',
+              'data-[state=active]:border-primary data-[state=active]:text-primary',
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </Tabs.Trigger>
+        ))}
+      </Tabs.List>
+
+      {showReportTab && (
+        <Tabs.Content value="report" className="p-4">
+          <ReportPane
+            presentation={resolvedPresentation}
+            loading={reportLoading}
+            error={reportError}
+            result={output}
+          />
+        </Tabs.Content>
+      )}
+
+      <Tabs.Content value="summary" className="p-4">
+        {output !== null ? (
+          <SummaryView output={output} />
+        ) : (
+          <pre className="text-sm whitespace-pre-wrap break-words">
+            {String(rawOutput)}
+          </pre>
+        )}
+      </Tabs.Content>
+
+      <Tabs.Content value="full" className="p-4">
+        <pre className="rounded-md bg-muted p-4 text-xs whitespace-pre-wrap break-words">
+          {output !== null ? JSON.stringify(output, null, 2) : String(rawOutput)}
+        </pre>
+      </Tabs.Content>
+    </Tabs.Root>
+  );
+}
+
+interface ReportPaneProps {
+  presentation: Presentation | null;
+  loading: boolean;
+  error: string | null;
+  result: Record<string, unknown> | null;
+}
+
+function ReportPane({ presentation, loading, error, result }: ReportPaneProps) {
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        <div className="h-4 w-32 rounded bg-muted animate-pulse" />
+        <div className="h-24 rounded bg-muted animate-pulse" />
+      </div>
+    );
+  }
+
+  if (error !== null && presentation === null) {
+    return (
+      <div className="rounded-md border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+        Report file not available — see Extracted Data tab.
+      </div>
+    );
+  }
+
+  if (presentation === null) {
+    return (
+      <div className="text-sm text-muted-foreground">
+        No report content.
+      </div>
+    );
+  }
+
+  if (presentation.kind === 'markdown') {
+    return <MarkdownPresentation content={presentation.content} />;
+  }
+
+  return (
+    <SandboxedHtmlIframe
+      html={presentation.content}
+      result={result}
+      title="Previous step report"
+    />
   );
 }
 

@@ -1,4 +1,4 @@
-import type { LlmClient, LlmMessage, LlmResponse } from '../interfaces/agent-plugin.js';
+import type { LlmClient, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
 
 export class NoopLlmClient implements LlmClient {
   private responses: LlmResponse[] = [];

@@ -25,8 +25,9 @@
  *       (stepInput), `previous_run.json` (carry-over), `prompt.txt` (agent
  *       plugins), `script.<ext>` (inline script mode), `mcp-config.json`.
  *     - The container writes the result contract: `result.json`.
- *     - Host reads `result.json` + optional `presentation.html` + `git-result.json`
- *       (written by the host itself post-commit) after the container exits.
+ *     - Host reads `result.json` + optional `presentation.md` (preferred)
+ *       or `presentation.html` + `git-result.json` (written by the host
+ *       itself post-commit) after the container exits.
  *
  * ### Why separate
  *
@@ -52,18 +53,19 @@
  * belongs in its own PR.
  */
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, cpSync, chmodSync, copyFileSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync, chmodSync, copyFileSync, statSync } from 'node:fs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
-import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
-import type { AgentConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
+import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
+import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import { writeFile } from 'node:fs/promises';
 import type { GitMetadata } from '@mediforce/platform-core';
-import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
-import type { ImageBuildMeta } from './docker-spawn-strategy.js';
-import { WorkspaceManager, type RunWorkspaceHandle } from '../workspace/workspace-manager.js';
+import { resolveStepEnv, type ResolvedEnv } from './resolve-env';
+import type { ImageBuildMeta } from './docker-spawn-strategy';
+import { WorkspaceManager, type RunWorkspaceHandle } from '../workspace/workspace-manager';
+import { copyOutputFilesIntoWorkspace } from '../workspace/output-files';
 
 let preparedDeployKeyPath: string | null = null;
 
@@ -72,13 +74,13 @@ let preparedDeployKeyPath: string | null = null;
  * to a private tmp file with 0600 perms so host-side mount modes can't break us.
  *
  * NOTE: Keep in sync with the duplicated copy in
- * `packages/agent-queue/src/docker-image-builder.ts` — agent-queue cannot
+ * `packages/container-worker/src/docker-image-builder.ts` — container-worker cannot
  * import from agent-runtime without dragging in Firebase deps.
  */
 export function prepareDeployKeyPath(): string {
   const source = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
-  if (!existsSync(source)) return source;
-  if (preparedDeployKeyPath && existsSync(preparedDeployKeyPath)) return preparedDeployKeyPath;
+  if (!existsSync(source) || !statSync(source).isFile()) return source;
+  if (preparedDeployKeyPath && existsSync(preparedDeployKeyPath) && statSync(preparedDeployKeyPath).isFile()) return preparedDeployKeyPath;
   const dir = mkdtempSync(join(tmpdir(), 'mediforce-ssh-'));
   const dest = join(dir, 'deploy_key');
   copyFileSync(source, dest);
@@ -128,44 +130,60 @@ export function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext)
  * `repoAuth` is the name of a key in resolvedEnv (sourced from workflow secrets).
  */
 export function resolveRepoToken(
-  agentConfig: AgentConfig,
+  buildConfig: ContainerConfig,
   context: AgentContext | WorkflowAgentContext,
   resolvedEnv?: Record<string, string>,
 ): string | undefined {
-  // Step-level repoAuth takes priority
-  const authKey = agentConfig.repoAuth
-    ?? (isWorkflowAgentContext(context) ? context.workflowDefinition.repo?.auth : undefined);
+  // Step-level repoAuth takes priority, then workflow-level externalSkillsRepo.auth.
+  const wfDef = isWorkflowAgentContext(context) ? context.workflowDefinition : undefined;
+  const authKey = buildConfig.repoAuth
+    ?? wfDef?.externalSkillsRepo?.auth;
   if (!authKey || !resolvedEnv) return undefined;
   return resolvedEnv[authKey];
 }
 
+/**
+ * Derive a deterministic image tag from the build inputs so callers that
+ * omit `image` in build mode still get a stable, cacheable tag.
+ * Format: `mediforce-built:<12-char-sha256-hex>`.
+ */
+export function deriveBuildTag(repoUrl: string, commit: string, dockerfile?: string): string {
+  const hash = createHash('sha256')
+    .update(`${repoUrl}\0${commit}\0${dockerfile ?? ''}`)
+    .digest('hex')
+    .slice(0, 12);
+  return `mediforce-built:${hash}`;
+}
+
 export function resolveImageBuild(
-  image: string,
-  agentConfig: AgentConfig,
+  image: string | undefined,
+  buildConfig: ContainerConfig,
   context: AgentContext | WorkflowAgentContext,
   resolvedEnv?: Record<string, string>,
 ): ImageBuildMeta | undefined {
-  const { dockerfile, repo, commit } = agentConfig;
+  const { dockerfile, repo, commit } = buildConfig;
 
   if (repo && commit) {
+    const repoUrl = normalizeRepoUrls(repo).gitUrl;
     return {
-      image,
-      repoUrl: normalizeRepoUrls(repo).gitUrl,
+      image: image ?? deriveBuildTag(repoUrl, commit, dockerfile),
+      repoUrl,
       commit,
       dockerfile,
-      repoToken: resolveRepoToken(agentConfig, context, resolvedEnv),
+      repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
     };
   }
 
   if (dockerfile && isWorkflowAgentContext(context)) {
-    const wfRepo = context.workflowDefinition.repo;
+    const wfRepo = context.workflowDefinition.externalSkillsRepo;
     if (wfRepo?.url && wfRepo?.commit) {
+      const repoUrl = repo ? normalizeRepoUrls(repo).gitUrl : normalizeRepoUrls(wfRepo.url).gitUrl;
       return {
-        image,
-        repoUrl: repo ? normalizeRepoUrls(repo).gitUrl : normalizeRepoUrls(wfRepo.url).gitUrl,
+        image: image ?? deriveBuildTag(repoUrl, commit ?? wfRepo.commit, dockerfile),
+        repoUrl,
         commit: commit ?? wfRepo.commit,
         dockerfile,
-        repoToken: resolveRepoToken(agentConfig, context, resolvedEnv),
+        repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
       };
     }
   }
@@ -175,6 +193,17 @@ export function resolveImageBuild(
 
 const SKILLS_CACHE_DIR = join(tmpdir(), 'mediforce-skills-cache');
 
+/**
+ * Content-addressed cache directory for skills fetched from a git repo.
+ * Key: sha256(repoUrl + commit + skillsDir). Pure — computable for free
+ * whenever the path is needed, so nothing about it has to be stored on
+ * shared instance state.
+ */
+export function skillsCacheDir(repoUrl: string, commit: string, skillsDir: string): string {
+  const hash = createHash('sha256').update(`${repoUrl}\0${commit}\0${skillsDir}`).digest('hex').slice(0, 16);
+  return join(SKILLS_CACHE_DIR, hash);
+}
+
 /** Convert SSH git URL to HTTPS with token for authenticated clone. */
 export function toHttpsWithToken(sshUrl: string, token: string): string {
   const match = sshUrl.match(/git@github\.com:(.+?)(?:\.git)?$/);
@@ -182,6 +211,53 @@ export function toHttpsWithToken(sshUrl: string, token: string): string {
     return `https://x-access-token:${token}@github.com/${match[1]}.git`;
   }
   return sshUrl.replace('https://', `https://x-access-token:${token}@`);
+}
+
+/**
+ * Resolve the clone URL + transport for a skills repo reference, honouring the
+ * form the user supplied: an `https://` URL clones over HTTPS, a `git@` URL
+ * clones over SSH. We never silently convert one to the other.
+ *
+ *   - token present  → authenticated HTTPS (`x-access-token`); a PAT only works
+ *                      over HTTPS, mirroring the main-repo clone path
+ *   - `git@…`        → SSH as given (needs deploy key + `GIT_SSH_COMMAND`)
+ *   - `https://…` / local path → HTTPS / local as given
+ *   - `owner/repo` shorthand   → anonymous HTTPS (github default)
+ */
+export function resolveSkillsCloneUrl(
+  repoRef: string,
+  repoToken?: string,
+): { cloneUrl: string; useSsh: boolean } {
+  if (repoToken) {
+    return { cloneUrl: toHttpsWithToken(normalizeRepoUrls(repoRef).gitUrl, repoToken), useSsh: false };
+  }
+  if (repoRef.startsWith('git@')) {
+    return { cloneUrl: repoRef, useSsh: true };
+  }
+  if (repoRef.startsWith('https://') || repoRef.startsWith('/') || repoRef.startsWith('.')) {
+    return { cloneUrl: repoRef, useSsh: false };
+  }
+  return { cloneUrl: normalizeRepoUrls(repoRef).httpsUrl, useSsh: false };
+}
+
+/**
+ * Human-readable exit descriptor for a finished container or child process.
+ * A SIGTERM kill is annotated as a likely timeout when the step's limit is
+ * known — the signal name alone doesn't tell the user we killed it for
+ * running too long.
+ */
+export function formatExitInfo(
+  result: { exitCode: number | null; signal: string | null },
+  timeoutMinutes?: number,
+): string {
+  if (result.signal === null) {
+    return `exit code ${result.exitCode}`;
+  }
+  const timeoutHint =
+    result.signal === 'SIGTERM' && typeof timeoutMinutes === 'number'
+      ? ` (likely timeout — ${timeoutMinutes} min limit)`
+      : '';
+  return `killed by ${result.signal}${timeoutHint}`;
 }
 
 export interface CommitRunWorkspaceOptions {
@@ -200,20 +276,35 @@ export interface CommitRunWorkspaceOptions {
   agentImage?: string;
 }
 
-export abstract class ContainerPlugin implements AgentPlugin {
+export interface WorkspaceManagerLike {
+  createRunWorkspace: WorkspaceManager['createRunWorkspace'];
+  commitStep: WorkspaceManager['commitStep'];
+}
+
+export interface ContainerPluginInit {
+  workspaceManager?: WorkspaceManagerLike;
+}
+
+export abstract class ContainerPlugin implements StepExecutorPlugin {
   abstract readonly metadata: PluginCapabilityMetadata;
 
   protected context!: AgentContext | WorkflowAgentContext;
-  protected resolvedEnv: ResolvedEnv = { vars: {}, injectedKeys: [] };
+  protected resolvedEnv: ResolvedEnv = { vars: {}, injectedKeys: [], sources: {} };
   protected imageBuild: ImageBuildMeta | undefined;
-  /** Cached skills dir path fetched from git repo. */
-  protected repoSkillsDir: string | null = null;
   /** Run-scoped git worktree — populated by `resolveRunWorkspace` at run start. */
   protected runWorkspaceHandle: RunWorkspaceHandle | null = null;
-  protected workspaceManager: WorkspaceManager | null = null;
+  protected workspaceManager: WorkspaceManagerLike | null = null;
+
+  constructor(init: ContainerPluginInit = {}) {
+    this.workspaceManager = init.workspaceManager ?? null;
+  }
 
   abstract initialize(context: AgentContext | WorkflowAgentContext): Promise<void>;
   abstract run(emit: EmitFn): Promise<void>;
+
+  protected createWorkspaceManager(): WorkspaceManagerLike {
+    return new WorkspaceManager();
+  }
 
   /**
    * Provision a per-run git worktree. Every step gets one — if the WD has no
@@ -234,7 +325,7 @@ export abstract class ContainerPlugin implements AgentPlugin {
       : undefined;
 
     if (!this.workspaceManager) {
-      this.workspaceManager = new WorkspaceManager();
+      this.workspaceManager = this.createWorkspaceManager();
     }
 
     const remoteToken = workspaceConfig.remoteAuth
@@ -259,6 +350,10 @@ export abstract class ContainerPlugin implements AgentPlugin {
    *   ✓ last agent step of the run (no more agents will touch the workspace)
    *   ✗ failed — commits whatever the step produced before the error
    *
+   * Before committing, copies the step's `/output` deliverables into
+   * `.mediforce/output/<stepId>/` in the worktree (best-effort) so the same
+   * commit captures them — see `copyOutputFilesIntoWorkspace`.
+   *
    * Writes `git-result.json` into `outputDir` for downstream consumers.
    * Never pushes — run branches stay local for now.
    */
@@ -267,6 +362,8 @@ export abstract class ContainerPlugin implements AgentPlugin {
     opts: CommitRunWorkspaceOptions = {},
   ): Promise<GitMetadata | null> {
     if (!this.runWorkspaceHandle || !this.workspaceManager) return null;
+
+    await copyOutputFilesIntoWorkspace(outputDir, this.runWorkspaceHandle.path, this.context.stepId);
 
     const commit = await this.workspaceManager.commitStep(this.runWorkspaceHandle, {
       stepId: this.context.stepId,
@@ -280,11 +377,17 @@ export abstract class ContainerPlugin implements AgentPlugin {
       agentImage: opts.agentImage,
     });
 
+    // Run branches are committed locally and never pushed (see comment above).
+    // Even when a remote is configured, the commit/branch does not yet exist
+    // on GitHub — emitting `remoteUrl` here produces broken `/commit/<sha>`,
+    // `/compare/main...<branch>` and `/blob/<sha>/<file>` links in the UI.
+    // Use the bare repo path so consumers can detect "not a real URL" and
+    // render the metadata as plain text instead of GitHub deep links.
     const metadata: GitMetadata = {
       commitSha: commit.commitSha,
       branch: this.runWorkspaceHandle.branch,
       changedFiles: commit.changedFiles,
-      repoUrl: this.runWorkspaceHandle.remoteUrl ?? this.runWorkspaceHandle.bareRepoPath,
+      repoUrl: this.runWorkspaceHandle.bareRepoPath,
     };
 
     await writeFile(join(outputDir, 'git-result.json'), JSON.stringify(metadata, null, 2), 'utf-8');
@@ -329,41 +432,43 @@ export abstract class ContainerPlugin implements AgentPlugin {
     definitionEnv?: Record<string, string>,
     stepEnv?: Record<string, string>,
     workflowSecrets?: Record<string, string>,
+    namespaceSecretKeys?: ReadonlySet<string>,
   ): void {
-    this.resolvedEnv = resolveStepEnv(definitionEnv, stepEnv, workflowSecrets);
+    this.resolvedEnv = resolveStepEnv(definitionEnv, stepEnv, workflowSecrets, this.metadata.requiredEnv, namespaceSecretKeys);
   }
 
   /**
-   * Fetch skills from a git repo into a deterministic cache directory.
-   * Cache key: sha256(repoUrl + commit + skillsDir).
-   * Returns the path to the cached skills directory.
+   * Populate the content-addressed skills cache from a git repo (clone + copy).
+   * Idempotent: a cache hit is a no-op. Stores nothing on instance state — the
+   * cache path is derived on demand by {@link resolveSkillsDir} via
+   * {@link skillsCacheDir}, so concurrent steps can't leak or clobber it.
    */
   protected async fetchSkillsFromRepo(
     skillsDir: string,
-    repoUrl: string,
+    repoRef: string,
     commit: string,
     repoToken?: string,
-  ): Promise<string> {
-    const hash = createHash('sha256').update(`${repoUrl}\0${commit}\0${skillsDir}`).digest('hex').slice(0, 16);
-    const cacheDir = join(SKILLS_CACHE_DIR, hash);
+  ): Promise<void> {
+    const cacheDir = skillsCacheDir(repoRef, commit, skillsDir);
 
     // Cache hit
     if (existsSync(cacheDir)) {
-      console.log(`[container-plugin] Skills cache hit for ${skillsDir} (${hash})`);
-      this.repoSkillsDir = cacheDir;
-      return cacheDir;
+      console.log(`[container-plugin] Skills cache hit for ${skillsDir} (${cacheDir})`);
+      return;
     }
 
     // Cache miss — clone, copy, delete clone
-    console.log(`[container-plugin] Fetching skills from ${repoUrl}@${commit.slice(0, 8)} path=${skillsDir}`);
+    console.log(`[container-plugin] Fetching skills from ${repoRef}@${commit.slice(0, 8)} path=${skillsDir}`);
     const cloneDir = mkdtempSync(join(tmpdir(), 'mediforce-skills-clone-'));
 
     try {
-      const cloneUrl = repoToken ? toHttpsWithToken(repoUrl, repoToken) : repoUrl;
-      const deployKeyPath = prepareDeployKeyPath();
+      const { cloneUrl, useSsh } = resolveSkillsCloneUrl(repoRef, repoToken);
+      // SSH refs need a deploy key + GIT_SSH_COMMAND; HTTPS and local paths must not set it.
       const execOpts = {
         stdio: 'pipe' as const,
-        env: { ...process.env, GIT_SSH_COMMAND: `ssh -i ${deployKeyPath} -o StrictHostKeyChecking=no -o IdentitiesOnly=yes` },
+        env: useSsh
+          ? { ...process.env, GIT_SSH_COMMAND: `ssh -i ${prepareDeployKeyPath()} -o StrictHostKeyChecking=no -o IdentitiesOnly=yes` }
+          : { ...process.env },
       };
 
       execSync(`git init "${cloneDir}"`, execOpts);
@@ -374,7 +479,7 @@ export abstract class ContainerPlugin implements AgentPlugin {
       const sourceDir = join(cloneDir, skillsDir);
       if (!existsSync(sourceDir)) {
         throw new Error(
-          `Skills directory "${skillsDir}" not found in repo ${repoUrl}@${commit.slice(0, 8)}`,
+          `Skills directory "${skillsDir}" not found in repo ${repoRef}@${commit.slice(0, 8)}`,
         );
       }
 
@@ -384,17 +489,24 @@ export abstract class ContainerPlugin implements AgentPlugin {
     } finally {
       rmSync(cloneDir, { recursive: true, force: true });
     }
-
-    this.repoSkillsDir = cacheDir;
-    return cacheDir;
   }
 
   /**
-   * Resolve skillsDir — uses repo cache if available, otherwise resolveProjectPath.
+   * Resolve the host skills directory for the current step. When the workflow
+   * declares an `externalSkillsRepo`, the path is the content-addressed cache
+   * dir (populated by {@link fetchSkillsFromRepo}); otherwise it's resolved
+   * from disk. Derived fresh from `this.context` per call — no shared field —
+   * so a repo-mode step can't leak its cache dir into a later disk-mode step,
+   * and concurrent steps can't clobber each other.
    */
   protected resolveSkillsDir(skillsDir: string, resolveProjectPath: (p: string) => string): string {
-    if (this.repoSkillsDir) {
-      return this.repoSkillsDir;
+    const wfRepo = isWorkflowAgentContext(this.context)
+      ? this.context.workflowDefinition.externalSkillsRepo
+      : undefined;
+    if (wfRepo?.url && wfRepo?.commit) {
+      // Key on the raw url — must match the `repoRef` `fetchSkillsFromRepo`
+      // populates with (see the call site in base-container-agent-plugin).
+      return skillsCacheDir(wfRepo.url, wfRepo.commit, skillsDir);
     }
     return resolveProjectPath(skillsDir);
   }

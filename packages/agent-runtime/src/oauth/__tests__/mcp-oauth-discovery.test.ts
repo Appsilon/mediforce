@@ -4,7 +4,7 @@ import {
   discoverMcpAuthServer,
   extractResourceMetadataUrl,
   McpDiscoveryError,
-} from '../mcp-oauth-discovery.js';
+} from '../mcp-oauth-discovery';
 
 describe('extractResourceMetadataUrl', () => {
   it('pulls the URL out of an RFC 9728 challenge header', () => {

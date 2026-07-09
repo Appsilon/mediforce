@@ -7,8 +7,8 @@ import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { WorkspaceManager, formatFileDelta, formatStepCommitMessage } from '../workspace-manager.js';
-import { createTestRepo, type TestRepo } from '../../plugins/__tests__/helpers/create-test-repo.js';
+import { WorkspaceManager, formatFileDelta, formatStepCommitMessage } from '../workspace-manager';
+import { createTestRepo, type TestRepo } from '../../plugins/__tests__/helpers/create-test-repo';
 import type { WorkflowWorkspace } from '@mediforce/platform-core';
 
 function listBareBranches(bareRepoPath: string): string[] {
@@ -41,7 +41,7 @@ describe('WorkspaceManager', () => {
       expect(listBareBranches(result.path)).toContain('main');
     });
 
-    it('clones from a remote path', async () => {
+    it('init+fetches from a remote path', async () => {
       const remote = createTestRepo();
       try {
         const wd = { name: 'wd-with-remote', workspace: { remote: remote.repoPath } as WorkflowWorkspace };
@@ -49,9 +49,14 @@ describe('WorkspaceManager', () => {
 
         expect(result.freshlyInitialized).toBe(true);
         expect(result.remoteUrl).toBe(remote.repoPath);
-        // Clone --bare brings over the initial commit from the test repo
-        const head = execFileSync('git', ['--git-dir', result.path, 'rev-parse', 'HEAD'], { encoding: 'utf-8' }).trim();
-        expect(head).toBe(remote.commitSha);
+        // The remote's tip is reachable via a remote-tracking ref. We use
+        // init+fetch (multi-remote model), not git clone --bare.
+        const remoteRefs = execFileSync('git', [
+          '--git-dir', result.path, 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/remotes/',
+        ], { encoding: 'utf-8' }).trim().split('\n').filter(Boolean);
+        const mainRef = remoteRefs.find((line) => line.endsWith('/main ' + remote.commitSha) || line.includes('/main '));
+        expect(mainRef).toBeDefined();
+        expect(mainRef!.endsWith(remote.commitSha)).toBe(true);
       } finally {
         remote.cleanup();
       }

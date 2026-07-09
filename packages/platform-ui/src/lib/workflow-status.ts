@@ -1,6 +1,6 @@
 import type { InstanceStatus } from '@mediforce/platform-core';
 
-export type WorkflowDisplayStatus = 'in_progress' | 'waiting_for_human' | 'error' | 'completed';
+export type WorkflowDisplayStatus = 'in_progress' | 'waiting_for_human' | 'error' | 'cancelled' | 'completed';
 
 export interface WorkflowStatus {
   displayStatus: WorkflowDisplayStatus;
@@ -53,24 +53,32 @@ export function getWorkflowStatus(instance: {
         return { displayStatus: 'waiting_for_human', reason: 'Waiting for agent approval review', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
       case 'cowork_in_progress':
         return { displayStatus: 'waiting_for_human', reason: 'Cowork session in progress', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
+      case 'waiting_for_timer':
+        return { displayStatus: 'in_progress', reason: 'Waiting for timer or condition', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
       case 'agent_escalated':
-        return { displayStatus: 'waiting_for_human', reason: 'Agent escalated to human review', rawReason: pauseReason, isRetryable: true, hasDedicatedBanner: false };
+        return { displayStatus: 'waiting_for_human', reason: error !== null ? `Agent failed: ${error}` : 'Agent escalated to human review', rawReason: pauseReason, isRetryable: true, hasDedicatedBanner: false };
       case 'agent_paused':
         return { displayStatus: 'waiting_for_human', reason: 'Agent requested human review', rawReason: pauseReason, isRetryable: true, hasDedicatedBanner: false };
       case 'missing_env':
         return { displayStatus: 'error', reason: 'Missing environment configuration', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: true };
       case 'step_failure':
-        return { displayStatus: 'error', reason: error ?? 'Step execution failed', rawReason: pauseReason, isRetryable: true, hasDedicatedBanner: false };
+        return { displayStatus: 'error', reason: error ?? 'Step execution failed', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
       case 'routing_error':
-        return { displayStatus: 'error', reason: 'Workflow routing error', rawReason: pauseReason, isRetryable: true, hasDedicatedBanner: false };
+        return { displayStatus: 'error', reason: 'Workflow routing error', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
       case 'max_iterations_exceeded':
         return { displayStatus: 'error', reason: 'Maximum review iterations exceeded', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
+      case null:
+        return {
+          displayStatus: 'error',
+          reason: 'Run paused without a recorded reason — the scheduler cannot resume it automatically. Resume this run to restart from the current step.',
+          rawReason: null,
+          isRetryable: false,
+          hasDedicatedBanner: false,
+        };
       default:
         return {
           displayStatus: 'error',
-          reason: pauseReason !== null
-            ? pauseReason.replace(/_/g, ' ')
-            : 'Workflow stopped unexpectedly',
+          reason: pauseReason.replace(/_/g, ' '),
           rawReason: pauseReason,
           isRetryable: false,
           hasDedicatedBanner: false,
@@ -79,10 +87,14 @@ export function getWorkflowStatus(instance: {
   }
 
   if (instance.status === 'failed') {
-    // cancelProcessRun sets error='Cancelled by user' — string match is the cheapest gate here;
-    // this value is written by cancelProcessRun and must not change without updating this check.
-    const isCancelled = error === 'Cancelled by user';
-    return { displayStatus: 'error', reason: error ?? 'Process failed', rawReason: null, isRetryable: !isCancelled, hasDedicatedBanner: false };
+    // cancelProcess handler sets error='Cancelled by user' (default reason);
+    // string match is the cheapest gate. The default reason in
+    // packages/platform-api/src/handlers/processes/cancel-process.ts must not
+    // change without updating this check.
+    if (error === 'Cancelled by user') {
+      return { displayStatus: 'cancelled', reason: 'Cancelled by user', rawReason: null, isRetryable: false, hasDedicatedBanner: false };
+    }
+    return { displayStatus: 'error', reason: error ?? 'Process failed', rawReason: null, isRetryable: false, hasDedicatedBanner: false };
   }
 
   return { displayStatus: 'error', reason: 'Unknown status', rawReason: null, isRetryable: false, hasDedicatedBanner: false };

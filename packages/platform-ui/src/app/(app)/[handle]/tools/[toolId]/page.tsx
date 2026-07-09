@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Lock, Plug, Shield, Terminal, Users } from 'lucide-react';
 import type { AgentDefinition, ToolCatalogEntry } from '@mediforce/platform-core';
 import { apiFetch } from '@/lib/api-fetch';
-import { getCatalogEntry } from '@/lib/mcp-admin-client';
+import { mediforce, ApiError } from '@/lib/mediforce';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function ToolDetailPage() {
@@ -25,8 +25,15 @@ export default function ToolDetailPage() {
     setError(null);
     try {
       const [fetchedEntry, agentList] = await Promise.all([
-        getCatalogEntry(handle, toolId),
-        apiFetch('/api/agent-definitions').then(async (res) =>
+        // 404 is a normal "not found" outcome here, not an error — surface
+        // it as `null` to match the old `getCatalogEntry` semantics.
+        mediforce.toolCatalog
+          .get({ namespace: handle, id: toolId })
+          .then((res) => res.entry)
+          .catch((err: unknown) =>
+            err instanceof ApiError && err.status === 404 ? null : Promise.reject(err),
+          ),
+        apiFetch('/api/agents').then(async (res) =>
           res.ok ? ((await res.json()) as { agents: AgentDefinition[] }).agents : [],
         ),
       ]);

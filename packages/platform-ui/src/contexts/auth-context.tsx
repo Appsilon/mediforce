@@ -14,105 +14,11 @@ import {
   type AuthError,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
-
-function generateHandle(email: string): string {
-  const localPart = email.split('@')[0] ?? '';
-  return localPart
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'user';
-}
-
-const namespaceCreationInProgress = new Set<string>();
-
-async function ensurePersonalNamespace(user: { uid: string; email: string | null; displayName: string | null }) {
-  if (namespaceCreationInProgress.has(user.uid)) return;
-  namespaceCreationInProgress.add(user.uid);
-
-  try {
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-    const userData = userSnap.exists() ? userSnap.data() : {};
-
-    // Self-heal helper: the hardened rules from PR #250 silently rejected
-    // this uid's owner-member write on any prior login (circular-dep bug
-    // fixed in the Step-5 rules patch). A namespace doc may therefore exist
-    // without a member doc for the owner. Re-seed when missing.
-    async function ensureOwnerMember(handle: string): Promise<void> {
-      const memberRef = doc(db, 'namespaces', handle, 'members', user.uid);
-      const memberSnap = await getDoc(memberRef);
-      if (memberSnap.exists()) return;
-      await setDoc(memberRef, {
-        uid: user.uid,
-        role: 'owner',
-        ...(user.displayName !== null ? { displayName: user.displayName } : {}),
-        joinedAt: new Date().toISOString(),
-      });
-    }
-
-    if (typeof userData.handle === 'string' && userData.handle !== '') {
-      // Already has handle — check namespace exists
-      const nsRef = doc(db, 'namespaces', userData.handle);
-      const nsSnap = await getDoc(nsRef);
-      if (!nsSnap.exists()) {
-        await setDoc(nsRef, {
-          handle: userData.handle,
-          type: 'personal',
-          displayName: user.displayName ?? user.email ?? userData.handle,
-          linkedUserId: user.uid,
-          createdAt: new Date().toISOString(),
-        });
-      }
-      await ensureOwnerMember(userData.handle);
-      return;
-    }
-
-    // No handle in user doc — check if a personal namespace already exists for this uid
-    const existingQuery = query(
-      collection(db, 'namespaces'),
-      where('linkedUserId', '==', user.uid),
-      where('type', '==', 'personal'),
-      limit(1),
-    );
-    const existingSnap = await getDocs(existingQuery);
-    if (!existingSnap.empty) {
-      const existingHandle = existingSnap.docs[0]!.id;
-      await setDoc(userRef, { handle: existingHandle }, { merge: true });
-      await ensureOwnerMember(existingHandle);
-      return;
-    }
-
-    // No handle yet — generate one and create namespace
-    const baseHandle = generateHandle(user.email ?? user.uid);
-    let handle = baseHandle;
-    let attempt = 1;
-    while (true) {
-      const nsSnap = await getDoc(doc(db, 'namespaces', handle));
-      if (!nsSnap.exists()) break;
-      attempt += 1;
-      handle = `${baseHandle}-${attempt}`;
-    }
-
-    await setDoc(doc(db, 'namespaces', handle), {
-      handle,
-      type: 'personal',
-      displayName: user.displayName ?? user.email ?? handle,
-      linkedUserId: user.uid,
-      createdAt: new Date().toISOString(),
-    });
-    await setDoc(doc(db, 'namespaces', handle, 'members', user.uid), {
-      uid: user.uid,
-      role: 'owner',
-      ...(user.displayName !== null ? { displayName: user.displayName } : {}),
-      joinedAt: new Date().toISOString(),
-    });
-    await setDoc(userRef, { handle }, { merge: true });
-  } finally {
-    namespaceCreationInProgress.delete(user.uid);
-  }
-}
+import { useQueryClient } from '@tanstack/react-query';
+import { auth } from '@/lib/firebase';
+import { mediforce, ApiError } from '@/lib/mediforce';
+import { queryKeys } from '@/lib/query-keys';
+import { useUserMe } from '@/hooks/use-user-me';
 
 interface AuthContextValue {
   firebaseUser: FirebaseUser | null;
@@ -174,11 +80,37 @@ async function probeEmailAuth(): Promise<boolean> {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = React.useState<FirebaseUser | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [mustChangePassword, setMustChangePassword] = React.useState(false);
+  const [firebaseReady, setFirebaseReady] = React.useState(false);
   const [emailAuthEnabled, setEmailAuthEnabled] = React.useState<boolean | null>(null);
   const [googleAuthEnabled, setGoogleAuthEnabled] = React.useState<boolean | null>(null);
   const [pendingGoogleCredential, setPendingGoogleCredential] = React.useState<OAuthCredential | null>(null);
+  const qc = useQueryClient();
+
+  // Trigger /api/users/me as soon as the user is signed in. The handler
+  // bootstraps the personal namespace on first call (formerly inline here as
+  // `ensurePersonalNamespace`), then react-query keeps the cache warm for
+  // every selector hook (`useNamespaceRole`, `useAllUserNamespaces`,
+  // `usePersonalNamespace`). The query also carries `user.mustChangePassword`
+  // — derived below into the context value so the layout's forced-reset
+  // gate stays driven by server state, not a parallel firestore read.
+  const userMe = useUserMe({ enabled: firebaseUser !== null });
+
+  // Layout reads both `loading` and `mustChangePassword` before deciding
+  // whether to redirect to `/change-password`. Clearing `loading` before
+  // `useUserMe` resolves would let the layout render under the default
+  // `mustChangePassword: false`, silently bypassing the forced-reset gate.
+  // So we stay loading until either: Firebase Auth resolved no user
+  // (anonymous path), or both auth and the `me` query have settled.
+  const loading =
+    !firebaseReady ||
+    (firebaseUser !== null && userMe.data === undefined && !userMe.isError);
+
+  // Fail-closed for the gate: if the `me` query has errored we default the
+  // flag to `true`, matching the pre-headless firestore-read behaviour.
+  const mustChangePassword =
+    firebaseUser !== null && userMe.isError
+      ? true
+      : userMe.data?.user.mustChangePassword === true;
 
   React.useEffect(() => {
     // In emulator mode both providers are always enabled — skip probes to avoid
@@ -195,51 +127,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
-      setLoading(false);
-
-      if (user !== null) {
-        const profile: Record<string, string> = {};
-        if (user.displayName !== null) profile.displayName = user.displayName;
-        if (user.photoURL !== null) profile.photoURL = user.photoURL;
-        if (user.email !== null) profile.email = user.email;
-        profile.uid = user.uid;
-
-        // Read mustChangePassword FIRST before any writes — pending writes to the same
-        // document can cause the Firestore SDK to return an optimistic local snapshot that
-        // omits server-side fields the client hasn't seen yet (e.g. mustChangePassword).
-        getDoc(doc(db, 'users', user.uid)).then((snap) => {
-          if (snap.exists()) {
-            setMustChangePassword(snap.data().mustChangePassword === true);
-          }
-          if (Object.keys(profile).length > 0) {
-            setDoc(doc(db, 'users', user.uid), profile, { merge: true }).catch((err) => {
-              console.error('[auth] Failed to update user profile doc:', err);
-            });
-          }
-          ensurePersonalNamespace(user).catch((err) => {
-            console.error('[auth] ensurePersonalNamespace failed:', err);
-          });
-        }).catch((err) => {
-          // Fail-closed: if we cannot read mustChangePassword, assume it is true so
-          // the forced-reset gate is never silently bypassed by a rules rejection or
-          // transient network error.
-          console.error('[auth] Failed to read user doc for mustChangePassword — failing closed:', err);
-          setMustChangePassword(true);
-          if (Object.keys(profile).length > 0) {
-            setDoc(doc(db, 'users', user.uid), profile, { merge: true }).catch((writeErr) => {
-              console.error('[auth] Failed to update user profile doc:', writeErr);
-            });
-          }
-          ensurePersonalNamespace(user).catch((nsErr) => {
-            console.error('[auth] ensurePersonalNamespace failed:', nsErr);
-          });
-        });
-      } else {
-        setMustChangePassword(false);
+      setFirebaseReady(true);
+      if (user === null) {
+        qc.removeQueries({ queryKey: queryKeys.users.me() });
       }
     });
     return unsub;
-  }, []);
+  }, [qc]);
 
   const signInWithGoogle = React.useCallback(async () => {
     const provider = new GoogleAuthProvider();
@@ -287,11 +181,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const clearMustChangePassword = React.useCallback(async () => {
-    if (auth.currentUser !== null) {
-      await setDoc(doc(db, 'users', auth.currentUser.uid), { mustChangePassword: false }, { merge: true });
-      setMustChangePassword(false);
+    if (auth.currentUser === null) return;
+    // Changing the password revokes the user's existing ID tokens. The caller
+    // re-authenticates first, but the SDK can still briefly hand a stale
+    // (pre-change) token to this request, which the backend rejects as revoked
+    // (401). Force a token refresh and retry so the call lands on the new
+    // session's valid token. In production tokens aren't revoked on this path,
+    // so the first attempt succeeds and the loop is a no-op.
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        await mediforce.users.clearMustChangePassword();
+        break;
+      } catch (err) {
+        if (attempt >= 5 || !(err instanceof ApiError) || err.status !== 401) throw err;
+        await auth.currentUser?.getIdToken(true);
+      }
     }
-  }, []);
+    // refetchQueries (not invalidateQueries) so the `me` cache holds the fresh
+    // `mustChangePassword: false` before the caller navigates. invalidateQueries
+    // only refetches *active* observers and resolves immediately when none are
+    // attached — during the post-change route transition the `me` observer can
+    // detach, leaving the cache stale and bouncing the user back to
+    // /change-password. refetchQueries always performs and awaits the refetch.
+    await qc.refetchQueries({ queryKey: queryKeys.users.me() });
+  }, [qc]);
 
   const signOut = React.useCallback(async () => {
     setPendingGoogleCredential(null);

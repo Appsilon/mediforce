@@ -14,14 +14,15 @@ import type {
 import {
   WorkflowEngine,
   InvalidTransitionError,
-} from '../index.js';
-import type { StepActor } from '../index.js';
+} from '../index';
+import type { StepActor } from '../index';
 
 // All test definitions use WorkflowDefinition (unified schema)
 const linearDef: WorkflowDefinition = {
   name: 'linear-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
     { id: 'process', name: 'Process', type: 'creation', executor: 'human' },
@@ -38,6 +39,7 @@ const branchingDef: WorkflowDefinition = {
   name: 'branching-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
     { id: 'path-a', name: 'Path A', type: 'creation', executor: 'agent' },
@@ -57,6 +59,7 @@ const reviewDef: WorkflowDefinition = {
   name: 'review-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'draft', name: 'Draft', type: 'creation', executor: 'agent' },
     {
@@ -122,7 +125,7 @@ describe('WorkflowEngine', () => {
   // --- createInstance ---
 
   it('createInstance returns ProcessInstance with status created and correct definition reference', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'linear-process',
       1,
       'user-1',
@@ -144,14 +147,14 @@ describe('WorkflowEngine', () => {
 
   it('createInstance throws if definition not found', async () => {
     await expect(
-      engine.createInstance('nonexistent', 99, 'user-1', 'manual'),
+      engine.createInstance('test', 'nonexistent', 99, 'user-1', 'manual'),
     ).rejects.toThrow();
   });
 
   // --- startInstance ---
 
   it('startInstance transitions created -> running, sets currentStepId to first step', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'linear-process',
       1,
       'user-1',
@@ -166,7 +169,7 @@ describe('WorkflowEngine', () => {
   // --- advanceStep ---
 
   it('advanceStep delegates to StepExecutor, commits new state', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'linear-process',
       1,
       'user-1',
@@ -182,7 +185,7 @@ describe('WorkflowEngine', () => {
   // --- submitReviewVerdict ---
 
   it('submitReviewVerdict adds verdict to ReviewTracker, routes via native verdicts', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'review-process',
       1,
       'user-1',
@@ -204,8 +207,46 @@ describe('WorkflowEngine', () => {
     expect(result.status).toBe('completed');
   });
 
+  it('submitReviewVerdict routes a non-first verdict to its declared target (N-way)', async () => {
+    // reviewDef declares: approve → approved, revise → draft, reject → rejected.
+    // 'reject' is the third declared verdict; routing must follow the verdicts
+    // map, NOT the order in which transitions are listed. Without this case,
+    // a bug that just takes the first matching transition would pass the
+    // 'approve' happy-path test.
+    const instance = await engine.createInstance('test',
+      'review-process',
+      1,
+      'user-1',
+      'manual',
+      {},
+    );
+    await engine.startInstance(instance.id);
+    await engine.advanceStep(instance.id, {}, actor);
+
+    const verdict = makeReviewVerdict('reject');
+    const result = await engine.submitReviewVerdict(
+      instance.id,
+      'review',
+      verdict,
+      actor,
+    );
+
+    expect(result.status).toBe('completed');
+    // currentStepId is cleared on completion. Read the terminal-reached
+    // audit event to verify the routing target. 'rejected' has to win
+    // over the first-declared 'approve → approved' verdict, proving the
+    // engine routes via step.verdicts[verdict].target, not first match.
+    const completedEvent = auditRepo
+      .getAll()
+      .find((e) => e.action === 'instance.completed');
+    expect(completedEvent).toBeDefined();
+    const terminalStepId =
+      (completedEvent!.inputSnapshot as { terminalStepId?: string } | undefined)?.terminalStepId;
+    expect(terminalStepId).toBe('rejected');
+  });
+
   it('submitReviewVerdict when maxIterations exceeded: pauses instance with reason max_iterations_exceeded', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'review-process',
       1,
       'user-1',
@@ -253,7 +294,7 @@ describe('WorkflowEngine', () => {
   // --- pauseInstance ---
 
   it('pauseInstance sets status paused and pauseReason, emits audit event', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'linear-process',
       1,
       'user-1',
@@ -273,7 +314,7 @@ describe('WorkflowEngine', () => {
   // --- resumeInstance ---
 
   it('resumeInstance on paused instance: status back to running, audit event emitted', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'linear-process',
       1,
       'user-1',
@@ -291,7 +332,7 @@ describe('WorkflowEngine', () => {
   });
 
   it('resumeInstance on non-paused instance: throws InvalidTransitionError', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'linear-process',
       1,
       'user-1',
@@ -307,7 +348,7 @@ describe('WorkflowEngine', () => {
   // --- abortInstance ---
 
   it('abortInstance sets status failed, audit event emitted', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'linear-process',
       1,
       'user-1',
@@ -326,7 +367,7 @@ describe('WorkflowEngine', () => {
   // --- Full lifecycle tests ---
 
   it('full linear flow: createInstance -> startInstance -> advanceStep x2 -> completed', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'linear-process',
       1,
       'user-1',
@@ -350,7 +391,7 @@ describe('WorkflowEngine', () => {
   });
 
   it('full branching flow: when expression routes to correct step based on output', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'branching-process',
       1,
       'user-1',
@@ -373,7 +414,7 @@ describe('WorkflowEngine', () => {
   });
 
   it('full review loop: two revise verdicts then approve -- loops back, then completes', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'review-process',
       1,
       'user-1',
@@ -444,7 +485,7 @@ describe('WorkflowEngine', () => {
         humanTaskRepo,
       );
 
-      const instance = await engineWithHumanTasks.createInstance(
+      const instance = await engineWithHumanTasks.createInstance('test',
         'linear-process',
         1,
         'user-1',
@@ -469,7 +510,7 @@ describe('WorkflowEngine', () => {
 
     it('does not create HumanTask when humanTaskRepository is not injected', async () => {
       // engine (from beforeEach) has no humanTaskRepository
-      const instance = await engine.createInstance(
+      const instance = await engine.createInstance('test',
         'linear-process',
         1,
         'user-1',
@@ -499,7 +540,7 @@ describe('WorkflowEngine', () => {
         humanTaskRepo,
       );
 
-      const instance = await engineWithHumanTasks.createInstance(
+      const instance = await engineWithHumanTasks.createInstance('test',
         'linear-process',
         1,
         'user-1',
@@ -543,7 +584,7 @@ describe('WorkflowEngine', () => {
         failingRepo,
       );
 
-      const instance = await engineWithFailingRepo.createInstance(
+      const instance = await engineWithFailingRepo.createInstance('test',
         'linear-process',
         1,
         'user-1',
@@ -559,6 +600,74 @@ describe('WorkflowEngine', () => {
           { id: 'user-1', role: 'operator' },
         ),
       ).rejects.toThrow('Firestore unavailable');
+    });
+
+    it('copies the next step verdicts onto the HumanTask as an ordered descriptor array', async () => {
+      const humanTaskRepo = new InMemoryHumanTaskRepository();
+      const engineWithHumanTasks = new WorkflowEngine(
+        processRepo,
+        instanceRepo,
+        auditRepo,
+        undefined,
+        undefined,
+        undefined,
+        humanTaskRepo,
+      );
+
+      const defWithVerdicts = {
+        name: 'linear-process-verdicts',
+        version: 1,
+        namespace: 'test',
+        visibility: 'private' as const,
+        steps: [
+          { id: 'start', name: 'Start', type: 'creation' as const, executor: 'agent' as const },
+          {
+            id: 'review',
+            name: 'Review',
+            type: 'review' as const,
+            executor: 'human' as const,
+            verdicts: {
+              accept: { target: 'done', label: 'Accept delivery', intent: 'success' as const },
+              reject_and_notify: { target: 'done', label: 'Reject — notify CRO', intent: 'danger' as const },
+              ask_agent_to_revise: {
+                target: 'done',
+                label: 'Ask agent to make changes',
+                intent: 'warning' as const,
+                requiresComment: true,
+              },
+            },
+          },
+          { id: 'done', name: 'Done', type: 'terminal' as const, executor: 'human' as const },
+        ],
+        transitions: [
+          { from: 'start', to: 'review' },
+        ],
+        triggers: [{ type: 'manual' as const, name: 'Start' }],
+      };
+      await processRepo.saveWorkflowDefinition(defWithVerdicts);
+
+      const instance = await engineWithHumanTasks.createInstance('test',
+        'linear-process-verdicts',
+        1,
+        'user-1',
+        'manual',
+        {},
+      );
+      await engineWithHumanTasks.startInstance(instance.id);
+      await engineWithHumanTasks.advanceStep(
+        instance.id,
+        {},
+        { id: 'user-1', role: 'operator' },
+      );
+
+      const tasks = humanTaskRepo.getAll();
+      expect(tasks).toHaveLength(1);
+      // Array shape — order matches WD insertion order.
+      expect(tasks[0].verdicts).toEqual([
+        { key: 'accept', label: 'Accept delivery', intent: 'success', requiresComment: false },
+        { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger', requiresComment: false },
+        { key: 'ask_agent_to_revise', label: 'Ask agent to make changes', intent: 'warning', requiresComment: true },
+      ]);
     });
 
     it('sets assignedRole from WorkflowDefinition step allowedRoles', async () => {
@@ -578,6 +687,7 @@ describe('WorkflowEngine', () => {
         name: 'linear-process-with-roles',
         version: 1,
         namespace: 'test',
+        visibility: 'private' as const,
         steps: [
           { id: 'start', name: 'Start', type: 'creation' as const, executor: 'agent' as const },
           { id: 'process', name: 'Process', type: 'creation' as const, executor: 'human' as const, allowedRoles: ['reviewer'] },
@@ -591,7 +701,7 @@ describe('WorkflowEngine', () => {
       };
       await processRepo.saveWorkflowDefinition(defWithRoles);
 
-      const instance = await engineWithHumanTasks.createInstance(
+      const instance = await engineWithHumanTasks.createInstance('test',
         'linear-process-with-roles',
         1,
         'user-1',
@@ -625,6 +735,7 @@ describe('WorkflowEngine', () => {
         name: 'linear-process-analyst',
         version: 1,
         namespace: 'test',
+        visibility: 'private' as const,
         steps: [
           { id: 'start', name: 'Start', type: 'creation' as const, executor: 'agent' as const },
           { id: 'process', name: 'Process', type: 'creation' as const, executor: 'human' as const, allowedRoles: ['supply-analyst'] },
@@ -638,7 +749,7 @@ describe('WorkflowEngine', () => {
       };
       await processRepo.saveWorkflowDefinition(defWithRoles);
 
-      const instance = await engineWithHumanTasks.createInstance(
+      const instance = await engineWithHumanTasks.createInstance('test',
         'linear-process-analyst', 1, 'user-1', 'manual', {},
       );
       await engineWithHumanTasks.startInstance(instance.id);
@@ -658,6 +769,7 @@ describe('WorkflowEngine', () => {
       name: 'selection-process',
       version: 1,
       namespace: 'test',
+      visibility: 'private',
       steps: [
         { id: 'generate', name: 'Generate Options', type: 'creation', executor: 'agent' },
         {
@@ -695,7 +807,7 @@ describe('WorkflowEngine', () => {
 
       await processRepo.saveWorkflowDefinition(selectionDef);
 
-      const instance = await engineWithSelection.createInstance(
+      const instance = await engineWithSelection.createInstance('test',
         'selection-process', 1, 'user-1', 'manual', {},
       );
       await engineWithSelection.startInstance(instance.id);
@@ -736,7 +848,7 @@ describe('WorkflowEngine', () => {
 
       await processRepo.saveWorkflowDefinition(selectionDef);
 
-      const instance = await engineWithSelection.createInstance(
+      const instance = await engineWithSelection.createInstance('test',
         'selection-process', 1, 'user-1', 'manual', {},
       );
       await engineWithSelection.startInstance(instance.id);
@@ -755,6 +867,57 @@ describe('WorkflowEngine', () => {
         ),
       ).rejects.toThrow(/options/);
     });
+
+    it('copies options to HumanTask even when next step has no selection (e.g. assignment-table)', async () => {
+      const humanTaskRepo = new InMemoryHumanTaskRepository();
+      const tableEngine = new WorkflowEngine(
+        processRepo, instanceRepo, auditRepo, undefined, undefined, undefined,
+        humanTaskRepo,
+      );
+
+      const tableDef: WorkflowDefinition = {
+        name: 'assignment-process',
+        version: 1,
+        namespace: 'test',
+        visibility: 'private',
+        steps: [
+          { id: 'fetch', name: 'Fetch', type: 'creation', executor: 'agent' },
+          {
+            id: 'assign',
+            name: 'Assign',
+            type: 'creation',
+            executor: 'human',
+            allowedRoles: ['triager'],
+            ui: { component: 'assignment-table', config: { assignees: [{ id: 'a', label: 'A', kind: 'human' }] } },
+          },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [
+          { from: 'fetch', to: 'assign' },
+          { from: 'assign', to: 'done' },
+        ],
+        triggers: [{ type: 'manual', name: 'Start' }],
+      };
+      await processRepo.saveWorkflowDefinition(tableDef);
+
+      const instance = await tableEngine.createInstance('test',
+        'assignment-process', 1, 'user-1', 'manual', {},
+      );
+      await tableEngine.startInstance(instance.id);
+      await tableEngine.advanceStep(
+        instance.id,
+        { options: [{ id: '101', label: '#101' }, { id: '102', label: '#102' }] },
+        { id: 'user-1', role: 'operator' },
+      );
+
+      const tasks = humanTaskRepo.getAll();
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].selection).toBeUndefined();
+      expect(tasks[0].options).toEqual([
+        { id: '101', label: '#101' },
+        { id: '102', label: '#102' },
+      ]);
+    });
   });
 });
 
@@ -766,6 +929,7 @@ const linearWorkflowDef: WorkflowDefinition = {
   name: 'linear-workflow',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
     { id: 'process', name: 'Process', type: 'creation', executor: 'human', allowedRoles: ['operator'] },
@@ -783,6 +947,7 @@ const reviewWorkflowDef: WorkflowDefinition = {
   name: 'review-workflow',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'draft', name: 'Draft', type: 'creation', executor: 'agent' },
     {
@@ -838,7 +1003,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
   // --- createInstance ---
 
   it('createInstance returns ProcessInstance with status created and no configName/configVersion', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'linear-workflow',
       1,
       'user-1',
@@ -857,7 +1022,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
   });
 
   it('createInstance uses definition.roles as assignedRoles', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'linear-workflow',
       1,
       'user-1',
@@ -867,7 +1032,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
   });
 
   it('createInstance uses definition roles when no custom roles supplied', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'linear-workflow',
       1,
       'user-1',
@@ -879,12 +1044,12 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
 
   it('createInstance throws when definition not found', async () => {
     await expect(
-      engine.createInstance('nonexistent', 99, 'user-1', 'manual'),
+      engine.createInstance('test', 'nonexistent', 99, 'user-1', 'manual'),
     ).rejects.toThrow("Workflow definition 'nonexistent' version '99' not found");
   });
 
   it('createInstance uses payload when provided', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'linear-workflow',
       1,
       'user-1',
@@ -895,7 +1060,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
   });
 
   it('createInstance defaults payload to empty object when omitted', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'linear-workflow',
       1,
       'user-1',
@@ -908,7 +1073,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
   // --- advanceStep ---
 
   it('advanceStep delegates to StepExecutor, advances to next step and pauses for human', async () => {
-    const instance = await engine.createInstance('linear-workflow', 1, 'user-1', 'manual');
+    const instance = await engine.createInstance('test', 'linear-workflow', 1, 'user-1', 'manual');
     await engine.startInstance(instance.id);
 
     const advanced = await engine.advanceStep(instance.id, { result: 'ok' }, actor);
@@ -918,7 +1083,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
   });
 
   it('advanceStep throws InvalidTransitionError when instance is not running', async () => {
-    const instance = await engine.createInstance('linear-workflow', 1, 'user-1', 'manual');
+    const instance = await engine.createInstance('test', 'linear-workflow', 1, 'user-1', 'manual');
     // Not started yet — status is 'created'
     await expect(
       engine.advanceStep(instance.id, {}, actor),
@@ -928,7 +1093,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
   // --- full lifecycle with WorkflowDefinition ---
 
   it('full linear flow with createInstance -> startInstance -> advanceStep -> resume -> advance -> completed', async () => {
-    const instance = await engine.createInstance('linear-workflow', 1, 'user-1', 'manual');
+    const instance = await engine.createInstance('test', 'linear-workflow', 1, 'user-1', 'manual');
     expect(instance.status).toBe('created');
 
     const started = await engine.startInstance(instance.id);
@@ -953,7 +1118,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
     const def = buildWorkflowDefinition({ name: 'factory-workflow', version: 2 });
     await processRepo.saveWorkflowDefinition(def);
 
-    const instance = await engine.createInstance('factory-workflow', 2, 'user-1', 'manual');
+    const instance = await engine.createInstance('test', 'factory-workflow', 2, 'user-1', 'manual');
     expect(instance.definitionName).toBe('factory-workflow');
     expect(instance.definitionVersion).toBe('2');
   });
@@ -972,7 +1137,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
       humanTaskRepo,
     );
 
-    const instance = await engineWithTasks.createInstance(
+    const instance = await engineWithTasks.createInstance('test',
       'linear-workflow',
       1,
       'user-1',
@@ -1008,7 +1173,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
       humanTaskRepo,
     );
 
-    const instance = await engineWithTasks.createInstance('linear-workflow', 1, 'user-1', 'manual');
+    const instance = await engineWithTasks.createInstance('test', 'linear-workflow', 1, 'user-1', 'manual');
     await engineWithTasks.startInstance(instance.id);
     await engineWithTasks.advanceStep(instance.id, {}, actor);
 
@@ -1020,7 +1185,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
   // --- review flow with WorkflowDefinition ---
 
   it('review flow: advanceStep then submitReviewVerdict routes via verdicts', async () => {
-    const instance = await engine.createInstance('review-workflow', 1, 'user-1', 'manual');
+    const instance = await engine.createInstance('test', 'review-workflow', 1, 'user-1', 'manual');
     await engine.startInstance(instance.id);
 
     // Advance: draft -> review (human step → pauses)
@@ -1048,6 +1213,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
     name: 'autonomy-test',
     version: 1,
     namespace: 'test',
+    visibility: 'private',
     steps: [
       { id: 'agent-step', name: 'Agent Step', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
       { id: 'human-step', name: 'Human Review', type: 'creation', executor: 'human', allowedRoles: ['reviewer'] },
@@ -1062,7 +1228,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
 
   it('[DATA] advanceStep after L2 agent completion routes to next human step and pauses', async () => {
     await processRepo.saveWorkflowDefinition(autonomyTestDef);
-    const instance = await engine.createInstance('autonomy-test', 1, 'user-1', 'manual');
+    const instance = await engine.createInstance('test', 'autonomy-test', 1, 'user-1', 'manual');
     await engine.startInstance(instance.id);
 
     // Simulate: L2 agent completes, then advance is called (this is what the fix does)
@@ -1089,6 +1255,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
       name: 'direct-terminal',
       version: 1,
       namespace: 'test',
+      visibility: 'private',
       steps: [
         { id: 'agent-step', name: 'Agent Step', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
@@ -1097,7 +1264,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
       triggers: [{ type: 'manual', name: 'Start' }],
     };
     await processRepo.saveWorkflowDefinition(directTerminalDef);
-    const instance = await engine.createInstance('direct-terminal', 1, 'user-1', 'manual');
+    const instance = await engine.createInstance('test', 'direct-terminal', 1, 'user-1', 'manual');
     await engine.startInstance(instance.id);
 
     const updated = await engine.advanceStep(
@@ -1114,6 +1281,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
       name: 'chained-agents',
       version: 1,
       namespace: 'test',
+      visibility: 'private',
       steps: [
         { id: 'step-1', name: 'Step 1', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
         { id: 'step-2', name: 'Step 2', type: 'creation', executor: 'agent', autonomyLevel: 'L4' },
@@ -1126,7 +1294,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
       triggers: [{ type: 'manual', name: 'Start' }],
     };
     await processRepo.saveWorkflowDefinition(chainedAgentDef);
-    const instance = await engine.createInstance('chained-agents', 1, 'user-1', 'manual');
+    const instance = await engine.createInstance('test', 'chained-agents', 1, 'user-1', 'manual');
     await engine.startInstance(instance.id);
 
     const updated = await engine.advanceStep(

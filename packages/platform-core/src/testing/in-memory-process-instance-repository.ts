@@ -1,9 +1,24 @@
-import type {
-  ProcessInstanceRepository,
-  ProcessInstance,
-  InstanceStatus,
-  StepExecution,
-} from '../index.js';
+import {
+  ProcessInstanceSchema,
+  StepExecutionSchema,
+  type ProcessInstanceRepository,
+  type ProcessInstance,
+  type InstanceStatus,
+  type StepExecution,
+  type ListInstancesOptions,
+  type WorkflowRunSummaryResult,
+} from '../index';
+import { RunNameEntrySchema, type RunNameEntry } from '../schemas/process-instance';
+
+const ACTIVE_STATUSES: ReadonlySet<InstanceStatus> = new Set([
+  'running',
+  'created',
+  'paused',
+]);
+const TERMINAL_STATUSES: ReadonlySet<InstanceStatus> = new Set([
+  'completed',
+  'failed',
+]);
 
 /**
  * In-memory implementation of ProcessInstanceRepository for testing.
@@ -17,13 +32,31 @@ export class InMemoryProcessInstanceRepository
   private stepExecutions = new Map<string, StepExecution[]>();
 
   async create(instance: ProcessInstance): Promise<ProcessInstance> {
-    this.instances.set(instance.id, { ...instance });
-    return { ...instance };
+    const parsed = ProcessInstanceSchema.parse(instance);
+    this.instances.set(parsed.id, { ...parsed });
+    return { ...parsed };
   }
 
   async getById(instanceId: string): Promise<ProcessInstance | null> {
     const instance = this.instances.get(instanceId);
     return instance ? { ...instance } : null;
+  }
+
+  async getByIdInNamespaces(
+    instanceId: string,
+    allowed: readonly string[],
+  ): Promise<ProcessInstance | null> {
+    const instance = this.instances.get(instanceId);
+    if (!instance) return null;
+    return allowed.includes(instance.namespace ?? '') ? { ...instance } : null;
+  }
+
+  async getNamespaceById(instanceId: string): Promise<string | null> {
+    const instance = this.instances.get(instanceId);
+    if (!instance) return null;
+    return typeof instance.namespace === 'string' && instance.namespace.length > 0
+      ? instance.namespace
+      : null;
   }
 
   async update(
@@ -37,8 +70,61 @@ export class InMemoryProcessInstanceRepository
     this.instances.set(instanceId, { ...existing, ...updates });
   }
 
-  async getByStatus(status: InstanceStatus): Promise<ProcessInstance[]> {
+  async listAll(options: ListInstancesOptions): Promise<ProcessInstance[]> {
+    return this.applyListFilters([...this.instances.values()], options);
+  }
+
+  async listInNamespaces(
+    allowed: readonly string[],
+    options: ListInstancesOptions,
+  ): Promise<ProcessInstance[]> {
+    const inScope = [...this.instances.values()].filter((i) =>
+      allowed.includes(i.namespace ?? ''),
+    );
+    return this.applyListFilters(inScope, options);
+  }
+
+  async listDefinitionNames(namespace: string): Promise<RunNameEntry[]> {
+    return [...this.instances.values()]
+      .filter((i) => i.deleted !== true && i.namespace === namespace)
+      .map((i) => RunNameEntrySchema.parse({ id: i.id, definitionName: i.definitionName }));
+  }
+
+  private applyListFilters(
+    rows: ProcessInstance[],
+    options: ListInstancesOptions,
+  ): ProcessInstance[] {
+    let results = rows.filter((i) => i.deleted !== true);
+    if (options.namespace !== undefined) {
+      results = results.filter((i) => i.namespace === options.namespace);
+    }
+    if (options.definitionName !== undefined) {
+      results = results.filter((i) => i.definitionName === options.definitionName);
+    }
+    if (options.status !== undefined) {
+      results = results.filter((i) => i.status === options.status);
+    }
+    if (options.namespace !== undefined) {
+      results = results.filter((i) => i.namespace === options.namespace);
+    }
+    if (options.dryRun !== undefined) {
+      results = results.filter((i) => (i.dryRun === true) === options.dryRun);
+    }
+    results.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    return results.slice(0, options.limit ?? 20);
+  }
+
+  async getByStatusAll(status: InstanceStatus): Promise<ProcessInstance[]> {
     return [...this.instances.values()].filter((i) => i.status === status);
+  }
+
+  async getByStatusInNamespaces(
+    status: InstanceStatus,
+    allowed: readonly string[],
+  ): Promise<ProcessInstance[]> {
+    return [...this.instances.values()].filter(
+      (i) => i.status === status && allowed.includes(i.namespace ?? ''),
+    );
   }
 
   async getByDefinition(
@@ -73,10 +159,11 @@ export class InMemoryProcessInstanceRepository
     instanceId: string,
     execution: StepExecution,
   ): Promise<StepExecution> {
+    const parsed = StepExecutionSchema.parse(execution);
     const executions = this.stepExecutions.get(instanceId) ?? [];
-    executions.push({ ...execution });
+    executions.push({ ...parsed });
     this.stepExecutions.set(instanceId, executions);
-    return { ...execution };
+    return { ...parsed };
   }
 
   async getStepExecutions(instanceId: string): Promise<StepExecution[]> {
@@ -121,6 +208,29 @@ export class InMemoryProcessInstanceRepository
 
   async setDeletedByDefinitionName(_name: string, _deleted: boolean): Promise<void> {
     // No-op in test double — Firestore uses untyped updateDoc for the `deleted` field
+  }
+
+  async summarizeRunsByWorkflow(
+    namespace: string,
+    name: string,
+    includeCompleted: boolean,
+  ): Promise<WorkflowRunSummaryResult> {
+    const scoped = [...this.instances.values()].filter(
+      (i) =>
+        i.namespace === namespace &&
+        i.definitionName === name &&
+        i.deleted !== true &&
+        i.archived !== true,
+    );
+    const active = scoped.filter((i) => ACTIVE_STATUSES.has(i.status)).length;
+    const counted = includeCompleted
+      ? scoped
+      : scoped.filter((i) => !TERMINAL_STATUSES.has(i.status));
+    const latest = [...counted]
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .slice(0, 3)
+      .map((i) => ({ ...i }));
+    return { total: counted.length, active, latest };
   }
 
   /** Test helper: clear all stored data */

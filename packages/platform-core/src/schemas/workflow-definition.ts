@@ -7,10 +7,141 @@ import {
   TransitionSchema,
   TriggerSchema,
   RepoSchema,
-} from './process-definition.js';
-import { ProcessNotificationConfigSchema } from './process-config.js';
-import { McpServerConfigSchema } from './mcp-server-config.js';
-import { StepMcpRestrictionSchema } from './agent-mcp-binding.js';
+  CommitShaSchema,
+} from './process-definition';
+import { ProcessNotificationConfigSchema } from './process-config';
+import { McpServerConfigSchema } from './mcp-server-config';
+import { StepMcpRestrictionSchema } from './agent-mcp-binding';
+
+/** HTTP method enum used by webhook triggers and the http action handler. */
+export const HttpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']);
+
+/** Webhook trigger config: method + url path (relative to /api/triggers/webhook/<ns>/<wf>).
+ *  The path discriminates when a workflow has multiple webhook triggers and is
+ *  matched verbatim against the suffix segment(s) the caller used. */
+export const WebhookTriggerConfigSchema = z.object({
+  method: HttpMethodSchema,
+  path: z
+    .string()
+    .min(1)
+    .regex(/^\/[A-Za-z0-9_\-/]*$/, 'path must start with "/" and contain url-safe chars only'),
+});
+
+/** http action config: minimal request shape passed to fetch().
+ *  `body` accepts any JSON-serializable value or a string template — the action
+ *  handler interpolates `${...}` placeholders before sending. */
+export const HttpActionConfigSchema = z.object({
+  method: HttpMethodSchema,
+  url: z.string().min(1),
+  body: z.unknown().optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+});
+
+/** reshape action config: rebuild a new object by interpolating each leaf
+ *  against the same sources (triggerPayload, steps, variables). Pure
+ *  data transformation — no side effects. Output is the interpolated
+ *  values map. */
+export const ReshapeActionConfigSchema = z.object({
+  values: z.record(z.string(), z.unknown()),
+});
+
+export const EmailActionConfigSchema = z.object({
+  to: z.union([z.string().min(1), z.array(z.string().min(1))]),
+  cc: z.array(z.string()).optional(),
+  bcc: z.array(z.string()).optional(),
+  from: z.string().optional(),
+  replyTo: z.string().optional(),
+  subject: z.string().min(1),
+  body: z.string().min(1),
+  html: z.string().optional(),
+});
+
+export const SpawnTargetSchema = z.object({
+  definitionName: z.string().min(1),
+  definitionVersion: z.number().int().positive().optional(),
+  triggerName: z.string().min(1).optional(),
+  payload: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const SpawnActionConfigSchema = z.object({
+  targets: z.union([SpawnTargetSchema, z.array(SpawnTargetSchema)]),
+  forEach: z.string().min(1).optional(),
+  continueOnSpawnError: z.boolean().default(true),
+});
+
+export const WaitActionConfigSchema = z.object({
+  duration: z.object({
+    seconds: z.number().int().nonnegative().optional(),
+    minutes: z.number().int().nonnegative().optional(),
+    hours: z.number().int().nonnegative().optional(),
+  }).optional(),
+  deadline: z.string().min(1).optional(),
+  condition: z.string().optional(),
+});
+
+/** Discriminated union of action configs. New kinds plug in here. */
+export const ActionConfigSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('http'), config: HttpActionConfigSchema }),
+  z.object({ kind: z.literal('reshape'), config: ReshapeActionConfigSchema }),
+  z.object({ kind: z.literal('email'), config: EmailActionConfigSchema }),
+  z.object({ kind: z.literal('spawn'), config: SpawnActionConfigSchema }),
+  z.object({ kind: z.literal('wait'), config: WaitActionConfigSchema }),
+]);
+
+export type HttpMethod = z.infer<typeof HttpMethodSchema>;
+export type WebhookTriggerConfig = z.infer<typeof WebhookTriggerConfigSchema>;
+export type HttpActionConfig = z.infer<typeof HttpActionConfigSchema>;
+export type ReshapeActionConfig = z.infer<typeof ReshapeActionConfigSchema>;
+export type EmailActionConfig = z.infer<typeof EmailActionConfigSchema>;
+export type SpawnTargetConfig = z.infer<typeof SpawnTargetSchema>;
+export type SpawnActionConfig = z.infer<typeof SpawnActionConfigSchema>;
+export type WaitActionConfig = z.infer<typeof WaitActionConfigSchema>;
+export type ActionConfig = z.infer<typeof ActionConfigSchema>;
+
+/**
+ * Shared container-image configuration, merged flat into both
+ * WorkflowAgentConfigSchema and ScriptStepConfigSchema so the fields
+ * are not copy-pasted across both definitions.
+ *
+ * Two mutually exclusive execution modes:
+ *
+ *   Prebuilt mode  — supply `image` (and nothing else from this group).
+ *                    The runtime pulls the named tag as-is.
+ *
+ *   Build mode     — supply `dockerfile` + `repo` + `commit`.
+ *                    The runtime clones `repo` at `commit`, builds the
+ *                    Dockerfile, and runs the resulting image.
+ *                    `image` is optional in build mode: when omitted the
+ *                    runtime derives a deterministic tag from
+ *                    sha256(repo + commit + dockerfile) so repeated builds
+ *                    of the same source hit the local image cache.
+ *                    Supply `image` explicitly to control the registry tag
+ *                    or when you push to a shared registry.
+ *
+ * Fallback: when a step sets `dockerfile` but no step-level `repo`/`commit`,
+ * the workflow's `externalSkillsRepo` (or the deprecated `repo`) field is
+ * used as the build context. This fallback is retained for backward
+ * compatibility and will be removed once the deprecated `repo` field is
+ * dropped (see follow-up issue for that migration).
+ */
+export const ContainerSchema = z.object({
+  /**
+   * Docker image tag (e.g. `mediforce-golden-image:latest`).
+   * Required in prebuilt mode; optional in build mode (auto-derived when absent).
+   */
+  image: z.string().optional(),
+  /** Path to a Dockerfile inside the cloned `repo`. Activates build mode. */
+  dockerfile: z.string().optional(),
+  /** Git repository URL for the Docker build context (SSH or HTTPS). */
+  repo: z.string().optional(),
+  /**
+   * Commit SHA (7–40 hex chars) to check out from `repo`.
+   * Must be set whenever `repo` is set — omitting it silently no-ops the build.
+   */
+  commit: CommitShaSchema.optional(),
+  /** Name of a workflow secret containing a token for cloning a private repo. */
+  repoAuth: z.string().optional(),
+});
 
 export const WorkflowAgentConfigSchema = z.object({
   model: z.string().optional(),
@@ -19,15 +150,6 @@ export const WorkflowAgentConfigSchema = z.object({
   skillsDir: z.string().optional(),
   timeoutMs: z.number().positive().optional(),
   timeoutMinutes: z.number().optional(),
-  command: z.string().optional(),
-  inlineScript: z.string().optional(),
-  runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),
-  image: z.string().optional(),
-  dockerfile: z.string().optional(),
-  repo: z.string().optional(),
-  commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
-  /** Name of a workflow secret containing a token for repo access. */
-  repoAuth: z.string().optional(),
   confidenceThreshold: z.number().min(0).max(1).optional(),
   fallbackBehavior: z.enum(['escalate_to_human', 'continue_with_flag', 'pause']).optional(),
   /** @deprecated Step-level MCP configuration is being removed.
@@ -40,6 +162,45 @@ export const WorkflowAgentConfigSchema = z.object({
    *  (Bash, Read, Write, Edit, Glob, Grep). Use this to grant internet
    *  access (WebSearch, WebFetch) or any other built-in tool. */
   allowedTools: z.array(z.string()).optional(),
+}).merge(ContainerSchema);
+
+/**
+ * Config for deterministic script steps (executor='script', plugin='script-container').
+ * Exactly one of `command` (run in `image`) or `inlineScript` (run via `runtime`)
+ * must be set. Container image fields (`image`, `dockerfile`, `repo`, `commit`,
+ * `repoAuth`) are shared with agent steps via ContainerSchema — both executor
+ * flavours resolve container images identically.
+ */
+export const ScriptStepConfigSchema = z.object({
+  command: z.string().min(1).optional(),
+  inlineScript: z.string().min(1).optional(),
+  runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),
+  timeoutMinutes: z.number().positive().optional(),
+}).merge(ContainerSchema).superRefine((config, ctx) => {
+  if ((config.command !== undefined) === (config.inlineScript !== undefined)) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'exactly one of command or inlineScript must be set',
+    });
+  }
+  if (config.inlineScript !== undefined && config.runtime === undefined) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['runtime'],
+      message: 'runtime is required when inlineScript is set',
+    });
+  }
+});
+
+/** Config for Databricks job steps (executor='script', plugin='databricks-job'). */
+export const DatabricksJobConfigSchema = z.object({
+  /** Numeric Databricks job id, or a string to allow `${...}` interpolation. */
+  jobId: z.union([z.number().int().positive(), z.string().min(1)]),
+  notebookParams: z.record(z.string(), z.string()).optional(),
+  jobParameters: z.record(z.string(), z.string()).optional(),
+  /** Run-state poll cadence; the plugin defaults to 10s when unset. */
+  pollIntervalMs: z.number().int().positive().optional(),
+  timeoutMinutes: z.number().positive().optional(),
 });
 
 export const CoworkChatConfigSchema = z.object({
@@ -58,6 +219,7 @@ export const WorkflowCoworkConfigSchema = z.object({
   agent: z.enum(['chat', 'voice-realtime']),
   systemPrompt: z.string().optional(),
   outputSchema: z.record(z.string(), z.unknown()).optional(),
+  outputSchemaRef: z.enum(['workflow-definition-authorable']).optional(),
   chat: CoworkChatConfigSchema.optional(),
   voiceRealtime: CoworkVoiceRealtimeConfigSchema.optional(),
   /** @deprecated Step-level MCP configuration is being removed.
@@ -102,8 +264,17 @@ export const WorkflowStepSchema = z.object({
   selection: SelectionSchema.optional(),
   ui: StepUiSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
-  executor: z.enum(['human', 'agent', 'script', 'cowork']),
+  executor: z.enum(['human', 'agent', 'script', 'cowork', 'action']),
+  /** Required when executor='action'. Discriminated by `kind`. */
+  action: ActionConfigSchema.optional(),
   autonomyLevel: z.enum(['L0', 'L1', 'L2', 'L3', 'L4']).optional(),
+  /** When true, an exception thrown by the step (e.g. action handler error,
+   *  unexpected runtime failure) is logged as a warning and the workflow
+   *  advances to the next step instead of failing the whole instance. The
+   *  step execution is recorded with status='failed' so the failure stays
+   *  visible in the audit trail. Useful for non-critical side-effects like
+   *  email notifications where the rest of the pipeline must run regardless. */
+  continueOnError: z.boolean().optional(),
   plugin: z.string().optional(),
   /** References an AgentDefinition by its deterministic slug (doc id).
    *  The referenced definition carries canonical MCP server bindings
@@ -111,7 +282,17 @@ export const WorkflowStepSchema = z.object({
    *  When unset, no MCP resolution runs for this step. */
   agentId: z.string().optional(),
   allowedRoles: z.array(z.string()).optional(),
+  /** Pre-assigns the created human task to a specific user. Supports `${...}`
+   *  interpolation against the run's trigger payload / step outputs
+   *  (e.g. "${triggerPayload.userId}"). Only valid when executor='human' — the
+   *  auto-runner resolves it, sets the result as the task's assignedUserId, and
+   *  marks the task 'claimed'. Validation rejects it on non-human steps. */
+  assignedTo: z.string().optional(),
   agent: WorkflowAgentConfigSchema.optional(),
+  /** Required when executor='script' and plugin='script-container'. */
+  script: ScriptStepConfigSchema.optional(),
+  /** Required when executor='script' and plugin='databricks-job'. */
+  databricks: DatabricksJobConfigSchema.optional(),
   review: WorkflowReviewConfigSchema.optional(),
   cowork: WorkflowCoworkConfigSchema.optional(),
   stepParams: z.record(z.string(), z.unknown()).optional(),
@@ -141,6 +322,196 @@ export const InputForNextRunEntrySchema = z.object({
  * Applied via superRefine on the top-level schema (and also exported so that
  * callers using `.omit()` or `.partial()` on the base object can re-apply it).
  */
+/**
+ * Script-executor plugins and the step config key they read. A plugin listed
+ * here REQUIRES its config key on the step (and executor='script'); the
+ * config keys are rejected everywhere else.
+ */
+const SCRIPT_PLUGIN_CONFIG_KEY: Record<string, 'script' | 'databricks'> = {
+  'script-container': 'script',
+  'databricks-job': 'databricks',
+};
+
+const SCRIPT_CONFIG_KEY_PLUGIN: Record<'script' | 'databricks', string> = {
+  script: 'script-container',
+  databricks: 'databricks-job',
+};
+
+/**
+ * executor='action' steps must carry an `action` config; conversely, `action`
+ * makes no sense on other executors. executor='script' steps carry their config
+ * under `script` / `databricks` (matching the plugin) — the old shape with
+ * script settings under `agent` (and `autonomyLevel`/`cowork` on script steps)
+ * is rejected. Webhook triggers must declare a typed config (method+path) —
+ * TriggerSchema accepts `config: z.record(...).optional()` for back-compat
+ * with cron/manual, so we narrow webhook here.
+ */
+function validateExecutorAndTriggers(
+  wd: {
+    steps: Array<{
+      id: string;
+      executor: string;
+      plugin?: string;
+      action?: unknown;
+      assignedTo?: string;
+      agent?: unknown;
+      autonomyLevel?: string;
+      cowork?: unknown;
+      script?: unknown;
+      databricks?: unknown;
+    }>;
+    triggers: Array<{ type: string; config?: unknown }>;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  wd.steps.forEach((step, i) => {
+    const pluginConfigKey = step.plugin !== undefined ? SCRIPT_PLUGIN_CONFIG_KEY[step.plugin] : undefined;
+
+    for (const configKey of ['script', 'databricks'] as const) {
+      if (step[configKey] === undefined) continue;
+      if (step.executor !== 'script') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, configKey],
+          message: `step '${step.id}' has ${configKey} config but executor is '${step.executor}' (must be 'script')`,
+        });
+      }
+      if (pluginConfigKey !== configKey) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, configKey],
+          message: `step '${step.id}' has ${configKey} config but plugin is '${step.plugin ?? 'unset'}' (expected '${SCRIPT_CONFIG_KEY_PLUGIN[configKey]}')`,
+        });
+      }
+    }
+
+    if (pluginConfigKey !== undefined && step.executor !== 'script') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['steps', i, 'plugin'],
+        message: `step '${step.id}': plugin '${step.plugin}' requires executor='script' (got '${step.executor}')`,
+      });
+    }
+
+    if (step.executor === 'script') {
+      if (pluginConfigKey !== undefined && step[pluginConfigKey] === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, pluginConfigKey],
+          message: `step '${step.id}' has plugin '${step.plugin}' but no ${pluginConfigKey} config`,
+        });
+      }
+      if (step.agent !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, 'agent'],
+          message: `step '${step.id}': agent config is not allowed on script steps — script settings moved to step.script`,
+        });
+      }
+      if (step.autonomyLevel !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, 'autonomyLevel'],
+          message: `step '${step.id}': autonomyLevel is not allowed on script steps (scripts are deterministic — remove the field)`,
+        });
+      }
+      if (step.cowork !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, 'cowork'],
+          message: `step '${step.id}': cowork config is not allowed on script steps`,
+        });
+      }
+    }
+
+    if (step.assignedTo !== undefined && step.executor !== 'human') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['steps', i, 'assignedTo'],
+        message: `step '${step.id}' has assignedTo but executor is '${step.executor}' (assignedTo is only valid on executor='human')`,
+      });
+    }
+    if (step.executor === 'action' && step.action === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['steps', i, 'action'],
+        message: `step '${step.id}' has executor='action' but no action config`,
+      });
+    }
+    if (step.executor !== 'action' && step.action !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['steps', i, 'action'],
+        message: `step '${step.id}' has action config but executor is '${step.executor}' (must be 'action')`,
+      });
+    }
+    if (step.executor === 'action' && step.action !== undefined) {
+      const action = step.action as { kind: string; config: Record<string, unknown> };
+      if (action.kind === 'spawn' && action.config.forEach && Array.isArray(action.config.targets)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, 'action', 'config', 'forEach'],
+          message: `step '${step.id}': forEach requires a single target template, not an array`,
+        });
+      }
+      if (action.kind === 'wait') {
+        const c = action.config as { duration?: { seconds?: number; minutes?: number; hours?: number }; deadline?: string };
+        if ((c.duration !== undefined) === (c.deadline !== undefined)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['steps', i, 'action', 'config'],
+            message: `step '${step.id}': exactly one of duration or deadline must be set`,
+          });
+        }
+        if (c.duration) {
+          const total = (c.duration.seconds ?? 0) + (c.duration.minutes ?? 0) + (c.duration.hours ?? 0);
+          if (total === 0) {
+            ctx.addIssue({
+              code: 'custom',
+              path: ['steps', i, 'action', 'config', 'duration'],
+              message: `step '${step.id}': duration must be greater than zero`,
+            });
+          }
+        }
+      }
+    }
+  });
+
+  wd.triggers.forEach((trigger, i) => {
+    if (trigger.type !== 'webhook') return;
+    const parsed = WebhookTriggerConfigSchema.safeParse(trigger.config);
+    if (!parsed.success) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['triggers', i, 'config'],
+        message: `webhook trigger config invalid: ${parsed.error.issues
+          .map((iss) => `${iss.path.join('.')}: ${iss.message}`)
+          .join('; ')}`,
+      });
+    }
+  });
+}
+
+function validateTriggerInput(
+  wd: {
+    triggerInput?: Array<{ name: string; type?: string }>;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (!wd.triggerInput) return;
+  const seen = new Set<string>();
+  wd.triggerInput.forEach((field, i) => {
+    if (seen.has(field.name)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['triggerInput', i, 'name'],
+        message: `triggerInput[${i}].name '${field.name}' is duplicated (must be unique)`,
+      });
+    }
+    seen.add(field.name);
+  });
+}
+
 function validateInputForNextRun(
   wd: {
     steps: Array<{ id: string }>;
@@ -171,6 +542,51 @@ function validateInputForNextRun(
 }
 
 /**
+ * L3 agent revision loop in workflow-engine's `complete-human-task.ts`
+ * (`isL3Revise`) keys off the literal 'revise' verdict. Allowing custom
+ * verdicts on L3 steps would silently break the loop. Lifting this is
+ * tracked in #391.
+ */
+const L3_VERDICT_KEYS = ['approve', 'revise'] as const; // see #391 — lift this allowlist when isL3Revise generalises to a per-verdict loopBack flag
+
+function validateVerdicts(
+  wd: {
+    steps: Array<{
+      id: string;
+      autonomyLevel?: string;
+      verdicts?: Record<string, { target: string }> | undefined;
+    }>;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  const stepIds = new Set(wd.steps.map((s) => s.id));
+  wd.steps.forEach((step, i) => {
+    if (!step.verdicts) return;
+    const keys = Object.keys(step.verdicts);
+    if (step.autonomyLevel === 'L3') {
+      for (const key of keys) {
+        if (!L3_VERDICT_KEYS.includes(key as 'approve' | 'revise')) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['steps', i, 'verdicts', key],
+            message: `verdict key '${key}' on L3 step '${step.id}' not allowed — L3 revision loop requires one of: ${L3_VERDICT_KEYS.join(', ')}`,
+          });
+        }
+      }
+    }
+    for (const [key, verdict] of Object.entries(step.verdicts)) {
+      if (!stepIds.has(verdict.target)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, 'verdicts', key, 'target'],
+          message: `verdict '${key}' on step '${step.id}' targets '${verdict.target}' which does not match any step id`,
+        });
+      }
+    }
+  });
+}
+
+/**
  * Base WorkflowDefinition schema (no cross-field refinements). Exposed so
  * callers can `.omit()` / `.partial()` and then re-apply validation via
  * `.superRefine(validateInputForNextRun)`.
@@ -185,6 +601,29 @@ function validateInputForNextRun(
  * prefer {@link parseWorkflowDefinitionForCreation} which applies the
  * refinement for you.
  */
+export const TriggerInputFieldSchema = StepParamSchema.extend({
+  type: z.enum(['string', 'number', 'boolean', 'date', 'datetime', 'select', 'multiselect', 'textarea']).default('string'),
+});
+
+export type TriggerInputField = z.infer<typeof TriggerInputFieldSchema>;
+
+export const WorkflowVisibilitySchema = z.enum(['public', 'private']);
+export type WorkflowVisibility = z.infer<typeof WorkflowVisibilitySchema>;
+
+/**
+ * Provenance of a Workflow Definition imported from a git repo. Reuses
+ * `RepoSchema` (`url`) minus `auth` (provenance never clones, so a token would
+ * be meaningless), plus the `path` of the imported `.wd.json`. `commit` is the
+ * immutable SHA resolved from the requested ref at import time — the import
+ * *input* still accepts a branch/tag/SHA, but only the resolved commit is
+ * stored. Informational only — no automatic sync. See ADR-0009.
+ */
+export const WorkflowSourceSchema = RepoSchema.omit({ auth: true }).extend({
+  commit: CommitShaSchema,
+  path: z.string().min(1),
+});
+export type WorkflowSource = z.infer<typeof WorkflowSourceSchema>;
+
 export const WorkflowDefinitionBaseSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
@@ -193,10 +632,21 @@ export const WorkflowDefinitionBaseSchema = z.object({
    *  tool catalog all key off this field — a workflow without one is
    *  not a runnable workflow. */
   namespace: z.string().min(1),
+  visibility: WorkflowVisibilitySchema.default('private'),
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   preamble: z.string().optional(),
-  repo: RepoSchema.optional(),
+  /**
+   * External git repository that provides skills for this workflow.
+   * The runtime clones the repo at `commit` and mounts the directory
+   * containing the skill files into the agent container.
+   *
+   * `commit` is required — omitting it silently no-ops the skills fetch.
+   * `auth` names a workflow secret that holds the clone token for private repos.
+   */
+  externalSkillsRepo: RepoSchema.extend({
+    commit: CommitShaSchema,
+  }).optional(),
   url: z.string().url().optional(),
   roles: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
@@ -206,16 +656,89 @@ export const WorkflowDefinitionBaseSchema = z.object({
   transitions: z.array(TransitionSchema),
   triggers: z.array(TriggerSchema).min(1),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  copiedFrom: z.object({
+    namespace: z.string().min(1),
+    name: z.string().min(1),
+    version: z.number().int().positive(),
+  }).optional(),
+  source: WorkflowSourceSchema.optional(),
   archived: z.boolean().optional(),
   deleted: z.boolean().optional(),
   createdAt: z.string().datetime().optional(),
   inputForNextRun: z.array(InputForNextRunEntrySchema).optional(),
+  triggerInput: z.array(TriggerInputFieldSchema).optional(),
 });
 
-export const WorkflowDefinitionSchema =
-  WorkflowDefinitionBaseSchema.superRefine(validateInputForNextRun);
+/**
+ * Fields the platform injects or manages at registration — never authored by
+ * template files, the design LLM, or `validate` callers. The loader supplies
+ * `namespace`; `version` and `createdAt` are assigned server-side. Single
+ * source for every `.omit()` / strip that drops them, so the three call sites
+ * that used to redeclare this set can no longer drift apart.
+ */
+export const SERVER_MANAGED_WORKFLOW_FIELDS = {
+  namespace: true,
+  version: true,
+  createdAt: true,
+} as const;
 
-export { validateInputForNextRun };
+/**
+ * The surface a workflow author controls — the design LLM's output schema (via
+ * {@link getWorkflowAuthorableJsonSchema}). Built with `.pick()` rather than
+ * `.omit()` so server-managed (`namespace`/`version`/`createdAt`) and lifecycle
+ * (`copiedFrom`/`archived`/`deleted`) fields are excluded by construction: a
+ * new lifecycle field added to the base schema cannot silently leak into the
+ * authorable contract.
+ */
+export const WorkflowAuthorableSchema = WorkflowDefinitionBaseSchema.pick({
+  name: true,
+  visibility: true,
+  title: true,
+  description: true,
+  preamble: true,
+  externalSkillsRepo: true,
+  url: true,
+  roles: true,
+  env: true,
+  notifications: true,
+  workspace: true,
+  steps: true,
+  transitions: true,
+  triggers: true,
+  metadata: true,
+  inputForNextRun: true,
+  triggerInput: true,
+});
+
+export function getWorkflowAuthorableJsonSchema(): Record<string, unknown> {
+  return z.toJSONSchema(WorkflowAuthorableSchema, { io: 'input' }) as Record<string, unknown>;
+}
+
+export function resolveCoworkOutputSchema(
+  cowork: WorkflowCoworkConfig | undefined,
+): Record<string, unknown> | null {
+  if (!cowork) return null;
+  if (cowork.outputSchema) return cowork.outputSchema;
+
+  if (cowork.outputSchemaRef === undefined) return null;
+  if (cowork.outputSchemaRef === 'workflow-definition-authorable') {
+    return getWorkflowAuthorableJsonSchema();
+  }
+
+  const _exhaustive: never = cowork.outputSchemaRef;
+  return _exhaustive;
+}
+
+export const WorkflowDefinitionSchema = WorkflowDefinitionBaseSchema.superRefine(
+  (wd, ctx) => {
+    validateInputForNextRun(wd, ctx);
+    validateExecutorAndTriggers(wd, ctx);
+    validateVerdicts(wd, ctx);
+    validateTriggerInput(wd, ctx);
+  },
+);
+
+export { validateInputForNextRun, validateExecutorAndTriggers, validateVerdicts, validateTriggerInput };
 
 /**
  * Default parse path for registering a new WorkflowDefinition (API routes,
@@ -228,14 +751,79 @@ export { validateInputForNextRun };
  */
 export function parseWorkflowDefinitionForCreation(input: unknown) {
   return WorkflowDefinitionBaseSchema.omit({ version: true, createdAt: true })
-    .superRefine(validateInputForNextRun)
+    .superRefine((wd, ctx) => {
+      validateInputForNextRun(wd, ctx);
+      validateExecutorAndTriggers(wd, ctx);
+      validateVerdicts(wd, ctx);
+      validateTriggerInput(wd, ctx);
+    })
     .safeParse(input);
 }
 
+/**
+ * Namespace-agnostic workflow template. Files in apps/examples/<app>/src/*.wd.json
+ * omit `namespace`; the loader injects it at registration so the same template
+ * can serve multiple tenants. Validation reuses WorkflowDefinitionBaseSchema
+ * minus the `namespace` field, then re-applies the same cross-field refinements.
+ *
+ * Templates that declare `namespace` are rejected — silently stripping the key
+ * would let the author believe their value was honored when the loader
+ * actually overwrites it.
+ */
+export const WorkflowTemplateSchema = WorkflowDefinitionBaseSchema.omit(
+  SERVER_MANAGED_WORKFLOW_FIELDS,
+).superRefine((wd, ctx) => {
+  validateInputForNextRun(wd, ctx);
+  validateExecutorAndTriggers(wd, ctx);
+  validateVerdicts(wd, ctx);
+  validateTriggerInput(wd, ctx);
+});
+
+export type WorkflowTemplate = z.infer<typeof WorkflowTemplateSchema>;
+
+export function parseWorkflowTemplate(input: unknown) {
+  if (
+    typeof input === 'object' &&
+    input !== null &&
+    !Array.isArray(input) &&
+    'namespace' in input
+  ) {
+    return {
+      success: false as const,
+      error: new z.ZodError([
+        {
+          code: 'custom',
+          path: ['namespace'],
+          message:
+            'Workflow templates must not declare a namespace; it is injected at registration time',
+          input,
+        },
+      ]),
+    };
+  }
+  return WorkflowTemplateSchema.safeParse(input);
+}
+
+export type ContainerConfig = z.infer<typeof ContainerSchema>;
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
+export type ScriptStepConfig = z.infer<typeof ScriptStepConfigSchema>;
+export type DatabricksJobConfig = z.infer<typeof DatabricksJobConfigSchema>;
 export type WorkflowCoworkConfig = z.infer<typeof WorkflowCoworkConfigSchema>;
 export type WorkflowReviewConfig = z.infer<typeof WorkflowReviewConfigSchema>;
 export type WorkflowWorkspace = z.infer<typeof WorkflowWorkspaceSchema>;
 export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
 export type InputForNextRunEntry = z.infer<typeof InputForNextRunEntrySchema>;
+
+/**
+ * Effective step timeout in minutes, regardless of executor flavour.
+ * Mirrors the runtime's historical default of 30 minutes (agent-runner).
+ */
+export function resolveStepTimeoutMinutes(
+  step: Pick<WorkflowStep, 'agent' | 'script' | 'databricks'>,
+): number {
+  return step.agent?.timeoutMinutes
+    ?? step.script?.timeoutMinutes
+    ?? step.databricks?.timeoutMinutes
+    ?? 30;
+}

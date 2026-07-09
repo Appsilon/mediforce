@@ -14,7 +14,7 @@ User-facing entry. Workspace-scoped pages (agents, tasks, processes, workflows, 
 
 ## Dependencies
 
-- Internal: [`platform-infra`](./platform-infra.md), [`platform-core`](./platform-core.md), [`workflow-engine`](./workflow-engine.md), [`agent-runtime`](./agent-runtime.md), `mcp-client`, [`supply-intelligence-plugins`](./supply-intelligence-plugins.md); optionally `agent-queue`.
+- Internal: [`platform-infra`](./platform-infra.md), [`platform-core`](./platform-core.md), [`workflow-engine`](./workflow-engine.md), [`agent-runtime`](./agent-runtime.md), `mcp-client`, [`supply-intelligence-plugins`](./supply-intelligence-plugins.md); optionally `container-worker`.
 - External: `next@15`, `react`, `radix-ui`, `firebase`, `playwright`.
 
 ## Key entry points
@@ -42,17 +42,18 @@ User-facing entry. Workspace-scoped pages (agents, tasks, processes, workflows, 
 
 ## Testing surface
 
-- Unit: `src/test/*.test.ts` (Vitest jsdom).
-- Journey: `src/test/*-journey.test.ts` — handler-level, in-memory repos.
-- E2E: `e2e/journeys/` (Playwright, port 9007 emulator), `e2e/smoke.spec.ts`. Remote env? → [remote-e2e-setup gotcha](../../gotchas/remote-e2e-setup.md).
-- Real-LLM E2E: `e2e/api/*.test.ts` via `pnpm test:mcp-real`.
+- L1 Unit: `src/**/__tests__/*.test.{ts,tsx}` (Vitest, co-located).
+- L2 Integration: `src/test/integration/*.test.ts` — route handlers + mocked services, Vitest.
+- L3 API E2E: `e2e/api/*.journey.ts` — Playwright `api` project, real Next + emulators, HTTP only (no browser).
+- L4 UI E2E: `e2e/ui/*.journey.ts` (Playwright `authenticated` project, port 9007 emulator), `e2e/smoke.spec.ts`. Remote env? → [remote-e2e-setup gotcha](../../gotchas/remote-e2e-setup.md).
+- L5 External / Tier 2 (real-LLM): `e2e/external/*.test.ts` via `pnpm test:external` (Vitest, opt-in).
 
 ## Ports / infra
 
 - Dev: `9003` (`pnpm dev`).
 - Emulator E2E: `9007`.
 - Firebase emulators: Auth `9099`, Firestore `8080`.
-- Prod: Firebase App Hosting (`apphosting.yaml`).
+- Prod: Hetzner VPS.
 
 ## Relationships
 

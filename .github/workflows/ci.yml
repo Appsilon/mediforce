@@ -1,5 +1,11 @@
 name: CI
 
+# NOTE: The `paths-ignore` lists below are mirrored in
+# `packages/platform-ui/vercel.json` (`ignoreCommand`) so Vercel skips
+# preview deploys for the same docs-only changes that skip CI. Keep both
+# lists in sync — adding an entry here without updating Vercel means
+# extra preview builds; the reverse means CI runs on changes Vercel
+# already skipped.
 on:
   pull_request:
     paths-ignore:
@@ -30,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -43,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -52,19 +58,81 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build custom Docker images for E2E tests
         run: docker build -t mediforce-node:latest -f packages/agent-runtime/container/Dockerfile.node .
-      - run: pnpm test
+      - run: pnpm test:unit
 
-  e2e-tests:
+  postgres-repository-tests:
+    # ADR-0001 parity: every Postgres-backed repository test runs against a
+    # real Postgres instance. Set TEST_DATABASE_URL so the parity suites
+    # exercise the Postgres branch instead of skipping it.
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mediforce
+          POSTGRES_PASSWORD: mediforce
+          POSTGRES_DB: mediforce
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mediforce -d mediforce"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://mediforce:mediforce@localhost:5432/mediforce
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mediforce/platform-infra exec vitest run src/postgres
+      # Route-level integration that drives the real attachment route adapters
+      # through a real PostgresTaskAttachmentRepository + FilesystemBlobStore
+      # (ADR-0003). Lives in platform-ui but needs the Postgres service, so it
+      # runs here rather than in the DB-less unit-tests job.
+      - run: pnpm --filter @mediforce/platform-ui exec vitest run src/test/integration/attachments-integration.pg.test.ts
+
+  e2e-tests:
+    # ADR-0001: L3 API + L4 UI E2E against Postgres. Runs the `api` Playwright
+    # project (browserless HTTP journeys) and then the `authenticated` UI
+    # project (Chromium journeys) against a real Postgres container with the
+    # Firebase Auth emulator. Sign-in uses the Auth emulator (no NextAuth), so
+    # both lanes share this job's setup. UI runs under workers:1, adding
+    # wall-clock for ~30 journeys.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mediforce
+          POSTGRES_PASSWORD: mediforce
+          POSTGRES_DB: mediforce
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mediforce -d mediforce"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://mediforce:mediforce@localhost:5432/mediforce
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply Postgres migrations
+        run: pnpm db:migrate
 
       - name: Cache Playwright browsers
         id: playwright-cache
@@ -89,33 +157,65 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
+      # Only the Auth emulator is needed: Firestore is fully removed
+      # (ADR-0001 final cutover, #534). Firebase Auth remains the identity
+      # provider, so auth-setup still seeds users here.
       - name: Start Firebase Emulators
         working-directory: packages/platform-ui
         run: |
-          firebase emulators:start --project demo-mediforce --only auth,firestore --config firebase.ci.json &
-          sleep 10
-          curl --retry 5 --retry-delay 2 --retry-connrefused http://127.0.0.1:9099/
-          curl --retry 5 --retry-delay 2 --retry-connrefused http://127.0.0.1:8080/
+          firebase emulators:start --project demo-mediforce --only auth --config firebase.ci.json &
+          curl --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:9099/
 
-      - name: Run E2E tests
-        run: cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth
+      # NEXT_PUBLIC_* values are baked into the bundle, so cache key includes
+      # them as a literal suffix. Bump the suffix if you change any value below.
+      - name: Cache .next build for E2E
+        id: next-cache
+        uses: actions/cache@v5
+        with:
+          path: packages/platform-ui/.next
+          key: next-e2e-v1-${{ runner.os }}-${{ hashFiles('packages/*/src/**/*.ts', 'packages/*/src/**/*.tsx', 'packages/*/src/**/*.js', 'packages/*/src/**/*.jsx', 'packages/*/src/**/*.css', 'packages/platform-ui/public/**', 'packages/platform-ui/next.config.mjs', 'packages/*/tsconfig.json', 'tsconfig.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml') }}-env-fake-api-key-localhost-demo-mediforce-demo-mediforce.appspot.com-000000000000-1:000000000000:web:fake-true-http://localhost:9007
+
+      - name: Build platform-ui for E2E
+        if: steps.next-cache.outputs.cache-hit != 'true'
+        run: cd packages/platform-ui && pnpm build:e2e
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: fake-api-key
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-mediforce
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: demo-mediforce.appspot.com
           FIREBASE_PROJECT_ID: demo-mediforce
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
           NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:fake'
-          # Fake key for server-to-server auth between server actions and /api routes
-          # (e.g. retryFailedStep → /api/processes/:id/run). Same value on both sides
-          # of the self-fetch, so validateApiKey passes. Only used locally within
-          # the Next.js process — no real secret needed.
           PLATFORM_API_KEY: ci-e2e-test-key
-          # Fake 64-hex-char key to satisfy validateSecretsKey() fail-fast check
-          # in getPlatformServices(). No real workflow secrets are encrypted/decrypted
-          # during E2E runs — this just has to be present and well-formed.
           SECRETS_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+
+      - name: Run API E2E against Postgres
+        run: pnpm test:e2e:api
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: fake-api-key
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-mediforce
+          FIREBASE_PROJECT_ID: demo-mediforce
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
+          NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:fake'
+          PLATFORM_API_KEY: ci-e2e-test-key
+          SECRETS_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+          MEDIFORCE_DISABLE_EMAIL: 'true'
+
+      # L4 UI journeys reuse the same prebuilt server (start:e2e,
+      # reuseExistingServer) + Auth emulator + Postgres as the API lane.
+      # workspace-docker.journey.ts self-skips under CI (#239).
+      - name: Run UI E2E against Postgres
+        run: pnpm test:e2e:ui
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: fake-api-key
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-mediforce
+          FIREBASE_PROJECT_ID: demo-mediforce
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
+          NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:fake'
+          PLATFORM_API_KEY: ci-e2e-test-key
+          SECRETS_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+          MEDIFORCE_DISABLE_EMAIL: 'true'
 
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
@@ -128,7 +228,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Check for compromised axios versions
         run: |
           if grep -qE 'axios@(1\.14\.1|0\.30\.4)' pnpm-lock.yaml; then
@@ -158,14 +258,3 @@ jobs:
       - name: Audit dependencies (full report)
         if: always()
         run: osv-scanner scan --lockfile=pnpm-lock.yaml || true
-
-  gif-check:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Check journey test changes have matching GIF updates
-        run: cd packages/platform-ui && python3 scripts/check-gif-freshness.py ${{ github.event.pull_request.base.sha }}

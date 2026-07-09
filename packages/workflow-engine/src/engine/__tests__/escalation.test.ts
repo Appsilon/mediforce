@@ -8,13 +8,12 @@ import {
 } from '@mediforce/platform-core';
 import type {
   WorkflowDefinition,
-  ProcessConfig,
   StepConfig,
   UserDirectoryService,
   DirectoryUser,
 } from '@mediforce/platform-core';
-import { WorkflowEngine } from '../workflow-engine.js';
-import type { StepActor, AgentRunResult } from '../../index.js';
+import { WorkflowEngine } from '../workflow-engine';
+import type { StepActor, AgentRunResult } from '../../index';
 
 // In-memory test double for UserDirectoryService (not exported, test-only)
 class InMemoryUserDirectoryService implements UserDirectoryService {
@@ -29,6 +28,10 @@ class InMemoryUserDirectoryService implements UserDirectoryService {
       .filter((u) => u.role === role)
       .map((u) => ({ uid: u.uid, email: u.email }));
   }
+
+  async getUserMetadata(): Promise<null> {
+    return null;
+  }
 }
 
 // A 2-step workflow: agent-step -> done
@@ -36,6 +39,7 @@ const agentProcessDef: WorkflowDefinition = {
   name: 'agent-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'agent-step', name: 'Agent Step', type: 'creation', executor: 'agent' },
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
@@ -105,7 +109,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
    * to simulate what FallbackHandler does before WorkflowEngine.advanceStep is called.
    */
   async function createRunningInstance(engine: WorkflowEngine): Promise<string> {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'agent-process',
       1,
       'system',
@@ -238,16 +242,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     const userDirectoryService = new InMemoryUserDirectoryService();
     userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
 
-    // Save process config with escalation notification config
-    const processConfig: ProcessConfig = {
-      processName: 'agent-process',
-      configName: 'default',
-      configVersion: '1.0',
-      stepConfigs: [],
-      notifications: [{ event: 'agent_escalation', roles: ['reviewer'] }],
-    };
-    await processRepo.saveProcessConfig(processConfig);
-
     const engine = new WorkflowEngine(
       processRepo,
       instanceRepo,
@@ -363,7 +357,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     );
 
     // agentProcessDef has notifications: [{ event: 'agent_escalation', roles: ['reviewer'] }]
-    const instance = await engine.createInstance('agent-process', 1, 'system', 'manual');
+    const instance = await engine.createInstance('test', 'agent-process', 1, 'system', 'manual');
     await engine.startInstance(instance.id);
 
     await engine.advanceStep(instance.id, {}, actor, undefined, escalatedResult);
@@ -409,15 +403,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
   it('propagates notification failure as advanceStep failure (fatal — no catch)', async () => {
     const userDirectoryService = new InMemoryUserDirectoryService();
     userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
-
-    const processConfig: ProcessConfig = {
-      processName: 'agent-process',
-      configName: 'default',
-      configVersion: '1.0',
-      stepConfigs: [],
-      notifications: [{ event: 'agent_escalation', roles: ['reviewer'] }],
-    };
-    await processRepo.saveProcessConfig(processConfig);
 
     const failingNotificationService = {
       sent: [] as Array<{ event: unknown; targets: unknown[] }>,
@@ -472,7 +457,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       userDirectoryService,
     );
 
-    const instance = await engine.createInstance('no-notif-process', 1, 'system', 'manual');
+    const instance = await engine.createInstance('test', 'no-notif-process', 1, 'system', 'manual');
     await engine.startInstance(instance.id);
 
     await engine.advanceStep(

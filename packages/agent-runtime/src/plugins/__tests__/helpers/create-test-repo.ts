@@ -52,8 +52,11 @@ export function createTestRepo(options: CreateTestRepoOptions = {}): TestRepo {
   };
   const execOpts = { env: gitEnv, stdio: 'pipe' as const };
 
-  // Create bare repo
-  execSync(`git init --bare "${bareDir}"`, execOpts);
+  // Create bare repo with explicit default branch — matches the platform's
+  // `git init --bare --initial-branch=main` so tests behave identically across
+  // hosts whose `init.defaultBranch` is `master` (CI runners) vs `main` (most
+  // modern dev machines).
+  execSync(`git init --bare --initial-branch=main "${bareDir}"`, execOpts);
 
   // Clone to worktree
   execSync(`git clone "${bareDir}" "${workDir}"`, execOpts);

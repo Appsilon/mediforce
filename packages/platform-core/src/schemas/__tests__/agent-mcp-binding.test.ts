@@ -7,9 +7,9 @@ import {
   HttpOAuthAuthSchema,
   StepMcpRestrictionSchema,
   ToolCatalogEntrySchema,
-} from '../agent-mcp-binding.js';
-import { AgentDefinitionSchema } from '../agent-definition.js';
-import { WorkflowDefinitionSchema } from '../workflow-definition.js';
+} from '../agent-mcp-binding';
+import { AgentDefinitionSchema } from '../agent-definition';
+import { WorkflowDefinitionSchema } from '../workflow-definition';
 
 describe('AgentMcpBindingSchema', () => {
   describe('stdio variant', () => {
@@ -420,7 +420,6 @@ describe('AgentDefinitionSchema with mcpServers', () => {
     systemPrompt: 'You are a helpful agent.',
     inputDescription: 'document',
     outputDescription: 'extracted data',
-    skillFileNames: [],
     createdAt: '2026-04-22T00:00:00.000Z',
     updatedAt: '2026-04-22T00:00:00.000Z',
   };

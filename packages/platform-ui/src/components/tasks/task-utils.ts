@@ -1,11 +1,5 @@
-import type { HumanTask, ProcessInstance } from '@mediforce/platform-core';
-
-/** Format a stepId into a human-readable title. */
-export function formatStepName(stepId: string): string {
-  return stepId
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
+import type { HumanTask, ProcessInstance, Presentation } from '@mediforce/platform-core';
+import { formatStepName } from '@/lib/format';
 
 /** Check if a task is an agent output review (L3 approval).
  *  Checks multiple signals: completionData.reviewType, completionData.agentOutput,
@@ -73,6 +67,14 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
       ? escalationReason
       : null;
 
+  const rawTokenUsage = agentOutput.tokenUsage as Record<string, unknown> | undefined;
+  const tokenUsage: TokenUsageData | null =
+    rawTokenUsage &&
+    typeof rawTokenUsage.inputTokens === 'number' &&
+    typeof rawTokenUsage.outputTokens === 'number'
+      ? { inputTokens: rawTokenUsage.inputTokens, outputTokens: rawTokenUsage.outputTokens }
+      : null;
+
   return {
     confidence: typeof agentOutput.confidence === 'number' ? agentOutput.confidence : null,
     confidence_rationale: typeof agentOutput.confidence_rationale === 'string' ? agentOutput.confidence_rationale : null,
@@ -80,29 +82,31 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
     result: (agentOutput.result as Record<string, unknown> | null) ?? null,
     model: typeof agentOutput.model === 'string' ? agentOutput.model : null,
     duration_ms: typeof agentOutput.duration_ms === 'number' ? agentOutput.duration_ms : null,
+    estimatedCostUsd: typeof agentOutput.estimatedCostUsd === 'number' ? agentOutput.estimatedCostUsd : null,
+    tokenUsage,
     gitMetadata,
-    presentation: typeof agentOutput.presentation === 'string' ? agentOutput.presentation : null,
+    presentation: normalizePresentation(agentOutput.presentation),
     escalationReason: normalizedEscalation,
   };
 }
 
-/** Find agent output from the closest preceding sibling task for the same step.
- *  Siblings are expected in createdAt-asc order. We walk backwards from the
- *  current task's position to find the agent run that produced output for
- *  this specific iteration (not just the first match). */
-export function getAgentOutputFromSiblings(
-  task: HumanTask,
-  siblingTasks: HumanTask[],
-): AgentOutputData | null {
-  const taskIndex = siblingTasks.findIndex((s) => s.id === task.id);
-
-  // Walk backwards from the current task to find the nearest preceding sibling
-  // with agent output on the same step — this is the agent run for this iteration.
-  for (let i = (taskIndex === -1 ? siblingTasks.length : taskIndex) - 1; i >= 0; i--) {
-    const sibling = siblingTasks[i];
-    if (sibling.stepId !== task.stepId) continue;
-    const output = getAgentOutput(sibling);
-    if (output) return output;
+/** Map a stored `presentation` field into the discriminated shape the UI
+ *  branches on. Legacy Firestore rows have `presentation: string` (always
+ *  HTML); newer rows carry `{kind, content}`. Unknown shapes return null
+ *  so the UI silently drops malformed data instead of crashing. */
+export function normalizePresentation(value: unknown): Presentation | null {
+  if (typeof value === 'string') {
+    return value.length > 0 ? { kind: 'html', content: value } : null;
+  }
+  if (value !== null && typeof value === 'object') {
+    const candidate = value as { kind?: unknown; content?: unknown };
+    if (
+      (candidate.kind === 'markdown' || candidate.kind === 'html') &&
+      typeof candidate.content === 'string' &&
+      candidate.content.length > 0
+    ) {
+      return { kind: candidate.kind, content: candidate.content };
+    }
   }
   return null;
 }
@@ -114,6 +118,11 @@ export interface GitMetadataData {
   repoUrl: string;
 }
 
+export interface TokenUsageData {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export type EscalationReason = 'low_confidence' | 'timeout' | 'error' | 'iterations_limit' | null;
 
 export interface AgentOutputData {
@@ -123,7 +132,9 @@ export interface AgentOutputData {
   result: Record<string, unknown> | null;
   model: string | null;
   duration_ms: number | null;
+  estimatedCostUsd: number | null;
+  tokenUsage: TokenUsageData | null;
   gitMetadata: GitMetadataData | null;
-  presentation: string | null;
+  presentation: Presentation | null;
   escalationReason: EscalationReason;
 }

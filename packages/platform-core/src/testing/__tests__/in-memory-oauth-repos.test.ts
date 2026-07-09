@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InMemoryOAuthProviderRepository } from '../in-memory-oauth-provider-repository.js';
-import { InMemoryAgentOAuthTokenRepository } from '../in-memory-agent-oauth-token-repository.js';
-import { ProviderAlreadyExistsError } from '../../repositories/oauth-provider-repository.js';
-import type { CreateOAuthProviderInput } from '../../schemas/oauth-provider.js';
-import type { AgentOAuthToken } from '../../schemas/agent-oauth-token.js';
+import { InMemoryOAuthProviderRepository } from '../in-memory-oauth-provider-repository';
+import { InMemoryAgentOAuthTokenRepository } from '../in-memory-agent-oauth-token-repository';
+import { ProviderAlreadyExistsError } from '../../repositories/oauth-provider-repository';
+import type { CreateOAuthProviderInput } from '../../schemas/oauth-provider';
+import type { AgentOAuthToken } from '../../schemas/agent-oauth-token';
 
 const providerInput: CreateOAuthProviderInput = {
   id: 'github',

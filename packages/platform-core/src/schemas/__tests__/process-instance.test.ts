@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   ProcessInstanceSchema,
   InstanceStatusSchema,
-} from '../process-instance.js';
+  RunNameEntrySchema,
+} from '../process-instance';
 
 const validInstance = {
   id: 'pi-001',
@@ -208,6 +209,31 @@ describe('ProcessInstanceSchema', () => {
 
   it('[DATA] should reject instance with empty configVersion', () => {
     const result = ProcessInstanceSchema.safeParse({ ...validInstance, configVersion: '' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('RunNameEntrySchema', () => {
+  it('parses a valid projected entry', () => {
+    const result = RunNameEntrySchema.safeParse({ id: 'pi-001', definitionName: 'wf' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual({ id: 'pi-001', definitionName: 'wf' });
+    }
+  });
+
+  it('fails loud when definitionName is missing (no silent default)', () => {
+    const result = RunNameEntrySchema.safeParse({ id: 'pi-001' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an empty definitionName', () => {
+    const result = RunNameEntrySchema.safeParse({ id: 'pi-001', definitionName: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a missing id', () => {
+    const result = RunNameEntrySchema.safeParse({ definitionName: 'wf' });
     expect(result.success).toBe(false);
   });
 });

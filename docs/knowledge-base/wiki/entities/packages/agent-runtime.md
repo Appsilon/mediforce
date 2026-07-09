@@ -14,7 +14,7 @@ Given an agent step: load plugin, assemble prompt (skill file + custom prompt + 
 
 ## Dependencies
 
-- Internal: [`platform-core`](./platform-core.md) (required); `@mediforce/agent-queue` (optional, on `REDIS_URL`).
+- Internal: [`platform-core`](./platform-core.md) (required); `@mediforce/container-worker` (optional, on `REDIS_URL`).
 - External: `firebase-admin`, `zod`.
 
 ## Key exports
@@ -39,7 +39,7 @@ Given an agent step: load plugin, assemble prompt (skill file + custom prompt + 
 ## Relationships
 
 - Consumed by: [`platform-ui`](./platform-ui.md), [`example-agent`](../plugins/example-agent.md), [`supply-intelligence-plugins`](./supply-intelligence-plugins.md).
-- Depends on: [`platform-core`](./platform-core.md), optionally `agent-queue`.
+- Depends on: [`platform-core`](./platform-core.md), optionally `container-worker`.
 
 ## Sources
 

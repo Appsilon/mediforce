@@ -9,14 +9,15 @@ import {
   type StepConfig,
   type WorkflowDefinition,
 } from '@mediforce/platform-core';
-import { WorkflowEngine } from '../engine/workflow-engine.js';
-import type { StepActor } from '../index.js';
+import { WorkflowEngine } from '../engine/workflow-engine';
+import type { StepActor } from '../index';
 
 // A simple 2-step workflow (start -> done) with no gate needed (single transition)
 const simpleDefinition: WorkflowDefinition = {
   name: 'rbac-test-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'human', allowedRoles: ['approver'] },
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
@@ -30,6 +31,7 @@ const noRolesDefinition: WorkflowDefinition = {
   name: 'rbac-no-roles',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'human' },
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
@@ -79,7 +81,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
       auditRepo,
       rbacService,
     );
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'rbac-test-process',
       1,
       'system',
@@ -99,7 +101,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
       auditRepo,
       // rbacService intentionally omitted
     );
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'rbac-test-process',
       1,
       'system',
@@ -135,7 +137,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
 
     // Use definition without allowedRoles
     const engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo, rbacService);
-    const instance = await engine.createInstance('rbac-no-roles', 1, 'system', 'manual');
+    const instance = await engine.createInstance('test', 'rbac-no-roles', 1, 'system', 'manual');
     await engine.startInstance(instance.id);
 
     const result = await engine.advanceStep(instance.id, {}, actor);
@@ -245,7 +247,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
 
     // Use definition without allowedRoles
     const engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo, rbacService);
-    const instance = await engine.createInstance('rbac-no-roles', 1, 'system', 'manual');
+    const instance = await engine.createInstance('test', 'rbac-no-roles', 1, 'system', 'manual');
     await engine.startInstance(instance.id);
 
     const result = await engine.advanceStep(instance.id, {}, actor);

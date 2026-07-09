@@ -10,7 +10,7 @@ import {
   buildAgentOutputEnvelope,
   buildFileMetadata,
   resetFactorySequence,
-} from '../factories.js';
+} from '../factories';
 import {
   ProcessDefinitionSchema,
   ProcessInstanceSchema,
@@ -21,7 +21,7 @@ import {
   ProcessConfigSchema,
   AgentOutputEnvelopeSchema,
   FileMetadataSchema,
-} from '../../schemas/index.js';
+} from '../../schemas/index';
 
 beforeEach(() => {
   resetFactorySequence();

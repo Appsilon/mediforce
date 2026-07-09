@@ -12,7 +12,6 @@
     "incremental": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "customConditions": ["@mediforce/source"],
     "types": ["node"]
   },
   "include": [],
@@ -21,10 +20,11 @@
     { "path": "packages/platform-infra" },
     { "path": "packages/workflow-engine" },
     { "path": "packages/agent-runtime" },
-    { "path": "packages/agent-queue" },
+    { "path": "packages/container-worker" },
     { "path": "packages/platform-api" },
     { "path": "packages/platform-ui" },
     { "path": "packages/mcp-client" },
-    { "path": "packages/cli" }
+    { "path": "packages/cli" },
+    { "path": "packages/core-actions" }
   ]
 }

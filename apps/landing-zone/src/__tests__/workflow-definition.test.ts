@@ -1,0 +1,258 @@
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { WorkflowDefinitionSchema, buildTaskVerdicts } from '@mediforce/platform-core';
+
+describe('landing-zone-CDISCPILOT01.wd.json', () => {
+  const appDir = resolve(import.meta.dirname, '../..');
+
+  function loadDefinition() {
+    const raw = JSON.parse(
+      readFileSync(resolve(appDir, 'src/landing-zone-CDISCPILOT01.wd.json'), 'utf8'),
+    );
+    return WorkflowDefinitionSchema.safeParse({ ...raw, version: 1 });
+  }
+
+  it('validates against WorkflowDefinitionSchema', () => {
+    const result = loadDefinition();
+
+    if (!result.success) {
+      console.error(result.error.format());
+    }
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    expect(result.data.name).toBe('landing-zone-CDISCPILOT01');
+    expect(result.data.namespace).toBe('appsilon');
+  });
+
+  it('has a manual trigger and no cron trigger', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    expect(result.data.triggers.find((t) => t.type === 'manual')).toBeDefined();
+    expect(result.data.triggers.find((t) => t.type === 'cron')).toBeUndefined();
+  });
+
+  it('declares inputForNextRun for SFTP listing carry-over', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    expect(result.data.inputForNextRun).toBeDefined();
+    expect(result.data.inputForNextRun?.[0]).toEqual({
+      stepId: 'sftp-poll',
+      output: 'listing',
+      as: 'previousListing',
+    });
+  });
+
+  it('every non-terminal step has an executor', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const nonTerminal = result.data.steps.filter((step) => step.type !== 'terminal');
+    for (const step of nonTerminal) {
+      expect(step.executor).toBeDefined();
+      expect(['human', 'agent', 'script', 'action']).toContain(step.executor);
+    }
+  });
+
+  it('script steps reference the script-container plugin', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const scriptSteps = result.data.steps.filter(
+      (step) => step.executor === 'script' && step.type !== 'terminal',
+    );
+    expect(scriptSteps.length).toBeGreaterThan(0);
+
+    for (const step of scriptSteps) {
+      expect(step.plugin).toBe('script-container');
+      expect(step.script?.image).toBeDefined();
+      expect(step.script?.command).toBeDefined();
+    }
+  });
+
+  it('agent steps reference claude-code-agent plugin with skill + skillsDir', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const agentSteps = result.data.steps.filter((step) => step.executor === 'agent');
+    expect(agentSteps.length).toBeGreaterThan(0);
+
+    for (const step of agentSteps) {
+      expect(step.plugin).toBe('claude-code-agent');
+      expect(step.agent?.skill).toBeDefined();
+      expect(step.agent?.skillsDir).toBe('apps/landing-zone/plugins/landing-zone/skills');
+    }
+  });
+
+  it('all transition targets reference valid step IDs', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const stepIds = new Set(result.data.steps.map((step) => step.id));
+    for (const transition of result.data.transitions) {
+      expect(stepIds.has(transition.from)).toBe(true);
+      expect(stepIds.has(transition.to)).toBe(true);
+    }
+  });
+
+  it('review step verdicts reference valid step IDs', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const stepIds = new Set(result.data.steps.map((step) => step.id));
+    const reviewSteps = result.data.steps.filter((step) => step.verdicts);
+    expect(reviewSteps.length).toBeGreaterThan(0);
+
+    for (const step of reviewSteps) {
+      for (const [, verdict] of Object.entries(step.verdicts!)) {
+        expect(stepIds.has(verdict.target)).toBe(true);
+      }
+    }
+  });
+
+  it('every non-terminal, non-branching step has an outgoing transition', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    for (const step of result.data.steps) {
+      if (step.type === 'terminal') continue;
+      const hasVerdicts = step.verdicts && Object.keys(step.verdicts).length > 0;
+      if (hasVerdicts) continue;
+      const hasOutgoing = result.data.transitions.some((transition) => transition.from === step.id);
+      expect(hasOutgoing, `Step "${step.id}" should have an outgoing transition`).toBe(true);
+    }
+  });
+
+  it('declares workspace.remote pointing to dedicated study repo', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    expect(result.data.workspace?.remote).toBe('Appsilon/mediforce-landing-zone-study-demo');
+    expect(result.data.workspace?.remoteAuth).toBe('GITHUB_TOKEN');
+  });
+
+  it('interpret-validation always routes to human-review (single unconditional edge)', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    // The wd.json was simplified to a single unconditional transition from
+    // interpret-validation → human-review. Engine no longer auto-skips on
+    // classification; the human always reviews. Classification stays in the
+    // agent output as informational context for the reviewer.
+    const interpretTransitions = result.data.transitions.filter(
+      (transition) => transition.from === 'interpret-validation',
+    );
+    expect(interpretTransitions).toHaveLength(1);
+    expect(interpretTransitions[0].to).toBe('human-review');
+    expect(interpretTransitions[0].when).toBeUndefined();
+  });
+
+  it('rejection path sends email before reaching terminal', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const emailStep = result.data.steps.find((step) => step.id === 'send-rejection-email');
+    expect(emailStep).toBeDefined();
+    expect(emailStep?.executor).toBe('action');
+    expect(emailStep?.action).toEqual({
+      kind: 'email',
+      config: {
+        // Recipients resolve from the workflow secrets bag (the same source
+        // the env block uses) rather than from instance.variables, which
+        // doesn't get those env-block values projected into it.
+        to: '${secrets.CRO_CONTACT_EMAIL_CDISCPILOT01}',
+        subject: '${steps.draft-rejection-note.suggestedSubject}',
+        body: '${steps.draft-rejection-note.rejectionNote}',
+        replyTo: '${secrets.DATA_MANAGER_EMAIL_CDISCPILOT01}',
+      },
+    });
+    // Email step is best-effort — a Mailgun failure must not take the rules-PR
+    // flow down with it.
+    expect(emailStep?.continueOnError).toBe(true);
+
+    const transitions = result.data.transitions;
+    expect(transitions).toContainEqual({ from: 'draft-rejection-note', to: 'send-rejection-email' });
+    expect(transitions).toContainEqual({ from: 'send-rejection-email', to: 'propose-rules' });
+  });
+
+  it('rejection path includes rules proposal and PR after email', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const proposeRules = result.data.steps.find((step) => step.id === 'propose-rules');
+    expect(proposeRules).toBeDefined();
+    expect(proposeRules?.type).toBe('review');
+    expect(proposeRules?.verdicts).toEqual({
+      approve: { target: 'new-rules-branch' },
+      revise: { target: 'propose-rules' },
+    });
+
+    const newRulesBranch = result.data.steps.find((step) => step.id === 'new-rules-branch');
+    expect(newRulesBranch).toBeDefined();
+    expect(newRulesBranch?.executor).toBe('script');
+
+    const transitions = result.data.transitions;
+    expect(transitions).toContainEqual({ from: 'new-rules-branch', to: 'rejected-with-note' });
+  });
+
+  it('human-review exposes three verdicts (accept / reject_and_notify / ask_agent_to_revise)', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const humanReview = result.data.steps.find((step) => step.id === 'human-review');
+    expect(humanReview).toBeDefined();
+    expect(humanReview?.verdicts).toEqual({
+      accept: {
+        target: 'accept-delivery',
+        label: 'Accept delivery',
+        intent: 'success',
+      },
+      reject_and_notify: {
+        target: 'draft-rejection-note',
+        label: 'Reject — notify CRO',
+        intent: 'danger',
+      },
+      ask_agent_to_revise: {
+        target: 'interpret-validation',
+        label: 'Ask agent to make changes',
+        intent: 'warning',
+        requiresComment: true,
+      },
+    });
+  });
+
+  it('round-trips WD verdicts through buildTaskVerdicts into the descriptor array reviewers see', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const humanReview = result.data.steps.find((step) => step.id === 'human-review');
+    expect(humanReview).toBeDefined();
+    const descriptors = buildTaskVerdicts(humanReview!.verdicts);
+
+    // Order, labels, intents and the per-verdict requiresComment must
+    // survive parse + descriptor build. This is what the engine writes
+    // onto the HumanTask and what VerdictForm renders.
+    expect(descriptors).toEqual([
+      { key: 'accept', label: 'Accept delivery', intent: 'success', requiresComment: false },
+      { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger', requiresComment: false },
+      { key: 'ask_agent_to_revise', label: 'Ask agent to make changes', intent: 'warning', requiresComment: true },
+    ]);
+  });
+});

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { runGetCommand } from '../commands/run-get.js';
-import { captureOutput, jsonResponse } from './test-helpers.js';
+import { runGetCommand } from '../commands/run-get';
+import { captureOutput, jsonResponse } from './test-helpers';
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -23,7 +23,7 @@ describe('run get command', () => {
     });
     expect(code).toBe(2);
     expect(output.stderrLines.join('\n') + output.stdoutLines.join('\n')).toMatch(
-      /runId is required/,
+      /Missing required positional argument: RUNID/,
     );
   });
 
@@ -104,6 +104,6 @@ describe('run get command', () => {
     });
     expect(code).toBe(2);
     const allOutput = output.stderrLines.join('\n') + output.stdoutLines.join('\n');
-    expect(allOutput).toMatch(/Usage: mediforce run get/);
+    expect(allOutput).toMatch(/USAGE mediforce run get/);
   });
 });

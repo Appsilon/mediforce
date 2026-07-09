@@ -1,0 +1,86 @@
+{
+  "name": "gather-perspective",
+  "namespace": "appsilon",
+  "title": "Gather Perspective",
+  "description": "Collects a single team member's perspective on a question posed by the product owner.",
+  "roles": [
+    "member"
+  ],
+  "triggers": [
+    {
+      "name": "manual",
+      "type": "manual"
+    }
+  ],
+  "triggerInput": [
+    {
+      "name": "userId",
+      "type": "string",
+      "required": true,
+      "description": "ID of the team member providing perspective"
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "required": true,
+      "description": "Email of the team member"
+    },
+    {
+      "name": "question",
+      "type": "string",
+      "required": true,
+      "description": "The question posed by the product owner"
+    }
+  ],
+  "steps": [
+    {
+      "id": "show_question",
+      "name": "Show question",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Renders the PO's question as a presentation card visible in the next step's context panel.",
+      "script": {
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const question = input.question || 'No question provided';\n  writeFileSync('/output/presentation.md', `## Question from your Product Owner\\n\\n${question}\\n\\nPlease share your perspective below.`);\n  writeFileSync('/output/result.json', JSON.stringify({ question }));\n  console.log('Question rendered for presentation');\n} catch (err) {\n  console.error('show_question crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n",
+        "runtime": "javascript",
+        "image": "mediforce-golden-image:latest"
+      }
+    },
+    {
+      "id": "provide_perspective",
+      "name": "Provide perspective",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": [
+        "member"
+      ],
+      "assignedTo": "${triggerPayload.email}",
+      "description": "Team member provides their perspective on the PO's question.",
+      "params": [
+        {
+          "name": "perspective",
+          "type": "textarea",
+          "required": true,
+          "description": "Share your thoughts on the question above"
+        }
+      ]
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "script",
+      "description": "Perspective collected."
+    }
+  ],
+  "transitions": [
+    {
+      "from": "show_question",
+      "to": "provide_perspective"
+    },
+    {
+      "from": "provide_perspective",
+      "to": "done"
+    }
+  ]
+}

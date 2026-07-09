@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest
 import { resolve } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { execSync } from 'node:child_process';
-import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin.js';
+import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/step-executor-plugin';
 import type { ProcessConfig } from '@mediforce/platform-core';
-import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin.js';
+import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
+import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 
 const PROJECT_ROOT = resolve(import.meta.dirname, '../../../../..');
 
@@ -52,7 +53,7 @@ const STEP_INPUT = {
 
 class StubClaudeCodeAgentPlugin extends ClaudeCodeAgentPlugin {
   constructor(private stubOutputPath: string) {
-    super();
+    super({ workspaceManager: createFakeWorkspaceManager() });
   }
 
   protected override async spawnDockerContainer(

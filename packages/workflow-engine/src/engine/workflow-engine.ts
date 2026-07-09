@@ -11,17 +11,19 @@ import type {
   NotificationTarget,
   HumanTaskRepository,
   HumanTask,
+  CompleteHumanTaskPayload,
   CoworkSessionRepository,
   UserDirectoryService,
   WorkflowDefinition,
   WorkflowStep,
 } from '@mediforce/platform-core';
-import type { Selection } from '@mediforce/platform-core';
-import { RbacService, RbacError, normalizeSelection } from '@mediforce/platform-core';
-import { validateStepGraph } from '../graph/graph-validator.js';
-import { StepExecutor, type StepActor } from './step-executor.js';
-import { RoutingError, InvalidTransitionError } from './errors.js';
-import { ReviewTracker } from '../review/review-tracker.js';
+import type { Selection, TaskVerdict } from '@mediforce/platform-core';
+import { RbacService, RbacError, normalizeSelection, buildTaskVerdicts, interpolate } from '@mediforce/platform-core';
+import { validateStepGraph } from '../graph/graph-validator';
+import { StepExecutor, type StepActor } from './step-executor';
+import { RoutingError, InvalidTransitionError, ParentInstanceNotFoundError } from './errors';
+import { ReviewTracker } from '../review/review-tracker';
+import { shapeCompletion } from './complete-human-task';
 
 /**
  * Minimal shape of AgentRunResult needed by WorkflowEngine for handoff creation.
@@ -71,13 +73,15 @@ export class WorkflowEngine {
    * Create a new process instance. Loads WorkflowDefinition to get roles.
    */
   async createInstance(
+    namespace: string,
     definitionName: string,
     version: number,
     triggeredBy: string,
     triggerType: 'manual' | 'webhook' | 'cron',
     payload?: Record<string, unknown>,
+    opts?: { parentInstanceId?: string; parentDefinitionName?: string; dryRun?: boolean },
   ): Promise<ProcessInstance> {
-    const definition = await this.processRepository.getWorkflowDefinition(definitionName, version);
+    const definition = await this.processRepository.getWorkflowDefinition(namespace, definitionName, version);
     if (!definition) {
       throw new Error(
         `Workflow definition '${definitionName}' version '${version}' not found`,
@@ -108,10 +112,14 @@ export class WorkflowEngine {
       // without needing a one-time backfill of pre-feature instances.
       deleted: false,
       archived: false,
+      namespace: definition.namespace,
       ...(carryOver !== null ? { previousRun: carryOver.values } : {}),
       ...(carryOver?.sourceId !== undefined
         ? { previousRunSourceId: carryOver.sourceId }
         : {}),
+      ...(opts?.parentInstanceId ? { parentInstanceId: opts.parentInstanceId } : {}),
+      ...(opts?.parentDefinitionName ? { parentDefinitionName: opts.parentDefinitionName } : {}),
+      dryRun: opts?.dryRun === true,
     };
 
     await this.instanceRepository.create(instance);
@@ -128,7 +136,7 @@ export class WorkflowEngine {
       basis: `Triggered by ${triggeredBy} via ${triggerType}`,
       entityType: 'processInstance',
       entityId: instance.id,
-      processInstanceId: String(version),
+      processInstanceId: instance.id,
     });
 
     return instance;
@@ -262,28 +270,65 @@ export class WorkflowEngine {
           const now = new Date().toISOString();
 
           const selectionFields: { selection?: Selection; options?: Record<string, unknown>[] } = {};
+          const prevOutput = updatedInstance.variables[instance.currentStepId!] as Record<string, unknown> | undefined;
+          const rawOptions = prevOutput?.options;
+          const opts = Array.isArray(rawOptions) && rawOptions.length > 0
+            ? (rawOptions as Record<string, unknown>[])
+            : null;
+
           if (nextStep.selection !== undefined) {
             selectionFields.selection = nextStep.selection;
-            const prevOutput = updatedInstance.variables[instance.currentStepId!] as Record<string, unknown> | undefined;
-            const rawOptions = prevOutput?.options;
-            if (Array.isArray(rawOptions) && rawOptions.length > 0) {
+            if (opts !== null) {
               const { min } = normalizeSelection(nextStep.selection);
-              if (rawOptions.length < min) {
+              if (opts.length < min) {
                 throw new Error(
-                  `Step "${nextStep.id}" requires selecting at least ${min} but only ${rawOptions.length} options available`,
+                  `Step "${nextStep.id}" requires selecting at least ${min} but only ${opts.length} options available`,
                 );
               }
-              selectionFields.options = rawOptions as Record<string, unknown>[];
             }
           }
+
+          // `options` flow to the task whenever the previous step produced them,
+          // not just for selection-style steps. Components like assignment-table
+          // consume them as their items list.
+          if (opts !== null) {
+            selectionFields.options = opts;
+          }
+
+          // L3 agent review tasks are created in execute-agent-step, not here;
+          // this branch only fires for executor === 'human'. Verdicts are
+          // copied onto the task so the form renders without re-reading the WD.
+          const verdictsField: { verdicts?: TaskVerdict[] } = {};
+          const resolvedVerdicts = buildTaskVerdicts(nextStep.verdicts);
+          if (resolvedVerdicts) verdictsField.verdicts = resolvedVerdicts;
+
+          let preAssignedUserId: string | null = null;
+          if (nextStep.assignedTo) {
+            const resolved = interpolate(nextStep.assignedTo, {
+              triggerPayload: (updatedInstance.triggerPayload as Record<string, unknown>) ?? {},
+              steps: updatedInstance.variables,
+              variables: updatedInstance.variables,
+              secrets: {},
+            });
+            if (typeof resolved === 'string' && resolved.length > 0) {
+              if (this.userDirectoryService?.resolveUser) {
+                const user = await this.userDirectoryService.resolveUser(resolved);
+                preAssignedUserId = user?.uid ?? resolved;
+              } else {
+                preAssignedUserId = resolved;
+              }
+            }
+          }
+          const taskAssignedUserId = preAssignedUserId ?? updatedInstance.createdBy ?? null;
+          const taskStatus: 'pending' | 'claimed' = taskAssignedUserId ? 'claimed' : 'pending';
 
           const task: HumanTask = {
             id: crypto.randomUUID(),
             processInstanceId: instanceId,
             stepId: nextStep.id,
             assignedRole,
-            assignedUserId: updatedInstance.createdBy ?? null,
-            status: updatedInstance.createdBy ? 'claimed' : 'pending',
+            assignedUserId: taskAssignedUserId,
+            status: taskStatus,
             deadline: null,
             createdAt: now,
             updatedAt: now,
@@ -293,6 +338,7 @@ export class WorkflowEngine {
             ...(nextStep.ui ? { ui: nextStep.ui } : {}),
             ...(nextStep.params?.length ? { params: nextStep.params } : {}),
             ...selectionFields,
+            ...verdictsField,
           };
           await this.humanTaskRepository.create(task);
 
@@ -645,6 +691,87 @@ export class WorkflowEngine {
     return this.loadInstance(instanceId);
   }
 
+  // L3-revise verdicts resume the instance but skip advanceStep so the
+  // auto-runner re-executes the agent with reviewer feedback.
+  async completeHumanTask(
+    taskId: string,
+    payload: CompleteHumanTaskPayload,
+    actorId: string,
+  ): Promise<{
+    task: HumanTask;
+    instance: ProcessInstance;
+    stepOutput: Record<string, unknown>;
+    resolvedStepId: string;
+    isL3Revise: boolean;
+  }> {
+    if (!this.humanTaskRepository) {
+      throw new Error(
+        'completeHumanTask requires humanTaskRepository — engine was constructed without one',
+      );
+    }
+
+    const task = await this.humanTaskRepository.getById(taskId);
+    if (!task) {
+      throw new Error(`Task '${taskId}' not found`);
+    }
+    if (task.status === 'completed' || task.status === 'cancelled') {
+      throw new InvalidTransitionError(task.status, 'completeHumanTask');
+    }
+
+    let resolvedTask: HumanTask = task;
+    if (task.status === 'pending') {
+      resolvedTask = await this.humanTaskRepository.claim(taskId, actorId);
+    }
+
+    const effectiveActor = resolvedTask.assignedUserId ?? actorId;
+    const now = new Date().toISOString();
+
+    const { completionData, stepOutput, isL3Revise } = shapeCompletion(
+      resolvedTask,
+      payload,
+      effectiveActor,
+      now,
+    );
+
+    await this.humanTaskRepository.complete(taskId, completionData);
+
+    const instance = await this.instanceRepository.getById(
+      resolvedTask.processInstanceId,
+    );
+    if (!instance) {
+      throw new ParentInstanceNotFoundError(resolvedTask.processInstanceId);
+    }
+    if (instance.status !== 'paused') {
+      throw new InvalidTransitionError(instance.status, 'completeHumanTask');
+    }
+
+    await this.instanceRepository.update(resolvedTask.processInstanceId, {
+      status: 'running',
+      pauseReason: null,
+      updatedAt: now,
+    });
+
+    if (!isL3Revise) {
+      await this.advanceStep(resolvedTask.processInstanceId, stepOutput, {
+        id: effectiveActor,
+        role: 'human',
+      });
+    }
+
+    const updatedTask = await this.humanTaskRepository.getById(taskId);
+    const updatedInstance = await this.instanceRepository.getById(
+      resolvedTask.processInstanceId,
+    );
+
+    return {
+      task: updatedTask ?? resolvedTask,
+      instance: updatedInstance ?? instance,
+      stepOutput,
+      resolvedStepId: resolvedTask.stepId,
+      isL3Revise,
+    };
+  }
+
   private async loadInstance(instanceId: string): Promise<ProcessInstance> {
     const instance = await this.instanceRepository.getById(instanceId);
     if (!instance) {
@@ -710,9 +837,11 @@ export class WorkflowEngine {
   private async loadDefinitionUnified(
     instance: ProcessInstance,
   ): Promise<WorkflowDefinition> {
+    const ns = instance.namespace ?? '';
     const versionNum = parseInt(instance.definitionVersion, 10);
     if (!isNaN(versionNum)) {
       const wd = await this.processRepository.getWorkflowDefinition(
+        ns,
         instance.definitionName,
         versionNum,
       );
@@ -720,9 +849,9 @@ export class WorkflowEngine {
     }
 
     // Fallback: latest version by name (handles legacy instances with string versions like "1.0.0")
-    const latestVersion = await this.processRepository.getLatestWorkflowVersion(instance.definitionName);
+    const latestVersion = await this.processRepository.getLatestWorkflowVersion(ns, instance.definitionName);
     if (latestVersion > 0) {
-      const wd = await this.processRepository.getWorkflowDefinition(instance.definitionName, latestVersion);
+      const wd = await this.processRepository.getWorkflowDefinition(ns, instance.definitionName, latestVersion);
       if (wd) return wd;
     }
 

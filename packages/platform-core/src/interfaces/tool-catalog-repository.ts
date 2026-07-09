@@ -1,4 +1,4 @@
-import type { ToolCatalogEntry } from '../schemas/agent-mcp-binding.js';
+import type { ToolCatalogEntry } from '../schemas/agent-mcp-binding';
 
 /** Admin-curated catalog of stdio MCP server launch specs, keyed by id
  *  within a namespace. Entries are referenced by AgentMcpBinding.catalogId;

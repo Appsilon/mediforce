@@ -16,7 +16,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const packageRoot = path.resolve(__dirname, '..');
-const entry = path.join(packageRoot, 'src', 'cli.ts');
+const entry = path.join(packageRoot, 'src', 'run.ts');
 
 let tsxBin;
 try {
@@ -30,24 +30,10 @@ try {
   process.exit(2);
 }
 
-// `--conditions=@mediforce/source` makes Node's ESM resolver pick the
-// `./src/...` entry from each workspace package's `exports`, matching the
-// custom condition declared in tsconfig.json. Without it, the resolver
-// falls back to `./dist/...` which has not been built in dev.
-//
-// Passed via NODE_OPTIONS rather than as an argv flag because tsx parses
-// argv before the runtime sees it, and a leading `--conditions=…` would be
-// consumed by tsx's own arg parser instead of reaching the ESM loader.
-const env = { ...process.env };
-const existing = env.NODE_OPTIONS ?? '';
-env.NODE_OPTIONS = existing.includes('--conditions=@mediforce/source')
-  ? existing
-  : `${existing} --conditions=@mediforce/source`.trim();
-
 const result = spawnSync(
   process.execPath,
   [tsxBin, entry, ...process.argv.slice(2)],
-  { stdio: 'inherit', env },
+  { stdio: 'inherit' },
 );
 
 if (result.error !== undefined) {

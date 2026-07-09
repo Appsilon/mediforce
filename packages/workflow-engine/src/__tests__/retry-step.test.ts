@@ -5,13 +5,14 @@ import {
   InMemoryAuditRepository,
 } from '@mediforce/platform-core';
 import type { StepExecution, WorkflowDefinition } from '@mediforce/platform-core';
-import { WorkflowEngine, InvalidTransitionError } from '../index.js';
-import type { StepActor } from '../index.js';
+import { WorkflowEngine, InvalidTransitionError } from '../index';
+import type { StepActor } from '../index';
 
 const def: WorkflowDefinition = {
   name: 'retry-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'upload', name: 'Upload', type: 'creation', executor: 'human' },
     { id: 'deploy', name: 'Deploy', type: 'creation', executor: 'agent' },
@@ -48,6 +49,7 @@ async function seedFailedInstance(
     assignedRoles: [],
     deleted: false,
     archived: false,
+    dryRun: false,
   });
   const exec: StepExecution = {
     id: 'exec-1',

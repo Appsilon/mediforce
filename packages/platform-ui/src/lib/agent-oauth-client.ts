@@ -53,15 +53,9 @@ export async function listAgentOAuthTokens(
   agentId: string,
   namespace: string,
 ): Promise<AgentOAuthTokenStatus[]> {
-  const res = await apiFetch(
-    `/api/agents/${encodeURIComponent(agentId)}/oauth` +
-      `?namespace=${encodeURIComponent(namespace)}`,
-  );
-  const { tokens } = await parseOrThrow<{ tokens: AgentOAuthTokenStatus[] }>(
-    res,
-    'List agent OAuth tokens',
-  );
-  return tokens;
+  const { mediforce } = await import('./mediforce');
+  const { tokens } = await mediforce.agents.listOAuthTokens({ id: agentId, namespace });
+  return tokens as AgentOAuthTokenStatus[];
 }
 
 export interface DisconnectOptions {
@@ -77,12 +71,14 @@ export async function disconnectOAuthToken(
   namespace: string,
   options: DisconnectOptions = {},
 ): Promise<void> {
-  const revoke = options.revokeAtProvider === true ? 'true' : 'false';
-  const res = await apiFetch(
-    `/api/agents/${encodeURIComponent(agentId)}/oauth/${encodeURIComponent(provider)}` +
-      `?namespace=${encodeURIComponent(namespace)}` +
-      `&serverName=${encodeURIComponent(serverName)}&revokeAtProvider=${revoke}`,
-    { method: 'DELETE' },
-  );
-  await parseOrThrow<{ success: true }>(res, 'Disconnect OAuth token');
+  const { mediforce } = await import('./mediforce');
+  await mediforce.agents.deleteOAuthToken({
+    id: agentId,
+    provider,
+    namespace,
+    serverName,
+    ...(options.revokeAtProvider !== undefined
+      ? { revokeAtProvider: options.revokeAtProvider }
+      : {}),
+  });
 }

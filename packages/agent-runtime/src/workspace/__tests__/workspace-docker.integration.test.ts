@@ -23,12 +23,12 @@ import type {
   WorkflowDefinition,
   WorkflowStep,
 } from '@mediforce/platform-core';
-import { ScriptContainerPlugin } from '../../plugins/script-container-plugin.js';
+import { ScriptContainerPlugin } from '../../plugins/script-container-plugin';
 import type {
   EmitFn,
   EmitPayload,
   WorkflowAgentContext,
-} from '../../interfaces/agent-plugin.js';
+} from '../../interfaces/step-executor-plugin';
 
 function dockerAvailable(): boolean {
   try {
@@ -52,7 +52,7 @@ function buildScriptContext(overrides: {
     type: 'creation',
     executor: 'script',
     plugin: 'script-container',
-    agent: {
+    script: {
       runtime: 'bash',
       image: TEST_IMAGE,
       inlineScript: overrides.inlineScript,
@@ -63,6 +63,7 @@ function buildScriptContext(overrides: {
     name: overrides.wdName ?? `wd-script-${Math.random().toString(36).slice(2, 8)}`,
     namespace: '_default',
     version: 1,
+    visibility: 'private',
     steps: [step],
     transitions: [],
     triggers: [{ type: 'manual', name: 'start' }],
@@ -72,6 +73,7 @@ function buildScriptContext(overrides: {
   return {
     stepId: step.id,
     processInstanceId: `pi-${Date.now().toString()}-${Math.random().toString(36).slice(2, 6)}`,
+    runNamespace: 'test',
     definitionVersion: 'v1',
     stepInput: {},
     autonomyLevel: 'L4',
@@ -217,8 +219,8 @@ describe.skipIf(!dockerAvailable())('WorkspaceManager + Docker end-to-end', () =
       step: {
         ...ctx1.step,
         id: 'step-2',
-        agent: {
-          ...ctx1.step.agent,
+        script: {
+          ...ctx1.step.script,
           inlineScript: [
             '#!/bin/sh',
             'set -eu',

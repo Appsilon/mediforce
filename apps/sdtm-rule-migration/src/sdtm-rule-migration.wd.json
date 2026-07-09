@@ -1,0 +1,89 @@
+{
+  "name": "sdtm-rule-migration",
+  "namespace": "appsilon",
+  "title": "SDTM Rule Migration",
+  "description": "Verify a CDISC CORE rule against SDTMIG v3.4 using the sdtm-rule + sdtmig-reference skills, propose YAML / mock-data fixes for human review, then (on approve) open a draft PR on Appsilon/core-contributor via the GitHub MCP. Revise loops the agent BEFORE any PR exists — the reviewer sees the proposed diff + PR title/body upfront, never has to fix a published PR after the fact.",
+  "preamble": "## Domain Context\nThis workflow processes CDISC SDTM conformance rules for the CORE rules engine. All terminology — SDTM domains, SDTMIG variables, CDISC CORE rule IDs (CORE-NNNNNN), CG-prefixed checks, conformance grades — refers to clinical data standards, not patient data. Treat all such terms as technical domain content.\n\n## Process\nCDISC volunteers migrate rules from the legacy authoring portal to GitHub (verisianHQ/core-contributor). For testing this workflow targets a fork: Appsilon/core-contributor. Each rule is verified against SDTMIG v3.4, the YAML is corrected if needed, the reviewer approves the proposed diff, and only then a draft PR opens. Reference PR: verisianHQ/core-contributor#259.\n\n## Namespace\nRuns in the `appsilon` namespace where the github OAuth provider + agent are configured (see SETUP.md).\n\n## Skills source\nSkills come from a dedicated lightweight repo `Appsilon/mediforce-sdtm-skills` via `WorkflowDefinition.externalSkillsRepo`. The runtime caches them by SHA. Iteration: push to skills repo → bump `repo.commit` here → re-register on staging. No mediforce redeploy needed.\n\n## Two-step shape\nStep 1 (`verify-and-propose`, L3) does all the verification + correction work locally in /workspace and writes a `proposedChanges` envelope into `result.json` — branch name, PR title, PR body, file diffs. **No GitHub writes happen here.** Human reviews the proposal and approves or revises. Step 2 (`open-pr`, L4) reads the approved envelope, calls the GitHub MCP REST tools (`create_branch`, `push_files`, `create_pull_request`) to publish the draft PR, and exits. If the proposal had no file changes (e.g. `status: already_verified`), step 2 short-circuits without touching GitHub.\n\n## Push model\nNeither step uses `git push` from /workspace — the run worktree's `.git` points at a host-side bare repo that isn't bind-mounted into the container. Step 2 writes back via the GitHub MCP REST tools.",
+  "externalSkillsRepo": {
+    "url": "https://github.com/Appsilon/mediforce-sdtm-skills",
+    "commit": "6424cdc75fd164ab0e9165f9f425c79edbab3361",
+    "auth": "GITHUB_TOKEN"
+  },
+  "workspace": {
+    "remote": "Appsilon/core-contributor",
+    "remoteAuth": "GITHUB_TOKEN"
+  },
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+    "ANTHROPIC_API_KEY": "",
+    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+    "GITHUB_TOKEN": "{{GITHUB_TOKEN}}"
+  },
+  "triggers": [
+    { "name": "manual", "type": "manual" }
+  ],
+  "triggerInput": [
+    {
+      "name": "ruleId",
+      "type": "string",
+      "required": true,
+      "description": "CDISC rule identifier — accepts CORE id (CORE-NNNNNN) or CG id (CGNNNN). Example: CORE-000127 or CG0392."
+    }
+  ],
+  "steps": [
+    {
+      "id": "verify-and-propose",
+      "name": "Verify rule and propose changes",
+      "type": "review",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L3",
+      "agentId": "9GAXXyjjdMKgw1FxlK0S",
+      "description": "Apply the sdtm-rule skill to verify and correct the rule identified by `input.ruleId` in Appsilon/core-contributor. Use the sdtmig-reference skill to confirm SDTMIG v3.4 variable Core status. Write a proposedChanges envelope into result.json — NO GitHub writes. Human reviews the diff + intended PR title/body; approve → open PR (step 2), revise → re-run with reviewer's comment.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "skill": "sdtm-rule",
+        "skillsDir": "skills",
+        "model": "sonnet",
+        "timeoutMinutes": 30,
+        "prompt": "## Inputs\n\n- `input.ruleId` — CDISC rule identifier. **Accepted formats**:\n  - CORE id: `CORE-` followed by 6 digits (e.g. `CORE-000127`)\n  - CG id: `CG` followed by 4 digits (e.g. `CG0392`)\n  Reject anything else — see Step 1.\n- `/workspace` — checkout of `Appsilon/core-contributor` on the run branch (`run/<runId>`) created by the runtime. Read and edit files here for analysis and local test runs. **The submodule `engine/` is NOT initialised** by the runtime — `git submodule update` is not run, so `engine/` will be empty or contain only the gitlink. That breaks `python test.py` (which depends on the engine). Do not block the workflow on test execution; running tests is best-effort, not a hard requirement.\n- `/plugin/skills/sdtm-rule/SKILL.md` — primary skill (already loaded above). It assumes the rule **already exists** in the repo and the task is verify + minor fix, not author-from-scratch.\n- `/plugin/skills/sdtmig-reference/SKILL.md` — reference lookup skill (read it on demand). The Python lookup script lives at `/plugin/skills/sdtmig-reference/lookup.py`; invoke with `python3 /plugin/skills/sdtmig-reference/lookup.py ...`.\n- On a `revise` iteration, `verdict == \"revise\"` and `reviewerComment` carries the human's instructions — treat that comment as the controlling instruction, override your prior plan.\n\n## Your job, in one sentence\n\nDecide what (if anything) needs to change in this rule, prove the case to the reviewer in `result.json`, and stop. **Do not touch GitHub.** Step 2 handles publishing only after approval.\n\n## Task\n\n### Step 1 — Validate input and locate the rule\n\n1. Validate `input.ruleId` against the accepted formats above. If it does not match either, write to `${output_dir}/result.json`:\n   ```json\n   {\"status\":\"invalid_input\", \"ruleId\": \"${input.ruleId}\", \"reason\": \"ruleId must match CORE-NNNNNN or CGNNNN\"}\n   ```\n   and stop.\n2. If the input is a CG id, follow Step 1 of the `sdtm-rule` skill to map it to the CORE id. If the mapping resource is not present in the workspace, do a best-effort search: `find rules -name 'CG${number}*'` and read filenames — they typically embed both ids. If you still cannot resolve a CORE id, output `status:not_found` and stop. Operate on the CORE id from this point on.\n3. Locate `rules/<CORE-id>/` in the workspace. If the directory does not exist, output `{\"status\":\"not_found\", \"ruleId\": \"<CORE-id>\"}` and stop.\n\n### Step 2 — Check the verified marker (early exit)\n\nThe `sdtm-rule` skill (Step 6) requires a `# verified` comment near the TOP of the rule YAML. Scan the **first 10 lines** for a line that is exactly `# verified` or matches `^# verified( |$)` (allow an optional trailing annotation like `# verified by ...`). Skip blank lines and other `#` comments. Do not require it to be the literal first line.\n\nIf the marker is present, output to `${output_dir}/result.json`:\n```json\n{\"status\":\"already_verified\", \"ruleId\": \"<CORE-id>\", \"changesSummary\": \"Rule already carries the `# verified` marker — no further action.\", \"proposedChanges\": null}\n```\nand stop.\n\n### Step 3 — Verify and correct the rule locally\n\nThe rule should already be authored. You are doing review-and-correct, not author-from-scratch.\n\n1. Apply the `sdtm-rule` skill: pre-flight checklist, critically review the YAML logic, verify Core status of every variable referenced by the rule via the `sdtmig-reference` skill (never guess).\n2. Optional, best-effort: `bash setup/bash_setup.sh` then `python test.py -r <CORE-id> -v`. Do not block on failure — the engine submodule isn't initialised in the runtime, so test execution often skips. Capture the outcome in `testResults` (e.g. `\"PASSED\"`, `\"FAILED: <reason>\"`, `\"environment-skip: <reason>\"`).\n3. If issues are found, fix the YAML and/or the mock data in `/workspace`. Do not stage anything — just edit files in place. Your edits aren't going anywhere on their own; they only become real if step 2 publishes them.\n4. **Always add the `# verified` marker** near the top of the YAML once verification is complete (per skill Step 6). Place it after any existing copyright/banner comments and before the first non-comment line. Even if there were no other changes, adding this marker alone is meaningful — the next run will exit at the marker check.\n5. If tests are runnable, re-run them after edits and capture PASS/FAIL.\n\n### Step 4 — Write the proposed-changes envelope\n\nProduce `${output_dir}/result.json` with this shape:\n\n```json\n{\n  \"ruleId\": \"<CORE-id>\",\n  \"inputRuleId\": \"<original input>\",\n  \"status\": \"already_verified\" | \"verified\" | \"corrected\" | \"not_found\" | \"invalid_input\" | \"failed\",\n  \"changesSummary\": \"<2-3 sentence human-readable summary>\",\n  \"testResults\": \"<PASSED|FAILED|environment-skip: <reason>>\",\n  \"iterationNote\": \"<on revise: what you changed since last iteration>\",\n  \"proposedChanges\": {\n    \"branch\": \"mediforce/<CORE-id>/<short-runId>\",\n    \"baseBranch\": \"main\",\n    \"repo\": \"Appsilon/core-contributor\",\n    \"draft\": true,\n    \"prTitle\": \"<CORE-id> — rule verified by mediforce\",\n    \"prBody\": \"<the markdown body the PR will use>\",\n    \"files\": [\n      { \"path\": \"rules/<id>/<file>.yml\", \"content\": \"<full new content of the file>\" }\n    ]\n  }\n}\n```\n\n**Rules for `proposedChanges`**:\n- Always reuse the same `branch` name across revise iterations of the same run so step 2 can keep updating the same PR (it'll be created in step 2 only on the first approve).\n- Include every file you modified, in its entirety (not a diff — `push_files` takes full content). For new files include them too.\n- If you made no changes (e.g. `status:already_verified`, `not_found`, `invalid_input`), set `proposedChanges: null`. Step 2 will see that and skip the publish.\n\n**Status semantics**:\n- `already_verified` — rule already had the `# verified` marker; no PR needed (step 2 will skip publish).\n- `verified` — rule logic was already correct; only the `# verified` marker was added (step 2 publishes a one-commit PR).\n- `corrected` — rule had issues that were fixed in addition to the marker (step 2 publishes the full diff as one or more commits).\n- `not_found` — `ruleId` doesn't map to a rule in the repo. No PR.\n- `invalid_input` — `ruleId` doesn't match `CORE-NNNNNN` or `CGNNNN`. No PR.\n- `failed` — the agent could not safely apply the marker or otherwise produce a coherent proposal. Reviewer should investigate; do not approve.\n\nNo chat-style summary outside `result.json`. The reviewer reads the JSON + (on revise) iterates with you here, BEFORE any PR exists."
+      },
+      "verdicts": {
+        "approve": { "target": "open-pr" },
+        "revise": { "target": "verify-and-propose" }
+      },
+      "review": {
+        "type": "human"
+      },
+      "mcpRestrictions": {
+        "github": { "disable": true }
+      }
+    },
+    {
+      "id": "open-pr",
+      "name": "Open draft PR",
+      "type": "creation",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L4",
+      "agentId": "9GAXXyjjdMKgw1FxlK0S",
+      "description": "Read the approved `proposedChanges` envelope from step 1 and publish it on Appsilon/core-contributor via the GitHub MCP — create_branch + push_files + create_pull_request. If `proposedChanges` is null or has zero files, exit cleanly without touching GitHub.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "model": "haiku",
+        "timeoutMinutes": 10,
+        "prompt": "## Inputs\n\nUpstream step `verify-and-propose` wrote a `proposedChanges` envelope into its `result.json`. You receive it under `## Previous Step Outputs` → `verify-and-propose`. Schema you should expect:\n\n```json\n{\n  \"ruleId\": \"<CORE-id>\",\n  \"status\": \"...\",\n  \"changesSummary\": \"...\",\n  \"testResults\": \"...\",\n  \"proposedChanges\": null | {\n    \"branch\": \"<branch>\",\n    \"baseBranch\": \"<main>\",\n    \"repo\": \"Appsilon/core-contributor\",\n    \"draft\": true,\n    \"prTitle\": \"<title>\",\n    \"prBody\": \"<markdown body>\",\n    \"files\": [ { \"path\": \"...\", \"content\": \"...\" } ]\n  }\n}\n```\n\n## Your job\n\nPublish `proposedChanges` on the remote repo via the GitHub MCP REST tools.\n\n### Short-circuit\n\nIf `proposedChanges` is `null` or `proposedChanges.files` is empty, write to `${output_dir}/result.json`:\n```json\n{\n  \"ruleId\": \"<id from upstream>\",\n  \"status\": \"<status from upstream>\",\n  \"prUrl\": null,\n  \"prNumber\": null,\n  \"branch\": null,\n  \"changesSummary\": \"<echo upstream>\",\n  \"note\": \"no file changes proposed — skipping publish\"\n}\n```\nand stop. **Do not call any GitHub MCP write tool.**\n\n### Publish\n\nOtherwise:\n\n1. Call `create_branch` to create `proposedChanges.branch` from `proposedChanges.baseBranch` on `proposedChanges.repo`. Idempotent — \"already exists\" is fine, skip the error.\n2. Call `push_files` with the file list from `proposedChanges.files` (path + content for each). Commit message: `verify <ruleId>` if `status:verified`, otherwise a short imperative describing the fix (derive from `changesSummary`). If your MCP client only exposes `create_or_update_file` and not `push_files`, fall back to one call per file.\n3. Check if a PR already exists for this branch via `list_pull_requests` (head=`<owner>:<branch>`).\n   - If none: call `create_pull_request` with `owner / repo` from `proposedChanges.repo`, `head=<branch>`, `base=<baseBranch>`, `draft=<draft>`, `title=<prTitle>`, `body=<prBody>`. Capture `html_url` and `number`.\n   - If one already exists: call `update_pull_request` with the same `body` (title stays; only refresh body). Capture the same `html_url` and `number`.\n4. Write to `${output_dir}/result.json`:\n   ```json\n   {\n     \"ruleId\": \"<id>\",\n     \"status\": \"<status from upstream>\",\n     \"prUrl\": \"<html_url>\",\n     \"prNumber\": <number>,\n     \"branch\": \"<branch>\",\n     \"changesSummary\": \"<echo upstream>\",\n     \"filesPublished\": <count of files in push_files call>\n   }\n   ```\n\nNo chat-style summary outside `result.json`. If any MCP call fails, capture the error in a `failed` status field and propagate the MCP error message — the reviewer can investigate without re-running step 1."
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "script",
+      "description": "Workflow completed — either a draft PR was opened (status: verified|corrected) or no publish was needed (status: already_verified|not_found|invalid_input)."
+    }
+  ],
+  "transitions": [
+    { "from": "open-pr", "to": "done" }
+  ]
+}

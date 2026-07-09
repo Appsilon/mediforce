@@ -4,41 +4,16 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": {
-      "import": {
-        "@mediforce/source": "./src/index.ts",
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      }
-    },
-    "./contract": {
-      "import": {
-        "@mediforce/source": "./src/contract/index.ts",
-        "types": "./dist/contract/index.d.ts",
-        "default": "./dist/contract/index.js"
-      }
-    },
-    "./handlers": {
-      "import": {
-        "@mediforce/source": "./src/handlers/index.ts",
-        "types": "./dist/handlers/index.d.ts",
-        "default": "./dist/handlers/index.js"
-      }
-    },
-    "./services": {
-      "import": {
-        "@mediforce/source": "./src/services/index.ts",
-        "types": "./dist/services/index.d.ts",
-        "default": "./dist/services/index.js"
-      }
-    },
-    "./client": {
-      "import": {
-        "@mediforce/source": "./src/client/index.ts",
-        "types": "./dist/client/index.d.ts",
-        "default": "./dist/client/index.js"
-      }
-    }
+    ".": "./src/index.ts",
+    "./contract": "./src/contract/index.ts",
+    "./handlers": "./src/handlers/index.ts",
+    "./services": "./src/services/index.ts",
+    "./errors": "./src/errors.ts",
+    "./auth": "./src/auth.ts",
+    "./client": "./src/client/index.ts",
+    "./repositories": "./src/repositories/index.ts",
+    "./testing": "./src/testing/index.ts",
+    "./runtime": "./src/runtime/index.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -46,6 +21,8 @@
   },
   "dependencies": {
     "@mediforce/agent-runtime": "workspace:*",
+    "@mediforce/core-actions": "workspace:*",
+    "@mediforce/mcp-client": "workspace:*",
     "@mediforce/platform-core": "workspace:*",
     "@mediforce/platform-infra": "workspace:*",
     "@mediforce/workflow-engine": "workspace:*",

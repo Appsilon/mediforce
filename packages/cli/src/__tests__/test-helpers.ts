@@ -1,4 +1,4 @@
-import type { OutputSink } from '../output.js';
+import type { OutputSink } from '../output';
 
 export interface CapturedOutput extends OutputSink {
   stdoutLines: string[];

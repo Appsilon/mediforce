@@ -1,5 +1,8 @@
-import type { ToolCatalogEntry } from '../schemas/agent-mcp-binding.js';
-import type { ToolCatalogRepository } from '../interfaces/tool-catalog-repository.js';
+import {
+  ToolCatalogEntrySchema,
+  type ToolCatalogEntry,
+} from '../schemas/agent-mcp-binding';
+import type { ToolCatalogRepository } from '../interfaces/tool-catalog-repository';
 
 /** In-memory double for ToolCatalogRepository. Stores entries keyed by
  *  `${namespace}/${entryId}` so tests can exercise namespace isolation
@@ -24,8 +27,9 @@ export class InMemoryToolCatalogRepository implements ToolCatalogRepository {
   }
 
   async upsert(namespace: string, entry: ToolCatalogEntry): Promise<ToolCatalogEntry> {
-    this.entries.set(this.key(namespace, entry.id), { ...entry });
-    return { ...entry };
+    const parsed = ToolCatalogEntrySchema.parse(entry);
+    this.entries.set(this.key(namespace, parsed.id), { ...parsed });
+    return { ...parsed };
   }
 
   async delete(namespace: string, entryId: string): Promise<void> {

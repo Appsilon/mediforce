@@ -2,11 +2,12 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { McpServerConfig } from '@mediforce/platform-core';
-import type { McpToolDefinition, McpToolCallResult, McpClientManagerOptions } from './types.js';
-import { resolveValue } from './resolve-env.js';
+import type { McpToolDefinition, McpToolCallResult, McpClientManagerOptions } from './types';
+import { resolveValue } from './resolve-env';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const NAMESPACE_SEPARATOR = '__';
+const MCP_DEBUG = process.env.MCP_DEBUG === 'true';
 
 /**
  * Env vars inherited by stdio MCP subprocesses. Deliberately narrow to avoid
@@ -17,6 +18,7 @@ const NAMESPACE_SEPARATOR = '__';
 const INHERITED_ENV_KEYS = [
   'PATH',
   'HOME',
+  'MEDIFORCE_ROOT',
   'USER',
   'LOGNAME',
   'SHELL',
@@ -102,14 +104,22 @@ export class McpClientManager {
     let transport: StdioClientTransport | StreamableHTTPClientTransport;
 
     if (serverConfig.command) {
+      const spawnEnv = {
+        ...inheritedEnv(),
+        ...resolvedEnv,
+      };
+      if (MCP_DEBUG) console.log(`[MCP] Spawning '${serverConfig.name}': command=${serverConfig.command} args=${JSON.stringify(serverConfig.args ?? [])} cwd=${process.cwd()} PATH=${(spawnEnv.PATH ?? '').slice(0, 120)}…`);
+      const cwd = spawnEnv.MEDIFORCE_ROOT || undefined;
       transport = new StdioClientTransport({
         command: serverConfig.command,
         args: serverConfig.args ?? [],
-        env: {
-          ...inheritedEnv(),
-          ...resolvedEnv,
-        },
+        env: spawnEnv,
+        stderr: 'pipe',
+        ...(cwd ? { cwd } : {}),
       });
+      transport.onerror = (err) => {
+        if (MCP_DEBUG) console.error(`[MCP] Transport error for '${serverConfig.name}':`, err);
+      };
     } else if (serverConfig.url) {
       transport = new StreamableHTTPClientTransport(
         new URL(serverConfig.url),
@@ -123,7 +133,19 @@ export class McpClientManager {
       version: '1.0.0',
     });
 
-    await client.connect(transport);
+    const stderrChunks: Buffer[] = [];
+    if (transport instanceof StdioClientTransport && transport.stderr) {
+      transport.stderr.on('data', (c: Buffer) => stderrChunks.push(c));
+    }
+
+    try {
+      await client.connect(transport);
+    } catch (err) {
+      await new Promise((r) => setTimeout(r, 300));
+      const stderrText = Buffer.concat(stderrChunks).toString().trim();
+      if (MCP_DEBUG && stderrText) console.error(`[MCP] stderr from '${serverConfig.name}':\n${stderrText}`);
+      throw err;
+    }
 
     const toolsResponse = await client.listTools();
     const toolMap = new Map<string, { originalName: string }>();
