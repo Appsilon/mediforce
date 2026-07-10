@@ -4,6 +4,7 @@ import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { checkRetiredModels } from '@mediforce/platform-api/handlers';
+import { resolveCoworkOutputSchema } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -292,7 +293,7 @@ export async function POST(
           if (currentStep.type === 'terminal') break;
 
           // Guard: skip if a pending/claimed task already exists (prevents race condition duplicates)
-          const { humanTaskRepo } = getPlatformServices();
+          const { humanTaskRepo, userDirectory } = getPlatformServices();
           const existingTasks = await humanTaskRepo.getByInstanceId(instanceId);
           const hasPendingTask = existingTasks.some(
             (t) => t.stepId === instance.currentStepId && (t.status === 'pending' || t.status === 'claimed'),
@@ -366,7 +367,7 @@ export async function POST(
               agent: agentType,
               model,
               systemPrompt: currentStep.cowork?.systemPrompt ?? null,
-              outputSchema: currentStep.cowork?.outputSchema ?? null,
+              outputSchema: resolveCoworkOutputSchema(currentStep.cowork),
               voiceConfig,
               artifact: null,
               validationResult: null,
@@ -436,7 +437,27 @@ export async function POST(
                 secrets: {},
               });
               if (typeof resolved === 'string' && resolved.length > 0) {
-                assignedUserId = resolved;
+                // The persisted assignedUserId must be a Mediforce uid: the task
+                // queues surface a claimed task only to the viewer whose uid
+                // matches. An email-shaped value (workflows may configure
+                // assignees by email) resolves to its uid via the directory
+                // first; a value that matches no user hard-fails rather than
+                // stranding the task in nobody's queue. Non-email values pass
+                // through unchanged (already a uid).
+                let resolvedUserId = resolved;
+                if (resolved.includes('@') && userDirectory?.resolveUser !== undefined) {
+                  const directoryUser = await userDirectory.resolveUser(resolved);
+                  if (directoryUser === null) {
+                    await instanceRepo.update(instanceId, {
+                      status: 'failed',
+                      error: `Step '${currentStep.id}': assignedTo '${currentStep.assignedTo}' resolved to '${resolved}', which matches no Mediforce user — cannot pre-assign human task`,
+                      updatedAt: new Date().toISOString(),
+                    });
+                    break;
+                  }
+                  resolvedUserId = directoryUser.uid;
+                }
+                assignedUserId = resolvedUserId;
                 taskStatus = 'claimed';
               } else {
                 await instanceRepo.update(instanceId, {

@@ -44,7 +44,7 @@ Skills are reusable instruction sets invoked on demand via `/skill-name`. Each s
 | `/use-mediforce` | mediforce CLI, dev environment, REST fallback ladder, adding a CLI command |
 | `/grill-with-docs` | Optional planning skill — interview-style stress test of a plan against CONTEXT.md / ADRs, sharpens fuzzy terms before coding (from [mattpocock/skills](https://github.com/mattpocock/skills)) |
 | `/code-review` | Review PRs and diffs against an 8-section checklist (security, architecture, testing, etc.) |
-| `/e2e-test` | Write, run, and record L4 UI journey tests with GIF + gallery update |
+| `/e2e-test` | Write and run L4 UI journey tests |
 | `/agent-browser` | Visual verification of UI in a live browser |
 | `/renovate-review` | Triage and validate Renovate dependency PRs |
 | `/discord-update` | Write Discord updates from rough notes |
@@ -54,15 +54,13 @@ Skills are reusable instruction sets invoked on demand via `/skill-name`. Each s
 
 Each skill has a `SKILL.md` with step-by-step workflow and optional `references/` with templates and checklists.
 
-### Testing: TDD with GIF Recordings
+### Testing: TDD for UI features
 
-UI features follow a tight TDD loop where the E2E test comes first and the GIF recording is part of the deliverable:
+UI features follow a tight TDD loop where the E2E journey test comes first:
 
 1. **RED** — Write the E2E journey test first
 2. **GREEN** — Implement until the test passes
-3. **Record** — Convert test recordings to GIFs in `docs/features/`
-4. **Gallery** — Add entry to `docs/features/FEATURES.md`
-5. **Ship** — GIF + feature code + gallery update in the same PR
+3. **Ship** — test + feature code in the same PR
 
 Quality gates run after every change: typecheck (~5s), affected tests (<1s), full suite (~9s). E2E with Firebase emulators (~60s) before merging UI changes.
 

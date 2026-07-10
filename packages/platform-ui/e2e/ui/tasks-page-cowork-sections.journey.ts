@@ -1,6 +1,6 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, showStep, showResult, endRecording } from '../helpers/recording';
+import { trackPageErrors } from '../helpers/page-errors';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tasks page renders cowork sections sourced from `mediforce.cowork.list`.
@@ -21,8 +21,8 @@ import { setupRecording, showStep, showResult, endRecording } from '../helpers/r
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe('Tasks page cowork sections', () => {
-  test('operator sees cowork sessions surfaced from cowork.list alongside tasks', async ({ page }, testInfo) => {
-    await setupRecording(page, 'tasks-page-cowork-sections', testInfo);
+  test('operator sees cowork sessions surfaced from cowork.list alongside tasks', async ({ page }) => {
+    trackPageErrors(page);
 
     await page.goto(`/${TEST_ORG_HANDLE}/tasks`);
 
@@ -32,8 +32,5 @@ test.describe('Tasks page cowork sections', () => {
     // through to `TaskGroupedView`. So once "Human actions" appears the
     // active + finalized cowork.list round trips have both succeeded.
     await expect(page.getByRole('heading', { name: 'Human actions' })).toBeVisible({ timeout: 30_000 });
-    await showResult(page);
-
-    await endRecording(page);
   });
 });

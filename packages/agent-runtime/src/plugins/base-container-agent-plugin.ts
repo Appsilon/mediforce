@@ -910,14 +910,14 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         ? parsedResult.confidence_rationale
         : undefined;
 
-      let tokenUsage: { inputTokens: number; outputTokens: number; cachedInputTokens?: number } | undefined;
+      let tokenUsage: { inputTokens: number; outputTokens: number; cachedInputTokens?: number; peakInputTokens?: number } | undefined;
 
       // First: check if agent reported tokenUsage in its result
       if (parsedResult.tokenUsage !== null
         && typeof parsedResult.tokenUsage === 'object'
         && typeof (parsedResult.tokenUsage as Record<string, unknown>).inputTokens === 'number'
         && typeof (parsedResult.tokenUsage as Record<string, unknown>).outputTokens === 'number') {
-        tokenUsage = parsedResult.tokenUsage as { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
+        tokenUsage = parsedResult.tokenUsage as { inputTokens: number; outputTokens: number; cachedInputTokens?: number; peakInputTokens?: number };
       }
 
       // Second: check stream event for CLI-reported usage (e.g. Claude Code stream-json result event)
@@ -932,10 +932,12 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           if (usage && typeof usage.input_tokens === 'number' && typeof usage.output_tokens === 'number') {
             const cacheCreationTokens = typeof usage.cache_creation_input_tokens === 'number' ? usage.cache_creation_input_tokens : 0;
             const cacheReadTokens = typeof usage.cache_read_input_tokens === 'number' ? usage.cache_read_input_tokens : 0;
+            const peakInputTokens = typeof usage.peak_input_tokens === 'number' ? usage.peak_input_tokens : 0;
             tokenUsage = {
               inputTokens: usage.input_tokens + cacheCreationTokens,
               outputTokens: usage.output_tokens,
               ...(cacheReadTokens > 0 ? { cachedInputTokens: cacheReadTokens } : {}),
+              ...(peakInputTokens > 0 ? { peakInputTokens } : {}),
             };
           }
         } catch {

@@ -79,8 +79,6 @@ Each step displays its autonomy configuration (L1–L4) so operators always know
 <img src="docs/features/run-detail-autonomy-badges.gif" alt="Process run with autonomy level badges" width="720" />
 </div>
 
-> **[See all features with recordings](docs/features/FEATURES.md)** — task management, workflow editor, run reports, agent catalog, escalation handling, and more.
-
 ## Why Open Source
 
 In regulated industries, trust and transparency are non-negotiable. Open source is the right model:
@@ -196,7 +194,7 @@ E2E variants:
 
 ```bash
 pnpm test:e2e:api     # L3 only — API E2E, no browser (~30s)
-pnpm test:e2e:record  # Record GIFs of UI journeys
+pnpm test:e2e:ui      # L4 only — UI E2E with real Chromium
 ```
 
 For UI-only journeys, run `pnpm test:e2e --project=authenticated` from the platform-ui directory (or invoke Playwright's interactive UI mode via `pnpm test:e2e:ui` there).
@@ -302,7 +300,6 @@ migration step in the deploy pipeline.
 | **[Architecture](docs/architecture.md)** | Processes, steps, agents, compliance — the technical foundation |
 | **[How We Work](docs/how-we-work.md)** | Building bottom-up, in public, with real processes |
 | **[Development](docs/development.md)** | Setup, monorepo structure, testing, deployment |
-| **[Features](docs/features/FEATURES.md)** | Full feature gallery with recorded walkthroughs |
 
 ## License
 

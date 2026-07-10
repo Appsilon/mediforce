@@ -25,7 +25,7 @@ Wiki ops write only inside `wiki/`. Everything else = raw source.
 
 | Source | Where |
 |--------|-------|
-| Project docs | `docs/*.md`, `docs/design/`, `docs/features/` |
+| Project docs | `docs/*.md`, `docs/design/` |
 | Agents contract | `AGENTS.md`, `CLAUDE.md` |
 | Package READMEs | `packages/*/README.md`, `apps/*/README.md` |
 | Source code | `packages/*/src/`, `apps/*/` |

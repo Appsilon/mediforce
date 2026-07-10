@@ -45,7 +45,7 @@ firestore-debug.log
 playwright-report/
 test-results/
 blob-report/
-
+.pnpm-store/
 coverage/
 
 # generated diagram snippets (regenerate with: node --import tsx docs/workflow-examples/build-diagrams.mjs)

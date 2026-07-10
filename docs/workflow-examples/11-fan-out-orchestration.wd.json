@@ -1,0 +1,98 @@
+{
+  "name": "tutorial-fan-out-orchestration",
+  "title": "Fan-out Orchestration",
+  "description": "Parent workflow that fans a child workflow out to every item in a list, waits for a collection window, then gathers the replies. Demonstrates action spawn with forEach (${item.*}), the wait action, and ${steps.*} interpolation. Distilled from apps/team-pulse.",
+  "preamble": "## Domain Context\nA coordinator launches one child workflow per reviewer to collect parallel input, waits for a fixed window, then aggregates whatever came back. This is the canonical fan-out shape: one parent run spawns N child runs and reconciles them.",
+  "triggers": [
+    { "type": "manual", "name": "manual" }
+  ],
+  "roles": ["coordinator"],
+  "triggerInput": [
+    {
+      "name": "question",
+      "type": "string",
+      "required": true,
+      "description": "Question sent to each reviewer's child workflow"
+    },
+    {
+      "name": "waitMinutes",
+      "type": "number",
+      "required": true,
+      "description": "Minutes to wait for child replies before gathering"
+    }
+  ],
+  "steps": [
+    {
+      "id": "build_batch",
+      "name": "Build batch",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Produce the list of items to fan out over. Real workflows would fetch this from an API; kept inline and tiny here on purpose.",
+      "script": {
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst reviewers = [\n  { id: 'rev-1', label: 'Reviewer One' },\n  { id: 'rev-2', label: 'Reviewer Two' },\n  { id: 'rev-3', label: 'Reviewer Three' },\n];\nwriteFileSync('/output/result.json', JSON.stringify({ reviewers, question: input.question }));\nconsole.log(`Fanning out to ${reviewers.length} reviewers`);\n",
+        "runtime": "javascript",
+        "image": "mediforce-golden-image:latest"
+      }
+    },
+    {
+      "id": "fan_out",
+      "name": "Fan out",
+      "type": "creation",
+      "executor": "action",
+      "description": "Spawn one collect-one child workflow per reviewer. forEach iterates the list; the single targets template reads ${item.*}.",
+      "action": {
+        "kind": "spawn",
+        "config": {
+          "forEach": "${steps.build_batch.reviewers}",
+          "targets": {
+            "definitionName": "tutorial-collect-one",
+            "payload": {
+              "reviewerId": "${item.id}",
+              "reviewerLabel": "${item.label}",
+              "question": "${steps.build_batch.question}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "await_replies",
+      "name": "Await replies",
+      "type": "creation",
+      "executor": "action",
+      "description": "Wait a fixed window for child workflows to report back.",
+      "action": {
+        "kind": "wait",
+        "config": {
+          "duration": { "minutes": 5 }
+        }
+      }
+    },
+    {
+      "id": "gather",
+      "name": "Gather replies",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Read the spawned child handles and summarize how many replied. A production version fetches each instance's output via the platform API.",
+      "script": {
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst spawned = input.steps?.fan_out?.spawned || [];\nwriteFileSync('/output/result.json', JSON.stringify({ spawnedCount: spawned.length, summary: `Spawned ${spawned.length} child run(s)` }));\nconsole.log(`Spawned ${spawned.length} child run(s)`);\n",
+        "runtime": "javascript",
+        "image": "mediforce-golden-image:latest"
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "build_batch", "to": "fan_out" },
+    { "from": "fan_out", "to": "await_replies" },
+    { "from": "await_replies", "to": "gather" },
+    { "from": "gather", "to": "done" }
+  ]
+}

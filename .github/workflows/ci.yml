@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -83,7 +83,7 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql://mediforce:mediforce@localhost:5432/mediforce
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -123,7 +123,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://mediforce:mediforce@localhost:5432/mediforce
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -182,7 +182,6 @@ jobs:
           NEXT_PUBLIC_FIREBASE_API_KEY: fake-api-key
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-mediforce
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: demo-mediforce.appspot.com
           FIREBASE_PROJECT_ID: demo-mediforce
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
           NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:fake'
@@ -195,7 +194,6 @@ jobs:
           NEXT_PUBLIC_FIREBASE_API_KEY: fake-api-key
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-mediforce
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: demo-mediforce.appspot.com
           FIREBASE_PROJECT_ID: demo-mediforce
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
           NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:fake'
@@ -212,7 +210,6 @@ jobs:
           NEXT_PUBLIC_FIREBASE_API_KEY: fake-api-key
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-mediforce
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: demo-mediforce.appspot.com
           FIREBASE_PROJECT_ID: demo-mediforce
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
           NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:fake'
@@ -231,7 +228,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Check for compromised axios versions
         run: |
           if grep -qE 'axios@(1\.14\.1|0\.30\.4)' pnpm-lock.yaml; then
