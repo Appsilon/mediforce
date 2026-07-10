@@ -47,7 +47,7 @@ export class AgentStepExecutor implements StepExecutor {
     const runResult = await this.agentRunner.runWithWorkflowStep(plugin, context);
 
     const envelope = runResult.envelope;
-    const costResult = envelope ? await estimateCostField(envelope, modelRegistryRepo) : {};
+    const costResult = envelope ? await estimateCostField(envelope, modelRegistryRepo, stepId) : {};
 
     if (stepExecutionId) {
       const isFailed = runResult.fallbackReason === 'error' || runResult.fallbackReason === 'timeout';
@@ -352,8 +352,9 @@ export class AgentStepExecutor implements StepExecutor {
 }
 
 async function estimateCostField(
-  envelope: { model: string | null; tokenUsage?: { inputTokens: number; outputTokens: number; cachedInputTokens?: number } },
-  modelRegistryRepo: { getById(id: string): Promise<{ pricing: { input: number; output: number; cacheRead?: number } } | null> },
+  envelope: { model: string | null; tokenUsage?: { inputTokens: number; outputTokens: number; cachedInputTokens?: number; peakInputTokens?: number } },
+  modelRegistryRepo: { getById(id: string): Promise<{ pricing: { input: number; output: number; cacheRead?: number }; contextLength: number } | null> },
+  stepId: string,
 ): Promise<{ estimatedCostUsd: number } | Record<string, never>> {
   if (!envelope.tokenUsage || !envelope.model) return {};
   const entry = await modelRegistryRepo.getById(envelope.model);
@@ -361,5 +362,23 @@ async function estimateCostField(
     console.warn(`[cost] model "${envelope.model}" not found in registry — cost unavailable`);
     return {};
   }
+  logContextSaturation(stepId, envelope.model, envelope.tokenUsage.peakInputTokens, entry.contextLength);
   return { estimatedCostUsd: calculateEstimatedCost(envelope.tokenUsage, entry.pricing) };
+}
+
+// Peak single-turn prompt vs the model's context window. This is the signal for
+// sizing agent batches (e.g. how many issues to hand triage at once): push the
+// batch up while peak saturation stays under a quality ceiling — model recall
+// degrades well before the hard limit — rather than aiming for 100%.
+function logContextSaturation(
+  stepId: string,
+  model: string,
+  peakInputTokens: number | undefined,
+  contextLength: number,
+): void {
+  if (peakInputTokens === undefined || peakInputTokens <= 0 || contextLength <= 0) return;
+  const saturationPct = Math.round((peakInputTokens / contextLength) * 100);
+  console.log(
+    `[saturation] step "${stepId}" (${model}): peak ${peakInputTokens}/${contextLength} tokens = ${saturationPct}%`,
+  );
 }

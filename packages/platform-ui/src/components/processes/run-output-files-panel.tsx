@@ -1,12 +1,16 @@
 'use client';
 
 import * as React from 'react';
-import { Download, DownloadCloud, File, FileArchive, FileImage, FileSpreadsheet, FileText, type LucideIcon } from 'lucide-react';
+import { Download, DownloadCloud, Eye, File, FileArchive, FileImage, FileSpreadsheet, FileText, type LucideIcon } from 'lucide-react';
 import type { Step } from '@mediforce/platform-core';
 import type { RunOutputFileEntry } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { formatBytes, formatStepName } from '@/lib/format';
 import { saveBlobToDevice } from '@/lib/save-blob';
+import { selectViewer } from '@/lib/output-file-viewer';
+import { extensionOf } from '@/lib/file-extension';
+import { cn } from '@/lib/utils';
+import { OutputFilePreview } from './output-file-preview';
 
 export interface OutputFileGroup {
   stepId: string;
@@ -55,10 +59,7 @@ const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp']);
 const ARCHIVE_EXTENSIONS = new Set(['zip', 'tar', 'gz', 'tgz', '7z']);
 
 function fileTypeIcon(fileName: string): LucideIcon {
-  const lastSegment = fileName.split('/').pop() ?? fileName;
-  const extension = lastSegment.includes('.')
-    ? (lastSegment.split('.').pop() ?? '').toLowerCase()
-    : '';
+  const extension = extensionOf(fileName);
   if (DOCUMENT_EXTENSIONS.has(extension)) return FileText;
   if (TABLE_EXTENSIONS.has(extension)) return FileSpreadsheet;
   if (IMAGE_EXTENSIONS.has(extension)) return FileImage;
@@ -66,22 +67,28 @@ function fileTypeIcon(fileName: string): LucideIcon {
   return File;
 }
 
+async function downloadOutputFile(runId: string, file: RunOutputFileEntry): Promise<void> {
+  const downloaded = await mediforce.runs.downloadOutputFile({ runId, path: file.path });
+  // `.slice()` re-types the view as Uint8Array<ArrayBuffer> (BlobPart
+  // rejects the wider ArrayBufferLike the client returns).
+  saveBlobToDevice(
+    new Blob([downloaded.bytes.slice()], { type: downloaded.contentType }),
+    downloaded.fileName,
+  );
+}
+
 export function OutputFileRow({ runId, file }: { runId: string; file: RunOutputFileEntry }) {
   const [downloading, setDownloading] = React.useState(false);
   const [downloadError, setDownloadError] = React.useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = React.useState(false);
   const Icon = fileTypeIcon(file.name);
+  const canPreview = selectViewer(file.name, file.size).viewer !== 'download';
 
   async function handleDownload() {
     setDownloading(true);
     setDownloadError(null);
     try {
-      const downloaded = await mediforce.runs.downloadOutputFile({ runId, path: file.path });
-      // `.slice()` re-types the view as Uint8Array<ArrayBuffer> (BlobPart
-      // rejects the wider ArrayBufferLike the client returns).
-      saveBlobToDevice(
-        new Blob([downloaded.bytes.slice()], { type: downloaded.contentType }),
-        downloaded.fileName,
-      );
+      await downloadOutputFile(runId, file);
     } catch (err) {
       setDownloadError(err instanceof Error ? err.message : 'Download failed');
     } finally {
@@ -97,14 +104,29 @@ export function OutputFileRow({ runId, file }: { runId: string; file: RunOutputF
       {downloadError && (
         <span className="text-xs text-destructive truncate">{downloadError}</span>
       )}
+      {canPreview && (
+        <button
+          onClick={() => setPreviewOpen(true)}
+          className="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
+        >
+          <Eye className="h-3 w-3" />
+          View
+        </button>
+      )}
       <button
         onClick={handleDownload}
         disabled={downloading}
-        className="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50 shrink-0"
+        className={cn(
+          'inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50 shrink-0',
+          canPreview ? '' : 'ml-auto',
+        )}
       >
         <Download className="h-3 w-3" />
         {downloading ? 'Downloading...' : 'Download'}
       </button>
+      {canPreview && (
+        <OutputFilePreview runId={runId} file={file} open={previewOpen} onOpenChange={setPreviewOpen} />
+      )}
     </li>
   );
 }
@@ -124,7 +146,6 @@ export function RunOutputFilesPanel({
 }) {
   const [downloadingAll, setDownloadingAll] = React.useState(false);
   const [downloadAllError, setDownloadAllError] = React.useState<string | null>(null);
-
   const groups = React.useMemo(
     () => groupOutputFilesByStep(files, definitionSteps),
     [files, definitionSteps],
@@ -156,14 +177,14 @@ export function RunOutputFilesPanel({
     <div className="rounded-lg border bg-card p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium">Files</h3>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           {downloadAllError && (
-            <span className="text-xs text-destructive truncate max-w-48">{downloadAllError}</span>
+            <span className="text-xs text-destructive truncate">{downloadAllError}</span>
           )}
           <button
             onClick={handleDownloadAll}
             disabled={downloadingAll}
-            className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline disabled:opacity-50 shrink-0"
           >
             <DownloadCloud className="h-3.5 w-3.5" />
             {downloadingAll ? 'Downloading...' : `Download all (${formatBytes(totalSize)})`}
