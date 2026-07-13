@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Fixed
+- Cancelling a run now cancels its still-actionable (`pending`/`claimed`) human tasks too, so dead runs no longer leave zombie "Action needed" items lingering in the task queue; the cancel audit event records how many tasks were cancelled [#639](https://github.com/Appsilon/mediforce/pull/639).
+
 ## [2026-07-05]
 
 ### Added

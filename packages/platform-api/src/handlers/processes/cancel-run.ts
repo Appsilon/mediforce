@@ -1,10 +1,12 @@
+import type { HumanTaskStatus } from '@mediforce/platform-core';
 import type { CancelRunInput, CancelRunOutput } from '../../contract/processes';
+import { ACTIONABLE_STATUSES } from '../../contract/tasks';
 import type { CallerScope } from '../../repositories/index';
 import { PreconditionFailedError } from '../../errors';
 import { loadOr404 } from '../_helpers';
 
 const DEFAULT_REASON = 'Cancelled by user';
-const ACTIONABLE_TASK_STATUSES = new Set(['pending', 'claimed']);
+const ACTIONABLE_TASK_STATUSES = new Set<HumanTaskStatus>(ACTIONABLE_STATUSES);
 
 export async function cancelRun(
   input: CancelRunInput,
@@ -32,13 +34,10 @@ export async function cancelRun(
   });
 
   const tasks = await scope.tasks.getByInstanceId(input.runId);
-  const cancelledTaskIds: string[] = [];
-  for (const task of tasks) {
-    if (ACTIONABLE_TASK_STATUSES.has(task.status)) {
-      await scope.tasks.cancel(task.id);
-      cancelledTaskIds.push(task.id);
-    }
-  }
+  const actionableTasks = tasks.filter((task) =>
+    ACTIONABLE_TASK_STATUSES.has(task.status),
+  );
+  await Promise.all(actionableTasks.map((task) => scope.tasks.cancel(task.id)));
 
   const isUser = scope.caller.kind === 'user';
   await scope.system.audit.append({
@@ -49,7 +48,7 @@ export async function cancelRun(
     description: `Run cancelled by operator (was ${run.status}${run.currentStepId ? ` at step '${run.currentStepId}'` : ''})`,
     timestamp: now,
     inputSnapshot: { previousStatus: run.status, currentStepId: run.currentStepId },
-    outputSnapshot: { status: 'failed', error: reason, cancelledTasks: cancelledTaskIds.length },
+    outputSnapshot: { status: 'failed', error: reason, cancelledTasks: actionableTasks.length },
     basis: 'User-initiated cancel via UI — double-confirm pattern',
     entityType: 'processInstance',
     entityId: input.runId,
