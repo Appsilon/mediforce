@@ -35,6 +35,7 @@ import {
   computeActiveProcessingTime,
 } from '@/lib/format';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
+import { saveBlobToDevice } from '@/lib/save-blob';
 
 type DetailLevel = 'brief' | 'full';
 
@@ -251,7 +252,7 @@ function ReportHeader({
             Generated: {format(new Date(), 'MMMM d, yyyy')}
           </p>
         </div>
-        <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} error={instance.error} />
+        <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} error={instance.error} dryRun={instance.dryRun} />
       </div>
 
       <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
@@ -446,13 +447,10 @@ function DeliverablesSection({
       { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} },
     );
     if (!response.ok) return;
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = effectiveDeliverableFile.split('/').pop() ?? 'download';
-    a.click();
-    URL.revokeObjectURL(url);
+    saveBlobToDevice(
+      await response.blob(),
+      effectiveDeliverableFile.split('/').pop() ?? 'download',
+    );
   }
 
   return (

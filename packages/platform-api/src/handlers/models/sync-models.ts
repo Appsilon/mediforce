@@ -8,9 +8,5 @@ export interface SyncModelsDeps {
 
 /** @public-handler  Model registry is platform-wide; sync is an admin operation. */
 export async function syncModels(deps: SyncModelsDeps): Promise<SyncModelsOutput> {
-  const result = await syncFromOpenRouter(deps.modelRegistryRepo);
-  return {
-    ...result,
-    lastSyncedAt: new Date().toISOString(),
-  };
+  return await syncFromOpenRouter(deps.modelRegistryRepo);
 }

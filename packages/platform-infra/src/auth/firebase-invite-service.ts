@@ -1,5 +1,5 @@
 import type { Auth } from 'firebase-admin/auth';
-import type { Firestore } from 'firebase-admin/firestore';
+import type { UserProfileRepository } from '@mediforce/platform-core';
 
 function generateTemporaryPassword(): string {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -11,10 +11,10 @@ function generateTemporaryPassword(): string {
 export class FirebaseInviteService {
   constructor(
     private readonly adminAuth: Auth,
-    private readonly adminDb: Firestore,
+    private readonly userProfileRepo: UserProfileRepository,
   ) {}
 
-  // Creates Firebase Auth user + Firestore user doc.
+  // Creates Firebase Auth user + marks the new user as must-change-password.
   // Returns { uid, temporaryPassword }. If user already exists in Firebase Auth, returns existing uid.
   async createInvitedUser(
     email: string,
@@ -49,17 +49,11 @@ export class FirebaseInviteService {
       }
     }
 
-    // Upsert Firestore user doc (merge so existing data is preserved)
-    const userRef = this.adminDb.collection('users').doc(uid);
-    await userRef.set(
-      {
-        uid,
-        email,
-        ...(displayName !== undefined && !isExisting ? { displayName } : {}),
-        ...(!isExisting ? { mustChangePassword: true } : {}),
-      },
-      { merge: true },
-    );
+    // New users must change their temporary password on first sign-in.
+    // Existing users keep their password and existing profile untouched.
+    if (!isExisting) {
+      await this.userProfileRepo.setMustChangePassword(uid, true);
+    }
 
     return { uid, temporaryPassword: isExisting ? '' : actualPassword, isExisting };
   }
@@ -67,8 +61,7 @@ export class FirebaseInviteService {
   async resetInvitePassword(uid: string): Promise<string> {
     const temporaryPassword = generateTemporaryPassword();
     await this.adminAuth.updateUser(uid, { password: temporaryPassword });
-    const userRef = this.adminDb.collection('users').doc(uid);
-    await userRef.set({ mustChangePassword: true }, { merge: true });
+    await this.userProfileRepo.setMustChangePassword(uid, true);
     return temporaryPassword;
   }
 

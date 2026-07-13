@@ -18,8 +18,6 @@ ROOT = PLATFORM_UI.parent.parent
 FIREBASE_CONFIG = Path("/tmp/mediforce-dev-mock-firebase.json")
 
 AUTH_PORT = 9099
-FIRESTORE_PORT = 8080
-STORAGE_PORT = 9199
 NEXT_PORT = 9007
 
 DEMO_ENV: dict[str, str] = {
@@ -27,12 +25,9 @@ DEMO_ENV: dict[str, str] = {
     "NEXT_PUBLIC_FIREBASE_API_KEY": "fake-api-key-for-emulators",
     "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN": "demo-mediforce.firebaseapp.com",
     "NEXT_PUBLIC_FIREBASE_PROJECT_ID": "demo-mediforce",
-    "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET": "demo-mediforce.appspot.com",
     "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "000000000000",
     "NEXT_PUBLIC_FIREBASE_APP_ID": "1:000000000000:web:0000000000000000",
     "FIREBASE_AUTH_EMULATOR_HOST": f"127.0.0.1:{AUTH_PORT}",
-    "FIRESTORE_EMULATOR_HOST": f"127.0.0.1:{FIRESTORE_PORT}",
-    "FIREBASE_STORAGE_EMULATOR_HOST": f"127.0.0.1:{STORAGE_PORT}",
     "MOCK_AGENT": "true",
     "MEDIFORCE_DATA_DIR": "/tmp/mediforce-e2e-data",
     "NEXT_PUBLIC_APP_URL": f"http://localhost:{NEXT_PORT}",
@@ -67,20 +62,9 @@ def wait_for_ports(ports: list[int], timeout_seconds: int) -> bool:
 
 
 def write_firebase_config() -> None:
-    firestore_rules = ROOT / "firestore.e2e.rules"
-    storage_rules = PLATFORM_UI / "storage.rules"
-    if not firestore_rules.exists():
-        raise RuntimeError(f"Missing Firestore rules file: {firestore_rules}")
-    if not storage_rules.exists():
-        raise RuntimeError(f"Missing Storage rules file: {storage_rules}")
-
     config = {
-        "firestore": {"rules": str(firestore_rules)},
-        "storage": {"rules": str(storage_rules)},
         "emulators": {
             "auth": {"port": AUTH_PORT},
-            "firestore": {"port": FIRESTORE_PORT},
-            "storage": {"port": STORAGE_PORT},
             "ui": {"enabled": False},
         },
     }
@@ -111,10 +95,10 @@ def with_local_java(env: dict[str, str]) -> dict[str, str]:
 
 
 def start_emulators(env: dict[str, str]) -> subprocess.Popen[bytes] | None:
-    emulator_ports = [AUTH_PORT, FIRESTORE_PORT, STORAGE_PORT]
+    emulator_ports = [AUTH_PORT]
     open_ports = [port for port in emulator_ports if port_open(port)]
     if len(open_ports) == len(emulator_ports):
-        log("Firebase emulators already running on 9099, 8080, and 9199.")
+        log("Firebase Auth emulator already running on 9099.")
         return None
 
     if open_ports:
@@ -139,7 +123,7 @@ def start_emulators(env: dict[str, str]) -> subprocess.Popen[bytes] | None:
             "--project",
             "demo-mediforce",
             "--only",
-            "auth,firestore,storage",
+            "auth",
             "--config",
             str(FIREBASE_CONFIG),
         ],

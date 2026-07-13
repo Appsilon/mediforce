@@ -9,7 +9,7 @@ export type {
   ResolvedOAuthBinding,
   EmitPayload,
   EmitFn,
-  AgentPlugin,
+  StepExecutorPlugin,
   ReviewPlugin,
   ReviewPluginContext,
   ReviewPluginResult,
@@ -17,26 +17,40 @@ export type {
 } from './interfaces/index';
 
 // Plugins
-export { BaseContainerAgentPlugin, isLocalExecutionAllowed, OAuthTokenUnavailableError } from './plugins/base-container-agent-plugin';
-export type { AgentCommandSpec, SpawnCliOptions, SpawnDockerResult } from './plugins/base-container-agent-plugin';
+export { BaseContainerAgentPlugin, isLocalExecutionAllowed, OAuthTokenUnavailableError, validateOutputSchema } from './plugins/base-container-agent-plugin';
+export type { AgentCommandSpec, OutputSchema, SpawnCliOptions, SpawnDockerResult } from './plugins/base-container-agent-plugin';
 export { ClaudeCodeAgentPlugin } from './plugins/claude-code-agent-plugin';
 export { MockClaudeCodeAgentPlugin } from './plugins/mock-claude-code-agent-plugin';
 export { OpenCodeAgentPlugin } from './plugins/opencode-agent-plugin';
 export { ScriptContainerPlugin } from './plugins/script-container-plugin';
+export { DatabricksJobPlugin } from './plugins/databricks/databricks-job-plugin';
+export type { DatabricksJobPluginInit } from './plugins/databricks/databricks-job-plugin';
+export { DatabricksClient } from './plugins/databricks/databricks-client';
+export type { DatabricksClientInit, DatabricksRunStatus } from './plugins/databricks/databricks-client';
 export type { DockerSpawnStrategy, DockerSpawnRequest, DockerSpawnResult } from './plugins/docker-spawn-strategy';
 
 // Runner
 export type { AgentEventLog } from './runner/agent-event-log';
-export { FirestoreAgentEventLog } from './runner/agent-event-log';
 export { PluginRegistry, PluginNotFoundError } from './runner/plugin-registry';
 export { OpenRouterLlmClient } from './runner/llm-client';
+export { PluginRunner } from './runner/plugin-runner';
+export type { PluginRunResult } from './runner/plugin-runner';
 export { AgentRunner } from './runner/agent-runner';
 export type { AgentRunResult } from './runner/agent-runner';
 export { FallbackHandler } from './runner/fallback-handler';
+export { ScriptStepExecutor } from './runner/script-step-executor';
+export { AgentStepExecutor } from './runner/agent-step-executor';
+export type {
+  StepExecutor,
+  StepExecutionResult,
+  StepExecutionStatus,
+  StepExecutorServices,
+  StepExecutorMeta,
+} from './runner/step-executor';
 
 // Env validation
-export { validateWorkflowEnv } from './plugins/resolve-env';
-export type { MissingEnvVar } from './plugins/resolve-env';
+export { validateWorkflowEnv, validateWorkflowModels, validateRetiredModels, validatePluginRequiredEnv } from './plugins/resolve-env';
+export type { MissingEnvVar, MissingPluginEnv, UnknownModel, RetiredModelRef } from './plugins/resolve-env';
 
 // MCP resolution helpers
 export { resolveMcpForStep, AgentDefinitionNotFoundError } from './mcp/resolve-mcp-for-step';
@@ -88,6 +102,14 @@ export type {
   CommitStepOptions,
   CommitStepResult,
 } from './workspace/workspace-manager';
+export { WorkspaceReader } from './workspace/workspace-reader';
+export type { OutputFileEntry, WorkspaceReaderInit } from './workspace/workspace-reader';
+export {
+  copyOutputFilesIntoWorkspace,
+  INTERNAL_OUTPUT_FILE_NAMES,
+  PRESENTATION_FILE_NAMES,
+  OUTPUT_FILES_REPO_ROOT,
+} from './workspace/output-files';
 
 // Testing utilities
 export {

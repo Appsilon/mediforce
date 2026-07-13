@@ -9,9 +9,14 @@
     "PLATFORM_API_KEY": "{{PLATFORM_API_KEY}}",
     "APP_BASE_URL": "{{APP_BASE_URL}}"
   },
-  "roles": ["triager"],
+  "roles": [
+    "triager"
+  ],
   "triggers": [
-    { "name": "manual", "type": "manual" }
+    {
+      "name": "manual",
+      "type": "manual"
+    }
   ],
   "triggerInput": [
     {
@@ -55,12 +60,11 @@
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "autonomyLevel": "L4",
       "description": "Fetch open issues from GitHub via REST. Skip pull requests. Emits an options array keyed by issue id.",
-      "agent": {
-        "image": "mediforce-golden-image:latest",
+      "script": {
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const repo = input.repo;\n  const labelFilter = input.labelFilter;\n  const limit = Math.max(1, Math.min(100, Number(input.limit) || 20));\n  const token = process.env.GITHUB_TOKEN;\n  if (!repo) { console.error('repo trigger param is required'); process.exit(1); }\n  if (!/^[\\w.-]+\\/[\\w.-]+$/.test(repo)) { console.error(`invalid repo format: '${repo}' (expected owner/name)`); process.exit(1); }\n  if (!token) { console.error('GITHUB_TOKEN secret not set on workflow'); process.exit(1); }\n  // Paginate until we have `limit` real issues. GitHub's issues endpoint\n  // counts PRs against per_page, so a single page can be PR-heavy; paging past\n  // them keeps the working set the newest `limit` ISSUES and stable across loop\n  // iterations (immune to PR churn / merges that shifted a single-page window).\n  const collected = [];\n  for (let page = 1; page <= 10 && collected.length < limit; page++) {\n    const url = new URL(`https://api.github.com/repos/${repo}/issues`);\n    url.searchParams.set('state', 'open');\n    url.searchParams.set('per_page', '100');\n    url.searchParams.set('page', String(page));\n    if (labelFilter) url.searchParams.set('labels', labelFilter);\n    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } });\n    if (!res.ok) { const body = await res.text(); console.error(`GitHub ${res.status} ${res.statusText}: ${body.slice(0,500)}`); process.exit(1); }\n    const batch = await res.json();\n    for (const i of batch) { if (!i.pull_request) collected.push(i); }\n    if (batch.length < 100) break;\n  }\n  const onlyIssues = collected.slice(0, limit);\n  const options = onlyIssues.map((i) => {\n    const labels = (i.labels || []).map((l) => typeof l === 'string' ? l : l.name);\n    return {\n      id: String(i.number),\n      label: `#${i.number} ${i.title}`,\n      sublabel: labels.join(', '),\n      href: i.html_url,\n      badges: labels,\n      currentAssignee: i.assignee?.login,\n      raw: { issueNumber: i.number, title: i.title, labels, currentAssignee: i.assignee?.login, url: i.html_url },\n    };\n  });\n  console.log(`Fetched ${options.length} open issue(s) from ${repo} (limit=${limit})`);\n  writeFileSync('/output/result.json', JSON.stringify({ options, repo, summary: `Fetched ${options.length} open issue(s) from ${repo}` }));\n} catch (err) {\n  console.error('fetch-backlog crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n",
         "runtime": "javascript",
-        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const repo = input.repo;\n  const labelFilter = input.labelFilter;\n  const limit = Math.max(1, Math.min(100, Number(input.limit) || 20));\n  const token = process.env.GITHUB_TOKEN;\n  if (!repo) { console.error('repo trigger param is required'); process.exit(1); }\n  if (!/^[\\w.-]+\\/[\\w.-]+$/.test(repo)) { console.error(`invalid repo format: '${repo}' (expected owner/name)`); process.exit(1); }\n  if (!token) { console.error('GITHUB_TOKEN secret not set on workflow'); process.exit(1); }\n  // Paginate until we have `limit` real issues. GitHub's issues endpoint\n  // counts PRs against per_page, so a single page can be PR-heavy; paging past\n  // them keeps the working set the newest `limit` ISSUES and stable across loop\n  // iterations (immune to PR churn / merges that shifted a single-page window).\n  const collected = [];\n  for (let page = 1; page <= 10 && collected.length < limit; page++) {\n    const url = new URL(`https://api.github.com/repos/${repo}/issues`);\n    url.searchParams.set('state', 'open');\n    url.searchParams.set('per_page', '100');\n    url.searchParams.set('page', String(page));\n    if (labelFilter) url.searchParams.set('labels', labelFilter);\n    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } });\n    if (!res.ok) { const body = await res.text(); console.error(`GitHub ${res.status} ${res.statusText}: ${body.slice(0,500)}`); process.exit(1); }\n    const batch = await res.json();\n    for (const i of batch) { if (!i.pull_request) collected.push(i); }\n    if (batch.length < 100) break;\n  }\n  const onlyIssues = collected.slice(0, limit);\n  const options = onlyIssues.map((i) => {\n    const labels = (i.labels || []).map((l) => typeof l === 'string' ? l : l.name);\n    return {\n      id: String(i.number),\n      label: `#${i.number} ${i.title}`,\n      sublabel: labels.join(', '),\n      href: i.html_url,\n      badges: labels,\n      currentAssignee: i.assignee?.login,\n      raw: { issueNumber: i.number, title: i.title, labels, currentAssignee: i.assignee?.login, url: i.html_url },\n    };\n  });\n  console.log(`Fetched ${options.length} open issue(s) from ${repo} (limit=${limit})`);\n  writeFileSync('/output/result.json', JSON.stringify({ options, repo, summary: `Fetched ${options.length} open issue(s) from ${repo}` }));\n} catch (err) {\n  console.error('fetch-backlog crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+        "image": "mediforce-golden-image:latest"
       }
     },
     {
@@ -69,12 +73,11 @@
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "autonomyLevel": "L4",
       "description": "Gate: every issue must carry at least one category label (ux, tech-debt, infra, security, product, workflow, engine, bug, enhancement). When any are missing, routes to a human task that shows a clickable list and waits for the product owner to tag them on GitHub.",
-      "agent": {
-        "image": "mediforce-golden-image:latest",
+      "script": {
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const options = input.options || [];\n  const repo = input.repo;\n  const CATEGORIES = ['ux', 'tech-debt', 'infra', 'security', 'product', 'workflow', 'engine', 'bug', 'enhancement'];\n  const categorySet = new Set(CATEGORIES.map((s) => s.toLowerCase()));\n  const untagged = options.filter((o) => {\n    const labels = (o.badges || o.raw?.labels || []).map((l) => String(l).toLowerCase());\n    return !labels.some((l) => categorySet.has(l));\n  });\n  const needsTagging = untagged.length > 0;\n  if (needsTagging) {\n    writeFileSync('/output/result.json', JSON.stringify({ needsTagging: true, untaggedCount: untagged.length, options: untagged, repo, summary: `${untagged.length} of ${options.length} issue(s) need a category tag` }));\n    console.log(`check-tags: ${untagged.length}/${options.length} untagged — routing to tag-issues`);\n  } else {\n    writeFileSync('/output/result.json', JSON.stringify({ needsTagging: false, options, repo, summary: `All ${options.length} issue(s) carry a category tag` }));\n    console.log(`check-tags: all ${options.length} tagged — routing to propose-assignments`);\n  }\n} catch (err) {\n  console.error('check-tags crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n",
         "runtime": "javascript",
-        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const options = input.options || [];\n  const repo = input.repo;\n  const CATEGORIES = ['ux', 'tech-debt', 'infra', 'security', 'product', 'workflow', 'engine', 'bug', 'enhancement'];\n  const categorySet = new Set(CATEGORIES.map((s) => s.toLowerCase()));\n  const untagged = options.filter((o) => {\n    const labels = (o.badges || o.raw?.labels || []).map((l) => String(l).toLowerCase());\n    return !labels.some((l) => categorySet.has(l));\n  });\n  const needsTagging = untagged.length > 0;\n  if (needsTagging) {\n    writeFileSync('/output/result.json', JSON.stringify({ needsTagging: true, untaggedCount: untagged.length, options: untagged, repo, summary: `${untagged.length} of ${options.length} issue(s) need a category tag` }));\n    console.log(`check-tags: ${untagged.length}/${options.length} untagged — routing to tag-issues`);\n  } else {\n    writeFileSync('/output/result.json', JSON.stringify({ needsTagging: false, options, repo, summary: `All ${options.length} issue(s) carry a category tag` }));\n    console.log(`check-tags: all ${options.length} tagged — routing to propose-assignments`);\n  }\n} catch (err) {\n  console.error('check-tags crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+        "image": "mediforce-golden-image:latest"
       }
     },
     {
@@ -82,30 +85,70 @@
       "name": "Tag issues",
       "type": "creation",
       "executor": "human",
-      "allowedRoles": ["triager"],
+      "allowedRoles": [
+        "triager"
+      ],
       "description": "Reviewer picks a category (and a priority hint) for each untagged issue in a table, then submits. The next step applies the labels on GitHub via the API and the workflow loops back to re-fetch and re-check — no GitHub round-trip for the reviewer.",
       "ui": {
         "component": "table-editor",
         "config": {
           "submitLabel": "Apply tags",
           "columns": [
-            { "id": "issue", "kind": "static", "label": "Issue", "field": "label", "link": true },
-            { "id": "existing", "kind": "static", "label": "Existing labels", "field": "badges" },
+            {
+              "id": "issue",
+              "kind": "static",
+              "label": "Issue",
+              "field": "label",
+              "link": true
+            },
+            {
+              "id": "existing",
+              "kind": "static",
+              "label": "Existing labels",
+              "field": "badges"
+            },
             {
               "id": "category",
               "kind": "single-select",
               "label": "Category",
               "allowEmpty": false,
               "options": [
-                { "id": "ux", "label": "UX" },
-                { "id": "tech-debt", "label": "Tech debt" },
-                { "id": "infra", "label": "Infra" },
-                { "id": "security", "label": "Security" },
-                { "id": "product", "label": "Product" },
-                { "id": "workflow", "label": "Workflow" },
-                { "id": "engine", "label": "Engine" },
-                { "id": "bug", "label": "Bug" },
-                { "id": "enhancement", "label": "Enhancement" }
+                {
+                  "id": "ux",
+                  "label": "UX"
+                },
+                {
+                  "id": "tech-debt",
+                  "label": "Tech debt"
+                },
+                {
+                  "id": "infra",
+                  "label": "Infra"
+                },
+                {
+                  "id": "security",
+                  "label": "Security"
+                },
+                {
+                  "id": "product",
+                  "label": "Product"
+                },
+                {
+                  "id": "workflow",
+                  "label": "Workflow"
+                },
+                {
+                  "id": "engine",
+                  "label": "Engine"
+                },
+                {
+                  "id": "bug",
+                  "label": "Bug"
+                },
+                {
+                  "id": "enhancement",
+                  "label": "Enhancement"
+                }
               ]
             },
             {
@@ -114,10 +157,22 @@
               "label": "Priority",
               "default": "P2",
               "options": [
-                { "id": "P0", "label": "P0" },
-                { "id": "P1", "label": "P1" },
-                { "id": "P2", "label": "P2" },
-                { "id": "P3", "label": "P3" }
+                {
+                  "id": "P0",
+                  "label": "P0"
+                },
+                {
+                  "id": "P1",
+                  "label": "P1"
+                },
+                {
+                  "id": "P2",
+                  "label": "P2"
+                },
+                {
+                  "id": "P3",
+                  "label": "P3"
+                }
               ]
             }
           ]
@@ -149,19 +204,50 @@
       "name": "Assign",
       "type": "creation",
       "executor": "human",
-      "allowedRoles": ["triager"],
+      "allowedRoles": [
+        "triager"
+      ],
       "description": "Human triager reviews each suggestion, edits assignee/priority/note as needed, and confirms.",
       "ui": {
         "component": "assignment-table",
         "config": {
           "assignees": [
-            { "id": "filip", "label": "Filip", "kind": "human", "role": "fullstack" },
-            { "id": "marek", "label": "Marek", "kind": "human", "role": "product-owner" },
-            { "id": "marcin", "label": "Marcin", "kind": "human", "role": "fullstack" },
-            { "id": "vedha", "label": "Vedha", "kind": "human", "role": "fullstack" },
-            { "id": "fullstack-on-issue", "label": "Fullstack agent", "kind": "agent" }
+            {
+              "id": "filip",
+              "label": "Filip",
+              "kind": "human",
+              "role": "fullstack"
+            },
+            {
+              "id": "marek",
+              "label": "Marek",
+              "kind": "human",
+              "role": "product-owner"
+            },
+            {
+              "id": "marcin",
+              "label": "Marcin",
+              "kind": "human",
+              "role": "fullstack"
+            },
+            {
+              "id": "vedha",
+              "label": "Vedha",
+              "kind": "human",
+              "role": "fullstack"
+            },
+            {
+              "id": "fullstack-on-issue",
+              "label": "Fullstack agent",
+              "kind": "agent"
+            }
           ],
-          "priorities": ["P0", "P1", "P2", "P3"],
+          "priorities": [
+            "P0",
+            "P1",
+            "P2",
+            "P3"
+          ],
           "defaultPriority": "P2",
           "allowSkip": true,
           "submitLabel": "Dispatch",
@@ -175,12 +261,11 @@
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "autonomyLevel": "L4",
       "description": "For human-assigned issues: POST the priority label and the assignee to GitHub (both additive — leaves existing category labels and existing assignees untouched). For agent-assigned issues: POST the Mediforce process-start API. Per-assignment errors are logged but do not fail the step.",
-      "agent": {
-        "image": "mediforce-golden-image:latest",
+      "script": {
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const assignments = input.assignments || [];\n  const repo = input.repo || input.steps?.['fetch-backlog']?.repo;\n  const token = process.env.GITHUB_TOKEN;\n  const apiKey = process.env.PLATFORM_API_KEY;\n  const baseUrl = process.env.APP_BASE_URL;\n  if (repo && !/^[\\w.-]+\\/[\\w.-]+$/.test(repo)) { console.error(`invalid repo format: '${repo}'`); process.exit(1); }\n  const humanAssignments = [];\n  const agentRuns = [];\n  const errors = [];\n  const ghHeaders = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/vnd.github+json' };\n  for (const a of assignments) {\n    const issueNumber = a.raw?.issueNumber ?? Number(a.itemId);\n    try {\n      if (a.assigneeKind === 'human') {\n        if (!repo || !token) { errors.push({ itemId: a.itemId, kind: 'human', message: 'repo or GITHUB_TOKEN missing' }); continue; }\n        const labelsRes = await fetch(`https://api.github.com/repos/${repo}/issues/${issueNumber}/labels`, {\n          method: 'POST', headers: ghHeaders,\n          body: JSON.stringify({ labels: [`priority/${a.priority}`] }),\n        });\n        if (!labelsRes.ok) { const body = await labelsRes.text(); errors.push({ itemId: a.itemId, kind: 'human', step: 'add-label', message: `GitHub POST /labels ${labelsRes.status}: ${body.slice(0,200)}` }); continue; }\n        const assigneesRes = await fetch(`https://api.github.com/repos/${repo}/issues/${issueNumber}/assignees`, {\n          method: 'POST', headers: ghHeaders,\n          body: JSON.stringify({ assignees: [a.assigneeId] }),\n        });\n        if (!assigneesRes.ok) { const body = await assigneesRes.text(); errors.push({ itemId: a.itemId, kind: 'human', step: 'add-assignee', message: `GitHub POST /assignees ${assigneesRes.status}: ${body.slice(0,200)}` }); continue; }\n        humanAssignments.push({ issueNumber, assignee: a.assigneeId, priority: a.priority });\n      } else if (a.assigneeKind === 'agent') {\n        if (!apiKey || !baseUrl) { errors.push({ itemId: a.itemId, kind: 'agent', message: 'PLATFORM_API_KEY or APP_BASE_URL missing' }); continue; }\n        const res = await fetch(`${baseUrl}/api/processes`, {\n          method: 'POST',\n          headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' },\n          body: JSON.stringify({ definitionName: a.assigneeId, triggerName: 'manual', triggeredBy: 'backlog-triage', payload: { issueNumber } }),\n        });\n        const body = res.headers.get('content-type')?.includes('json') ? await res.json() : { error: await res.text() };\n        if (!res.ok) { errors.push({ itemId: a.itemId, kind: 'agent', message: `Mediforce POST ${res.status}: ${body.error || ''}` }); }\n        else { agentRuns.push({ issueNumber, workflowId: a.assigneeId, runId: body.instanceId, url: `${baseUrl}/runs/${body.instanceId}` }); }\n      }\n    } catch (err) {\n      errors.push({ itemId: a.itemId, kind: a.assigneeKind, message: String(err?.message ?? err) });\n    }\n  }\n  console.log(`Dispatched ${humanAssignments.length} human(s), ${agentRuns.length} agent run(s), ${errors.length} error(s)`);\n  writeFileSync('/output/result.json', JSON.stringify({ humanAssignments, agentRuns, errors, summary: `Dispatched ${humanAssignments.length} human(s), ${agentRuns.length} agent run(s), ${errors.length} error(s)` }));\n} catch (err) {\n  console.error('dispatch crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n",
         "runtime": "javascript",
-        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const assignments = input.assignments || [];\n  const repo = input.repo || input.steps?.['fetch-backlog']?.repo;\n  const token = process.env.GITHUB_TOKEN;\n  const apiKey = process.env.PLATFORM_API_KEY;\n  const baseUrl = process.env.APP_BASE_URL;\n  if (repo && !/^[\\w.-]+\\/[\\w.-]+$/.test(repo)) { console.error(`invalid repo format: '${repo}'`); process.exit(1); }\n  const humanAssignments = [];\n  const agentRuns = [];\n  const errors = [];\n  const ghHeaders = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/vnd.github+json' };\n  for (const a of assignments) {\n    const issueNumber = a.raw?.issueNumber ?? Number(a.itemId);\n    try {\n      if (a.assigneeKind === 'human') {\n        if (!repo || !token) { errors.push({ itemId: a.itemId, kind: 'human', message: 'repo or GITHUB_TOKEN missing' }); continue; }\n        const labelsRes = await fetch(`https://api.github.com/repos/${repo}/issues/${issueNumber}/labels`, {\n          method: 'POST', headers: ghHeaders,\n          body: JSON.stringify({ labels: [`priority/${a.priority}`] }),\n        });\n        if (!labelsRes.ok) { const body = await labelsRes.text(); errors.push({ itemId: a.itemId, kind: 'human', step: 'add-label', message: `GitHub POST /labels ${labelsRes.status}: ${body.slice(0,200)}` }); continue; }\n        const assigneesRes = await fetch(`https://api.github.com/repos/${repo}/issues/${issueNumber}/assignees`, {\n          method: 'POST', headers: ghHeaders,\n          body: JSON.stringify({ assignees: [a.assigneeId] }),\n        });\n        if (!assigneesRes.ok) { const body = await assigneesRes.text(); errors.push({ itemId: a.itemId, kind: 'human', step: 'add-assignee', message: `GitHub POST /assignees ${assigneesRes.status}: ${body.slice(0,200)}` }); continue; }\n        humanAssignments.push({ issueNumber, assignee: a.assigneeId, priority: a.priority });\n      } else if (a.assigneeKind === 'agent') {\n        if (!apiKey || !baseUrl) { errors.push({ itemId: a.itemId, kind: 'agent', message: 'PLATFORM_API_KEY or APP_BASE_URL missing' }); continue; }\n        const res = await fetch(`${baseUrl}/api/processes`, {\n          method: 'POST',\n          headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' },\n          body: JSON.stringify({ definitionName: a.assigneeId, triggerName: 'manual', triggeredBy: 'backlog-triage', payload: { issueNumber } }),\n        });\n        const body = res.headers.get('content-type')?.includes('json') ? await res.json() : { error: await res.text() };\n        if (!res.ok) { errors.push({ itemId: a.itemId, kind: 'agent', message: `Mediforce POST ${res.status}: ${body.error || ''}` }); }\n        else { agentRuns.push({ issueNumber, workflowId: a.assigneeId, runId: body.instanceId, url: `${baseUrl}/runs/${body.instanceId}` }); }\n      }\n    } catch (err) {\n      errors.push({ itemId: a.itemId, kind: a.assigneeKind, message: String(err?.message ?? err) });\n    }\n  }\n  console.log(`Dispatched ${humanAssignments.length} human(s), ${agentRuns.length} agent run(s), ${errors.length} error(s)`);\n  writeFileSync('/output/result.json', JSON.stringify({ humanAssignments, agentRuns, errors, summary: `Dispatched ${humanAssignments.length} human(s), ${agentRuns.length} agent run(s), ${errors.length} error(s)` }));\n} catch (err) {\n  console.error('dispatch crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+        "image": "mediforce-golden-image:latest"
       }
     },
     {
@@ -189,12 +274,11 @@
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "autonomyLevel": "L4",
       "description": "Reads the submitted rows and POSTs each issue's category + priority/<P> labels to GitHub, creating any label the repo lacks first (201/422 both mean it exists). Per-row errors accumulate; the step exits 0 with errors[] so the loop re-presents any that failed.",
-      "agent": {
-        "image": "mediforce-golden-image:latest",
+      "script": {
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const rows = input.rows || [];\n  const repo = input.repo || input.steps?.['fetch-backlog']?.repo;\n  const token = process.env.GITHUB_TOKEN;\n  if (repo && !/^[\\w.-]+\\/[\\w.-]+$/.test(repo)) { console.error(`invalid repo format: '${repo}'`); process.exit(1); }\n  const ghHeaders = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/vnd.github+json' };\n  const applied = [];\n  const errors = [];\n  const ensured = new Set();\n  for (const row of rows) {\n    const itemId = row.itemId;\n    const values = row.values || {};\n    const labels = [];\n    if (values.category) labels.push(String(values.category));\n    if (values.priority) labels.push(`priority/${values.priority}`);\n    try {\n      if (!repo || !token) { errors.push({ itemId, message: 'repo or GITHUB_TOKEN missing' }); continue; }\n      if (labels.length === 0) { errors.push({ itemId, message: 'no category/priority selected' }); continue; }\n      let createFailed = false;\n      for (const label of labels) {\n        if (ensured.has(label)) continue;\n        const createRes = await fetch(`https://api.github.com/repos/${repo}/labels`, {\n          method: 'POST', headers: ghHeaders,\n          body: JSON.stringify({ name: label, color: 'ededed' }),\n        });\n        if (createRes.ok || createRes.status === 422) { ensured.add(label); }\n        else { const body = await createRes.text(); errors.push({ itemId, label, step: 'create-label', message: `GitHub POST /labels ${createRes.status}: ${body.slice(0,200)}` }); createFailed = true; break; }\n      }\n      if (createFailed) continue;\n      const res = await fetch(`https://api.github.com/repos/${repo}/issues/${itemId}/labels`, {\n        method: 'POST', headers: ghHeaders,\n        body: JSON.stringify({ labels }),\n      });\n      if (!res.ok) { const body = await res.text(); errors.push({ itemId, step: 'add-labels', message: `GitHub POST /labels ${res.status}: ${body.slice(0,200)}` }); continue; }\n      applied.push({ itemId, labels });\n    } catch (err) {\n      errors.push({ itemId, message: String(err?.message ?? err) });\n    }\n  }\n  console.log(`Applied tags to ${applied.length} issue(s), ${errors.length} error(s)`);\n  // Total failure (e.g. token can't write labels) → fail the step: the run goes\n  // red, the loop stops, and console.error becomes the surfaced error detail.\n  // The runner only renders presentation.md on the success path, so we write it\n  // for partial failures (which exit 0) and skip it when we're about to exit 1.\n  const totalFailure = applied.length === 0 && errors.length > 0;\n  if (errors.length > 0 && !totalFailure) {\n    const lines = errors.map((e) => `- \\`#${e.itemId}\\`${e.label ? ` (\\`${e.label}\\`)` : ''} — ${e.message}`).join('\\n');\n    writeFileSync('/output/presentation.md', `## ⚠️ ${errors.length} label update(s) failed\\n\\n${applied.length} applied, ${errors.length} failed. Fix the cause and the loop re-presents the rest.\\n\\n${lines}\\n`);\n  }\n  writeFileSync('/output/result.json', JSON.stringify({ applied, errors, repo, summary: `Applied tags to ${applied.length} issue(s), ${errors.length} error(s)` }));\n  if (totalFailure) {\n    console.error(`apply-tags: all ${errors.length} label update(s) failed — failing the step. First error: ${errors[0].message}`);\n    process.exit(1);\n  }\n} catch (err) {\n  console.error('apply-tags crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n",
         "runtime": "javascript",
-        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const rows = input.rows || [];\n  const repo = input.repo || input.steps?.['fetch-backlog']?.repo;\n  const token = process.env.GITHUB_TOKEN;\n  if (repo && !/^[\\w.-]+\\/[\\w.-]+$/.test(repo)) { console.error(`invalid repo format: '${repo}'`); process.exit(1); }\n  const ghHeaders = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/vnd.github+json' };\n  const applied = [];\n  const errors = [];\n  const ensured = new Set();\n  for (const row of rows) {\n    const itemId = row.itemId;\n    const values = row.values || {};\n    const labels = [];\n    if (values.category) labels.push(String(values.category));\n    if (values.priority) labels.push(`priority/${values.priority}`);\n    try {\n      if (!repo || !token) { errors.push({ itemId, message: 'repo or GITHUB_TOKEN missing' }); continue; }\n      if (labels.length === 0) { errors.push({ itemId, message: 'no category/priority selected' }); continue; }\n      let createFailed = false;\n      for (const label of labels) {\n        if (ensured.has(label)) continue;\n        const createRes = await fetch(`https://api.github.com/repos/${repo}/labels`, {\n          method: 'POST', headers: ghHeaders,\n          body: JSON.stringify({ name: label, color: 'ededed' }),\n        });\n        if (createRes.ok || createRes.status === 422) { ensured.add(label); }\n        else { const body = await createRes.text(); errors.push({ itemId, label, step: 'create-label', message: `GitHub POST /labels ${createRes.status}: ${body.slice(0,200)}` }); createFailed = true; break; }\n      }\n      if (createFailed) continue;\n      const res = await fetch(`https://api.github.com/repos/${repo}/issues/${itemId}/labels`, {\n        method: 'POST', headers: ghHeaders,\n        body: JSON.stringify({ labels }),\n      });\n      if (!res.ok) { const body = await res.text(); errors.push({ itemId, step: 'add-labels', message: `GitHub POST /labels ${res.status}: ${body.slice(0,200)}` }); continue; }\n      applied.push({ itemId, labels });\n    } catch (err) {\n      errors.push({ itemId, message: String(err?.message ?? err) });\n    }\n  }\n  console.log(`Applied tags to ${applied.length} issue(s), ${errors.length} error(s)`);\n  // Total failure (e.g. token can't write labels) → fail the step: the run goes\n  // red, the loop stops, and console.error becomes the surfaced error detail.\n  // The runner only renders presentation.md on the success path, so we write it\n  // for partial failures (which exit 0) and skip it when we're about to exit 1.\n  const totalFailure = applied.length === 0 && errors.length > 0;\n  if (errors.length > 0 && !totalFailure) {\n    const lines = errors.map((e) => `- \\`#${e.itemId}\\`${e.label ? ` (\\`${e.label}\\`)` : ''} — ${e.message}`).join('\\n');\n    writeFileSync('/output/presentation.md', `## ⚠️ ${errors.length} label update(s) failed\\n\\n${applied.length} applied, ${errors.length} failed. Fix the cause and the loop re-presents the rest.\\n\\n${lines}\\n`);\n  }\n  writeFileSync('/output/result.json', JSON.stringify({ applied, errors, repo, summary: `Applied tags to ${applied.length} issue(s), ${errors.length} error(s)` }));\n  if (totalFailure) {\n    console.error(`apply-tags: all ${errors.length} label update(s) failed — failing the step. First error: ${errors[0].message}`);\n    process.exit(1);\n  }\n} catch (err) {\n  console.error('apply-tags crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+        "image": "mediforce-golden-image:latest"
       }
     },
     {
@@ -206,13 +290,39 @@
     }
   ],
   "transitions": [
-    { "from": "fetch-backlog", "to": "check-tags" },
-    { "from": "check-tags", "to": "tag-issues", "when": "output.needsTagging == true" },
-    { "from": "check-tags", "to": "propose-assignments", "when": "output.needsTagging == false" },
-    { "from": "tag-issues", "to": "apply-tags" },
-    { "from": "apply-tags", "to": "fetch-backlog" },
-    { "from": "propose-assignments", "to": "assign" },
-    { "from": "assign", "to": "dispatch" },
-    { "from": "dispatch", "to": "report" }
+    {
+      "from": "fetch-backlog",
+      "to": "check-tags"
+    },
+    {
+      "from": "check-tags",
+      "to": "tag-issues",
+      "when": "output.needsTagging == true"
+    },
+    {
+      "from": "check-tags",
+      "to": "propose-assignments",
+      "when": "output.needsTagging == false"
+    },
+    {
+      "from": "tag-issues",
+      "to": "apply-tags"
+    },
+    {
+      "from": "apply-tags",
+      "to": "fetch-backlog"
+    },
+    {
+      "from": "propose-assignments",
+      "to": "assign"
+    },
+    {
+      "from": "assign",
+      "to": "dispatch"
+    },
+    {
+      "from": "dispatch",
+      "to": "report"
+    }
   ]
 }

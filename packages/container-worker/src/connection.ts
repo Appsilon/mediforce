@@ -31,16 +31,19 @@ export function getRedisConnection(): RedisConnectionInfo {
   };
 }
 
-/** Quick health check — connects, PINGs, disconnects. */
+/** Quick health check — connects, queries server info, disconnects. */
 export async function pingRedis(): Promise<{ pong: string; host: string; port: number; tls: boolean }> {
   const connection = getRedisConnection();
   const { Queue } = await import('bullmq');
   const queue = new Queue('redis-health-ping', { connection });
   const client = await queue.client;
-  const pong = await client.ping();
+  // bullmq's IRedisClient is backend-agnostic (ioredis/node-redis/Bun) and no
+  // longer exposes ioredis's `ping`; `info()` is part of the interface and
+  // serves as the liveness probe.
+  await client.info();
   await queue.close();
   return {
-    pong,
+    pong: 'PONG',
     host: connection.host,
     port: connection.port,
     tls: !!connection.tls,

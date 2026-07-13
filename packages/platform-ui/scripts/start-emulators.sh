@@ -1,8 +1,12 @@
 #!/bin/bash
-export JAVA_HOME=/opt/homebrew/Cellar/openjdk@21/21.0.10/libexec/openjdk.jdk/Contents/Home
-export PATH="$JAVA_HOME/bin:$PATH"
+# Resolve Java home from homebrew without hardcoding the patch version.
+BREW_OPENJDK="$(brew --prefix openjdk@21 2>/dev/null)"
+if [ -n "$BREW_OPENJDK" ] && [ -d "$BREW_OPENJDK/libexec/openjdk.jdk/Contents/Home" ]; then
+  export JAVA_HOME="$BREW_OPENJDK/libexec/openjdk.jdk/Contents/Home"
+  export PATH="$JAVA_HOME/bin:$PATH"
+fi
 
-PORTS=(9099 8080 9199 4000)
+PORTS=(9099 4000)
 blocked=()
 
 kill_port() {
@@ -29,5 +33,5 @@ if [ ${#blocked[@]} -gt 0 ]; then
 fi
 
 DATA_DIR="$(cd "$(dirname "$0")/.." && pwd)/.emulator-data"
-exec firebase emulators:start --project demo-mediforce --only auth,firestore,storage \
+exec firebase emulators:start --project demo-mediforce --only auth \
   --import "$DATA_DIR" --export-on-exit "$DATA_DIR" "$@"

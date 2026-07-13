@@ -99,6 +99,44 @@ describe('platform-api boundary conventions', () => {
     expect(offenders).toEqual([]);
   });
 
+  // firebase/firestore tripwire — Phase 4 cutover removed every direct
+  // Firestore subscription from the UI. The allowlist is now empty: any
+  // new `from 'firebase/firestore'` import under platform-ui/src/ fails CI.
+  // PG PR2 (#534) relies on this invariant.
+  it('forbids `firebase/firestore` imports anywhere under platform-ui/src/', () => {
+    const FIRESTORE_IMPORT_ALLOWLIST = new Set<string>([]);
+
+    const FIRESTORE_IMPORT = /\bfrom\s*['"]firebase\/firestore['"]/;
+    const offenders: string[] = [];
+    for (const file of walkSourceFiles(UI_SRC)) {
+      const source = readFileSync(file, 'utf8');
+      if (!FIRESTORE_IMPORT.test(source)) continue;
+      const rel = relative(MONOREPO_ROOT, file);
+      if (!FIRESTORE_IMPORT_ALLOWLIST.has(rel)) offenders.push(rel);
+    }
+
+    expect(
+      offenders,
+      'New `firebase/firestore` import detected. The Phase 4 PRD ' +
+        '(docs/headless-migration-phase-4-plan.md) forbids new Firestore ' +
+        'subscriptions in platform-ui; migrate via mediforce.X.Y() + ' +
+        'react-query instead.',
+    ).toEqual([]);
+
+    // Allowlist must shrink monotonically. Fail when an entry is migrated
+    // away but the entry stays — forces cleanup so the list never lies
+    // about the residual surface.
+    const stale = [...FIRESTORE_IMPORT_ALLOWLIST].filter((rel) => {
+      const abs = join(MONOREPO_ROOT, rel);
+      return !existsSync(abs) || !FIRESTORE_IMPORT.test(readFileSync(abs, 'utf8'));
+    });
+    expect(
+      stale,
+      'Allowlist entries no longer import `firebase/firestore`. Remove ' +
+        'them so the list reflects the real residual surface.',
+    ).toEqual([]);
+  });
+
   it('every handler has a sibling __tests__/<name>.test.ts', () => {
     if (!existsSync(API_HANDLERS)) return;
 

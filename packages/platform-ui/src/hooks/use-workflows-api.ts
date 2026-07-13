@@ -16,7 +16,7 @@ export interface ApiDefinitionItem {
     triggers: Array<{ type: string; name: string }>;
     title?: string;
     description?: string;
-    repo?: { url: string; branch?: string; directory?: string };
+    externalSkillsRepo?: { url: string; commit?: string; auth?: string };
     url?: string;
     archived?: boolean;
     namespace?: string;
@@ -45,11 +45,13 @@ export function mapApiToDefinitionGroups(
         }],
         stepCount: def.steps.length,
         hasManualTrigger: def.triggers.some((t) => t.type === 'manual'),
-        repo: def.repo,
+        externalSkillsRepo: def.externalSkillsRepo,
         url: def.url,
         archived: def.archived,
         namespace: def.namespace,
         visibility: def.visibility,
+        // Public profile shows definitions only, never runs.
+        runSummary: { total: 0, active: 0, latest: [], stepsByVersion: {} },
       };
     });
 }

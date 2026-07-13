@@ -1,3 +1,12 @@
+// Fixed UUID literals for seeded agent_runs. `agent_runs.id` is a Postgres
+// `uuid` column, so the seed ids must be valid uuids (not readable slugs) or the
+// route's `eq(agentRuns.id, ...)` lookup raises `invalid input syntax for type
+// uuid`. Deterministic v4-shaped uuids keep the seed reproducible.
+export const RUN_COMPLETED_1_ID = '00000000-0000-4000-8000-000000000001';
+export const RUN_ESCALATED_1_ID = '00000000-0000-4000-8000-000000000002';
+export const RUN_RUNNING_1_ID = '00000000-0000-4000-8000-000000000003';
+export const RUN_L4_AUTOPILOT_ID = '00000000-0000-4000-8000-000000000004';
+
 const now = new Date().toISOString();
 const oneHourAgo = new Date(Date.now() - 3600_000).toISOString();
 const twoDaysAgo = new Date(Date.now() - 2 * 86400_000).toISOString();
@@ -94,6 +103,56 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       updatedAt: now,
       completedAt: null,
       completionData: null,
+    },
+    // Dedicated tasks for verdict-with-params.journey.ts — isolated from all
+    // other tests so submitting the pending task never pollutes shared state.
+    'task-param-verdict-target': {
+      id: 'task-param-verdict-target',
+      processInstanceId: 'proc-param-verdict-target',
+      stepId: 'supply-chain-assessment',
+      assignedRole: 'reviewer',
+      assignedUserId: null,
+      status: 'pending',
+      deadline: nextWeek,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      completionData: null,
+      params: [
+        { name: 'findings', type: 'string', required: true, description: 'Summary of assessment findings' },
+        { name: 'riskScore', type: 'number', required: false, description: 'Risk score 1–10' },
+      ],
+      verdicts: [
+        { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+        { key: 'reject', label: 'Reject', intent: 'danger', requiresComment: true },
+      ],
+    },
+    // Already-completed variant — used by the read-only CompletionReadOnly test
+    'task-param-verdict-completed': {
+      id: 'task-param-verdict-completed',
+      processInstanceId: 'proc-completed-1',
+      stepId: 'supply-chain-assessment',
+      assignedRole: 'reviewer',
+      assignedUserId: testUserId,
+      status: 'completed',
+      deadline: null,
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      completedAt: now,
+      completionData: {
+        verdict: 'approve',
+        paramValues: { findings: 'All vendor checks passed', riskScore: 2 },
+        completedBy: testUserId,
+        completedAt: now,
+      },
+      params: [
+        { name: 'findings', type: 'string', required: true, description: 'Summary of assessment findings' },
+        { name: 'riskScore', type: 'number', required: false, description: 'Risk score 1–10' },
+      ],
+      verdicts: [
+        { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+        { key: 'reject', label: 'Reject', intent: 'danger', requiresComment: true },
+      ],
     },
     'task-upload-docs': {
       id: 'task-upload-docs',
@@ -315,6 +374,28 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       error: null,
       assignedRoles: ['reviewer'],
     },
+    // Dedicated instance for verdict-with-params.journey.ts — isolated so
+    // submitting task-param-verdict-target does not pollute other tests.
+    // Uses 'Param Verdict Test:1' which contains the supply-chain-assessment
+    // step so advanceStep succeeds after task completion (Supply Chain Review
+    // v1 does not have this step and would throw a 500).
+    'proc-param-verdict-target': {
+      id: 'proc-param-verdict-target',
+      namespace: 'test',
+      definitionName: 'Param Verdict Test',
+      definitionVersion: '1',
+      status: 'paused',
+      currentStepId: 'supply-chain-assessment',
+      variables: { studyId: 'study-pv-target' },
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: 'auto-runner',
+      pauseReason: 'waiting_for_human',
+      error: null,
+      assignedRoles: ['reviewer'],
+    },
     // New-style run — uses WorkflowDefinition (no configName/configVersion)
     'proc-workflow-run-1': {
       id: 'proc-workflow-run-1',
@@ -337,7 +418,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       id: 'proc-upload-waiting',
       namespace: 'test',
       definitionName: 'Protocol to TFL',
-      definitionVersion: '0.1.0',
+      definitionVersion: '1.0.0',
       configName: 'default',
       configVersion: '1',
       status: 'paused',
@@ -413,11 +494,68 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       error: 'API rate limit exceeded — retried 3 times',
       assignedRoles: ['reviewer'],
     },
+    // Dedicated runs for runs-names.journey.ts (GET /api/runs/names, #588).
+    // Unique definitionNames + ids so the projected { id, definitionName }
+    // assertions are deterministic. `proc-names-deleted` carries a non-null
+    // `deletedAt` tombstone so the journey can assert soft-deleted runs are
+    // excluded by the `isNull(deletedAt)` filter.
+    'proc-names-journey-1': {
+      id: 'proc-names-journey-1',
+      namespace: 'test',
+      definitionName: 'Names Journey Workflow A',
+      definitionVersion: '1.0.0',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: twoDaysAgo,
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+    },
+    'proc-names-journey-2': {
+      id: 'proc-names-journey-2',
+      namespace: 'test',
+      definitionName: 'Names Journey Workflow B',
+      definitionVersion: '1.0.0',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: twoDaysAgo,
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+    },
+    'proc-names-journey-deleted': {
+      id: 'proc-names-journey-deleted',
+      namespace: 'test',
+      definitionName: 'Names Journey Soft Deleted',
+      definitionVersion: '1.0.0',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: twoDaysAgo,
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+      deletedAt: twoDaysAgo,
+    },
   };
 
   const agentRuns: Record<string, Record<string, unknown>> = {
-    'run-completed-1': {
-      id: 'run-completed-1',
+    [RUN_COMPLETED_1_ID]: {
+      id: RUN_COMPLETED_1_ID,
       processInstanceId: 'proc-running-1',
       stepId: 'narrative-summary',
       pluginId: 'narrative-summary',
@@ -439,8 +577,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       executorType: 'agent',
       reviewerType: 'none',
     },
-    'run-escalated-1': {
-      id: 'run-escalated-1',
+    [RUN_ESCALATED_1_ID]: {
+      id: RUN_ESCALATED_1_ID,
       processInstanceId: 'proc-paused-1',
       stepId: 'data-quality-check',
       pluginId: 'data-quality',
@@ -462,8 +600,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       executorType: 'agent',
       reviewerType: 'human',
     },
-    'run-running-1': {
-      id: 'run-running-1',
+    [RUN_RUNNING_1_ID]: {
+      id: RUN_RUNNING_1_ID,
       processInstanceId: 'proc-running-1',
       stepId: 'compliance-check',
       pluginId: 'compliance-check',
@@ -475,8 +613,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       completedAt: null,
       executorType: 'agent',
     },
-    'run-l4-autopilot': {
-      id: 'run-l4-autopilot',
+    [RUN_L4_AUTOPILOT_ID]: {
+      id: RUN_L4_AUTOPILOT_ID,
       processInstanceId: 'proc-completed-2',
       stepId: 'vendor-assessment',
       pluginId: 'vendor-assessment',
@@ -894,22 +1032,34 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
   };
 
-  // User profile document — required by Firestore security rules.
-  // humanTasks and handoffEntities rules call get(/users/{uid}).data.roles
-  // to verify the reader has a matching role.
-  const users: Record<string, Record<string, unknown>> = {
-    [testUserId]: {
-      uid: testUserId,
-      email: 'test@mediforce.dev',
-      displayName: 'Test User',
-      handle: 'test',
-      organizations: [],
-      role: 'admin',
-      roles: ['reviewer', 'analyst', 'operator'],
-    },
-  };
-
   const workflowDefinitions: Record<string, Record<string, unknown>> = {
+    // Backs `proc-upload-waiting` / `task-upload-docs` (the file-upload task).
+    // Trimmed to the human upload step + a terminal so completing the upload
+    // advances the run without spawning the real agent pipeline (ADR-0003 E2E).
+    'test:Protocol to TFL:1': {
+      name: 'Protocol to TFL',
+      namespace: 'test',
+      version: 1,
+      title: 'Protocol to TFL pipeline',
+      description: 'Upload protocol documents (E2E-trimmed to the upload step).',
+      workspace: {},
+      steps: [
+        {
+          id: 'upload-documents',
+          name: 'Upload Documents',
+          type: 'creation',
+          executor: 'human',
+          description: 'Upload protocol PDF and SAP document',
+          ui: {
+            component: 'file-upload',
+            config: { acceptedTypes: ['application/pdf'], minFiles: 1, maxFiles: 5 },
+          },
+        },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'upload-documents', to: 'done' }],
+      triggers: [{ type: 'manual', name: 'start' }],
+    },
     // Example workflow that exercises the run-scoped git workspace with a
     // small real-shaped data pipeline: step 1 generates a CSV dataset, step 2
     // reads it, computes summary stats, and writes a markdown report into a
@@ -935,8 +1085,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
           type: 'creation',
           executor: 'script',
           plugin: 'script-container',
-          autonomyLevel: 'L4',
-          agent: {
+          script: {
             runtime: 'bash',
             inlineScript: [
               '#!/bin/sh',
@@ -954,8 +1103,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
           type: 'creation',
           executor: 'script',
           plugin: 'script-container',
-          autonomyLevel: 'L4',
-          agent: {
+          script: {
             runtime: 'bash',
             inlineScript: [
               '#!/bin/sh',
@@ -1097,7 +1245,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       outputDescription: 'Generated code, analysis results, or task completion report',
       foundationModel: 'anthropic/claude-sonnet-4',
       systemPrompt: '',
-      skillFileNames: [],
       createdAt: twoDaysAgo,
       updatedAt: twoDaysAgo,
     },
@@ -1112,7 +1259,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       outputDescription: 'test output',
       foundationModel: 'anthropic/claude-sonnet-4',
       systemPrompt: '',
-      skillFileNames: [],
       mcpServers: {
         filesystem: { type: 'stdio', catalogId: 'filesystem' },
       },
@@ -1134,7 +1280,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       outputDescription: 'task output',
       foundationModel: 'anthropic/claude-sonnet-4',
       systemPrompt: '',
-      skillFileNames: [],
       mcpServers: {
         'github-mcp': {
           type: 'http',
@@ -1186,7 +1331,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         type: 'creation',
         executor: 'agent',
         autonomyLevel: 'L2',
-        plugin: 'script-container',
+        plugin: 'claude-code-agent',
         agentId: 'mcp-test-agent',
       },
       { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
@@ -1384,6 +1529,23 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     createdAt: twoDaysAgo,
   };
 
+  // Minimal workflow for verdict-with-params.journey.ts. Contains the
+  // supply-chain-assessment step so advanceStep succeeds when the test submits
+  // the task — Supply Chain Review v1 lacks this step and would 500.
+  workflowDefinitions['test:Param Verdict Test:1'] = {
+    name: 'Param Verdict Test',
+    namespace: 'test',
+    version: 1,
+    description: 'Fixture workflow for verdict-with-params journey',
+    steps: [
+      { id: 'supply-chain-assessment', name: 'Supply Chain Assessment', type: 'creation', executor: 'human' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'supply-chain-assessment', to: 'done' }],
+    triggers: [{ type: 'manual', name: 'start' }],
+    createdAt: twoDaysAgo,
+  };
+
   // Step executions for the new-style workflow run (proc-workflow-run-1)
   // Used by executor identity label tests — vendor-assessment has plugin 'supply-data-collector'
   // in the WorkflowDefinition, so its label should render as 'agent:supply-data-collector'.
@@ -1481,14 +1643,19 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   };
 
   // Match prod write shape — WorkflowEngine.createInstance writes `deleted: false`
-  // on every instance, and the runs.list query filters server-side via
-  // `.where('deleted','==',false)`. Firestore equality where-clauses do not
-  // match docs missing the field, so seeded rows without `deleted` are hidden.
+  // AND `archived: false` on every instance. Both the runs.list query and the
+  // home-card `summarizeRunsByWorkflow` aggregate filter server-side via
+  // `.where('deleted','==',false).where('archived','==',false)`. Firestore
+  // equality where-clauses do not match docs missing the field, so seeded rows
+  // without these fields are hidden (empty run counts + empty card previews).
   for (const key of Object.keys(processInstances)) {
     if (processInstances[key].deleted === undefined) {
       processInstances[key].deleted = false;
     }
+    if (processInstances[key].archived === undefined) {
+      processInstances[key].archived = false;
+    }
   }
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, modelRegistry };
+  return { humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, modelRegistry };
 }

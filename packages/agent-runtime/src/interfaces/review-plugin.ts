@@ -1,5 +1,5 @@
 import type { AgentOutputEnvelope } from '@mediforce/platform-core';
-import type { LlmClient } from './agent-plugin';
+import type { LlmClient } from './step-executor-plugin';
 
 export interface ReviewPluginContext {
   stepId: string;

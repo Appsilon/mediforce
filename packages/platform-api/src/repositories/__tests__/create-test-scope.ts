@@ -5,6 +5,7 @@
  */
 import {
   InMemoryAgentDefinitionRepository,
+  InMemoryAgentEventRepository,
   InMemoryAgentRunRepository,
   InMemoryAuditRepository,
   InMemoryCoworkSessionRepository,
@@ -12,18 +13,26 @@ import {
   InMemoryHandoffRepository,
   InMemoryHumanTaskRepository,
   InMemoryOAuthProviderRepository,
+  InMemoryPlatformSettingsRepository,
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
   InMemoryToolCatalogRepository,
   InMemoryAgentOAuthTokenRepository,
   InMemoryUserProfileRepository,
+  InMemoryTaskAttachmentRepository,
+  InMemoryBlobStore,
 } from '@mediforce/platform-core/testing';
 import type {
   AgentRunRepository,
+  BlobStore,
+  EmailProviderInfo,
+  HumanTaskRepository,
   ModelRegistryRepository,
   NamespaceRepository,
   NamespaceSecretsRepository,
+  PlatformSettingsRepository,
   ProcessInstanceRepository,
+  TaskAttachmentRepository,
   UserDirectoryService,
   UserProfileRepository,
   WorkflowSecretsRepository,
@@ -104,6 +113,12 @@ const stubModelRegistry: ModelRegistryRepository = {
   async updateRankings() {
     return 0;
   },
+  async listIds() {
+    return [];
+  },
+  async retireAbsentModels() {
+    return { retired: 0, reinstated: 0 };
+  },
   async getMeta() {
     return {} as never;
   },
@@ -150,9 +165,12 @@ const stubNamespaceSecrets: NamespaceSecretsRepository = {
 export interface TestScopeOverrides {
   readonly caller?: CallerIdentity;
   readonly instanceRepo?: ProcessInstanceRepository;
-  readonly humanTaskRepo?: InMemoryHumanTaskRepository;
+  readonly humanTaskRepo?: HumanTaskRepository;
+  readonly taskAttachmentRepo?: TaskAttachmentRepository;
+  readonly blobStore?: BlobStore;
   readonly processRepo?: InMemoryProcessRepository;
   readonly auditRepo?: InMemoryAuditRepository;
+  readonly agentEventRepo?: InMemoryAgentEventRepository;
   readonly agentRunRepo?: AgentRunRepository;
   readonly handoffRepo?: InMemoryHandoffRepository;
   readonly agentDefinitionRepo?: InMemoryAgentDefinitionRepository;
@@ -172,6 +190,8 @@ export interface TestScopeOverrides {
   readonly namespaceRepo?: NamespaceRepository;
   readonly userProfileRepo?: UserProfileRepository;
   readonly userDirectory?: UserDirectoryService | null;
+  readonly platformSettingsRepo?: PlatformSettingsRepository;
+  readonly emailProviderInfo?: EmailProviderInfo | null;
 }
 
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
@@ -197,8 +217,12 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     instanceRepo,
     processRepo: overrides.processRepo ?? new InMemoryProcessRepository(),
     auditRepo: overrides.auditRepo ?? new InMemoryAuditRepository(instanceRepo),
+    agentEventRepo:
+      overrides.agentEventRepo ?? new InMemoryAgentEventRepository(instanceRepo),
     agentRunRepo: overrides.agentRunRepo ?? new InMemoryAgentRunRepository(instanceRepo),
     humanTaskRepo: overrides.humanTaskRepo ?? new InMemoryHumanTaskRepository(instanceRepo),
+    taskAttachmentRepo: overrides.taskAttachmentRepo ?? new InMemoryTaskAttachmentRepository(),
+    blobStore: overrides.blobStore ?? new InMemoryBlobStore(),
     handoffRepo: overrides.handoffRepo ?? new InMemoryHandoffRepository(instanceRepo),
     agentDefinitionRepo: overrides.agentDefinitionRepo ?? new InMemoryAgentDefinitionRepository(),
     coworkSessionRepo: overrides.coworkSessionRepo ?? new InMemoryCoworkSessionRepository(instanceRepo),
@@ -211,6 +235,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     modelRegistryRepo: overrides.modelRegistryRepo ?? stubModelRegistry,
     secretsRepo: overrides.secretsRepo ?? stubWorkflowSecrets,
     namespaceSecretsRepo: overrides.namespaceSecretsRepo ?? stubNamespaceSecrets,
+    platformSettingsRepo: overrides.platformSettingsRepo ?? new InMemoryPlatformSettingsRepository(),
     pluginRegistry: (overrides.pluginRegistry ?? stubPluginRegistry) as CallerScopeServices['pluginRegistry'],
     engine: null as unknown as CallerScopeServices['engine'],
     manualTrigger: null as unknown as CallerScopeServices['manualTrigger'],
@@ -222,6 +247,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     inviteNotificationService: overrides.inviteNotificationService ?? null,
     dockerImages: overrides.dockerImages ?? null,
     userDirectory: overrides.userDirectory ?? null,
+    emailProviderInfo: overrides.emailProviderInfo ?? null,
   };
   return createCallerScope(services, caller);
 }

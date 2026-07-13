@@ -25,7 +25,6 @@ export const AgentDefinitionSchema = z.object({
   systemPrompt: z.string(),
   inputDescription: z.string(),
   outputDescription: z.string(),
-  skillFileNames: z.array(z.string()),
   /** Canonical MCP server configuration for this agent. Map of server
    *  name → AgentMcpBinding. Step-level restrictions can only narrow
    *  (disable servers or deny tools) — they cannot broaden. */

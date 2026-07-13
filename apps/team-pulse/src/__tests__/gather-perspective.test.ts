@@ -36,7 +36,7 @@ describe('gather-perspective', () => {
     if (!result.success) return;
     const step = result.data.steps.find((s) => s.id === 'show_question');
     expect(step?.executor).toBe('script');
-    expect(step?.agent?.inlineScript).toMatch(/presentation\.md/);
+    expect(step?.script?.inlineScript).toMatch(/presentation\.md/);
   });
 
   it('provide_perspective is a human step with textarea param', () => {

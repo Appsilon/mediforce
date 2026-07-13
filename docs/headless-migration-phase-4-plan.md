@@ -1,7 +1,9 @@
 # Headless migration — Phase 4 plan
 
-- **Status:** Active (mutable through implementation; finalize on PR-final
-  merge)
+> **Status: Completed** — concluded in PR #534 (2026-05-31). Historical
+> record; active design decisions live in docs/adr/ (0005, 0006).
+
+- **Status:** Finalized (PR-final merged; PG PR2 [#534](https://github.com/Appsilon/mediforce/pull/534) unblocked)
 - **Date opened:** 2026-05-28
 - **Authors:** Marek Rogala (@marekrogala)
 - **Reviewers:** Filip Stachura (@filipstachura), Paweł Przytuła (@przytu1)

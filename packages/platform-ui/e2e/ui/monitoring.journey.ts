@@ -1,11 +1,11 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, showStep, showResult, endRecording } from '../helpers/recording';
+import { trackPageErrors } from '../helpers/page-errors';
 
 test.describe('Monitoring Journey', () => {
-  test('monitoring page mounts and calls the headless summary endpoint', async ({ page }, testInfo) => {
+  test('monitoring page mounts and calls the headless summary endpoint', async ({ page }) => {
     test.setTimeout(60_000);
-    await setupRecording(page, 'monitoring-dashboard', testInfo);
+    trackPageErrors(page);
 
     // ADR-0006 §4 NICE LIVE: the summary endpoint replaces the old Firestore
     // `processInstances` subscription for the four status cards. Lock in
@@ -23,7 +23,6 @@ test.describe('Monitoring Journey', () => {
     await expect(
       page.getByText('Real-time view of all workflows and task assignments'),
     ).toBeVisible({ timeout: 30_000 });
-    await showStep(page);
 
     const summaryRes = await summaryRequest;
     expect(summaryRes.status()).toBe(200);
@@ -48,7 +47,6 @@ test.describe('Monitoring Journey', () => {
     await expect(page.getByText('Paused', { exact: true })).toBeVisible();
     await expect(page.getByText('Failed', { exact: true })).toBeVisible();
     await expect(page.getByText('Completed', { exact: true })).toBeVisible();
-    await showStep(page);
 
     // Two side-by-side sections render below the cards. `AssignmentMap` reads
     // `summary.roleTaskCounts`; `StuckProcessesList` still pulls from the
@@ -60,8 +58,5 @@ test.describe('Monitoring Journey', () => {
     await expect(
       page.getByRole('heading', { name: 'Task Assignments by Role' }),
     ).toBeVisible();
-    await showResult(page);
-
-    await endRecording(page);
   });
 });

@@ -1,39 +1,32 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useCollection } from './use-collection';
-
-interface UserProfile {
-  id: string;
-  uid: string;
-  displayName: string;
-  email: string;
-  photoURL: string;
-}
+import { useNamespace } from './use-namespace';
 
 export type UserInfo = {
   displayName: string;
   photoURL: string | undefined;
+  personalHandle: string | undefined;
 };
 
-export function useUserProfiles(): Map<string, UserInfo> {
-  const { data: users } = useCollection<UserProfile>('users');
+export function useUserProfiles(handle: string | null | undefined): Map<string, UserInfo> {
+  const { members, personalHandles } = useNamespace(handle ?? '');
   return useMemo(() => {
     const map = new Map<string, UserInfo>();
-    for (const user of users) {
+    for (const member of members) {
       const info: UserInfo = {
-        displayName: user.displayName ?? user.email ?? user.id,
-        photoURL: typeof user.photoURL === 'string' && user.photoURL !== '' ? user.photoURL : undefined,
+        displayName: member.displayName ?? member.uid,
+        photoURL: typeof member.avatarUrl === 'string' && member.avatarUrl !== '' ? member.avatarUrl : undefined,
+        personalHandle: personalHandles.get(member.uid),
       };
-      if (user.uid) map.set(user.uid, info);
-      map.set(user.id, info);
+      map.set(member.uid, info);
     }
     return map;
-  }, [users]);
+  }, [members, personalHandles]);
 }
 
-export function useUserDisplayNames(): Map<string, string> {
-  const profiles = useUserProfiles();
+export function useUserDisplayNames(handle: string | null | undefined): Map<string, string> {
+  const profiles = useUserProfiles(handle);
   return useMemo(() => {
     const map = new Map<string, string>();
     for (const [uid, info] of profiles) {
@@ -41,4 +34,9 @@ export function useUserDisplayNames(): Map<string, string> {
     }
     return map;
   }, [profiles]);
+}
+
+export function usePersonalHandles(handle: string | null | undefined): Map<string, string> {
+  const { personalHandles } = useNamespace(handle ?? '');
+  return personalHandles;
 }

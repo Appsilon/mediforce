@@ -82,8 +82,7 @@ Handler stays one file. New consumers wrap it from outside.
   — Mutation handler contract: error envelope, typed `ApiError`, HTTP
   status mapping, response shape, Server Action policy, audit-bridge.
 - [`docs/headless-migration.md`](./headless-migration.md)
-  — Living phased plan executing the separation. Gets deleted when the
-  migration completes; ADRs persist.
+  — Historical record; migration concluded in PR #534 (2026-05-31). ADRs persist.
 
 ## Adapter responsibilities, in detail
 
@@ -119,7 +118,7 @@ Trivial reads skip the handler file entirely via `listAdapter` /
 ## What never goes in a handler
 
 - `NextRequest`, `NextResponse`, `cookies()`, any Next.js import.
-- Firestore / Firebase Admin SDK imports.
+- Postgres / Drizzle imports (Firebase Admin SDK is Auth-only now).
 - Raw repositories from `@mediforce/platform-core/interfaces`.
   Handler receives `CallerScope` only; the static guard
   `no-raw-repo-imports.test.ts` (ADR-0004 §9) enforces this in CI.

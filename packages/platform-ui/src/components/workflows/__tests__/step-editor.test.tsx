@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { WorkflowStep } from '@mediforce/platform-core';
+import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 
 // ---- Mocks (must be before component import) ----
 
@@ -37,6 +38,10 @@ function buildStep(overrides: Partial<WorkflowStep> = {}): WorkflowStep {
 }
 
 const noop = () => {};
+
+const dockerImages: DockerImageInfo[] = [
+  { repository: 'mediforce/golden-image', tag: 'latest', id: 'abc', size: '1GB', created: '1d ago' },
+];
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -133,19 +138,19 @@ describe('StepEditor', () => {
     expect(screen.getByText('My Agent Step')).toBeInTheDocument();
   });
 
-  it('[RENDER] header shows executor label for agent step', () => {
+  it('[RENDER] header shows Agent label for assist agent step (L2)', () => {
     render(
       <StepEditor
-        step={buildStep({ executor: 'agent', type: 'creation' })}
+        step={buildStep({ executor: 'agent', autonomyLevel: 'L2', type: 'creation' })}
         allSteps={[]}
         onChange={noop}
       />,
     );
 
-    expect(screen.getByText('Agent')).toBeInTheDocument();
+    expect(screen.getAllByText('Agent').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('[RENDER] header shows executor label for human step', () => {
+  it('[RENDER] header shows Human executor label for human step', () => {
     render(
       <StepEditor
         step={buildStep({ executor: 'human', type: 'creation' })}
@@ -154,10 +159,10 @@ describe('StepEditor', () => {
       />,
     );
 
-    expect(screen.getByText('Human')).toBeInTheDocument();
+    expect(screen.getAllByText('Human').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('[RENDER] header shows executor label for script step', () => {
+  it('[RENDER] header shows Script executor label for script step', () => {
     render(
       <StepEditor
         step={buildStep({ executor: 'script', type: 'creation' })}
@@ -166,7 +171,7 @@ describe('StepEditor', () => {
       />,
     );
 
-    expect(screen.getByText('Script')).toBeInTheDocument();
+    expect(screen.getAllByText('Script').length).toBeGreaterThanOrEqual(1);
   });
 
   it('[RENDER] header shows Review type label for review step', () => {
@@ -208,7 +213,7 @@ describe('StepEditor', () => {
     );
 
     // Agent-specific labels should be visible
-    expect(screen.getByText('autonomyLevel')).toBeInTheDocument();
+    expect(screen.getAllByText('autonomy level').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('agentId')).toBeInTheDocument();
     expect(screen.getByText('agent.model')).toBeInTheDocument();
     expect(screen.getByText('agent.prompt')).toBeInTheDocument();
@@ -223,9 +228,9 @@ describe('StepEditor', () => {
       />,
     );
 
-    expect(screen.getByText('agent.runtime')).toBeInTheDocument();
-    expect(screen.getByText('agent.command')).toBeInTheDocument();
-    expect(screen.getByText('agent.inlineScript')).toBeInTheDocument();
+    expect(screen.getByText('script.runtime')).toBeInTheDocument();
+    expect(screen.getByText('script.command')).toBeInTheDocument();
+    expect(screen.getByText('script.inlineScript')).toBeInTheDocument();
   });
 
   it('[RENDER] human config shows allowedRoles field', () => {
@@ -255,5 +260,23 @@ describe('StepEditor', () => {
       (el) => el.getAttribute('placeholder') !== null && el.getAttribute('placeholder') !== '',
     );
     expect(inputsWithPlaceholder).toHaveLength(0);
+  });
+
+  it('[REGRESSION] allows custom agent image entry when Docker images are discovered', () => {
+    const onChange = vi.fn();
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent' })}
+        allSteps={[]}
+        onChange={onChange}
+        dockerImages={dockerImages}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Custom Docker image'), {
+      target: { value: 'python:3.11-slim' },
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ agent: { image: 'python:3.11-slim' } });
   });
 });

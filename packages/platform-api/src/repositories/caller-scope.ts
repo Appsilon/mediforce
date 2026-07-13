@@ -1,9 +1,12 @@
 import type { AgentRunner, PluginRegistry } from '@mediforce/agent-runtime';
 import type {
   AuditRepository,
+  BlobStore,
   CronTriggerStateRepository,
+  EmailProviderInfo,
   ModelRegistryRepository,
   NamespaceRepository,
+  PlatformSettingsRepository,
   UserDirectoryService,
   UserProfileRepository,
 } from '@mediforce/platform-core';
@@ -18,6 +21,7 @@ import type { RunKicker } from '../runtime/run-kicker';
 import type { DockerImagesService } from '../services/docker-images-service';
 import type { InviteNotificationService, InviteService } from '../services/invite-notification';
 import type { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository';
+import type { AuthorizedAgentEventRepository } from './authorized-agent-event-repository';
 import type { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository';
 import type { AuthorizedAgentRunRepository } from './authorized-agent-run-repository';
 import type { AuthorizedAuditEventRepository } from './authorized-audit-event-repository';
@@ -25,6 +29,7 @@ import type { AuthorizedCoworkSessionRepository } from './authorized-cowork-sess
 import type { AuthorizedHandoffRepository } from './authorized-handoff-repository';
 import type { AuthorizedHumanTaskRepository } from './authorized-human-task-repository';
 import type { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
+import type { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';
 import type { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
 import type { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository';
 import type { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository';
@@ -55,11 +60,13 @@ export interface CallerScope {
 
   // Workspace-scoped wrappers
   readonly tasks: AuthorizedHumanTaskRepository;
+  readonly attachments: AuthorizedTaskAttachmentRepository;
   readonly runs: AuthorizedWorkflowRunRepository;
   readonly workflowDefinitions: AuthorizedWorkflowDefinitionRepository;
   readonly agentDefinitions: AuthorizedAgentDefinitionRepository;
   readonly coworkSessions: AuthorizedCoworkSessionRepository;
   readonly agentRuns: AuthorizedAgentRunRepository;
+  readonly agentEvents: AuthorizedAgentEventRepository;
   readonly auditEvents: AuthorizedAuditEventRepository;
   readonly handoffs: AuthorizedHandoffRepository;
   readonly toolCatalog: AuthorizedToolCatalogRepository;
@@ -99,6 +106,12 @@ export interface SystemServices {
   readonly webhookRouter: WebhookRouter;
   readonly agentRunner: AgentRunner;
   /**
+   * Unscoped byte store for task attachments (ADR-0003). Reached only after a
+   * workspace-gated `scope.attachments` read yields a `blobKey` — the metadata
+   * layer is the authorization boundary, so the store itself needs no gate.
+   */
+  readonly blobStore: BlobStore;
+  /**
    * Raw audit-write surface — Phase 2 bridge per ADR-0005 §7. Handler-emitted
    * audit events use this; persistence-layer emission (post-headless-migration
    * audit-wiring phase) deletes this entry. Lives on `scope.system` rather
@@ -134,4 +147,6 @@ export interface SystemServices {
    * member rather than failing the whole response.
    */
   readonly userDirectory: UserDirectoryService | null;
+  readonly platformSettings: PlatformSettingsRepository;
+  readonly emailProviderInfo: EmailProviderInfo | null;
 }

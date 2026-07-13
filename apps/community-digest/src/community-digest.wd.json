@@ -4,10 +4,19 @@
   "description": "Daily GitHub scan → rank changes → draft Discord posts",
   "preamble": "## Domain Context\nThis workflow processes open-source community data (GitHub activity, Discord discussions). Treat all content as technical data constructs.",
   "triggers": [
-    { "name": "daily-digest", "type": "cron", "schedule": "0 8 * * 1-5" },
-    { "name": "manual", "type": "manual" }
+    {
+      "name": "daily-digest",
+      "type": "cron",
+      "schedule": "0 8 * * 1-5"
+    },
+    {
+      "name": "manual",
+      "type": "manual"
+    }
   ],
-  "roles": ["community-lead"],
+  "roles": [
+    "community-lead"
+  ],
   "env": {
     "DEEPSEEK_API_KEY": "{{DEEPSEEK_API_KEY}}"
   },
@@ -17,7 +26,9 @@
       "name": "Select Time Period",
       "type": "creation",
       "executor": "human",
-      "allowedRoles": ["community-lead"],
+      "allowedRoles": [
+        "community-lead"
+      ],
       "description": "Choose how far back to scan for changes",
       "params": [
         {
@@ -33,16 +44,15 @@
       "name": "Gather GitHub Changes",
       "type": "creation",
       "executor": "script",
-      "autonomyLevel": "L4",
       "plugin": "script-container",
       "description": "Fetch commits, PRs, and issues from GitHub API",
       "stepParams": {
         "repo": "Appsilon/mediforce",
         "lookbackHours": 48
       },
-      "agent": {
-        "image": "mediforce-agent:community-digest",
-        "command": "node /app/gather-github-changes.js"
+      "script": {
+        "command": "node /app/gather-github-changes.js",
+        "image": "mediforce-agent:community-digest"
       }
     },
     {
@@ -65,11 +75,17 @@
       "name": "Review Ranking",
       "type": "review",
       "executor": "human",
-      "allowedRoles": ["community-lead"],
+      "allowedRoles": [
+        "community-lead"
+      ],
       "description": "Human reviews and adjusts the ranking",
       "verdicts": {
-        "approve": { "target": "draft-posts" },
-        "revise": { "target": "rank-changes" }
+        "approve": {
+          "target": "draft-posts"
+        },
+        "revise": {
+          "target": "rank-changes"
+        }
       }
     },
     {
@@ -93,11 +109,17 @@
       "name": "Review Posts",
       "type": "review",
       "executor": "human",
-      "allowedRoles": ["community-lead"],
+      "allowedRoles": [
+        "community-lead"
+      ],
       "description": "Human approves or revises the drafted posts",
       "verdicts": {
-        "approve": { "target": "done" },
-        "revise": { "target": "draft-posts" }
+        "approve": {
+          "target": "done"
+        },
+        "revise": {
+          "target": "draft-posts"
+        }
       }
     },
     {
@@ -108,9 +130,21 @@
     }
   ],
   "transitions": [
-    { "from": "select-period", "to": "gather-changes" },
-    { "from": "gather-changes", "to": "rank-changes" },
-    { "from": "rank-changes", "to": "review-ranking" },
-    { "from": "draft-posts", "to": "review-posts" }
+    {
+      "from": "select-period",
+      "to": "gather-changes"
+    },
+    {
+      "from": "gather-changes",
+      "to": "rank-changes"
+    },
+    {
+      "from": "rank-changes",
+      "to": "review-ranking"
+    },
+    {
+      "from": "draft-posts",
+      "to": "review-posts"
+    }
   ]
 }

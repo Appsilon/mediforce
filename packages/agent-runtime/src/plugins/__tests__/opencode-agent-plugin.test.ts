@@ -2,9 +2,9 @@ import { mkdtemp, writeFile, rm, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
-import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin';
+import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/step-executor-plugin';
 import type { ProcessConfig } from '@mediforce/platform-core';
-import { OpenCodeAgentPlugin } from '../opencode-agent-plugin';
+import { OpenCodeAgentPlugin, normaliseModelId } from '../opencode-agent-plugin';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 
 const originalAllowLocal = process.env.ALLOW_LOCAL_AGENTS;
@@ -71,6 +71,29 @@ function buildEmitSpy(): { emit: EmitFn; events: EmitPayload[] } {
 function openCodeJsonOutput(response: string): string {
   return JSON.stringify({ type: 'text', part: { type: 'text', text: response } });
 }
+
+describe('normaliseModelId', () => {
+  it('converts first __ to /', () => {
+    expect(normaliseModelId('deepseek__deepseek-v4-flash:free')).toBe('deepseek/deepseek-v4-flash:free');
+  });
+
+  it('handles tilde-prefixed provider', () => {
+    expect(normaliseModelId('~anthropic__claude-haiku-latest')).toBe('~anthropic/claude-haiku-latest');
+  });
+
+  it('leaves already-normalised IDs unchanged', () => {
+    expect(normaliseModelId('deepseek/deepseek-chat')).toBe('deepseek/deepseek-chat');
+    expect(normaliseModelId('openrouter/deepseek/deepseek-chat')).toBe('openrouter/deepseek/deepseek-chat');
+  });
+
+  it('leaves bare model names unchanged', () => {
+    expect(normaliseModelId('gpt-4o')).toBe('gpt-4o');
+  });
+
+  it('only replaces the first __ occurrence', () => {
+    expect(normaliseModelId('provider__model__variant')).toBe('provider/model__variant');
+  });
+});
 
 describe('OpenCodeAgentPlugin', () => {
   let plugin: OpenCodeAgentPlugin;
@@ -212,7 +235,37 @@ describe('OpenCodeAgentPlugin', () => {
 
       const result = plugin.parseAgentOutput(stdout);
       const parsed = JSON.parse(result);
-      expect(parsed.usage).toEqual({ input_tokens: 3000, output_tokens: 1300 });
+      expect(parsed.usage).toEqual({ input_tokens: 3000, output_tokens: 1300, peak_input_tokens: 2000 });
+    });
+
+    it('[DATA] reports peak_input_tokens as the max single-turn prompt, not the sum', () => {
+      const agentResponse = JSON.stringify({ output_file: '/output/result.json', summary: 'Done' });
+      const stdout = [
+        JSON.stringify({ type: 'step_finish', part: { tokens: { input: 5000, output: 100 }, cost: 0.01 } }),
+        JSON.stringify({ type: 'step_finish', part: { tokens: { input: 42000, output: 300 }, cost: 0.02 } }),
+        JSON.stringify({ type: 'step_finish', part: { tokens: { input: 18000, output: 200 }, cost: 0.02 } }),
+        openCodeJsonOutput(agentResponse),
+      ].join('\n');
+
+      const result = plugin.parseAgentOutput(stdout);
+      const parsed = JSON.parse(result);
+      expect(parsed.usage.peak_input_tokens).toBe(42000);
+      expect(parsed.usage.input_tokens).toBe(65000);
+    });
+
+    it('[DATA] peak_input_tokens counts cached prompt tokens, not just uncached input', () => {
+      // With prompt caching on, `input` is only the uncached delta; the real
+      // context occupancy is input + cache.read + cache.write.
+      const agentResponse = JSON.stringify({ output_file: '/output/result.json', summary: 'Done' });
+      const stdout = [
+        JSON.stringify({ type: 'step_finish', part: { tokens: { input: 26, output: 100, cache: { read: 8158, write: 0 } }, cost: 0.01 } }),
+        JSON.stringify({ type: 'step_finish', part: { tokens: { input: 40, output: 200, cache: { read: 60000, write: 1200 } }, cost: 0.02 } }),
+        openCodeJsonOutput(agentResponse),
+      ].join('\n');
+
+      const result = plugin.parseAgentOutput(stdout);
+      const parsed = JSON.parse(result);
+      expect(parsed.usage.peak_input_tokens).toBe(61240); // 40 + 60000 + 1200
     });
 
     it('[DATA] omits usage when no step_finish events have tokens', () => {

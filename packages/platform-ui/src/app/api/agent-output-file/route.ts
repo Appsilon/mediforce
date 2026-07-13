@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getAdminAuth } from '@mediforce/platform-infra';
+import { attachmentContentDisposition, contentTypeForFilePath } from '@/lib/file-content-type';
 
 /**
  * Serves agent output files from allowed directories.
@@ -87,29 +88,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   try {
     const buffer = await readFile(resolved);
-    const ext = resolved.split('.').pop()?.toLowerCase() ?? '';
-    const contentTypeMap: Record<string, string> = {
-      html: 'text/html; charset=utf-8',
-      htm: 'text/html; charset=utf-8',
-      pdf: 'application/pdf',
-      csv: 'text/csv; charset=utf-8',
-      md: 'text/markdown; charset=utf-8',
-      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    };
-    const contentType = contentTypeMap[ext] ?? 'application/octet-stream';
+    const contentType = contentTypeForFilePath(resolved);
     const filename = resolved.split('/').pop() ?? 'download';
-    // RFC 6266: use filename* with percent-encoding for full Unicode and special-char safety.
-    const encodedFilename = encodeURIComponent(filename);
 
     const contentDisposition =
-      disposition === 'inline'
-        ? 'inline'
-        : `attachment; filename="${filename.replace(/"/g, '\\"')}"; filename*=UTF-8''${encodedFilename}`;
+      disposition === 'inline' ? 'inline' : attachmentContentDisposition(filename);
 
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': contentType,
         'Content-Disposition': contentDisposition,
+        // This route serves inline (iframe-embeddable), so pin the declared
+        // content-type and forbid MIME sniffing to close the sniff-to-execute gap.
+        'X-Content-Type-Options': 'nosniff',
       },
     });
   } catch {

@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { InstanceStatusSchema, ProcessInstanceSchema } from '@mediforce/platform-core';
+import {
+  InstanceStatusSchema,
+  ProcessInstanceSchema,
+  RunNameEntrySchema,
+} from '@mediforce/platform-core';
 
 /**
  * Contract for `GET /api/runs/<runId>`.
@@ -27,6 +31,7 @@ export const GetRunOutputSchema = z.object({
    *  servers that don't include the field. */
   definitionNamespace: z.string().min(1).nullable().optional(),
   totalCostUsd: z.number().optional(),
+  dryRun: z.boolean().optional(),
 });
 
 export type GetRunInput = z.infer<typeof GetRunInputSchema>;
@@ -40,6 +45,7 @@ export const StartRunInputSchema = z.object({
   triggerName: z.string().min(1).default('manual'),
   triggeredBy: z.string().min(1),
   payload: z.record(z.string(), z.unknown()).optional(),
+  dryRun: z.boolean().optional(),
 });
 
 export const StartRunOutputSchema = z.object({
@@ -70,6 +76,7 @@ export const ListRunsInputSchema = z.object({
   // more runs. Tracked in #588 alongside PR2's identical workaround — the
   // cap drops back to a sane page size once cursor pagination lands.
   limit: z.coerce.number().int().positive().max(10000).default(20),
+  dryRun: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
 });
 
 /**
@@ -87,3 +94,80 @@ export const ListRunsOutputSchema = z.object({
 
 export type ListRunsInput = z.infer<typeof ListRunsInputSchema>;
 export type ListRunsOutput = z.infer<typeof ListRunsOutputSchema>;
+
+/**
+ * Contract for `GET /api/runs/names`.
+ *
+ * Projected `{ id, definitionName }` slice scoped to one workspace — backs the
+ * UI label map (`useProcessNameMap`). Unlike `runs.list` (which is unscoped by
+ * default), `namespace` is REQUIRED: the map is always per-workspace, and the
+ * projection has no `limit`, so an unscoped call would be a whole-deployment
+ * read. Asking for a workspace the caller isn't in returns an empty list
+ * (intersection semantics, not an access check).
+ */
+export const ListRunNamesInputSchema = z.object({
+  namespace: z.string().min(1),
+});
+
+export const ListRunNamesOutputSchema = z.object({
+  runs: z.array(RunNameEntrySchema),
+});
+
+export type ListRunNamesInput = z.infer<typeof ListRunNamesInputSchema>;
+export type ListRunNamesOutput = z.infer<typeof ListRunNamesOutputSchema>;
+
+/**
+ * Contract for `GET /api/runs/<runId>/files`.
+ *
+ * Output Files: artifacts the runtime committed under
+ * `.mediforce/output/<stepId>/` on the run branch of the workflow's bare
+ * repo. `path` is the repo-relative download key for
+ * `GET /api/runs/<runId>/files/<path>` (binary route, not part of this
+ * JSON contract).
+ */
+export const ListRunOutputFilesInputSchema = z.object({
+  runId: z.string().min(1),
+});
+
+export const RunOutputFileEntrySchema = z.object({
+  stepId: z.string().min(1),
+  /** Path relative to `.mediforce/output/<stepId>/` (may contain slashes). */
+  name: z.string().min(1),
+  /** Repo-relative path `.mediforce/output/<stepId>/<name>` — the download key. */
+  path: z.string().min(1),
+  /** Blob size in bytes. */
+  size: z.number().int().nonnegative(),
+});
+
+export const ListRunOutputFilesOutputSchema = z.object({
+  files: z.array(RunOutputFileEntrySchema),
+});
+
+export type ListRunOutputFilesInput = z.infer<typeof ListRunOutputFilesInputSchema>;
+export type RunOutputFileEntry = z.infer<typeof RunOutputFileEntrySchema>;
+export type ListRunOutputFilesOutput = z.infer<typeof ListRunOutputFilesOutputSchema>;
+
+/**
+ * Client-side input for `GET /api/runs/<runId>/files/<path>` (binary
+ * download). The response is raw bytes, so there is no output schema —
+ * `mediforce.runs.downloadOutputFile` returns `{ fileName, contentType,
+ * bytes }` assembled from headers + body.
+ */
+export const DownloadRunOutputFileInputSchema = z.object({
+  runId: z.string().min(1),
+  /** Repo-relative path from `RunOutputFileEntry.path` (incl. `.mediforce/output/` prefix). */
+  path: z.string().min(1),
+});
+
+export type DownloadRunOutputFileInput = z.infer<typeof DownloadRunOutputFileInputSchema>;
+
+/**
+ * Client-side input for `GET /api/runs/<runId>/files/archive` (zip download).
+ * The response is a zip stream, so there is no output schema — the client
+ * returns `{ fileName, bytes }`.
+ */
+export const DownloadOutputFilesArchiveInputSchema = z.object({
+  runId: z.string().min(1),
+});
+
+export type DownloadOutputFilesArchiveInput = z.infer<typeof DownloadOutputFilesArchiveInputSchema>;

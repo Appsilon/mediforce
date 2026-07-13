@@ -1,4 +1,7 @@
-import type { CronTriggerState } from '../schemas/cron-trigger-state';
+import {
+  CronTriggerStateSchema,
+  type CronTriggerState,
+} from '../schemas/cron-trigger-state';
 import type { CronTriggerStateRepository } from '../interfaces/cron-trigger-state-repository';
 
 export class InMemoryCronTriggerStateRepository implements CronTriggerStateRepository {
@@ -13,6 +16,7 @@ export class InMemoryCronTriggerStateRepository implements CronTriggerStateRepos
   }
 
   async set(state: CronTriggerState): Promise<void> {
-    this.store.set(this.key(state.definitionName, state.triggerName), state);
+    const parsed = CronTriggerStateSchema.parse(state);
+    this.store.set(this.key(parsed.definitionName, parsed.triggerName), parsed);
   }
 }

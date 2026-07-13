@@ -2,13 +2,16 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { AgentRun, AgentRunStatus, ProcessInstance } from '@mediforce/platform-core';
-import { ApiError, mediforce } from '@/lib/mediforce';
+import type { AgentRun, AgentRunStatus } from '@mediforce/platform-core';
+import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
-import { useCollection } from './use-collection';
+import { stopRetryOn4xx } from '@/lib/retry';
+import {
+  CRITICAL_LIVE_INTERVAL_MS,
+  NICE_LIVE_INTERVAL_MS,
+  STANDARD_LIVE_INTERVAL_MS,
+} from '@/lib/polling-cadence';
 
-const STANDARD_LIVE_INTERVAL_MS = 5_000;
-const CRITICAL_LIVE_INTERVAL_MS = 1_500;
 const TERMINAL: ReadonlySet<AgentRunStatus> = new Set([
   'completed',
   'timed_out',
@@ -17,13 +20,6 @@ const TERMINAL: ReadonlySet<AgentRunStatus> = new Set([
   'escalated',
   'flagged',
 ]);
-
-// ADR-0006 §8a — 4xx is not transient; stop retrying so a 403/404 surfaces
-// immediately instead of burning the default two retries first.
-function stopRetryOn4xx(failureCount: number, err: unknown): boolean {
-  if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-  return failureCount < 2;
-}
 
 /**
  * Practical cap for the unbounded UI fetch. Pre-PR2 the page used a Firestore
@@ -139,15 +135,37 @@ export function useAgentRun(runId: string | null): {
 }
 
 /**
- * @deprecated Firestore-backed `processInstances` subscription kept here so
- * the agents list page can render definition-name labels until the
- * processes-domain react-query migration lands.
+ * Definition-name lookup map indexed by process-instance id, scoped to the
+ * active workspace `handle`. Uses the projected `mediforce.runs.listNames`
+ * endpoint (issue #588): only `{ id, definitionName }` per run, not the full
+ * `ProcessInstance` — the full-document `runs.list` path was ~24 s/request in
+ * dev for a 10k-run workspace.
+ *
+ * NICE LIVE (30 s): the map only changes when a new run lands, so a slower
+ * cadence plus `staleTime` cuts read volume on this loop without staleness the
+ * operator would notice.
  */
-export function useProcessNameMap(): Map<string, string> {
-  const { data: instances } = useCollection<ProcessInstance>('processInstances');
+export function useProcessNameMap(handle: string): Map<string, string> {
+  const query = useQuery({
+    queryKey: queryKeys.runs.nameMap(handle),
+    enabled: handle.length > 0,
+    staleTime: NICE_LIVE_INTERVAL_MS,
+    queryFn: async () => {
+      const result = await mediforce.runs.listNames({ namespace: handle });
+      return result.runs;
+    },
+    refetchInterval: (q) => {
+      // PRD §9 rule 4: terminate on 4xx so a session whose membership flipped
+      // stops polling this slice.
+      if (q.state.error !== null) return false;
+      return NICE_LIVE_INTERVAL_MS;
+    },
+    retry: stopRetryOn4xx,
+  });
+  const entries = query.data ?? [];
   return useMemo(() => {
     const map = new Map<string, string>();
-    for (const inst of instances) map.set(inst.id, inst.definitionName);
+    for (const entry of entries) map.set(entry.id, entry.definitionName);
     return map;
-  }, [instances]);
+  }, [entries]);
 }

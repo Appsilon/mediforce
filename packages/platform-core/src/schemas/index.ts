@@ -59,8 +59,10 @@ export {
 export {
   InstanceStatusSchema,
   ProcessInstanceSchema,
+  RunNameEntrySchema,
   type InstanceStatus,
   type ProcessInstance,
+  type RunNameEntry,
 } from './process-instance';
 
 export {
@@ -79,11 +81,13 @@ export {
 export {
   AnnotationSchema,
   GitMetadataSchema,
+  StepOutputEnvelopeSchema,
   AgentOutputEnvelopeSchema,
   TokenUsageSchema,
   type Annotation,
   type GitMetadata,
   type TokenUsage,
+  type StepOutputEnvelope,
   type AgentOutputEnvelope,
 } from './agent-output-envelope';
 
@@ -106,6 +110,14 @@ export {
   type HumanTaskStatus,
   type HumanTask,
 } from './human-task';
+
+export {
+  ATTACHMENT_MAX_BYTES,
+  TaskAttachmentSchema,
+  NewTaskAttachmentSchema,
+  type TaskAttachment,
+  type NewTaskAttachment,
+} from './task-attachment';
 
 export {
   HandoffStatusSchema,
@@ -145,12 +157,18 @@ export {
 } from './agent-mcp-binding';
 
 export {
+  ContainerSchema,
   WorkflowAgentConfigSchema,
+  ScriptStepConfigSchema,
+  DatabricksJobConfigSchema,
   WorkflowCoworkConfigSchema,
   WorkflowReviewConfigSchema,
   WorkflowWorkspaceSchema,
   WorkflowStepSchema,
   WorkflowVisibilitySchema,
+  WorkflowAuthorableSchema,
+  SERVER_MANAGED_WORKFLOW_FIELDS,
+  WorkflowSourceSchema,
   WorkflowDefinitionSchema,
   WorkflowDefinitionBaseSchema,
   WorkflowTemplateSchema,
@@ -170,12 +188,19 @@ export {
   validateTriggerInput,
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,
+  getWorkflowAuthorableJsonSchema,
+  resolveCoworkOutputSchema,
+  resolveStepTimeoutMinutes,
+  type ContainerConfig,
   type WorkflowAgentConfig,
+  type ScriptStepConfig,
+  type DatabricksJobConfig,
   type WorkflowCoworkConfig,
   type WorkflowReviewConfig,
   type WorkflowWorkspace,
   type WorkflowStep,
   type WorkflowVisibility,
+  type WorkflowSource,
   type WorkflowDefinition,
   type WorkflowTemplate,
   type InputForNextRunEntry,
@@ -206,6 +231,7 @@ export {
   type ToolTurn,
   type CoworkSessionStatus,
   type CoworkSession,
+  type OutputSchemaShape,
 } from './cowork-session';
 
 export {

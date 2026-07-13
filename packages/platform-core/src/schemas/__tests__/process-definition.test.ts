@@ -444,24 +444,22 @@ describe('ProcessDefinitionSchema', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.repo?.url).toBe('https://github.com/org/repo');
-      expect(result.data.repo?.branch).toBeUndefined();
-      expect(result.data.repo?.directory).toBeUndefined();
     }
   });
 
-  it('should accept a definition with repo including branch and directory', () => {
+  it('should accept a definition with repo including commit and auth', () => {
     const result = ProcessDefinitionSchema.safeParse({
       ...minimalDefinition,
       repo: {
         url: 'https://github.com/org/monorepo',
-        branch: 'main',
-        directory: 'packages/my-app',
+        commit: 'abc1234',
+        auth: 'GITHUB_TOKEN',
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.repo?.branch).toBe('main');
-      expect(result.data.repo?.directory).toBe('packages/my-app');
+      expect(result.data.repo?.commit).toBe('abc1234');
+      expect(result.data.repo?.auth).toBe('GITHUB_TOKEN');
     }
   });
 
@@ -476,7 +474,7 @@ describe('ProcessDefinitionSchema', () => {
   it('should reject repo without url field', () => {
     const result = ProcessDefinitionSchema.safeParse({
       ...minimalDefinition,
-      repo: { branch: 'main' },
+      repo: { auth: 'GITHUB_TOKEN' },
     });
     expect(result.success).toBe(false);
   });

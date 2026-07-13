@@ -1,6 +1,18 @@
 import { z } from 'zod';
 import { McpServerConfigSchema } from './mcp-server-config';
 
+/**
+ * Shape expected by `validateOutputSchema` — the structural subset of JSON
+ * Schema used for cowork artifact validation. Defined here (next to the
+ * `outputSchema` field on CoworkSession) so both platform-api handlers and
+ * agent-runtime can import it without circular deps.
+ */
+export interface OutputSchemaShape {
+  type?: string;
+  required?: string[];
+  properties?: Record<string, { type?: string }>;
+}
+
 // ---------------------------------------------------------------------------
 // ConversationTurn — a single message in a cowork conversation
 // ---------------------------------------------------------------------------
@@ -35,6 +47,9 @@ export const ToolTurnSchema = z.object({
   toolStatus: z.enum(['running', 'success', 'error']),
   /** MCP server name that owns this tool */
   serverName: z.string(),
+  /** OpenRouter tool_call_id — links this result to the assistant's tool_calls entry.
+   *  Optional for backward compat with sessions created before this field existed. */
+  toolCallId: z.string().optional(),
 });
 
 export const ConversationTurnSchema = z.discriminatedUnion('role', [
@@ -74,12 +89,24 @@ export const CoworkSessionSchema = z.object({
   assignedRole: z.string().min(1),
   assignedUserId: z.string().nullable(),
   status: CoworkSessionStatusSchema,
-  agent: CoworkAgentSchema,
+  // Legacy sessions created before the `agent` field existed predate
+  // voice-realtime — they were all chat. Default keeps full-scan reads
+  // tolerant of those docs instead of failing the whole list.
+  agent: CoworkAgentSchema.default('chat'),
   model: z.string().nullable(),
   systemPrompt: z.string().nullable(),
   outputSchema: z.record(z.string(), z.unknown()).nullable(),
-  voiceConfig: CoworkVoiceConfigSchema.nullable(),
+  // Legacy chat-only sessions predate voice — they have no voiceConfig.
+  // Default null keeps full-scan reads tolerant of those docs.
+  voiceConfig: CoworkVoiceConfigSchema.nullable().default(null),
   artifact: z.record(z.string(), z.unknown()).nullable(),
+  /** Validation result from the last update_artifact call */
+  validationResult: z.object({
+    valid: z.boolean(),
+    errors: z.array(z.string()),
+  }).nullable().default(null),
+  /** HTML presentation produced by the agent via update_presentation */
+  presentation: z.string().nullable().default(null),
   /** MCP servers available during this cowork session */
   mcpServers: z.array(McpServerConfigSchema).nullable().default(null),
   turns: z.array(ConversationTurnSchema),

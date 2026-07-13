@@ -4,10 +4,13 @@ import type {
   StepExecution,
   HumanTask,
   AgentRun,
+  AgentEvent,
   AuditEvent,
   ProcessConfig,
+  StepOutputEnvelope,
   AgentOutputEnvelope,
   FileMetadata,
+  TaskAttachment,
 } from '../index';
 import type { WorkflowDefinition } from '../schemas/workflow-definition';
 import type { CoworkSession } from '../schemas/cowork-session';
@@ -103,6 +106,7 @@ export function buildProcessInstance(
     assignedRoles: [],
     deleted: false,
     archived: false,
+    dryRun: false,
     namespace: 'test',
     ...overrides,
   };
@@ -154,6 +158,45 @@ export function buildHumanTask(
     updatedAt: DEFAULT_UPDATED_TIMESTAMP,
     completedAt: null,
     completionData: null,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// buildTaskAttachment
+// ---------------------------------------------------------------------------
+
+export function buildTaskAttachment(
+  overrides?: Partial<TaskAttachment>,
+): TaskAttachment {
+  _seq += 1;
+  const id = `00000000-0000-4000-8000-${String(_seq).padStart(12, '0')}`;
+  return {
+    id,
+    taskId: 'task-0001',
+    workspace: 'ws-1',
+    name: 'dataset.csv',
+    contentType: 'text/csv',
+    sizeBytes: 1024,
+    blobKey: id,
+    uploadedBy: 'uid-uploader',
+    uploadedAt: DEFAULT_TIMESTAMP,
+    deletedAt: null,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// buildStepOutputEnvelope
+// ---------------------------------------------------------------------------
+
+export function buildStepOutputEnvelope(
+  overrides?: Partial<StepOutputEnvelope>,
+): StepOutputEnvelope {
+  return {
+    duration_ms: 1500,
+    result: { status: 'ok' },
+    annotations: [],
     ...overrides,
   };
 }
@@ -232,6 +275,26 @@ export function buildAuditEvent(
     entityId: 'exec-0001',
     processInstanceId: 'inst-0001',
     stepId: 'step-intake',
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// buildAgentEvent
+// ---------------------------------------------------------------------------
+
+export function buildAgentEvent(
+  overrides?: Partial<AgentEvent>,
+): AgentEvent {
+  const id = nextId('evt');
+  return {
+    id,
+    processInstanceId: 'inst-0001',
+    stepId: 'step-analyze',
+    type: 'status',
+    payload: null,
+    timestamp: DEFAULT_TIMESTAMP,
+    sequence: 0,
     ...overrides,
   };
 }
@@ -351,6 +414,8 @@ export function buildCoworkSession(
     outputSchema: null,
     voiceConfig: null,
     artifact: null,
+    validationResult: null,
+    presentation: null,
     mcpServers: null,
     turns: [],
     createdAt: DEFAULT_TIMESTAMP,

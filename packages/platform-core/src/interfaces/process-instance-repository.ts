@@ -1,4 +1,4 @@
-import type { ProcessInstance } from '../schemas/process-instance';
+import type { ProcessInstance, RunNameEntry } from '../schemas/process-instance';
 import type { StepExecution } from '../schemas/step-execution';
 import type { InstanceStatus } from '../schemas/process-instance';
 
@@ -18,6 +18,25 @@ export interface ListInstancesOptions {
    */
   namespace?: string;
   limit?: number;
+  dryRun?: boolean;
+}
+
+/**
+ * Per-workflow run aggregate for the workspace home cards. Computed without
+ * shipping the whole run collection: `total` / `active` come from Firestore
+ * count() aggregations (no document reads), `latest` from a bounded
+ * `orderBy(createdAt desc).limit(3)` query.
+ *
+ * Always excludes soft-deleted (`deleted`) and user-archived (`archived`)
+ * runs — the home cards never show either. `active` counts runs in
+ * {running, created, paused} and is unaffected by `includeCompleted`. When
+ * `includeCompleted` is false, `total` and `latest` exclude terminal
+ * (completed / failed) runs.
+ */
+export interface WorkflowRunSummaryResult {
+  total: number;
+  active: number;
+  latest: ProcessInstance[];
 }
 
 /**
@@ -52,6 +71,24 @@ export interface ProcessInstanceRepository {
   listAll(options: ListInstancesOptions): Promise<ProcessInstance[]>;
   listInNamespaces(allowed: readonly string[], options: ListInstancesOptions): Promise<ProcessInstance[]>;
 
+  /**
+   * Projected `{ id, definitionName }` view of every non-deleted run in a
+   * namespace. Backs the workspace label map (`useProcessNameMap`), which only
+   * reads those two fields — the full-document `listAll` path was 24 s/request
+   * in dev for a 10k-run workspace (issue #588). Projects only those two
+   * columns instead of `SELECT *`, so it never pulls the large
+   * `variables`/`trigger_payload`/`previous_run` jsonb blobs that `runs.list`
+   * returns by contract.
+   *
+   * Deliberately UNBOUNDED (no limit) to mirror `listAll`'s
+   * `deleted_at IS NULL` filter — returns one entry per non-deleted run in the
+   * namespace. The legacy `runs.list({ limit: 10000 })` workaround was a cap on
+   * the full-document path; this projection drops it to restore the "read all"
+   * parity the map depends on. Fails loud on a row missing `definitionName`
+   * rather than defaulting.
+   */
+  listDefinitionNames(namespace: string): Promise<RunNameEntry[]>;
+
   getByStatusAll(status: InstanceStatus): Promise<ProcessInstance[]>;
   getByStatusInNamespaces(status: InstanceStatus, allowed: readonly string[]): Promise<ProcessInstance[]>;
 
@@ -83,4 +120,16 @@ export interface ProcessInstanceRepository {
 
   getIdsByDefinitionName(name: string): Promise<string[]>;
   setDeletedByDefinitionName(name: string, deleted: boolean): Promise<void>;
+
+  /**
+   * Per-workflow run aggregate for the workspace home cards. Scoped by
+   * (`namespace`, `definitionName` == `name`). Uses count aggregations for
+   * `total` / `active` (no document reads) plus a bounded latest-3 query — so
+   * the home page never re-reads the whole run collection on every poll.
+   */
+  summarizeRunsByWorkflow(
+    namespace: string,
+    name: string,
+    includeCompleted: boolean,
+  ): Promise<WorkflowRunSummaryResult>;
 }

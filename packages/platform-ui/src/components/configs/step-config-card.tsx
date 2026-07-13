@@ -106,11 +106,9 @@ const executorTypeOptions = [
 ];
 
 const autonomyLevelOptions = [
-  { value: 'L0', label: 'L0 — No automation' },
-  { value: 'L1', label: 'L1 — Assisted' },
-  { value: 'L2', label: 'L2 — Supervised' },
-  { value: 'L3', label: 'L3 — Autonomous with review' },
-  { value: 'L4', label: 'L4 — Fully autonomous' },
+  { value: 'L2', label: 'Assist — agent draft, human approves' },
+  { value: 'L3', label: 'Human review — agent output, explicit approval' },
+  { value: 'L4', label: 'Autonomous agent — executes without review' },
 ];
 
 const reviewerTypeOptions = [
@@ -250,7 +248,7 @@ export function StepConfigCard({
           {/* Executor section */}
           <div className="grid grid-cols-2 gap-4">
             <SelectField
-              label="Executor Type"
+              label="Executor type"
               value={config.executorType}
               onValueChange={(v) =>
                 updateField('executorType', v as StepConfig['executorType'])
@@ -260,7 +258,7 @@ export function StepConfigCard({
               hasError={fieldErrors('executorType').length > 0}
             />
             <SelectField
-              label="Autonomy Level"
+              label="Autonomy level"
               value={config.autonomyLevel ?? 'L4'}
               onValueChange={(v) =>
                 updateField('autonomyLevel', v as StepConfig['autonomyLevel'])

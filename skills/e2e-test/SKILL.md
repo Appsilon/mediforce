@@ -1,13 +1,13 @@
 ---
 name: e2e-test
-description: Write, run, and record E2E journey tests. Use when implementing UI features (TDD red-green), adding tests for existing features, or when E2E tests need updating. Handles the full workflow: write test → run → record GIF → update gallery.
+description: Write and run L4 UI E2E journey tests. Use when implementing UI features (TDD red-green), adding tests for existing features, or when E2E tests need updating. Handles the workflow: write test → run → green.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 metadata:
   author: Appsilon
   version: "1.0"
   domain: testing
   complexity: intermediate
-  tags: e2e, playwright, testing, recording, gif
+  tags: e2e, playwright, testing
 ---
 
 # E2E Journey Tests
@@ -42,38 +42,30 @@ packages/platform-ui/e2e/ui/<feature-name>.journey.ts
 ```typescript
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
+import { trackPageErrors } from '../helpers/page-errors';
 
 test.describe('<Feature> Journey', () => {
-  test('<what the user does>', async ({ page }, testInfo) => {
-    await setupRecording(page, '<gif-name>', testInfo);
+  test('<what the user does>', async ({ page }) => {
+    trackPageErrors(page);
 
     // Entry point
     await page.goto(`/${TEST_ORG_HANDLE}/<path>`);
     await expect(page.getByRole('heading', { name: '<title>' })).toBeVisible({ timeout: 10_000 });
-    await showStep(page);
 
     // Navigate by clicking
-    await click(page, page.getByText('<link text>'));
-    await showStep(page);
+    await page.getByText('<link text>').click();
 
     // Complete the action
-    await click(page, page.getByRole('button', { name: /submit/i }));
+    await page.getByRole('button', { name: /submit/i }).click();
     await expect(page.getByText(/success/i)).toBeVisible({ timeout: 15_000 });
-    await showResult(page);
-
-    await endRecording(page);
   });
 });
 ```
 
 ### 3. Key helpers
 
-- `setupRecording(page, 'gif-name', testInfo)` — first line, names the GIF
-- `click(page, locator)` — use instead of `locator.click()` (shows cursor in recordings)
-- `showStep(page)` — 1.5s pause at intermediate steps (recording only)
-- `showResult(page)` — 2.5s pause at key outcomes (recording only)
-- `endRecording(page)` — last line, moves cursor to center for seamless GIF loop
+- `trackPageErrors(page)` — first line; collects page/console errors so you can assert none occurred via `getPageErrors(page)`
+- `allowPageErrors(page, [...])` — filter out test-environment-only errors that cannot occur in production
 - `{ timeout: 10_000 }` — on first assertion after page load
 
 ### 4. If test mutates state
@@ -98,16 +90,11 @@ pnpm test:e2e -- --grep "<test name>"
 
 # Run all E2E
 pnpm test:e2e
-
-# Record + convert to GIFs (run from packages/platform-ui)
-cd packages/platform-ui && pnpm test:e2e:gif
 ```
 
 ## After Test Passes
 
-1. **Record**: `cd packages/platform-ui && pnpm test:e2e:gif`
-2. **Update gallery**: add entry to `docs/features/FEATURES.md`
-3. **Commit**: GIF + FEATURES.md + test file in same PR
+Commit the test file with the feature code in the same PR.
 
 ## Debugging Failures
 

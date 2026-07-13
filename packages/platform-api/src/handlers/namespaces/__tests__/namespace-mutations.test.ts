@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import type { AuditEvent } from '@mediforce/platform-core';
 import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
 import {
   deleteNamespace,
@@ -9,6 +10,40 @@ import {
 } from '../namespace-mutations';
 import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../../errors';
 import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index';
+
+/**
+ * `InMemoryAuditRepository` strips the write-time `namespace` hint before
+ * storing, so `getAll()` cannot prove a handler supplied the FK-valid
+ * workspace the Postgres backend requires (RC2). This double records the raw
+ * `namespace` passed to `append` so tests can assert it directly.
+ */
+class RecordingAuditRepo extends InMemoryAuditRepository {
+  readonly appendedNamespaces: (string | undefined)[] = [];
+  override async append(
+    event: Omit<AuditEvent, 'serverTimestamp'>,
+  ): Promise<AuditEvent> {
+    this.appendedNamespaces.push(event.namespace);
+    return super.append(event);
+  }
+}
+
+/**
+ * `InMemoryNamespaceRepo` that records the relative order of an audit emit vs.
+ * the cascade delete — `deleteNamespace` must emit BEFORE the cascade so the
+ * audit row's workspace FK still resolves (and is anchored to a surviving
+ * workspace).
+ */
+class OrderedNamespaceRepo extends InMemoryNamespaceRepo {
+  cascadeAt = -1;
+  private clock: () => number = () => -1;
+  bindClock(clock: () => number): void {
+    this.clock = clock;
+  }
+  override async deleteNamespaceCascade(handle: string): Promise<void> {
+    this.cascadeAt = this.clock();
+    await super.deleteNamespaceCascade(handle);
+  }
+}
 
 const HANDLE = 'acme';
 const ownerCaller = userCaller('uid-owner', [HANDLE], new Map([[HANDLE, 'owner']]));
@@ -94,6 +129,18 @@ describe('updateNamespace handler', () => {
 describe('deleteNamespace handler', () => {
   let namespaceRepo: InMemoryNamespaceRepo;
   let auditRepo: InMemoryAuditRepository;
+  // The owner's personal namespace anchors the deletion audit (survives the
+  // workspace cascade). Seeded only by the tests that reach the audit emit.
+  function seedOwnerPersonal(): void {
+    namespaceRepo.seedNamespace({
+      handle: 'uid-owner',
+      type: 'personal',
+      displayName: 'Owner',
+      linkedUserId: 'uid-owner',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    namespaceRepo.seedMember('uid-owner', { uid: 'uid-owner', role: 'owner', joinedAt: '2026-01-01T00:00:00.000Z' });
+  }
   beforeEach(() => {
     namespaceRepo = seededRepo();
     auditRepo = new InMemoryAuditRepository();
@@ -131,11 +178,69 @@ describe('deleteNamespace handler', () => {
   });
 
   it('emits namespace.deleted exactly once on success', async () => {
+    seedOwnerPersonal();
     const scope = createTestScope({ namespaceRepo, auditRepo, caller: ownerCaller });
     await deleteNamespace({ handle: HANDLE }, scope);
     const events = auditRepo.getAll().filter((e) => e.action === 'namespace.deleted');
     expect(events).toHaveLength(1);
     expect(events[0]?.entityId).toBe(HANDLE);
+  });
+
+  it('anchors the audit event to the owner personal namespace, which survives the cascade', async () => {
+    seedOwnerPersonal();
+    const recording = new RecordingAuditRepo();
+    const scope = createTestScope({ namespaceRepo, auditRepo: recording, caller: ownerCaller });
+    await deleteNamespace({ handle: HANDLE }, scope);
+    // NOT the deleted org handle — that workspace is gone after the cascade
+    // (audit_events.workspace is ON DELETE CASCADE), so attributing the
+    // deletion to it would wipe the row. The owner personal namespace survives.
+    expect(recording.appendedNamespaces).toEqual(['uid-owner']);
+    expect(namespaceRepo.namespaces.get('uid-owner')).toBeDefined();
+  });
+
+  it('emits the audit event BEFORE the cascade delete (FK target still present)', async () => {
+    const orderedRepo = new OrderedNamespaceRepo();
+    orderedRepo.seedNamespace({
+      handle: HANDLE,
+      type: 'organization',
+      displayName: 'Acme Co.',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    orderedRepo.seedMember(HANDLE, { uid: 'uid-owner', role: 'owner', joinedAt: '2026-01-01T00:00:00.000Z' });
+    orderedRepo.seedNamespace({
+      handle: 'uid-owner',
+      type: 'personal',
+      displayName: 'Owner',
+      linkedUserId: 'uid-owner',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    orderedRepo.seedMember('uid-owner', { uid: 'uid-owner', role: 'owner', joinedAt: '2026-01-01T00:00:00.000Z' });
+
+    let tick = 0;
+    let emitAt = -1;
+    const recording = new RecordingAuditRepo();
+    const originalAppend = recording.append.bind(recording);
+    recording.append = async (event) => {
+      emitAt = tick++;
+      return originalAppend(event);
+    };
+    orderedRepo.bindClock(() => tick++);
+
+    const scope = createTestScope({ namespaceRepo: orderedRepo, auditRepo: recording, caller: ownerCaller });
+    await deleteNamespace({ handle: HANDLE }, scope);
+
+    expect(emitAt).toBeGreaterThanOrEqual(0);
+    expect(orderedRepo.cascadeAt).toBeGreaterThan(emitAt);
+  });
+
+  it('apiKey caller (no personal namespace) falls back to the deleted handle and still succeeds', async () => {
+    const recording = new RecordingAuditRepo();
+    const scope = createTestScope({ namespaceRepo, auditRepo: recording });
+    const result = await deleteNamespace({ handle: HANDLE }, scope);
+    expect(result).toEqual({ handle: HANDLE });
+    // FK-valid at insert (emitted before the cascade); no personal namespace
+    // to anchor to, so the deleted handle is used.
+    expect(recording.appendedNamespaces).toEqual([HANDLE]);
   });
 });
 
@@ -213,6 +318,13 @@ describe('leaveNamespace handler', () => {
     expect(events[0]?.actorId).toBe('uid-member');
     expect(events[0]?.entityId).toBe(HANDLE);
   });
+
+  it('attributes the audit event to the mutated workspace (FK-valid on Postgres)', async () => {
+    const recording = new RecordingAuditRepo();
+    const scope = createTestScope({ namespaceRepo, auditRepo: recording, caller: memberCaller });
+    await leaveNamespace({ handle: HANDLE }, scope);
+    expect(recording.appendedNamespaces).toEqual([HANDLE]);
+  });
 });
 
 describe('removeNamespaceMember handler', () => {
@@ -259,6 +371,13 @@ describe('removeNamespaceMember handler', () => {
     const events = auditRepo.getAll().filter((e) => e.action === 'namespace.member_removed');
     expect(events).toHaveLength(1);
     expect(events[0]?.entityId).toBe(HANDLE);
+  });
+
+  it('attributes the audit event to the mutated workspace (FK-valid on Postgres)', async () => {
+    const recording = new RecordingAuditRepo();
+    const scope = createTestScope({ namespaceRepo, auditRepo: recording, caller: ownerCaller });
+    await removeNamespaceMember({ handle: HANDLE, uid: 'uid-member' }, scope);
+    expect(recording.appendedNamespaces).toEqual([HANDLE]);
   });
 });
 
@@ -307,5 +426,12 @@ describe('updateNamespaceMemberRole handler', () => {
     const events = auditRepo.getAll().filter((e) => e.action === 'namespace.member_role_changed');
     expect(events).toHaveLength(1);
     expect(events[0]?.entityId).toBe(HANDLE);
+  });
+
+  it('attributes the audit event to the mutated workspace (FK-valid on Postgres)', async () => {
+    const recording = new RecordingAuditRepo();
+    const scope = createTestScope({ namespaceRepo, auditRepo: recording, caller: ownerCaller });
+    await updateNamespaceMemberRole({ handle: HANDLE, uid: 'uid-member', role: 'admin' }, scope);
+    expect(recording.appendedNamespaces).toEqual([HANDLE]);
   });
 });

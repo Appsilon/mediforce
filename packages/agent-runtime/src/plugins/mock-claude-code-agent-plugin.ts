@@ -1,9 +1,16 @@
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
-import type { AgentContext, AgentPlugin, EmitFn, WorkflowAgentContext } from '../interfaces/agent-plugin';
+import type { AgentContext, StepExecutorPlugin, EmitFn, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
 import { ClaudeCodeAgentPlugin } from './claude-code-agent-plugin';
 
-export class MockClaudeCodeAgentPlugin implements AgentPlugin {
-  readonly metadata: PluginCapabilityMetadata = new ClaudeCodeAgentPlugin().metadata;
+export class MockClaudeCodeAgentPlugin implements StepExecutorPlugin {
+  // The mock emits a deterministic result without spawning a container, so it
+  // has none of the real plugin's implicit env requirements. Drop requiredEnv
+  // so the run preflight does not block MOCK_AGENT runs (e2e, local dev) that
+  // legitimately lack ANTHROPIC_API_KEY / OPENROUTER_API_KEY.
+  readonly metadata: PluginCapabilityMetadata = {
+    ...new ClaudeCodeAgentPlugin().metadata,
+    requiredEnv: undefined,
+  };
 
   private context: AgentContext | WorkflowAgentContext | null = null;
 

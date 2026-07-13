@@ -1,6 +1,7 @@
 import { emitAudit } from '../../audit-helpers';
-import { ForbiddenError, ValidationError } from '../../errors';
+import { ForbiddenError, PreconditionFailedError, ValidationError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
+import { resolvePersonalNamespace } from '../_helpers';
 import type {
   ClearMustChangePasswordInput,
   ClearMustChangePasswordOutput,
@@ -18,6 +19,13 @@ export async function clearMustChangePassword(
 
   await scope.userProfiles.setMustChangePassword(uid, false);
 
+  const namespace = await resolvePersonalNamespace(scope, uid);
+  if (namespace === null) {
+    throw new PreconditionFailedError(
+      `Cannot attribute password-change audit event to a workspace: user '${uid}' has no namespace.`,
+    );
+  }
+
   await emitAudit(scope.system.audit, scope.caller, {
     action: 'user.password_change_acknowledged',
     description: `User '${uid}' acknowledged forced password change`,
@@ -26,6 +34,7 @@ export async function clearMustChangePassword(
     basis: 'User completed forced password change',
     entityType: 'user',
     entityId: uid,
+    namespace,
   });
 
   return { user: { uid, mustChangePassword: false } };

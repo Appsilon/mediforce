@@ -10,10 +10,9 @@
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "autonomyLevel": "L4",
-      "agent": {
-        "runtime": "python",
-        "inlineScript": "import json, os\ntry:\n    with open('/output/previous_run.json') as f:\n        prev = json.load(f)\nexcept FileNotFoundError:\n    prev = {}\nmsg = prev.get('message')\nif msg:\n    summary = f\"Previous run said: {msg!r}\"\nelse:\n    summary = 'Previous run said nothing (first run, predecessor failed, or no message was set).'\nwith open('/output/result.json', 'w') as f:\n    json.dump({'summary': summary, 'previousMessage': msg}, f)\nprint(summary)"
+      "script": {
+        "inlineScript": "import json, os\ntry:\n    with open('/output/previous_run.json') as f:\n        prev = json.load(f)\nexcept FileNotFoundError:\n    prev = {}\nmsg = prev.get('message')\nif msg:\n    summary = f\"Previous run said: {msg!r}\"\nelse:\n    summary = 'Previous run said nothing (first run, predecessor failed, or no message was set).'\nwith open('/output/result.json', 'w') as f:\n    json.dump({'summary': summary, 'previousMessage': msg}, f)\nprint(summary)",
+        "runtime": "python"
       }
     },
     {
@@ -21,7 +20,9 @@
       "name": "Set message for next run",
       "type": "creation",
       "executor": "human",
-      "allowedRoles": ["operator"],
+      "allowedRoles": [
+        "operator"
+      ],
       "description": "Type a message in the form below. The next run of this workflow will see it as `previousRun.message`.",
       "params": [
         {
@@ -40,11 +41,26 @@
     }
   ],
   "transitions": [
-    { "from": "echo-previous", "to": "set-next" },
-    { "from": "set-next", "to": "done" }
+    {
+      "from": "echo-previous",
+      "to": "set-next"
+    },
+    {
+      "from": "set-next",
+      "to": "done"
+    }
   ],
-  "triggers": [{ "type": "manual", "name": "Start" }],
+  "triggers": [
+    {
+      "type": "manual",
+      "name": "Start"
+    }
+  ],
   "inputForNextRun": [
-    { "stepId": "set-next", "output": "message", "as": "message" }
+    {
+      "stepId": "set-next",
+      "output": "message",
+      "as": "message"
+    }
   ]
 }

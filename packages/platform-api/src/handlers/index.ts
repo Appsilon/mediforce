@@ -1,11 +1,20 @@
 export { listTasks } from './tasks/list-tasks';
 export { claimTask } from './tasks/claim-task';
 export { completeTask } from './tasks/complete-task';
+export { listAttachments } from './tasks/attachments/list';
+export { uploadAttachment } from './tasks/attachments/upload';
+export { deleteAttachment } from './tasks/attachments/delete';
+export {
+  getAttachmentBlob,
+  type GetAttachmentBlobResult,
+} from './tasks/attachments/get-blob';
 export { listModels, type ListModelsDeps } from './models/list-models';
 export { getModel, type GetModelDeps } from './models/get-model';
 export { syncModels, type SyncModelsDeps } from './models/sync-models';
 export { updateRankings, type UpdateRankingsDeps } from './models/update-rankings';
+export { validateModels, type ValidateModelsDeps } from './models/validate-models';
 
+export { listAgentEvents } from './processes/list-agent-events';
 export { listAuditEvents } from './processes/list-audit-events';
 export { getProcessSteps } from './processes/get-process-steps';
 export { cancelRun } from './processes/cancel-run';
@@ -31,8 +40,11 @@ export {
 } from './agents/oauth-tokens';
 
 export { listWorkflows } from './workflows/list-workflows';
+export { listWorkflowVersions } from './workflows/list-workflow-versions';
 export { getWorkflow } from './workflows/get-workflow';
 export { registerWorkflow } from './workflows/register-workflow';
+export { validateWorkflow } from './workflows/validate-workflow';
+export { getWorkflowSchema } from './workflows/get-workflow-schema';
 export { setWorkflowVisibility } from './workflows/set-visibility';
 export {
   archiveWorkflow,
@@ -42,12 +54,16 @@ export { copyWorkflow } from './workflows/copy-workflow';
 export { setDefaultWorkflowVersion } from './workflows/set-default-version';
 export { deleteWorkflow } from './workflows/delete-workflow';
 export { transferWorkflowNamespace } from './workflows/transfer-workflow';
+export { importWorkflow } from './workflows/import-workflow';
+export { getManifest } from './workflows/get-manifest';
 export { getWorkflowRunCount } from './workflows/get-run-count';
+export { checkRetiredModels } from './workflows/retired-model-check';
 
-export { getCoworkSessionByInstance } from './cowork/get-cowork-session-by-instance';
 export { chatCoworkSession } from './cowork/chat';
-export { finalizeCoworkSession } from './cowork/finalize';
 export { createVoiceEphemeralKey } from './cowork/voice-ephemeral-key';
+export { finalizeCoworkSession } from './cowork/finalize';
+export { getCoworkSessionByInstance } from './cowork/get-cowork-session-by-instance';
+export { listCoworkSessions } from './cowork/list-cowork-sessions';
 export { synthesizeVoiceArtifact } from './cowork/voice-synthesize';
 
 export { listPlugins } from './plugins/list-plugins';
@@ -55,8 +71,10 @@ export { listPlugins } from './plugins/list-plugins';
 export { heartbeat as cronHeartbeat } from './cron/heartbeat';
 
 export { listRuns } from './runs/list-runs';
+export { listRunNames } from './runs/list-run-names';
 export { getRun } from './runs/get-run';
 export { startRun } from './runs/start-run';
+export { listRunOutputFiles } from './runs/list-output-files';
 
 export { listSecretKeys } from './secrets/list-secret-keys';
 export { setSecret } from './secrets/set-secret';
@@ -68,6 +86,7 @@ export { saveWorkflowSecrets } from './secrets/save-workflow-secrets';
 
 export { getDockerInfo } from './system/get-docker-info';
 export { getOpenRouterCredits } from './system/get-openrouter-credits';
+export { getEmailStatus } from './admin/email-status';
 
 export { deleteDockerImage } from './docker-images/delete-image';
 
@@ -102,4 +121,10 @@ export { deleteToolCatalogEntry } from './tool-catalog/delete-entry';
 export { listAgentRuns } from './agent-runs/list-agent-runs';
 export { getMonitoringSummary } from './monitoring/get-monitoring-summary';
 
+export { getConfig, getConfigByPrefix } from './config/index';
+export { setConfig } from './config/index';
+export { testWebhook } from './config/index';
+
 export { listAdapter, getByIdAdapter } from './_generic';
+
+export { renderWorkflowDiagram, renderWorkflowDiagramHandler, RenderWorkflowDiagramInputSchema } from './renders/workflow-diagram';

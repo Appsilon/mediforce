@@ -4,12 +4,13 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Save } from 'lucide-react';
-import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
+import { useWorkflowVersion } from '@/hooks/use-workflow-versions';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { mediforce, ApiError } from '@/lib/mediforce';
-import { parseStepErrors, validateSteps, mergeVerdictTransitions } from '@/lib/workflow-save-utils';
+import { parseStepErrors, validateSteps, mergeVerdictTransitions, toastRegistrationWarnings } from '@/lib/workflow-save-utils';
+import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
@@ -23,11 +24,11 @@ type SaveState =
 export default function WorkflowDefinitionVersionPage() {
   const { name, version, handle } = useParams<{ name: string; version: string; handle: string }>();
   const router = useRouter();
+  const { toast } = useToast();
   const decodedName = decodeURIComponent(name);
   const versionNumber = parseInt(version, 10);
 
-  const { definitions, loading } = useWorkflowDefinitions(decodedName, handle);
-  const definition = definitions.find((def) => def.version === versionNumber) ?? null;
+  const { definition, loading } = useWorkflowVersion(decodedName, handle, versionNumber);
 
   const [editedDescription, setEditedDescription] = useState('');
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
@@ -93,7 +94,7 @@ export default function WorkflowDefinitionVersionPage() {
           env: definition.env,
           notifications: definition.notifications,
           metadata: definition.metadata,
-          repo: definition.repo,
+          externalSkillsRepo: definition.externalSkillsRepo,
           url: definition.url,
         },
         { namespace: definition.namespace },
@@ -106,6 +107,7 @@ export default function WorkflowDefinitionVersionPage() {
         });
       }
       setSaveState({ status: 'saved', version: result.version });
+      toastRegistrationWarnings(result.warnings, toast);
       redirectTimerRef.current = setTimeout(() => {
         router.push(`/${handle}/workflows/${name}/definitions/${result.version}`);
       }, 500);

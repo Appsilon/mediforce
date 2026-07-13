@@ -1,18 +1,28 @@
 name: Deploy to Staging
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Build & Push Docker Images"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
-
-concurrency:
-  group: deploy-staging
-  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: staging # staging.mediforce.ai
+            ip_secret: STAGING_SERVER_IP
+          - target: cdisc # cdisc.mediforce.ai
+            ip_secret: CDISC_SERVER_IP
+    concurrency:
+      group: deploy-${{ matrix.target }}
+      cancel-in-progress: true
 
     steps:
       - name: Deploy via SSH
@@ -20,4 +30,5 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy@${{ secrets.STAGING_SERVER_IP }} "/opt/mediforce/scripts/deploy-staging.sh ${{ github.sha }}"
+          SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy@${{ secrets[matrix.ip_secret] }} "/opt/mediforce/scripts/deploy-staging.sh $SHA"

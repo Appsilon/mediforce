@@ -19,6 +19,9 @@ export * from './auth';
 // membership. Import from `@mediforce/platform-api/repositories`.
 export * from './repositories/index';
 
+// Audit helpers — emitAudit + auditActorFrom (used by route adapters for system-actor events)
+export { emitAudit, auditActorFrom } from './audit-helpers';
+
 // Services (factory + seeding) intentionally NOT re-exported here — import from
 // `@mediforce/platform-api/services` so consumers of `/contract` or `/handlers`
 // never evaluate Firestore/Firebase-admin wiring transitively.

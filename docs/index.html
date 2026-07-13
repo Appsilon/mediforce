@@ -36,6 +36,11 @@
       --script-dim: rgba(251,191,36,0.15);
       --agent: #7C3AED;
       --agent-dim: rgba(124,58,237,0.1);
+      --cm0: #F97316;
+      --cm1: #84CC16;
+      --cm2: #14B8A6;
+      --cm3: #6366F1;
+      --cm4: #8B5CF6;
     }
 
     html { scroll-behavior: smooth; }
@@ -57,51 +62,7 @@
     }
 
     /* ── Header ── */
-    .header {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      border-bottom: 1px solid var(--border);
-      background: rgba(255, 255, 255, 0.88);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-    }
-    .header-inner {
-      max-width: 68rem;
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.875rem 1.5rem;
-    }
-    .logo-group { display: flex; align-items: center; gap: 0.625rem; text-decoration: none; }
-    .logo-mark {
-      width: 1.75rem; height: 1.75rem;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .logo-mark img { width: 100%; height: 100%; object-fit: contain; }
-    .logo-text {
-      font-family: 'Manrope', sans-serif;
-      font-size: 1.125rem; font-weight: 700; letter-spacing: -0.025em;
-      color: var(--text);
-    }
-    .header-links { display: flex; align-items: center; gap: 0.25rem; }
-    .header-link {
-      display: inline-flex; align-items: center; gap: 0.375rem;
-      font-size: 0.8125rem; font-weight: 500;
-      color: var(--text-60);
-      padding: 0.375rem 0.75rem;
-      border-radius: 0.375rem;
-      text-decoration: none;
-      transition: color 0.15s;
-    }
-    .header-link:hover { color: var(--text); background: var(--bg-2); }
-    .header-link--icon { display: flex; align-items: center; padding: 0.375rem 0.5rem; color: var(--text-3); }
-    .header-link--icon:hover { color: var(--text); background: var(--bg-2); }
-    .header-link--discord { background: #5865F2; color: #fff; display: inline-flex; align-items: center; gap: 0.375rem; margin-left: 0.25rem; }
-    .header-link--discord:hover { background: #4752C4; color: #fff; }
-    .header-link--discord svg { width: 1rem; height: 1rem; }
-    .header-link--icon svg { width: 1.125rem; height: 1.125rem; }
+    /* Header injected by nav.js */
 
     /* ── Hero ── */
     .hero {
@@ -196,8 +157,6 @@
     .btn--discord:hover { background: var(--discord-hover); }
     .btn--outline { background: transparent; color: var(--text-90); border-color: var(--text-30); }
     .btn--outline:hover { background: #F1F3F5; border-color: var(--text-50); }
-    .btn--meet { background: #1A73E8; color: #fff; border-color: transparent; }
-    .btn--meet:hover { background: #1557B0; }
 
     /* ── Section base ── */
     .section {
@@ -292,16 +251,21 @@
     .autonomy-table td {
       padding: 1rem;
       border-bottom: 1px solid var(--border);
-      vertical-align: top;
+      vertical-align: middle;
     }
     .autonomy-table tr:last-child td { border-bottom: none; }
+    .autonomy-table .cm-icon-cell {
+      width: 3.25rem;
+      padding-right: 0;
+    }
+    .autonomy-table .cm-icon { display: inline-flex; align-items: center; }
     .autonomy-table .level-name {
       font-weight: 600;
-      color: var(--accent);
+      color: var(--text-90);
       white-space: nowrap;
+      text-align: left;
     }
     .autonomy-table .level-desc { color: var(--text-80); }
-    .autonomy-table .level-human { color: var(--text-50); }
 
     .how-layout {
       display: grid;
@@ -354,12 +318,15 @@
         padding: 0.125rem 0;
         border-bottom: none;
       }
-      .autonomy-table .level-human::before {
-        content: "Human: ";
-        color: var(--text-40);
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+      .autonomy-table .cm-icon-cell {
+        display: inline-block;
+        width: auto;
+        vertical-align: middle;
+        margin-right: 0.5rem;
+      }
+      .autonomy-table .level-name {
+        display: inline-block;
+        vertical-align: middle;
       }
     }
 
@@ -408,51 +375,42 @@
     }
 
     /* ── Community ── */
-    .community-grid {
-      display: grid;
-      gap: 1.5rem;
-      margin-top: 2.5rem;
-    }
-    @media (min-width: 640px) {
-      .community-grid { grid-template-columns: 1fr 1fr; }
-    }
     .community-card {
-      padding: 2rem;
-      border-radius: 0.75rem;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
+      margin-top: 2.5rem;
+      max-width: 34rem;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 3rem 2.5rem;
+      border-radius: 1rem;
+      background: radial-gradient(circle at 50% 0%, rgba(88,101,242,0.09), rgba(88,101,242,0.02) 60%), var(--bg-card);
+      border: 1px solid rgba(88,101,242,0.25);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      transition: border-color 0.2s;
     }
+    .community-card:hover { border-color: rgba(88,101,242,0.45); }
     .community-card h3 {
-      font-size: 1.125rem;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
+      font-size: 1.375rem;
+      font-weight: 700;
+      margin-bottom: 0.625rem;
     }
     .community-card p {
-      font-size: 0.875rem;
+      font-size: 0.9375rem;
       color: var(--text-60);
       line-height: 1.7;
-      margin-bottom: 1.25rem;
+      max-width: 28rem;
+      margin-bottom: 1.75rem;
     }
-    .community-card .schedule {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.25rem 1rem;
-      margin-bottom: 1rem;
-      font-size: 0.875rem;
-      font-weight: 600;
-    }
-    .schedule .tz {
-      font-weight: 400;
-      color: var(--text-50);
-    }
-    .community-card--discord { border-color: rgba(88,101,242,0.3); }
-    .community-card--discord:hover { border-color: rgba(88,101,242,0.5); }
     .community-card-icon {
-      width: 2.25rem; height: 2.25rem;
-      margin-bottom: 1rem;
+      width: 3rem; height: 3rem;
+      margin-bottom: 1.25rem;
+      color: var(--discord);
+      background: rgba(88,101,242,0.1);
+      border-radius: 50%;
+      padding: 0.75rem;
     }
-    .community-card-icon--discord { color: var(--discord); }
-    .community-card-icon--session { color: var(--accent); }
     .community-byline {
       margin-top: 2rem;
       font-size: 0.8125rem;
@@ -553,88 +511,12 @@
       display: block;
     }
 
-    /* ── Mobile navigation ── */
-    .nav-toggle {
-      display: none;
-      align-items: center;
-      justify-content: center;
-      width: 2.25rem;
-      height: 2.25rem;
-      padding: 0;
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--text-60, #6B7280);
-      border-radius: 0.375rem;
-      flex-shrink: 0;
-    }
-    .nav-toggle:hover { background: rgba(0,0,0,0.04); color: var(--text, #111827); }
-    .nav-toggle svg { display: block; }
-    .mobile-nav {
-      display: none;
-      flex-direction: column;
-      padding: 0.75rem 1.5rem 1.25rem;
-      border-top: 1px solid var(--border, #E5E7EB);
-      background: rgba(255,255,255,0.98);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-    }
-    .mobile-nav.is-open { display: flex; }
-    .mobile-nav a {
-      display: block;
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      font-size: 0.9375rem;
-      font-weight: 500;
-      color: var(--text-70, #4B5563);
-      padding: 0.625rem 0.75rem;
-      border-radius: 0.375rem;
-      text-decoration: none;
-    }
-    .mobile-nav a:hover { background: rgba(0,0,0,0.04); color: var(--text, #111827); }
-    .mobile-nav-discord {
-      background: #5865F2 !important;
-      color: #fff !important;
-      display: flex !important;
-      align-items: center !important;
-      gap: 0.5rem;
-      justify-content: center;
-      margin-top: 0.5rem;
-    }
-    .mobile-nav-discord:hover { background: #4752C4 !important; }
-    @media (max-width: 767px) {
-      .nav-toggle { display: flex; }
-      .header-links { display: none !important; }
-    }
+    /* Navigation injected by nav.js */
   </style>
 </head>
 <body>
 
-  <header class="header">
-  <div class="header-inner">
-    <a href="index.html" class="logo-group">
-      <div class="logo-mark"><img src="logo.png" alt="Mediforce logo" style="width:100%;height:100%;object-fit:contain;" /></div>
-      <span class="logo-text">Mediforce</span>
-    </a>
-    <div class="header-links">
-      <a href="data-delivery.html" class="header-link">Data Delivery</a>
-      <a href="validated-ai.html" class="header-link">Validation</a>
-      <a href="security.html" class="header-link">Security</a>
-      <a href="fda-principles.html" class="header-link">FDA Alignment</a>
-      <a href="https://github.com/Appsilon/mediforce" target="_blank" class="header-link header-link--icon" aria-label="GitHub"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
-      <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="header-link header-link--discord"><svg viewBox="0 -28.5 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z" fill="currentColor"/></svg> Join Discord</a>
-    </div>
-    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/></svg></button>
-  </div>
-  <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
-    <a href="index.html" style="color:var(--accent,#0D9488);font-weight:600">Home</a>
-    <a href="data-delivery.html">Data Delivery</a>
-    <a href="validated-ai.html">Validation</a>
-    <a href="security.html">Security</a>
-    <a href="fda-principles.html">FDA Alignment</a>
-    <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer">GitHub</a>
-    <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="mobile-nav-discord"><svg width="14" height="14" viewBox="0 -28.5 256 256" fill="currentColor" aria-hidden="true"><path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z"/></svg> Join Discord</a>
-  </nav>
-</header>
+  <script src="nav.js"></script>
 
   <!-- Hero -->
   <section class="hero">
@@ -749,37 +631,63 @@
           <h2 class="section-title">You define the process. The platform handles compliance.</h2>
           <p class="how-intro">
             For each step in a workflow, you decide who does the work - human, AI
-            agent, or both. Agents operate at one of four autonomy levels, and the
-            platform enforces the rules.
+            agent, or both. Every step is assigned a Control Mode, the same
+            picker your team uses in the workflow designer, and the platform
+            enforces the rules.
           </p>
           <table class="autonomy-table">
             <thead>
               <tr>
-                <th>Autonomy Level</th>
-                <th>What the agent does</th>
-                <th>Human involvement</th>
+                <th class="cm-icon-cell"></th>
+                <th>Control Mode</th>
+                <th>What it means</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td class="level-name">Observer</td>
-                <td class="level-desc">Watches and reports</td>
-                <td class="level-human">None - informational only</td>
+                <td class="cm-icon-cell">
+                  <span class="cm-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24"><g fill="none" stroke="var(--cm0)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g></svg>
+                  </span>
+                </td>
+                <td class="level-name">No agent</td>
+                <td class="level-desc">Human, script, or automated action - no AI involved. Full manual control.</td>
               </tr>
               <tr>
-                <td class="level-name">Advisor</td>
-                <td class="level-desc">Suggests actions</td>
-                <td class="level-human">Human decides and acts</td>
+                <td class="cm-icon-cell">
+                  <span class="cm-icon">
+                    <svg width="46" height="21" viewBox="0 0 52 24"><g fill="none" stroke="var(--cm1)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g><g transform="translate(28,0) scale(0.85)" fill="none" stroke="var(--cm1)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><circle cx="9" cy="14" r="1.25" fill="var(--cm1)" stroke="none"/><circle cx="15" cy="14" r="1.25" fill="var(--cm1)" stroke="none"/><line x1="9" y1="18" x2="15" y2="18"/><line x1="12" y1="8" x2="12" y2="4"/><circle cx="12" cy="3" r="1.25"/></g><g stroke="var(--cm1)" stroke-width="2.2" stroke-linecap="round" fill="none"><circle cx="45" cy="20" r="2.4"/><line x1="46.7" y1="21.7" x2="48.2" y2="23.2"/></g></svg>
+                  </span>
+                </td>
+                <td class="level-name">Assist</td>
+                <td class="level-desc">Human leads and does the work; AI reviews the result afterward.</td>
               </tr>
               <tr>
-                <td class="level-name">Drafter</td>
-                <td class="level-desc">Does work, submits for approval</td>
-                <td class="level-human">Human approves or sends back</td>
+                <td class="cm-icon-cell">
+                  <span class="cm-icon">
+                    <svg width="46" height="21" viewBox="0 0 52 24"><g fill="none" stroke="var(--cm2)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g><g transform="translate(28,0)" fill="none" stroke="var(--cm2)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><circle cx="9" cy="14" r="1.25" fill="var(--cm2)" stroke="none"/><circle cx="15" cy="14" r="1.25" fill="var(--cm2)" stroke="none"/><line x1="9" y1="18" x2="15" y2="18"/><line x1="12" y1="8" x2="12" y2="4"/><circle cx="12" cy="3" r="1.25"/></g></svg>
+                  </span>
+                </td>
+                <td class="level-name">Cowork</td>
+                <td class="level-desc">Agent and human work together in real time, via chat or voice.</td>
               </tr>
               <tr>
-                <td class="level-name">Executor</td>
-                <td class="level-desc">Acts autonomously</td>
-                <td class="level-human">Human reviews after the fact</td>
+                <td class="cm-icon-cell">
+                  <span class="cm-icon">
+                    <svg width="46" height="21" viewBox="0 0 52 24"><g fill="none" stroke="var(--cm3)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><circle cx="9" cy="14" r="1.25" fill="var(--cm3)" stroke="none"/><circle cx="15" cy="14" r="1.25" fill="var(--cm3)" stroke="none"/><line x1="9" y1="18" x2="15" y2="18"/><line x1="12" y1="8" x2="12" y2="4"/><circle cx="12" cy="3" r="1.25"/></g><g transform="translate(28,0) scale(0.85)" fill="none" stroke="var(--cm3)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g><g stroke="var(--cm3)" stroke-width="2.2" stroke-linecap="round" fill="none"><circle cx="45" cy="20" r="2.4"/><line x1="46.7" y1="21.7" x2="48.2" y2="23.2"/></g></svg>
+                  </span>
+                </td>
+                <td class="level-name">Human review</td>
+                <td class="level-desc">Agent completes the step; a human reviews and approves before the workflow proceeds.</td>
+              </tr>
+              <tr>
+                <td class="cm-icon-cell">
+                  <span class="cm-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24"><g fill="none" stroke="var(--cm4)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><circle cx="9" cy="14" r="1.25" fill="var(--cm4)" stroke="none"/><circle cx="15" cy="14" r="1.25" fill="var(--cm4)" stroke="none"/><line x1="9" y1="18" x2="15" y2="18"/><line x1="12" y1="8" x2="12" y2="4"/><circle cx="12" cy="3" r="1.25"/></g></svg>
+                  </span>
+                </td>
+                <td class="level-name">Autonomous agent</td>
+                <td class="level-desc">Agent completes the step and the workflow advances on its own; a human can review after the fact via the audit trail.</td>
               </tr>
             </tbody>
           </table>
@@ -885,39 +793,19 @@
       <p class="section-subtitle">
         Follow the development, ask questions, and shape the direction of the project.
       </p>
-      <div class="community-grid">
-        <div class="community-card community-card--discord">
-          <svg class="community-card-icon community-card-icon--discord" viewBox="0 -28.5 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z" fill="currentColor"/>
-          </svg>
-          <h3>Join our Discord</h3>
-          <p>
-            Ask questions, share ideas, follow progress, or just see how things
-            evolve. This is where the conversation happens.
-          </p>
-          <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="btn btn--discord">
-            <svg viewBox="0 -28.5 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z" fill="currentColor"/></svg>
-            Join Discord Server
-          </a>
-        </div>
-        <div class="community-card">
-          <img class="community-card-icon" src="images/google-meet-icon.png" alt="Google Meet" />
-          <h3>Weekly Planning Session</h3>
-          <div class="schedule">
-            <span>Fridays</span>
-            <span>3:00 PM <span class="tz">CET</span></span>
-            <span>2:00 PM <span class="tz">GMT</span></span>
-            <span>9:00 AM <span class="tz">EST</span></span>
-          </div>
-          <p>
-            Live demo, architecture discussion, and open Q&amp;A. Every Friday on
-            Google Meet. Drop in, listen, or ask anything.
-          </p>
-          <a href="https://meet.google.com/itu-dwce-ktw" target="_blank" rel="noopener noreferrer" class="btn btn--meet">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="18" height="18"><rect width="24" height="24" rx="4" fill="#1A73E8"/><path d="M6 8.5C6 7.67 6.67 7 7.5 7h5C13.33 7 14 7.67 14 8.5v7c0 .83-.67 1.5-1.5 1.5h-5C6.67 17 6 16.33 6 15.5v-7Z" fill="#fff"/><path d="M14 10.25l3.5-2.25v7.5L14 13.25v-3Z" fill="#fff"/></svg>
-            Join on Google Meet
-          </a>
-        </div>
+      <div class="community-card">
+        <svg class="community-card-icon" viewBox="0 -28.5 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z" fill="currentColor"/>
+        </svg>
+        <h3>Join our Discord</h3>
+        <p>
+          Ask questions, share ideas, follow progress, or just see how things
+          evolve. This is where the conversation happens.
+        </p>
+        <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="btn btn--discord">
+          <svg viewBox="0 -28.5 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z" fill="currentColor"/></svg>
+          Join Discord Server
+        </a>
       </div>
       <p class="community-byline">
         Built by <a href="https://appsilon.com" target="_blank" rel="noopener noreferrer">Appsilon</a> - building open-source tools for life sciences since 2013.
@@ -941,23 +829,5 @@
     </div>
   </footer>
 
-<script>
-(function() {
-  var toggle = document.getElementById('nav-toggle');
-  var nav = document.getElementById('mobile-nav');
-  if (!toggle || !nav) return;
-  toggle.addEventListener('click', function() {
-    var open = nav.classList.toggle('is-open');
-    toggle.setAttribute('aria-expanded', String(open));
-  });
-  document.addEventListener('click', function(e) {
-    if (!nav.classList.contains('is-open')) return;
-    if (!nav.contains(e.target) && !toggle.contains(e.target)) {
-      nav.classList.remove('is-open');
-      toggle.setAttribute('aria-expanded', 'false');
-    }
-  });
-})();
-</script>
 </body>
 </html>

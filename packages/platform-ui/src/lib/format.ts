@@ -1,5 +1,7 @@
 import type { StepExecution } from '@mediforce/platform-core';
 
+export { formatBytes } from '@mediforce/platform-core';
+
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   const seconds = Math.round(ms / 1000);
@@ -20,6 +22,14 @@ export function formatStepName(stepId: string): string {
   return stepId
     .replace(/[-_]/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function deriveInitials(name: string): string {
+  const words = name.trim().split(/\s+/);
+  const first = words[0] ?? '';
+  if (words.length === 1) return first.slice(0, 2).toUpperCase();
+  const last = words[words.length - 1]![0] ?? '';
+  return ((first[0] ?? '') + last).toUpperCase();
 }
 
 export function computeWallClockDuration(

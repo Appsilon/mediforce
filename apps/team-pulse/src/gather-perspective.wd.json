@@ -3,9 +3,14 @@
   "namespace": "appsilon",
   "title": "Gather Perspective",
   "description": "Collects a single team member's perspective on a question posed by the product owner.",
-  "roles": ["member"],
+  "roles": [
+    "member"
+  ],
   "triggers": [
-    { "name": "manual", "type": "manual" }
+    {
+      "name": "manual",
+      "type": "manual"
+    }
   ],
   "triggerInput": [
     {
@@ -34,12 +39,11 @@
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "autonomyLevel": "L4",
       "description": "Renders the PO's question as a presentation card visible in the next step's context panel.",
-      "agent": {
-        "image": "mediforce-golden-image:latest",
+      "script": {
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const question = input.question || 'No question provided';\n  writeFileSync('/output/presentation.md', `## Question from your Product Owner\\n\\n${question}\\n\\nPlease share your perspective below.`);\n  writeFileSync('/output/result.json', JSON.stringify({ question }));\n  console.log('Question rendered for presentation');\n} catch (err) {\n  console.error('show_question crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n",
         "runtime": "javascript",
-        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const question = input.question || 'No question provided';\n  writeFileSync('/output/presentation.md', `## Question from your Product Owner\\n\\n${question}\\n\\nPlease share your perspective below.`);\n  writeFileSync('/output/result.json', JSON.stringify({ question }));\n  console.log('Question rendered for presentation');\n} catch (err) {\n  console.error('show_question crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+        "image": "mediforce-golden-image:latest"
       }
     },
     {
@@ -47,7 +51,9 @@
       "name": "Provide perspective",
       "type": "creation",
       "executor": "human",
-      "allowedRoles": ["member"],
+      "allowedRoles": [
+        "member"
+      ],
       "assignedTo": "${triggerPayload.email}",
       "description": "Team member provides their perspective on the PO's question.",
       "params": [
@@ -68,7 +74,13 @@
     }
   ],
   "transitions": [
-    { "from": "show_question", "to": "provide_perspective" },
-    { "from": "provide_perspective", "to": "done" }
+    {
+      "from": "show_question",
+      "to": "provide_perspective"
+    },
+    {
+      "from": "provide_perspective",
+      "to": "done"
+    }
   ]
 }

@@ -2,13 +2,16 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
-import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin';
+import type { AgentContext, EmitFn, EmitPayload, WorkflowAgentContext } from '../../interfaces/step-executor-plugin';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 
 type DockerResult = { cliOutput: string; gitMetadata: null; presentation: string | null; outputDir: string; injectedEnvVars: string[] };
 type SpawnDockerTarget = { spawnDockerContainer: (prompt: string, options?: Record<string, unknown>) => Promise<DockerResult> };
+type SpawnLocalTarget = {
+  spawnLocalProcess: (prompt: string, options: Record<string, unknown>, workingDir: string) => Promise<DockerResult>;
+};
 type ReadSkillTarget = { readSkillFile: (skillsDir: string, skill: string) => Promise<string> };
 
 // Ensure ALLOW_LOCAL_AGENTS is not set during tests (unless explicitly set in a test)
@@ -28,6 +31,10 @@ function mockSpawn(plugin: ClaudeCodeAgentPlugin) {
 
 function mockReadSkill(plugin: ClaudeCodeAgentPlugin) {
   return vi.spyOn(plugin as unknown as ReadSkillTarget, 'readSkillFile');
+}
+
+function mockSpawnLocal(plugin: ClaudeCodeAgentPlugin) {
+  return vi.spyOn(plugin as unknown as SpawnLocalTarget, 'spawnLocalProcess');
 }
 
 function buildMockContext(overrides: Partial<AgentContext> = {}): AgentContext {
@@ -220,6 +227,31 @@ describe('ClaudeCodeAgentPlugin', () => {
       const result = plugin.parseAgentOutput(stdout);
       expect(result).toBe('');
     });
+
+    it('[DATA] folds peak per-turn context (input + cache) into result usage', () => {
+      const stdout = [
+        JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 40_000, cache_read_input_tokens: 10_000, output_tokens: 200 } } }),
+        JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 90_000, cache_read_input_tokens: 60_000, cache_creation_input_tokens: 5_000, output_tokens: 300 } } }),
+        JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 20_000, output_tokens: 100 } } }),
+        JSON.stringify({ type: 'result', subtype: 'success', result: 'done', usage: { input_tokens: 20_000, output_tokens: 100 } }),
+      ].join('\n');
+
+      const parsed = JSON.parse(plugin.parseAgentOutput(stdout));
+      // Peak is the largest single turn's full prompt: 90k + 60k + 5k = 155k,
+      // not the final turn (20k) that result.usage would otherwise report.
+      expect(parsed.usage.peak_input_tokens).toBe(155_000);
+      expect(parsed.usage.input_tokens).toBe(20_000);
+    });
+
+    it('[DATA] leaves usage untouched when no assistant turn reports tokens', () => {
+      const stdout = [
+        JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'hi' }] } }),
+        JSON.stringify({ type: 'result', subtype: 'success', result: 'done', usage: { input_tokens: 5_000, output_tokens: 50 } }),
+      ].join('\n');
+
+      const parsed = JSON.parse(plugin.parseAgentOutput(stdout));
+      expect(parsed.usage).toEqual({ input_tokens: 5_000, output_tokens: 50 });
+    });
   });
 
   describe('run', () => {
@@ -238,6 +270,102 @@ describe('ClaudeCodeAgentPlugin', () => {
       const statusEvents = events.filter((e) => e.type === 'status');
       expect(statusEvents.length).toBeGreaterThanOrEqual(1);
       expect(statusEvents[0].payload).toContain('trial-metadata-extractor');
+    });
+
+    it('[DATA] folds cache_creation into input tokens and captures cache_read for cost', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
+      mockSpawn(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({
+          type: 'result',
+          subtype: 'success',
+          result: JSON.stringify({ summary: 'done' }),
+          usage: {
+            input_tokens: 100,
+            output_tokens: 50,
+            cache_creation_input_tokens: 20,
+            cache_read_input_tokens: 30,
+          },
+        }),
+        gitMetadata: null,
+        presentation: null,
+        outputDir: '/tmp/mock-output',
+        injectedEnvVars: [],
+      });
+
+      await plugin.run(emit);
+
+      const resultEvent = events.find((e) => e.type === 'result');
+      expect(resultEvent?.payload).toMatchObject({
+        tokenUsage: { inputTokens: 120, outputTokens: 50, cachedInputTokens: 30 },
+      });
+    });
+
+    it('[DATA] routes image-less build-mode workflow agents through Docker', async () => {
+      const context: WorkflowAgentContext = {
+        stepId: 'extract',
+        processInstanceId: 'pi-001',
+        runNamespace: 'test-namespace',
+        definitionVersion: 'v1',
+        stepInput: { filePaths: ['/data/protocol.pdf'] },
+        autonomyLevel: 'L2',
+        workflowDefinition: {
+          name: 'protocol-to-tfl',
+          version: 1,
+          namespace: 'test-namespace',
+          visibility: 'private',
+          steps: [],
+          transitions: [],
+          triggers: [],
+        },
+        step: {
+          id: 'extract',
+          name: 'Extract metadata',
+          type: 'creation',
+          executor: 'agent',
+          agent: {
+            skill: 'trial-metadata-extractor',
+            skillsDir: '/plugins/protocol-to-tfl/skills',
+            dockerfile: 'Dockerfile.agent',
+            repo: 'https://github.com/appsilon/mediforce-agent.git',
+            commit: 'abcdef1234567890abcdef1234567890abcdef12',
+          },
+        },
+        llm: { complete: vi.fn() },
+        getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
+      };
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
+      const dockerSpy = mockSpawn(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ result: 'ok' }),
+        gitMetadata: null,
+        presentation: null,
+        outputDir: '/tmp/mock-output',
+        injectedEnvVars: [],
+      });
+      const localSpy = mockSpawnLocal(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ result: 'local' }),
+        gitMetadata: null,
+        presentation: null,
+        outputDir: '/tmp/mock-output',
+        injectedEnvVars: [],
+      });
+
+      await plugin.run(emit);
+
+      expect(localSpy).not.toHaveBeenCalled();
+      expect(dockerSpy).toHaveBeenCalledOnce();
+      expect(events).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'status',
+          payload: expect.stringMatching(/using Docker container image 'mediforce-built:[a-f0-9]{12}'/),
+        }),
+      ]));
     });
 
     it('[DATA] builds prompt from SKILL.md content and input data', async () => {

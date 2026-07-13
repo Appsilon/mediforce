@@ -4,7 +4,15 @@ import * as React from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { SlidersHorizontal, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { useMyTasks, useCompletedTasks, useMyCoworkSessions, useFinalizedCoworkSessions } from '@/hooks/use-tasks';
+import { useViewerIdentity } from '@/hooks/use-viewer-identity';
+import {
+  useMyActionableTasks,
+  useMyActionableTasksByRole,
+  useMyCompletedTasks,
+  useCompletedTasksByRole,
+  useMyCoworkSessions,
+  useFinalizedCoworkSessions,
+} from '@/hooks/use-tasks';
 import { TaskGroupedView, type GroupByField } from '@/components/tasks/task-grouped-view';
 import type { ActionItem } from '@/components/tasks/action-type';
 import { cn } from '@/lib/utils';
@@ -74,29 +82,20 @@ export default function TasksPage() {
 
   const toggleField = React.useCallback((field: GroupByField) => {
     setGroupByFields((prev) => {
-      const next = new Set(prev);
-      if (next.has(field)) {
-        next.delete(field);
-      } else {
-        next.add(field);
-      }
-      return next;
+      if (prev.has(field)) return new Set<GroupByField>();
+      return new Set<GroupByField>([field]);
     });
   }, []);
 
-  const [role, setRole] = React.useState<string | null>(null);
-  React.useEffect(() => {
-    if (!firebaseUser) return;
-    firebaseUser.getIdTokenResult().then((result) => {
-      const roles = result.claims['roles'];
-      if (Array.isArray(roles) && roles.length > 0) {
-        setRole(roles[0] as string);
-      }
-    });
-  }, [firebaseUser]);
-
-  const { data: activeTasks, loading: activeLoading } = useMyTasks(role, firebaseUser?.uid ?? null);
-  const { data: completedTasks, loading: completedLoading } = useCompletedTasks(role);
+  const { uid, role } = useViewerIdentity();
+  const roleActive = useMyActionableTasksByRole(role ?? undefined, uid);
+  const callerActive = useMyActionableTasks(uid);
+  const roleCompleted = useCompletedTasksByRole(role ?? undefined);
+  const callerCompleted = useMyCompletedTasks();
+  const activeTasks = role ? roleActive.data : callerActive.data;
+  const activeLoading = role ? roleActive.loading : callerActive.loading;
+  const completedTasks = role ? roleCompleted.data : callerCompleted.data;
+  const completedLoading = role ? roleCompleted.loading : callerCompleted.loading;
   const { data: activeCoworkSessions, loading: coworkLoading } = useMyCoworkSessions(role);
   const { data: finalizedCoworkSessions, loading: finalizedLoading } = useFinalizedCoworkSessions(role);
   const currentUserId = firebaseUser?.uid ?? '';
@@ -132,7 +131,7 @@ export default function TasksPage() {
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-headline font-semibold">New actions</h1>
+          <h1 className="text-xl font-headline font-semibold">Human actions</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {role ? (
               <>

@@ -121,8 +121,10 @@ export function createRouteAdapter<
 
 // `HandlerError.toEnvelope()` is the ADR-0005 §1 wire shape; `statusCode` is
 // derived from `code` via the §3 table inside the class. This adapter is the
-// only place that turns a HandlerError into an HTTP response.
-function jsonErrorResponse(err: HandlerError): NextResponse {
+// canonical place that turns a HandlerError into an HTTP response; the rare
+// binary routes that can't compose through `createRouteAdapter` reuse this so
+// their error envelopes stay byte-identical to the JSON routes'.
+export function jsonErrorResponse(err: HandlerError): NextResponse {
   return NextResponse.json(err.toEnvelope(), { status: err.statusCode });
 }
 
@@ -131,14 +133,17 @@ const prodRunKicker: RunKicker = createHttpSelfFetchRunKicker({
   apiKey: () => process.env.PLATFORM_API_KEY ?? '',
 });
 
-function defaultBuildScope(caller: CallerIdentity): CallerScope {
+// Exported for the rare non-JSON route (binary file download) that can't
+// compose through `createRouteAdapter` but MUST run the identical auth +
+// scope pipeline. Everything JSON goes through the adapter — see module doc.
+export function defaultBuildScope(caller: CallerIdentity): CallerScope {
   return createCallerScope(
     { ...getPlatformServices(), runKicker: prodRunKicker },
     caller,
   );
 }
 
-async function defaultResolveCaller(req: NextRequest): Promise<CallerIdentity | NextResponse> {
+export async function defaultResolveCaller(req: NextRequest): Promise<CallerIdentity | NextResponse> {
   const { namespaceRepo } = getPlatformServices();
   return resolveCallerIdentity(req, namespaceRepo);
 }

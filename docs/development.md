@@ -27,7 +27,6 @@ Fill in your Firebase project values. Get them from: Firebase Console > Project 
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase API key |
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Firebase auth domain |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Firebase project ID |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Firebase storage bucket |
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase app ID |
 | `OPENROUTER_API_KEY` | OpenRouter API key (for agent LLM calls) |
@@ -39,16 +38,39 @@ Fill in your Firebase project values. Get them from: Firebase Console > Project 
 packages/
   platform-core/       # Shared types, domain models, test factories
   platform-ui/         # Next.js UI — the main web application
-  platform-infra/      # Firebase/Firestore infrastructure layer
+  platform-infra/      # Postgres infrastructure (Drizzle ORM) + Firebase Auth
   platform-api/        # API contract schemas + pure handlers (framework-free)
   agent-runtime/       # Agent execution engine
   workflow-engine/     # Process orchestration engine
   example-agent/       # Reference agent implementation
 ```
 
+## Local Postgres dev
+
+All server data lives in a local Postgres (ADR-0001) — there is no Firestore
+data layer. `pnpm dev` starts the container, runs migrations, and boots the UI
+against it. Quick recipes:
+
+```bash
+# Reset local data (wipes the persistent volume, re-migrates)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v && pnpm dev
+
+# Add a migration: edit a schema file under
+#   packages/platform-infra/src/postgres/schema/
+pnpm db:generate    # emit NNNN_*.sql + journal entry
+pnpm db:migrate     # apply locally (pnpm dev auto-runs this)
+
+# Run repo tests against a real Postgres
+TEST_DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce \
+  pnpm --filter @mediforce/platform-infra exec vitest run src/postgres
+```
+
+Deep dive (inspecting migration state, branch-collision renames, connection
+pool, troubleshooting): [postgres-local-dev.md](postgres-local-dev.md).
+
 ## Local agent execution
 
-When running with `ALLOW_LOCAL_AGENTS=true` (via `pnpm dev:no-docker`), the platform spawns agent CLIs directly as local processes instead of Docker containers. The following tools must be installed and on your `PATH`:
+When running with `ALLOW_LOCAL_AGENTS=true` (via `pnpm dev:no-docker`), the platform spawns agent CLIs directly as local processes instead of Docker containers. This mode is docker-free but **still requires Postgres on `:5432`** (`DATABASE_URL` is required at boot) — it does not start the container itself, so run `pnpm dev` once first or point `DATABASE_URL` at your own DB. The following tools must be installed and on your `PATH`:
 
 | Tool | Used by | Install |
 |------|---------|---------|
@@ -108,7 +130,6 @@ pnpm emulators
 pnpm test:e2e               # all E2E (L3 + L4)
 pnpm test:e2e:api           # L3 only — API E2E, no browser (~30s)
 pnpm test:e2e:ui            # L4 only — UI E2E with real Chromium (~3min)
-pnpm test:e2e:record        # record GIFs of UI journeys
 ```
 
 Variants run from `packages/platform-ui`:

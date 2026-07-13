@@ -18,6 +18,7 @@ import {
 import { ApiError, mediforce } from '@/lib/mediforce';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
+import { UserProfileLink } from '@/components/user-profile-link';
 import {
   useDeleteNamespace,
   useLeaveNamespace,
@@ -161,7 +162,7 @@ export default function WorkspaceConfigPage() {
   const qc = useQueryClient();
 
   const { firebaseUser } = useAuth();
-  const { namespace, loading: namespaceLoading } = useNamespace(handle);
+  const { namespace, personalHandles, loading: namespaceLoading } = useNamespace(handle);
 
   // Polled members list via the headless contract — replaces the previous
   // `onSnapshot(namespaces/{handle}/members)` subscription. Realtime updates
@@ -716,17 +717,23 @@ export default function WorkspaceConfigPage() {
                       <tr key={member.id} className="hover:bg-muted/30 transition-colors">
                         {/* User */}
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="flex items-center gap-2.5">
-                            {avatar !== undefined ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={avatar} alt={name} className="h-7 w-7 shrink-0 rounded-full object-cover" />
-                            ) : (
-                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-[11px] font-semibold">
-                                {initials}
-                              </div>
-                            )}
-                            <span className="font-medium">{name}</span>
-                          </div>
+                          <UserProfileLink
+                            displayName={name}
+                            personalHandle={personalHandles.get(member.uid)}
+                            className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              {avatar !== undefined ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={avatar} alt={name} className="h-7 w-7 shrink-0 rounded-full object-cover" />
+                              ) : (
+                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-[11px] font-semibold">
+                                  {initials}
+                                </div>
+                              )}
+                              <span className="font-medium">{name}</span>
+                            </div>
+                          </UserProfileLink>
                         </td>
 
                         {/* Email */}
@@ -920,6 +927,17 @@ export default function WorkspaceConfigPage() {
                 <div>
                   <p className="text-sm font-medium group-hover:text-primary transition-colors">OAuth providers</p>
                   <p className="text-xs text-muted-foreground">External authentication for MCP tools</p>
+                </div>
+                <ArrowLeft className="h-4 w-4 text-muted-foreground rotate-180 group-hover:text-primary transition-colors" />
+              </Link>
+              <div className="border-t" />
+              <Link
+                href={`/${handle}/admin/email-status`}
+                className="flex items-center justify-between group"
+              >
+                <div>
+                  <p className="text-sm font-medium group-hover:text-primary transition-colors">Email</p>
+                  <p className="text-xs text-muted-foreground">Email provider configuration status</p>
                 </div>
                 <ArrowLeft className="h-4 w-4 text-muted-foreground rotate-180 group-hover:text-primary transition-colors" />
               </Link>

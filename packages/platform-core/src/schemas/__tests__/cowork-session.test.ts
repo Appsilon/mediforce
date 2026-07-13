@@ -162,6 +162,18 @@ describe('CoworkSessionSchema with mcpServers', () => {
     }
   });
 
+  it('should default agent and voiceConfig when omitted (legacy chat-only sessions)', () => {
+    const session = buildCoworkSession();
+    // Remove agent + voiceConfig to simulate sessions created before voice existed
+    const { agent: _a, voiceConfig: _v, ...legacySession } = session;
+    const result = CoworkSessionSchema.safeParse(legacySession);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.agent).toBe('chat');
+      expect(result.data.voiceConfig).toBeNull();
+    }
+  });
+
   it('should parse a session with tool turns in conversation', () => {
     const session = buildCoworkSession({
       turns: [

@@ -23,5 +23,22 @@ export async function getNamespace(
   }
 
   const members = await scope.workspaces.getMembers(input.handle);
-  return { namespace, members };
+
+  const settled = await Promise.allSettled(
+    members.map(async (m) => {
+      const namespaces = await scope.workspaces.getNamespacesByUser(m.uid);
+      const personal = namespaces.find((ns) => ns.type === 'personal');
+      return personal ? ([m.uid, personal.handle] as const) : null;
+    }),
+  );
+
+  const personalHandles: Record<string, string> = {};
+  for (const result of settled) {
+    if (result.status === 'fulfilled' && result.value) {
+      const [uid, handle] = result.value;
+      personalHandles[uid] = handle;
+    }
+  }
+
+  return { namespace, members, personalHandles };
 }

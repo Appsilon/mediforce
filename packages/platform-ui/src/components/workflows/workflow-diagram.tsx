@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useCallback, useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ReactFlow,
@@ -17,9 +17,15 @@ import {
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { User, Bot, Terminal, Users, Trash2, Plus, PenLine, Search, GitBranch, Flag, ArrowUp, ArrowDown, ChevronRight, ChevronDown, AlertTriangle } from 'lucide-react';
+import { User, Bot, Terminal, Trash2, Plus, PenLine, Search, GitBranch, ArrowUp, ArrowDown, ArrowRight, ChevronRight, ChevronDown, AlertTriangle, Zap, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
+import {
+  getControlMode,
+  CONTROL_MODE_LABELS,
+  type ControlMode,
+  type NewStepPayload,
+} from '@/lib/control-mode';
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -58,23 +64,58 @@ const STEP_STYLES: Record<string, { bg: string; border: string; activeBorder: st
   },
 };
 
-const STEP_TYPE_CONFIG: Record<string, { icon: typeof PenLine; label: string; color: string }> = {
-  creation: { icon: PenLine,    label: 'Creation', color: 'text-blue-500 dark:text-blue-400' },
-  review:   { icon: Search,     label: 'Review',   color: 'text-amber-500 dark:text-amber-400' },
-  decision: { icon: GitBranch,  label: 'Decision', color: 'text-purple-500 dark:text-purple-400' },
-  terminal: { icon: Flag,       label: 'End',      color: 'text-emerald-500 dark:text-emerald-400' },
-};
-
-const EXECUTOR_STYLES: Record<string, { icon: typeof User; color: string; bg: string }> = {
-  human: { icon: User, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-  agent: { icon: Bot, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/30' },
-  script: { icon: Terminal, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
-  cowork: { icon: Users, color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-100 dark:bg-teal-900/30' },
+const STEP_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
+  creation: { label: 'Creation', color: 'text-blue-500 dark:text-blue-400' },
+  review:   { label: 'Review',   color: 'text-amber-500 dark:text-amber-400' },
+  decision: { label: 'Decision', color: 'text-purple-500 dark:text-purple-400' },
+  terminal: { label: 'End',      color: 'text-emerald-500 dark:text-emerald-400' },
 };
 
 // ---------------------------------------------------------------------------
 // Custom nodes
 // ---------------------------------------------------------------------------
+
+function ExecutorIcon({ executor, autonomyLevel }: { executor: string; autonomyLevel?: string }) {
+  const mode = getControlMode(executor, autonomyLevel);
+  if (executor === 'script') return <Terminal className="h-3.5 w-3.5 shrink-0 text-yellow-500 dark:text-yellow-400" />;
+  if (executor === 'action') return <Zap className="h-3.5 w-3.5 shrink-0 text-pink-500 dark:text-pink-400" />;
+  if (executor === 'cowork') return (
+    <span className="inline-flex items-center gap-0.5">
+      <User className="h-3.5 w-3.5 shrink-0 text-teal-500 dark:text-teal-400" />
+      <Bot className="h-3.5 w-3.5 shrink-0 text-teal-500 dark:text-teal-400" />
+    </span>
+  );
+  if (executor === 'agent') {
+    if (mode === 'human-review') return (
+      <span className="inline-flex items-center gap-0.5">
+        <Bot className="h-3.5 w-3.5 shrink-0 text-indigo-500 dark:text-indigo-400" />
+        <span className="relative inline-flex shrink-0 mr-2">
+          <User className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" />
+          <Search className="absolute -bottom-0.5 -right-1.5 h-2 w-2 text-indigo-500 dark:text-indigo-400" strokeWidth={2.5} />
+        </span>
+      </span>
+    );
+    if (mode === 'autonomous-agent') return <Bot className="h-3.5 w-3.5 shrink-0 text-violet-500 dark:text-violet-400" />;
+    return <Bot className="h-3.5 w-3.5 shrink-0 text-lime-500 dark:text-lime-400" />;
+  }
+  return <User className="h-3.5 w-3.5 shrink-0 text-orange-500 dark:text-orange-400" />;
+}
+
+function getExecutorLabel(executor: string, mode: ControlMode): string {
+  if (executor === 'human') return 'Human';
+  if (executor === 'script') return 'Script';
+  if (executor === 'action') return 'Action';
+  return CONTROL_MODE_LABELS[mode];
+}
+
+type BranchInfo = {
+  branchIdx: number;
+  label: string;
+  isActive: boolean;
+  isBackEdge: boolean;
+  backTargetName?: string;
+  onExpand?: () => void;
+};
 
 type StepNodeData = {
   label: string;
@@ -88,29 +129,28 @@ type StepNodeData = {
   onDelete?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
+  branches?: BranchInfo[];
 };
-
-type BranchPlaceholderNodeData = {
-  label: string;
-  fromStepId: string;
-  branchIdx: number;
-  isActive: boolean;
-  isBackEdge?: boolean;
-  backTargetName?: string;
-  onExpand?: () => void;
-};
-
-const PLACEHOLDER_HEIGHT = 38;
-const PLACEHOLDER_ROW_HEIGHT = PLACEHOLDER_HEIGHT + 24;
 
 const NODE_WIDTH = 240;
 const NODE_INNER_HEIGHT = 85;
+const BRANCH_ROW_HEIGHT = 32;
 const ROW_GAP = 58;
 
 const HANDLE_CLASS = '!bg-transparent !border-0 !w-px !h-px';
-const PLACEHOLDER_PREFIX = '__placeholder__';
 
 function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
+  // Measure the actual offsetTop of the branch section so the right-out handle
+  // is anchored to the visual center of the revise row, not a pixel estimate.
+  const branchSectionRef = useRef<HTMLDivElement>(null);
+  const [branchSectionTop, setBranchSectionTop] = useState(NODE_INNER_HEIGHT);
+  useLayoutEffect(() => {
+    if (branchSectionRef.current) {
+      const top = branchSectionRef.current.offsetTop;
+      if (top !== branchSectionTop) setBranchSectionTop(top);
+    }
+  });
+
   const isTerminal = data.stepType === 'terminal';
 
   if (isTerminal) {
@@ -133,22 +173,27 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   }
 
   const style = STEP_STYLES[data.stepType] ?? STEP_STYLES.creation;
-  const exec = EXECUTOR_STYLES[data.executor] ?? EXECUTOR_STYLES.human;
-  const Icon = exec.icon;
   const typeConfig = STEP_TYPE_CONFIG[data.stepType] ?? STEP_TYPE_CONFIG.creation;
-  const TypeIcon = typeConfig.icon;
+  const mode = getControlMode(data.executor, data.autonomyLevel);
+
+  const firstBackEdgeIdx = data.branches?.findIndex((b) => b.isBackEdge) ?? -1;
+  // branchSectionTop is measured via ref; firstBackEdgeIdx is always 0 (revise rows come first)
+  const rightOutTop = firstBackEdgeIdx >= 0
+    ? branchSectionTop + firstBackEdgeIdx * BRANCH_ROW_HEIGHT + BRANCH_ROW_HEIGHT / 2
+    : undefined;
 
   return (
     <>
       <Handle id="top" type="target" position={Position.Top} className={HANDLE_CLASS} />
       <Handle id="bottom" type="source" position={Position.Bottom} className={HANDLE_CLASS} />
-      <Handle id="right-out" type="source" position={Position.Right} className={HANDLE_CLASS} />
+      <Handle id="right-out" type="source" position={Position.Right} className={HANDLE_CLASS} style={rightOutTop !== undefined ? { top: rightOutTop } : undefined} />
       <Handle id="right-in" type="target" position={Position.Right} className={HANDLE_CLASS} />
 
       <div
         style={{ width: NODE_WIDTH, minHeight: NODE_INNER_HEIGHT }}
         className={cn(
-          'group rounded-xl border-[1.5px] px-4 py-3 transition-all cursor-pointer relative',
+          'group rounded-xl border-[1.5px] px-4 pt-3 transition-all cursor-pointer relative overflow-hidden',
+          data.branches?.length ? 'pb-0' : 'pb-3',
           'hover:shadow-md',
           style.bg,
           selected
@@ -199,104 +244,79 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
             </button>
           </div>
         )}
-        <div className="flex items-start gap-2.5">
-          <div className={cn('rounded-lg p-1.5 mt-0.5', exec.bg)}>
-            <Icon className={cn('h-3.5 w-3.5', exec.color)} />
+
+        {/* Row 1: executor identity (left) + step type (right) */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1 min-w-0">
+            <ExecutorIcon executor={data.executor} autonomyLevel={data.autonomyLevel} />
+            <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">
+              {getExecutorLabel(data.executor, mode)}
+            </span>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-semibold leading-tight text-foreground truncate">
-              {data.label}
-            </p>
-            <div className="flex items-center gap-1.5 mt-1">
-              <TypeIcon className={cn('h-3 w-3 shrink-0', typeConfig.color)} strokeWidth={1.5} />
-              <span className={cn('text-[10px] font-semibold', typeConfig.color)}>{typeConfig.label}</span>
-              <span className="text-[10px] text-muted-foreground/30">·</span>
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                {{ human: 'Human', agent: 'Agent', script: 'Script', cowork: 'Cowork' }[data.executor] ?? data.executor}
-              </span>
-              {data.autonomyLevel && data.executor === 'agent' && (
-                <span className="text-[10px] font-mono text-muted-foreground/70">
-                  {data.autonomyLevel}
-                </span>
-              )}
-            </div>
-            {data.hasWarning && (
-              <div className="flex items-center gap-1 mt-1" title={data.warningTooltip}>
-                <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" strokeWidth={2} />
-                <span className="text-[10px] text-amber-600 dark:text-amber-400 truncate">Image not found</span>
-              </div>
-            )}
-          </div>
+          <span className={cn('text-[10px] font-semibold shrink-0', typeConfig.color)}>
+            {typeConfig.label}
+          </span>
         </div>
+
+        {/* Row 2: step name, max 2 lines */}
+        <p className="text-[12px] font-semibold leading-snug text-foreground mt-3 line-clamp-2">
+          {data.label}
+        </p>
+
+        {data.hasWarning && (
+          <div className="flex items-center gap-1 mt-1" title={data.warningTooltip}>
+            <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" strokeWidth={2} />
+            <span className="text-[10px] text-amber-600 dark:text-amber-400 truncate">Image not found</span>
+          </div>
+        )}
+
+        {data.branches && data.branches.length > 0 && (
+          <div ref={branchSectionRef} className="-mx-4 mt-3 border-t border-border/40">
+            {data.branches.map((branch, i) => (
+              <button
+                key={branch.branchIdx}
+                disabled={branch.isBackEdge || branch.isActive}
+                onClick={(e) => { e.stopPropagation(); branch.onExpand?.(); }}
+                style={{ height: BRANCH_ROW_HEIGHT }}
+                className={cn(
+                  'w-full flex items-center gap-2 px-4 text-left text-[11px] transition-all',
+                  i < data.branches!.length - 1 && 'border-b border-border/20',
+                  branch.isActive
+                    ? 'bg-blue-100/80 text-blue-700 font-semibold dark:bg-blue-900/30 dark:text-blue-300 cursor-default'
+                    : branch.isBackEdge
+                    ? 'bg-slate-50/60 text-slate-500 dark:bg-slate-800/30 dark:text-slate-400 cursor-default'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer',
+                )}
+              >
+                <span className="truncate flex-1">{branch.label}</span>
+                {branch.isBackEdge
+                  ? <ArrowRight className="h-3 w-3 shrink-0 text-amber-500 dark:text-amber-400" />
+                  : branch.isActive
+                  ? <Eye className="h-3 w-3 shrink-0 text-blue-500 dark:text-blue-400" />
+                  : <EyeOff className="h-3 w-3 shrink-0 text-slate-400 dark:text-slate-500" />
+                }
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );
 }
 
-function BranchPlaceholderNode({ data }: NodeProps<Node<BranchPlaceholderNodeData>>) {
-  return (
-    <>
-      <Handle id="top" type="target" position={Position.Top} className={HANDLE_CLASS} />
-      <Handle id="bottom" type="source" position={Position.Bottom} className={HANDLE_CLASS} />
-      <Handle id="right-in" type="target" position={Position.Right} className={HANDLE_CLASS} />
-      <Handle id="right-out" type="source" position={Position.Right} className={HANDLE_CLASS} />
-      <button
-        onClick={() => { if (!data.isBackEdge && !data.isActive) data.onExpand?.(); }}
-        style={{ width: NODE_WIDTH, height: PLACEHOLDER_HEIGHT }}
-        className={cn(
-          'group flex items-center gap-2 px-3 rounded-lg border text-left transition-all',
-          data.isBackEdge
-            ? 'border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20 cursor-default'
-            : data.isActive
-            ? 'border-primary/50 bg-primary/8 cursor-default'
-            : 'border-dashed border-slate-200 dark:border-slate-700 bg-background hover:border-primary/50 hover:bg-primary/5 cursor-pointer',
-        )}
-        title={data.isBackEdge ? `Returns to: ${data.backTargetName ?? data.label}` : data.isActive ? `Active: ${data.label}` : `Show: ${data.label}`}
-      >
-        <div className={cn(
-          'h-2 w-2 rounded-full shrink-0 transition-colors',
-          data.isBackEdge
-            ? 'bg-amber-400 dark:bg-amber-500'
-            : data.isActive
-            ? 'bg-primary'
-            : 'bg-muted-foreground/25 group-hover:bg-primary/50',
-        )} />
-        <span className={cn(
-          'text-[11px] font-mono truncate transition-colors',
-          data.isBackEdge
-            ? 'text-amber-600 dark:text-amber-400 font-semibold'
-            : data.isActive
-            ? 'text-primary font-semibold'
-            : 'text-muted-foreground/70 group-hover:text-primary',
-        )}>
-          {data.label}
-        </span>
-        {data.isBackEdge
-          ? <ArrowUp className="ml-auto h-3 w-3 shrink-0 text-amber-500" />
-          : data.isActive
-          ? <ChevronDown className="ml-auto h-3 w-3 shrink-0 text-primary" />
-          : <ChevronRight className="ml-auto h-3 w-3 shrink-0 text-muted-foreground/30 group-hover:text-primary transition-colors" />
-        }
-      </button>
-    </>
-  );
-}
-
-const nodeTypes = { step: StepNode, branchPlaceholder: BranchPlaceholderNode };
+const nodeTypes = { step: StepNode };
 
 // ---------------------------------------------------------------------------
 // Custom edge — forward edges with a mid-point "add step" button
 // ---------------------------------------------------------------------------
 
 type AddStepEdgeData = {
-  onAdd?: (type: WorkflowStep['type'], executor: WorkflowStep['executor']) => void;
+  onAdd?: (payload: NewStepPayload) => void;
+  onOpenPopover?: (pos: { top: number; left: number }, onAdd: (payload: NewStepPayload) => void) => void;
+  onClosePopover?: () => void;
+  popoverEdgeId?: string | null;
+  edgeId?: string;
 };
-
-const STEP_TYPE_OPTIONS = [
-  { type: 'creation' as const, icon: PenLine,  label: 'Creation', description: 'A step where content or data is produced — by a human, an AI agent, or a script.', color: 'text-blue-600 dark:text-blue-400',    activeBg: 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-400' },
-  { type: 'review'   as const, icon: Search,    label: 'Review',   description: 'A step where someone evaluates work and gives a verdict such as approve or reject.',  color: 'text-amber-600 dark:text-amber-400',  activeBg: 'bg-amber-50 dark:bg-amber-900/30 ring-1 ring-amber-400' },
-  { type: 'decision' as const, icon: GitBranch, label: 'Decision', description: 'A branching step that routes the workflow to different paths based on a condition.',   color: 'text-purple-600 dark:text-purple-400', activeBg: 'bg-purple-50 dark:bg-purple-900/30 ring-1 ring-purple-400' },
-] as const;
 
 function AddStepEdge({
   id,
@@ -306,51 +326,35 @@ function AddStepEdge({
   label, labelStyle, labelBgStyle, labelBgPadding, labelBgBorderRadius,
   data,
 }: EdgeProps & { data?: AddStepEdgeData }) {
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const [pendingType, setPendingType] = useState<WorkflowStep['type'] | null>(null);
-  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!popoverOpen) return;
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (
-        popoverRef.current && !popoverRef.current.contains(e.target as HTMLElement) &&
-        buttonRef.current && !buttonRef.current.contains(e.target as HTMLElement)
-      ) {
-        setPopoverOpen(false);
-        setPendingType(null);
-      }
-    };
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [popoverOpen]);
 
   const [path, midX, midY] = getSmoothStepPath({
     sourceX, sourceY, sourcePosition,
     targetX, targetY, targetPosition,
   });
 
-  // Position the button 40% along the source→target vector (10% closer to source than midpoint).
   const buttonX = sourceX + 0.4 * (targetX - sourceX);
   const buttonY = sourceY + 0.4 * (targetY - sourceY);
 
   const handleButtonClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (popoverOpen) {
-      setPopoverOpen(false);
-      setPendingType(null);
-      setPopoverPos(null);
+    if (data?.popoverEdgeId === id) {
+      data?.onClosePopover?.();
     } else {
       const rect = buttonRef.current?.getBoundingClientRect();
-      if (rect) {
-        setPopoverPos({
+      if (rect && data?.onAdd) {
+        const POPOVER_WIDTH = 500;
+        const rawLeft = rect.left + window.scrollX + rect.width / 2;
+        const viewportWidth = document.documentElement.clientWidth;
+        const left = Math.max(
+          window.scrollX + POPOVER_WIDTH / 2 + 8,
+          Math.min(rawLeft, window.scrollX + viewportWidth - POPOVER_WIDTH / 2 - 8),
+        );
+        data.onOpenPopover?.({
           top: rect.bottom + window.scrollY + 8,
-          left: rect.left + window.scrollX + rect.width / 2,
-        });
+          left,
+        }, data.onAdd);
       }
-      setPopoverOpen(true);
     }
   };
 
@@ -391,61 +395,6 @@ function AddStepEdge({
           </div>
         </EdgeLabelRenderer>
       )}
-      {popoverOpen && popoverPos && data?.onAdd && createPortal(
-        <div
-          ref={popoverRef}
-          style={{
-            position: 'absolute',
-            top: popoverPos.top,
-            left: popoverPos.left,
-            transform: 'translateX(-50%)',
-            zIndex: 9999,
-          }}
-          className="bg-background border rounded-xl shadow-xl p-3 w-80 space-y-3"
-        >
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Step type</p>
-            <div className="flex flex-col gap-1">
-              {STEP_TYPE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.type}
-                  onClick={(e) => { e.stopPropagation(); setPendingType(opt.type); }}
-                  className={cn(
-                    'rounded-lg px-3 py-2 text-left transition-all w-full',
-                    pendingType === opt.type ? opt.activeBg : 'hover:bg-muted',
-                  )}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <opt.icon className={cn('h-3.5 w-3.5 shrink-0', opt.color)} strokeWidth={1.5} />
-                    <span className={cn('text-xs font-semibold', opt.color)}>{opt.label}</span>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{opt.description}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-          {pendingType && (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Who handles this step?</p>
-              <div className="flex gap-1.5">
-                {(pendingType === 'creation'
-                  ? (['human', 'agent', 'script', 'cowork'] as const)
-                  : (['human', 'agent'] as const)
-                ).map((executor) => (
-                  <button
-                    key={executor}
-                    onClick={(e) => { e.stopPropagation(); data.onAdd?.(pendingType, executor); setPopoverOpen(false); setPendingType(null); setPopoverPos(null); }}
-                    className="flex-1 rounded-lg py-1.5 text-xs font-semibold hover:bg-muted transition-all capitalize border"
-                  >
-                    {executor}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>,
-        document.body,
-      )}
     </>
   );
 }
@@ -456,9 +405,7 @@ const edgeTypes = { addStep: AddStepEdge };
 // Layout engine — single column, branch-accordion
 // ---------------------------------------------------------------------------
 
-type LayoutItem =
-  | { kind: 'step'; stepId: string }
-  | { kind: 'placeholder'; id: string; fromStepId: string; branchIdx: number; label: string; isActive: boolean; isBackEdge?: boolean; backTargetName?: string };
+type LayoutItem = { kind: 'step'; stepId: string; branches?: BranchInfo[] };
 
 function shortenCondition(raw: string | undefined): string | undefined {
   return raw
@@ -541,53 +488,51 @@ function buildLayout(
   for (const r of roots) visited.add(r.id);
 
   // Collected during BFS for edge building after node layout
-  const branchStepToFirstButton: { stepId: string; firstButtonId: string }[] = [];
-  const activeButtonToFirstStep: { buttonId: string; toStepId: string }[] = [];
-  const backEdgeButtonToTarget: { buttonId: string; targetStepId: string }[] = [];
+  const decisionStepToNextStep: { stepId: string; nextStepId: string }[] = [];
+  const decisionStepToBackTarget: { stepId: string; targetStepId: string }[] = [];
   const accordionSteps = new Set<string>();
 
   let head = 0;
   while (head < bfsQueue.length) {
     const current = bfsQueue[head++];
-    layoutItems.push({ kind: 'step', stepId: current });
 
     const outs = outgoing.get(current) ?? [];
     if (outs.length <= 1) {
+      layoutItems.push({ kind: 'step', stepId: current });
       for (const { to } of outs) {
         if (to && !visited.has(to)) { visited.add(to); bfsQueue.push(to); }
       }
     } else {
-      // Multiple branches: create buttons for ALL branches (forward + back-edge alike).
-      // Forward branches use the accordion (active/inactive). Back-edge branches are amber
-      // buttons that source an arc pointing up to an earlier step.
+      // Multiple branches — render inline inside the step card, no separate placeholder nodes.
       accordionSteps.add(current);
       const forwardOuts = outs.filter(({ to }) => !visited.has(to));
       const backOuts = outs.filter(({ to }) => visited.has(to));
       const rawIdx = expandedBranches.get(current) ?? 0;
       const expandedIdx = rawIdx < forwardOuts.length ? rawIdx : 0;
 
-      branchStepToFirstButton.push({ stepId: current, firstButtonId: `${PLACEHOLDER_PREFIX}${current}__0` });
+      const branches: BranchInfo[] = [];
 
-      // Forward buttons first (stable indices for accordion state)
+      // Back-edge (revise) branches displayed first so the right-out handle
+      // and the orange arc always originate from the top branch row.
+      for (let bi = 0; bi < backOuts.length; bi++) {
+        const { to, label } = backOuts[bi];
+        const backTargetName = to ? stepMap.get(to)?.name : undefined;
+        branches.push({ branchIdx: forwardOuts.length + bi, label: shortenCondition(label) ?? `Revise`, isActive: false, isBackEdge: true, backTargetName });
+        if (to) decisionStepToBackTarget.push({ stepId: current, targetStepId: to });
+      }
+
       for (let fi = 0; fi < forwardOuts.length; fi++) {
         const { to, label } = forwardOuts[fi];
         const isActive = fi === expandedIdx;
-        const id = `${PLACEHOLDER_PREFIX}${current}__${fi}`;
-        layoutItems.push({ kind: 'placeholder', id, fromStepId: current, branchIdx: fi, label: shortenCondition(label) ?? `Branch ${fi + 1}`, isActive, isBackEdge: false });
+        // branchIdx stays as the forwardOuts index so expandedBranches state is unaffected
+        branches.push({ branchIdx: fi, label: shortenCondition(label) ?? `Branch ${fi + 1}`, isActive, isBackEdge: false });
         if (isActive) {
-          if (to) activeButtonToFirstStep.push({ buttonId: id, toStepId: to });
+          if (to) decisionStepToNextStep.push({ stepId: current, nextStepId: to });
           if (to && !visited.has(to)) { visited.add(to); bfsQueue.push(to); }
         }
       }
 
-      // Back-edge buttons after forward buttons
-      for (let bi = 0; bi < backOuts.length; bi++) {
-        const { to, label } = backOuts[bi];
-        const id = `${PLACEHOLDER_PREFIX}${current}__${forwardOuts.length + bi}`;
-        const backTargetName = to ? stepMap.get(to)?.name : undefined;
-        layoutItems.push({ kind: 'placeholder', id, fromStepId: current, branchIdx: forwardOuts.length + bi, label: shortenCondition(label) ?? `Back ${bi + 1}`, isActive: false, isBackEdge: true, backTargetName });
-        if (to) backEdgeButtonToTarget.push({ buttonId: id, targetStepId: to });
-      }
+      layoutItems.push({ kind: 'step', stepId: current, branches });
     }
   }
 
@@ -600,48 +545,32 @@ function buildLayout(
     }
   }
 
-  // Assign sequential positions (placeholder rows are more compact)
-  const STEP_ROW_HEIGHT = NODE_INNER_HEIGHT + ROW_GAP;
+  // Assign sequential positions — compound height for decision steps with branches
   const seqIdxMap = new Map<string, number>();
   const nodes: Node[] = [];
   let seqIdx = 0;
   let currentY = 0;
 
   for (const item of layoutItems) {
-    if (item.kind === 'step') {
-      const step = stepMap.get(item.stepId);
-      if (!step) { seqIdx++; currentY += STEP_ROW_HEIGHT; continue; }
-      seqIdxMap.set(step.id, seqIdx);
-      nodes.push({
-        id: step.id,
-        type: 'step',
-        position: { x: 0, y: currentY },
-        data: {
-          label: step.name,
-          stepType: step.type,
-          executor: step.executor,
-          autonomyLevel: step.autonomyLevel,
-          plugin: step.plugin,
-        } as StepNodeData,
-      });
-      currentY += STEP_ROW_HEIGHT;
-    } else {
-      seqIdxMap.set(item.id, seqIdx);
-      nodes.push({
-        id: item.id,
-        type: 'branchPlaceholder',
-        position: { x: 0, y: currentY },
-        data: {
-          label: item.label,
-          fromStepId: item.fromStepId,
-          branchIdx: item.branchIdx,
-          isActive: item.isActive,
-          isBackEdge: item.isBackEdge ?? false,
-          backTargetName: item.backTargetName,
-        } as BranchPlaceholderNodeData,
-      });
-      currentY += PLACEHOLDER_ROW_HEIGHT;
-    }
+    const step = stepMap.get(item.stepId);
+    const numBranches = item.branches?.length ?? 0;
+    const nodeHeight = NODE_INNER_HEIGHT + numBranches * BRANCH_ROW_HEIGHT;
+    if (!step) { seqIdx++; currentY += nodeHeight + ROW_GAP; continue; }
+    seqIdxMap.set(step.id, seqIdx);
+    nodes.push({
+      id: step.id,
+      type: 'step',
+      position: { x: 0, y: currentY },
+      data: {
+        label: step.name,
+        stepType: step.type,
+        executor: step.executor,
+        autonomyLevel: step.autonomyLevel,
+        plugin: step.plugin,
+        branches: item.branches,
+      } as StepNodeData,
+    });
+    currentY += nodeHeight + ROW_GAP;
     seqIdx++;
   }
 
@@ -683,24 +612,17 @@ function buildLayout(
     });
   }
 
-  // Branching step → its first button (no label — condition lives in the button)
-  for (const { stepId, firstButtonId } of branchStepToFirstButton) {
-    if (seqIdxMap.has(stepId) && seqIdxMap.has(firstButtonId)) {
-      addEdge(stepId, firstButtonId);
+  // Decision step → first step of active branch (direct, no intermediate placeholder)
+  for (const { stepId, nextStepId } of decisionStepToNextStep) {
+    if (seqIdxMap.has(stepId) && seqIdxMap.has(nextStepId)) {
+      addEdge(stepId, nextStepId);
     }
   }
 
-  // Active branch button → first step of that branch
-  for (const { buttonId, toStepId } of activeButtonToFirstStep) {
-    if (seqIdxMap.has(buttonId) && seqIdxMap.has(toStepId)) {
-      addEdge(buttonId, toStepId);
-    }
-  }
-
-  // Back-edge button → target step (amber arc from button's right-out to target's right-in)
-  for (const { buttonId, targetStepId } of backEdgeButtonToTarget) {
-    if (seqIdxMap.has(buttonId) && seqIdxMap.has(targetStepId)) {
-      addEdge(buttonId, targetStepId);
+  // Decision step → back-edge target (amber arc from step's right-out to target's right-in)
+  for (const { stepId, targetStepId } of decisionStepToBackTarget) {
+    if (seqIdxMap.has(stepId) && seqIdxMap.has(targetStepId)) {
+      addEdge(stepId, targetStepId);
     }
   }
 
@@ -736,7 +658,7 @@ interface WorkflowDiagramProps {
   onNodeDelete?: (stepId: string) => void;
   onNodeMoveUp?: (stepId: string) => void;
   onNodeMoveDown?: (stepId: string) => void;
-  onEdgeAdd?: (fromStepId: string, type: WorkflowStep['type'], executor: WorkflowStep['executor']) => void;
+  onEdgeAdd?: (fromStepId: string, payload: NewStepPayload, toStepId: string) => void;
   onPaneClick?: () => void;
   selectedStepId?: string | null;
   errorStepIds?: Set<string>;
@@ -747,10 +669,43 @@ interface WorkflowDiagramProps {
 
 export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, onPaneClick, selectedStepId, errorStepIds, warningStepIds, canMoveUp, canMoveDown }: WorkflowDiagramProps) {
   const [expandedBranches, setExpandedBranches] = useState<Map<string, number>>(new Map());
+  const [popover, setPopover] = useState<{
+    pos: { top: number; left: number };
+    onAdd: (payload: NewStepPayload) => void;
+    edgeId: string;
+  } | null>(null);
+  const [pendingType, setPendingType] = useState<'creation' | 'decision'>('creation');
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  const resetWizard = useCallback(() => {
+    setPendingType('creation');
+  }, []);
 
   useEffect(() => {
     setExpandedBranches(new Map());
   }, [definition]);
+
+  useEffect(() => {
+    if (!popover) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as HTMLElement)) {
+        setPopover(null);
+        resetWizard();
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [popover, resetWizard]);
+
+  const handleOpenPopover = useCallback((edgeId: string, pos: { top: number; left: number }, onAdd: (payload: NewStepPayload) => void) => {
+    setPopover({ pos, onAdd, edgeId });
+    resetWizard();
+  }, [resetWizard]);
+
+  const handleClosePopover = useCallback(() => {
+    setPopover(null);
+    resetWizard();
+  }, [resetWizard]);
 
   const { nodes: layoutNodes, edges: layoutEdges, height } = useMemo(
     () => buildLayout(definition, expandedBranches),
@@ -759,20 +714,6 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
 
   const { nodes, edges } = useMemo<{ nodes: Node[]; edges: Edge[] }>(() => {
     const styledNodes = layoutNodes.map((n) => {
-      if (n.type === 'branchPlaceholder') {
-        const d = n.data as BranchPlaceholderNodeData;
-        return {
-          ...n,
-          data: {
-            ...d,
-            onExpand: () => setExpandedBranches((prev) => {
-              const next = new Map(prev);
-              next.set(d.fromStepId, d.branchIdx);
-              return next;
-            }),
-          },
-        };
-      }
       const d = n.data as StepNodeData;
       return {
         ...n,
@@ -785,23 +726,38 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
           onDelete: onNodeDelete && d.stepType !== 'terminal' ? () => onNodeDelete(n.id) : undefined,
           onMoveUp: onNodeMoveUp && canMoveUp?.has(n.id) ? () => onNodeMoveUp(n.id) : undefined,
           onMoveDown: onNodeMoveDown && canMoveDown?.has(n.id) ? () => onNodeMoveDown(n.id) : undefined,
+          branches: d.branches?.map((branch) => ({
+            ...branch,
+            onExpand: !branch.isBackEdge && !branch.isActive
+              ? () => setExpandedBranches((prev) => {
+                  const next = new Map(prev);
+                  next.set(n.id, branch.branchIdx);
+                  return next;
+                })
+              : undefined,
+          })),
         },
       };
     });
     const styledEdges: Edge[] = layoutEdges.map((e) => {
       const isForward = e.sourceHandle !== 'right-out';
-      const isPlaceholderEdge = e.target.startsWith(PLACEHOLDER_PREFIX) || e.source.startsWith(PLACEHOLDER_PREFIX);
-      if (isForward && onEdgeAdd && !isPlaceholderEdge) {
+      if (isForward && onEdgeAdd) {
         return {
           ...e,
           type: 'addStep',
-          data: { onAdd: (type, executor) => onEdgeAdd(e.source, type, executor) } satisfies AddStepEdgeData,
+          data: {
+            onAdd: (payload: NewStepPayload) => onEdgeAdd(e.source, payload, e.target),
+            onOpenPopover: (pos: { top: number; left: number }, onAdd: (payload: NewStepPayload) => void) => handleOpenPopover(e.id, pos, onAdd),
+            onClosePopover: handleClosePopover,
+            popoverEdgeId: popover?.edgeId ?? null,
+            edgeId: e.id,
+          } satisfies AddStepEdgeData,
         };
       }
       return e;
     });
     return { nodes: styledNodes as Node[], edges: styledEdges };
-  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, warningStepIds, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, canMoveUp, canMoveDown]);
+  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, warningStepIds, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, canMoveUp, canMoveDown, handleOpenPopover, handleClosePopover, popover?.edgeId]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<StepNodeData>) => {
@@ -817,9 +773,6 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
         style={{ width: '100%', height: `${Math.max(360, height)}px`, ...style }}
       >
         <ReactFlow
-          // ReactFlow infers Node<StepNodeData> from nodeTypes; mixed node types
-          // (step + branchPlaceholder) require this cast. Safe at runtime because
-          // nodeTypes dispatches rendering by the `type` string, not the generic.
           nodes={nodes as Node<StepNodeData>[]}
           edges={edges}
           nodeTypes={nodeTypes}
@@ -838,6 +791,161 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
           proOptions={{ hideAttribution: true }}
         />
       </div>
+      {popover && createPortal(
+        <div
+          ref={popoverRef}
+          style={{
+            position: 'absolute',
+            top: popover.pos.top,
+            left: popover.pos.left,
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+          }}
+          className="bg-background border rounded-xl shadow-xl p-3 w-[500px] space-y-3"
+        >
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Add new step</p>
+
+          {/* Section 1: step type */}
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-medium text-muted-foreground">What do you want to do in this step?</p>
+            <div className="flex gap-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); setPendingType('creation'); }}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-lg py-1.5 px-3 text-xs font-semibold border transition-all whitespace-nowrap',
+                  pendingType === 'creation'
+                    ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700'
+                    : 'hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 hover:ring-1 hover:ring-blue-300 dark:hover:bg-blue-900/20 dark:hover:text-blue-300 dark:hover:ring-blue-700',
+                )}
+              >
+                <PenLine className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+                Create new result
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setPendingType('decision'); }}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-lg py-1.5 px-3 text-xs font-semibold border transition-all whitespace-nowrap',
+                  pendingType === 'decision'
+                    ? 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700'
+                    : 'hover:bg-purple-50 hover:text-purple-700 hover:border-purple-300 hover:ring-1 hover:ring-purple-300 dark:hover:bg-purple-900/20 dark:hover:text-purple-300 dark:hover:ring-purple-700',
+                )}
+              >
+                <GitBranch className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+                Make a decision
+              </button>
+            </div>
+          </div>
+
+          {/* Section 2: executor — one row per Control Mode */}
+          <div className="space-y-1">
+            <p className="text-[11px] font-medium text-muted-foreground">Who executes this step?</p>
+
+            {/* CM0 */}
+            <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
+              <span className="w-14 shrink-0 flex items-center">
+                <User className="h-4 w-4 text-orange-400 dark:text-orange-500" />
+              </span>
+              <div className="flex gap-1.5 shrink-0">
+                <button
+                  onClick={(e) => { e.stopPropagation(); popover.onAdd({ type: pendingType, executor: 'human' }); setPopover(null); }}
+                  className="inline-flex items-center gap-1 rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap hover:bg-orange-50 hover:text-orange-700 hover:border-orange-400 hover:ring-1 hover:ring-orange-200 dark:hover:bg-orange-950/20 dark:hover:text-orange-300 dark:hover:border-orange-500 dark:hover:ring-orange-800"
+                >
+                  <User className="h-3 w-3 shrink-0" />Human
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); popover.onAdd({ type: pendingType, executor: 'script' }); setPopover(null); }}
+                  className="inline-flex items-center gap-1 rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-400 hover:ring-1 hover:ring-yellow-200 dark:hover:bg-yellow-950/20 dark:hover:text-yellow-300 dark:hover:border-yellow-500 dark:hover:ring-yellow-800"
+                >
+                  <Terminal className="h-3 w-3 shrink-0" />Script
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); popover.onAdd({ type: pendingType, executor: 'action' }); setPopover(null); }}
+                  className="inline-flex items-center gap-1 rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap hover:bg-pink-50 hover:text-pink-700 hover:border-pink-400 hover:ring-1 hover:ring-pink-200 dark:hover:bg-pink-950/20 dark:hover:text-pink-300 dark:hover:border-pink-500 dark:hover:ring-pink-800"
+                >
+                  <Zap className="h-3 w-3 shrink-0" />Action
+                </button>
+              </div>
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">No AI involved</span>
+            </div>
+
+            {/* CM1: Assist — disabled, coming soon */}
+            <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5 opacity-50">
+              <span className="w-14 shrink-0 flex items-center gap-0.5">
+                <User className="h-4 w-4 text-lime-500 dark:text-lime-400 shrink-0" />
+                <span className="relative inline-flex shrink-0 mr-2">
+                  <Bot className="h-4 w-4 text-lime-500 dark:text-lime-400" />
+                  <Search className="absolute -bottom-0.5 -right-1.5 h-2.5 w-2.5 text-lime-500 dark:text-lime-400" strokeWidth={2.5} />
+                </span>
+              </span>
+              <button disabled className="w-36 text-left rounded-md py-1 px-2.5 text-xs font-semibold border cursor-not-allowed whitespace-nowrap shrink-0">
+                Assist
+              </button>
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">Human executes, AI reviews — <em>coming soon</em></span>
+            </div>
+
+            {/* CM2: Cowork */}
+            <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
+              <span className="w-14 shrink-0 flex items-center gap-0.5">
+                <User className="h-4 w-4 text-teal-500 dark:text-teal-400 shrink-0" />
+                <Bot className="h-4 w-4 text-teal-500 dark:text-teal-400 shrink-0" />
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  popover.onAdd({ type: pendingType, executor: 'cowork', cowork: { agent: 'chat' } });
+                  setPopover(null);
+                }}
+                className="w-36 text-left rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap shrink-0 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-400 hover:ring-1 hover:ring-teal-200 dark:hover:bg-teal-900/20 dark:hover:text-teal-300 dark:hover:border-teal-600 dark:hover:ring-teal-800"
+              >
+                Cowork
+              </button>
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">Human and AI collaborate in real time</span>
+            </div>
+
+            {/* CM3: Human review */}
+            <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
+              <span className="w-14 shrink-0 flex items-center gap-0.5">
+                <Bot className="h-4 w-4 text-indigo-500 dark:text-indigo-400 shrink-0" />
+                <span className="relative inline-flex shrink-0 mr-2">
+                  <User className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />
+                  <Search className="absolute -bottom-0.5 -right-1.5 h-2.5 w-2.5 text-indigo-500 dark:text-indigo-400" strokeWidth={2.5} />
+                </span>
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  popover.onAdd({ type: pendingType, executor: 'agent', autonomyLevel: 'L3' });
+                  setPopover(null);
+                }}
+                className="w-36 text-left rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap shrink-0 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-400 hover:ring-1 hover:ring-indigo-200 dark:hover:bg-indigo-950/20 dark:hover:text-indigo-300 dark:hover:border-indigo-500 dark:hover:ring-indigo-800"
+              >
+                Human review
+              </button>
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">AI executes, human reviews before proceeding</span>
+            </div>
+
+            {/* CM4: Autonomous agent */}
+            <div className="flex items-center gap-3 rounded-lg border border-border/40 px-2.5 py-1.5">
+              <span className="w-14 shrink-0 flex items-center">
+                <Bot className="h-4 w-4 text-violet-500 dark:text-violet-400" />
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  popover.onAdd({ type: pendingType, executor: 'agent', autonomyLevel: 'L4' });
+                  setPopover(null);
+                }}
+                className="w-36 text-left rounded-md py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap shrink-0 hover:bg-violet-50 hover:text-violet-700 hover:border-violet-400 hover:ring-1 hover:ring-violet-200 dark:hover:bg-violet-950/20 dark:hover:text-violet-300 dark:hover:border-violet-500 dark:hover:ring-violet-800"
+              >
+                Autonomous agent
+              </button>
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">AI executes without waiting for human review</span>
+            </div>
+
+          </div>
+        </div>,
+        document.body,
+      )}
     </ReactFlowProvider>
   );
 }

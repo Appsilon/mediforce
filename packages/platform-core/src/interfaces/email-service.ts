@@ -14,3 +14,9 @@ export interface SendEmailResult {
 }
 
 export type SendEmailFn = (params: SendEmailParams) => Promise<SendEmailResult>;
+
+export interface EmailProviderInfo {
+  provider: 'mailgun' | 'smtp' | null;
+  configured: boolean;
+  from: string | null;
+}

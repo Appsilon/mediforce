@@ -5,16 +5,26 @@ import {
   GetTaskOutputSchema,
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
+  ValidateWorkflowOutputSchema,
+  GetWorkflowSchemaOutputSchema,
   ListWorkflowsInputSchema,
   ListWorkflowsOutputSchema,
   GetWorkflowInputSchema,
   GetWorkflowOutputSchema,
+  ListWorkflowVersionsInputSchema,
+  ListWorkflowVersionsOutputSchema,
   GetRunInputSchema,
   GetRunOutputSchema,
   StartRunInputSchema,
   StartRunOutputSchema,
   ListRunsInputSchema,
   ListRunsOutputSchema,
+  ListRunNamesInputSchema,
+  ListRunNamesOutputSchema,
+  ListRunOutputFilesInputSchema,
+  ListRunOutputFilesOutputSchema,
+  DownloadRunOutputFileInputSchema,
+  DownloadOutputFilesArchiveInputSchema,
   ArchiveVersionInputSchema,
   ArchiveVersionOutputSchema,
   ArchiveAllInputSchema,
@@ -31,6 +41,9 @@ import {
   GetWorkflowRunCountOutputSchema,
   TransferWorkflowInputSchema,
   TransferWorkflowOutputSchema,
+  ImportWorkflowInputSchema,
+  GetManifestInputSchema,
+  GetManifestOutputSchema,
   DockerInfoResponseSchema,
   OpenRouterCreditsInputSchema,
   OpenRouterCreditsOutputSchema,
@@ -75,12 +88,16 @@ import {
   GetProcessOutputSchema,
   ListAuditEventsInputSchema,
   ListAuditEventsOutputSchema,
+  ListAgentEventsInputSchema,
+  ListAgentEventsOutputSchema,
   GetProcessStepsInputSchema,
   GetProcessStepsOutputSchema,
   GetCoworkSessionInputSchema,
   GetCoworkSessionOutputSchema,
   GetCoworkSessionByInstanceInputSchema,
   GetCoworkSessionByInstanceOutputSchema,
+  ListCoworkSessionsInputSchema,
+  ListCoworkSessionsOutputSchema,
   ChatCoworkSessionInputSchema,
   ChatCoworkSessionOutputSchema,
   FinalizeCoworkSessionInputSchema,
@@ -94,6 +111,16 @@ import {
   ClaimTaskOutputSchema,
   CompleteTaskInputSchema,
   CompleteTaskOutputSchema,
+  ListAttachmentsInputSchema,
+  ListAttachmentsOutputSchema,
+  UploadAttachmentOutputSchema,
+  DeleteAttachmentInputSchema,
+  DeleteAttachmentOutputSchema,
+  type ListAttachmentsInput,
+  type ListAttachmentsOutput,
+  type UploadAttachmentOutput,
+  type DeleteAttachmentInput,
+  type DeleteAttachmentOutput,
   CancelRunInputSchema,
   CancelRunOutputSchema,
   ResumeRunInputSchema,
@@ -211,10 +238,15 @@ import {
   type RegisterWorkflowBody,
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
-  type ListWorkflowsInput,
+  type ValidateWorkflowInput,
+  type ValidateWorkflowOutput,
+  type GetWorkflowSchemaOutput,
+  type ListWorkflowsRequest,
   type ListWorkflowsOutput,
   type GetWorkflowInput,
   type GetWorkflowOutput,
+  type ListWorkflowVersionsInput,
+  type ListWorkflowVersionsOutput,
   type ArchiveVersionInput,
   type ArchiveVersionOutput,
   type ArchiveAllInput,
@@ -232,12 +264,22 @@ import {
   type GetWorkflowRunCountOutput,
   type TransferWorkflowInput,
   type TransferWorkflowOutput,
+  type ImportWorkflowInput,
+  type ImportWorkflowOutput,
+  type GetManifestInput,
+  type GetManifestOutput,
   type GetRunInput,
   type GetRunOutput,
   type StartRunInput,
   type StartRunOutput,
   type ListRunsInput,
   type ListRunsOutput,
+  type ListRunNamesInput,
+  type ListRunNamesOutput,
+  type ListRunOutputFilesInput,
+  type ListRunOutputFilesOutput,
+  type DownloadRunOutputFileInput,
+  type DownloadOutputFilesArchiveInput,
   type DockerInfoResponse,
   type OpenRouterCreditsInput,
   type OpenRouterCreditsOutput,
@@ -283,15 +325,21 @@ import {
   GetModelInputSchema,
   GetModelOutputSchema,
   SyncModelsOutputSchema,
+  ValidateModelsInputSchema,
+  ValidateModelsOutputSchema,
   type ListModelsInput,
   type ListModelsOutput,
   type GetModelInput,
   type GetModelOutput,
   type SyncModelsOutput,
+  type ValidateModelsInput,
+  type ValidateModelsOutput,
   type GetProcessInput,
   type GetProcessOutput,
   type ListAuditEventsInput,
   type ListAuditEventsOutput,
+  type ListAgentEventsInput,
+  type ListAgentEventsOutput,
   type GetProcessStepsInput,
   type GetProcessStepsOutput,
   type CancelRunInput,
@@ -310,6 +358,8 @@ import {
   type GetCoworkSessionOutput,
   type GetCoworkSessionByInstanceInput,
   type GetCoworkSessionByInstanceOutput,
+  type ListCoworkSessionsInput,
+  type ListCoworkSessionsOutput,
   type ChatCoworkSessionInput,
   type ChatCoworkSessionOutput,
   type FinalizeCoworkSessionInput,
@@ -331,6 +381,19 @@ import {
   GetMonitoringSummaryOutputSchema,
   type MonitoringSummaryInput,
   type GetMonitoringSummaryOutput,
+  GetConfigInputSchema,
+  GetConfigOutputSchema,
+  GetConfigByPrefixInputSchema,
+  GetConfigByPrefixOutputSchema,
+  SetConfigInputSchema,
+  SetConfigOutputSchema,
+  TestWebhookOutputSchema,
+  type GetConfigOutput,
+  type GetConfigByPrefixOutput,
+  type SetConfigOutput,
+  type TestWebhookOutput,
+  GetEmailStatusOutputSchema,
+  type GetEmailStatusOutput,
 } from '../contract/index';
 // SDK consumers reach for one path:
 //   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
@@ -400,21 +463,59 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * One downloaded Output File. `bytes` is the raw body (binary-safe);
+ * `fileName` comes from the RFC 6266 `Content-Disposition` header with the
+ * last path segment as fallback.
+ */
+export interface DownloadedRunOutputFile {
+  fileName: string;
+  contentType: string;
+  bytes: Uint8Array;
+}
+
+export interface DownloadedOutputFilesArchive {
+  fileName: string;
+  bytes: Uint8Array;
+}
+
 export class Mediforce {
   readonly tasks: {
     list: (input: ListTasksInput) => Promise<ListTasksOutput>;
     get: (input: GetTaskInput) => Promise<GetTaskOutput>;
     claim: (input: ClaimTaskInput) => Promise<ClaimTaskOutput>;
     complete: (input: CompleteTaskInput) => Promise<CompleteTaskOutput>;
+    attachments: {
+      list: (input: ListAttachmentsInput) => Promise<ListAttachmentsOutput>;
+      upload: (input: {
+        taskId: string;
+        name: string;
+        contentType: string;
+        content: Uint8Array;
+      }) => Promise<UploadAttachmentOutput>;
+      delete: (input: DeleteAttachmentInput) => Promise<DeleteAttachmentOutput>;
+    };
+  };
+
+  /**
+   * Attachment blob helper. `blobUrl(id)` is the authenticated streaming URL
+   * for an attachment's bytes — point an `<a download>` / `<img src>` at it;
+   * the browser sends the session cookie. Server-to-server callers fetch it
+   * via `request` with the configured auth header.
+   */
+  readonly attachments: {
+    blobUrl: (attachmentId: string) => string;
   };
 
   readonly processes: {
     get: (input: GetProcessInput) => Promise<GetProcessOutput>;
     listAuditEvents: (input: ListAuditEventsInput) => Promise<ListAuditEventsOutput>;
+    agentEvents: (input: ListAgentEventsInput) => Promise<ListAgentEventsOutput>;
     getSteps: (input: GetProcessStepsInput) => Promise<GetProcessStepsOutput>;
   };
 
   readonly cowork: {
+    list: (input?: ListCoworkSessionsInput) => Promise<ListCoworkSessionsOutput>;
     get: (input: GetCoworkSessionInput) => Promise<GetCoworkSessionOutput>;
     getByInstance: (
       input: GetCoworkSessionByInstanceInput,
@@ -440,8 +541,11 @@ export class Mediforce {
       input: RegisterWorkflowBody,
       options: RegisterWorkflowOptions,
     ) => Promise<RegisterWorkflowOutput>;
-    list: (input?: ListWorkflowsInput) => Promise<ListWorkflowsOutput>;
+    validate: (input: ValidateWorkflowInput) => Promise<ValidateWorkflowOutput>;
+    schema: () => Promise<GetWorkflowSchemaOutput>;
+    list: (input?: ListWorkflowsRequest) => Promise<ListWorkflowsOutput>;
     get: (input: GetWorkflowInput) => Promise<GetWorkflowOutput>;
+    versions: (input: ListWorkflowVersionsInput) => Promise<ListWorkflowVersionsOutput>;
     archiveVersion: (input: ArchiveVersionInput, options: { namespace: string }) => Promise<ArchiveVersionOutput>;
     archiveAll: (input: ArchiveAllInput, options: { namespace: string }) => Promise<ArchiveAllOutput>;
     setVisibility: (input: SetVisibilityInput, options: { namespace: string }) => Promise<SetVisibilityOutput>;
@@ -450,11 +554,17 @@ export class Mediforce {
     delete: (input: DeleteWorkflowInput) => Promise<DeleteWorkflowOutput>;
     getRunCount: (input: GetWorkflowRunCountInput) => Promise<GetWorkflowRunCountOutput>;
     transferNamespace: (input: TransferWorkflowInput) => Promise<TransferWorkflowOutput>;
+    importFromRepo: (input: ImportWorkflowInput) => Promise<ImportWorkflowOutput>;
+    getManifest: (input: GetManifestInput) => Promise<GetManifestOutput>;
   };
 
   readonly runs: {
     list: (input?: ListRunsInput) => Promise<ListRunsOutput>;
+    listNames: (input: ListRunNamesInput) => Promise<ListRunNamesOutput>;
     get: (input: GetRunInput) => Promise<GetRunOutput>;
+    listOutputFiles: (input: ListRunOutputFilesInput) => Promise<ListRunOutputFilesOutput>;
+    downloadOutputFile: (input: DownloadRunOutputFileInput) => Promise<DownloadedRunOutputFile>;
+    downloadOutputFilesArchive: (input: DownloadOutputFilesArchiveInput) => Promise<DownloadedOutputFilesArchive>;
     start: (input: StartRunInput) => Promise<StartRunOutput>;
     cancel: (input: CancelRunInput) => Promise<CancelRunOutput>;
     resume: (input: ResumeRunInput) => Promise<ResumeRunOutput>;
@@ -494,6 +604,7 @@ export class Mediforce {
     list: (input?: ListModelsInput) => Promise<ListModelsOutput>;
     get: (input: GetModelInput) => Promise<GetModelOutput>;
     sync: () => Promise<SyncModelsOutput>;
+    validate: (input: ValidateModelsInput) => Promise<ValidateModelsOutput>;
   };
 
   readonly secrets: {
@@ -516,6 +627,7 @@ export class Mediforce {
   readonly system: {
     dockerInfo: () => Promise<DockerInfoResponse>;
     credits: (input: OpenRouterCreditsInput) => Promise<OpenRouterCreditsOutput>;
+    emailStatus: () => Promise<GetEmailStatusOutput>;
   };
 
   readonly cron: {
@@ -569,12 +681,19 @@ export class Mediforce {
     summary: (input: MonitoringSummaryInput) => Promise<GetMonitoringSummaryOutput>;
   };
 
-  constructor(private readonly config: ClientConfig) {
+  readonly config: {
+    get: (input: { key: string }) => Promise<GetConfigOutput>;
+    getByPrefix: (input: { prefix: string }) => Promise<GetConfigByPrefixOutput>;
+    set: (input: { key: string; value: string }) => Promise<SetConfigOutput>;
+    testWebhook: () => Promise<TestWebhookOutput>;
+  };
+
+  constructor(private readonly clientConfig: ClientConfig) {
     // Defense-in-depth against JS callers / bad casts that bypass the
     // discriminated union (e.g. `new Mediforce()` with no argument, which the
     // type system already rejects). Treat a missing config like one with no
     // auth sources, triggering the same "exactly one" error below.
-    const safeConfig = (config ?? {}) as Partial<{
+    const safeConfig = (clientConfig ?? {}) as Partial<{
       apiKey: string;
       bearerToken: () => Promise<string | null>;
       fetch: typeof fetch;
@@ -595,7 +714,7 @@ export class Mediforce {
     // Node ("Invalid URL" from `fetch('/api/...')` is not obviously a config
     // mistake at the call site).
     if (safeConfig.apiKey !== undefined) {
-      const baseUrl = (config as BaseClientConfig).baseUrl;
+      const baseUrl = (clientConfig as BaseClientConfig).baseUrl;
       if (typeof baseUrl !== 'string' || baseUrl.length === 0) {
         throw new Error(
           'Mediforce: `apiKey` requires a non-empty `baseUrl` (server-to-server calls need an absolute target). ' +
@@ -647,6 +766,51 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.complete');
         return CompleteTaskOutputSchema.parse(body);
       },
+      attachments: {
+        list: async (input) => {
+          const validated = ListAttachmentsInputSchema.parse(input);
+          const res = await this.request(
+            `/api/tasks/${encodeURIComponent(validated.taskId)}/attachments`,
+          );
+          const body = await parseJsonOrThrow(res, 'mediforce.tasks.attachments.list');
+          return ListAttachmentsOutputSchema.parse(body);
+        },
+        upload: async (input) => {
+          // multipart/form-data — let fetch set the boundary Content-Type.
+          const form = new FormData();
+          // `BlobPart` requires a Uint8Array backed by a plain ArrayBuffer; TS
+          // widens the input's buffer to `ArrayBufferLike`. The bytes are always
+          // a real ArrayBuffer here, so narrow it for the Blob constructor.
+          const blobPart = input.content as unknown as BlobPart;
+          form.append(
+            'file',
+            new Blob([blobPart], { type: input.contentType }),
+            input.name,
+          );
+          const res = await this.request(
+            `/api/tasks/${encodeURIComponent(input.taskId)}/attachments`,
+            { method: 'POST', body: form },
+          );
+          const body = await parseJsonOrThrow(res, 'mediforce.tasks.attachments.upload');
+          return UploadAttachmentOutputSchema.parse(body);
+        },
+        delete: async (input) => {
+          const validated = DeleteAttachmentInputSchema.parse(input);
+          const res = await this.request(
+            `/api/attachments/${encodeURIComponent(validated.attachmentId)}`,
+            { method: 'DELETE' },
+          );
+          const body = await parseJsonOrThrow(res, 'mediforce.tasks.attachments.delete');
+          return DeleteAttachmentOutputSchema.parse(body);
+        },
+      },
+    };
+
+    this.attachments = {
+      blobUrl: (attachmentId) => {
+        const base = this.clientConfig.baseUrl ?? '';
+        return `${base}/api/attachments/${encodeURIComponent(attachmentId)}/blob`;
+      },
     };
 
     this.processes = {
@@ -666,6 +830,21 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.processes.listAuditEvents');
         return ListAuditEventsOutputSchema.parse(body);
       },
+      agentEvents: async (input) => {
+        const validated = ListAgentEventsInputSchema.parse(input);
+        const qs = toSearchParams({
+          stepId: validated.stepId,
+          afterSequence:
+            validated.afterSequence === undefined
+              ? undefined
+              : String(validated.afterSequence),
+        });
+        const res = await this.request(
+          `/api/processes/${encodeURIComponent(validated.instanceId)}/agent-events${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.processes.agentEvents');
+        return ListAgentEventsOutputSchema.parse(body);
+      },
       getSteps: async (input) => {
         const validated = GetProcessStepsInputSchema.parse(input);
         const res = await this.request(
@@ -677,6 +856,16 @@ export class Mediforce {
     };
 
     this.cowork = {
+      list: async (input) => {
+        const validated = ListCoworkSessionsInputSchema.parse(input ?? {});
+        const qs = toSearchParams({
+          role: validated.role,
+          status: validated.status,
+        });
+        const res = await this.request(`/api/cowork${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.cowork.list');
+        return ListCoworkSessionsOutputSchema.parse(body);
+      },
       get: async (input) => {
         const validated = GetCoworkSessionInputSchema.parse(input);
         const res = await this.request(
@@ -761,10 +950,29 @@ export class Mediforce {
           'mediforce.workflows.register',
         );
       },
+      validate: async (input) => {
+        return this.sendJson(
+          'POST',
+          '/api/workflow-definitions/validate',
+          { ...input },
+          ValidateWorkflowOutputSchema,
+          'mediforce.workflows.validate',
+        );
+      },
+      schema: async () => {
+        const res = await this.request('/api/workflow-definitions/schema');
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.schema');
+        return GetWorkflowSchemaOutputSchema.parse(body);
+      },
       list: async (input) => {
         const validated = input ? ListWorkflowsInputSchema.parse(input) : undefined;
         const qs = validated
-          ? toSearchParams({ namespace: validated.namespace })
+          ? toSearchParams({
+              namespace: validated.namespace,
+              // Forward only when the caller turns "show completed" off; the
+              // server defaults to true, so omitting keeps the common URL clean.
+              includeCompletedRuns: validated.includeCompletedRuns ? undefined : 'false',
+            })
           : '';
         const res = await this.request(`/api/workflow-definitions${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.list');
@@ -781,6 +989,15 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.get');
         return GetWorkflowOutputSchema.parse(body);
+      },
+      versions: async (input) => {
+        const validated = ListWorkflowVersionsInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/workflow-definitions/${encodeURIComponent(validated.name)}/versions${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.versions');
+        return ListWorkflowVersionsOutputSchema.parse(body);
       },
       archiveVersion: (input, options) => {
         const validated = ArchiveVersionInputSchema.parse(input);
@@ -871,6 +1088,24 @@ export class Mediforce {
           CopyWorkflowOutputSchema,
           'mediforce.workflows.copy',
         );
+      },
+      importFromRepo: async (input) => {
+        const validated = ImportWorkflowInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions/import${qs}`,
+          { repo: validated.repo, path: validated.path, ref: validated.ref },
+          RegisterWorkflowOutputSchema,
+          'mediforce.workflows.importFromRepo',
+        );
+      },
+      getManifest: async (input) => {
+        const validated = GetManifestInputSchema.parse(input);
+        const qs = toSearchParams({ repo: validated.repo, ref: validated.ref });
+        const res = await this.request(`/api/workflow-definitions/manifest${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.getManifest');
+        return GetManifestOutputSchema.parse(body);
       },
     };
 
@@ -1008,6 +1243,16 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.models.sync');
         return SyncModelsOutputSchema.parse(body);
       },
+      validate: async (input) => {
+        const validated = ValidateModelsInputSchema.parse(input);
+        const res = await this.request('/api/model-registry/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.models.validate');
+        return ValidateModelsOutputSchema.parse(body);
+      },
     };
 
     this.runs = {
@@ -1023,6 +1268,13 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.runs.list');
         return ListRunsOutputSchema.parse(body);
       },
+      listNames: async (input) => {
+        const validated = ListRunNamesInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/runs/names${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.runs.listNames');
+        return ListRunNamesOutputSchema.parse(body);
+      },
       get: async (input) => {
         const validated = GetRunInputSchema.parse(input);
         const res = await this.request(
@@ -1030,6 +1282,56 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.runs.get');
         return GetRunOutputSchema.parse(body);
+      },
+      listOutputFiles: async (input) => {
+        const validated = ListRunOutputFilesInputSchema.parse(input);
+        const res = await this.request(
+          `/api/runs/${encodeURIComponent(validated.runId)}/files`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.runs.listOutputFiles');
+        return ListRunOutputFilesOutputSchema.parse(body);
+      },
+      downloadOutputFile: async (input) => {
+        const validated = DownloadRunOutputFileInputSchema.parse(input);
+        // `path` is repo-relative with meaningful slashes (`.mediforce/output/<stepId>/<name>`)
+        // — encode each segment, keep the separators.
+        const encodedPath = validated.path
+          .split('/')
+          .map(encodeURIComponent)
+          .join('/');
+        const res = await this.request(
+          `/api/runs/${encodeURIComponent(validated.runId)}/files/${encodedPath}`,
+        );
+        if (res.ok === false) {
+          // Error responses are the JSON envelope — parseJsonOrThrow always
+          // throws ApiError on non-OK.
+          await parseJsonOrThrow(res, 'mediforce.runs.downloadOutputFile');
+        }
+        const fileName =
+          fileNameFromContentDisposition(res.headers.get('Content-Disposition')) ??
+          validated.path.split('/').pop() ??
+          'download';
+        return {
+          fileName,
+          contentType: res.headers.get('Content-Type') ?? 'application/octet-stream',
+          bytes: new Uint8Array(await res.arrayBuffer()),
+        };
+      },
+      downloadOutputFilesArchive: async (input) => {
+        const validated = DownloadOutputFilesArchiveInputSchema.parse(input);
+        const res = await this.request(
+          `/api/runs/${encodeURIComponent(validated.runId)}/files/archive`,
+        );
+        if (res.ok === false) {
+          await parseJsonOrThrow(res, 'mediforce.runs.downloadOutputFilesArchive');
+        }
+        const fileName =
+          fileNameFromContentDisposition(res.headers.get('Content-Disposition')) ??
+          'output.zip';
+        return {
+          fileName,
+          bytes: new Uint8Array(await res.arrayBuffer()),
+        };
       },
       start: async (input) => {
         const validated = StartRunInputSchema.parse(input);
@@ -1195,6 +1497,11 @@ export class Mediforce {
         const res = await this.request(`/api/system/openrouter-credits${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.system.credits');
         return OpenRouterCreditsOutputSchema.parse(body);
+      },
+      emailStatus: async () => {
+        const res = await this.request('/api/admin/email-status');
+        const body = await parseJsonOrThrow(res, 'mediforce.system.emailStatus');
+        return GetEmailStatusOutputSchema.parse(body);
       },
     };
 
@@ -1487,6 +1794,42 @@ export class Mediforce {
         );
       },
     };
+
+    this.config = {
+      get: async (input) => {
+        const validated = GetConfigInputSchema.parse(input);
+        const qs = `?key=${encodeURIComponent(validated.key)}`;
+        const res = await this.request(`/api/config${qs}`);
+        const responseBody = await parseJsonOrThrow(res, 'mediforce.config.get');
+        return GetConfigOutputSchema.parse(responseBody);
+      },
+      getByPrefix: async (input) => {
+        const validated = GetConfigByPrefixInputSchema.parse(input);
+        const qs = `?prefix=${encodeURIComponent(validated.prefix)}`;
+        const res = await this.request(`/api/config${qs}`);
+        const responseBody = await parseJsonOrThrow(res, 'mediforce.config.getByPrefix');
+        return GetConfigByPrefixOutputSchema.parse(responseBody);
+      },
+      set: async (input) => {
+        const validated = SetConfigInputSchema.parse(input);
+        return this.sendJson(
+          'PUT',
+          '/api/config',
+          { key: validated.key, value: validated.value },
+          SetConfigOutputSchema,
+          'mediforce.config.set',
+        );
+      },
+      testWebhook: async () => {
+        return this.sendJson(
+          'POST',
+          '/api/config/test-webhook',
+          undefined,
+          TestWebhookOutputSchema,
+          'mediforce.config.testWebhook',
+        );
+      },
+    };
   }
 
   private async request(path: string, init?: RequestInit): Promise<Response> {
@@ -1495,8 +1838,8 @@ export class Mediforce {
     for (const [key, value] of Object.entries(authHeaders)) {
       if (!headers.has(key)) headers.set(key, value);
     }
-    const base = this.config.baseUrl ?? '';
-    const fetchImpl = this.config.fetch ?? globalThis.fetch;
+    const base = this.clientConfig.baseUrl ?? '';
+    const fetchImpl = this.clientConfig.fetch ?? globalThis.fetch;
     return fetchImpl(`${base}${path}`, { ...init, headers });
   }
 
@@ -1527,11 +1870,11 @@ export class Mediforce {
   }
 
   private async buildAuthHeaders(): Promise<Record<string, string>> {
-    if (this.config.apiKey !== undefined) {
-      return { 'X-Api-Key': this.config.apiKey };
+    if (this.clientConfig.apiKey !== undefined) {
+      return { 'X-Api-Key': this.clientConfig.apiKey };
     }
-    if (this.config.bearerToken !== undefined) {
-      const token = await this.config.bearerToken();
+    if (this.clientConfig.bearerToken !== undefined) {
+      const token = await this.clientConfig.bearerToken();
       return token === null ? {} : { Authorization: `Bearer ${token}` };
     }
     return {};
@@ -1552,6 +1895,28 @@ function toSearchParams(
   }
   const qs = params.toString();
   return qs.length > 0 ? `?${qs}` : '';
+}
+
+/**
+ * Extract the file name from an RFC 6266 `Content-Disposition` header.
+ * Prefers the percent-encoded `filename*` parameter (full Unicode), falls
+ * back to the quoted `filename`, returns null when neither parses.
+ */
+function fileNameFromContentDisposition(header: string | null): string | null {
+  if (header === null) return null;
+  const extendedMatch = header.match(/filename\*=UTF-8''([^;]+)/i);
+  if (extendedMatch !== null) {
+    try {
+      return decodeURIComponent(extendedMatch[1]);
+    } catch {
+      return null;
+    }
+  }
+  const quotedMatch = header.match(/filename="((?:[^"\\]|\\.)*)"/);
+  if (quotedMatch !== null) {
+    return quotedMatch[1].replace(/\\(.)/g, '$1');
+  }
+  return null;
 }
 
 async function parseJsonOrThrow(res: Response, context: string): Promise<unknown> {

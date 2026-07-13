@@ -1,33 +1,28 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
+import { trackPageErrors } from '../helpers/page-errors';
 
 test.describe('Cancel Run Journey', () => {
-  test('dismiss cancel, then confirm cancel — run status changes', async ({ page }, testInfo) => {
-    await setupRecording(page, 'cancel-run', testInfo);
+  test('dismiss cancel, then confirm cancel — run status changes', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-cancel-target`);
-    await expect(page.getByRole('button', { name: /^cancel$/i })).toBeVisible({ timeout: 10_000 });
-    await showStep(page);
+    await expect(page.getByRole('button', { name: /^cancel run$/i })).toBeVisible({ timeout: 10_000 });
 
     // Click cancel — confirmation appears
-    await click(page, page.getByRole('button', { name: /^cancel$/i }));
+    await page.getByRole('button', { name: /^cancel run$/i }).click();
     await expect(page.getByText(/cannot be undone/i)).toBeVisible();
     await expect(page.getByRole('button', { name: /confirm cancel/i })).toBeVisible();
-    await showStep(page);
 
     // Dismiss with "Keep running" — back to idle
-    await click(page, page.getByRole('button', { name: /keep running/i }));
-    await expect(page.getByRole('button', { name: /^cancel$/i })).toBeVisible();
-    await showStep(page);
+    await page.getByRole('button', { name: /keep running/i }).click();
+    await expect(page.getByRole('button', { name: /^cancel run$/i })).toBeVisible();
 
     // Now actually cancel — click cancel again and confirm
-    await click(page, page.getByRole('button', { name: /^cancel$/i }));
+    await page.getByRole('button', { name: /^cancel run$/i }).click();
     await expect(page.getByText(/cannot be undone/i)).toBeVisible();
-    await click(page, page.getByRole('button', { name: /confirm cancel/i }));
+    await page.getByRole('button', { name: /confirm cancel/i }).click();
 
     // Run shows "Cancelled" badge after cancellation (distinct gray badge, not Error)
     await expect(page.getByText(/^cancelled$/i).first()).toBeVisible({ timeout: 10_000 });
-    await showResult(page);
-    await endRecording(page);
   });
 });

@@ -72,7 +72,6 @@ test.describe('Docker-backed workspace E2E', () => {
   // a 500, and the test fails at the first POST before the workspace flow even
   // starts. Fix is server-side admin SDK adoption — out of scope for #213.
   test.skip(process.env.CI === 'true', 'Blocked by #239 (Firestore rules + client-SDK auth)');
-  test.skip(process.env.E2E_RECORD === 'true', 'Excluded from GIF recording — known broken locally, tracked in #239');
   test.skip(process.env.NEXT_PUBLIC_USE_EMULATORS === 'true', 'Blocked by #239 — Firestore rules deny writes in emulator mode');
   test.skip(!dockerAvailable(), 'Docker daemon not available');
 
@@ -96,8 +95,7 @@ test.describe('Docker-backed workspace E2E', () => {
           type: 'creation',
           executor: 'script',
           plugin: 'script-container',
-          autonomyLevel: 'L4',
-          agent: {
+          script: {
             image: TEST_IMAGE,
             command: 'bash -c "echo step 1 content > /workspace/step-1.md && echo \'{\\"ok\\":true}\' > /output/result.json"',
           },
@@ -108,8 +106,7 @@ test.describe('Docker-backed workspace E2E', () => {
           type: 'creation',
           executor: 'script',
           plugin: 'script-container',
-          autonomyLevel: 'L4',
-          agent: {
+          script: {
             image: TEST_IMAGE,
             // Fails hard if /workspace/step-1.md isn't there — proves inter-step file visibility.
             command: 'bash -c "test -f /workspace/step-1.md && cp /workspace/step-1.md /workspace/step-2.md && echo \'{\\"ok\\":true}\' > /output/result.json"',

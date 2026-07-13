@@ -20,7 +20,14 @@ describe('workflow list command', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({
         definitions: [
-          { namespace: wd.namespace, name: wd.name, latestVersion: 3, defaultVersion: 2, definition: wd },
+          {
+            namespace: wd.namespace,
+            name: wd.name,
+            latestVersion: 3,
+            defaultVersion: 2,
+            definition: wd,
+            runSummary: { total: 0, active: 0, latest: [] },
+          },
         ],
       }),
     );
@@ -57,7 +64,14 @@ describe('workflow list command', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({
         definitions: [
-          { namespace: wd.namespace, name: wd.name, latestVersion: 1, defaultVersion: 1, definition: wd },
+          {
+            namespace: wd.namespace,
+            name: wd.name,
+            latestVersion: 1,
+            defaultVersion: 1,
+            definition: wd,
+            runSummary: { total: 0, active: 0, latest: [] },
+          },
         ],
       }),
     );
@@ -107,7 +121,7 @@ describe('workflow list command', () => {
     const text = output.stderrLines.join('\n');
     expect(text).toContain('Cannot reach Mediforce API at http://localhost:9003');
     expect(text).toContain('Reason: connection refused (ECONNREFUSED 127.0.0.1:9003)');
-    expect(text).toContain('pnpm dev:local');
+    expect(text).toContain('pnpm dev');
     expect(text).not.toContain('TypeError: fetch failed');
   });
 

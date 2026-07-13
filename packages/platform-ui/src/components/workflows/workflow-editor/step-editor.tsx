@@ -7,10 +7,12 @@ import { usePlugins } from '@/hooks/use-plugins';
 import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
+
 import type { WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
+import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import {
-  AUTONOMY_LEVELS,
+  AGENT_CONTROL_MODES,
   STEP_TYPE_LABELS,
   FALLBACK_OPTIONS,
   RUNTIME_OPTIONS,
@@ -33,36 +35,37 @@ function friendlyFieldError(message: string): string {
 }
 
 export function buildExecutorChangePatch(step: WorkflowStep, targetExecutor: WorkflowStep['executor']): Partial<WorkflowStep> {
-  const AGENT_ONLY = ['model', 'skill', 'prompt', 'skillsDir', 'timeoutMs', 'timeoutMinutes', 'confidenceThreshold', 'fallbackBehavior'] as const;
-  const SCRIPT_ONLY = ['command', 'inlineScript', 'runtime', 'image', 'dockerfile', 'repo', 'commit', 'repoAuth'] as const;
+  const SHARED_CONTAINER_KEYS = ['image', 'dockerfile', 'repo', 'commit', 'repoAuth'] as const;
   const base: Partial<WorkflowStep> = { executor: targetExecutor };
 
   if (targetExecutor === 'human') {
-    return { ...base, plugin: undefined, agent: undefined, cowork: undefined };
+    return { ...base, plugin: undefined, agent: undefined, script: undefined, databricks: undefined, cowork: undefined };
   }
   if (targetExecutor === 'agent') {
-    const cleanedAgent = step.agent
-      ? Object.fromEntries(Object.entries(step.agent).filter(([k]) => !SCRIPT_ONLY.includes(k as typeof SCRIPT_ONLY[number])))
+    const carriedFromScript = step.script
+      ? Object.fromEntries(Object.entries(step.script).filter(([k]) => SHARED_CONTAINER_KEYS.includes(k as typeof SHARED_CONTAINER_KEYS[number])))
       : undefined;
+    const agent = step.agent ?? (Object.keys(carriedFromScript ?? {}).length > 0 ? carriedFromScript as WorkflowStep['agent'] : undefined);
     return {
-      ...base, allowedRoles: undefined, cowork: undefined,
-      plugin: step.plugin ?? 'opencode-agent',
-      agent: Object.keys(cleanedAgent ?? {}).length > 0 ? cleanedAgent as WorkflowStep['agent'] : undefined,
+      ...base, allowedRoles: undefined, cowork: undefined, script: undefined, databricks: undefined,
+      plugin: step.plugin === 'script-container' || step.plugin === 'databricks-job' ? 'opencode-agent' : step.plugin ?? 'opencode-agent',
+      agent,
     };
   }
   if (targetExecutor === 'script') {
-    const cleanedAgent = step.agent
-      ? Object.fromEntries(Object.entries(step.agent).filter(([k]) => !AGENT_ONLY.includes(k as typeof AGENT_ONLY[number])))
+    const carriedFromAgent = step.agent
+      ? Object.fromEntries(Object.entries(step.agent).filter(([k]) => SHARED_CONTAINER_KEYS.includes(k as typeof SHARED_CONTAINER_KEYS[number])))
       : undefined;
+    const script = step.script ?? (Object.keys(carriedFromAgent ?? {}).length > 0 ? carriedFromAgent as WorkflowStep['script'] : undefined);
     return {
-      ...base, allowedRoles: undefined, autonomyLevel: undefined, cowork: undefined,
+      ...base, allowedRoles: undefined, autonomyLevel: undefined, cowork: undefined, agent: undefined,
       plugin: step.plugin ?? 'script-container',
-      agent: Object.keys(cleanedAgent ?? {}).length > 0 ? cleanedAgent as WorkflowStep['agent'] : undefined,
+      script,
     };
   }
   return {
     ...base, plugin: undefined, autonomyLevel: undefined, allowedRoles: undefined,
-    agent: undefined, cowork: step.cowork ?? { agent: 'chat' },
+    agent: undefined, script: undefined, databricks: undefined, cowork: step.cowork ?? { agent: 'chat' },
   };
 }
 
@@ -70,6 +73,10 @@ const ri = inputBase;
 const riMono = inputBaseMono;
 const rs = selectBase;
 const rt = textareaBase;
+
+function imageRef(img: DockerImageInfo): string {
+  return img.tag && img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.repository;
+}
 
 // ---------------------------------------------------------------------------
 // Executor / step-type icon maps (mirrors workflow-diagram.tsx)
@@ -80,6 +87,7 @@ const EXECUTOR_ICON: Record<string, { icon: React.ElementType; color: string; bg
   agent:  { icon: Bot,      color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/30', label: 'Agent' },
   script: { icon: Terminal, color: 'text-amber-600 dark:text-amber-400',   bg: 'bg-amber-100 dark:bg-amber-900/30',  label: 'Script' },
   cowork: { icon: Users,    color: 'text-teal-600 dark:text-teal-400',     bg: 'bg-teal-100 dark:bg-teal-900/30',    label: 'Cowork' },
+  action: { icon: Terminal, color: 'text-sky-600 dark:text-sky-400',       bg: 'bg-sky-100 dark:bg-sky-900/30',      label: 'Action' },
 };
 
 const STEP_TYPE_ICON: Record<string, { icon: React.ElementType; color: string; label: string }> = {
@@ -100,7 +108,7 @@ const TIP = {
   type:                    'Structural role in the workflow: creation, review, decision, or terminal. Fixed at step creation.',
   executor:                'Who performs this step: human, agent, script, cowork, or action. Fixed at step creation.',
 
-  autonomyLevel:           'How much authority the agent has. L0 = human-only, L2 = human approves output, L4 = fully autonomous.',
+  autonomyLevel:           'Assist: agent runs and produces a draft; human approves. Human review: explicit human approval required. Autonomous agent: agent executes without review. L0/L1 are developer-only flags set via raw YAML.',
   plugin:                  'Agent plugin to invoke (e.g. opencode-agent, claude-code-agent). Must be registered in the platform.',
   pluginScript:            'Plugin that runs the script (usually script-container). Must be registered in the platform.',
   agentId:                 'Slug of a saved agent definition. Loads its base model, skills, and MCP server bindings for this step.',
@@ -113,15 +121,26 @@ const TIP = {
   agentFallback:           'What to do if the agent fails or is below the confidence threshold: escalate to human, retry, or skip.',
   agentAllowedTools:       'Tools the agent may call, comma-separated. Leave empty to allow all available tools.',
   agentPrompt:             'Additional instructions appended to the agent\'s system prompt for this step only.',
-
-  agentRuntime:            'Language runtime for the inline script: javascript, python, r, or bash.',
-  agentCommand:            'Shell command to run in the container, typically to invoke a file from agent.repo.',
-  agentImage:              'Docker base image for the container (e.g. python:3.11-slim).',
+  agentImage:              'Docker image for the agent container (e.g. python:3.11-slim). Required for deployed execution.',
   agentDockerfile:         'Path to a Dockerfile in agent.repo. When set, the container is built from this file instead of agent.image.',
-  agentRepo:               'Git repository URL to clone into the container before running the command.',
+  agentRepo:               'Git repository URL to clone into the container before running the agent.',
   agentCommit:             'Commit SHA or branch to check out from agent.repo. Defaults to the repo\'s default branch.',
   agentRepoAuth:           'Name of a workflow secret holding the auth token for cloning a private repository.',
-  agentInlineScript:       'Script source code to run directly in the container. Set the language via agent.runtime.',
+
+  scriptRuntime:           'Language runtime for the inline script: javascript, python, r, or bash.',
+  scriptCommand:           'Shell command to run in the container, typically to invoke a file from script.repo.',
+  scriptImage:             'Docker base image for the container (e.g. python:3.11-slim).',
+  scriptDockerfile:        'Path to a Dockerfile in script.repo. When set, the container is built from this file instead of script.image.',
+  scriptRepo:              'Git repository URL to clone into the container before running the command.',
+  scriptCommit:            'Commit SHA or branch to check out from script.repo. Defaults to the repo\'s default branch.',
+  scriptRepoAuth:          'Name of a workflow secret holding the auth token for cloning a private repository.',
+  scriptInlineScript:      'Script source code to run directly in the container. Set the language via script.runtime.',
+
+  databricksJobId:         'ID of an existing Databricks job to trigger. Supports ${steps.*} interpolation when given as a string.',
+  databricksNotebookParams:'notebook_params for run-now as JSON object of string values. Values support ${steps.*} interpolation.',
+  databricksJobParameters: 'job_parameters for run-now (jobs with job-level parameters) as JSON object of string values.',
+  databricksPollIntervalMs:'How often to poll the run state, in milliseconds. Default 10000.',
+  databricksTimeoutMinutes:'Step timeout in minutes — the run is cancelled when exceeded. Default 30.',
 
   allowedRoles:            'Roles that can claim this task, comma-separated. Leave empty to allow any signed-in user.',
 
@@ -140,7 +159,7 @@ const TIP = {
   actionTo:                'Recipient email address(es), comma-separated.',
   actionCc:                'CC recipients, comma-separated.',
   actionBcc:               'BCC recipients, comma-separated. Not visible to other recipients.',
-  actionFrom:              'Sender address. Must be an authorised SendGrid verified sender.',
+  actionFrom:              'Sender address. Must be authorised by the configured email provider.',
   actionReplyTo:           'Reply-to address. Replies from recipients go here instead of action.from.',
   actionSubject:           'Email subject line. Supports ${variables.field} interpolation.',
   actionEmailBody:         'Plain-text email body. Displayed by clients that do not support HTML.',
@@ -196,6 +215,7 @@ export function StepEditor({
   onChange,
   errors,
   imageWarning,
+  dockerImages,
 }: {
   step: WorkflowStep;
   allSteps: WorkflowStep[];
@@ -203,6 +223,7 @@ export function StepEditor({
   onChange: (patch: Partial<WorkflowStep>) => void;
   errors?: Record<string, string>;
   imageWarning?: string;
+  dockerImages?: DockerImageInfo[];
 }) {
   const isNewStep = step.id.startsWith('new-step-');
   const { plugins } = usePlugins();
@@ -240,6 +261,19 @@ export function StepEditor({
   function updateAgent(patch: Partial<NonNullable<WorkflowStep['agent']>>) {
     onChange({ agent: { ...step.agent, ...patch } });
   }
+  function updateScript(patch: Partial<NonNullable<WorkflowStep['script']>>) {
+    onChange({ script: { ...step.script, ...patch } });
+  }
+  function updateDatabricks(patch: Partial<NonNullable<WorkflowStep['databricks']>>) {
+    onChange({ databricks: { ...(step.databricks ?? { jobId: 0 }), ...patch } });
+  }
+  function updateDatabricksParams(
+    field: 'notebookParams' | 'jobParameters',
+    mutate: (params: Record<string, string>) => Record<string, string>,
+  ) {
+    const next = mutate({ ...(step.databricks?.[field] ?? {}) });
+    updateDatabricks({ [field]: Object.keys(next).length > 0 ? next : undefined });
+  }
   function updateReview(patch: Partial<NonNullable<WorkflowStep['review']>>) {
     onChange({ review: { ...step.review, ...patch } });
   }
@@ -255,6 +289,13 @@ export function StepEditor({
 
   return (
     <div className="space-y-4" data-testid="step-editor">
+
+      {/* ── Review deprecation warning ───────────────────────────── */}
+      {step.type === 'review' && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          <strong>Review steps are deprecated.</strong> They will be replaced by Decision steps — where a human explicitly decides if the previous work is satisfactory. You can continue using this step; it will keep working. To migrate, replace it with a Decision step.
+        </div>
+      )}
 
       {/* ── Step type header ─────────────────────────────────────── */}
       <div className="flex items-center gap-3 pb-3 border-b border-border/40">
@@ -311,27 +352,25 @@ export function StepEditor({
         </FieldRow>
 
         <FieldRow label="executor" tooltip={TIP.executor}>
-          <span
-            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5"
-            title="Executor is set at creation. To change, remove this step and add a new one."
-          >
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5" title="executor is set at creation. To change, remove this step and add a new one.">
             <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-            {step.executor}
+            <span>{execStyle.label.toLowerCase()}</span>
           </span>
         </FieldRow>
       </FieldGroup>
 
       {/* ── Agent config ─────────────────────────────────────────── */}
-      {isAgent && (
+      {isAgent && (<>
         <FieldGroup>
-          <FieldRow label="autonomyLevel" tooltip={TIP.autonomyLevel}>
+          <FieldRow label="autonomy level" tooltip="Assist: agent draft, human approves. Human review: explicit approval required. Autonomous agent: executes without review.">
             <select
-              value={step.autonomyLevel ?? ''}
+              value={step.autonomyLevel ?? 'L2'}
               onChange={(e) => onChange({ autonomyLevel: (e.target.value || undefined) as WorkflowStep['autonomyLevel'] })}
               className={rs}
             >
-              <option value="">Default</option>
-              {AUTONOMY_LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+              {AGENT_CONTROL_MODES.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
             </select>
           </FieldRow>
 
@@ -442,43 +481,41 @@ export function StepEditor({
             />
           </FieldRow>
         </FieldGroup>
-      )}
 
-      {/* ── Script config ────────────────────────────────────────── */}
-      {isScript && (
         <FieldGroup>
-          <FieldRow label="plugin" tooltip={TIP.pluginScript}>
-            <input
-              value={step.plugin ?? ''}
-              onChange={(e) => onChange({ plugin: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
-
-          <FieldRow label="agent.runtime" tooltip={TIP.agentRuntime}>
-            <select
-              value={step.agent?.runtime ?? ''}
-              onChange={(e) => updateAgent({ runtime: (e.target.value || undefined) as 'javascript' | 'python' | 'r' | 'bash' | undefined })}
-              className={rs}
-            >
-              {RUNTIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </FieldRow>
-
-          <FieldRow label="agent.command" tooltip={TIP.agentCommand}>
-            <input
-              value={step.agent?.command ?? ''}
-              onChange={(e) => updateAgent({ command: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
-
           <FieldRow label="agent.image" tooltip={TIP.agentImage}>
-            <input
-              value={step.agent?.image ?? ''}
-              onChange={(e) => updateAgent({ image: e.target.value || undefined })}
-              className={riMono}
-            />
+            {dockerImages && dockerImages.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                <select
+                  aria-label="Known Docker image"
+                  value={step.agent?.image ?? ''}
+                  onChange={(e) => updateAgent({ image: e.target.value || undefined })}
+                  className={rs}
+                >
+                  <option value="">Select image…</option>
+                  {dockerImages.map((img) => {
+                    const ref = imageRef(img);
+                    return <option key={img.id} value={ref}>{ref}</option>;
+                  })}
+                  {step.agent?.image && !dockerImages.some((img) => imageRef(img) === step.agent?.image) && (
+                    <option value={step.agent.image}>{step.agent.image}</option>
+                  )}
+                </select>
+                <input
+                  aria-label="Custom Docker image"
+                  value={step.agent?.image ?? ''}
+                  onChange={(e) => updateAgent({ image: e.target.value || undefined })}
+                  className={riMono}
+                />
+              </div>
+            ) : (
+              <input
+                aria-label="Custom Docker image"
+                value={step.agent?.image ?? ''}
+                onChange={(e) => updateAgent({ image: e.target.value || undefined })}
+                className={riMono}
+              />
+            )}
           </FieldRow>
           {imageWarning && (
             <div className="flex items-center gap-1.5 px-3 -mt-1">
@@ -518,18 +555,191 @@ export function StepEditor({
               className={riMono}
             />
           </FieldRow>
+        </FieldGroup>
+      </>)}
 
-          <FieldRow label="agent.inlineScript" tooltip={TIP.agentInlineScript} alignStart>
+      {/* ── Script config ────────────────────────────────────────── */}
+      {isScript && (<>
+        <FieldGroup>
+          <FieldRow label="plugin" tooltip={TIP.pluginScript}>
+            <input
+              value={step.plugin ?? ''}
+              onChange={(e) => onChange({ plugin: e.target.value || undefined })}
+              className={riMono}
+            />
+          </FieldRow>
+
+          {step.plugin !== 'databricks-job' && (<>
+          <FieldRow label="script.runtime" tooltip={TIP.scriptRuntime}>
+            <select
+              value={step.script?.runtime ?? ''}
+              onChange={(e) => updateScript({ runtime: (e.target.value || undefined) as 'javascript' | 'python' | 'r' | 'bash' | undefined })}
+              className={rs}
+            >
+              {RUNTIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </FieldRow>
+
+          <FieldRow label="script.command" tooltip={TIP.scriptCommand}>
+            <input
+              value={step.script?.command ?? ''}
+              onChange={(e) => updateScript({ command: e.target.value || undefined })}
+              className={riMono}
+            />
+          </FieldRow>
+
+          <FieldRow label="script.inlineScript" tooltip={TIP.scriptInlineScript} alignStart>
             <textarea
-              value={step.agent?.inlineScript ?? ''}
-              onChange={(e) => updateAgent({ inlineScript: e.target.value || undefined })}
+              value={step.script?.inlineScript ?? ''}
+              onChange={(e) => updateScript({ inlineScript: e.target.value || undefined })}
               rows={3}
               placeholder="Script code…"
               className={cn(rt, 'font-mono text-[11px] placeholder:italic placeholder:text-muted-foreground/40')}
             />
           </FieldRow>
+          </>)}
+
+          {step.plugin === 'databricks-job' && (<>
+          <FieldRow label="databricks.jobId" tooltip={TIP.databricksJobId}>
+            <input
+              value={step.databricks?.jobId !== undefined ? String(step.databricks.jobId) : ''}
+              onChange={(e) => updateDatabricks({ jobId: /^\d+$/.test(e.target.value) ? Number(e.target.value) : e.target.value })}
+              className={riMono}
+            />
+          </FieldRow>
+          <FieldRow label="databricks.pollIntervalMs" tooltip={TIP.databricksPollIntervalMs}>
+            <input
+              type="number"
+              value={step.databricks?.pollIntervalMs ?? ''}
+              onChange={(e) => updateDatabricks({ pollIntervalMs: e.target.value ? Number(e.target.value) : undefined })}
+              className={riMono}
+            />
+          </FieldRow>
+          <FieldRow label="databricks.timeoutMinutes" tooltip={TIP.databricksTimeoutMinutes}>
+            <input
+              type="number"
+              value={step.databricks?.timeoutMinutes ?? ''}
+              onChange={(e) => updateDatabricks({ timeoutMinutes: e.target.value ? Number(e.target.value) : undefined })}
+              className={riMono}
+            />
+          </FieldRow>
+          {(['notebookParams', 'jobParameters'] as const).map((field) => (
+            <div key={field} className="px-3 py-1.5 border-b border-border/30 last:border-0">
+              <div
+                className="text-[11px] text-muted-foreground mb-1"
+                title={field === 'notebookParams' ? TIP.databricksNotebookParams : TIP.databricksJobParameters}
+              >databricks.{field}</div>
+              {Object.entries(step.databricks?.[field] ?? {}).map(([key, val], idx) => (
+                <div key={idx} className="grid grid-cols-[184px_1fr_auto] gap-x-3 py-1 items-center">
+                  <input
+                    value={key}
+                    onChange={(e) => updateDatabricksParams(field, (params) => {
+                      const renamed: Record<string, string> = {};
+                      for (const [k, v] of Object.entries(params)) renamed[k === key ? e.target.value : k] = v;
+                      return renamed;
+                    })}
+                    className={cn(riMono, 'text-muted-foreground/70')}
+                  />
+                  <input
+                    value={val}
+                    onChange={(e) => updateDatabricksParams(field, (params) => ({ ...params, [key]: e.target.value }))}
+                    className={riMono}
+                  />
+                  <button
+                    onClick={() => updateDatabricksParams(field, (params) => {
+                      delete params[key];
+                      return params;
+                    })}
+                    className="text-[10px] text-muted-foreground/30 hover:text-red-500 transition-colors"
+                  >×</button>
+                </div>
+              ))}
+              <button
+                onClick={() => updateDatabricksParams(field, (params) => ({ ...params, param: '' }))}
+                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              >+ Add parameter</button>
+            </div>
+          ))}
+          </>)}
         </FieldGroup>
-      )}
+
+        {step.plugin !== 'databricks-job' && (
+          <FieldGroup>
+            <FieldRow label="script.image" tooltip={TIP.scriptImage}>
+              {dockerImages && dockerImages.length > 0 ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <select
+                    aria-label="Known Docker image"
+                    value={step.script?.image ?? ''}
+                    onChange={(e) => updateScript({ image: e.target.value || undefined })}
+                    className={rs}
+                  >
+                    <option value="">Select image…</option>
+                    {dockerImages.map((img) => {
+                      const ref = imageRef(img);
+                      return <option key={img.id} value={ref}>{ref}</option>;
+                    })}
+                    {step.script?.image && !dockerImages.some((img) => imageRef(img) === step.script?.image) && (
+                      <option value={step.script.image}>{step.script.image}</option>
+                    )}
+                  </select>
+                  <input
+                    aria-label="Custom Docker image"
+                    value={step.script?.image ?? ''}
+                    onChange={(e) => updateScript({ image: e.target.value || undefined })}
+                    className={riMono}
+                  />
+                </div>
+              ) : (
+                <input
+                  aria-label="Custom Docker image"
+                  value={step.script?.image ?? ''}
+                  onChange={(e) => updateScript({ image: e.target.value || undefined })}
+                  className={riMono}
+                />
+              )}
+            </FieldRow>
+            {imageWarning && (
+              <div className="flex items-center gap-1.5 px-3 -mt-1">
+                <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" strokeWidth={2} />
+                <span className="text-[11px] text-amber-600 dark:text-amber-400">{imageWarning}</span>
+              </div>
+            )}
+
+            <FieldRow label="script.dockerfile" tooltip={TIP.scriptDockerfile}>
+              <input
+                value={step.script?.dockerfile ?? ''}
+                onChange={(e) => updateScript({ dockerfile: e.target.value || undefined })}
+                className={riMono}
+              />
+            </FieldRow>
+
+            <FieldRow label="script.repo" tooltip={TIP.scriptRepo}>
+              <input
+                value={step.script?.repo ?? ''}
+                onChange={(e) => updateScript({ repo: e.target.value || undefined })}
+                className={riMono}
+              />
+            </FieldRow>
+
+            <FieldRow label="script.commit" tooltip={TIP.scriptCommit}>
+              <input
+                value={step.script?.commit ?? ''}
+                onChange={(e) => updateScript({ commit: e.target.value || undefined })}
+                className={riMono}
+              />
+            </FieldRow>
+
+            <FieldRow label="script.repoAuth" tooltip={TIP.scriptRepoAuth}>
+              <input
+                value={step.script?.repoAuth ?? ''}
+                onChange={(e) => updateScript({ repoAuth: e.target.value || undefined })}
+                className={riMono}
+              />
+            </FieldRow>
+          </FieldGroup>
+        )}
+      </>)}
 
       {/* ── Human config ─────────────────────────────────────────── */}
       {isHuman && (

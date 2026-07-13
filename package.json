@@ -2,21 +2,20 @@
   "name": "mediforce",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.33.4",
+  "packageManager": "pnpm@10.34.4",
   "scripts": {
     "build": "pnpm -r run build",
     "typecheck": "tsc -b --noEmit",
-    "dev": "pnpm install --prefer-offline --silent && pnpm --filter @mediforce/platform-ui dev",
+    "dev": "pnpm install --prefer-offline --silent && python3 scripts/dev-infra.py && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce pnpm db:migrate && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce pnpm --filter @mediforce/platform-ui dev",
     "dev:mock": "pnpm install --prefer-offline --silent && pnpm --filter @mediforce/platform-ui dev:mock",
-    "dev:no-docker": "ALLOW_LOCAL_AGENTS=true pnpm dev",
-    "dev:queue": "REDIS_URL=redis://localhost:6379 pnpm dev",
-    "dev:postgres": "docker compose up postgres redis -d && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce STORAGE_BACKEND=postgres pnpm db:migrate && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce STORAGE_BACKEND=postgres REDIS_URL=redis://localhost:6379 pnpm dev",
+    "dev:no-docker": "pnpm install --prefer-offline --silent && DATABASE_URL=\"${DATABASE_URL:-postgresql://mediforce:mediforce@localhost:5432/mediforce}\" ALLOW_LOCAL_AGENTS=true pnpm --filter @mediforce/platform-ui dev",
+    "dev:queue": "pnpm install --prefer-offline --silent && python3 scripts/dev-infra.py --redis && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce pnpm db:migrate && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce REDIS_URL=redis://localhost:6379 pnpm --filter @mediforce/platform-ui dev",
     "emulators": "pnpm --filter @mediforce/platform-ui emulators",
     "test": "pnpm test:unit && pnpm test:e2e",
     "test:unit": "vitest run",
     "test:e2e": "pnpm --filter @mediforce/platform-ui test:e2e",
     "test:e2e:api": "pnpm --filter @mediforce/platform-ui test:e2e --project=api",
-    "test:e2e:record": "pnpm --filter @mediforce/platform-ui test:e2e:record",
+    "test:e2e:ui": "pnpm --filter @mediforce/platform-ui test:e2e --project=authenticated",
     "test:watch": "vitest",
     "test:affected": "vitest run --changed",
     "test:coverage": "vitest run --coverage",
@@ -25,7 +24,6 @@
     "start": "pnpm --filter @mediforce/platform-ui start",
     "db:migrate": "pnpm --filter @mediforce/platform-infra exec drizzle-kit migrate",
     "db:generate": "pnpm --filter @mediforce/platform-infra exec drizzle-kit generate",
-    "migrate:handles": "tsx scripts/migrate-user-handles.ts",
     "link:cli": "python3 scripts/link-cli.py"
   },
   "pnpm": {
@@ -38,16 +36,16 @@
     ],
     "overrides": {
       "axios": ">=1.15.0",
-      "protobufjs": "8.4.2",
-      "hono": "4.12.21",
-      "@hono/node-server": "2.0.3",
-      "fast-xml-parser": "5.8.0",
+      "protobufjs": "8.6.5",
+      "hono": "4.12.27",
+      "@hono/node-server": "2.0.6",
+      "fast-xml-parser": "5.9.3",
       "node-forge": "1.4.0",
       "follow-redirects": "1.16.0",
-      "brace-expansion": "5.0.6",
+      "brace-expansion": "5.0.7",
       "@tootallnate/once": "3.0.1",
-      "next": "16.2.6",
-      "vite": "8.0.14"
+      "next": "16.2.9",
+      "vite": "8.0.16"
     },
     "minimumReleaseAgeExclude": [
       "axios",
@@ -63,7 +61,7 @@
     "ts-morph": "^28.0.0",
     "tsx": "latest",
     "typescript": "~6.0.0",
-    "vite": "8.0.14",
+    "vite": "8.0.16",
     "vitest": "^4.1.4"
   }
 }

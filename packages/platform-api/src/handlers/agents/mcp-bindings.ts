@@ -7,7 +7,30 @@ import type {
   ListAgentMcpBindingsOutput,
 } from '../../contract/agents';
 import type { CallerScope } from '../../repositories/index';
-import { actorFromCaller, loadOr404 } from '../_helpers';
+import { PreconditionFailedError } from '../../errors';
+import { actorFromCaller, loadOr404, resolvePersonalNamespace } from '../_helpers';
+
+/**
+ * The FK-valid `workspace` an MCP-binding audit event belongs to. A
+ * namespace-bound agent's own namespace owns the event; for a platform-global
+ * agent (no namespace) the acting user's personal namespace owns it. apiKey
+ * callers editing a global agent have no namespace to attribute to — reject
+ * loudly rather than letting the Postgres NOT-NULL audit write throw.
+ */
+async function actingNamespace(
+  scope: CallerScope,
+  agentNamespace: string | undefined,
+): Promise<string> {
+  if (agentNamespace !== undefined) return agentNamespace;
+  if (scope.caller.kind === 'user') {
+    const personal = await resolvePersonalNamespace(scope, scope.caller.uid);
+    if (personal !== null) return personal;
+  }
+  throw new PreconditionFailedError(
+    'Cannot attribute MCP-binding audit event to a workspace: the agent is ' +
+      'platform-global and the caller has no namespace.',
+  );
+}
 
 export async function listAgentMcpBindings(
   input: ListAgentMcpBindingsInput,
@@ -35,6 +58,7 @@ export async function upsertAgentMcpBinding(
     basis: 'MCP binding upsert via API',
     entityType: 'agentDefinition',
     entityId: updated.id,
+    namespace: await actingNamespace(scope, updated.namespace),
   });
   return { mcpServers: updated.mcpServers ?? {} };
 }
@@ -58,6 +82,7 @@ export async function deleteAgentMcpBinding(
     basis: 'MCP binding delete via API',
     entityType: 'agentDefinition',
     entityId: updated.id,
+    namespace: await actingNamespace(scope, updated.namespace),
   });
   return { mcpServers: updated.mcpServers ?? {} };
 }

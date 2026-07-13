@@ -3,20 +3,19 @@
 import * as React from 'react';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import * as Tabs from '@radix-ui/react-tabs';
-import { useTheme } from 'next-themes';
 import { ChevronDown, Code, FileText, MonitorPlay } from 'lucide-react';
-import type { Presentation, StepExecution } from '@mediforce/platform-core';
-import { useSubcollection } from '@/hooks/use-process-instances';
+import type { Presentation } from '@mediforce/platform-core';
+import { useProcessInstance } from '@/hooks/use-process-instances';
+import { useStepExecutions } from '@/hooks/use-step-executions';
 import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
-import { buildSrcdoc, clampIframeHeight, isIframeResizeMessage } from './iframe-helpers';
+import { SandboxedHtmlIframe } from './sandboxed-html-iframe';
 import { MarkdownPresentation } from './markdown-presentation';
 import { normalizePresentation } from './task-utils';
 
 interface TaskContextPanelProps {
   processInstanceId: string;
   stepId: string; // The human task's stepId — we need the PREVIOUS step's output
-  onContentLoaded?: (hasContent: boolean) => void;
 }
 
 /**
@@ -24,19 +23,18 @@ interface TaskContextPanelProps {
  * report — either inline (`presentation` field) or as a written file
  * (`htmlReportPath` field) — the panel renders it inside a sandboxed
  * iframe under a "Report" tab and selects that tab by default. The
- * Summary and Full Output tabs remain available for the structured JSON.
+ * Extracted Data and Raw JSON tabs remain available for the structured JSON.
  *
- * Reports content availability via onContentLoaded callback so the parent
- * can disable verdict buttons when no content exists to review.
+ * Renders nothing if the previous step produced no output to show.
  */
 export function TaskContextPanel({
   processInstanceId,
   stepId,
-  onContentLoaded,
 }: TaskContextPanelProps) {
-  const { data: executions, loading } = useSubcollection<StepExecution & { id: string }>(
-    processInstanceId ? `processInstances/${processInstanceId}` : '',
-    'stepExecutions',
+  const { data: instance } = useProcessInstance(processInstanceId);
+  const { data: executions, loading } = useStepExecutions(
+    processInstanceId,
+    instance?.status,
   );
 
   // Find the completed step execution that directly precedes this human task's
@@ -53,9 +51,19 @@ export function TaskContextPanel({
     const currentStepExecs = executions
       .filter((e) => e.stepId === stepId)
       .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
-    const currentStepStart = currentStepExecs.length > 0
-      ? new Date(currentStepExecs[currentStepExecs.length - 1].startedAt).getTime()
-      : Infinity;
+
+    // In a loop revisit, the engine hasn't created an execution record for the
+    // new active visit yet. All known executions for this step are completed
+    // (they belong to past iterations). Use Infinity so the most recent
+    // preceding step from the current loop pass is found as context.
+    const isLoopRevisitWithNoRecord =
+      instance?.currentStepId === stepId &&
+      currentStepExecs.every((e) => e.status === 'completed');
+
+    const currentStepStart =
+      currentStepExecs.length === 0 || isLoopRevisitWithNoRecord
+        ? Infinity
+        : new Date(currentStepExecs[currentStepExecs.length - 1].startedAt).getTime();
 
     const completed = executions
       .filter((e) =>
@@ -75,11 +83,6 @@ export function TaskContextPanel({
       normalizePresentation(previousStepOutput.agentOutput?.presentation) !== null
     );
 
-  // Notify parent about content availability
-  React.useEffect(() => {
-    onContentLoaded?.(hasContent);
-  }, [hasContent, onContentLoaded]);
-
   if (loading) {
     return (
       <div className="rounded-lg border p-6">
@@ -92,16 +95,7 @@ export function TaskContextPanel({
   }
 
   if (!hasContent) {
-    return (
-      <div className="rounded-lg border border-dashed p-6 text-center">
-        <p className="text-sm text-muted-foreground">
-          Waiting for step output...
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Verdict buttons will be enabled once there is content to review.
-        </p>
-      </div>
-    );
+    return null;
   }
 
   const previousStep = previousStepOutput!;
@@ -211,13 +205,15 @@ function PreviousStepOutputTabs({
     ?? (fetchedReport !== null ? { kind: 'html', content: fetchedReport } : null);
   const showReportTab = reportMode !== null;
 
+  const defaultTab = showReportTab ? 'report' : 'summary';
+
   return (
-    <Tabs.Root defaultValue="summary">
+    <Tabs.Root key={String(showReportTab)} defaultValue={defaultTab}>
       <Tabs.List className="flex gap-1 border-b px-4">
         {[
-          { value: 'summary', label: 'Summary', icon: FileText },
           ...(showReportTab ? [{ value: 'report', label: 'Report', icon: MonitorPlay }] : []),
-          { value: 'full', label: 'Full Output', icon: Code },
+          { value: 'summary', label: 'Extracted Data', icon: FileText },
+          { value: 'full', label: 'Raw JSON', icon: Code },
         ].map(({ value, label, icon: Icon }) => (
           <Tabs.Trigger
             key={value}
@@ -257,7 +253,7 @@ function PreviousStepOutputTabs({
       </Tabs.Content>
 
       <Tabs.Content value="full" className="p-4">
-        <pre className="rounded-md bg-muted p-4 text-xs overflow-auto max-h-96 whitespace-pre-wrap break-words">
+        <pre className="rounded-md bg-muted p-4 text-xs whitespace-pre-wrap break-words">
           {output !== null ? JSON.stringify(output, null, 2) : String(rawOutput)}
         </pre>
       </Tabs.Content>
@@ -273,43 +269,6 @@ interface ReportPaneProps {
 }
 
 function ReportPane({ presentation, loading, error, result }: ReportPaneProps) {
-  const iframeRef = React.useRef<HTMLIFrameElement>(null);
-  const [iframeHeight, setIframeHeight] = React.useState(300);
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
-
-  const html = presentation?.kind === 'html' ? presentation.content : null;
-
-  // Listen for resize messages from the iframe
-  React.useEffect(() => {
-    if (html === null) return;
-    const handler = (event: MessageEvent) => {
-      if (
-        isIframeResizeMessage(event.data) &&
-        iframeRef.current &&
-        event.source === iframeRef.current.contentWindow
-      ) {
-        setIframeHeight((prev) => {
-          const next = clampIframeHeight(event.data.height);
-          return next > 0 ? next : prev;
-        });
-      }
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, [html]);
-
-  // Sync theme changes to iframe. Iframe is sandboxed without
-  // `allow-same-origin`, so its origin is null. `postMessage` rejects the
-  // literal string 'null' as targetOrigin and we can't compute the parent
-  // origin from inside the iframe — '*' is the only valid value here. The
-  // payload is benign (theme bool only), and the iframe-side handler does
-  // not act on sensitive data, so wildcard is acceptable.
-  React.useEffect(() => {
-    if (html === null) return;
-    iframeRef.current?.contentWindow?.postMessage({ type: 'theme', dark: isDark }, '*');
-  }, [isDark, html]);
-
   if (loading) {
     return (
       <div className="space-y-3">
@@ -322,7 +281,7 @@ function ReportPane({ presentation, loading, error, result }: ReportPaneProps) {
   if (error !== null && presentation === null) {
     return (
       <div className="rounded-md border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-        Report file not available — see Summary tab.
+        Report file not available — see Extracted Data tab.
       </div>
     );
   }
@@ -340,11 +299,9 @@ function ReportPane({ presentation, loading, error, result }: ReportPaneProps) {
   }
 
   return (
-    <iframe
-      ref={iframeRef}
-      srcDoc={buildSrcdoc(presentation.content, result, isDark)}
-      sandbox="allow-scripts"
-      style={{ width: '100%', height: iframeHeight, border: 'none' }}
+    <SandboxedHtmlIframe
+      html={presentation.content}
+      result={result}
       title="Previous step report"
     />
   );

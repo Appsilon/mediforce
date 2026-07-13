@@ -5,9 +5,16 @@ import { CheckCircle2, ExternalLink, Gauge, GitBranch, Clock, FileText, DollarSi
 import type { StepExecution, AgentOutputSnapshot } from '@mediforce/platform-core';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
 import { formatDuration, formatStepName, formatCostUsd } from '@/lib/format';
+import { SandboxedHtmlIframe } from '@/components/tasks/sandboxed-html-iframe';
+
+interface StepConfigInfo {
+  executorType?: string;
+  [key: string]: unknown;
+}
 
 interface RunResultsPanelProps {
   stepExecutions: StepExecution[];
+  stepConfigMap?: Map<string, StepConfigInfo>;
 }
 
 const RESULT_KEY_LABELS: Record<string, string> = {
@@ -45,6 +52,15 @@ function isEmptyResultValue(value: unknown): boolean {
   return false;
 }
 
+function isHtmlString(value: string): boolean {
+  const trimmed = value.trimStart().toLowerCase();
+  return (
+    trimmed.startsWith('<!doctype html') ||
+    trimmed.startsWith('<html>') ||
+    trimmed.startsWith('<html ')
+  );
+}
+
 function ResultValue({ value }: { value: unknown }) {
   if (typeof value === 'boolean') {
     return <span className="text-sm">{value ? 'Yes' : 'No'}</span>;
@@ -62,6 +78,9 @@ function ResultValue({ value }: { value: unknown }) {
           <ExternalLink className="h-3 w-3 shrink-0" />
         </a>
       );
+    }
+    if (isHtmlString(value)) {
+      return <SandboxedHtmlIframe html={value} title="HTML output preview" />;
     }
     return <span className="text-sm font-mono break-all">{value}</span>;
   }
@@ -154,7 +173,7 @@ function findFinalAgentOutput(stepExecutions: StepExecution[]): {
   };
 }
 
-export function RunResultsPanel({ stepExecutions }: RunResultsPanelProps) {
+export function RunResultsPanel({ stepExecutions, stepConfigMap }: RunResultsPanelProps) {
   const finalOutput = React.useMemo(
     () => findFinalAgentOutput(stepExecutions),
     [stepExecutions],
@@ -163,7 +182,8 @@ export function RunResultsPanel({ stepExecutions }: RunResultsPanelProps) {
   if (!finalOutput) return null;
 
   const { stepId, output, result } = finalOutput;
-  const confidencePct = output.confidence !== null
+  const isScript = stepConfigMap?.get(stepId)?.executorType === 'script';
+  const confidencePct = !isScript && output.confidence !== null
     ? Math.round(output.confidence * 100)
     : null;
   const git = output.gitMetadata;
@@ -196,10 +216,10 @@ export function RunResultsPanel({ stepExecutions }: RunResultsPanelProps) {
               )}>{confidencePct}%</span>
             </div>
           )}
-          {output.confidence_rationale && (
+          {!isScript && output.confidence_rationale && (
             <p className="text-xs text-muted-foreground italic">{output.confidence_rationale}</p>
           )}
-          {output.model && (
+          {!isScript && output.model && (
             <div className="flex items-center gap-1.5">
               <span className="text-muted-foreground">Model:</span>
               <span className="font-mono text-xs">{output.model}</span>
@@ -310,14 +330,17 @@ export function RunResultsPanel({ stepExecutions }: RunResultsPanelProps) {
                     Output
                   </h4>
                   <dl className="space-y-1.5">
-                    {remainingEntries.map(([key, value]) => (
-                      <div key={key} className="flex flex-wrap items-baseline gap-2 text-sm">
-                        <dt className="text-muted-foreground">{formatResultKey(key)}:</dt>
-                        <dd className="min-w-0 flex-1">
-                          <ResultValue value={value} />
-                        </dd>
-                      </div>
-                    ))}
+                    {remainingEntries.map(([key, value]) => {
+                      const isHtml = typeof value === 'string' && isHtmlString(value);
+                      return (
+                        <div key={key} className={isHtml ? 'space-y-1 text-sm' : 'flex flex-wrap items-baseline gap-2 text-sm'}>
+                          <dt className="text-muted-foreground">{formatResultKey(key)}:</dt>
+                          <dd className="min-w-0 flex-1">
+                            <ResultValue value={value} />
+                          </dd>
+                        </div>
+                      );
+                    })}
                   </dl>
                 </div>
               )}

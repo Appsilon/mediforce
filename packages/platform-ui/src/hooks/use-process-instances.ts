@@ -1,22 +1,19 @@
 'use client';
 
-import * as React from 'react';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { onSnapshot, collection } from 'firebase/firestore';
 import type { InstanceStatus } from '@mediforce/platform-core';
 import { ApiError, mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
-import { db } from '@/lib/firebase';
+import { stopRetryOn4xx } from '@/lib/retry';
+import {
+  CRITICAL_LIVE_INTERVAL_MS,
+  LEGACY_FIRESTORE_PARITY_LIMIT,
+  STANDARD_LIVE_INTERVAL_MS,
+  TERMINAL_STATUSES,
+} from '@/lib/polling-cadence';
 
 export type ProcessStatusFilter = 'all' | 'running' | 'paused' | 'completed' | 'failed' | 'created';
-
-const STANDARD_LIVE_INTERVAL_MS = 5_000;
-const CRITICAL_LIVE_INTERVAL_MS = 1_500;
-const TERMINAL_STATUSES: ReadonlySet<InstanceStatus> = new Set([
-  'completed',
-  'failed',
-]);
 
 function statusForApi(filter: ProcessStatusFilter): InstanceStatus | undefined {
   return filter === 'all' ? undefined : filter;
@@ -49,19 +46,13 @@ export function useProcessInstances(
         namespace,
         workflow: definitionName,
         status: apiStatus,
-        // Parity workaround — tracked in #588. Pre-PR3 the UI did an
-        // unbounded Firestore read; pagination on the contract isn't here
-        // yet, so we ride the schema max instead of regressing visibility.
-        limit: 10000,
+        limit: LEGACY_FIRESTORE_PARITY_LIMIT,
       });
       return result.runs;
     },
     enabled: namespace.length > 0,
-    refetchInterval: STANDARD_LIVE_INTERVAL_MS,
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-      return failureCount < 2;
-    },
+    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
+    retry: stopRetryOn4xx,
   });
 
   const data = useMemo(() => {
@@ -96,10 +87,7 @@ export function useProcessInstance(instanceId: string | null) {
     queryKey: enabled ? queryKeys.run(instanceId) : (['run', '__noop__'] as const),
     queryFn: () => mediforce.processes.get({ instanceId: instanceId as string }),
     enabled,
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-      return failureCount < 2;
-    },
+    retry: stopRetryOn4xx,
     refetchInterval: (q) => {
       if (q.state.error !== null) return false;
       const status = q.state.data?.status;
@@ -122,37 +110,3 @@ export function useProcessInstance(instanceId: string | null) {
   };
 }
 
-/**
- * Step-execution / agent-event subcollection reader. Stays on Firestore
- * `onSnapshot` for now — the corresponding read endpoints are not in PR3's
- * scope (step execution detail moves with PR2's agent-runs migration; the
- * dedicated "process steps" endpoint covers the aggregate view consumed by
- * the run detail page).
- */
-export function useSubcollection<T extends { id: string }>(
-  parentPath: string,
-  subcollection: string,
-) {
-  const [state, setState] = React.useState<{ data: T[]; loading: boolean; error: Error | null }>({
-    data: [],
-    loading: true,
-    error: null,
-  });
-
-  React.useEffect(() => {
-    if (!parentPath) {
-      setState({ data: [], loading: false, error: null });
-      return;
-    }
-    const colRef = collection(db, parentPath, subcollection);
-    const unsub = onSnapshot(colRef, (snap) => {
-      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as T[];
-      setState({ data: docs, loading: false, error: null });
-    }, (error) => {
-      setState((prev) => ({ ...prev, loading: false, error }));
-    });
-    return unsub;
-  }, [parentPath, subcollection]);
-
-  return state;
-}

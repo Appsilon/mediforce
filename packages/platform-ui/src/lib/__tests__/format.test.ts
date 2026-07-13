@@ -37,6 +37,8 @@ describe('formatDuration', () => {
   });
 });
 
+// formatBytes tests live in @mediforce/platform-core (src/utils/__tests__/format.test.ts).
+
 describe('formatStepName', () => {
   it('[DATA] formats hyphenated step IDs', () => {
     expect(formatStepName('validate-data')).toBe('Validate Data');

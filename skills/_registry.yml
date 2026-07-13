@@ -1,7 +1,7 @@
 version: "1.0"
-generated: "2026-05-19"
+generated: "2026-06-11"
 standard: "agentskills.io/specification"
-total_skills: 12
+total_skills: 14
 
 # Runtime skills have their own per-app registries:
 #   apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/_registry.yml
@@ -72,3 +72,13 @@ domains:
         complexity: basic
         language: multi
         description: Interview-style plan stress-test against CONTEXT.md and ADRs (vendored from mattpocock/skills)
+      - id: sync-docs
+        path: skills/sync-docs/SKILL.md
+        complexity: moderate
+        language: multi
+        description: Keep monitored docs in sync — auto-fixes Tier 1 (commands/ports/env vars), proposes Tier 2 (narrative) as git diff
+      - id: design-workflow
+        path: skills/design-workflow/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Interview-driven authoring/editing of a Mediforce workflow package; challenges the design toward the golden rules and validates the .wd.json against the checkout

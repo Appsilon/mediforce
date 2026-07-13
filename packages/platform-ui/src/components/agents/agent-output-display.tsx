@@ -3,7 +3,6 @@
 import * as React from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Collapsible from '@radix-ui/react-collapsible';
-import { useTheme } from 'next-themes';
 import {
   ChevronDown,
   Clock,
@@ -16,7 +15,7 @@ import {
   MonitorPlay,
 } from 'lucide-react';
 import type { AgentOutputData } from '@/components/tasks/task-utils';
-import { buildSrcdoc, clampIframeHeight, isIframeResizeMessage } from '@/components/tasks/iframe-helpers';
+import { SandboxedHtmlIframe } from '@/components/tasks/sandboxed-html-iframe';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { apiFetch } from '@/lib/api-fetch';
 import { formatCostUsd, formatDuration } from '@/lib/format';
@@ -59,38 +58,7 @@ export function AgentOutputDisplay({
 }: AgentOutputDisplayProps) {
   const presentation = agentOutput.presentation;
   const hasPresentation = presentation !== null;
-  // Iframe path is only used for the HTML branch. Markdown renders inline
-  // via MarkdownPresentation and ignores the iframe resize/theme dance.
-  const needsIframe = presentation?.kind === 'html';
   const result = agentOutput.result ?? {};
-  const iframeRef = React.useRef<HTMLIFrameElement>(null);
-  const [iframeHeight, setIframeHeight] = React.useState(300);
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
-
-  React.useEffect(() => {
-    if (!needsIframe) return;
-    const handler = (event: MessageEvent) => {
-      if (
-        isIframeResizeMessage(event.data) &&
-        iframeRef.current &&
-        event.source === iframeRef.current.contentWindow
-      ) {
-        setIframeHeight((prev) => {
-          const next = clampIframeHeight(event.data.height);
-          return next > 0 ? next : prev;
-        });
-      }
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, [needsIframe]);
-
-  // Sync theme changes to iframe
-  React.useEffect(() => {
-    if (!needsIframe) return;
-    iframeRef.current?.contentWindow?.postMessage({ type: 'theme', dark: isDark }, '*');
-  }, [isDark, needsIframe]);
 
   const hasResult = agentOutput.result !== null && Object.keys(agentOutput.result).length > 0;
   const hasContent = hasResult || hasPresentation;
@@ -161,11 +129,11 @@ export function AgentOutputDisplay({
         <GeneratedFiles git={agentOutput.gitMetadata} />
       )}
 
-      <Tabs.Root defaultValue={defaultTab}>
+      <Tabs.Root key={defaultTab} defaultValue={defaultTab}>
         <Tabs.List className="flex gap-1 border-b px-4">
           {[
-            ...(hasPresentation ? [{ value: 'presentation', label: 'Presentation', icon: MonitorPlay }] : []),
-            ...(hasFileTab ? [{ value: 'content', label: 'Content', icon: FileText }] : []),
+            ...(hasPresentation ? [{ value: 'presentation', label: 'Report', icon: MonitorPlay }] : []),
+            ...(hasFileTab ? [{ value: 'content', label: 'Output File', icon: FileText }] : []),
             { value: 'summary', label: 'Extracted Data', icon: FileText },
             { value: 'full', label: 'Raw JSON', icon: Code },
           ].map(({ value, label, icon: Icon }) => (
@@ -190,11 +158,9 @@ export function AgentOutputDisplay({
             {presentation.kind === 'markdown' ? (
               <MarkdownPresentation content={presentation.content} />
             ) : (
-              <iframe
-                ref={iframeRef}
-                srcDoc={buildSrcdoc(presentation.content, agentOutput.result, isDark)}
-                sandbox="allow-scripts"
-                style={{ width: '100%', height: iframeHeight, border: 'none' }}
+              <SandboxedHtmlIframe
+                html={presentation.content}
+                result={agentOutput.result}
                 title="Agent presentation"
               />
             )}

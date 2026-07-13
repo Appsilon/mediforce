@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import type { ModelRegistryEntry } from '@mediforce/platform-core';
 
@@ -38,6 +39,7 @@ export function ModelPicker({ value, onChange, defaultModel, className }: ModelP
 
   const topPicks = useMemo(() =>
     models
+      .filter((m) => m.retiredAt === null)
       .filter((m) => m.requestCount !== null && m.requestCount > 0)
       .sort((a, b) => (b.requestCount ?? 0) - (a.requestCount ?? 0))
       .slice(0, TOP_PICKS_COUNT),
@@ -48,6 +50,11 @@ export function ModelPicker({ value, onChange, defaultModel, className }: ModelP
     if (!value) return null;
     return models.find((m) => m.id === value) ?? null;
   }, [models, value]);
+
+  const retiredModel = useMemo(() => {
+    if (!selectedModel || selectedModel.retiredAt === null) return null;
+    return selectedModel;
+  }, [selectedModel]);
 
   const displayDefault = defaultModel ?? 'plugin default';
   const isCustom = value !== undefined && value !== '' && !topPicks.some((m) => m.id === value);
@@ -72,9 +79,10 @@ export function ModelPicker({ value, onChange, defaultModel, className }: ModelP
           </button>
         </div>
         <datalist id="model-registry-list">
-          {models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          {models.filter((m) => m.retiredAt === null).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
         </datalist>
         {selectedModel && <ModelMeta model={selectedModel} />}
+        {retiredModel && <RetiredWarning model={retiredModel} />}
       </div>
     );
   }
@@ -108,6 +116,7 @@ export function ModelPicker({ value, onChange, defaultModel, className }: ModelP
       {(selectedModel ?? (value === '' || value === undefined ? defaultModelMeta(models, defaultModel) : null)) && (
         <ModelMeta model={(selectedModel ?? defaultModelMeta(models, defaultModel))!} />
       )}
+      {retiredModel && <RetiredWarning model={retiredModel} />}
     </div>
   );
 }
@@ -128,6 +137,23 @@ function ModelMeta({ model }: { model: ModelRegistryEntry }) {
       {model.requestCount !== null && model.requestCount > 0 && (
         <span>{model.requestCount >= 1_000_000 ? `${(model.requestCount / 1_000_000).toFixed(1)}M` : `${Math.round(model.requestCount / 1000)}K`} requests</span>
       )}
+    </div>
+  );
+}
+
+function RetiredWarning({ model }: { model: ModelRegistryEntry }) {
+  const date = model.retiredAt
+    ? new Date(model.retiredAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+    : '';
+  return (
+    <div
+      data-testid="retired-model-warning"
+      className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-md px-2.5 py-1.5"
+    >
+      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+      <span>
+        <strong>{model.name}</strong> was retired on {date}. Choose a different model before saving.
+      </span>
     </div>
   );
 }

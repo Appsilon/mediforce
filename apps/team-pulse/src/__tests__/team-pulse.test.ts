@@ -35,8 +35,8 @@ describe('team-pulse', () => {
     if (!result.success) return;
     const step = result.data.steps.find((s) => s.id === 'fetch_members');
     expect(step?.executor).toBe('script');
-    expect(step?.agent?.inlineScript).toMatch(/\/api\/users\/members/);
-    expect(step?.agent?.inlineScript).toMatch(/options/);
+    expect(step?.script?.inlineScript).toMatch(/\/api\/users\/members/);
+    expect(step?.script?.inlineScript).toMatch(/options/);
   });
 
   it('select_members is human step with table-editor', () => {
@@ -57,9 +57,9 @@ describe('team-pulse', () => {
     if (!result.success) return;
     const step = result.data.steps.find((s) => s.id === 'prepare');
     expect(step?.executor).toBe('script');
-    expect(step?.agent?.inlineScript).toMatch(/includedIds/);
-    expect(step?.agent?.inlineScript).toMatch(/durationHours/);
-    expect(step?.agent?.inlineScript).toMatch(/deadline/);
+    expect(step?.script?.inlineScript).toMatch(/includedIds/);
+    expect(step?.script?.inlineScript).toMatch(/durationHours/);
+    expect(step?.script?.inlineScript).toMatch(/deadline/);
   });
 
   it('spawn_perspectives is action step with spawn kind and forEach', () => {
@@ -93,9 +93,9 @@ describe('team-pulse', () => {
     const step = result.data.steps.find((s) => s.id === 'collect_responses');
     expect(step?.executor).toBe('script');
     expect(step?.plugin).toBe('script-container');
-    expect(step?.agent?.image).toBe('mediforce-golden-image:latest');
-    expect(step?.agent?.runtime).toBe('javascript');
-    expect(step?.agent?.inlineScript).toBeDefined();
+    expect(step?.script?.image).toBe('mediforce-golden-image:latest');
+    expect(step?.script?.runtime).toBe('javascript');
+    expect(step?.script?.inlineScript).toBeDefined();
   });
 
   it('synthesize is agent step with OpenRouter env', () => {

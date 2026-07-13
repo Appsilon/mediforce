@@ -28,7 +28,7 @@ import type {
   EmitFn,
   EmitPayload,
   WorkflowAgentContext,
-} from '../../interfaces/agent-plugin';
+} from '../../interfaces/step-executor-plugin';
 
 function dockerAvailable(): boolean {
   try {
@@ -52,7 +52,7 @@ function buildScriptContext(overrides: {
     type: 'creation',
     executor: 'script',
     plugin: 'script-container',
-    agent: {
+    script: {
       runtime: 'bash',
       image: TEST_IMAGE,
       inlineScript: overrides.inlineScript,
@@ -219,8 +219,8 @@ describe.skipIf(!dockerAvailable())('WorkspaceManager + Docker end-to-end', () =
       step: {
         ...ctx1.step,
         id: 'step-2',
-        agent: {
-          ...ctx1.step.agent,
+        script: {
+          ...ctx1.step.script,
           inlineScript: [
             '#!/bin/sh',
             'set -eu',

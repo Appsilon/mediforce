@@ -2,9 +2,16 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { Readable, Writable } from 'node:stream';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+const originalAllowLocal = process.env.ALLOW_LOCAL_AGENTS;
+beforeEach(() => { delete process.env.ALLOW_LOCAL_AGENTS; });
+afterEach(() => {
+  if (originalAllowLocal === undefined) delete process.env.ALLOW_LOCAL_AGENTS;
+  else process.env.ALLOW_LOCAL_AGENTS = originalAllowLocal;
+});
 import type { ChildProcess } from 'node:child_process';
-import type { AgentContext, WorkflowAgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin';
+import type { AgentContext, WorkflowAgentContext, EmitFn, EmitPayload } from '../../interfaces/step-executor-plugin';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { ScriptContainerPlugin } from '../script-container-plugin';
@@ -124,7 +131,7 @@ describe('ScriptContainerPlugin', () => {
       await expect(plugin.initialize(context)).rejects.toThrow(/step config not found/i);
     });
 
-    it('[ERROR] throws if no agentConfig', async () => {
+    it('[ERROR] throws if no script config', async () => {
       const context = buildMockContext({
         config: {
           processName: 'protocol-to-tfl',
@@ -135,7 +142,7 @@ describe('ScriptContainerPlugin', () => {
           ],
         } satisfies ProcessConfig,
       });
-      await expect(plugin.initialize(context)).rejects.toThrow(/no agent config/i);
+      await expect(plugin.initialize(context)).rejects.toThrow(/no script config/i);
     });
 
     it('[ERROR] throws if no command configured', async () => {
@@ -457,7 +464,7 @@ describe('ScriptContainerPlugin', () => {
 
     it('[DATA] result event lands after every preceding live activity event (no UI completed-before-output flicker)', async () => {
       // Plugin issues live emits as fire-and-forget while the container runs, then awaits
-      // the result emit. With FirestoreAgentEventLog's per-step chain serialization,
+      // the result emit. With AgentEventLog's per-step chain serialization,
       // awaiting the result waits for every queued live emit — so result.sequence is
       // strictly greater than every assistant.sequence. Tested here at the plugin level
       // by checking emission order through the in-memory spy (which preserves call order).
@@ -510,7 +517,7 @@ describe('ScriptContainerPlugin', () => {
           name: 'Register',
           type: 'creation',
           executor: 'script',
-          agent: { runtime: 'bash', inlineScript: '#!/bin/sh\necho ok\n' },
+          script: { runtime: 'bash', inlineScript: '#!/bin/sh\necho ok\n' },
         },
         llm: { complete: vi.fn() },
         getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
@@ -548,7 +555,7 @@ describe('ScriptContainerPlugin', () => {
           name: 'Register',
           type: 'creation',
           executor: 'script',
-          agent: { runtime: 'bash', inlineScript: '#!/bin/sh\necho ok\n' },
+          script: { runtime: 'bash', inlineScript: '#!/bin/sh\necho ok\n' },
         },
         llm: { complete: vi.fn() },
         getPreviousStepOutputs: vi.fn().mockResolvedValue({}),

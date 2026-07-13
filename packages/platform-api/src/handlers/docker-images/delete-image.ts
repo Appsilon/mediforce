@@ -1,11 +1,11 @@
 import { assertCallerCanAdminDockerImages } from '../../auth';
+import { emitAudit } from '../../audit-helpers';
 import { PreconditionFailedError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type {
   DeleteDockerImageInput,
   DeleteDockerImageOutput,
 } from '../../contract/docker-images';
-import { actorFromCaller } from '../_helpers';
 
 export async function deleteDockerImage(
   input: DeleteDockerImageInput,
@@ -22,17 +22,15 @@ export async function deleteDockerImage(
 
   const result = await deleter.delete(input.imageId);
 
-  const actor = actorFromCaller(scope);
-  await scope.system.audit.append({
-    ...actor,
+  await emitAudit(scope.system.audit, scope.caller, {
     action: 'docker_image.deleted',
-    description: `Docker image '${input.imageId}' deleted from platform image store`,
-    timestamp: new Date().toISOString(),
-    inputSnapshot: { imageId: input.imageId },
-    outputSnapshot: { deleted: result.deleted },
-    basis: 'Docker image deleted via API',
-    entityType: 'dockerImage',
+    namespace: '_system',
+    description: `Deleted docker image ${input.imageId}`,
+    entityType: 'docker_image',
     entityId: input.imageId,
+    basis: 'api-call',
+    inputSnapshot: { imageId: input.imageId },
+    outputSnapshot: { ...result },
   });
 
   return result;

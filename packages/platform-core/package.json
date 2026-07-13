@@ -5,14 +5,14 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./testing": "./src/testing/index.ts"
+    "./testing": "./src/testing/index.ts",
+    "./workflow-examples": "./src/workflow-examples.ts"
   },
   "dependencies": {
     "yaml": "^2.8.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@firebase/rules-unit-testing": "^5.0.0",
     "@types/node": "^24.12.2"
   }
 }

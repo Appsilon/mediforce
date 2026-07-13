@@ -1,8 +1,10 @@
 import type {
   ProcessInstance,
   ProcessInstanceRepository,
+  RunNameEntry,
   StepExecution,
   InstanceStatus,
+  WorkflowRunSummaryResult,
 } from '@mediforce/platform-core';
 import type { ListInstancesOptions } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
@@ -38,6 +40,15 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
     this.caller.isSystemActor
       ? this.raw.listAll(options)
       : this.raw.listInNamespaces([...this.caller.namespaces], options);
+
+  /**
+   * Projected `id → definitionName` slice for the named workspace. Gated on
+   * `namespace`: a user caller who isn't a member gets an empty list (same
+   * "out-of-scope reads return absent" contract as `list` / `summarizeRuns`),
+   * not an error — so the UI label map degrades to empty rather than failing.
+   */
+  listDefinitionNames = async (namespace: string): Promise<RunNameEntry[]> =>
+    this.canSeeNamespace(namespace) ? this.raw.listDefinitionNames(namespace) : [];
 
   getByStatus = async (status: InstanceStatus): Promise<ProcessInstance[]> =>
     this.caller.isSystemActor
@@ -88,6 +99,24 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
 
   softDeleteByDefinitionName = async (definitionName: string): Promise<void> => {
     await this.raw.setDeletedByDefinitionName(definitionName, true);
+  };
+
+  /**
+   * Per-workflow run aggregate for the workspace home cards. Gated on the
+   * named `namespace`: a user caller who isn't a member gets a zeroed summary
+   * (same "out-of-scope reads return absent" contract as the list methods)
+   * rather than an error, so the home page degrades to empty cards instead of
+   * failing the whole response.
+   */
+  summarizeRuns = async (
+    namespace: string,
+    name: string,
+    includeCompleted: boolean,
+  ): Promise<WorkflowRunSummaryResult> => {
+    if (!this.canSeeNamespace(namespace)) {
+      return { total: 0, active: 0, latest: [] };
+    }
+    return this.raw.summarizeRunsByWorkflow(namespace, name, includeCompleted);
   };
 
   update = async (id: string, updates: Partial<ProcessInstance>): Promise<void> => {

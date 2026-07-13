@@ -79,6 +79,7 @@ export class WorkflowEngine {
     triggeredBy: string,
     triggerType: 'manual' | 'webhook' | 'cron',
     payload?: Record<string, unknown>,
+    opts?: { parentInstanceId?: string; parentDefinitionName?: string; dryRun?: boolean },
   ): Promise<ProcessInstance> {
     const definition = await this.processRepository.getWorkflowDefinition(namespace, definitionName, version);
     if (!definition) {
@@ -116,6 +117,9 @@ export class WorkflowEngine {
       ...(carryOver?.sourceId !== undefined
         ? { previousRunSourceId: carryOver.sourceId }
         : {}),
+      ...(opts?.parentInstanceId ? { parentInstanceId: opts.parentInstanceId } : {}),
+      ...(opts?.parentDefinitionName ? { parentDefinitionName: opts.parentDefinitionName } : {}),
+      dryRun: opts?.dryRun === true,
     };
 
     await this.instanceRepository.create(instance);
@@ -132,7 +136,7 @@ export class WorkflowEngine {
       basis: `Triggered by ${triggeredBy} via ${triggerType}`,
       entityType: 'processInstance',
       entityId: instance.id,
-      processInstanceId: String(version),
+      processInstanceId: instance.id,
     });
 
     return instance;

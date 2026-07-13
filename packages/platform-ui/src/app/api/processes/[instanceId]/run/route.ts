@@ -2,7 +2,9 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
-import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv } from '@mediforce/agent-runtime';
+import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
+import { checkRetiredModels } from '@mediforce/platform-api/handlers';
+import { resolveCoworkOutputSchema } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -117,9 +119,35 @@ export async function POST(
         workflowDefinition.steps,
         workflowSecrets,
       );
+
+      // Check plugin-required env vars (implicit agent needs like ANTHROPIC_API_KEY)
+      const { pluginRegistry } = getPlatformServices();
+      const pluginRequiredEnvMap = new Map<string, string[][]>();
+      for (const { name, metadata } of pluginRegistry.list()) {
+        if (metadata?.requiredEnv) {
+          pluginRequiredEnvMap.set(name, metadata.requiredEnv);
+        }
+      }
+      const missingPluginEnv = validatePluginRequiredEnv(
+        workflowDefinition, pluginRequiredEnvMap, workflowSecrets,
+      );
+      const pluginEnvAsMissing = missingPluginEnv.flatMap((m) => {
+        const bestGroup = m.groups.reduce((a, b) => a.missing.length <= b.missing.length ? a : b);
+        return bestGroup.missing.map((key) => ({
+          secretName: key,
+          template: `{{${key}}}`,
+          steps: m.steps,
+          hint: `Required by ${m.pluginName}` +
+            (m.groups.length > 1
+              ? `. Alternatives: ${m.groups.map((g) => g.keys.join(' + ')).join(' or ')}`
+              : ''),
+        }));
+      });
+
       const allMissing = [
         ...missingEnv,
         ...missingActionSecrets.map((m) => ({ ...m, template: `\${secrets.${m.secretName}}` })),
+        ...pluginEnvAsMissing,
       ];
       if (allMissing.length > 0) {
         const names = allMissing.map((m) => m.secretName);
@@ -139,6 +167,51 @@ export async function POST(
       }
     }
 
+    // Pre-flight: validate agent step models exist in the registry and are not retired.
+    {
+      const { modelRegistryRepo } = getPlatformServices();
+      const allModels = await modelRegistryRepo.list();
+
+      const knownIds = new Set(allModels.map((m) => m.id));
+      const unknownModels = validateWorkflowModels(workflowDefinition, knownIds);
+      if (unknownModels.length > 0) {
+        const detail = unknownModels
+          .map((u) => `model '${u.model}' in step(s) ${u.steps.map((s) => `'${s.stepId}'`).join(', ')}`)
+          .join('; ');
+        const message = `Unknown model(s): ${detail}. Check the model name or sync the model registry.`;
+        console.log(`[auto-runner] ${message}`);
+        await instanceRepo.update(instanceId, {
+          status: 'paused',
+          pauseReason: 'missing_env',
+          error: message,
+          updatedAt: new Date().toISOString(),
+        });
+        releaseRunLock(instanceId);
+        runLockAcquired = false;
+        return NextResponse.json(
+          { error: message, unknownModels, instanceId },
+          { status: 422 },
+        );
+      }
+
+      const retired = checkRetiredModels(workflowDefinition, allModels);
+      if (retired !== null) {
+        console.log(`[auto-runner] ${retired.message}`);
+        await instanceRepo.update(instanceId, {
+          status: 'paused',
+          pauseReason: 'retired_model',
+          error: retired.message,
+          updatedAt: new Date().toISOString(),
+        });
+        releaseRunLock(instanceId);
+        runLockAcquired = false;
+        return NextResponse.json(
+          { error: retired.message, retiredModels: retired.refs, instanceId },
+          { status: 422 },
+        );
+      }
+    }
+
     const appContext: Record<string, unknown> = body.appContext
       ?? (initialInstance.triggerPayload as Record<string, unknown>)
       ?? {};
@@ -153,14 +226,23 @@ export async function POST(
       let lastActiveStepId: string | null = null;
       try {
         const agentStepCount = workflowDefinition.steps.filter(
-          (s) => s.executor === 'agent' || s.executor === 'script',
+          (s) => s.executor === 'agent',
         ).length;
+        const scriptStepCount = workflowDefinition.steps.filter(
+          (s) => s.executor === 'script',
+        ).length;
+        const stepCountParts: string[] = [];
+        if (agentStepCount > 0) stepCountParts.push(`${agentStepCount} agent step(s)`);
+        if (scriptStepCount > 0) stepCountParts.push(`${scriptStepCount} script step(s)`);
+        const stepCountDescription = stepCountParts.length > 0
+          ? stepCountParts.join(', ')
+          : '0 step(s)';
         await auditRepo.append({
           actorId: 'auto-runner',
           actorType: 'system',
           actorRole: 'orchestrator',
           action: 'process.run.started',
-          description: `Auto-runner started for '${initialInstance.definitionName}' (workflow) — ${agentStepCount} agent step(s) to execute`,
+          description: `Auto-runner started for '${initialInstance.definitionName}' (workflow) — ${stepCountDescription} to execute`,
           timestamp: new Date().toISOString(),
           inputSnapshot: { definitionName: initialInstance.definitionName, definitionVersion: initialInstance.definitionVersion, appContext, triggeredBy: triggeredBy ?? 'auto-runner' },
           outputSnapshot: {},
@@ -183,10 +265,16 @@ export async function POST(
           lastActiveStepId = instance.currentStepId;
 
           if (isStuckLoop(instance.currentStepId, loopTracker)) {
-            console.error(`[auto-runner] Safety guard: step '${instance.currentStepId}' looped ${MAX_SAME_STEP_ITERATIONS} times — aborting instance ${instanceId}`);
+            const executions = await instanceRepo.getStepExecutions(instanceId);
+            const lastFailed = executions
+              .filter((e) => e.stepId === instance.currentStepId && e.status === 'failed' && e.error)
+              .at(-1);
+            const cause = lastFailed?.error ? ` — last error: ${lastFailed.error}` : '';
+            const message = `Auto-runner stuck: step '${instance.currentStepId}' looped ${MAX_SAME_STEP_ITERATIONS} times${cause}`;
+            console.error(`[auto-runner] Safety guard: ${message} — aborting instance ${instanceId}`);
             await instanceRepo.update(instanceId, {
               status: 'failed',
-              error: `Auto-runner stuck: step '${instance.currentStepId}' looped ${MAX_SAME_STEP_ITERATIONS} times`,
+              error: message,
               updatedAt: new Date().toISOString(),
             });
             break;
@@ -205,7 +293,7 @@ export async function POST(
           if (currentStep.type === 'terminal') break;
 
           // Guard: skip if a pending/claimed task already exists (prevents race condition duplicates)
-          const { humanTaskRepo } = getPlatformServices();
+          const { humanTaskRepo, userDirectory } = getPlatformServices();
           const existingTasks = await humanTaskRepo.getByInstanceId(instanceId);
           const hasPendingTask = existingTasks.some(
             (t) => t.stepId === instance.currentStepId && (t.status === 'pending' || t.status === 'claimed'),
@@ -279,9 +367,11 @@ export async function POST(
               agent: agentType,
               model,
               systemPrompt: currentStep.cowork?.systemPrompt ?? null,
-              outputSchema: currentStep.cowork?.outputSchema ?? null,
+              outputSchema: resolveCoworkOutputSchema(currentStep.cowork),
               voiceConfig,
               artifact: null,
+              validationResult: null,
+              presentation: null,
               mcpServers: sessionMcpServers,
               turns: [],
               createdAt: now,
@@ -347,7 +437,27 @@ export async function POST(
                 secrets: {},
               });
               if (typeof resolved === 'string' && resolved.length > 0) {
-                assignedUserId = resolved;
+                // The persisted assignedUserId must be a Mediforce uid: the task
+                // queues surface a claimed task only to the viewer whose uid
+                // matches. An email-shaped value (workflows may configure
+                // assignees by email) resolves to its uid via the directory
+                // first; a value that matches no user hard-fails rather than
+                // stranding the task in nobody's queue. Non-email values pass
+                // through unchanged (already a uid).
+                let resolvedUserId = resolved;
+                if (resolved.includes('@') && userDirectory?.resolveUser !== undefined) {
+                  const directoryUser = await userDirectory.resolveUser(resolved);
+                  if (directoryUser === null) {
+                    await instanceRepo.update(instanceId, {
+                      status: 'failed',
+                      error: `Step '${currentStep.id}': assignedTo '${currentStep.assignedTo}' resolved to '${resolved}', which matches no Mediforce user — cannot pre-assign human task`,
+                      updatedAt: new Date().toISOString(),
+                    });
+                    break;
+                  }
+                  resolvedUserId = directoryUser.uid;
+                }
+                assignedUserId = resolvedUserId;
                 taskStatus = 'claimed';
               } else {
                 await instanceRepo.update(instanceId, {
@@ -478,6 +588,8 @@ export async function POST(
                 stepId: instance.currentStepId,
                 processInstanceId: instanceId,
                 namespace: instance.namespace ?? '',
+                definitionName: instance.definitionName,
+                ...(instance.dryRun ? { dryRun: true } : {}),
                 sources: {
                   triggerPayload: (instance.triggerPayload as Record<string, unknown>) ?? {},
                   steps: instance.variables,
@@ -499,7 +611,28 @@ export async function POST(
                     variables: { ...instance.variables, __wait: waitMeta },
                     updatedAt: new Date().toISOString(),
                   });
-                  console.log(`[auto-runner] Wait action paused instance '${instanceId}' until ${waitMeta.resumeAt}`);
+
+                  // Verify the write persisted. Two sequential writes with no
+                  // transaction guarantee mean the second write (pauseReason +
+                  // __wait) can be lost silently — the run ends up paused/null,
+                  // invisible to the heartbeat sweep, and stranded forever.
+                  const afterWrite = await instanceRepo.getById(instanceId);
+                  if (afterWrite?.pauseReason !== 'waiting_for_timer') {
+                    console.error(
+                      `[auto-runner] Wait sentinel write lost for '${instanceId}': ` +
+                      `pauseReason=${afterWrite?.pauseReason} — escalating to failed`,
+                    );
+                    await instanceRepo.update(instanceId, {
+                      status: 'failed',
+                      error:
+                        `Wait step '${instance.currentStepId}' could not register its timer — ` +
+                        `the scheduler metadata was not persisted. ` +
+                        `Resume this run to restart from the wait step.`,
+                      updatedAt: new Date().toISOString(),
+                    });
+                  } else {
+                    console.log(`[auto-runner] Wait action paused instance '${instanceId}' until ${waitMeta.resumeAt}`);
+                  }
                   break;
                 }
               }

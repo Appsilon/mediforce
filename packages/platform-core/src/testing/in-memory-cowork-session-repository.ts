@@ -1,4 +1,9 @@
-import type { CoworkSession, ConversationTurn } from '../schemas/cowork-session';
+import {
+  CoworkSessionSchema,
+  ConversationTurnSchema,
+  type CoworkSession,
+  type ConversationTurn,
+} from '../schemas/cowork-session';
 import type { CoworkSessionRepository } from '../interfaces/cowork-session-repository';
 import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository';
 
@@ -16,8 +21,9 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
   constructor(private readonly parents?: ProcessInstanceRepository) {}
 
   async create(session: CoworkSession): Promise<CoworkSession> {
-    this.sessions.set(session.id, { ...session, turns: [...session.turns] });
-    return { ...session, turns: [...session.turns] };
+    const parsed = CoworkSessionSchema.parse(session);
+    this.sessions.set(parsed.id, { ...parsed, turns: [...parsed.turns] });
+    return { ...parsed, turns: [...parsed.turns] };
   }
 
   async getById(sessionId: string): Promise<CoworkSession | null> {
@@ -43,6 +49,30 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
     );
   }
 
+  async listAll(): Promise<CoworkSession[]> {
+    return [...this.sessions.values()]
+      .map((s) => ({ ...s, turns: [...s.turns] }))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async listInNamespaces(allowed: readonly string[]): Promise<CoworkSession[]> {
+    return this.filterByParentNamespace(await this.listAll(), allowed);
+  }
+
+  async listByRoleAll(role: string): Promise<CoworkSession[]> {
+    return [...this.sessions.values()]
+      .filter((s) => s.assignedRole === role)
+      .map((s) => ({ ...s, turns: [...s.turns] }))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async listByRoleInNamespaces(
+    role: string,
+    allowed: readonly string[],
+  ): Promise<CoworkSession[]> {
+    return this.filterByParentNamespace(await this.listByRoleAll(role), allowed);
+  }
+
   async findMostRecentActive(instanceId: string): Promise<CoworkSession | null> {
     const active = [...this.sessions.values()]
       .filter((s) => s.processInstanceId === instanceId && s.status === 'active')
@@ -61,12 +91,13 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
   }
 
   async addTurn(sessionId: string, turn: ConversationTurn): Promise<CoworkSession> {
+    const parsedTurn = ConversationTurnSchema.parse(turn);
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`CoworkSession not found: ${sessionId}`);
     const now = new Date().toISOString();
     const updated: CoworkSession = {
       ...session,
-      turns: [...session.turns, turn],
+      turns: [...session.turns, parsedTurn],
       updatedAt: now,
     };
     this.sessions.set(sessionId, updated);
@@ -108,6 +139,35 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
     return { ...updated, turns: [...updated.turns] };
   }
 
+  async updateValidationResult(
+    sessionId: string,
+    result: { valid: boolean; errors: string[] },
+  ): Promise<CoworkSession> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`CoworkSession not found: ${sessionId}`);
+    const now = new Date().toISOString();
+    const updated: CoworkSession = {
+      ...session,
+      validationResult: result,
+      updatedAt: now,
+    };
+    this.sessions.set(sessionId, updated);
+    return { ...updated, turns: [...updated.turns] };
+  }
+
+  async updatePresentation(sessionId: string, html: string): Promise<CoworkSession> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`CoworkSession not found: ${sessionId}`);
+    const now = new Date().toISOString();
+    const updated: CoworkSession = {
+      ...session,
+      presentation: html,
+      updatedAt: now,
+    };
+    this.sessions.set(sessionId, updated);
+    return { ...updated, turns: [...updated.turns] };
+  }
+
   async finalize(sessionId: string, artifact: Record<string, unknown>): Promise<CoworkSession> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`CoworkSession not found: ${sessionId}`);
@@ -134,6 +194,26 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
     };
     this.sessions.set(sessionId, updated);
     return { ...updated, turns: [...updated.turns] };
+  }
+
+  private async filterByParentNamespace(
+    rows: CoworkSession[],
+    allowed: readonly string[],
+  ): Promise<CoworkSession[]> {
+    if (rows.length === 0) return [];
+    const parents = this.requireParents();
+    const instanceIds = [...new Set(rows.map((r) => r.processInstanceId))];
+    const namespaceById = new Map<string, string | undefined>();
+    await Promise.all(
+      instanceIds.map(async (id) => {
+        const parent = await parents.getById(id);
+        namespaceById.set(id, parent?.namespace);
+      }),
+    );
+    return rows.filter((r) => {
+      const ns = namespaceById.get(r.processInstanceId);
+      return typeof ns === 'string' && allowed.includes(ns);
+    });
   }
 
   private requireParents(): ProcessInstanceRepository {

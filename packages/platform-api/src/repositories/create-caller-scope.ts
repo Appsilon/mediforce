@@ -1,17 +1,22 @@
 import type { AgentRunner, PluginRegistry } from '@mediforce/agent-runtime';
 import type {
   AgentDefinitionRepository,
+  AgentEventRepository,
   AgentOAuthTokenRepository,
   AgentRunRepository,
   AuditRepository,
+  BlobStore,
   CoworkSessionRepository,
   CronTriggerStateRepository,
+  EmailProviderInfo,
   HandoffRepository,
   HumanTaskRepository,
+  TaskAttachmentRepository,
   ModelRegistryRepository,
   NamespaceRepository,
   NamespaceSecretsRepository,
   OAuthProviderRepository,
+  PlatformSettingsRepository,
   ProcessInstanceRepository,
   ProcessRepository,
   ToolCatalogRepository,
@@ -31,6 +36,7 @@ import type { DockerImagesService } from '../services/docker-images-service';
 import type { InviteNotificationService, InviteService } from '../services/invite-notification';
 import type { CallerScope } from './caller-scope';
 import { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository';
+import { AuthorizedAgentEventRepository } from './authorized-agent-event-repository';
 import { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository';
 import { AuthorizedAgentRunRepository } from './authorized-agent-run-repository';
 import { AuthorizedAuditEventRepository } from './authorized-audit-event-repository';
@@ -38,6 +44,7 @@ import { AuthorizedCoworkSessionRepository } from './authorized-cowork-session-r
 import { AuthorizedHandoffRepository } from './authorized-handoff-repository';
 import { AuthorizedHumanTaskRepository } from './authorized-human-task-repository';
 import { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
+import { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';
 import { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
 import { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository';
 import { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository';
@@ -53,8 +60,11 @@ export interface CallerScopeServices {
   readonly instanceRepo: ProcessInstanceRepository;
   readonly processRepo: ProcessRepository;
   readonly auditRepo: AuditRepository;
+  readonly agentEventRepo: AgentEventRepository;
   readonly agentRunRepo: AgentRunRepository;
   readonly humanTaskRepo: HumanTaskRepository;
+  readonly taskAttachmentRepo: TaskAttachmentRepository;
+  readonly blobStore: BlobStore;
   readonly handoffRepo: HandoffRepository;
   readonly agentDefinitionRepo: AgentDefinitionRepository;
   readonly coworkSessionRepo: CoworkSessionRepository;
@@ -78,6 +88,8 @@ export interface CallerScopeServices {
   readonly inviteNotificationService: InviteNotificationService | null;
   readonly dockerImages: DockerImagesService | null;
   readonly userDirectory: UserDirectoryService | null;
+  readonly platformSettingsRepo: PlatformSettingsRepository;
+  readonly emailProviderInfo: EmailProviderInfo | null;
 }
 
 /**
@@ -93,6 +105,7 @@ export function createCallerScope(
     caller,
 
     tasks: new AuthorizedHumanTaskRepository(caller, services.humanTaskRepo),
+    attachments: new AuthorizedTaskAttachmentRepository(caller, services.taskAttachmentRepo),
     runs: new AuthorizedWorkflowRunRepository(caller, services.instanceRepo),
     workflowDefinitions: new AuthorizedWorkflowDefinitionRepository(
       caller,
@@ -107,6 +120,7 @@ export function createCallerScope(
       services.coworkSessionRepo,
     ),
     agentRuns: new AuthorizedAgentRunRepository(caller, services.agentRunRepo),
+    agentEvents: new AuthorizedAgentEventRepository(caller, services.agentEventRepo),
     auditEvents: new AuthorizedAuditEventRepository(caller, services.auditRepo),
     handoffs: new AuthorizedHandoffRepository(caller, services.handoffRepo),
     toolCatalog: new AuthorizedToolCatalogRepository(caller, services.toolCatalogRepo),
@@ -137,12 +151,15 @@ export function createCallerScope(
       cronTrigger: services.cronTrigger,
       webhookRouter: services.webhookRouter,
       agentRunner: services.agentRunner,
+      blobStore: services.blobStore,
       audit: services.auditRepo,
       runKicker: services.runKicker,
       inviteService: services.inviteService,
       inviteNotificationService: services.inviteNotificationService,
       dockerImages: services.dockerImages,
       userDirectory: services.userDirectory,
+      platformSettings: services.platformSettingsRepo,
+      emailProviderInfo: services.emailProviderInfo,
     },
   };
 }

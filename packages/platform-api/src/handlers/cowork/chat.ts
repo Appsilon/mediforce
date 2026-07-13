@@ -2,7 +2,7 @@ import {
   McpClientManager,
   type McpToolDefinition,
 } from '@mediforce/mcp-client';
-import type { ConversationTurn, CoworkSession } from '@mediforce/platform-core';
+import type { ConversationTurn, CoworkSession, OutputSchemaShape } from '@mediforce/platform-core';
 import {
   HandlerError,
   PreconditionFailedError,
@@ -24,9 +24,25 @@ import {
   callOpenRouter,
   type OpenRouterToolCall,
 } from '../../services/openrouter-client';
+import { validateOutputSchema } from '@mediforce/agent-runtime';
 
 const MAX_TOOL_LOOP_ITERATIONS = 10;
 const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
+/**
+ * Output budget per turn. A full WorkflowDefinition artifact (many steps,
+ * transitions, descriptions) is emitted as `update_artifact` tool-call
+ * arguments and routinely exceeds the client's 4096 default — truncation
+ * there yields invalid JSON and a silently dropped artifact. 16k gives the
+ * model room to emit a complete definition in one turn.
+ */
+const CHAT_MAX_TOKENS = 16384;
+const COWORK_DEBUG = process.env.COWORK_DEBUG === 'true';
+
+const ARTIFACT_TRUNCATED_MESSAGE =
+  `Artifact update failed: model response truncated at the ${CHAT_MAX_TOKENS}-token limit ` +
+  '(the artifact is too large to emit in one turn). Emit a smaller artifact and build it up ' +
+  'across several update_artifact calls.';
+const ARTIFACT_PARSE_ERROR_MESSAGE = 'Artifact update skipped (parse error).';
 
 /**
  * Chat turn — orchestrates the MCP tool loop server-side. Intermediate tool
@@ -39,7 +55,7 @@ export async function chatCoworkSession(
   scope: CallerScope,
 ): Promise<ChatCoworkSessionOutput> {
   const ctx = await loadChatContext(input.sessionId, scope);
-  const mcp = await connectMcp(ctx.session);
+  const mcp = await connectMcp(ctx.session, ctx.namespace, ctx.secrets);
   try {
     await addTurn(scope, input.sessionId, humanTurn(input.message));
     const reloaded = await loadOr404(
@@ -70,8 +86,10 @@ export async function chatCoworkSession(
 interface ChatContext {
   readonly session: CoworkSession;
   readonly openRouterKey: string;
+  readonly secrets: Record<string, string>;
   readonly stepContext: Record<string, unknown> | undefined;
   readonly model: string;
+  readonly namespace: string;
 }
 
 async function loadChatContext(
@@ -113,8 +131,10 @@ async function loadChatContext(
   return {
     session,
     openRouterKey,
+    secrets,
     stepContext: instance.variables as Record<string, unknown> | undefined,
     model: session.model ?? DEFAULT_MODEL,
+    namespace,
   };
 }
 
@@ -123,15 +143,27 @@ interface McpHandle {
   readonly tools: McpToolDefinition[];
 }
 
-async function connectMcp(session: CoworkSession): Promise<McpHandle | null> {
+async function connectMcp(
+  session: CoworkSession,
+  namespace: string,
+  workflowSecrets?: Record<string, string>,
+): Promise<McpHandle | null> {
   if (!session.mcpServers || session.mcpServers.length === 0) return null;
-  const manager = new McpClientManager(session.mcpServers);
+  const serversWithNamespace = session.mcpServers.map((s) => ({
+    ...s,
+    env: { ...s.env, MEDIFORCE_NAMESPACE: namespace },
+  }));
+  const manager = new McpClientManager(serversWithNamespace, {
+    workflowSecrets,
+  });
   try {
     const tools = await manager.connect();
     return { manager, tools };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    throw new HandlerError('internal', `Failed to connect to MCP servers: ${message}`);
+    console.warn(`[cowork-chat] MCP connection failed (continuing without MCP tools): ${message}`);
+    await manager.disconnect().catch(() => {});
+    return null;
   }
 }
 
@@ -162,6 +194,7 @@ function toolRunningTurn(
   toolName: string,
   serverName: string,
   toolArgs: Record<string, unknown>,
+  toolCallId?: string,
 ): ConversationTurn {
   return {
     id: crypto.randomUUID(),
@@ -173,6 +206,7 @@ function toolRunningTurn(
     toolArgs,
     toolStatus: 'running',
     serverName,
+    ...(toolCallId !== undefined ? { toolCallId } : {}),
   };
 }
 
@@ -207,6 +241,7 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
   }
 
   const tools = buildToolsArray(mcp?.tools ?? []);
+  if (COWORK_DEBUG) console.log(`[cowork-chat] Tools sent to LLM: ${tools.map(t => t.function.name).join(', ')} (${tools.length} total)`);
   const toolCallSummaries: ChatCoworkToolCall[] = [];
   let artifact: Record<string, unknown> | undefined;
   let agentText = '';
@@ -217,33 +252,110 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
       messages,
       tools,
       apiKey: ctx.openRouterKey,
+      maxTokens: CHAT_MAX_TOKENS,
     });
     agentText = response.content;
+    if (COWORK_DEBUG) console.log(`[cowork-chat] LLM response: text=${agentText.length}chars toolCalls=[${response.toolCalls.map(tc => tc.function.name).join(', ')}]`);
 
     const artifactCalls = response.toolCalls.filter(
       (tc) => tc.function.name === 'update_artifact',
     );
+    const presentationCalls = response.toolCalls.filter(
+      (tc) => tc.function.name === 'update_presentation',
+    );
     const mcpCalls = response.toolCalls.filter(
-      (tc) => tc.function.name !== 'update_artifact',
+      (tc) => tc.function.name !== 'update_artifact' && tc.function.name !== 'update_presentation',
     );
 
     for (const call of artifactCalls) {
+      const turn = toolRunningTurn('update_artifact', '_builtin', {}, call.id);
+      await addTurn(scope, ctx.session.id, turn);
+
       const parsed = applyArtifactUpdate(call);
       if (parsed !== null) {
         artifact = parsed;
         await scope.coworkSessions.updateArtifact(ctx.session.id, parsed);
+
+        let resultMsg = 'Artifact updated.';
+        if (ctx.session.outputSchema) {
+          const error = validateOutputSchema(
+            parsed,
+            ctx.session.outputSchema as OutputSchemaShape,
+          );
+          const validationResult = error === null
+            ? { valid: true, errors: [] as string[] }
+            : { valid: false, errors: [error] };
+          await scope.coworkSessions.updateValidationResult(ctx.session.id, validationResult);
+          resultMsg = error === null
+            ? 'Artifact updated and validated.'
+            : `Artifact updated. Validation: ${error}`;
+        }
+        await scope.coworkSessions.updateTurn(ctx.session.id, turn.id, {
+          toolResult: resultMsg,
+          toolStatus: 'success',
+        });
+      } else {
+        const toolResult = response.finishReason === 'length'
+          ? ARTIFACT_TRUNCATED_MESSAGE
+          : ARTIFACT_PARSE_ERROR_MESSAGE;
+        await scope.coworkSessions.updateTurn(ctx.session.id, turn.id, {
+          toolResult,
+          toolStatus: 'error',
+        });
       }
     }
 
-    if (mcpCalls.length === 0) break;
-    // mcpCalls non-empty implies the LLM picked at least one MCP tool, which
-    // can only happen when `tools` included MCP entries (`mcp !== null`).
-    if (mcp === null) break;
+    for (const call of presentationCalls) {
+      const turn = toolRunningTurn('update_presentation', '_builtin', {}, call.id);
+      await addTurn(scope, ctx.session.id, turn);
 
+      const html = applyPresentationUpdate(call);
+      if (html !== null) {
+        await scope.coworkSessions.updatePresentation(ctx.session.id, html);
+        await scope.coworkSessions.updateTurn(ctx.session.id, turn.id, {
+          toolResult: 'Presentation updated.',
+          toolStatus: 'success',
+        });
+      } else {
+        await scope.coworkSessions.updateTurn(ctx.session.id, turn.id, {
+          toolResult: 'Presentation update skipped (parse error).',
+          toolStatus: 'error',
+        });
+      }
+    }
+
+    // No tool calls at all → LLM is done, break.
+    if (response.toolCalls.length === 0) break;
+
+    // Built-in tools (artifact, presentation) are handled above and don't
+    // produce tool_result messages. If the LLM called ONLY built-in tools,
+    // we still need to feed back tool results so it can continue. Push
+    // synthetic "ok" results for built-in calls.
     messages.push(assistantMessage(agentText, response.toolCalls));
-    for (const call of mcpCalls) {
-      const summary = await executeMcpTool(scope, ctx.session.id, mcp, call, messages);
-      toolCallSummaries.push(summary);
+
+    for (const call of artifactCalls) {
+      let validationMsg: string;
+      if (artifact) {
+        validationMsg = ctx.session.outputSchema
+          ? 'Artifact updated and validated.'
+          : 'Artifact updated.';
+      } else if (response.finishReason === 'length') {
+        validationMsg = ARTIFACT_TRUNCATED_MESSAGE;
+      } else {
+        validationMsg = ARTIFACT_PARSE_ERROR_MESSAGE;
+      }
+      messages.push({ role: 'tool', content: validationMsg, tool_call_id: call.id });
+    }
+    for (const call of presentationCalls) {
+      messages.push({ role: 'tool', content: 'Presentation updated.', tool_call_id: call.id });
+    }
+
+    if (mcpCalls.length > 0) {
+      if (mcp === null) break;
+      for (const call of mcpCalls) {
+        const summary = await executeMcpTool(scope, ctx.session.id, mcp, call, messages);
+        toolCallSummaries.push(summary);
+      }
     }
   }
 
@@ -277,7 +389,7 @@ async function executeMcpTool(
   const serverName = sep > 0 ? toolName.slice(0, sep) : 'unknown';
   const toolArgs = parseToolArgs(call.function.arguments);
 
-  const turn = toolRunningTurn(toolName, serverName, toolArgs);
+  const turn = toolRunningTurn(toolName, serverName, toolArgs, call.id);
   await scope.coworkSessions.addTurn(sessionId, turn);
 
   const result = await mcp.manager.callTool(toolName, toolArgs);
@@ -311,10 +423,33 @@ function applyArtifactUpdate(
   call: OpenRouterToolCall,
 ): Record<string, unknown> | null {
   try {
-    const parsed = JSON.parse(call.function.arguments) as {
-      artifact: Record<string, unknown>;
-    };
-    return parsed.artifact;
+    const parsed = JSON.parse(call.function.arguments) as Record<string, unknown>;
+    if (parsed === null || typeof parsed !== 'object') return null;
+    // Wrapped form { artifact: {...} }: once the wrapper key is present, the
+    // inner value IS the artifact. A null/non-object inner is a malformed
+    // wrapper, not a cue to fall through and persist the wrapper `{ artifact:
+    // null }` itself as the artifact — return null so it's skipped.
+    if ('artifact' in parsed) {
+      const inner = parsed['artifact'];
+      return inner !== null && typeof inner === 'object'
+        ? (inner as Record<string, unknown>)
+        : null;
+    }
+    // No wrapper key — models that pass the artifact directly. Treat a
+    // non-empty top-level object as the artifact.
+    if (Object.keys(parsed).length > 0) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function applyPresentationUpdate(
+  call: OpenRouterToolCall,
+): string | null {
+  try {
+    const parsed = JSON.parse(call.function.arguments) as { html: string };
+    return typeof parsed.html === 'string' ? parsed.html : null;
   } catch {
     return null;
   }

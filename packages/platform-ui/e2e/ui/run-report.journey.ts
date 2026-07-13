@@ -1,20 +1,19 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
+import { trackPageErrors } from '../helpers/page-errors';
 
 test.describe('Run Report Journey', () => {
-  test('completed run report shows timeline, toggles detail level, and has branding', async ({ page }, testInfo) => {
-    await setupRecording(page, 'run-report', testInfo);
+  test('completed run report shows timeline, toggles detail level, and has branding', async ({ page }) => {
+    trackPageErrors(page);
     // First check the View Report link exists on run detail
     const runUrl = `/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review/runs/proc-completed-1`;
     await page.goto(runUrl);
     const reportLink = page.getByRole('link', { name: /View Report/i });
     await expect(reportLink).toBeVisible({ timeout: 10_000 });
     await expect(reportLink).toHaveAttribute('href', /\/report$/);
-    await showStep(page);
 
     // Navigate to report by clicking the link
-    await click(page, reportLink);
+    await reportLink.click();
     await page.waitForURL(/\/report$/, { timeout: 20_000 });
     await expect(page.getByRole('heading', { name: /Data Quality Review — Run Report/i })).toBeVisible({ timeout: 10_000 });
 
@@ -26,14 +25,12 @@ test.describe('Run Report Journey', () => {
     // Timing information
     await expect(page.getByText(/Wall-clock/i)).toBeVisible();
     await expect(page.getByText(/Active processing/i)).toBeVisible();
-    await showStep(page);
 
     // Toggle detail level: brief -> full -> brief
     await expect(page.getByText(/Executed by/i).first()).toBeVisible();
-    await click(page, page.getByRole('button', { name: /full/i }));
+    await page.getByRole('button', { name: /full/i }).click();
     await expect(page.getByText(/Output/i).first()).toBeVisible();
-    await showStep(page);
-    await click(page, page.getByRole('button', { name: /brief/i }));
+    await page.getByRole('button', { name: /brief/i }).click();
     await expect(page.getByText(/Step Timeline/i)).toBeVisible();
 
     // Branding
@@ -42,14 +39,11 @@ test.describe('Run Report Journey', () => {
 
     // Print button
     await expect(page.getByRole('button', { name: /print/i })).toBeVisible();
-    await showResult(page);
   });
 
-  test('report unavailable for non-completed runs', async ({ page }, testInfo) => {
-    await setupRecording(page, 'run-report-unavailable', testInfo);
+  test('report unavailable for non-completed runs', async ({ page }) => {
+    trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1/report`);
     await expect(page.getByText(/only available for completed runs/i)).toBeVisible({ timeout: 10_000 });
-    await showResult(page);
-    await endRecording(page);
   });
 });

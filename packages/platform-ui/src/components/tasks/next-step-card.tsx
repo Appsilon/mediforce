@@ -3,15 +3,17 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Bot, User, CheckCircle2, Loader2 } from 'lucide-react';
-import type { StepExecution, WorkflowStep, HumanTask } from '@mediforce/platform-core';
+import { ArrowRight, Bot, User, CheckCircle2, Loader2, Terminal, Zap } from 'lucide-react';
+import type { WorkflowStep, HumanTask } from '@mediforce/platform-core';
 import { ACTIONABLE_STATUSES } from '@mediforce/platform-api/contract';
-import { useSubcollection, useProcessInstance } from '@/hooks/use-process-instances';
+import { useProcessInstance } from '@/hooks/use-process-instances';
+import { useStepExecutions } from '@/hooks/use-step-executions';
 import { ApiError, mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
+import { CONTROL_MODE_LABELS, getControlMode } from '@/lib/control-mode';
 
 interface NextStepCardProps {
   processInstanceId: string;
@@ -27,14 +29,11 @@ function formatStepName(stepId: string): string {
 
 export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
   const handle = useHandleFromPath();
-  // Step executions still live in Firestore (PR2 scope migrates the agent /
-  // step-execution domain). Keep Firestore-backed here.
-  const { data: executions, loading: execLoading } = useSubcollection<StepExecution & { id: string }>(
-    processInstanceId ? `processInstances/${processInstanceId}` : '',
-    'stepExecutions',
-  );
-
   const { data: instance, loading: instanceLoading } = useProcessInstance(processInstanceId);
+  const { data: executions, loading: execLoading } = useStepExecutions(
+    processInstanceId,
+    instance?.status,
+  );
 
   const stepExecution = React.useMemo(() => {
     if (executions.length === 0) return null;
@@ -102,10 +101,14 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
   const nextStep = definition?.steps.find((s) => s.id === nextStepId) as WorkflowStep | undefined;
   const isTerminal = nextStep?.type === 'terminal';
   const executorType = nextStep?.executor ?? null;
+  const autonomyLevel = nextStep?.autonomyLevel ?? null;
   const processCompleted = instance?.status === 'completed';
 
   const runHref = instance
     ? routes.workflowRun(handle, instance.definitionName, processInstanceId)
+    : null;
+  const nextStepHref = instance && nextStepId
+    ? routes.workflowRunStep(handle, instance.definitionName, processInstanceId, nextStepId)
     : null;
 
   return (
@@ -116,7 +119,7 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
       </div>
 
       <div className="flex items-center gap-3">
-        <StepIcon isTerminal={isTerminal} processCompleted={processCompleted} executorType={executorType} />
+        <StepIcon isTerminal={isTerminal} processCompleted={processCompleted} executorType={executorType} autonomyLevel={autonomyLevel} />
 
         <div className="flex-1 min-w-0">
           {isTerminal || processCompleted ? (
@@ -136,6 +139,7 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
               <p className="text-xs text-muted-foreground mt-0.5">
                 <StepDescription
                   executorType={executorType}
+                  autonomyLevel={autonomyLevel}
                   nextHumanTask={nextHumanTask}
                   reason={stepExecution.gateResult?.reason}
                 />
@@ -150,7 +154,7 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
           executorType={executorType}
           nextHumanTask={nextHumanTask}
           runHref={runHref}
-          handle={handle}
+          nextStepHref={nextStepHref}
         />
       </div>
     </div>
@@ -161,10 +165,12 @@ function StepIcon({
   isTerminal,
   processCompleted,
   executorType,
+  autonomyLevel,
 }: {
   isTerminal: boolean;
   processCompleted: boolean;
   executorType: string | null;
+  autonomyLevel: string | null;
 }) {
   if (isTerminal || processCompleted) {
     return (
@@ -173,33 +179,77 @@ function StepIcon({
       </div>
     );
   }
-  if (executorType === 'agent') {
+  if (executorType === 'script') {
     return (
-      <div className="rounded-full bg-purple-100 p-1.5 dark:bg-purple-900/30">
-        <Bot className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+      <div className="rounded-full bg-slate-100 p-1.5 dark:bg-slate-800/30">
+        <Terminal className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+      </div>
+    );
+  }
+  if (executorType === 'action') {
+    return (
+      <div className="rounded-full bg-slate-100 p-1.5 dark:bg-slate-800/30">
+        <Zap className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+      </div>
+    );
+  }
+  if (executorType === 'cowork') {
+    return (
+      <div className="rounded-full bg-teal-100 p-1.5 dark:bg-teal-900/30 flex items-center gap-0.5">
+        <User className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+        <Bot className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+      </div>
+    );
+  }
+  if (executorType === 'agent') {
+    const mode = getControlMode('agent', autonomyLevel ?? undefined);
+    if (mode === 'human-review') {
+      return (
+        <div className="rounded-full bg-amber-100 p-1.5 dark:bg-amber-900/30">
+          <Bot className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+        </div>
+      );
+    }
+    if (mode === 'autonomous-agent') {
+      return (
+        <div className="rounded-full bg-emerald-100 p-1.5 dark:bg-emerald-900/30">
+          <Bot className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+        </div>
+      );
+    }
+    return (
+      <div className="rounded-full bg-violet-100 p-1.5 dark:bg-violet-900/30">
+        <Bot className="h-4 w-4 text-violet-600 dark:text-violet-400" />
       </div>
     );
   }
   return (
-    <div className="rounded-full bg-blue-100 p-1.5 dark:bg-blue-900/30">
-      <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+    <div className="rounded-full bg-slate-100 p-1.5 dark:bg-slate-800/30">
+      <User className="h-4 w-4 text-slate-600 dark:text-slate-400" />
     </div>
   );
 }
 
 function StepDescription({
   executorType,
+  autonomyLevel,
   nextHumanTask,
   reason,
 }: {
   executorType: string | null;
+  autonomyLevel: string | null;
   nextHumanTask: HumanTask | null;
   reason: string | undefined;
 }) {
   const parts: string[] = [];
 
-  if (executorType === 'agent') {
-    parts.push('Running via agent');
+  if (executorType === 'script') {
+    parts.push('Script automation');
+  } else if (executorType === 'action') {
+    parts.push('Automated action');
+  } else if (executorType === 'agent' || executorType === 'cowork') {
+    const mode = getControlMode(executorType ?? undefined, autonomyLevel);
+    parts.push(CONTROL_MODE_LABELS[mode]);
   } else if (nextHumanTask) {
     const roleLabel = nextHumanTask.assignedRole;
     if (nextHumanTask.status === 'completed') {
@@ -226,19 +276,19 @@ function StepLink({
   executorType,
   nextHumanTask,
   runHref,
-  handle,
+  nextStepHref,
 }: {
   isTerminal: boolean;
   processCompleted: boolean;
   executorType: string | null;
   nextHumanTask: HumanTask | null;
   runHref: string | null;
-  handle: string;
+  nextStepHref: string | null;
 }) {
-  if (!isTerminal && !processCompleted && executorType === 'human' && nextHumanTask) {
+  if (!isTerminal && !processCompleted && executorType === 'human' && nextHumanTask && nextStepHref) {
     return (
       <Link
-        href={routes.task(handle, nextHumanTask.id)}
+        href={nextStepHref}
         className={cn(
           'shrink-0 inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium',
           'bg-primary/10 text-primary hover:bg-primary/20 transition-colors',

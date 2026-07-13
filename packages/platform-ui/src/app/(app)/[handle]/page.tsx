@@ -5,23 +5,24 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { Pencil, Check, X, Settings, GitBranch, Plus } from 'lucide-react';
+import { Pencil, Check, X, Settings, GitBranch, Plus, Download } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useNamespace } from '@/hooks/use-namespace';
 import { useUserProfiles } from '@/hooks/use-users';
 import { useProcessDefinitions } from '@/hooks/use-process-definitions';
-import { useProcessInstances } from '@/hooks/use-process-instances';
 import { useWorkflowDefinitionsApi } from '@/hooks/use-workflows-api';
 import { useMyActionableTasks } from '@/hooks/use-tasks';
+import { useQueryClient } from '@tanstack/react-query';
 import { useUserMe } from '@/hooks/use-user-me';
 import { useUpdateNamespace } from '@/hooks/use-namespace-mutations';
-import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons, isActiveStatus } from '@/components/processes/process-card';
+import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons } from '@/components/processes/process-card';
 import { WorkflowProblems } from '@/components/processes/workflow-problems';
 import { OpenRouterCreditsIndicator } from '@/components/namespace/openrouter-credits-indicator';
 import { WorkflowSecretKeysProvider } from '@/hooks/use-workflow-secret-keys';
+import { ImportWorkflowDialog } from '@/components/workflows/import-workflow-dialog';
 import { cn } from '@/lib/utils';
-import type { Namespace, ProcessInstance } from '@mediforce/platform-core';
+import type { Namespace } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
 // Hooks
@@ -137,7 +138,7 @@ function MemberAvatars({ namespace, isMember }: { namespace: Namespace; isMember
     namespace.handle,
     namespace.type === 'organization',
   );
-  const userProfiles = useUserProfiles();
+  const userProfiles = useUserProfiles(namespace.handle);
 
   if (namespace.type !== 'organization') return null;
   if (totalCount === null) return null;
@@ -410,8 +411,7 @@ function WorkflowCatalogPublic({ handle }: { handle: string }) {
             <ProcessCard
               key={definition.name}
               definition={definition}
-              instances={[]}
-              showCompleted={true}
+              runSummary={definition.runSummary}
               handle={handle}
               activeTaskByInstance={emptyTaskMap}
               isMember={false}
@@ -426,12 +426,13 @@ function WorkflowCatalogPublic({ handle }: { handle: string }) {
 function WorkflowCatalogMember({ handle }: { handle: string }) {
   const [showCompleted, setShowCompleted] = React.useState(true);
   const [showArchived, setShowArchived] = React.useState(false);
+  const [importOpen, setImportOpen] = React.useState(false);
+  const queryClient = useQueryClient();
 
-  const { definitions, stepsByDefinition, latestDocs, loading: defsLoading } = useProcessDefinitions();
-  const { data: allInstances, loading: instancesLoading } = useProcessInstances('all', undefined, false, handle);
+  const { definitions, stepsByDefinition, latestDocs, loading: defsLoading } = useProcessDefinitions(showCompleted);
   const { data: activeTasks } = useMyActionableTasks();
 
-  const loading = defsLoading || instancesLoading;
+  const loading = defsLoading;
 
   const activeTaskByInstance = useMemo(() => {
     const map = new Map<string, string>();
@@ -453,27 +454,15 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
       .filter((d) => showArchived || d.archived !== true);
   }, [definitions, showArchived, handle]);
 
-  const instancesByDefinition = useMemo((): Map<string, ProcessInstance[]> => {
-    const map = new Map<string, ProcessInstance[]>();
-    for (const instance of allInstances) {
-      const existing = map.get(instance.definitionName) ?? [];
-      existing.push(instance);
-      map.set(instance.definitionName, existing);
-    }
-    return map;
-  }, [allInstances]);
-
   const sortedDefinitions = useMemo(() => {
     return [...visibleDefinitions].sort((defA, defB) => {
-      const instancesA = instancesByDefinition.get(defA.name) ?? [];
-      const instancesB = instancesByDefinition.get(defB.name) ?? [];
-      const activeA = instancesA.some((instance) => isActiveStatus(instance.status));
-      const activeB = instancesB.some((instance) => isActiveStatus(instance.status));
+      const activeA = defA.runSummary.active > 0;
+      const activeB = defB.runSummary.active > 0;
       if (activeA && !activeB) return -1;
       if (!activeA && activeB) return 1;
       return defA.name.localeCompare(defB.name);
     });
-  }, [visibleDefinitions, instancesByDefinition]);
+  }, [visibleDefinitions]);
 
   return (
     <WorkflowSecretKeysProvider handle={handle} workflowNames={workflowNames}>
@@ -491,6 +480,16 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
             onToggleArchived={() => setShowArchived((prev) => !prev)}
             hasArchivedDefinitions={hasArchivedDefinitions}
           />
+          <button
+            onClick={() => setImportOpen(true)}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap shrink-0',
+              'border hover:bg-muted transition-colors',
+            )}
+          >
+            <Download className="h-3.5 w-3.5" />
+            Import from git
+          </button>
           <Link
             href={`/${handle}/workflows/new`}
             className={cn(
@@ -503,6 +502,12 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
           </Link>
         </div>
       </div>
+      <ImportWorkflowDialog
+        namespace={handle}
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => void queryClient.invalidateQueries({ queryKey: ['workflows', 'list'] })}
+      />
 
       {loading ? (
         <WorkflowCatalogSkeletons />
@@ -538,8 +543,7 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
             <ProcessCard
               key={definition.name}
               definition={definition}
-              instances={instancesByDefinition.get(definition.name) ?? []}
-              showCompleted={showCompleted}
+              runSummary={definition.runSummary}
               steps={stepsByDefinition.get(definition.name)}
               handle={handle}
               activeTaskByInstance={activeTaskByInstance}
@@ -565,7 +569,7 @@ export default function ProfilePage() {
   const { namespace, loading, error } = useNamespace(handle ?? '');
   const { role: currentRole, canAdmin: canEdit, loading: roleLoading } = useNamespaceRole(handle ?? '');
   const isMember = currentRole !== null;
-  const userProfiles = useUserProfiles();
+  const userProfiles = useUserProfiles(handle);
   const [profileImgError, setProfileImgError] = useState(false);
 
   if (loading || roleLoading) {

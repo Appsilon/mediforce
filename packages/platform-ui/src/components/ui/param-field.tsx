@@ -21,11 +21,80 @@ interface ParamFieldProps {
 
 const inputClasses = (disabled?: boolean) =>
   cn(
-    'w-full rounded-md border bg-background px-3 py-2 text-sm',
+    'w-full rounded-md border bg-white dark:bg-white/[0.05] px-3 py-2 text-sm',
     'placeholder:text-muted-foreground',
     'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary',
     disabled && 'opacity-50 cursor-not-allowed',
   );
+
+// Convert a stored datetime string to YYYY-MM-DDTHH:MM in the browser's local
+// timezone, suitable for a datetime-local input's value prop.
+// UTC ISO strings ("2026-06-18T09:15:00.000Z") round-trip correctly.
+// Legacy no-timezone strings ("2026-06-18T11:15:00") display the wall-clock
+// time the user originally typed, but the value stored in the DB was already
+// misinterpreted as UTC by the server — the display looks consistent, but the
+// downstream scheduled time was wrong. Only newly-entered values are correct.
+function toLocalDatetimeInput(stored: string): string {
+  if (!stored) return '';
+  const date = new Date(stored);
+  if (isNaN(date.getTime())) return stored.slice(0, 16);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
+}
+
+// Build a short timezone label like "Europe/Warsaw (UTC+2)" for display.
+function buildTzLabel(): string {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const offsetMin = new Date().getTimezoneOffset(); // negative east of UTC
+  const absMins = Math.abs(offsetMin);
+  const sign = offsetMin <= 0 ? '+' : '-';
+  const h = Math.floor(absMins / 60);
+  const m = absMins % 60;
+  const offset = m === 0 ? `UTC${sign}${h}` : `UTC${sign}${h}:${String(m).padStart(2, '0')}`;
+  return `${tz} (${offset})`;
+}
+
+// Separate component so tzLabel is set client-side only (useEffect), preventing
+// a flash if this component is ever moved into an SSR context.
+function DatetimeField({
+  value,
+  onChange,
+  disabled,
+  classes,
+}: {
+  value: unknown;
+  onChange: (value: unknown) => void;
+  disabled?: boolean;
+  classes: string;
+}) {
+  const [tzLabel, setTzLabel] = React.useState<string | null>(null);
+  React.useEffect(() => { setTzLabel(buildTzLabel()); }, []);
+
+  return (
+    <div className="space-y-1">
+      <input
+        type="datetime-local"
+        value={toLocalDatetimeInput(String(value ?? ''))}
+        onChange={(event) => {
+          const s = event.target.value;
+          if (!s) { onChange(''); return; }
+          // Browser parses datetime-local strings as local time; .toISOString()
+          // converts to UTC so the server always receives an unambiguous timestamp.
+          const date = new Date(s);
+          onChange(isNaN(date.getTime()) ? s : date.toISOString());
+        }}
+        disabled={disabled}
+        className={classes}
+      />
+      {tzLabel !== null && (
+        <p className="text-xs text-muted-foreground">{tzLabel}</p>
+      )}
+    </div>
+  );
+}
 
 export function ParamField({ param, value, onChange, disabled }: ParamFieldProps) {
   const type = param.type ?? 'string';
@@ -132,6 +201,10 @@ function renderInput(
         className={classes}
       />
     );
+  }
+
+  if (type === 'datetime') {
+    return <DatetimeField value={value} onChange={onChange} disabled={disabled} classes={classes} />;
   }
 
   if (type === 'textarea') {

@@ -1,4 +1,4 @@
-import type { HumanTask } from '../schemas/human-task';
+import { HumanTaskSchema, type HumanTask } from '../schemas/human-task';
 import type { HumanTaskRepository } from '../interfaces/human-task-repository';
 import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository';
 
@@ -17,8 +17,11 @@ export class InMemoryHumanTaskRepository implements HumanTaskRepository {
   constructor(private readonly parents?: ProcessInstanceRepository) {}
 
   async create(task: HumanTask): Promise<HumanTask> {
-    this.tasks.set(task.id, { ...task });
-    return { ...task };
+    // Parse on write — mirrors the Firestore + Postgres backends (ADR-0001
+    // Implementation pattern 2).
+    const parsed = HumanTaskSchema.parse(task);
+    this.tasks.set(parsed.id, { ...parsed });
+    return { ...parsed };
   }
 
   async getById(taskId: string): Promise<HumanTask | null> {
@@ -38,7 +41,12 @@ export class InMemoryHumanTaskRepository implements HumanTaskRepository {
   }
 
   async getByRoleAll(role: string): Promise<HumanTask[]> {
-    return [...this.tasks.values()].filter((t) => t.assignedRole === role);
+    // Mirror the Postgres partial index: tombstoned tasks are excluded from
+    // the role queue. Callers narrow by status via ACTIONABLE_STATUSES if
+    // they want the actionable subset.
+    return [...this.tasks.values()].filter(
+      (t) => t.assignedRole === role && t.deleted !== true,
+    );
   }
 
   async getByRoleInNamespaces(
@@ -137,8 +145,18 @@ export class InMemoryHumanTaskRepository implements HumanTaskRepository {
     return { ...updated };
   }
 
-  async setDeletedByInstanceIds(_instanceIds: string[], _deleted: boolean): Promise<void> {
-    // No-op in test double
+  async setDeletedByInstanceIds(
+    instanceIds: string[],
+    deleted: boolean,
+  ): Promise<void> {
+    if (instanceIds.length === 0) return;
+    const idSet = new Set(instanceIds);
+    for (const [id, task] of this.tasks.entries()) {
+      if (idSet.has(task.processInstanceId)) {
+        const updated: HumanTask = { ...task, deleted };
+        this.tasks.set(id, updated);
+      }
+    }
   }
 
   private requireParents(): ProcessInstanceRepository {

@@ -62,7 +62,8 @@ const coworkAgent = {
   systemPrompt: '',
   inputDescription: '',
   outputDescription: '',
-  skillFileNames: [],
+  // Namespace owns the FK-valid workspace the binding audit event attributes to.
+  namespace: 'acme',
   mcpServers: {
     existing: { type: 'stdio' as const, catalogId: 'existing-mcp' },
   },

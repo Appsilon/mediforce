@@ -67,12 +67,18 @@ export function getWorkflowStatus(instance: {
         return { displayStatus: 'error', reason: 'Workflow routing error', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
       case 'max_iterations_exceeded':
         return { displayStatus: 'error', reason: 'Maximum review iterations exceeded', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
+      case null:
+        return {
+          displayStatus: 'error',
+          reason: 'Run paused without a recorded reason — the scheduler cannot resume it automatically. Resume this run to restart from the current step.',
+          rawReason: null,
+          isRetryable: false,
+          hasDedicatedBanner: false,
+        };
       default:
         return {
           displayStatus: 'error',
-          reason: pauseReason !== null
-            ? pauseReason.replace(/_/g, ' ')
-            : 'Workflow stopped unexpectedly',
+          reason: pauseReason.replace(/_/g, ' '),
           rawReason: pauseReason,
           isRetryable: false,
           hasDedicatedBanner: false,

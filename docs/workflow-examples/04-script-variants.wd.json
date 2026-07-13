@@ -1,0 +1,75 @@
+{
+  "name": "tutorial-script-variants",
+  "title": "Script Variants",
+  "description": "Chain script steps with different runtimes — JavaScript, Python, and Bash. Each step reads the previous step's output and transforms it further. Demonstrates runtime selection, data passing between scripts, and the script config block.",
+  "triggers": [
+    { "type": "manual", "name": "manual" }
+  ],
+  "roles": ["operator"],
+  "steps": [
+    {
+      "id": "enter-numbers",
+      "name": "Enter Numbers",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["operator"],
+      "description": "Provide a comma-separated list of numbers to analyze.",
+      "params": [
+        {
+          "name": "numbers",
+          "type": "string",
+          "required": true,
+          "description": "Comma-separated numbers, e.g. 10,20,35,42,7"
+        }
+      ]
+    },
+    {
+      "id": "parse-js",
+      "name": "Parse (JavaScript)",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Parse the comma-separated string into a sorted array of numbers.",
+      "script": {
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\n\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst raw = input.steps?.['enter-numbers']?.numbers || '';\nconst numbers = raw.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));\nnumbers.sort((a, b) => a - b);\n\nwriteFileSync('/output/result.json', JSON.stringify({\n  numbers,\n  count: numbers.length\n}));\n",
+        "runtime": "javascript"
+      }
+    },
+    {
+      "id": "stats-python",
+      "name": "Compute Stats (Python)",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Compute basic statistics — mean, median, min, max, standard deviation.",
+      "script": {
+        "inlineScript": "import json, statistics\n\nwith open('/output/input.json') as f:\n    data = json.load(f)\n\nnumbers = data.get('steps', {}).get('parse-js', {}).get('numbers', [])\n\nif not numbers:\n    result = {'error': 'No numbers provided'}\nelse:\n    result = {\n        'count': len(numbers),\n        'min': min(numbers),\n        'max': max(numbers),\n        'mean': round(statistics.mean(numbers), 2),\n        'median': round(statistics.median(numbers), 2),\n        'stdev': round(statistics.stdev(numbers), 2) if len(numbers) > 1 else 0,\n        'numbers': numbers\n    }\n\nwith open('/output/result.json', 'w') as f:\n    json.dump(result, f)\n",
+        "runtime": "python"
+      }
+    },
+    {
+      "id": "report-bash",
+      "name": "Format Report (Bash)",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Format the statistics into a human-readable text report.",
+      "script": {
+        "inlineScript": "#!/usr/bin/env bash\nset -euo pipefail\n\nDATA=$(cat /output/input.json)\nCOUNT=$(echo \"$DATA\" | jq '.steps[\"stats-python\"].count')\nMIN=$(echo \"$DATA\" | jq '.steps[\"stats-python\"].min')\nMAX=$(echo \"$DATA\" | jq '.steps[\"stats-python\"].max')\nMEAN=$(echo \"$DATA\" | jq '.steps[\"stats-python\"].mean')\nMEDIAN=$(echo \"$DATA\" | jq '.steps[\"stats-python\"].median')\nSTDEV=$(echo \"$DATA\" | jq '.steps[\"stats-python\"].stdev')\n\nREPORT=\"Number Analysis Report\\n======================\\nCount:  ${COUNT}\\nMin:    ${MIN}\\nMax:    ${MAX}\\nMean:   ${MEAN}\\nMedian: ${MEDIAN}\\nStdDev: ${STDEV}\"\n\njq -n --arg report \"$REPORT\" '{report: $report, format: \"text\"}' > /output/result.json\n",
+        "runtime": "bash"
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "enter-numbers", "to": "parse-js" },
+    { "from": "parse-js", "to": "stats-python" },
+    { "from": "stats-python", "to": "report-bash" },
+    { "from": "report-bash", "to": "done" }
+  ]
+}

@@ -1,9 +1,8 @@
-export const AUTONOMY_LEVELS = [
-  { value: 'L0', label: 'L0 — Manual only' },
-  { value: 'L1', label: 'L1 — Human review' },
-  { value: 'L2', label: 'L2 — Auto if confident' },
-  { value: 'L3', label: 'L3 — Auto + fallback' },
-  { value: 'L4', label: 'L4 — Full autonomy' },
+/** L2/L3/L4 only — the three modes surfaced in the wizard. L0/L1 are developer-only (raw YAML). */
+export const AGENT_CONTROL_MODES = [
+  { value: 'L2' as const, label: 'Assist — agent draft, human approves' },
+  { value: 'L3' as const, label: 'Human review — agent output, explicit approval' },
+  { value: 'L4' as const, label: 'Autonomous agent — executes without review' },
 ] as const;
 
 export const STEP_TYPE_LABELS: Record<string, string> = { creation: 'Creation', review: 'Review', decision: 'Decision', terminal: 'End' };

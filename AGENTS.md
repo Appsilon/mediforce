@@ -13,7 +13,7 @@ complexity estimates because of medical vocabulary.
 packages/
   platform-core/    Zod schemas, repo interfaces, in-memory test doubles
   platform-api/     Contract + framework-free handlers
-  platform-infra/   Firestore + Postgres (ADR-0001 transition), Firebase Auth, SendGrid
+  platform-infra/   Postgres, Firebase Auth, email (Mailgun/SMTP)
   platform-ui/      Next.js 15 App Router (dev :9003, e2e :9007)
   workflow-engine/  Engine, transitions, expression DSL
   agent-runtime/    PluginRegistry, AgentRunner, Docker spawn
@@ -60,7 +60,7 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    picks the level (L1 unit / L2 integration / L3 API E2E / L4 UI / L5
    external), scaffolds the file, and walks RED → GREEN. Product features
    MUST land at **L3** (proves storage backend + middleware + auth). For L4 UI
-   journeys with a GIF deliverable, use `/e2e-test`.
+   journeys, use `/e2e-test`.
 
    **Don't test infra/tooling/workflow code.** CI scripts, build glue, dev
    tooling, workflow configs (`apps/*/workflow.yaml`), one-off migrations —
@@ -164,6 +164,15 @@ descriptions are the router, no manual table needed. Reach for one when its
 trigger phrases match the action you're about to take. List with
 `ls .claude/skills/`.
 
+For Codex: repo skills live in `skills/<name>/SKILL.md` and may be symlinked
+under `.codex/skills/` for discovery. Treat them as shared workflow
+instructions, but translate Claude-specific tool syntax instead of executing it
+literally: `Agent(...)` → Codex subagents, `Bash` / `Read` / `Edit` / `Write` /
+`Grep` / `Glob` → Codex shell and file tools, `WebFetch` → Codex web or GitHub
+tools, and `agent-browser` CLI steps → the Codex Browser plugin when available.
+Slash commands like `/new-test` mean "read and follow
+`skills/new-test/SKILL.md`".
+
 ## Reminder — re-read at the top of every task
 
 1. Simplify before coding.
@@ -184,3 +193,5 @@ trigger phrases match the action you're about to take. List with
     "regression", never "risk".
 
 See `README.md` for one-time env setup (Node, pnpm, Firebase CLI, `.env.local`).
+For the day-to-day dev loop (which `pnpm dev*` to run, test levels, CLI,
+migrations, ports, troubleshooting) see [`docs/dev-quickref.md`](docs/dev-quickref.md).

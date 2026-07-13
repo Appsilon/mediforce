@@ -13,14 +13,22 @@
  */
 
 import { workflowRegisterCommand } from './commands/workflow-register';
+import { workflowValidateCommand } from './commands/workflow-validate';
+import { workflowSchemaCommand } from './commands/workflow-schema';
+import { workflowImportCommand } from './commands/workflow-import';
 import { workflowListCommand } from './commands/workflow-list';
+import { workflowListVersionsCommand } from './commands/workflow-list-versions';
 import { workflowGetCommand } from './commands/workflow-get';
 import { runGetCommand } from './commands/run-get';
 import { runListCommand } from './commands/run-list';
+import { runFilesCommand } from './commands/run-files';
+import { runDownloadCommand } from './commands/run-download';
 import { runStartCommand } from './commands/run-start';
 import { runCancelCommand } from './commands/run-cancel';
 import { runArchiveCommand } from './commands/run-archive';
 import { runBulkCancelCommand, runBulkArchiveCommand } from './commands/run-bulk';
+import { runLogsCommand } from './commands/run-logs';
+import { runWatchCommand } from './commands/run-watch';
 import { workflowArchiveCommand } from './commands/workflow-archive';
 import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility';
 import { workflowCopyCommand } from './commands/workflow-copy';
@@ -31,6 +39,7 @@ import {
   systemDiskCommand,
   systemRmiCommand,
 } from './commands/system-status';
+import { emailStatusCommand } from './commands/email-status';
 import { systemCreditsCommand } from './commands/system-credits';
 import { agentListCommand } from './commands/agent-list';
 import { agentGetCommand } from './commands/agent-get';
@@ -40,14 +49,17 @@ import { agentCreateCommand } from './commands/agent-create';
 import { modelListCommand } from './commands/model-list';
 import { modelGetCommand } from './commands/model-get';
 import { modelSyncCommand } from './commands/model-sync';
+import { modelValidateCommand } from './commands/model-validate';
 import { secretSetCommand } from './commands/secret-set';
 import { secretListCommand } from './commands/secret-list';
 import { secretDeleteCommand } from './commands/secret-delete';
 import { taskListCommand } from './commands/task-list';
 import { taskGetCommand } from './commands/task-get';
 import { taskClaimCommand } from './commands/task-claim';
+import { taskCompleteCommand } from './commands/task-complete';
 import { coworkGetCommand } from './commands/cowork-get';
 import { coworkGetByInstanceCommand } from './commands/cowork-get-by-instance';
+import { coworkListCommand } from './commands/cowork-list';
 import { coworkChatCommand } from './commands/cowork-chat';
 import { usersMeCommand } from './commands/users-me';
 import { usersClearMustChangePasswordCommand } from './commands/users-clear-must-change-password';
@@ -60,6 +72,10 @@ import { namespaceDeleteCommand } from './commands/namespace-delete';
 import { namespaceLeaveCommand } from './commands/namespace-leave';
 import { namespaceRemoveMemberCommand } from './commands/namespace-remove-member';
 import { namespaceSetMemberRoleCommand } from './commands/namespace-set-member-role';
+import { processesAgentEventsCommand } from './commands/processes-agent-events';
+import { configSetCommand } from './commands/config-set';
+import { configGetCommand } from './commands/config-get';
+import { configTestWebhookCommand } from './commands/config-test-webhook';
 import { type CommandFn } from './define-command';
 import { consoleOutput, type OutputSink } from './output';
 
@@ -84,7 +100,14 @@ export const TREE: Record<string, BranchEntry> = {
     description: 'Workflow definitions (register, list, get, copy, archive, delete, visibility)',
     leaves: {
       register: { description: 'Register a workflow definition from a JSON file', fn: workflowRegisterCommand },
+      validate: { description: 'Validate a workflow definition JSON file against the schema', fn: workflowValidateCommand },
+      schema: { description: 'Fetch the live WorkflowDefinition JSON Schema from the platform', fn: workflowSchemaCommand },
+      import: { description: 'Import a workflow from a GitHub repo (one-time copy)', fn: workflowImportCommand },
       list: { description: 'List registered workflow definitions', fn: workflowListCommand },
+      'list-versions': {
+        description: 'List metadata for every version of a workflow',
+        fn: workflowListVersionsCommand,
+      },
       get: { description: 'Fetch a workflow definition', fn: workflowGetCommand },
       'set-visibility': { description: 'Set workflow visibility (public|private)', fn: workflowSetVisibilityCommand },
       copy: { description: 'Copy workflow to another namespace', fn: workflowCopyCommand },
@@ -93,11 +116,15 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   run: {
-    description: 'Workflow runs (list, start, get, cancel, archive, bulk)',
+    description: 'Workflow runs (list, start, get, watch, logs, files, download, cancel, archive, bulk)',
     leaves: {
       list: { description: 'List recent runs', fn: runListCommand },
       start: { description: 'Start a new run (manual trigger)', fn: runStartCommand },
       get: { description: "Fetch a single run's status", fn: runGetCommand },
+      watch: { description: 'Watch a run until terminal, streaming step events', fn: runWatchCommand },
+      logs: { description: 'Show audit events and step executions for a run', fn: runLogsCommand },
+      files: { description: "List a run's Output Files", fn: runFilesCommand },
+      download: { description: "Download a run's Output Files (one or all)", fn: runDownloadCommand },
       cancel: { description: 'Cancel a running or paused run', fn: runCancelCommand },
       archive: { description: 'Soft-archive (or restore) a run', fn: runArchiveCommand },
       'bulk-cancel': { description: 'Cancel multiple runs in one call', fn: runBulkCancelCommand },
@@ -105,16 +132,18 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   task: {
-    description: 'Human tasks (list, get, claim)',
+    description: 'Human tasks (list, get, claim, complete)',
     leaves: {
       list: { description: 'List tasks by role or instance', fn: taskListCommand },
       get: { description: 'Fetch a single task', fn: taskGetCommand },
       claim: { description: 'Claim a pending task', fn: taskClaimCommand },
+      complete: { description: 'Complete a human task with a payload', fn: taskCompleteCommand },
     },
   },
   cowork: {
-    description: 'Cowork sessions (get, get-by-instance, chat)',
+    description: 'Cowork sessions (list, get, get-by-instance, chat)',
     leaves: {
+      list: { description: 'List cowork sessions by role or caller scope', fn: coworkListCommand },
       get: { description: 'Fetch a single cowork session', fn: coworkGetCommand },
       'get-by-instance': {
         description: 'Fetch the active cowork session for a process instance',
@@ -141,11 +170,12 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   model: {
-    description: 'Foundation model registry (list, get, sync)',
+    description: 'Foundation model registry (list, get, sync, validate)',
     leaves: {
       list: { description: 'List models in registry', fn: modelListCommand },
       get: { description: 'Fetch a model from registry', fn: modelGetCommand },
       sync: { description: 'Sync models from OpenRouter', fn: modelSyncCommand },
+      validate: { description: 'Validate model IDs against registry', fn: modelValidateCommand },
     },
   },
   secret: {
@@ -178,6 +208,15 @@ export const TREE: Record<string, BranchEntry> = {
       'set-member-role': { description: 'Flip a member to admin|member', fn: namespaceSetMemberRoleCommand },
     },
   },
+  processes: {
+    description: 'Process instances (read-only diagnostics)',
+    leaves: {
+      'agent-events': {
+        description: 'Dump the agent-event feed for a process instance',
+        fn: processesAgentEventsCommand,
+      },
+    },
+  },
   system: {
     description: 'Docker infrastructure + OpenRouter credits',
     leaves: {
@@ -186,6 +225,20 @@ export const TREE: Record<string, BranchEntry> = {
       rmi: { description: 'Remove a Docker image by ID or name:tag', fn: systemRmiCommand },
       disk: { description: 'Docker disk usage breakdown', fn: systemDiskCommand },
       credits: { description: 'OpenRouter credit balance for a workspace', fn: systemCreditsCommand },
+    },
+  },
+  email: {
+    description: 'Email provider status',
+    leaves: {
+      status: { description: 'Show configured email provider', fn: emailStatusCommand },
+    },
+  },
+  config: {
+    description: 'Platform configuration',
+    leaves: {
+      set: { description: 'Set a config value', fn: configSetCommand },
+      get: { description: 'Get a config value or all values matching a prefix', fn: configGetCommand },
+      'test-webhook': { description: 'Send a test webhook notification', fn: configTestWebhookCommand },
     },
   },
 };

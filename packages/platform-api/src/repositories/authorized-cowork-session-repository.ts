@@ -29,6 +29,23 @@ export class AuthorizedCoworkSessionRepository extends AuthorizedScope {
       ? this.raw.getById(sessionId)
       : this.raw.getByIdInNamespaces(sessionId, [...this.caller.namespaces]);
 
+  /**
+   * Caller-scope read: every session the caller is allowed to see. Optional
+   * `role` filter narrows to a single assigned role. System actors see the
+   * whole store; user callers see sessions whose parent run belongs to one of
+   * their namespaces.
+   */
+  list = async (filters?: { role?: string }): Promise<CoworkSession[]> => {
+    const role = filters?.role;
+    if (this.caller.isSystemActor) {
+      return role !== undefined ? this.raw.listByRoleAll(role) : this.raw.listAll();
+    }
+    const allowed = [...this.caller.namespaces];
+    return role !== undefined
+      ? this.raw.listByRoleInNamespaces(role, allowed)
+      : this.raw.listInNamespaces(allowed);
+  };
+
   findMostRecentActiveForInstance = async (instanceId: string): Promise<CoworkSession | null> =>
     this.caller.isSystemActor
       ? this.raw.findMostRecentActive(instanceId)
@@ -54,6 +71,22 @@ export class AuthorizedCoworkSessionRepository extends AuthorizedScope {
   ): Promise<CoworkSession> => {
     await this.requireAccess(sessionId);
     return this.raw.updateArtifact(sessionId, artifact);
+  };
+
+  updateValidationResult = async (
+    sessionId: string,
+    result: { valid: boolean; errors: string[] },
+  ): Promise<CoworkSession> => {
+    await this.requireAccess(sessionId);
+    return this.raw.updateValidationResult(sessionId, result);
+  };
+
+  updatePresentation = async (
+    sessionId: string,
+    html: string,
+  ): Promise<CoworkSession> => {
+    await this.requireAccess(sessionId);
+    return this.raw.updatePresentation(sessionId, html);
   };
 
   finalize = async (

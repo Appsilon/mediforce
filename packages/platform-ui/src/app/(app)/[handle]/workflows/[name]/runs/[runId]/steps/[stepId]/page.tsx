@@ -1,20 +1,26 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { format } from 'date-fns';
 import { CheckCircle2, Clock, XCircle, Circle, Pause, Bot, User, ExternalLink, FileText, GitBranch, Gauge, ChevronDown, ChevronRight, MessageSquare, DollarSign } from 'lucide-react';
-import type { StepExecution, Step, AgentEvent, HumanTask } from '@mediforce/platform-core';
-import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
-import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
-import { useInstanceTasks } from '@/hooks/use-instance-tasks';
+import type { StepExecution, Step, AgentEvent, HumanTask, WorkflowStep } from '@mediforce/platform-core';
+import { useProcessInstance } from '@/hooks/use-process-instances';
+import { useStepExecutions } from '@/hooks/use-step-executions';
+import { useAgentEvents } from '@/hooks/use-agent-events';
+import { useWorkflowVersion } from '@/hooks/use-workflow-versions';
+import { useStepTasks } from '@/hooks/use-tasks';
+import { useViewerIdentity } from '@/hooks/use-viewer-identity';
 import { useAgentRunsForStep } from '@/hooks/use-agent-runs';
 import { getAgentOutput, type AgentOutputData } from '@/components/tasks/task-utils';
+import { resolveStepView } from '@/components/tasks/resolve-step-view';
+import { HumanStepView } from '@/components/tasks/human-step-view';
 import { AgentOutputDisplay } from '@/components/agents/agent-output-display';
 import { agentOutputFromEnvelope } from './agent-output-from-envelope';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
-import { formatDuration, formatStepName, formatCostUsd } from '@/lib/format';
+import { downloadViaApiFetch } from '@/lib/save-blob';
+import { formatBytes, formatDuration, formatStepName, formatCostUsd } from '@/lib/format';
 
 function StatusIcon({ status }: { status: string }) {
   switch (status) {
@@ -33,51 +39,58 @@ function StatusIcon({ status }: { status: string }) {
 
 export default function StepDetailPage() {
   const { name, runId, stepId, handle } = useParams<{ name: string; runId: string; stepId: string; handle: string }>();
+  const searchParams = useSearchParams();
+  const executionId = searchParams.get('executionId') ?? undefined;
 
   const decodedName = name ? decodeURIComponent(name) : '';
   const decodedStepId = stepId ? decodeURIComponent(stepId) : '';
 
   const { data: instance, loading: instanceLoading } = useProcessInstance(runId ?? null);
-  const { data: stepExecutions, loading: stepsLoading } = useSubcollection<StepExecution>(
-    runId ? `processInstances/${runId}` : '',
-    'stepExecutions',
+  const { data: stepExecutions, loading: stepsLoading } = useStepExecutions(
+    runId ?? null,
+    instance?.status,
   );
-  const { data: agentEvents, loading: eventsLoading } = useSubcollection<AgentEvent>(
-    runId ? `processInstances/${runId}` : '',
-    'agentEvents',
+  const { data: agentEvents, loading: eventsLoading } = useAgentEvents(
+    runId ?? null,
+    decodedStepId || null,
+    instance?.status,
   );
 
-  const { versions } = useProcessDefinitionVersions(decodedName, handle);
-
-  const definition = useMemo(() => {
-    if (!instance || versions.length === 0) return null;
-    const versionNum = parseInt(instance.definitionVersion, 10);
-    if (!isNaN(versionNum)) {
-      return versions.find((v) => v.version === versionNum) ?? null;
-    }
-    return versions.find((v) => String(v.version) === instance.definitionVersion) ?? null;
-  }, [instance, versions]);
+  const runVersion = instance ? Number.parseInt(instance.definitionVersion, 10) : null;
+  const { definition } = useWorkflowVersion(
+    decodedName,
+    handle,
+    runVersion !== null && !Number.isNaN(runVersion) ? runVersion : null,
+  );
 
   const definitionStep = useMemo((): Step | null => {
-    return definition?.steps.find((s) => s.id === decodedStepId) ?? null;
+    return definition?.steps?.find((s) => s.id === decodedStepId) ?? null;
   }, [definition, decodedStepId]);
+
+  const executorType = useMemo(() => {
+    if (!definitionStep) return undefined;
+    return (definitionStep as unknown as WorkflowStep).executor;
+  }, [definitionStep]);
 
   // Find previous step name for the "From:" label
   const previousStepName = useMemo(() => {
     const transitions = definition?.transitions ?? [];
     const incoming = transitions.find((t) => t.to === decodedStepId);
     if (!incoming) return null;
-    const prevStep = definition?.steps.find((s) => s.id === incoming.from);
+    const prevStep = definition?.steps?.find((s) => s.id === incoming.from);
     return prevStep?.name ?? formatStepName(incoming.from);
   }, [definition, decodedStepId]);
 
-  // Get the latest execution for this step
+  // Resolve the execution: pin to executionId from the URL when present (so
+  // each row in the history links to a different view), otherwise fall back
+  // to the latest execution for the step.
   const execution = useMemo((): StepExecution | null => {
-    const execs = stepExecutions
-      .filter((e) => e.stepId === decodedStepId)
-      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
-    return execs[0] ?? null;
-  }, [stepExecutions, decodedStepId]);
+    const execs = stepExecutions.filter((e) => e.stepId === decodedStepId);
+    if (executionId !== undefined) {
+      return execs.find((e) => e.id === executionId) ?? null;
+    }
+    return execs.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0] ?? null;
+  }, [stepExecutions, decodedStepId, executionId]);
 
   // Agent prompt event for this step
   const promptEvent = useMemo(() => {
@@ -93,7 +106,11 @@ export default function StepDetailPage() {
   //   2. HumanTask.completionData.agentOutput (only for L3 review steps) —
   //      fallback for older runs where envelope wasn't queryable.
   const { data: agentRuns } = useAgentRunsForStep(runId ?? null, decodedStepId || null);
-  const { tasks: instanceTasks } = useInstanceTasks(runId ?? undefined);
+  const { tasks: stepTasks, loading: tasksLoading } = useStepTasks(
+    runId ?? null,
+    decodedStepId || null,
+    instance?.status,
+  );
   const agentOutput = useMemo((): AgentOutputData | null => {
     const latestRun = agentRuns
       .slice()
@@ -101,20 +118,24 @@ export default function StepDetailPage() {
     if (latestRun?.envelope) {
       return agentOutputFromEnvelope(latestRun.envelope);
     }
-    const candidates = instanceTasks
-      .filter((task: HumanTask) => task.stepId === decodedStepId)
-      .sort(
-        (a: HumanTask, b: HumanTask) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+    const candidates = [...stepTasks].sort(
+      (a: HumanTask, b: HumanTask) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
     for (const task of candidates) {
       const output = getAgentOutput(task);
       if (output) return output;
     }
     return null;
-  }, [agentRuns, instanceTasks, decodedStepId]);
+  }, [agentRuns, stepTasks]);
 
-  const loading = instanceLoading || stepsLoading || eventsLoading;
+  const viewer = useViewerIdentity();
+  const stepView = useMemo(
+    () => resolveStepView({ tasks: stepTasks, execution, viewer }),
+    [stepTasks, execution, viewer],
+  );
+
+  const loading = instanceLoading || stepsLoading || eventsLoading || tasksLoading;
 
   if (loading) {
     return (
@@ -137,8 +158,33 @@ export default function StepDetailPage() {
   const stepName = definitionStep?.name ?? formatStepName(decodedStepId);
   const hasAgentBadge = agentOutput !== null || execution?.agentOutput !== undefined;
 
+  if (stepView.kind === 'human-step') {
+    const executionPanel = execution !== null && stepView.access.kind === 'completed' ? (
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <InputColumn
+          execution={execution}
+          previousStepName={previousStepName}
+          promptEvent={promptEvent}
+        />
+        <OutputColumn execution={execution} />
+      </div>
+    ) : undefined;
+
+    return (
+      <div className="p-6">
+        <HumanStepView
+          task={stepView.task}
+          access={stepView.access}
+          processInstance={instance}
+          agentOutput={agentOutput}
+          executionPanel={executionPanel}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 space-y-6 max-w-6xl">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-3">
@@ -192,24 +238,24 @@ export default function StepDetailPage() {
               Step IO (debug)
             </Collapsible.Trigger>
             <Collapsible.Content className="mt-3">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <InputColumn
                   execution={execution}
                   previousStepName={previousStepName}
                   promptEvent={promptEvent}
                 />
-                <OutputColumn execution={execution} />
+                <OutputColumn execution={execution} executorType={executorType} />
               </div>
             </Collapsible.Content>
           </Collapsible.Root>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <InputColumn
               execution={execution}
               previousStepName={previousStepName}
               promptEvent={promptEvent}
             />
-            <OutputColumn execution={execution} />
+            <OutputColumn execution={execution} executorType={executorType} />
           </div>
         )
       ) : (
@@ -286,7 +332,7 @@ function CollapsiblePrompt({ prompt }: { prompt: unknown }) {
         )}
       </button>
       {expanded && (
-        <pre className="rounded-md bg-muted p-3 text-xs overflow-auto max-h-[500px] whitespace-pre-wrap break-words">
+        <pre className="rounded-md bg-muted p-3 text-xs whitespace-pre-wrap break-words">
           {promptText}
         </pre>
       )}
@@ -296,7 +342,7 @@ function CollapsiblePrompt({ prompt }: { prompt: unknown }) {
 
 // ── Output Column ───────────────────────────────────────────────────────────
 
-function OutputColumn({ execution }: { execution: StepExecution }) {
+function OutputColumn({ execution, executorType }: { execution: StepExecution; executorType?: string }) {
   const agentOutput = execution.agentOutput;
   const hasAgent = agentOutput !== undefined;
   const output = execution.output;
@@ -313,7 +359,7 @@ function OutputColumn({ execution }: { execution: StepExecution }) {
         ) : (
           <div className="divide-y">
             {hasAgent && agentOutput && (
-              <AgentMetadataSection agentOutput={agentOutput} />
+              <AgentMetadataSection agentOutput={agentOutput} executorType={executorType} />
             )}
 
             {hasAgent && agentOutput?.gitMetadata && (
@@ -332,8 +378,9 @@ function OutputColumn({ execution }: { execution: StepExecution }) {
 
 // ── Agent Metadata ──────────────────────────────────────────────────────────
 
-function AgentMetadataSection({ agentOutput }: { agentOutput: NonNullable<StepExecution['agentOutput']> }) {
-  const confidencePct = agentOutput.confidence !== null
+function AgentMetadataSection({ agentOutput, executorType }: { agentOutput: NonNullable<StepExecution['agentOutput']>; executorType?: string }) {
+  const isScript = executorType === 'script';
+  const confidencePct = !isScript && agentOutput.confidence !== null
     ? Math.round(agentOutput.confidence * 100)
     : null;
 
@@ -356,7 +403,7 @@ function AgentMetadataSection({ agentOutput }: { agentOutput: NonNullable<StepEx
             )}>{confidencePct}%</span>
           </div>
         )}
-        {agentOutput.model && (
+        {!isScript && agentOutput.model && (
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground">Model:</span>
             <span className="font-mono text-xs">{agentOutput.model}</span>
@@ -383,7 +430,7 @@ function AgentMetadataSection({ agentOutput }: { agentOutput: NonNullable<StepEx
           </div>
         )}
       </div>
-      {agentOutput.confidence_rationale && (
+      {!isScript && agentOutput.confidence_rationale && (
         <p className="text-xs text-muted-foreground italic">{agentOutput.confidence_rationale}</p>
       )}
       {agentOutput.reasoning && (
@@ -519,7 +566,7 @@ function DataValue({ value }: { value: unknown }) {
       );
     }
     return (
-      <pre className="rounded-md bg-muted p-3 text-xs overflow-auto max-h-[400px] whitespace-pre-wrap break-words">
+      <pre className="rounded-md bg-muted p-3 text-xs whitespace-pre-wrap break-words">
         {JSON.stringify(value, null, 2)}
       </pre>
     );
@@ -527,7 +574,7 @@ function DataValue({ value }: { value: unknown }) {
 
   if (typeof value === 'object') {
     return (
-      <pre className="rounded-md bg-muted p-3 text-xs overflow-auto max-h-[400px] whitespace-pre-wrap break-words">
+      <pre className="rounded-md bg-muted p-3 text-xs whitespace-pre-wrap break-words">
         {JSON.stringify(value, null, 2)}
       </pre>
     );
@@ -557,14 +604,6 @@ function isFileArray(arr: unknown[]): boolean {
   );
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  const exp = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const size = bytes / Math.pow(1024, exp);
-  return `${size.toFixed(exp > 0 ? 1 : 0)} ${units[exp]}`;
-}
-
 function FileList({ files }: { files: FileItem[] }) {
   return (
     <div className="space-y-1">
@@ -573,17 +612,44 @@ function FileList({ files }: { files: FileItem[] }) {
         {files.map((file) => (
           <li key={file.name} className="flex items-center gap-2 text-sm">
             <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            {file.downloadUrl ? (
-              <a href={file.downloadUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate">
-                {file.name}
-              </a>
-            ) : (
-              <span className="truncate">{file.name}</span>
-            )}
+            <FileNameLink file={file} />
             <span className="text-xs text-muted-foreground shrink-0">{formatBytes(file.size)}</span>
           </li>
         ))}
       </ul>
     </div>
+  );
+}
+
+function FileNameLink({ file }: { file: FileItem }) {
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  if (!file.downloadUrl) {
+    return <span className="truncate">{file.name}</span>;
+  }
+  // Same-origin API URLs (attachment blobs, ADR-0003) need the Bearer token, so
+  // they can't be a bare `<a href>`. Absolute external URLs open directly.
+  if (file.downloadUrl.startsWith('/api/')) {
+    const downloadUrl = file.downloadUrl;
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() =>
+            downloadViaApiFetch(downloadUrl, file.name).catch((err) =>
+              setDownloadError(err instanceof Error ? err.message : 'Download failed'),
+            )
+          }
+          className="text-primary hover:underline truncate text-left"
+        >
+          {file.name}
+        </button>
+        {downloadError && <span className="text-xs text-destructive truncate">{downloadError}</span>}
+      </>
+    );
+  }
+  return (
+    <a href={file.downloadUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate">
+      {file.name}
+    </a>
   );
 }

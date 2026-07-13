@@ -39,6 +39,7 @@ export async function archiveWorkflow(
     basis: 'Workflow archive flag toggled via API',
     entityType: 'workflow_definition',
     entityId: input.name,
+    namespace: input.namespace,
   });
 
   return { success: true as const, name: input.name, archived: input.archived };
@@ -74,6 +75,7 @@ export async function archiveWorkflowVersion(
     basis: 'Workflow version archive flag toggled via API',
     entityType: 'workflow_definition',
     entityId: input.name,
+    namespace: input.namespace,
   });
 
   return {

@@ -1,10 +1,10 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
+import { trackPageErrors } from '../helpers/page-errors';
 
 test.describe('Retry Failed Step Journey', () => {
-  test('agent_escalated instance — Fixed try again retries the step and flips banner to waiting_for_human', async ({ page }, testInfo) => {
-    await setupRecording(page, 'retry-step', testInfo);
+  test('agent_escalated instance — Fixed try again retries the step and flips banner to waiting_for_human', async ({ page }) => {
+    trackPageErrors(page);
 
     // proc-retry-test is seeded as:
     //   status=paused, pauseReason=agent_escalated, error='Simulated step failure...',
@@ -18,11 +18,10 @@ test.describe('Retry Failed Step Journey', () => {
     // AgentEscalatedBanner shows "Fixed, try again" button
     const retryButton = page.getByRole('button', { name: /fixed, try again/i });
     await expect(retryButton).toBeVisible();
-    await showStep(page);
 
     // Click "Fixed, try again" — server action calls engine.retryStep (flips status→running,
     // clears pauseReason/error) and fire-and-forgets POST /run which re-enters the auto-runner.
-    await click(page, retryButton);
+    await retryButton.click();
 
     // Auto-runner hits executor='human' for human-review, creates a new HumanTask,
     // and pauses with pauseReason='waiting_for_human'. "Waiting for human" badge remains
@@ -30,8 +29,5 @@ test.describe('Retry Failed Step Journey', () => {
     // disappears because rawReason is no longer 'agent_escalated'.
     await expect(page.getByText('Waiting for human').first()).toBeVisible({ timeout: 20_000 });
     await expect(retryButton).toHaveCount(0);
-    await showResult(page);
-
-    await endRecording(page);
   });
 });

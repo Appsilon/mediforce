@@ -1,5 +1,5 @@
 import { test, expect } from '../helpers/test-fixtures';
-import { setupRecording, click, showStep, showResult, showCaption, endRecording } from '../helpers/recording';
+import { trackPageErrors } from '../helpers/page-errors';
 
 /**
  * Phase 4 PR4 — `POST /api/namespaces` with list-affecting optimistic prepend.
@@ -12,9 +12,9 @@ import { setupRecording, click, showStep, showResult, showCaption, endRecording 
  * sidebar entry — rather than the internal cache transition.
  */
 test.describe('Create workspace journey', () => {
-  test('owner creates an organisation workspace and is redirected to it', async ({ page }, testInfo) => {
+  test('owner creates an organisation workspace and is redirected to it', async ({ page }) => {
     test.setTimeout(60_000);
-    await setupRecording(page, 'create-workspace', testInfo);
+    trackPageErrors(page);
 
     const suffix = Date.now().toString().slice(-6);
     const handle = `journey-org-${suffix}`;
@@ -22,28 +22,22 @@ test.describe('Create workspace journey', () => {
 
     await page.goto('/workspaces/new');
     await expect(page.getByRole('heading', { name: 'New Workspace' })).toBeVisible({ timeout: 15_000 });
-    await showCaption(page, 'Fill the new-workspace form');
 
-    await click(page, page.getByLabel('Handle'));
+    await page.getByLabel('Handle').click();
     await page.getByLabel('Handle').fill(handle);
     await page.getByLabel('Display name').fill(displayName);
     await page.getByLabel(/bio/i).fill('Created from the create-workspace journey.');
-    await showStep(page);
 
-    await showCaption(page, 'Submitting — POST /api/namespaces');
-    await click(page, page.getByRole('button', { name: /create workspace/i }));
+    await page.getByRole('button', { name: /create workspace/i }).click();
 
     // onSuccess of the mutation redirects to `/${handle}`. The workspace home
     // loads via the same react-query cache the optimistic prepend touched, so
     // the sidebar entry comes "for free".
     await page.waitForURL(new RegExp(`/${handle}(?:/|$)`), { timeout: 25_000 });
-    await showCaption(page, 'Landed on new workspace home');
 
     // The sidebar switcher is driven by `useAllUserNamespaces` (selector over
     // useUserMe). The new workspace must be present immediately, not on
     // next-load refresh.
     await expect(page.getByText(displayName).first()).toBeVisible({ timeout: 10_000 });
-    await showResult(page);
-    await endRecording(page);
   });
 });

@@ -30,16 +30,21 @@ Mediforce is that infrastructure. Open-source, built for pharma, designed so you
 
 Processes are made of steps. Each step can be performed by a human, an AI agent, or both — with clear rules about who decides what.
 
-### Configurable Autonomy
+### Configurable Control Modes
 
-| Level | Agent Role | Human Involvement |
-|-------|-----------|-------------------|
-| **L1 — Observer** | Watches and surfaces insights | Informational only |
-| **L2 — Advisor** | Suggests actions | Human decides and acts |
-| **L3 — Drafter** | Does the work, submits for review | Human approves or sends back |
-| **L4 — Executor** | Acts autonomously | Human reviews periodically |
+Every step is assigned a Control Mode (CM0–CM4) — the same picker used in the workflow designer's step-type popover:
 
-At any level, an agent can signal uncertainty and escalate to a human. This isn't a failure mode — it's how the system maintains safety in production.
+| Mode | What it means |
+|------|----------------|
+| **No agent** `CM0` | Human, script, or automated action - no AI involved. Full manual control. |
+| **Assist** `CM1` _(coming soon)_ | Human leads and does the work; AI reviews the result afterward. |
+| **Cowork** `CM2` | Agent and human work together in real time, via chat or voice. |
+| **Human review** `CM3` | Agent completes the step; a human reviews and approves before the workflow proceeds. |
+| **Autonomous agent** `CM4` | Agent completes the step and the workflow advances on its own; a human can review after the fact via the audit trail. |
+
+`executor` and `autonomyLevel` remain the underlying schema fields (unchanged); Control Mode is a UI-only classification layered on top — see [`docs/design/AUTONOMY-LEVELS-REFACTOR.md`](docs/design/AUTONOMY-LEVELS-REFACTOR.md).
+
+At any mode, an agent can signal uncertainty and escalate to a human. This isn't a failure mode — it's how the system maintains safety in production.
 
 ### What Agents Actually Do
 
@@ -71,16 +76,6 @@ The core decision point. Reviewers see full context from the agent's work and su
 <img src="docs/features/task-approve-flow.gif" alt="Task approval flow with agent context" width="720" />
 </div>
 
-### Autonomy Levels on Every Step
-
-Each step displays its autonomy configuration (L1–L4) so operators always know what's agent-driven and what requires human action.
-
-<div align="center">
-<img src="docs/features/run-detail-autonomy-badges.gif" alt="Process run with autonomy level badges" width="720" />
-</div>
-
-> **[See all features with recordings](docs/features/FEATURES.md)** — task management, workflow editor, run reports, agent catalog, escalation handling, and more.
-
 ## Why Open Source
 
 In regulated industries, trust and transparency are non-negotiable. Open source is the right model:
@@ -105,12 +100,10 @@ We're building the standard for human-agent collaboration in pharma — and we'r
 
 **[Getting Started Guide](GETTING-STARTED.md)** — Quick start with emulators and demo data, no setup required.
 
-> **Datastore transition (ADR-0001).** Mediforce is moving from Firestore to
-> self-hosted Postgres. The Postgres path is opt-in via
-> `STORAGE_BACKEND=postgres`; default is still `firestore` until the cutover.
-> Local-dev instructions below cover **both** modes. See
-> [`docs/postgres-local-dev.md`](docs/postgres-local-dev.md) and
+> **Datastore (ADR-0001).** Server data layer runs on self-hosted Postgres.
+> See [`docs/postgres-local-dev.md`](docs/postgres-local-dev.md) and
 > [`docs/adr/0001-firestore-to-postgres.md`](docs/adr/0001-firestore-to-postgres.md).
+
 
 ### Fastest start (no setup)
 
@@ -125,38 +118,33 @@ Open `http://localhost:9007`. Use this to click through the UI without configuri
 
 | Command | What it gives you |
 |---|---|
-| `pnpm dev` | Default. Real Firebase per `.env.local`, agents in Docker. The main dev loop. |
+| `pnpm dev` | Default full local stack. Boots a local Postgres via the docker overlay, runs migrations, then starts the UI; agents run inline via Docker (no Redis). Firebase Auth/Storage + the `users/{uid}` profile collection still come from `.env.local`. The main dev loop. |
 | `pnpm dev:mock` | Mocked agents + seeded local emulator data, port 9007. No cloud keys, no Docker, no Firebase project. |
-| `pnpm dev:no-docker` | Like `dev`, but agents run via host `claude` CLI instead of Docker. |
-| `pnpm dev:queue` | Like `dev`, but agent execution goes through BullMQ queue (production architecture). Requires Redis + worker running — see below. |
-| `pnpm dev:postgres` | One-command Postgres mode. Boots `postgres` + `redis` via docker compose, runs `pnpm db:migrate`, then starts the dev server with `STORAGE_BACKEND=postgres`. Idempotent — safe to re-run after pulling new migrations. |
+| `pnpm dev:no-docker` | Docker-free, UI-only. Agents run via host `claude` CLI instead of Docker. |
+| `pnpm dev:queue` | Like `dev`, but agent execution goes through the BullMQ queue (production architecture). Boots `redis` alongside Postgres; requires the worker running — see below. |
 
 ### Postgres mode (ADR-0001)
 
-The new path. Bring up Postgres + Redis, point the app at them, set
-`STORAGE_BACKEND=postgres` to route migrated repositories through Postgres
-(today: `tool_catalog_entries`; more land per the [PLAN-0001 build order](docs/adr/PLAN-0001.md#52-build-order-postgres-implementations)).
-
-One command does all of the above:
+Bring up Postgres and point the app at it. One command does all
+of the above:
 
 ```bash
-pnpm dev:postgres                                  # docker compose up + migrate + dev
+pnpm dev                                           # docker compose up + migrate + dev
 ```
 
 Manual equivalent if you need to wire your own env (e.g. point at an
 external Postgres):
 
 ```bash
-docker compose up postgres redis -d                # boot Postgres 16 + Redis
+docker compose up postgres -d                      # boot Postgres 16
 # in packages/platform-ui/.env.local:
-#   STORAGE_BACKEND=postgres
 #   DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce
 pnpm db:migrate                                    # apply Drizzle migrations once
 pnpm dev                                           # start the app
 ```
 
 `pnpm db:migrate` is idempotent — re-run after pulling new migrations
-from main. Same script runs inside `pnpm dev:postgres` and inside the
+from main. Same script runs inside `pnpm dev` and inside the
 production Dockerfile's CMD, so dev and prod share the migration path.
 See [Staging / production ops](#staging--production-ops-postgres) below.
 
@@ -178,7 +166,7 @@ pnpm dev:queue             # native UI pointed at compose Redis
 docker compose down        # stop infra when you're done
 ```
 
-### Emulator + own seed data (Firestore path, default until cutover)
+### Emulator + own seed data (legacy Firestore demo path)
 
 ```bash
 cp packages/platform-ui/.env.example packages/platform-ui/.env.local
@@ -203,7 +191,7 @@ E2E variants:
 
 ```bash
 pnpm test:e2e:api     # L3 only — API E2E, no browser (~30s)
-pnpm test:e2e:record  # Record GIFs of UI journeys
+pnpm test:e2e:ui      # L4 only — UI E2E with real Chromium
 ```
 
 For UI-only journeys, run `pnpm test:e2e --project=authenticated` from the platform-ui directory (or invoke Playwright's interactive UI mode via `pnpm test:e2e:ui` there).
@@ -242,15 +230,17 @@ pnpm exec mediforce <command> --help                                     # per-c
 
 ### Building Docker images for script steps
 
-Workflows with `script` executor steps need Docker images built locally:
+Workflows with `script` executor steps need Docker images built locally — none
+are pulled from a registry. Build everything in one go:
 
 ```bash
-# Community Digest workflow
-docker build -t mediforce-agent:community-digest -f apps/community-digest/container/Dockerfile .
-
-# Protocol to TFL workflow
-docker build -t mediforce-agent:protocol-to-tfl -f apps/protocol-to-tfl/container/Dockerfile .
+./scripts/rebuild-docker-images.sh
 ```
+
+This builds `mediforce-golden-image` and `mediforce-node` (used by most inline
+`runtime: javascript` script steps, and as the fallback when a step omits
+`agent.image`), plus the per-app images (`community-digest`, `protocol-to-tfl`,
+`tealflow`, `landing-zone`).
 
 Skip this if you only use `human` or `agent` executor steps, or run with `MOCK_AGENT=true`.
 
@@ -288,35 +278,25 @@ the bind-mount data dir with the right ownership as part of its
 
 **Already-bootstrapped deployments** (the current staging) — bootstrap
 is not re-run against them. Add `POSTGRES_PASSWORD` + create the dir
-manually via ssh. See
-[`docs/staging-postgres-prep.md`](docs/staging-postgres-prep.md) for
-the one-off checklist.
+manually via ssh.
 
-`platform-ui` runs Drizzle migrations on every container start via
-[`packages/platform-infra/scripts/migrate.mjs`](packages/platform-infra/scripts/migrate.mjs)
-(idempotent via the `drizzle.__drizzle_migrations` ledger). No separate
+Drizzle migrations run in a short-lived `migrate` compose service (init
+container, see [`docker-compose.prod.yml`](docker-compose.prod.yml))
+before `platform-ui` starts. `platform-ui` waits via
+`depends_on: { migrate: { condition: service_completed_successfully } }`.
+Idempotent (drizzle's `__drizzle_migrations` ledger). No separate
 migration step in the deploy pipeline.
 
-`STORAGE_BACKEND` defaults to `firestore` until the ADR-0001 §8 data
-cutover. Until then, Postgres runs on staging but the app routes only
-`tool-catalog` reads/writes through it (when the flag is flipped).
-
-> **Current cutover (one-off):** existing staging needs the prep run
-> once before PR #515 lands. See
-> [`docs/staging-postgres-prep.md`](docs/staging-postgres-prep.md). That
-> file gets deleted after the cutover succeeds — long-term ops content
-> stays here.
 
 ## Deep Dives
 
 | | |
 |---|---|
-| **[Getting Started](GETTING-STARTED.md)** | Set up your development environment with Firebase |
+| **[Getting Started](GETTING-STARTED.md)** | Set up your development environment — local Postgres data layer plus Firebase Auth/Storage |
 | **[Vision](docs/vision.md)** | Why this needs to exist, what agents actually do in pharma, and where we're headed |
 | **[Architecture](docs/architecture.md)** | Processes, steps, agents, compliance — the technical foundation |
 | **[How We Work](docs/how-we-work.md)** | Building bottom-up, in public, with real processes |
 | **[Development](docs/development.md)** | Setup, monorepo structure, testing, deployment |
-| **[Features](docs/features/FEATURES.md)** | Full feature gallery with recorded walkthroughs |
 
 ## License
 

@@ -193,7 +193,7 @@ describe('getProcessSteps handler', () => {
     expect(s1?.executorType).toBe('human');
     expect(s1?.status).toBe('completed');
     expect(s1?.output).toEqual({ decision: 'approve', notes: 'looks good' });
-    expect(s1?.execution).toBeNull();
+    expect(s1?.executions).toEqual([]);
   });
 
   it('marks all reachable steps completed when status=completed and currentStepId=null', async () => {
@@ -217,6 +217,83 @@ describe('getProcessSteps handler', () => {
 
     expect(result.steps.find((s) => s.stepId === 's1')?.status).toBe('completed');
     expect(result.steps.find((s) => s.stepId === 's2')?.status).toBe('completed');
+  });
+
+  it('returns all iterations for a step that ran multiple times in a loop', async () => {
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-loop',
+        definitionName: 'demo',
+        definitionVersion: '1',
+        namespace: 'team-alpha',
+        currentStepId: 's1',
+      }),
+    );
+    const firstVisit = buildStepExecution({
+      instanceId: 'inst-loop',
+      stepId: 's2',
+      iterationNumber: 0,
+      startedAt: new Date('2024-01-01T10:00:00Z').toISOString(),
+      status: 'completed',
+      output: { ok: true },
+    });
+    const secondVisit = buildStepExecution({
+      instanceId: 'inst-loop',
+      stepId: 's2',
+      iterationNumber: 1,
+      startedAt: new Date('2024-01-01T11:00:00Z').toISOString(),
+      status: 'completed',
+      output: { ok: true },
+    });
+    await instanceRepo.addStepExecution('inst-loop', firstVisit);
+    await instanceRepo.addStepExecution('inst-loop', secondVisit);
+
+    const scope = createTestScope({ instanceRepo, processRepo });
+    const result = await getProcessSteps({ instanceId: 'inst-loop' }, scope);
+
+    const s2 = result.steps.find((s) => s.stepId === 's2');
+    expect(s2?.executions).toHaveLength(2);
+    expect(s2?.executions.map((e) => e.iterationNumber).sort()).toEqual([0, 1]);
+    expect(s2?.status).toBe('completed');
+  });
+
+  it('marks a step completed when it ran before currentStepId in a loop even if defined after it', async () => {
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'looping',
+        version: 1,
+        namespace: 'team-alpha',
+        steps: [
+          { id: 'gate', name: 'Gate', type: 'decision', executor: 'human' },
+          { id: 'wait', name: 'Wait', type: 'creation', executor: 'action' },
+        ],
+      }),
+    );
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-loop2',
+        definitionName: 'looping',
+        definitionVersion: '1',
+        namespace: 'team-alpha',
+        currentStepId: 'gate',
+      }),
+    );
+    await instanceRepo.addStepExecution(
+      'inst-loop2',
+      buildStepExecution({
+        instanceId: 'inst-loop2',
+        stepId: 'wait',
+        iterationNumber: 0,
+        status: 'completed',
+        output: { resumeReason: 'deadline_reached' },
+      }),
+    );
+
+    const scope = createTestScope({ instanceRepo, processRepo });
+    const result = await getProcessSteps({ instanceId: 'inst-loop2' }, scope);
+
+    expect(result.steps.find((s) => s.stepId === 'gate')?.status).toBe('running');
+    expect(result.steps.find((s) => s.stepId === 'wait')?.status).toBe('completed');
   });
 
   it('returns the steps for in-namespace user callers', async () => {

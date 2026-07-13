@@ -3,11 +3,12 @@ import { readFile, readdir, mkdtemp, writeFile, rm, mkdir, appendFile, realpath,
 import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation } from '@mediforce/platform-core';
+import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
+import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, OutputSchemaShape } from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls, formatExitInfo, type ContainerPluginInit } from './container-plugin';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, formatExitInfo, type ContainerPluginInit } from './container-plugin';
+import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
 import { createLineStreamReader } from '@mediforce/platform-core';
 
@@ -203,15 +204,11 @@ function buildHttpHeaders(
   return { [bundle.headerName]: headerValue };
 }
 
-interface OutputSchema {
-  type?: string;
-  required?: string[];
-  properties?: Record<string, { type?: string }>;
-}
+export type OutputSchema = OutputSchemaShape;
 
 export function validateOutputSchema(
   output: Record<string, unknown>,
-  schema: OutputSchema,
+  schema: OutputSchemaShape,
 ): string | null {
   let data = output;
 
@@ -535,11 +532,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     instanceId: string,
     stepId: string,
   ): Promise<string | null> {
-    const INTERNAL_NAMES = new Set([
-      'opencode.json', 'auth.json', 'prompt.txt', 'result.json',
-      'git-result.json', 'mock-result.json',
-      'presentation.html', 'presentation.md',
-    ]);
+    const INTERNAL_NAMES = new Set([...INTERNAL_OUTPUT_FILE_NAMES, ...PRESENTATION_FILE_NAMES]);
     const DELIVERABLE_EXTS = new Set(['.html', '.htm', '.pdf', '.csv', '.xlsx', '.md']);
 
     let entries: string[];
@@ -570,7 +563,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     // Also handle presentation.{md,html} — already read into
     // spawnResult.presentation but a persisted path is needed for the
     // Download Report button. Markdown wins on tie.
-    for (const filename of ['presentation.md', 'presentation.html']) {
+    for (const filename of PRESENTATION_FILE_NAMES) {
       const presentationPath = join(outputDir, filename);
       try {
         const destDir = join(tmpdir(), 'mediforce-deliverables', instanceId);
@@ -630,11 +623,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         );
       }
 
-      if (!stepAgent.image && !isLocalExecutionAllowed()) {
+      const agentInBuildMode = !!(stepAgent.dockerfile || stepAgent.repo);
+      if (!stepAgent.image && !agentInBuildMode && !isLocalExecutionAllowed()) {
         throw new Error(
           `No Docker image configured in step.agent for step '${context.stepId}'. ` +
           'Local agent execution requires ALLOW_LOCAL_AGENTS=true. ' +
-          'Either set step.agent.image for Docker execution, or enable local execution.',
+          'Either set step.agent.image for Docker execution, set step.agent.dockerfile + ' +
+          'repo + commit for build mode, or enable local execution.',
         );
       }
 
@@ -645,9 +640,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         prompt: stepAgent.prompt,
         skillsDir: stepAgent.skillsDir,
         timeoutMs: stepAgent.timeoutMs ?? (stepAgent.timeoutMinutes ? stepAgent.timeoutMinutes * 60_000 : undefined),
-        command: stepAgent.command,
-        inlineScript: stepAgent.inlineScript,
-        runtime: stepAgent.runtime,
         image: stepAgent.image,
         repo: stepAgent.repo,
         commit: stepAgent.commit,
@@ -719,6 +711,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         this.context.workflowDefinition.env,
         this.context.step.env,
         this.context.workflowSecrets,
+        this.metadata.requiredEnv,
+        this.context.namespaceSecretKeys,
       );
     } else {
       const stepConfig = this.context.config.stepConfigs.find(
@@ -755,6 +749,16 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         });
       }
 
+      const imageBuild = resolveImageBuild(
+        this.agentConfig.image,
+        this.agentConfig,
+        this.context,
+        this.resolvedEnv.vars,
+      );
+      if (imageBuild?.image) {
+        this.agentConfig.image = imageBuild.image;
+      }
+
       const isLocalMode = !this.agentConfig.image;
       agentLog('run.mode', `execution mode: ${isLocalMode ? 'local' : 'docker'}`, { stepId });
 
@@ -769,14 +773,14 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       await this.resolveRunWorkspace();
       const workingDirForPrompt = isLocalMode ? this.runWorkspaceHandle!.path : '/workspace';
 
-      // Fetch skills from workflow repo if configured
+      // Fetch skills from the workflow's external skills repo if configured.
       if (this.agentConfig.skillsDir && isWorkflowAgentContext(this.context)) {
-        const wfRepo = this.context.workflowDefinition.repo;
+        const wfRepo = this.context.workflowDefinition.externalSkillsRepo;
         if (wfRepo?.url && wfRepo?.commit) {
           const repoToken = resolveRepoToken(this.agentConfig, this.context, this.resolvedEnv.vars);
           await this.fetchSkillsFromRepo(
             this.agentConfig.skillsDir,
-            normalizeRepoUrls(wfRepo.url).gitUrl,
+            wfRepo.url,
             wfRepo.commit,
             repoToken,
           );
@@ -869,11 +873,16 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         }
       }
 
-      // Log injected env vars for audit
+      // Log injected env vars with source info for audit
       if (spawnResult.injectedEnvVars.length > 0) {
+        const sources = this.resolvedEnv.sources;
+        const labeled = spawnResult.injectedEnvVars.map((key) => {
+          const src = sources[key];
+          return src && src !== 'literal' ? `${key} (${src})` : key;
+        });
         await emit({
           type: 'status',
-          payload: `injected env vars: ${spawnResult.injectedEnvVars.join(', ')}`,
+          payload: `injected env vars: ${labeled.join(', ')}`,
           timestamp: new Date().toISOString(),
         });
       } else {
@@ -901,24 +910,35 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         ? parsedResult.confidence_rationale
         : undefined;
 
-      let tokenUsage: { inputTokens: number; outputTokens: number } | undefined;
+      let tokenUsage: { inputTokens: number; outputTokens: number; cachedInputTokens?: number; peakInputTokens?: number } | undefined;
 
       // First: check if agent reported tokenUsage in its result
       if (parsedResult.tokenUsage !== null
         && typeof parsedResult.tokenUsage === 'object'
         && typeof (parsedResult.tokenUsage as Record<string, unknown>).inputTokens === 'number'
         && typeof (parsedResult.tokenUsage as Record<string, unknown>).outputTokens === 'number') {
-        tokenUsage = parsedResult.tokenUsage as { inputTokens: number; outputTokens: number };
+        tokenUsage = parsedResult.tokenUsage as { inputTokens: number; outputTokens: number; cachedInputTokens?: number; peakInputTokens?: number };
       }
 
       // Second: check stream event for CLI-reported usage (e.g. Claude Code stream-json result event)
       // parseAgentOutput() returns a single JSON object for the final result event.
+      // Cache-creation tokens are billed at (roughly) the input rate, so they fold into
+      // inputTokens; cache-read tokens are billed at the cheaper cacheRead rate, so they are
+      // tracked separately. Dropping either — as the previous version did — under-reports cost.
       if (!tokenUsage) {
         try {
           const rawEvent = JSON.parse(spawnResult.cliOutput) as Record<string, unknown>;
           const usage = rawEvent.usage as Record<string, number> | undefined;
           if (usage && typeof usage.input_tokens === 'number' && typeof usage.output_tokens === 'number') {
-            tokenUsage = { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens };
+            const cacheCreationTokens = typeof usage.cache_creation_input_tokens === 'number' ? usage.cache_creation_input_tokens : 0;
+            const cacheReadTokens = typeof usage.cache_read_input_tokens === 'number' ? usage.cache_read_input_tokens : 0;
+            const peakInputTokens = typeof usage.peak_input_tokens === 'number' ? usage.peak_input_tokens : 0;
+            tokenUsage = {
+              inputTokens: usage.input_tokens + cacheCreationTokens,
+              outputTokens: usage.output_tokens,
+              ...(cacheReadTokens > 0 ? { cachedInputTokens: cacheReadTokens } : {}),
+              ...(peakInputTokens > 0 ? { peakInputTokens } : {}),
+            };
           }
         } catch {
           agentLog('cost.tokenExtraction', 'could not extract token usage from CLI output', {
@@ -1422,16 +1442,23 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     prompt: string,
     options?: SpawnCliOptions,
   ): Promise<SpawnDockerResult> {
-    const image = this.agentConfig.image;
-
-    if (!image) {
+    const inBuildMode = !!(this.agentConfig.dockerfile || this.agentConfig.repo);
+    if (!this.agentConfig.image && !inBuildMode) {
       throw new Error(`agentConfig.image is required for Docker container execution`);
     }
     if (!this.runWorkspaceHandle) {
       throw new Error('runWorkspaceHandle is not set — resolveRunWorkspace() must run before spawnDockerContainer()');
     }
 
-    const imageBuild = resolveImageBuild(image, this.agentConfig, this.context, this.resolvedEnv.vars);
+    const imageBuild = resolveImageBuild(this.agentConfig.image, this.agentConfig, this.context, this.resolvedEnv.vars);
+    const image = imageBuild?.image ?? this.agentConfig.image;
+    if (!image) {
+      throw new Error(
+        `No Docker image could be resolved for step '${this.context.stepId}'. ` +
+        'In build mode set dockerfile + repo + commit on the step, or provide ' +
+        'externalSkillsRepo (with commit) on the workflow definition.',
+      );
+    }
 
     // Merge config-driven env vars with plugin-internal env vars
     const internalVars = this.getInternalEnvVars();

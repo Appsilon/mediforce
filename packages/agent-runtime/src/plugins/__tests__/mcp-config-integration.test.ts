@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { AgentContext, WorkflowAgentContext } from '../../interfaces/agent-plugin';
+import type { AgentContext, WorkflowAgentContext } from '../../interfaces/step-executor-plugin';
 import type { ProcessConfig, WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
 

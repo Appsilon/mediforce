@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  AgentEventSchema,
   AuditEventSchema,
   InstanceStatusSchema,
   ProcessInstanceSchema,
@@ -62,6 +63,28 @@ export const ListAuditEventsOutputSchema = z.object({
 export type ListAuditEventsInput = z.infer<typeof ListAuditEventsInputSchema>;
 export type ListAuditEventsOutput = z.infer<typeof ListAuditEventsOutputSchema>;
 
+// Per-instance agent-event feed. Mirrors the audit shape: `{ events }`,
+// 404 on missing or out-of-workspace parent. Optional `stepId` narrows to a
+// single step; absent returns the entire instance's event log. Ordering is
+// `sequence ASC` (Firestore timestamps alone aren't reliable for ordering —
+// see `AgentEventSchema` doc on the `sequence` field).
+//
+// `afterSequence` is the incremental-poll cursor: when set, only events with
+// `sequence > afterSequence` are returned. Absent → full log. Lets the live
+// poller fetch deltas instead of re-reading the whole subcollection each tick.
+export const ListAgentEventsInputSchema = z.object({
+  instanceId: z.string().min(1),
+  stepId: z.string().min(1).optional(),
+  afterSequence: z.number().int().optional(),
+});
+
+export const ListAgentEventsOutputSchema = z.object({
+  events: z.array(AgentEventSchema),
+});
+
+export type ListAgentEventsInput = z.infer<typeof ListAgentEventsInputSchema>;
+export type ListAgentEventsOutput = z.infer<typeof ListAgentEventsOutputSchema>;
+
 // Derived view: walks the workflow definition in order and joins each step's
 // latest execution + the slice of `instance.variables` keyed by stepId.
 // Human steps don't produce executions, so their input/output is
@@ -77,7 +100,7 @@ export const StepEntrySchema = z.object({
   status: StepEntryStatusSchema,
   input: z.record(z.string(), z.unknown()).nullable(),
   output: z.record(z.string(), z.unknown()).nullable(),
-  execution: StepExecutionSchema.nullable(),
+  executions: z.array(StepExecutionSchema),
 });
 
 export const GetProcessStepsInputSchema = z.object({
@@ -89,6 +112,7 @@ export const GetProcessStepsOutputSchema = z.object({
   definitionName: z.string(),
   definitionVersion: z.string(),
   instanceStatus: InstanceStatusSchema,
+  instanceError: z.string().nullish(),
   currentStepId: z.string().nullable(),
   steps: z.array(StepEntrySchema),
 });

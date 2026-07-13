@@ -1,13 +1,16 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
 import { ApiError, mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
+import { stopRetryOn4xx } from '@/lib/retry';
 
 export interface UseNamespaceResult {
   namespace: Namespace | null;
   members: NamespaceMember[];
+  personalHandles: Map<string, string>;
   loading: boolean;
   error: Error | null;
 }
@@ -24,18 +27,22 @@ export function useNamespace(handle: string | undefined | null): UseNamespaceRes
     queryFn: () => mediforce.namespaces.get({ handle: handle as string }),
     enabled,
     refetchOnWindowFocus: true,
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-      return failureCount < 2;
-    },
+    retry: stopRetryOn4xx,
   });
 
   const err = enabled ? (query.error as Error | null) ?? null : null;
   const notFound = err instanceof ApiError && err.status === 404;
 
+  const rawHandles = query.data?.personalHandles;
+  const personalHandles = useMemo(() => {
+    if (rawHandles === undefined || rawHandles === null) return new Map<string, string>();
+    return new Map(Object.entries(rawHandles));
+  }, [rawHandles]);
+
   return {
     namespace: enabled ? query.data?.namespace ?? null : null,
     members: enabled ? query.data?.members ?? [] : [],
+    personalHandles,
     loading: query.isLoading && enabled,
     error: notFound ? null : err,
   };

@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import {
   ToolCatalogEntrySchema,
+  parseRow,
   type ToolCatalogEntry,
   type ToolCatalogRepository,
 } from '@mediforce/platform-core';
@@ -34,7 +35,7 @@ export class PostgresToolCatalogRepository implements ToolCatalogRepository {
       )
       .limit(1);
     const row = rows[0];
-    return row ? ToolCatalogEntrySchema.parse(toEntry(row)) : null;
+    return row ? toEntry(row) : null;
   }
 
   async list(namespace: string): Promise<ToolCatalogEntry[]> {
@@ -42,7 +43,7 @@ export class PostgresToolCatalogRepository implements ToolCatalogRepository {
       .select()
       .from(toolCatalogEntries)
       .where(eq(toolCatalogEntries.workspace, namespace));
-    return rows.map((r) => ToolCatalogEntrySchema.parse(toEntry(r)));
+    return rows.map((r) => toEntry(r));
   }
 
   async upsert(namespace: string, entry: ToolCatalogEntry): Promise<ToolCatalogEntry> {
@@ -85,12 +86,11 @@ export class PostgresToolCatalogRepository implements ToolCatalogRepository {
 }
 
 function toEntry(row: typeof toolCatalogEntries.$inferSelect): ToolCatalogEntry {
-  const out: Record<string, unknown> = {
+  return parseRow(ToolCatalogEntrySchema, {
     id: row.id,
     command: row.command,
-  };
-  if (row.args) out.args = row.args;
-  if (row.env) out.env = row.env;
-  if (row.description !== null && row.description !== undefined) out.description = row.description;
-  return out as ToolCatalogEntry;
+    args: row.args ?? undefined,
+    env: row.env ?? undefined,
+    description: row.description ?? undefined,
+  });
 }

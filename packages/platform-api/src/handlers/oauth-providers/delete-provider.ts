@@ -29,6 +29,7 @@ export async function deleteOAuthProvider(
       basis: 'OAuth provider deleted via API',
       entityType: 'oauthProvider',
       entityId: input.id,
+      namespace: input.namespace,
     });
   }
 

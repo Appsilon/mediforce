@@ -11,20 +11,29 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import {
+  InMemoryAgentEventRepository,
+  InMemoryCoworkSessionRepository,
   InMemoryHumanTaskRepository,
   InMemoryProcessInstanceRepository,
+  InMemoryProcessRepository,
   InMemoryAuditRepository,
   InMemoryUserProfileRepository,
+  buildAgentEvent,
+  buildCoworkSession,
   buildHumanTask,
   buildProcessInstance,
+  buildWorkflowDefinition,
 } from '@mediforce/platform-core/testing';
 import {
+  listAgentEvents,
+  listCoworkSessions,
   listTasks,
   claimTask,
   cancelRun,
   createNamespace,
   listRuns,
   listAuditEvents,
+  listWorkflowVersions,
   updateNamespace,
   leaveNamespace,
   deleteNamespace,
@@ -33,12 +42,15 @@ import {
   clearMustChangePassword,
 } from '@mediforce/platform-api/handlers';
 import {
+  ListCoworkSessionsInputSchema,
   ListTasksInputSchema,
   ClaimTaskInputSchema,
   CancelRunInputSchema,
   CreateNamespaceInputSchema,
   ListRunsInputSchema,
   ListAuditEventsInputSchema,
+  ListAgentEventsInputSchema,
+  ListWorkflowVersionsInputSchema,
   UpdateNamespaceInputSchema,
   LeaveNamespaceInputSchema,
   DeleteNamespaceInputSchema,
@@ -52,6 +64,7 @@ import type {
   DeleteNamespaceInput,
   RemoveNamespaceMemberInput,
   UpdateNamespaceMemberRoleInput,
+  ListWorkflowVersionsInput,
 } from '@mediforce/platform-api/contract';
 import type { CallerIdentity, NamespaceRole } from '@mediforce/platform-api/auth';
 import { Mediforce, ApiError } from '@mediforce/platform-api/client';
@@ -749,6 +762,7 @@ describe('Mediforce client ↔ route-adapter ↔ updateNamespaceMemberRole (in-p
 describe('Mediforce client ↔ route-adapter ↔ clearMustChangePassword (in-process)', () => {
   let userProfileRepo: InMemoryUserProfileRepository;
   let auditRepo: InMemoryAuditRepository;
+  let namespaceRepo: InMemoryNamespaceRepo;
   let mediforce: Mediforce;
 
   const userCaller: CallerIdentity = {
@@ -763,6 +777,20 @@ describe('Mediforce client ↔ route-adapter ↔ clearMustChangePassword (in-pro
     userProfileRepo = new InMemoryUserProfileRepository();
     await userProfileRepo.setMustChangePassword('uid-forced', true);
     auditRepo = new InMemoryAuditRepository();
+    namespaceRepo = new InMemoryNamespaceRepo();
+    // The forced-password-change audit event is attributed to the user's
+    // personal namespace (FK-valid `audit_events.workspace`).
+    const now = new Date().toISOString();
+    await namespaceRepo.createNamespaceWithOwner({
+      namespace: {
+        handle: 'uid-forced',
+        type: 'personal',
+        displayName: 'Forced User',
+        linkedUserId: 'uid-forced',
+        createdAt: now,
+      },
+      ownerMember: { uid: 'uid-forced', role: 'owner', joinedAt: now },
+    });
 
     const route = createRouteAdapter(
       ClearMustChangePasswordInputSchema,
@@ -770,7 +798,8 @@ describe('Mediforce client ↔ route-adapter ↔ clearMustChangePassword (in-pro
       clearMustChangePassword,
       {
         resolveCaller: async () => userCaller,
-        buildScope: (caller) => createTestScope({ caller, userProfileRepo, auditRepo }),
+        buildScope: (caller) =>
+          createTestScope({ caller, userProfileRepo, auditRepo, namespaceRepo }),
       },
     );
 
@@ -1043,5 +1072,303 @@ describe('Mediforce client ↔ route-adapter ↔ listTasks caller-scope (in-proc
   it('combines caller-scope with status[] for the "my actionable queue" view', async () => {
     const result = await mediforce.tasks.list({ status: ['claimed'] });
     expect(result.tasks.map((t) => t.id)).toEqual(['t-alpha-2']);
+  });
+});
+
+// Cowork list scenario — full client → route adapter → handler → in-memory
+// repo loopback. Mirrors the tasks caller-scope block above.
+describe('Mediforce client ↔ route-adapter ↔ listCoworkSessions (in-process)', () => {
+  let instanceRepo: InMemoryProcessInstanceRepository;
+  let coworkSessionRepo: InMemoryCoworkSessionRepository;
+  let mediforce: Mediforce;
+  let route: (req: NextRequest) => Promise<Response>;
+  const callerScope: CallerIdentity = {
+    kind: 'user',
+    uid: 'u-cowork',
+    namespaces: new Set(['team-alpha']),
+    namespaceRoles: new Map([['team-alpha', 'member']]),
+    isSystemActor: false,
+  };
+
+  beforeEach(async () => {
+    instanceRepo = new InMemoryProcessInstanceRepository();
+    coworkSessionRepo = new InMemoryCoworkSessionRepository(instanceRepo);
+    await instanceRepo.create(
+      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }),
+    );
+    await instanceRepo.create(
+      buildProcessInstance({ id: 'inst-b', namespace: 'team-beta' }),
+    );
+    await coworkSessionRepo.create(
+      buildCoworkSession({
+        id: 'sess-mine-analyst',
+        processInstanceId: 'inst-a',
+        assignedRole: 'analyst',
+        status: 'active',
+      }),
+    );
+    await coworkSessionRepo.create(
+      buildCoworkSession({
+        id: 'sess-mine-reviewer',
+        processInstanceId: 'inst-a',
+        assignedRole: 'reviewer',
+        status: 'finalized',
+      }),
+    );
+    await coworkSessionRepo.create(
+      buildCoworkSession({
+        id: 'sess-foreign',
+        processInstanceId: 'inst-b',
+        assignedRole: 'analyst',
+        status: 'active',
+      }),
+    );
+
+    route = createRouteAdapter(
+      ListCoworkSessionsInputSchema,
+      (req) => {
+        const p = req.nextUrl.searchParams;
+        const statuses = p.getAll('status');
+        return {
+          role: p.get('role') ?? undefined,
+          status: statuses.length > 0 ? statuses : undefined,
+        };
+      },
+      listCoworkSessions,
+      {
+        resolveCaller: async () => callerScope,
+        buildScope: (caller) =>
+          createTestScope({ caller, coworkSessionRepo, instanceRepo }),
+      },
+    );
+
+    mediforce = new Mediforce({ fetch: loopbackFetch(route) });
+  });
+
+  it('returns every session in the caller’s namespaces when no axis is set', async () => {
+    const result = await mediforce.cowork.list({});
+    const ids = result.sessions.map((s) => s.id).sort();
+    expect(ids).toEqual(['sess-mine-analyst', 'sess-mine-reviewer']);
+  });
+
+  it('combines role + status[] filters across the round trip', async () => {
+    const result = await mediforce.cowork.list({
+      role: 'analyst',
+      status: ['active'],
+    });
+    expect(result.sessions.map((s) => s.id)).toEqual(['sess-mine-analyst']);
+  });
+});
+
+// Loopback for `workflows.versions(name, namespace)` — confirms the
+// metadata-only summary flows through the real adapter + handler + repo and
+// that the response carries no full step / trigger payload (the whole point
+// of the endpoint).
+describe('Mediforce client ↔ route-adapter ↔ listWorkflowVersions (in-process)', () => {
+  let processRepo: InMemoryProcessRepository;
+  let mediforce: Mediforce;
+  const memberCaller: CallerIdentity = {
+    kind: 'user',
+    uid: 'u-versions',
+    namespaces: new Set(['team-alpha']),
+    namespaceRoles: new Map([['team-alpha', 'member']]),
+    isSystemActor: false,
+  };
+
+  beforeEach(async () => {
+    processRepo = new InMemoryProcessRepository();
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'flow-a',
+        namespace: 'team-alpha',
+        version: 1,
+        title: 'Flow A',
+      }),
+    );
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'flow-a',
+        namespace: 'team-alpha',
+        version: 2,
+        archived: true,
+      }),
+    );
+    await processRepo.setDefaultWorkflowVersion('team-alpha', 'flow-a', 1);
+
+    const route = createRouteAdapter<
+      typeof ListWorkflowVersionsInputSchema,
+      ListWorkflowVersionsInput,
+      unknown,
+      { params: Promise<{ name: string }> }
+    >(
+      ListWorkflowVersionsInputSchema,
+      async (req, ctx) => {
+        const { name } = await ctx.params;
+        const namespace = req.nextUrl.searchParams.get('namespace');
+        return { name, namespace: namespace ?? undefined };
+      },
+      listWorkflowVersions,
+      {
+        resolveCaller: async () => memberCaller,
+        buildScope: (caller) => createTestScope({ caller, processRepo }),
+      },
+    );
+
+    mediforce = new Mediforce({
+      fetch: loopbackFetchWithParams(route, (url) => {
+        // path: /api/workflow-definitions/<name>/versions
+        const segments = url.pathname.split('/');
+        return { name: segments[segments.length - 2] ?? '' };
+      }),
+    });
+  });
+
+  it('round-trips metadata-only summaries + the pinned default version', async () => {
+    const result = await mediforce.workflows.versions({
+      name: 'flow-a',
+      namespace: 'team-alpha',
+    });
+
+    expect(result.defaultVersion).toBe(1);
+    expect(result.versions.map((v) => v.version).sort()).toEqual([1, 2]);
+
+    // Metadata-only: no full definition body should leak to the wire.
+    for (const version of result.versions) {
+      expect(version).not.toHaveProperty('steps');
+      expect(version).not.toHaveProperty('triggers');
+      expect(version).not.toHaveProperty('transitions');
+    }
+
+    const v1 = result.versions.find((v) => v.version === 1);
+    const v2 = result.versions.find((v) => v.version === 2);
+    expect(v1?.title).toBe('Flow A');
+    expect(v1?.archived).toBe(false);
+    expect(v2?.archived).toBe(true);
+    expect(v1?.stepCount).toBe(3);
+    expect(v1?.triggerCount).toBe(1);
+  });
+
+  it('404s when the workflow does not exist in the caller’s namespace', async () => {
+    const err = await mediforce.workflows
+      .versions({ name: 'missing', namespace: 'team-alpha' })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(404);
+  });
+});
+
+// Agent-event feed integration scenario. Proves the contract → handler →
+// route → client loop for `processes.agentEvents`, including the optional
+// `stepId` filter that the live UI hook will use to swap out the
+// Firestore subcollection `onSnapshot` (`use-process-instances.ts`).
+describe('Mediforce client ↔ route-adapter ↔ agentEvents (in-process)', () => {
+  let instanceRepo: InMemoryProcessInstanceRepository;
+  let agentEventRepo: InMemoryAgentEventRepository;
+  let mediforce: Mediforce;
+  let route: (
+    req: NextRequest,
+    ctx: { params: Promise<{ instanceId: string }> },
+  ) => Promise<Response>;
+  const userCaller: CallerIdentity = {
+    kind: 'user',
+    uid: 'u-agent-events-test',
+    namespaces: new Set(['team-alpha']),
+    namespaceRoles: new Map([['team-alpha', 'member']]),
+    isSystemActor: false,
+  };
+
+  beforeEach(async () => {
+    instanceRepo = new InMemoryProcessInstanceRepository();
+    agentEventRepo = new InMemoryAgentEventRepository(instanceRepo);
+    await instanceRepo.create(
+      buildProcessInstance({ id: 'run-a', namespace: 'team-alpha' }),
+    );
+    // Seed two steps, out of sequence to prove the sort.
+    await agentEventRepo.append(
+      buildAgentEvent({
+        id: 'e-1-1',
+        processInstanceId: 'run-a',
+        stepId: 'step-1',
+        sequence: 1,
+        type: 'status',
+      }),
+    );
+    await agentEventRepo.append(
+      buildAgentEvent({
+        id: 'e-1-0',
+        processInstanceId: 'run-a',
+        stepId: 'step-1',
+        sequence: 0,
+        type: 'start',
+      }),
+    );
+    await agentEventRepo.append(
+      buildAgentEvent({
+        id: 'e-2-0',
+        processInstanceId: 'run-a',
+        stepId: 'step-2',
+        sequence: 0,
+        type: 'start',
+      }),
+    );
+
+    route = createRouteAdapter<
+      typeof ListAgentEventsInputSchema,
+      { instanceId: string; stepId?: string },
+      { events: unknown },
+      { params: Promise<{ instanceId: string }> }
+    >(
+      ListAgentEventsInputSchema,
+      async (req, ctx) => {
+        const stepId = new URL(req.url).searchParams.get('stepId') ?? undefined;
+        return { instanceId: (await ctx.params).instanceId, stepId };
+      },
+      listAgentEvents,
+      {
+        resolveCaller: async () => userCaller,
+        buildScope: (caller) =>
+          createTestScope({ caller, instanceRepo, agentEventRepo }),
+      },
+    );
+
+    mediforce = new Mediforce({
+      fetch: async (input, init) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        const instanceId =
+          url.match(/\/api\/processes\/([^/?]+)\/agent-events/)?.[1] ?? '';
+        const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
+        return route(new NextRequest(absolute, init), {
+          params: Promise.resolve({ instanceId: decodeURIComponent(instanceId) }),
+        });
+      },
+    });
+  });
+
+  it('round-trips the full instance feed', async () => {
+    const result = await mediforce.processes.agentEvents({ instanceId: 'run-a' });
+    expect(result.events).toHaveLength(3);
+    const ids = result.events.map((e) => e.id).sort();
+    expect(ids).toEqual(['e-1-0', 'e-1-1', 'e-2-0']);
+  });
+
+  it('narrows to one step via the `stepId` query param', async () => {
+    const result = await mediforce.processes.agentEvents({
+      instanceId: 'run-a',
+      stepId: 'step-1',
+    });
+    expect(result.events.map((e) => e.sequence)).toEqual([0, 1]);
+    expect(result.events.map((e) => e.id)).toEqual(['e-1-0', 'e-1-1']);
+  });
+
+  it('returns 404 for a run in a workspace the caller does not belong to', async () => {
+    await instanceRepo.create(
+      buildProcessInstance({ id: 'run-foreign', namespace: 'team-beta' }),
+    );
+    const err = await mediforce.processes
+      .agentEvents({ instanceId: 'run-foreign' })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(404);
   });
 });

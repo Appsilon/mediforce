@@ -8,7 +8,8 @@ import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { mediforce, ApiError } from '@/lib/mediforce';
-import { parseStepErrors, validateSteps, mergeVerdictTransitions } from '@/lib/workflow-save-utils';
+import { parseStepErrors, validateSteps, mergeVerdictTransitions, toastRegistrationWarnings } from '@/lib/workflow-save-utils';
+import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
@@ -62,6 +63,7 @@ function toWorkflowId(name: string): string {
 export default function NewWorkflowPage() {
   const { handle } = useParams<{ handle: string }>();
   const router = useRouter();
+  const { toast } = useToast();
   const { firebaseUser } = useAuth();
   const { namespaces, loading: namespacesLoading } = useAllUserNamespaces(firebaseUser?.uid);
 
@@ -131,6 +133,7 @@ export default function NewWorkflowPage() {
         { namespace: effectiveNamespace },
       );
       setSaveState({ status: 'saved', name: result.name });
+      toastRegistrationWarnings(result.warnings, toast);
       redirectTimerRef.current = setTimeout(() => {
         router.push(`/${handle}/workflows/${encodeURIComponent(result.name)}/definitions/${result.version}`);
       }, 500);

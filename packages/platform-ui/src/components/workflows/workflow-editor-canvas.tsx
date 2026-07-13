@@ -13,6 +13,7 @@ import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
 import { WorkflowStepSchema, TransitionSchema } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
+import type { NewStepPayload } from '@/lib/control-mode';
 import { StepEditor } from './workflow-editor/step-editor';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
 import { computeMoveEligibility, ensureTerminalConnected } from './workflow-editor-utils';
@@ -170,7 +171,7 @@ export function WorkflowEditorCanvas({
     if (!dockerAvailable) return undefined;
     const map = new Map<string, string>();
     for (const step of editedSteps) {
-      const image = step.agent?.image;
+      const image = step.agent?.image ?? step.script?.image;
       if (typeof image === 'string' && image.length > 0 && !isImageAvailable(dockerImages, image)) {
         map.set(step.id, `Image '${image}' not available on platform`);
       }
@@ -300,31 +301,34 @@ export function WorkflowEditorCanvas({
     }
   }, []);
 
-  const addStep = useCallback((type: WorkflowStep['type'], executor: WorkflowStep['executor'], insertAfterId: string | null = null) => {
+  const stepCounterRef = useRef(0);
+
+  const addStep = useCallback((payload: NewStepPayload, insertAfterId: string | null = null, insertBeforeId: string | null = null) => {
     const terminalStep = editedSteps.find((s) => s.type === 'terminal');
 
-    // Only one terminal allowed
-    if (type === 'terminal' && terminalStep) return;
-
     saveSnapshot();
-    const stepNum = editedSteps.length + 1;
+    stepCounterRef.current += 1;
+    const stepNum = stepCounterRef.current;
     const newId = `new-step-${stepNum}`;
     const newStep: WorkflowStep = {
       id: newId,
       name: `New Step ${stepNum}`,
-      type,
-      executor,
-      ...(executor === 'agent' ? { plugin: 'opencode-agent', autonomyLevel: 'L2' } : {}),
-      ...(executor === 'script' ? { plugin: 'script-container' } : {}),
-      ...(executor === 'cowork' ? { cowork: { agent: 'chat' as const } } : {}),
+      type: payload.type,
+      executor: payload.executor as WorkflowStep['executor'],
+      ...(payload.autonomyLevel ? { autonomyLevel: payload.autonomyLevel as WorkflowStep['autonomyLevel'] } : {}),
+      ...(payload.agentId ? { agentId: payload.agentId } : {}),
+      ...(payload.executor === 'agent' && !payload.autonomyLevel ? { plugin: 'opencode-agent', autonomyLevel: 'L2' } : {}),
+      ...(payload.executor === 'agent' && payload.autonomyLevel ? { plugin: 'opencode-agent' } : {}),
+      ...(payload.executor === 'script' ? { plugin: 'script-container' } : {}),
+      ...(payload.executor === 'cowork' ? { cowork: payload.cowork ?? { agent: 'chat' as const } } : {}),
     };
 
     // When inserting via an edge button, insertAfterId is set explicitly.
     // Otherwise fall back to the currently selected step.
     const resolvedInsertAfterId = insertAfterId ?? selectedStepId;
 
-    if (!terminalStep || type === 'terminal') {
-      // No terminal yet (or we're adding the terminal itself): append at end
+    if (!terminalStep) {
+      // No terminal yet: append at end
       const lastId = editedSteps[editedSteps.length - 1]?.id;
       setEditedSteps((prev) => [...prev, newStep]);
       setEditedTransitions((prev) => lastId ? [...prev, { from: lastId, to: newId }] : prev);
@@ -337,7 +341,13 @@ export function WorkflowEditorCanvas({
         return next;
       });
       setEditedTransitions((prev) => {
-        // Edges from resolvedInsertAfterId → their targets now go through newStep
+        if (insertBeforeId) {
+          // Edge-button path: only splice into the one clicked edge A→B.
+          // Other outgoing transitions from A (e.g. back-edges) stay on A.
+          const others = prev.filter((t) => !(t.from === resolvedInsertAfterId && t.to === insertBeforeId));
+          return [...others, { from: resolvedInsertAfterId, to: newId }, { from: newId, to: insertBeforeId }];
+        }
+        // Selected-step fallback: rewire all outgoing transitions through newStep.
         const outgoing = prev.filter((t) => t.from === resolvedInsertAfterId);
         const others = prev.filter((t) => t.from !== resolvedInsertAfterId);
         const rewired = outgoing.map((t) => ({ from: newId, to: t.to }));
@@ -575,7 +585,7 @@ export function WorkflowEditorCanvas({
             onNodeDelete={removeStep}
             onNodeMoveUp={(stepId) => moveStep(stepId, 'up')}
             onNodeMoveDown={(stepId) => moveStep(stepId, 'down')}
-            onEdgeAdd={(fromStepId, type, executor) => addStep(type, executor, fromStepId)}
+            onEdgeAdd={(fromStepId, payload, toStepId) => addStep(payload, fromStepId, toStepId)}
             onPaneClick={() => { setSelectedStepId(null); setRightPanelView('yaml'); }}
             selectedStepId={selectedStepId}
             errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
@@ -605,6 +615,7 @@ export function WorkflowEditorCanvas({
                   onChange={(patch) => updateStep(selectedStep.id, patch)}
                   errors={stepErrors?.[selectedStep.id]}
                   imageWarning={warningStepIds?.get(selectedStep.id)}
+                  dockerImages={dockerImages}
                 />
               </div>
             </>

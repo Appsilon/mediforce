@@ -10,7 +10,7 @@ const STATUS_STYLES: Record<WorkflowDisplayStatus, string> = {
   completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
 };
 
-const STATUS_LABELS: Record<WorkflowDisplayStatus, string> = {
+export const STATUS_LABELS: Record<WorkflowDisplayStatus, string> = {
   in_progress: 'In Progress',
   waiting_for_human: 'Waiting for human',
   error: 'Error',
@@ -22,15 +22,24 @@ export function ProcessStatusBadge({
   status,
   pauseReason,
   error,
+  dryRun,
 }: {
   status: InstanceStatus;
   pauseReason?: string | null;
   error?: string | null;
+  dryRun?: boolean;
 }) {
   const { displayStatus } = getWorkflowStatus({ status, pauseReason, error });
   return (
-    <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', STATUS_STYLES[displayStatus])}>
-      {STATUS_LABELS[displayStatus]}
+    <span className="inline-flex items-center gap-1.5">
+      <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', STATUS_STYLES[displayStatus])}>
+        {STATUS_LABELS[displayStatus]}
+      </span>
+      {dryRun && (
+        <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300">
+          Dry Run
+        </span>
+      )}
     </span>
   );
 }

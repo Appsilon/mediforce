@@ -47,7 +47,7 @@ Steps do NOT chain via git. Each step has its own `repo` + `commit` — its own 
 
 Example: `generate-tlg-shells` might work on a TLG template repo at commit `abc123`. `generate-adam` works on an ADaM generation repo at commit `def456`. Different code, different purpose.
 
-**Data flows between steps via mounting, not via git.** The outputs of `generate-tlg-shells` (markdown files) are stored in the platform's data layer (Firebase Storage / KMS) and mounted into the `generate-adam` container at `/data` alongside the SDTM files. The git repo is strictly for the agent's working code within that step.
+**Data flows between steps via mounting, not via git.** The outputs of `generate-tlg-shells` (markdown files) are stored in the platform's data layer (the blob store on the `~/.mediforce` data volume) and mounted into the `generate-adam` container at `/data` alongside the SDTM files. The git repo is strictly for the agent's working code within that step.
 
 ```
 generate-tlg-shells                    generate-adam
@@ -70,7 +70,7 @@ generate-tlg-shells                    generate-adam
 
 ```
 1. Platform gathers input data for this step:
-   - User uploads (SDTM files from Firebase Storage)
+   - User uploads (SDTM files from the platform blob store)
    - Previous step outputs (TLG shells, metadata — from platform data layer)
    - Downloads all to a host temp directory
 2. Platform creates Docker container from `image`:
@@ -98,10 +98,10 @@ generate-tlg-shells                    generate-adam
 | Data | Location | Why |
 |------|----------|-----|
 | Code outputs (R scripts, specs, markdown) | Git repo | Reviewable, versioned, reproducible |
-| Input files (SDTM .xpt, PDFs) | Firebase Storage → mounted at `/data` | Large binaries don't belong in git |
-| Agent activity logs | Platform (Firestore) | Real-time observability |
-| Commit SHAs, branch names | Platform (Firestore, on step execution record) | Audit trail linking run to exact code |
-| Reviewer feedback (revise comments) | Platform (Firestore, via verdict form) | Fed to agent as step input on retry |
+| Input files (SDTM .xpt, PDFs) | Platform blob store → mounted at `/data` | Large binaries don't belong in git |
+| Agent activity logs | Platform (Postgres) | Real-time observability |
+| Commit SHAs, branch names | Platform (Postgres, on step execution record) | Audit trail linking run to exact code |
+| Reviewer feedback (revise comments) | Platform (Postgres, via verdict form) | Fed to agent as step input on retry |
 
 ### Branching Model
 
@@ -137,7 +137,7 @@ The architecture supports per-step images — if `generate-tlg` needs different 
 ### Input file mounting
 
 Agent steps that need uploaded files (e.g., SDTM datasets):
-1. Platform downloads files from Firebase Storage to a host temp directory
+1. Platform downloads files from the blob store to a host temp directory
 2. Directory is mounted into the container at `/data` (read-only)
 3. Agent reads from `/data`, writes code to the git repo
 4. Temp directory cleaned up after container exits
@@ -339,8 +339,8 @@ User                Platform              Docker              GitHub
 1. **Mock first**: Update `MockClaudeCodeAgentPlugin` to return git metadata. Update review panel to show GitHub links. UAT the full flow with fake data.
 2. **Entrypoint + image**: Build the base Docker image with Claude CLI + R + git. Write `entrypoint.sh`. Test locally with `docker run`.
 3. **Plugin swap**: Replace `spawn('claude')` with `spawn('docker', ['run', ...])` in `ClaudeCodeAgentPlugin`. Wire up git credential mounting and env vars.
-4. **Schema + recording**: Add git fields to `AgentConfig` and step execution records. Store commit SHA in Firestore.
-5. **Network isolation**: Add Docker network rules to restrict container access to essentials only (Anthropic API, GitHub, Firestore).
+4. **Schema + recording**: Add git fields to `AgentConfig` and step execution records. Store commit SHA in Postgres.
+5. **Network isolation**: Add Docker network rules to restrict container access to essentials only (Anthropic API, GitHub, the platform API).
 
 ## Git Auth in Containers
 

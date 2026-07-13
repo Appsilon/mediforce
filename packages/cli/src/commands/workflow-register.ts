@@ -27,12 +27,14 @@ async function warnMissingImages(
 ): Promise<void> {
   const images = new Set<string>();
   for (const step of body.steps) {
-    const agent = (step as { agent?: { image?: string; repo?: string; commit?: string } }).agent;
-    const image = agent?.image;
-    const hasBuildSource =
-      typeof agent?.repo === 'string' && agent.repo.length > 0
-      && typeof agent?.commit === 'string' && agent.commit.length > 0;
-    if (typeof image === 'string' && image.length > 0 && !hasBuildSource) images.add(image);
+    // Agent steps configure their container under `agent`; script steps under `script`.
+    for (const containerConfig of [step.agent, step.script]) {
+      const image = containerConfig?.image;
+      const hasBuildSource =
+        typeof containerConfig?.repo === 'string' && containerConfig.repo.length > 0
+        && typeof containerConfig?.commit === 'string' && containerConfig.commit.length > 0;
+      if (typeof image === 'string' && image.length > 0 && !hasBuildSource) images.add(image);
+    }
   }
   if (images.size === 0) return;
 
@@ -126,6 +128,7 @@ export const workflowRegisterCommand = defineCommand({
           `[dry-run] OK — ${body.name} (namespace: ${args.namespace}, ${String(body.steps.length)} steps, ${String(body.transitions.length)} transitions, ${String(body.triggers.length)} triggers)`,
         );
       }
+      await warnMissingImages(body, output, jsonMode);
       return 0;
     }
 
@@ -135,8 +138,16 @@ export const workflowRegisterCommand = defineCommand({
       printJson(output, result);
     } else {
       output.stdout(`Registered ${result.name} v${String(result.version)} (namespace: ${args.namespace})`);
+      if (result.warnings?.length) {
+        output.stderr(`\nWarning: ${String(result.warnings.length)} Docker image(s) not found on platform:`);
+        for (const w of result.warnings) output.stderr(`  - ${w.message}`);
+      }
     }
-    await warnMissingImages(body, output, jsonMode);
+    // Server-side warnings are authoritative (platform images); fall back to
+    // local `docker image inspect` only when the server didn't check (e.g. local-agent mode).
+    if (!result.warnings?.length) {
+      await warnMissingImages(body, output, jsonMode);
+    }
     return 0;
   },
 });

@@ -15,6 +15,7 @@ vi.mock('@/lib/platform-services', () => ({
     },
     auditRepo: { append: mockAuditAppend },
     namespaceRepo: {},
+    modelRegistryRepo: { list: vi.fn().mockResolvedValue([]) },
   }),
 }));
 
@@ -62,7 +63,7 @@ describe('POST /api/workflow-definitions', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    expect(json).toEqual({ success: true, name: 'wf-new', version: 1 });
+    expect(json).toMatchObject({ success: true, name: 'wf-new', version: 1 });
     expect(mockSaveWorkflowDefinition).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'wf-new', namespace: 'ns-1', version: 1 }),
     );

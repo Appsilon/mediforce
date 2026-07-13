@@ -49,6 +49,7 @@ async function seedFailedInstance(
     assignedRoles: [],
     deleted: false,
     archived: false,
+    dryRun: false,
   });
   const exec: StepExecution = {
     id: 'exec-1',

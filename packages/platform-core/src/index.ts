@@ -1,3 +1,9 @@
+// Cross-backend domain errors
+export {
+  WorkflowDefinitionVersionAlreadyExistsError,
+  WorkflowDefinitionVersionNotFoundError,
+} from './errors';
+
 // Schemas (Zod schema objects + inferred types)
 export {
   VerdictSchema,
@@ -21,12 +27,14 @@ export {
   StepOutputSchema,
   InstanceStatusSchema,
   ProcessInstanceSchema,
+  RunNameEntrySchema,
   StepExecutionStatusSchema,
   GateResultSchema,
   ReviewVerdictSchema,
   AgentOutputSnapshotSchema,
   StepExecutionSchema,
   AnnotationSchema,
+  StepOutputEnvelopeSchema,
   AgentOutputEnvelopeSchema,
   GitMetadataSchema,
   TokenUsageSchema,
@@ -40,12 +48,19 @@ export {
   NotificationTargetSchema,
   PluginRoleSchema,
   PluginCapabilityMetadataSchema,
+  ContainerSchema,
   WorkflowAgentConfigSchema,
+  ScriptStepConfigSchema,
+  DatabricksJobConfigSchema,
+  resolveStepTimeoutMinutes,
   WorkflowCoworkConfigSchema,
   WorkflowReviewConfigSchema,
   WorkflowWorkspaceSchema,
   WorkflowStepSchema,
   WorkflowVisibilitySchema,
+  WorkflowAuthorableSchema,
+  SERVER_MANAGED_WORKFLOW_FIELDS,
+  WorkflowSourceSchema,
   WorkflowDefinitionSchema,
   WorkflowDefinitionBaseSchema,
   WorkflowTemplateSchema,
@@ -65,6 +80,8 @@ export {
   validateTriggerInput,
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,
+  getWorkflowAuthorableJsonSchema,
+  resolveCoworkOutputSchema,
   ConversationTurnSchema,
   CoworkAgentSchema,
   CoworkVoiceConfigSchema,
@@ -123,12 +140,14 @@ export type {
   StepOutput,
   InstanceStatus,
   ProcessInstance,
+  RunNameEntry,
   StepExecutionStatus,
   GateResult,
   ReviewVerdict,
   AgentOutputSnapshot,
   StepExecution,
   Annotation,
+  StepOutputEnvelope,
   AgentOutputEnvelope,
   GitMetadata,
   TokenUsage,
@@ -146,12 +165,16 @@ export type {
   NotificationTarget,
   ProcessNotificationConfig,
   PluginCapabilityMetadata,
+  ContainerConfig,
   WorkflowAgentConfig,
+  ScriptStepConfig,
+  DatabricksJobConfig,
   WorkflowCoworkConfig,
   WorkflowReviewConfig,
   WorkflowWorkspace,
   WorkflowStep,
   WorkflowVisibility,
+  WorkflowSource,
   WorkflowDefinition,
   WorkflowTemplate,
   TriggerInputField,
@@ -170,6 +193,7 @@ export type {
   ToolTurn,
   CoworkSessionStatus,
   CoworkSession,
+  OutputSchemaShape,
   NamespaceType,
   Namespace,
   NamespaceMember,
@@ -193,10 +217,18 @@ export type {
   AssignmentItem,
   TableEditorRow,
   CompleteHumanTaskPayload,
+  TaskAttachment,
+  NewTaskAttachment,
+} from './schemas/index';
+export {
+  ATTACHMENT_MAX_BYTES,
+  TaskAttachmentSchema,
+  NewTaskAttachmentSchema,
 } from './schemas/index';
 
 // Interfaces (repository and service contracts)
 export type {
+  AgentEventRepository,
   AuditRepository,
   AuthService,
   AuthUser,
@@ -205,7 +237,10 @@ export type {
   WorkflowDefinitionGroup,
   ProcessInstanceRepository,
   ListInstancesOptions,
+  WorkflowRunSummaryResult,
   HumanTaskRepository,
+  TaskAttachmentRepository,
+  BlobStore,
   HandoffRepository,
   NotificationService,
   NotificationEvent,
@@ -227,6 +262,7 @@ export type {
   SendEmailParams,
   SendEmailResult,
   SendEmailFn,
+  EmailProviderInfo,
 } from './interfaces/index';
 
 export { encodeCursor, decodeCursor } from './cursors/cursor';
@@ -267,6 +303,7 @@ export type {
   UpdateRankingsInput,
 } from './schemas/model-registry';
 export type { ModelRegistryRepository } from './repositories/model-registry-repository';
+export type { PlatformSettingsRepository } from './repositories/platform-settings-repository';
 
 // OAuth — Step 5
 export {
@@ -302,6 +339,7 @@ export { formatZodErrors } from './parser/index';
 
 // Testing utilities (in-memory implementations for test doubles)
 export {
+  InMemoryAgentEventRepository,
   InMemoryAuditRepository,
   InMemoryProcessRepository,
   InMemoryAuthService,
@@ -313,15 +351,19 @@ export {
   InMemoryCronTriggerStateRepository,
   InMemoryOAuthProviderRepository,
   InMemoryAgentOAuthTokenRepository,
+  InMemoryAgentRunRepository,
+  InMemoryPlatformSettingsRepository,
   // Test factories
   buildProcessDefinition,
   buildProcessInstance,
   buildStepExecution,
   buildHumanTask,
   buildAgentRun,
+  buildAgentEvent,
   buildAuditEvent,
   buildProcessConfig,
   buildWorkflowDefinition,
+  buildStepOutputEnvelope,
   buildAgentOutputEnvelope,
   buildFileMetadata,
   buildCoworkSession,
@@ -361,3 +403,10 @@ export {
 export { createLineStreamReader } from './utils/line-stream';
 export type { LineStreamReader } from './utils/line-stream';
 export { calculateEstimatedCost } from './utils/cost';
+export { formatBytes } from './utils/format';
+export { compact, parseRow } from './utils/compact';
+export { normaliseModelId } from './utils/normalise-model-id';
+
+// Workflow examples — shared loader for MCP tool, tests, and build scripts.
+// Uses Node.js fs/path so NOT exported from this barrel (breaks browser bundles).
+// Import directly: import { loadWorkflowExamples } from '@mediforce/platform-core/workflow-examples'

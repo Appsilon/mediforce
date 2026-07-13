@@ -128,6 +128,8 @@ describe('Cowork lifecycle: route → simulate session → finalize → complete
       outputSchema: coworkDesignerDef.steps[1].cowork!.outputSchema!,
       voiceConfig: null,
       artifact: null,
+      validationResult: null,
+      presentation: null,
       mcpServers: null,
       turns: [],
       createdAt: new Date().toISOString(),

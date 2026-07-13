@@ -4,10 +4,15 @@ import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import type { StepExecution } from '@mediforce/platform-core';
 
-// Mock useSubcollection so we can feed canned step executions to the panel.
-const mockSubcollection = vi.fn();
+// Mock useStepExecutions so we can feed canned step executions to the panel.
+const mockStepExecutions = vi.fn();
+vi.mock('@/hooks/use-step-executions', () => ({
+  useStepExecutions: (...args: unknown[]) => mockStepExecutions(...args),
+}));
+
+const mockProcessInstance = vi.fn(() => ({ data: { status: 'running' }, loading: false }));
 vi.mock('@/hooks/use-process-instances', () => ({
-  useSubcollection: (...args: unknown[]) => mockSubcollection(...args),
+  useProcessInstance: (...args: unknown[]) => mockProcessInstance(...args),
 }));
 
 // Mock apiFetch — Response constructor is available in jsdom environment.
@@ -46,8 +51,8 @@ function buildExecution(overrides: Partial<StepExecutionRecord> = {}): StepExecu
   };
 }
 
-function setSubcollection(executions: StepExecutionRecord[], loading = false): void {
-  mockSubcollection.mockReturnValue({ data: executions, loading, error: null });
+function setStepExecutions(executions: StepExecutionRecord[], loading = false): void {
+  mockStepExecutions.mockReturnValue({ data: executions, loading, error: null });
 }
 
 async function expandPanel(): Promise<void> {
@@ -60,8 +65,8 @@ async function expandPanel(): Promise<void> {
   }
 }
 
-// Summary is the default selected tab. Iframe-related tests need the Report
-// tab active; this helper switches to it.
+// Extracted Data is the default tab when there is no report. Iframe-related
+// tests need the Report tab active; this helper switches to it.
 async function activateReportTab(): Promise<void> {
   const reportTrigger = screen.getByRole('tab', { name: /report/i });
   await userEvent.setup().click(reportTrigger);
@@ -70,18 +75,20 @@ async function activateReportTab(): Promise<void> {
 describe('TaskContextPanel', () => {
   beforeEach(() => {
     mockApiFetch.mockReset();
-    mockSubcollection.mockReset();
+    mockStepExecutions.mockReset();
+    mockProcessInstance.mockReset();
+    mockProcessInstance.mockReturnValue({ data: { status: 'running' }, loading: false });
     mockUseTheme.mockReturnValue({ resolvedTheme: 'light', setTheme: vi.fn() });
   });
 
-  it('renders Summary tab as default with Report tab available when inline presentation is present', async () => {
+  it('defaults to Report tab with Extracted Data tab available when inline presentation is present', async () => {
     const execution = buildExecution({
       output: {
         summary: 'OK',
         presentation: '<section id="agent-report">Inline body</section>',
       },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -91,11 +98,11 @@ describe('TaskContextPanel', () => {
     );
     await expandPanel();
 
-    // Summary selected by default; Report tab present but inactive.
-    const summaryTrigger = screen.getByRole('tab', { name: /summary/i });
+    // Report selected by default when presentation is available; Extracted Data tab present but inactive.
     const reportTrigger = screen.getByRole('tab', { name: /report/i });
-    expect(summaryTrigger.getAttribute('data-state')).toBe('active');
-    expect(reportTrigger.getAttribute('data-state')).toBe('inactive');
+    const extractedDataTrigger = screen.getByRole('tab', { name: /extracted data/i });
+    expect(reportTrigger.getAttribute('data-state')).toBe('active');
+    expect(extractedDataTrigger.getAttribute('data-state')).toBe('inactive');
 
     // Switching to Report tab reveals the inline iframe.
     await activateReportTab();
@@ -121,7 +128,7 @@ describe('TaskContextPanel', () => {
         presentation: '<section id="agent-output-report">Agent output body</section>',
       },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -144,7 +151,7 @@ describe('TaskContextPanel', () => {
         summary: 'Validation completed',
       },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     mockApiFetch.mockResolvedValue(
       new Response('<article id="fetched-report">From file</article>', { status: 200 }),
@@ -180,9 +187,9 @@ describe('TaskContextPanel', () => {
     expect(reportTrigger.getAttribute('data-state')).toBe('active');
   });
 
-  it('falls back to Summary tab when neither presentation nor htmlReportPath is present', async () => {
+  it('defaults to Extracted Data tab when neither presentation nor htmlReportPath is present', async () => {
     const execution = buildExecution({ output: { summary: 'Plain output' } });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -194,20 +201,34 @@ describe('TaskContextPanel', () => {
 
     expect(screen.queryByRole('tab', { name: /report/i })).toBeNull();
 
-    const summaryTrigger = screen.getByRole('tab', { name: /summary/i });
-    expect(summaryTrigger.getAttribute('data-state')).toBe('active');
+    const extractedDataTrigger = screen.getByRole('tab', { name: /extracted data/i });
+    expect(extractedDataTrigger.getAttribute('data-state')).toBe('active');
 
     expect(document.querySelector('iframe')).toBeNull();
   });
 
-  it('shows an inline error notice when the report fetch returns 404 — Summary tab is still selectable', async () => {
+  it('renders nothing when there is no previous step output to show', async () => {
+    setStepExecutions([]);
+
+    const { container } = render(
+      <TaskContextPanel
+        processInstanceId="inst-1"
+        stepId="human-review"
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /previous step output/i })).toBeNull();
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('shows an inline error notice when the report fetch returns 404 — Extracted Data tab is still selectable', async () => {
     const execution = buildExecution({
       output: {
         htmlReportPath: '/output/presentation.html',
         summary: 'Has summary text',
       },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     mockApiFetch.mockResolvedValue(
       new Response('Not Found', { status: 404 }),
@@ -229,18 +250,18 @@ describe('TaskContextPanel', () => {
     // Inline notice shows in Report tab
     await waitFor(() => {
       expect(
-        screen.getByText(/report file not available — see summary tab/i),
+        screen.getByText(/report file not available — see extracted data tab/i),
       ).toBeInTheDocument();
     });
 
     // No iframe on failure
     expect(document.querySelector('iframe')).toBeNull();
 
-    // Summary tab still works
+    // Extracted Data tab still works
     const user = userEvent.setup();
-    const summaryTrigger = screen.getByRole('tab', { name: /summary/i });
-    await user.click(summaryTrigger);
-    expect(summaryTrigger.getAttribute('data-state')).toBe('active');
+    const extractedDataTrigger = screen.getByRole('tab', { name: /extracted data/i });
+    await user.click(extractedDataTrigger);
+    expect(extractedDataTrigger.getAttribute('data-state')).toBe('active');
     expect(screen.getByText('Has summary text')).toBeInTheDocument();
   });
 
@@ -249,7 +270,7 @@ describe('TaskContextPanel', () => {
     const execution = buildExecution({
       output: { presentation },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -271,7 +292,7 @@ describe('TaskContextPanel', () => {
     const execution = buildExecution({
       output: { presentation: '<div>resize me</div>' },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -304,7 +325,7 @@ describe('TaskContextPanel', () => {
     const execution = buildExecution({
       output: { presentation: '<div>runaway</div>' },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -337,7 +358,7 @@ describe('TaskContextPanel', () => {
     const execution = buildExecution({
       output: { presentation: '<div>loop</div>' },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -374,7 +395,7 @@ describe('TaskContextPanel', () => {
     const execution = buildExecution({
       output: { presentation: '<div>invalid</div>' },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -429,7 +450,7 @@ describe('TaskContextPanel', () => {
         presentation: { kind: 'markdown', content: '## Status\n\n- one\n- two' },
       },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -465,7 +486,7 @@ describe('TaskContextPanel', () => {
         },
       },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -485,7 +506,7 @@ describe('TaskContextPanel', () => {
     const execution = buildExecution({
       output: { presentation: '<div class="min-h-screen">vh content</div>' },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     render(
       <TaskContextPanel
@@ -513,7 +534,7 @@ describe('TaskContextPanel', () => {
     const execution = buildExecution({
       output: { presentation: '<div>theme-test</div>' },
     });
-    setSubcollection([execution]);
+    setStepExecutions([execution]);
 
     mockUseTheme.mockReturnValue({ resolvedTheme: 'light', setTheme: vi.fn() });
 

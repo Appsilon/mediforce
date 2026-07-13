@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, existsSync, statSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync, statSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -53,6 +53,38 @@ describe('prepareDeployKeyPath', () => {
     expect(readFileSync(result, 'utf8')).toBe('PRIVATE-KEY-CONTENTS');
     // Mask to permission bits — statSync returns full mode incl. file type.
     expect(statSync(result).mode & 0o777).toBe(0o600);
+  });
+
+  it('returns source path unchanged when source is a directory (EISDIR guard)', async () => {
+    const sourceDir = makeTmpDir();
+    process.env.DEPLOY_KEY_PATH = sourceDir;
+
+    const { prepareDeployKeyPath } = await importFresh();
+    const result = prepareDeployKeyPath();
+
+    expect(result).toBe(sourceDir);
+  });
+
+  it('re-copies when cached path is replaced by a directory', async () => {
+    const sourceDir = makeTmpDir();
+    const source = join(sourceDir, 'deploy_key');
+    writeFileSync(source, 'KEY', { mode: 0o644 });
+    process.env.DEPLOY_KEY_PATH = source;
+
+    const { prepareDeployKeyPath } = await importFresh();
+    const first = prepareDeployKeyPath();
+    tmpDirs.push(first);
+
+    // Replace cached file with a directory to simulate the EISDIR scenario
+    rmSync(first);
+    mkdirSync(first);
+
+    const second = prepareDeployKeyPath();
+    tmpDirs.push(second);
+
+    expect(second).not.toBe(first);
+    expect(statSync(second).isFile()).toBe(true);
+    expect(readFileSync(second, 'utf8')).toBe('KEY');
   });
 
   it('caches the prepared path across calls (does not re-copy)', async () => {

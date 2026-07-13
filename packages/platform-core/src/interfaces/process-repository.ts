@@ -33,6 +33,14 @@ export interface ProcessRepository {
     includeArchived: boolean,
   ): Promise<WorkflowDefinitionListResult>;
   getLatestWorkflowVersion(namespace: string, name: string): Promise<number>;
+  /**
+   * Return every persisted version of `name` in `namespace`, ascending by
+   * version. Returns an empty array when no versions exist (including for
+   * unknown names). Includes archived versions so the version picker can
+   * render the archived badge — callers that need to exclude archived
+   * filter at the call site.
+   */
+  listWorkflowVersions(namespace: string, name: string): Promise<WorkflowDefinition[]>;
   getDefaultWorkflowVersion(namespace: string, name: string): Promise<number | null>;
   setDefaultWorkflowVersion(namespace: string, name: string, version: number): Promise<void>;
 

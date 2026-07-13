@@ -1,11 +1,5 @@
 import type { HumanTask, ProcessInstance, Presentation } from '@mediforce/platform-core';
-
-/** Format a stepId into a human-readable title. */
-export function formatStepName(stepId: string): string {
-  return stepId
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
+import { formatStepName } from '@/lib/format';
 
 /** Check if a task is an agent output review (L3 approval).
  *  Checks multiple signals: completionData.reviewType, completionData.agentOutput,
@@ -113,27 +107,6 @@ export function normalizePresentation(value: unknown): Presentation | null {
     ) {
       return { kind: candidate.kind, content: candidate.content };
     }
-  }
-  return null;
-}
-
-/** Find agent output from the closest preceding sibling task for the same step.
- *  Siblings are expected in createdAt-asc order. We walk backwards from the
- *  current task's position to find the agent run that produced output for
- *  this specific iteration (not just the first match). */
-export function getAgentOutputFromSiblings(
-  task: HumanTask,
-  siblingTasks: HumanTask[],
-): AgentOutputData | null {
-  const taskIndex = siblingTasks.findIndex((s) => s.id === task.id);
-
-  // Walk backwards from the current task to find the nearest preceding sibling
-  // with agent output on the same step — this is the agent run for this iteration.
-  for (let i = (taskIndex === -1 ? siblingTasks.length : taskIndex) - 1; i >= 0; i--) {
-    const sibling = siblingTasks[i];
-    if (sibling.stepId !== task.stepId) continue;
-    const output = getAgentOutput(sibling);
-    if (output) return output;
   }
   return null;
 }

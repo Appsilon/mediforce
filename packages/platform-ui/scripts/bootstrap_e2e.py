@@ -28,7 +28,6 @@ ENV_LOCAL = PLATFORM_UI / ".env.local"
 FIREBASE_CONFIG = Path("/tmp/firebase-e2e.json")
 # Emulator ports
 AUTH_PORT = 9099
-FIRESTORE_PORT = 8080
 DEV_SERVER_PORT = 9007
 
 # Colors for terminal output
@@ -56,7 +55,6 @@ REQUIRED_ENV: dict[str, str] = {
     "NEXT_PUBLIC_FIREBASE_API_KEY": "fake-api-key-for-emulators",
     "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN": "demo-mediforce.firebaseapp.com",
     "NEXT_PUBLIC_FIREBASE_PROJECT_ID": "demo-mediforce",
-    "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET": "demo-mediforce.appspot.com",
     "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "000000000000",
     "NEXT_PUBLIC_FIREBASE_APP_ID": "1:000000000000:web:0000000000000000",
     "OPENROUTER_API_KEY": "fake-openrouter-key",
@@ -115,26 +113,12 @@ def ensure_env_local() -> bool:
 def ensure_firebase_config() -> None:
     """Create Firebase emulator config without UI (avoids proxy/download issues).
 
-    Points the emulator at firestore.e2e.rules — a permissive test-only
-    rules file. The production firestore.rules enforce role-scoped reads that
-    Playwright journey tests do not model, which causes collection queries to
-    be rejected and the retry loop to trigger firebase-js-sdk#9267 (a
-    Firestore internal assertion that breaks every subsequent listener).
-
-    Uses absolute path so the emulator finds it regardless of cwd. A relative
-    path would be resolved against the config file location (/tmp/) — no rules
-    there — so the emulator falls back to default deny-all.
+    Only the Auth emulator is needed — Firestore is fully removed (ADR-0001
+    final cutover, #534). Firebase Auth remains the identity provider.
     """
-    rules_path = ROOT / "firestore.e2e.rules"
-    if not rules_path.exists():
-        log(f"firestore.e2e.rules not found at {rules_path}", RED)
-        sys.exit(1)
-
     config = {
-        "firestore": {"rules": str(rules_path)},
         "emulators": {
             "auth": {"port": AUTH_PORT},
-            "firestore": {"port": FIRESTORE_PORT},
             "ui": {"enabled": False},
         },
     }
@@ -144,7 +128,7 @@ def ensure_firebase_config() -> None:
 
 def start_emulators() -> subprocess.Popen[bytes] | None:
     """Start Firebase emulators if not already running."""
-    if check_port(AUTH_PORT) and check_port(FIRESTORE_PORT):
+    if check_port(AUTH_PORT):
         log("Firebase emulators already running", YELLOW)
         return None
 
@@ -162,13 +146,13 @@ def start_emulators() -> subprocess.Popen[bytes] | None:
     if "JAVA_HOME" in os.environ:
         clean_env["JAVA_HOME"] = os.environ["JAVA_HOME"]
 
-    log("Starting Firebase emulators (auth + firestore)...")
+    log("Starting Firebase emulators (auth)...")
     proc = subprocess.Popen(
         [
             "firebase",
             "emulators:start",
             "--project", "demo-mediforce",
-            "--only", "auth,firestore",
+            "--only", "auth",
             "--config", str(FIREBASE_CONFIG),
         ],
         cwd=str(PLATFORM_UI),
@@ -179,7 +163,7 @@ def start_emulators() -> subprocess.Popen[bytes] | None:
 
     # Wait for emulators to be ready
     for attempt in range(30):
-        if check_port(AUTH_PORT) and check_port(FIRESTORE_PORT):
+        if check_port(AUTH_PORT):
             log("Firebase emulators ready")
             return proc
         time.sleep(1)
@@ -201,24 +185,6 @@ def ensure_playwright() -> None:
         log("Playwright chromium ready")
     else:
         log(f"Playwright install warning: {result.stderr[:200]}", YELLOW)
-
-
-def ensure_ffmpeg() -> None:
-    """Install ffmpeg if not available (needed for GIF conversion)."""
-    if shutil.which("ffmpeg"):
-        log("ffmpeg already available", YELLOW)
-        return
-
-    log("Installing ffmpeg...")
-    result = subprocess.run(
-        ["apt-get", "install", "-y", "-qq", "ffmpeg"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode == 0:
-        log("ffmpeg installed")
-    else:
-        log("ffmpeg install failed (non-critical — GIF conversion won't work)", YELLOW)
 
 
 def kill_port(port: int) -> None:
@@ -244,10 +210,7 @@ def main() -> None:
     # 4. Playwright browsers
     ensure_playwright()
 
-    # 5. ffmpeg for GIF conversion
-    ensure_ffmpeg()
-
-    # 6. Kill stale dev server on test port
+    # 5. Kill stale dev server on test port
     if check_port(DEV_SERVER_PORT):
         log(f"Killing stale process on port {DEV_SERVER_PORT}")
         kill_port(DEV_SERVER_PORT)
@@ -256,9 +219,6 @@ def main() -> None:
     print()
     log("E2E environment ready! Run tests with:")
     print(f"  pnpm test:e2e")
-    print()
-    print(f"  # With recording + GIFs:")
-    print(f"  cd {PLATFORM_UI} && pnpm test:e2e:gif")
     print()
 
     if emulator_proc is not None:

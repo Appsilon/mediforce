@@ -33,7 +33,7 @@ export const runGetCommand = defineCommand({
       result.finalOutput !== null && result.finalOutput !== undefined
         ? JSON.stringify(result.finalOutput)
         : undefined;
-    output.stdout(`Run ${result.runId}`);
+    output.stdout(`Run ${result.runId}${result.dryRun ? ' (dry run)' : ''}`);
     printKv(output, [
       ['status', result.status],
       ['currentStep', result.currentStepId],

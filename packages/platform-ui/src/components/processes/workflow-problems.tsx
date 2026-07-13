@@ -19,7 +19,7 @@ interface WorkflowWarning extends PreflightWarning {
 
 interface WorkflowProblemsProps {
   handle: string;
-  latestDocs: Map<string, WorkflowDefinition & { id: string }>;
+  latestDocs: Map<string, WorkflowDefinition>;
   loading: boolean;
 }
 
@@ -31,7 +31,7 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
   const [copied, setCopied] = React.useState(false);
 
   const namespaceDocs = React.useMemo(() => {
-    const result: Array<WorkflowDefinition & { id: string }> = [];
+    const result: WorkflowDefinition[] = [];
     for (const doc of latestDocs.values()) {
       if (doc.namespace === handle && doc.archived !== true) {
         result.push(doc);
@@ -51,6 +51,8 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
         dockerAvailable,
         secretKeys,
         namespaceSecretKeys,
+        handle,
+        workflowName: doc.name,
       });
       for (const warning of checks) {
         all.push({ ...warning, workflowName: doc.name, workflowTitle: doc.title });
@@ -74,7 +76,7 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
         : warning.workflowName;
       lines.push(`- [${label}] ${warning.message}`);
       lines.push(`  Steps: ${warning.stepNames.join(', ')}`);
-      lines.push(`  Hint: ${warning.hint}`);
+      lines.push(`  Actions: ${warning.actions.map((a) => `${a.label}: ${a.href}`).join(', ')}`);
     }
     return lines.join('\n');
   }

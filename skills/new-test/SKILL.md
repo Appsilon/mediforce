@@ -1,6 +1,6 @@
 ---
 name: new-test
-description: Write a new test for a feature, endpoint, handler, or pure function. Use when adding test coverage for new or changed code, or when starting a feature TDD-style (RED → GREEN). Triggers include "write a test for", "add unit test", "add integration test", "add API E2E", "TDD this", "red-green this", "cover X with a test", "test plan for". Decides the right level (L1 unit / L2 integration / L3 API E2E / L4 UI E2E / L5 external), scaffolds the file, and walks the RED-GREEN loop. Use `/e2e-test` instead for the L4 UI journey + GIF workflow.
+description: Write a new test for a feature, endpoint, handler, or pure function. Use when adding test coverage for new or changed code, or when starting a feature TDD-style (RED → GREEN). Triggers include "write a test for", "add unit test", "add integration test", "add API E2E", "TDD this", "red-green this", "cover X with a test", "test plan for". Decides the right level (L1 unit / L2 integration / L3 API E2E / L4 UI E2E / L5 external), scaffolds the file, and walks the RED-GREEN loop. Use `/e2e-test` instead for the L4 UI journey workflow.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 metadata:
   author: Mediforce
@@ -88,7 +88,7 @@ Bootstrap once per machine: `python3 packages/platform-ui/scripts/bootstrap_e2e.
 
 ### L4 — UI E2E
 
-**Use `/e2e-test` instead.** UI E2E ships a GIF + gallery entry as part of the deliverable. This skill does not handle the recording workflow.
+**Use `/e2e-test` instead.** It owns the L4 UI journey workflow (write → run) and the journey conventions; this skill does not.
 
 Reminder before reaching for L4: a UI E2E is a real multi-step user journey (click → fill → navigate → assert outcome). NOT "is the button visible" — visibility belongs in L1/L2 against the component.
 

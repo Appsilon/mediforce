@@ -29,6 +29,7 @@ export type { StepInput, StepOutput } from '../schemas/step-contract';
 export type {
   InstanceStatus,
   ProcessInstance,
+  RunNameEntry,
 } from '../schemas/process-instance';
 
 export type {
@@ -44,6 +45,7 @@ export type {
   GitMetadata,
   TokenUsage,
   Presentation,
+  StepOutputEnvelope,
   AgentOutputEnvelope,
 } from '../schemas/agent-output-envelope';
 
@@ -56,6 +58,8 @@ export type {
 
 export type {
   WorkflowAgentConfig,
+  ScriptStepConfig,
+  DatabricksJobConfig,
   WorkflowCoworkConfig,
   WorkflowReviewConfig,
   WorkflowStep,

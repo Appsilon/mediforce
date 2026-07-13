@@ -6,8 +6,9 @@ import { ChevronRight, ExternalLink, Archive, ArchiveRestore, XCircle } from 'lu
 import { formatDistanceToNow } from 'date-fns';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
-import { useUserDisplayNames } from '@/hooks/use-users';
+import { useUserProfiles } from '@/hooks/use-users';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { UserProfileLink } from '@/components/user-profile-link';
 import { routes } from '@/lib/routes';
 import { ApiError } from '@/lib/mediforce';
 import type { BulkRunOutput } from '@mediforce/platform-api/contract';
@@ -52,7 +53,7 @@ export function RunsTable({
 }: RunsTableProps) {
   const handle = useHandleFromPath();
   const { toast } = useToast();
-  const userNames = useUserDisplayNames();
+  const userProfiles = useUserProfiles(handle);
   const archiveMutation = useArchiveRun();
   const bulkCancelMutation = useBulkCancelRuns();
   const bulkArchiveMutation = useBulkArchiveRuns();
@@ -301,16 +302,28 @@ export function RunsTable({
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <ProcessStatusBadge status={run.status} pauseReason={run.pauseReason} error={run.error} />
+                  <ProcessStatusBadge status={run.status} pauseReason={run.pauseReason} error={run.error} dryRun={run.dryRun} />
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
-                  {run.createdBy ? (userNames.get(run.createdBy) ?? run.createdBy) : '—'}
+                  {run.parentInstanceId && run.parentDefinitionName ? (
+                    <Link
+                      href={`/${handle}/workflows/${encodeURIComponent(run.parentDefinitionName)}/runs/${run.parentInstanceId}`}
+                      className="text-primary hover:underline"
+                    >
+                      {run.parentDefinitionName}
+                    </Link>
+                  ) : run.createdBy ? (
+                    <UserProfileLink
+                      displayName={userProfiles.get(run.createdBy)?.displayName ?? run.createdBy}
+                      personalHandle={userProfiles.get(run.createdBy)?.personalHandle}
+                    />
+                  ) : '—'}
                 </td>
                 <td className="px-4 py-3 text-xs">
                   {run.currentStepId ? (
                     activeTaskByInstance?.get(run.id) ? (
                       <Link
-                        href={routes.task(handle, activeTaskByInstance.get(run.id)!)}
+                        href={routes.workflowRunStep(handle, run.definitionName, run.id, run.currentStepId)}
                         className="inline-flex items-center gap-1 bg-muted/50 rounded px-1.5 py-0.5 font-medium cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
                       >
                         {run.currentStepId}

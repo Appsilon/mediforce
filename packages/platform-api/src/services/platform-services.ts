@@ -1,32 +1,61 @@
 import {
-  FirestoreProcessRepository,
-  FirestoreProcessInstanceRepository,
-  FirestoreAuditRepository,
-  FirestoreAgentRunRepository,
-  FirestoreHumanTaskRepository,
-  FirestoreHandoffRepository,
-  FirestoreAgentDefinitionRepository,
-  FirestoreCoworkSessionRepository,
-  FirestoreCronTriggerStateRepository,
-  FirestoreToolCatalogRepository,
-  FirestoreNamespaceRepository,
-  FirestoreUserProfileRepository,
-  FirestoreOAuthProviderRepository,
-  FirestoreAgentOAuthTokenRepository,
-  FirestoreModelRegistryRepository,
-  FirestoreWorkflowSecretsRepository,
-  FirestoreNamespaceSecretsRepository,
-  FirebaseInviteService,
+  PostgresAgentEventRepository,
+  PostgresUserProfileRepository,
+  PostgresHandoffRepository,
+  PostgresAgentDefinitionRepository,
+  PostgresModelRegistryRepository,
+  PostgresNamespaceSecretsRepository,
+  PostgresWorkflowSecretsRepository,
   PostgresToolCatalogRepository,
+  PostgresNamespaceRepository,
+  PostgresAuditRepository,
+  PostgresOAuthProviderRepository,
+  PostgresAgentOAuthTokenRepository,
+  PostgresCronTriggerStateRepository,
+  PostgresAgentRunRepository,
+  PostgresHumanTaskRepository,
+  PostgresTaskAttachmentRepository,
+  FilesystemBlobStore,
+  PostgresCoworkSessionRepository,
+  PostgresProcessInstanceRepository,
+  PostgresProcessRepository,
+  PostgresAgentEventLog,
+  PostgresPlatformSettingsRepository,
   getSharedPostgresClient,
-  getAdminFirestore,
+  FirebaseInviteService,
   validateSecretsKey,
   createMailgunSender,
-  MailgunNotificationService,
+  createSmtpSender,
+  EmailNotificationService,
   FirebaseUserDirectoryService,
   getAdminAuth,
 } from '@mediforce/platform-infra';
-import type { SendEmailFn, UserDirectoryService } from '@mediforce/platform-core';
+import type {
+  AgentDefinitionRepository,
+  AgentEventRepository,
+  AgentOAuthTokenRepository,
+  AgentRunRepository,
+  AuditRepository,
+  BlobStore,
+  CoworkSessionRepository,
+  CronTriggerStateRepository,
+  EmailProviderInfo,
+  HandoffRepository,
+  HumanTaskRepository,
+  TaskAttachmentRepository,
+  ModelRegistryRepository,
+  NamespaceRepository,
+  NamespaceSecretsRepository,
+  OAuthProviderRepository,
+  PlatformSettingsRepository,
+  ProcessInstanceRepository,
+  ProcessRepository,
+  SendEmailFn,
+  ToolCatalogRepository,
+  UserDirectoryService,
+  UserProfileRepository,
+  WorkflowSecretsRepository,
+} from '@mediforce/platform-core';
 import {
   ContainerWorkerDockerImagesService,
   LocalDockerImagesService,
@@ -41,10 +70,6 @@ import type {
   SendInviteEmailInput,
   SendWorkspaceNotificationEmailInput,
 } from './invite-notification';
-import type {
-  CronTriggerStateRepository,
-  ToolCatalogRepository,
-} from '@mediforce/platform-core';
 import {
   WorkflowEngine,
   ManualTrigger,
@@ -52,13 +77,16 @@ import {
 } from '@mediforce/workflow-engine';
 import {
   AgentRunner,
+  PluginRunner,
   PluginRegistry,
   OpenRouterLlmClient,
-  FirestoreAgentEventLog,
   ClaudeCodeAgentPlugin,
   MockClaudeCodeAgentPlugin,
   OpenCodeAgentPlugin,
   ScriptContainerPlugin,
+  DatabricksJobPlugin,
+  ScriptStepExecutor,
+  AgentStepExecutor,
 } from '@mediforce/agent-runtime';
 import {
   ActionRegistry,
@@ -72,7 +100,7 @@ import { createHttpSelfFetchRunKicker } from '../runtime/run-kicker';
 import { WebhookRouter } from '@mediforce/workflow-engine';
 import { seedBuiltinAgentDefinitions } from './seed-agent-definitions';
 import { seedBuiltinToolCatalog } from './seed-tool-catalog';
-import { backfillInstanceNamespaces } from '@mediforce/platform-infra';
+import { eagerSyncIfStale } from '@mediforce/platform-infra';
 
 let services: PlatformServices | null = null;
 let seedingStarted = false;
@@ -84,28 +112,35 @@ export interface PlatformServices {
   webhookRouter: WebhookRouter;
   actionRegistry: ActionRegistry;
   agentRunner: AgentRunner;
+  scriptStepExecutor: ScriptStepExecutor;
+  agentStepExecutor: AgentStepExecutor;
   pluginRegistry: PluginRegistry;
   llmClient: OpenRouterLlmClient;
-  processRepo: FirestoreProcessRepository;
-  instanceRepo: FirestoreProcessInstanceRepository;
-  auditRepo: FirestoreAuditRepository;
-  agentRunRepo: FirestoreAgentRunRepository;
-  humanTaskRepo: FirestoreHumanTaskRepository;
-  handoffRepo: FirestoreHandoffRepository;
-  agentDefinitionRepo: FirestoreAgentDefinitionRepository;
-  coworkSessionRepo: FirestoreCoworkSessionRepository;
+  processRepo: ProcessRepository;
+  instanceRepo: ProcessInstanceRepository;
+  auditRepo: AuditRepository;
+  agentEventRepo: AgentEventRepository;
+  agentRunRepo: AgentRunRepository;
+  humanTaskRepo: HumanTaskRepository;
+  taskAttachmentRepo: TaskAttachmentRepository;
+  blobStore: BlobStore;
+  handoffRepo: HandoffRepository;
+  agentDefinitionRepo: AgentDefinitionRepository;
+  coworkSessionRepo: CoworkSessionRepository;
   cronTriggerStateRepo: CronTriggerStateRepository;
   toolCatalogRepo: ToolCatalogRepository;
-  namespaceRepo: FirestoreNamespaceRepository;
-  userProfileRepo: FirestoreUserProfileRepository;
-  oauthProviderRepo: FirestoreOAuthProviderRepository;
-  agentOAuthTokenRepo: FirestoreAgentOAuthTokenRepository;
-  modelRegistryRepo: FirestoreModelRegistryRepository;
-  secretsRepo: FirestoreWorkflowSecretsRepository;
-  namespaceSecretsRepo: FirestoreNamespaceSecretsRepository;
+  namespaceRepo: NamespaceRepository;
+  userProfileRepo: UserProfileRepository;
+  oauthProviderRepo: OAuthProviderRepository;
+  agentOAuthTokenRepo: AgentOAuthTokenRepository;
+  modelRegistryRepo: ModelRegistryRepository;
+  platformSettingsRepo: PlatformSettingsRepository;
+  secretsRepo: WorkflowSecretsRepository;
+  namespaceSecretsRepo: NamespaceSecretsRepository;
   inviteService: InviteService;
-  /** `null` when Mailgun env vars are unset (email disabled). */
+  /** `null` when email env vars are unset (email disabled). */
   inviteNotificationService: InviteNotificationService | null;
+  emailProviderInfo: EmailProviderInfo | null;
   dockerImages: DockerImagesService;
   /**
    * Firebase Auth metadata lookup (uid → email, lastSignInTime). Always wired
@@ -128,19 +163,6 @@ interface UserRecordPort {
 interface AuthPort {
   getUser(uid: string): Promise<UserRecordPort>;
 }
-interface DocSnapshotPort {
-  readonly exists: boolean;
-  data(): { readonly mustChangePassword?: boolean } | undefined;
-}
-interface DocRefPort {
-  get(): Promise<DocSnapshotPort>;
-}
-interface CollectionPort {
-  doc(id: string): DocRefPort;
-}
-interface FirestorePort {
-  collection(name: string): CollectionPort;
-}
 
 /**
  * Adapts `FirebaseInviteService` onto the framework-free `InviteService`
@@ -152,7 +174,7 @@ class FirebaseInviteServiceAdapter implements InviteService {
   constructor(
     private readonly firebase: FirebaseInviteService,
     private readonly adminAuth: AuthPort,
-    private readonly adminDb: FirestorePort,
+    private readonly userProfileRepo: UserProfileRepository,
   ) {}
 
   async createInvitedUser(email: string, displayName: string | undefined): Promise<InvitedUser> {
@@ -182,19 +204,18 @@ class FirebaseInviteServiceAdapter implements InviteService {
       // Treat unknown users as not pending — handlers will surface a 404.
       return false;
     }
-    const userDoc = await this.adminDb.collection('users').doc(uid).get();
-    const mustChangePassword = userDoc.exists ? userDoc.data()?.mustChangePassword === true : false;
+    const mustChangePassword = (await this.userProfileRepo.getProfile(uid))?.mustChangePassword ?? false;
     const hasNeverSignedIn = lastSignInTime === null || lastSignInTime === '';
     return mustChangePassword || hasNeverSignedIn;
   }
 }
 
 /**
- * Adapts the Mailgun `SendEmailFn` into the `InviteNotificationService`
+ * Adapts a `SendEmailFn` into the `InviteNotificationService`
  * interface — delegates to the existing pure email-body helpers and supplies
  * deployment config (app URL, sender name) so handlers never see env vars.
  */
-class MailgunInviteNotificationService implements InviteNotificationService {
+class EmailInviteNotificationService implements InviteNotificationService {
   constructor(
     private readonly sendEmail: SendEmailFn,
     private readonly appUrl: string,
@@ -230,32 +251,38 @@ export function getPlatformServices(): PlatformServices {
   // than to boot successfully and fail opaquely mid-workflow.
   validateSecretsKey();
 
-  const db = getAdminFirestore();
+  const pg = getSharedPostgresClient().db;
 
-  const processRepo = new FirestoreProcessRepository(db);
-  const instanceRepo = new FirestoreProcessInstanceRepository(db);
+  const processRepo: ProcessRepository = new PostgresProcessRepository(pg);
+  const instanceRepo: PostgresProcessInstanceRepository =
+    new PostgresProcessInstanceRepository(pg);
   // Indirect-namespace repos depend on instanceRepo for parent-run namespace
   // resolution inside the namespace-scoped read variants (ADR-0004 §"Storage-
   // layer filter, today").
-  const auditRepo = new FirestoreAuditRepository(db, instanceRepo);
-  const agentRunRepo = new FirestoreAgentRunRepository(db, instanceRepo);
-  const humanTaskRepo = new FirestoreHumanTaskRepository(db, instanceRepo);
-  const handoffRepo = new FirestoreHandoffRepository(db, instanceRepo);
-  const agentDefinitionRepo = new FirestoreAgentDefinitionRepository(db);
-  const coworkSessionRepo = new FirestoreCoworkSessionRepository(db, instanceRepo);
-  const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
-  const toolCatalogRepo: ToolCatalogRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresToolCatalogRepository(getSharedPostgresClient().db)
-      : new FirestoreToolCatalogRepository(db);
-  const namespaceRepo = new FirestoreNamespaceRepository(db);
-  const userProfileRepo = new FirestoreUserProfileRepository(db);
-  const oauthProviderRepo = new FirestoreOAuthProviderRepository(db);
-  const agentOAuthTokenRepo = new FirestoreAgentOAuthTokenRepository(db);
-  const modelRegistryRepo = new FirestoreModelRegistryRepository(db);
-  const secretsRepo = new FirestoreWorkflowSecretsRepository(db);
-  const namespaceSecretsRepo = new FirestoreNamespaceSecretsRepository(db);
-  const eventLog = new FirestoreAgentEventLog(db);
+  const auditRepo: AuditRepository = new PostgresAuditRepository(pg, instanceRepo);
+  const agentEventRepo: AgentEventRepository = new PostgresAgentEventRepository(instanceRepo);
+  const agentRunRepo: AgentRunRepository = new PostgresAgentRunRepository(pg, instanceRepo);
+  const humanTaskRepo: HumanTaskRepository = new PostgresHumanTaskRepository(pg, instanceRepo);
+  const taskAttachmentRepo: TaskAttachmentRepository = new PostgresTaskAttachmentRepository(pg);
+  const blobStore: BlobStore = new FilesystemBlobStore();
+  const handoffRepo: HandoffRepository = new PostgresHandoffRepository(pg, instanceRepo);
+  const agentDefinitionRepo: AgentDefinitionRepository = new PostgresAgentDefinitionRepository(pg);
+  const coworkSessionRepo: CoworkSessionRepository =
+    new PostgresCoworkSessionRepository(pg, instanceRepo);
+  const cronTriggerStateRepo: CronTriggerStateRepository =
+    new PostgresCronTriggerStateRepository(pg);
+  const toolCatalogRepo: ToolCatalogRepository = new PostgresToolCatalogRepository(pg);
+  const namespaceRepo: NamespaceRepository = new PostgresNamespaceRepository(pg);
+  const userProfileRepo: UserProfileRepository = new PostgresUserProfileRepository(pg);
+  const oauthProviderRepo: OAuthProviderRepository = new PostgresOAuthProviderRepository(pg);
+  const agentOAuthTokenRepo: AgentOAuthTokenRepository =
+    new PostgresAgentOAuthTokenRepository(pg);
+  const modelRegistryRepo: ModelRegistryRepository = new PostgresModelRegistryRepository(pg);
+  const platformSettingsRepo: PlatformSettingsRepository = new PostgresPlatformSettingsRepository(pg);
+  const secretsRepo: WorkflowSecretsRepository = new PostgresWorkflowSecretsRepository(pg);
+  const namespaceSecretsRepo: NamespaceSecretsRepository =
+    new PostgresNamespaceSecretsRepository(pg);
+  const eventLog = new PostgresAgentEventLog(instanceRepo);
 
   const pluginRegistry = new PluginRegistry();
 
@@ -270,10 +297,16 @@ export function getPlatformServices(): PlatformServices {
 
   pluginRegistry.register('opencode-agent', new OpenCodeAgentPlugin());
   pluginRegistry.register('script-container', new ScriptContainerPlugin());
+  pluginRegistry.register('databricks-job', new DatabricksJobPlugin());
+
+  const otelTracingOptions = {
+    captureContent: process.env.MEDIFORCE_OTEL_CAPTURE_CONTENT === 'true',
+  };
 
   const llmClient = new OpenRouterLlmClient(
     process.env.OPENROUTER_API_KEY ?? '',
     'anthropic/claude-sonnet-4',
+    otelTracingOptions,
   );
 
   const emailDisabled = process.env.MEDIFORCE_DISABLE_EMAIL === 'true';
@@ -281,36 +314,86 @@ export function getPlatformServices(): PlatformServices {
   const mailgunDomain = process.env.MAILGUN_DOMAIN ?? '';
   const mailgunFrom = process.env.MAILGUN_FROM_EMAIL ?? '';
   const mailgunSenderName = process.env.MAILGUN_SENDER_NAME ?? 'Mediforce';
-
   const mailgunConfigured = mailgunApiKey !== '' && mailgunDomain !== '' && mailgunFrom !== '';
-  if (!emailDisabled && !mailgunConfigured) {
-    const missing = [
-      !mailgunApiKey && 'MAILGUN_API_KEY',
-      !mailgunDomain && 'MAILGUN_DOMAIN',
-      !mailgunFrom && 'MAILGUN_FROM_EMAIL',
-    ].filter(Boolean).join(', ');
+
+  const smtpHost = process.env.SMTP_HOST ?? '';
+  const smtpPort = process.env.SMTP_PORT ?? '';
+  const smtpUser = process.env.SMTP_USER ?? '';
+  const smtpPass = process.env.SMTP_PASS ?? '';
+  const smtpSecure = process.env.SMTP_SECURE !== 'false';
+  const smtpFrom = process.env.SMTP_FROM_EMAIL ?? '';
+  const smtpSenderName = process.env.SMTP_SENDER_NAME ?? 'Mediforce';
+  const smtpConfigured = smtpHost !== '' && smtpFrom !== '';
+
+  const rawEmailProvider = process.env.EMAIL_PROVIDER || undefined;
+  if (rawEmailProvider !== undefined && rawEmailProvider !== 'mailgun' && rawEmailProvider !== 'smtp') {
     throw new Error(
-      `Email is enabled but Mailgun config incomplete (missing: ${missing}). ` +
-      `Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.`,
+      `EMAIL_PROVIDER="${rawEmailProvider}" is not valid. Use "mailgun" or "smtp".`,
     );
   }
+  const explicitProvider = rawEmailProvider as 'mailgun' | 'smtp' | undefined;
+  const resolvedProvider = resolveEmailProvider(explicitProvider, mailgunConfigured, smtpConfigured);
+
   if (emailDisabled) {
     console.log('[platform-services] MEDIFORCE_DISABLE_EMAIL=true — email handler and notifications disabled');
   }
 
-  const mailgunSender = mailgunConfigured
-    ? createMailgunSender({
-        apiKey: mailgunApiKey,
-        domain: mailgunDomain,
-        defaultFrom: mailgunFrom,
-        defaultSenderName: mailgunSenderName,
-      })
-    : undefined;
+  let emailSender: SendEmailFn | undefined;
+  let emailProviderInfo: EmailProviderInfo | null = null;
 
-  const notificationService = mailgunSender
-    ? new MailgunNotificationService(mailgunSender)
+  if (!emailDisabled && resolvedProvider === 'mailgun') {
+    if (!mailgunConfigured) {
+      const missing = [
+        !mailgunApiKey && 'MAILGUN_API_KEY',
+        !mailgunDomain && 'MAILGUN_DOMAIN',
+        !mailgunFrom && 'MAILGUN_FROM_EMAIL',
+      ].filter(Boolean).join(', ');
+      throw new Error(
+        `EMAIL_PROVIDER=mailgun but config incomplete (missing: ${missing}). ` +
+        `Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.`,
+      );
+    }
+    emailSender = createMailgunSender({
+      apiKey: mailgunApiKey,
+      domain: mailgunDomain,
+      defaultFrom: mailgunFrom,
+      defaultSenderName: mailgunSenderName,
+    });
+    emailProviderInfo = { provider: 'mailgun', configured: true, from: mailgunFrom };
+    console.log('[platform-services] Email provider: Mailgun');
+  } else if (!emailDisabled && resolvedProvider === 'smtp') {
+    if (!smtpConfigured) {
+      const missing = [
+        !smtpHost && 'SMTP_HOST',
+        !smtpFrom && 'SMTP_FROM_EMAIL',
+      ].filter(Boolean).join(', ');
+      throw new Error(
+        `EMAIL_PROVIDER=smtp but config incomplete (missing: ${missing}). ` +
+        `Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.`,
+      );
+    }
+    emailSender = createSmtpSender({
+      host: smtpHost,
+      port: smtpPort !== '' ? Number(smtpPort) : 587,
+      secure: smtpSecure,
+      user: smtpUser,
+      pass: smtpPass,
+      defaultFrom: smtpFrom,
+      defaultSenderName: smtpSenderName,
+    });
+    emailProviderInfo = { provider: 'smtp', configured: true, from: smtpFrom };
+    console.log('[platform-services] Email provider: SMTP');
+  } else if (!emailDisabled && resolvedProvider === null) {
+    throw new Error(
+      'Email is enabled but no email provider is configured. ' +
+      'Set MAILGUN_* or SMTP_* env vars, or set MEDIFORCE_DISABLE_EMAIL=true to start without email.',
+    );
+  }
+
+  const notificationService = emailSender
+    ? new EmailNotificationService(emailSender)
     : undefined;
-  // Wired whenever Firebase Auth is available — independent of Mailgun.
+  // Wired whenever Firebase Auth is available — independent of email provider.
   // Email-disabled deployments still need uid → email/lastSignInTime lookups
   // for the namespace-members endpoint.
   const userDirectoryService: UserDirectoryService = new FirebaseUserDirectoryService(
@@ -329,12 +412,18 @@ export function getPlatformServices(): PlatformServices {
     userDirectoryService,
   );
 
+  const pluginRunner = new PluginRunner(eventLog);
+
   const agentRunner = new AgentRunner(
     instanceRepo,
     auditRepo,
     eventLog,
     agentRunRepo,
+    otelTracingOptions,
   );
+
+  const scriptStepExecutor = new ScriptStepExecutor(pluginRunner);
+  const agentStepExecutor = new AgentStepExecutor(agentRunner);
 
   const manualTrigger = new ManualTrigger(engine, processRepo);
 
@@ -347,21 +436,25 @@ export function getPlatformServices(): PlatformServices {
   });
   actionRegistry.register('spawn', createSpawnActionHandler(manualTrigger, processRepo, spawnRunKicker));
   actionRegistry.register('wait', waitActionHandler);
-  if (mailgunSender) {
-    actionRegistry.register('email', createEmailActionHandler(mailgunSender));
+  if (emailSender) {
+    actionRegistry.register('email', createEmailActionHandler(emailSender));
   }
 
   const webhookRouter = new WebhookRouter(engine, processRepo);
 
+  // FirebaseInviteService writes to the Firebase Auth user store (identity
+  // stays on Firebase Auth) and records the must-change-password flag via the
+  // Postgres user-profile repository.
   const adminAuth = getAdminAuth();
-  const firebaseInvite = new FirebaseInviteService(adminAuth, db);
-  const inviteService = new FirebaseInviteServiceAdapter(firebaseInvite, adminAuth, db);
+  const firebaseInvite = new FirebaseInviteService(adminAuth, userProfileRepo);
+  const inviteService = new FirebaseInviteServiceAdapter(firebaseInvite, adminAuth, userProfileRepo);
   // `appUrl` matches the legacy invite route's fallback so dev-without-
   // NEXT_PUBLIC_PLATFORM_URL still renders sensible links.
   const inviteAppUrl =
     process.env.NEXT_PUBLIC_PLATFORM_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
-  const inviteNotificationService = mailgunSender
-    ? new MailgunInviteNotificationService(mailgunSender, inviteAppUrl, mailgunSenderName)
+  const senderName = resolvedProvider === 'mailgun' ? mailgunSenderName : smtpSenderName;
+  const inviteNotificationService = emailSender
+    ? new EmailInviteNotificationService(emailSender, inviteAppUrl, senderName)
     : null;
 
   const dockerImages: DockerImagesService = isLocalAgentMode()
@@ -378,13 +471,18 @@ export function getPlatformServices(): PlatformServices {
     webhookRouter,
     actionRegistry,
     agentRunner,
+    scriptStepExecutor,
+    agentStepExecutor,
     pluginRegistry,
     llmClient,
     processRepo,
     instanceRepo,
     auditRepo,
+    agentEventRepo,
     agentRunRepo,
     humanTaskRepo,
+    taskAttachmentRepo,
+    blobStore,
     handoffRepo,
     agentDefinitionRepo,
     coworkSessionRepo,
@@ -395,10 +493,12 @@ export function getPlatformServices(): PlatformServices {
     oauthProviderRepo,
     agentOAuthTokenRepo,
     modelRegistryRepo,
+    platformSettingsRepo,
     secretsRepo,
     namespaceSecretsRepo,
     inviteService,
     inviteNotificationService,
+    emailProviderInfo,
     dockerImages,
     userDirectory: userDirectoryService,
   };
@@ -411,10 +511,26 @@ export function getPlatformServices(): PlatformServices {
     seedBuiltinToolCatalog(toolCatalogRepo).catch((err) => {
       console.error('[platform-services] Failed to seed built-in tool catalog:', err);
     });
-    backfillInstanceNamespaces(db, processRepo).catch((err) => {
-      console.error('[platform-services] Failed to backfill instance namespaces:', err);
+    eagerSyncIfStale(modelRegistryRepo, { auditRepo }).catch((err) => {
+      console.error('[platform-services] Model registry eager sync failed:', err);
     });
   }
 
   return services;
+}
+
+function resolveEmailProvider(
+  explicit: 'mailgun' | 'smtp' | undefined,
+  mailgunConfigured: boolean,
+  smtpConfigured: boolean,
+): 'mailgun' | 'smtp' | null {
+  if (explicit !== undefined) return explicit;
+  if (mailgunConfigured && smtpConfigured) {
+    throw new Error(
+      'Both Mailgun and SMTP env vars are set. Set EMAIL_PROVIDER=mailgun or EMAIL_PROVIDER=smtp to disambiguate.',
+    );
+  }
+  if (mailgunConfigured) return 'mailgun';
+  if (smtpConfigured) return 'smtp';
+  return null;
 }

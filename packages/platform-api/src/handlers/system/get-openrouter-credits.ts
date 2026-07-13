@@ -9,6 +9,7 @@ const EMPTY: OpenRouterCreditsOutput = {
   limit: 0,
   usage: 0,
   remaining: 0,
+  effectiveRemaining: 0,
 };
 
 export interface GetOpenRouterCreditsOptions {
@@ -57,13 +58,53 @@ async function fetchCredits(
     if (!data || typeof data.limit_remaining !== 'number') {
       return { ...EMPTY, error: 'Unexpected response shape from OpenRouter' };
     }
+    const remaining = data.limit_remaining;
+    const accountRemaining = await fetchAccountRemaining(apiKey, fetchImpl);
+    const effectiveRemaining =
+      accountRemaining === undefined ? remaining : Math.min(remaining, accountRemaining);
     return {
       available: true,
       limit: data.limit ?? 0,
       usage: data.usage ?? 0,
-      remaining: data.limit_remaining,
+      remaining,
+      accountRemaining,
+      effectiveRemaining,
     };
   } catch (err) {
     return { ...EMPTY, error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}
+
+/**
+ * Account prepaid credit remaining from `GET /credits`. This is the balance the
+ * runtime actually charges against, separate from the per-key cap. Returns
+ * `undefined` on any failure so the caller degrades to key-level numbers
+ * instead of dropping the whole response.
+ */
+async function fetchAccountRemaining(
+  apiKey: string,
+  fetchImpl: typeof globalThis.fetch,
+): Promise<number | undefined> {
+  try {
+    const res = await fetchImpl('https://openrouter.ai/api/v1/credits', {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) {
+      return undefined;
+    }
+    const body = (await res.json()) as {
+      data?: { total_credits?: number; total_usage?: number };
+    };
+    const data = body?.data;
+    if (
+      !data ||
+      typeof data.total_credits !== 'number' ||
+      typeof data.total_usage !== 'number'
+    ) {
+      return undefined;
+    }
+    return data.total_credits - data.total_usage;
+  } catch {
+    return undefined;
   }
 }
