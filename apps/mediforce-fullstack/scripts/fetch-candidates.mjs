@@ -77,6 +77,20 @@ export function labelNames(issue) {
   return (issue.labels || []).map((l) => (typeof l === 'string' ? l : l.name));
 }
 
+/** Newest created_at (ms) across all issue events, or null when there are none.
+ *  Label/assignment/state changes each create an event at the same instant they bump
+ *  `updated_at`; body edits and new comments bump `updated_at` WITHOUT an event (the
+ *  issues events API omits both). So `updated_at` outrunning this is the only signal
+ *  that a human genuinely edited the issue rather than just relabelled it. */
+export function newestEventTime(events) {
+  let latest = null;
+  for (const e of events) {
+    const t = new Date(e.created_at).getTime();
+    if (latest === null || t > latest) latest = t;
+  }
+  return latest;
+}
+
 /** Newest created_at of a `labeled <name>` event, and how many such events exist. */
 export function summariseLabelEvents(events, name) {
   let latest = null;
@@ -125,10 +139,15 @@ export function classifyIssue(issue, events, nowMs, ttlHours, maxAttempts, reass
   }
 
   if (has(MANUAL)) {
-    const { latestAt } = summariseLabelEvents(events, MANUAL);
-    // apply-verdicts posts the decline comment ~1s after adding the manual label, which bumps updated_at past the labeled event; ignore that self-write and only re-triage on a genuine later human edit.
+    // Re-judge a declined issue only on a genuine content edit. `updated_at` is bumped
+    // by ANY activity — including a human adding an unrelated label (which also created
+    // an event at the same instant) — so comparing it to the manual label event alone
+    // latched issue #425 into an every-tick re-triage loop. A body edit or new comment
+    // is the only change that pushes `updated_at` past the newest recorded event; the
+    // grace absorbs apply-verdicts' own decline comment, posted ~1s after labelling.
+    const newestEventAt = newestEventTime(events);
     const SELF_DECLINE_GRACE_MS = 120_000;
-    const editedSince = latestAt && new Date(issue.updated_at).getTime() - new Date(latestAt).getTime() > SELF_DECLINE_GRACE_MS;
+    const editedSince = newestEventAt !== null && new Date(issue.updated_at).getTime() - newestEventAt > SELF_DECLINE_GRACE_MS;
     if (reassign === true || editedSince) return { action: 'triage', attemptCount: attempts };
     return { action: 'skip' };
   }

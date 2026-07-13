@@ -56,8 +56,14 @@ export function reconcile(currentLabels, verdict) {
   const managed = [...ALL_SUITABILITY, ...ALL_PRIO];
   const add = [...want].filter((l) => !currentLabels.includes(l));
   const remove = managed.filter((l) => currentLabels.includes(l) && !want.has(l));
-  const newlyManual = verdict.suitability === 'manual' && !currentLabels.includes(SUITABILITY.manual);
-  return { add, remove, newlyManual };
+  const alreadyManual = currentLabels.includes(SUITABILITY.manual);
+  const newlyManual = verdict.suitability === 'manual' && !alreadyManual;
+  // Re-declining an issue that is already manual leaves the label in place, so its
+  // `labeled` event never moves and fetch-candidates' edited-since clock stays stuck
+  // in the past — a genuine edit that re-judges back to manual would loop forever.
+  // Flag it so applyOne refreshes the label event (a decline comment is NOT re-posted).
+  const restampManual = verdict.suitability === 'manual' && alreadyManual;
+  return { add, remove, newlyManual, restampManual };
 }
 
 function declineComment(verdict) {
@@ -83,7 +89,7 @@ function obsoleteComment(verdict, author) {
 async function applyOne(verdict) {
   const issue = await gh(`/repos/${REPO}/issues/${verdict.issueNumber}`);
   const current = (issue.labels || []).map((l) => (typeof l === 'string' ? l : l.name));
-  const { add, remove, newlyManual } = reconcile(current, verdict);
+  const { add, remove, newlyManual, restampManual } = reconcile(current, verdict);
 
   if (add.length > 0) {
     await gh(`/repos/${REPO}/issues/${verdict.issueNumber}/labels`, {
@@ -94,6 +100,17 @@ async function applyOne(verdict) {
   }
   for (const name of remove) {
     await gh(`/repos/${REPO}/issues/${verdict.issueNumber}/labels/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  }
+  if (restampManual) {
+    // Refresh the manual label event (remove + re-add) so its timestamp becomes "now",
+    // advancing fetch-candidates' edited-since baseline past updated_at. Without this a
+    // genuine edit that re-judges back to manual re-triages on every subsequent tick.
+    await gh(`/repos/${REPO}/issues/${verdict.issueNumber}/labels/${encodeURIComponent(SUITABILITY.manual)}`, { method: 'DELETE' });
+    await gh(`/repos/${REPO}/issues/${verdict.issueNumber}/labels`, {
+      method: 'POST',
+      headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ labels: [SUITABILITY.manual] }),
+    });
   }
   if (newlyManual) {
     await gh(`/repos/${REPO}/issues/${verdict.issueNumber}/comments`, {
@@ -118,7 +135,7 @@ async function applyOne(verdict) {
     });
     closed = true;
   }
-  return { issueNumber: verdict.issueNumber, add, remove, newlyManual, closed };
+  return { issueNumber: verdict.issueNumber, add, remove, newlyManual, restampManual, closed };
 }
 
 async function main() {
