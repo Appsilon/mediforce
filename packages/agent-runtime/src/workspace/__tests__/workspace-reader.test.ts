@@ -174,7 +174,7 @@ describe('WorkspaceReader', () => {
       const zipPath = join(dataDir, 'test-archive.zip');
       await writeFile(zipPath, zipBuffer);
       const { stdout } = await execFileAsync('zipinfo', ['-1', zipPath], { encoding: 'utf-8' });
-      return stdout.trim().split('\n').filter((e) => e !== '' && e.endsWith('/') === false).sort();
+      return stdout.trim().split('\n').filter((entry) => entry !== '' && entry.endsWith('/') === false).sort();
     }
 
     async function unzipFileContent(zipBuffer: Buffer, entryPath: string): Promise<Buffer> {

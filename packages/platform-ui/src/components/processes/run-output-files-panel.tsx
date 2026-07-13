@@ -155,7 +155,7 @@ export function RunOutputFilesPanel({
     return null;
   }
 
-  const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
 
   async function handleDownloadAll() {
     setDownloadingAll(true);
