@@ -30,6 +30,21 @@ const ACTION_ITEMS = [
 
 const MONITORING_ITEM = { path: '/monitoring', label: 'Monitoring', icon: Activity } as const;
 
+const SWITCH_PRESERVED_SECTIONS = ['/runs', '/agents', '/tools', '/tasks', '/monitoring'] as const;
+
+export function buildSwitchHref(pathname: string, currentHandle: string, targetHandle: string): string {
+  const currentPrefix = currentHandle !== '' ? `/${currentHandle}` : '';
+  const targetPrefix = `/${targetHandle}`;
+  if (currentPrefix !== '' && pathname.startsWith(currentPrefix)) {
+    const rest = pathname.slice(currentPrefix.length);
+    const section = `/${rest.split('/').filter(Boolean)[0] ?? ''}`;
+    if ((SWITCH_PRESERVED_SECTIONS as readonly string[]).includes(section)) {
+      return `${targetPrefix}${rest}`;
+    }
+  }
+  return targetPrefix;
+}
+
 function NavItem({
   href,
   label,
@@ -208,7 +223,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <>
                     <Popover.Close asChild>
                       <Link
-                        href={`/${personalNamespace.handle}`}
+                        href={buildSwitchHref(pathname, handleFromPath, personalNamespace.handle)}
                         className={cn(
                           'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
                           handleFromPath === personalNamespace.handle ? 'text-foreground' : 'text-muted-foreground',
@@ -234,7 +249,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   return (
                     <Popover.Close asChild key={ns.handle}>
                       <Link
-                        href={`/${ns.handle}`}
+                        href={buildSwitchHref(pathname, handleFromPath, ns.handle)}
                         className={cn(
                           'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
                           isActive ? 'text-foreground' : 'text-muted-foreground',
