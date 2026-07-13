@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-07-05]
+
 ### Added
 - `mediforce-fullstack` gains a `TRIAGE_ONLY` mode: when set, the pipeline triages the batch and persists the verdict labels (incl. auto-closing proven-obsolete issues) then stops before `select`, so a run can label the backlog without opening any PR — pairs with `FULLSTACK_REASSIGN` to re-label the whole backlog for review. The flag is echoed into `fetch-candidates` / `apply-verdicts` output as `triageOnly` (transition expressions can't read env) and routes both to `done-empty`. `TRIAGE_BATCH_MAX` is now a `{{…}}` env ref (tunable without re-registering) and its default drops from `25` to the safer `10` for the grounded clone-and-verify triage pass.
 - Run **Files** panel now has a "Download all" button in the section header, so every Output File across all steps can be saved in one click instead of downloading each row individually.
