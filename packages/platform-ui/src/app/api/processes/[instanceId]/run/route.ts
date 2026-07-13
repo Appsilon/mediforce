@@ -488,6 +488,21 @@ export async function POST(
               pauseReason: 'waiting_for_human',
               updatedAt: new Date().toISOString(),
             });
+
+            // Dispatch task_assigned notification when the workflow declares
+            // one. Shared with the engine's advanceStep path so an
+            // already-current human step (e.g. a workflow whose first step is
+            // human) notifies role members / the assignee instead of staying
+            // pull-only. Sent after the pause so a notification failure cannot
+            // strand a created task with a non-paused instance.
+            const { engine } = getPlatformServices();
+            await engine.dispatchTaskAssignedNotification(workflowDefinition, {
+              instanceId,
+              stepId: instance.currentStepId,
+              assignedRole: currentStep.allowedRoles?.[0] ?? 'unassigned',
+              taskId,
+              assigneeUserId: assignedUserId,
+            });
             break;
           }
 

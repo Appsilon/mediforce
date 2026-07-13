@@ -27,8 +27,29 @@ class InMemoryUserDirectoryService implements UserDirectoryService {
       .map((u) => ({ uid: u.uid, email: u.email }));
   }
 
-  async getUserMetadata(): Promise<null> {
-    return null;
+  async resolveUser(identifier: string): Promise<DirectoryUser | null> {
+    const match = this.users.find(
+      (u) => u.uid === identifier || u.email === identifier,
+    );
+    return match ? { uid: match.uid, email: match.email } : null;
+  }
+
+  async getUserMetadata(
+    uid: string,
+  ): Promise<{
+    email: string | null;
+    displayName: string | null;
+    lastSignInTime: string | null;
+    photoURL: string | null;
+  } | null> {
+    const match = this.users.find((u) => u.uid === uid);
+    if (!match) return null;
+    return {
+      email: match.email,
+      displayName: null,
+      lastSignInTime: null,
+      photoURL: null,
+    };
   }
 }
 
@@ -120,6 +141,99 @@ describe('WorkflowEngine — task_assigned notification dispatch', () => {
     });
   });
 
+  it('also notifies the pre-assigned user when assignedTo resolves to someone outside the notified roles', async () => {
+    const assignedProcessDef: WorkflowDefinition = {
+      ...humanProcessDef,
+      name: 'human-process-assigned',
+      steps: humanProcessDef.steps.map((step) =>
+        step.id === 'review'
+          ? { ...step, assignedTo: '${triggerPayload.assignee}' }
+          : step,
+      ),
+    };
+    await processRepo.saveWorkflowDefinition(assignedProcessDef);
+
+    const userDirectoryService = new InMemoryUserDirectoryService();
+    userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
+    // Assignee is NOT a member of the 'reviewer' role.
+    userDirectoryService.addUser('operator', 'uid-a1', 'assignee@example.com');
+
+    const engine = new WorkflowEngine(
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      undefined,
+      undefined,
+      notificationService,
+      humanTaskRepo,
+      undefined,
+      userDirectoryService,
+    );
+
+    const instance = await engine.createInstance(
+      'test',
+      'human-process-assigned',
+      1,
+      'user-1',
+      'manual',
+      { assignee: 'uid-a1' },
+    );
+    await engine.startInstance(instance.id);
+    await engine.advanceStep(instance.id, { result: 'done' }, actor);
+
+    expect(notificationService.sent).toHaveLength(1);
+    const sent = notificationService.sent[0];
+    expect(sent.targets).toContainEqual({
+      channel: 'email',
+      address: 'reviewer@example.com',
+    });
+    expect(sent.targets).toContainEqual({
+      channel: 'email',
+      address: 'assignee@example.com',
+    });
+  });
+
+  it('notifies the fallback assignee (instance creator) when the notified roles are empty', async () => {
+    const emptyRolesDef: WorkflowDefinition = {
+      ...humanProcessDef,
+      name: 'human-process-empty-roles',
+      notifications: [{ event: 'task_assigned', roles: [] }],
+    };
+    await processRepo.saveWorkflowDefinition(emptyRolesDef);
+
+    const userDirectoryService = new InMemoryUserDirectoryService();
+    userDirectoryService.addUser('creator', 'user-1', 'creator@example.com');
+
+    const engine = new WorkflowEngine(
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      undefined,
+      undefined,
+      notificationService,
+      humanTaskRepo,
+      undefined,
+      userDirectoryService,
+    );
+
+    const instance = await engine.createInstance(
+      'test',
+      'human-process-empty-roles',
+      1,
+      'user-1',
+      'manual',
+      {},
+    );
+    await engine.startInstance(instance.id);
+    await engine.advanceStep(instance.id, { result: 'done' }, actor);
+
+    expect(notificationService.sent).toHaveLength(1);
+    expect(notificationService.sent[0].targets).toContainEqual({
+      channel: 'email',
+      address: 'creator@example.com',
+    });
+  });
+
   it('does not dispatch task_assigned when the workflow declares no such notification', async () => {
     const userDirectoryService = new InMemoryUserDirectoryService();
     userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
@@ -185,5 +299,80 @@ describe('WorkflowEngine — task_assigned notification dispatch', () => {
 
     expect(humanTaskRepo.getAll()).toHaveLength(1);
     expect(notificationService.sent).toHaveLength(0);
+  });
+
+  // The auto-runner (route.ts) creates the task for an already-current human
+  // step itself and calls this shared dispatch directly, rather than going
+  // through advanceStep. Assignee identifier is the raw resolved `assignedTo`
+  // value (uid or email), resolved to an email here.
+  describe('dispatchTaskAssignedNotification (shared with auto-runner)', () => {
+    it('notifies role members and the assignee for an already-current human step', async () => {
+      const userDirectoryService = new InMemoryUserDirectoryService();
+      userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
+      userDirectoryService.addUser('operator', 'uid-a1', 'assignee@example.com');
+
+      const engine = new WorkflowEngine(
+        processRepo,
+        instanceRepo,
+        auditRepo,
+        undefined,
+        undefined,
+        notificationService,
+        humanTaskRepo,
+        undefined,
+        userDirectoryService,
+      );
+
+      await engine.dispatchTaskAssignedNotification(humanProcessDef, {
+        instanceId: 'inst-1',
+        stepId: 'review',
+        assignedRole: 'reviewer',
+        taskId: 'task-1',
+        assigneeUserId: 'uid-a1',
+      });
+
+      expect(notificationService.sent).toHaveLength(1);
+      const sent = notificationService.sent[0];
+      expect(sent.event.type).toBe('task_assigned');
+      expect(sent.event.entityId).toBe('task-1');
+      expect(sent.targets).toContainEqual({
+        channel: 'email',
+        address: 'reviewer@example.com',
+      });
+      expect(sent.targets).toContainEqual({
+        channel: 'email',
+        address: 'assignee@example.com',
+      });
+    });
+
+    it('is a no-op when the workflow declares no task_assigned notification', async () => {
+      const userDirectoryService = new InMemoryUserDirectoryService();
+      userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
+
+      const engine = new WorkflowEngine(
+        processRepo,
+        instanceRepo,
+        auditRepo,
+        undefined,
+        undefined,
+        notificationService,
+        humanTaskRepo,
+        undefined,
+        userDirectoryService,
+      );
+
+      await engine.dispatchTaskAssignedNotification(
+        { ...humanProcessDef, notifications: [] },
+        {
+          instanceId: 'inst-1',
+          stepId: 'review',
+          assignedRole: 'reviewer',
+          taskId: 'task-1',
+          assigneeUserId: 'uid-a1',
+        },
+      );
+
+      expect(notificationService.sent).toHaveLength(0);
+    });
   });
 });
