@@ -1,4 +1,5 @@
-import type { CronTriggerState, Trigger, WorkflowDefinition } from '@mediforce/platform-core';
+import type { CronTriggerState, ProcessInstance, Trigger, WorkflowDefinition } from '@mediforce/platform-core';
+import { resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 import { validateCronSchedule, isDue } from '@mediforce/workflow-engine';
 import type {
   HeartbeatInput,
@@ -12,17 +13,40 @@ import { resumeWait } from '../processes/resume-wait';
 
 type Evaluation = { fire: true } | { fire: false; reason: string };
 
-// A `running` instance whose `updatedAt` is older than this has no live
-// auto-runner: its driving `/run` request died mid-step (deploy, crash, or
-// request timeout). The bound sits comfortably above the runtime's default
-// 30-minute step timeout so a legitimately long step is never mistaken for a
-// stranded one — a live driver would have enforced that timeout and advanced
-// or failed the step long before this elapses. A step that overrides
-// `timeoutMinutes` to >= 45 could be swept while its driver is alive; that is
-// a no-op today (the /run 409 lock guard, single-process) and no shipped
-// workflow configures such a step — deriving the bound from the step's own
-// timeout is the tracked follow-up.
-export const STRANDED_RUNNING_THRESHOLD_MS = 45 * 60 * 1000;
+// Grace added on top of a running step's own timeout before its instance is
+// treated as stranded. A live driver enforces the step timeout and then
+// advances or fails the step (refreshing `updatedAt`); this grace covers the
+// gap between the timeout firing and that write, plus queue/spawn latency, so a
+// driver about to enforce its own timeout is never pre-empted.
+const STRANDED_GRACE_MS = 15 * 60 * 1000;
+
+// Fallback age used only when a run's current step (or its definition) can't be
+// resolved. Mirrors the runtime's 30-minute default step timeout + grace. The
+// live path derives the bound from the current step's *configured* timeout
+// (`strandedBudgetMs`) so a step that legitimately runs longer than the default
+// is never mistaken for stranded.
+export const STRANDED_RUNNING_THRESHOLD_MS = 30 * 60 * 1000 + STRANDED_GRACE_MS;
+
+// Longest a `running` instance may sit idle (no `updatedAt` refresh) before its
+// driver is presumed dead: the current step's effective timeout + grace. Falls
+// back to the default bound when the step or its definition can't be loaded.
+async function strandedBudgetMs(
+  inst: ProcessInstance,
+  scope: CallerScope,
+): Promise<number> {
+  if (inst.currentStepId === null) return STRANDED_RUNNING_THRESHOLD_MS;
+  try {
+    const version = parseInt(inst.definitionVersion, 10);
+    const def = Number.isNaN(version)
+      ? null
+      : await scope.workflowDefinitions.get(inst.namespace ?? '', inst.definitionName, version);
+    const step = def?.steps.find((s) => s.id === inst.currentStepId);
+    if (step === undefined) return STRANDED_RUNNING_THRESHOLD_MS;
+    return resolveStepTimeoutMinutes(step) * 60_000 + STRANDED_GRACE_MS;
+  } catch {
+    return STRANDED_RUNNING_THRESHOLD_MS;
+  }
+}
 
 function evaluateTrigger(
   trigger: Trigger,
@@ -189,14 +213,15 @@ export async function heartbeat(
   // (Contrast the orphan sweep above, which *fails* paused/null runs — a
   // paused run cannot be re-kicked because /run requires status=running.)
   const runningInstances = await scope.runs.getByStatus('running');
-  const strandedInstances = runningInstances.filter(
-    (inst) => now.getTime() - new Date(inst.updatedAt).getTime() >= STRANDED_RUNNING_THRESHOLD_MS,
-  );
 
-  for (const inst of strandedInstances) {
-    const idleMinutes = Math.round(
-      (now.getTime() - new Date(inst.updatedAt).getTime()) / 60000,
-    );
+  for (const inst of runningInstances) {
+    const idleMs = now.getTime() - new Date(inst.updatedAt).getTime();
+    // Derive the bound from the current step's own timeout so a step that
+    // legitimately runs longer than the default is never mistaken for stranded.
+    const budgetMs = await strandedBudgetMs(inst, scope);
+    if (idleMs < budgetMs) continue;
+
+    const idleMinutes = Math.round(idleMs / 60000);
     try {
       await scope.system.audit.append({
         actorId: 'cron-heartbeat',
