@@ -1,9 +1,19 @@
+import { routes } from '@/lib/routes';
+
 /**
- * Stable top-level sections that exist identically in every workspace. When a
- * user is on one of these *list* routes, switching workspace should land on the
- * equivalent list in the target workspace rather than the workspace root.
+ * Top-level list sections that exist identically in every workspace, keyed to
+ * the centralized route builder (`routes`) — the single source of truth for
+ * app URLs. When a user is on one of these *list* routes, switching workspace
+ * should land on the equivalent list in the target workspace rather than the
+ * workspace root.
  */
-const STABLE_SECTIONS = ['runs', 'agents', 'tools', 'tasks', 'monitoring'] as const;
+const SECTION_ROUTES: Record<string, (handle: string) => string> = {
+  runs: routes.runs,
+  agents: routes.agents,
+  tools: routes.tools,
+  tasks: routes.tasks,
+  monitoring: routes.monitoring,
+};
 
 /**
  * Build the href the namespace switcher should navigate to when leaving
@@ -26,7 +36,7 @@ export function workspaceSwitchHref(
   const rest = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : pathname;
   const segments = rest.split('/').filter(Boolean);
   const [section] = segments;
-  const isStableList =
-    segments.length === 1 && (STABLE_SECTIONS as readonly string[]).includes(section ?? '');
-  return isStableList ? `/${targetHandle}/${section}` : `/${targetHandle}`;
+  const buildSectionRoute = SECTION_ROUTES[section ?? ''];
+  const isStableList = segments.length === 1 && buildSectionRoute !== undefined;
+  return isStableList ? buildSectionRoute(targetHandle) : routes.home(targetHandle);
 }
