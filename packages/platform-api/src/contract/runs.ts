@@ -160,3 +160,14 @@ export const DownloadRunOutputFileInputSchema = z.object({
 });
 
 export type DownloadRunOutputFileInput = z.infer<typeof DownloadRunOutputFileInputSchema>;
+
+/**
+ * Client-side input for `GET /api/runs/<runId>/files/archive` (zip download).
+ * The response is a zip stream, so there is no output schema — the client
+ * returns `{ fileName, bytes }`.
+ */
+export const DownloadOutputFilesArchiveInputSchema = z.object({
+  runId: z.string().min(1),
+});
+
+export type DownloadOutputFilesArchiveInput = z.infer<typeof DownloadOutputFilesArchiveInputSchema>;

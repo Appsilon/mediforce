@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Download, Eye, File, FileArchive, FileImage, FileSpreadsheet, FileText, type LucideIcon } from 'lucide-react';
+import { Download, DownloadCloud, Eye, File, FileArchive, FileImage, FileSpreadsheet, FileText, type LucideIcon } from 'lucide-react';
 import type { Step } from '@mediforce/platform-core';
 import type { RunOutputFileEntry } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
@@ -155,17 +155,17 @@ export function RunOutputFilesPanel({
     return null;
   }
 
+  const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+
   async function handleDownloadAll() {
     setDownloadingAll(true);
     setDownloadAllError(null);
     try {
-      // Sequential so browsers keep every "save file" flow rather than
-      // dropping concurrent ones, and to avoid hammering the API at once.
-      for (const group of groups) {
-        for (const file of group.files) {
-          await downloadOutputFile(runId, file);
-        }
-      }
+      const archive = await mediforce.runs.downloadOutputFilesArchive({ runId });
+      saveBlobToDevice(
+        new Blob([archive.bytes.slice()], { type: 'application/zip' }),
+        archive.fileName,
+      );
     } catch (err) {
       setDownloadAllError(err instanceof Error ? err.message : 'Download failed');
     } finally {
@@ -184,10 +184,10 @@ export function RunOutputFilesPanel({
           <button
             onClick={handleDownloadAll}
             disabled={downloadingAll}
-            className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50 shrink-0"
+            className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline disabled:opacity-50 shrink-0"
           >
-            <Download className="h-3 w-3" />
-            {downloadingAll ? 'Downloading...' : 'Download all'}
+            <DownloadCloud className="h-3.5 w-3.5" />
+            {downloadingAll ? 'Downloading...' : `Download all (${formatBytes(totalSize)})`}
           </button>
         </div>
       </div>
