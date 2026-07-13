@@ -47,6 +47,16 @@ any workflows you registered there are **never touched**. If a journey creates a
 workspace handle that isn't in the cleanup list, add it to the `E2E_WORKSPACES` array
 in [e2e/helpers/postgres-seed.ts](../packages/platform-ui/e2e/helpers/postgres-seed.ts).
 
+### E2E build freshness
+
+`start:e2e` never serves a stale `.next`: `build:e2e` stamps `git rev-parse HEAD`
+into `.next/BUILD_GIT_SHA`, and `start:e2e` rebuilds whenever that stamp is missing
+or differs from `HEAD`. Switching branches / editing source and running the e2e
+suite therefore always serves a bundle built from the current source. A leftover
+`.next` from a previous commit no longer short-circuits the rebuild. CI keeps its
+source-hash `.next` cache — on a cache hit the stamp already matches `HEAD`, so no
+rebuild runs there.
+
 ## CLI cheat sheet
 
 Dogfood rule: **CLI > REST.** Full guide: [use-mediforce skill](../.claude/skills/use-mediforce/SKILL.md).
