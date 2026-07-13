@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WorkspaceReader } from '@mediforce/agent-runtime';
 import { HandlerError, NotFoundError } from '@mediforce/platform-api/errors';
-import { defaultBuildScope, defaultResolveCaller } from '@/lib/route-adapter';
+import { defaultBuildScope, defaultResolveCaller, jsonErrorResponse } from '@/lib/route-adapter';
 import { attachmentContentDisposition } from '@/lib/file-content-type';
 
 interface RouteContext {
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest, ctx: RouteContext): Promise<NextResp
 
     const run = await scope.runs.getById(runId);
     if (run === null) {
-      return errorResponse(new NotFoundError(`Run ${runId} not found`));
+      return jsonErrorResponse(new NotFoundError(`Run ${runId} not found`));
     }
 
     const archive = await new WorkspaceReader().archiveOutputFiles(
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest, ctx: RouteContext): Promise<NextResp
       runId,
     );
     if (archive === null) {
-      return errorResponse(new NotFoundError(`No output files found for run ${runId}`));
+      return jsonErrorResponse(new NotFoundError(`No output files found for run ${runId}`));
     }
 
     const fileName = `${run.definitionName}-${runId.slice(0, 8)}-output.zip`;
@@ -45,12 +45,8 @@ export async function GET(req: NextRequest, ctx: RouteContext): Promise<NextResp
       },
     });
   } catch (err) {
-    if (err instanceof HandlerError) return errorResponse(err);
+    if (err instanceof HandlerError) return jsonErrorResponse(err);
     console.error('[run-output-files-archive-route] handler error:', err);
-    return errorResponse(new HandlerError('internal', 'Internal error'));
+    return jsonErrorResponse(new HandlerError('internal', 'Internal error'));
   }
-}
-
-function errorResponse(err: HandlerError): NextResponse {
-  return NextResponse.json(err.toEnvelope(), { status: err.statusCode });
 }

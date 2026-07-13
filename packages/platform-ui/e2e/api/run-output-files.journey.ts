@@ -4,8 +4,9 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { seedOutputFiles } from '../helpers/seed-output-files';
 
 /**
- * API E2E for Output Files: list (`GET /api/runs/<runId>/files`) and download
- * (`GET /api/runs/<runId>/files/<path>`).
+ * API E2E for Output Files: list (`GET /api/runs/<runId>/files`), download one
+ * (`GET /api/runs/<runId>/files/<path>`), and download all as a zip
+ * (`GET /api/runs/<runId>/files/archive`).
  *
  * The run itself is driven end-to-end through the platform (agent step under
  * MOCK_AGENT=true), but the Output Files are SEEDED into the bare repo with
@@ -168,6 +169,19 @@ test.describe('Run Output Files — API E2E', () => {
     expect((await binRes.body()).equals(binaryContent)).toBe(true);
     expect(binRes.headers()['content-type']).toBe('application/octet-stream');
 
+    // -------- Download all as one zip archive --------
+    const archiveRes = await request.get(`/api/runs/${runId}/files/archive`, { headers: AUTH_HEADERS });
+    expect(archiveRes.status(), await archiveRes.text()).toBe(200);
+    expect(archiveRes.headers()['content-type']).toBe('application/zip');
+    expect(archiveRes.headers()['content-disposition']).toBe(
+      `attachment; filename="${wdName}-${runId.slice(0, 8)}-output.zip"; ` +
+        `filename*=UTF-8''${wdName}-${runId.slice(0, 8)}-output.zip`,
+    );
+    // Zip local-file-header magic — proves a real archive, not an error body.
+    const archiveBody = await archiveRes.body();
+    expect(archiveBody.subarray(0, 2).toString('latin1')).toBe('PK');
+    expect(archiveBody.byteLength).toBeGreaterThan(0);
+
     // -------- Missing file under the output root → 404, not bytes --------
     const ghostRes = await request.get(`/api/runs/${runId}/files/.mediforce/output/generate/ghost.txt`, {
       headers: AUTH_HEADERS,
@@ -194,13 +208,22 @@ test.describe('Run Output Files — API E2E', () => {
     // -------- Listing a missing run → 404 (anti-enumeration) --------
     const missingRunRes = await request.get('/api/runs/no-such-run/files', { headers: AUTH_HEADERS });
     expect(missingRunRes.status()).toBe(404);
+
+    // -------- Archiving a missing / out-of-scope run → 404 (anti-enumeration) --------
+    const missingArchiveRes = await request.get('/api/runs/no-such-run/files/archive', {
+      headers: AUTH_HEADERS,
+    });
+    expect(missingArchiveRes.status()).toBe(404);
   });
 
-  test('rejects unauthenticated access to both routes with 401', async ({ request }) => {
+  test('rejects unauthenticated access to all routes with 401', async ({ request }) => {
     const listRes = await request.get('/api/runs/any-run/files');
     expect(listRes.status()).toBe(401);
 
     const downloadRes = await request.get('/api/runs/any-run/files/.mediforce/output/step/file.txt');
     expect(downloadRes.status()).toBe(401);
+
+    const archiveRes = await request.get('/api/runs/any-run/files/archive');
+    expect(archiveRes.status()).toBe(401);
   });
 });
