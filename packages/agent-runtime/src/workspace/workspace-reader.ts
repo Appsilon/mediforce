@@ -113,4 +113,24 @@ export class WorkspaceReader {
       return null;
     }
   }
+
+  /**
+   * All Output Files as a zip archive via `git archive`. Entries are rooted
+   * at the output tree (`<stepId>/<fileName>`) — the `.mediforce/output/`
+   * prefix is stripped by archiving the subtree object directly.
+   * Returns null when the repo, branch, or output directory doesn't exist.
+   */
+  async archiveOutputFiles(workflow: WorkflowIdentity, runId: string): Promise<Buffer | null> {
+    const bareRepoPath = bareRepoPathFor(this.dataDir, workflow);
+    try {
+      const { stdout } = await execFileAsync(
+        'git',
+        ['archive', '--format=zip', `${runBranchName(runId)}:${OUTPUT_FILES_REPO_ROOT}`],
+        { cwd: bareRepoPath, encoding: 'buffer', maxBuffer: gitMaxBuffer() },
+      );
+      return stdout;
+    } catch {
+      return null;
+    }
+  }
 }

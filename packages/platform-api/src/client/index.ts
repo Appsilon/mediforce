@@ -24,6 +24,7 @@ import {
   ListRunOutputFilesInputSchema,
   ListRunOutputFilesOutputSchema,
   DownloadRunOutputFileInputSchema,
+  DownloadOutputFilesArchiveInputSchema,
   ArchiveVersionInputSchema,
   ArchiveVersionOutputSchema,
   ArchiveAllInputSchema,
@@ -278,6 +279,7 @@ import {
   type ListRunOutputFilesInput,
   type ListRunOutputFilesOutput,
   type DownloadRunOutputFileInput,
+  type DownloadOutputFilesArchiveInput,
   type DockerInfoResponse,
   type OpenRouterCreditsInput,
   type OpenRouterCreditsOutput,
@@ -472,6 +474,11 @@ export interface DownloadedRunOutputFile {
   bytes: Uint8Array;
 }
 
+export interface DownloadedOutputFilesArchive {
+  fileName: string;
+  bytes: Uint8Array;
+}
+
 export class Mediforce {
   readonly tasks: {
     list: (input: ListTasksInput) => Promise<ListTasksOutput>;
@@ -557,6 +564,7 @@ export class Mediforce {
     get: (input: GetRunInput) => Promise<GetRunOutput>;
     listOutputFiles: (input: ListRunOutputFilesInput) => Promise<ListRunOutputFilesOutput>;
     downloadOutputFile: (input: DownloadRunOutputFileInput) => Promise<DownloadedRunOutputFile>;
+    downloadOutputFilesArchive: (input: DownloadOutputFilesArchiveInput) => Promise<DownloadedOutputFilesArchive>;
     start: (input: StartRunInput) => Promise<StartRunOutput>;
     cancel: (input: CancelRunInput) => Promise<CancelRunOutput>;
     resume: (input: ResumeRunInput) => Promise<ResumeRunOutput>;
@@ -1306,6 +1314,22 @@ export class Mediforce {
         return {
           fileName,
           contentType: res.headers.get('Content-Type') ?? 'application/octet-stream',
+          bytes: new Uint8Array(await res.arrayBuffer()),
+        };
+      },
+      downloadOutputFilesArchive: async (input) => {
+        const validated = DownloadOutputFilesArchiveInputSchema.parse(input);
+        const res = await this.request(
+          `/api/runs/${encodeURIComponent(validated.runId)}/files/archive`,
+        );
+        if (res.ok === false) {
+          await parseJsonOrThrow(res, 'mediforce.runs.downloadOutputFilesArchive');
+        }
+        const fileName =
+          fileNameFromContentDisposition(res.headers.get('Content-Disposition')) ??
+          'output.zip';
+        return {
+          fileName,
           bytes: new Uint8Array(await res.arrayBuffer()),
         };
       },

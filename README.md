@@ -30,16 +30,21 @@ Mediforce is that infrastructure. Open-source, built for pharma, designed so you
 
 Processes are made of steps. Each step can be performed by a human, an AI agent, or both — with clear rules about who decides what.
 
-### Configurable Autonomy
+### Configurable Control Modes
 
-| Level | Agent Role | Human Involvement |
-|-------|-----------|-------------------|
-| **L1 — Observer** | Watches and surfaces insights | Informational only |
-| **L2 — Advisor** | Suggests actions | Human decides and acts |
-| **L3 — Drafter** | Does the work, submits for review | Human approves or sends back |
-| **L4 — Executor** | Acts autonomously | Human reviews periodically |
+Every step is assigned a Control Mode (CM0–CM4) — the same picker used in the workflow designer's step-type popover:
 
-At any level, an agent can signal uncertainty and escalate to a human. This isn't a failure mode — it's how the system maintains safety in production.
+| Mode | What it means |
+|------|----------------|
+| **No agent** `CM0` | Human, script, or automated action - no AI involved. Full manual control. |
+| **Assist** `CM1` _(coming soon)_ | Human leads and does the work; AI reviews the result afterward. |
+| **Cowork** `CM2` | Agent and human work together in real time, via chat or voice. |
+| **Human review** `CM3` | Agent completes the step; a human reviews and approves before the workflow proceeds. |
+| **Autonomous agent** `CM4` | Agent completes the step and the workflow advances on its own; a human can review after the fact via the audit trail. |
+
+`executor` and `autonomyLevel` remain the underlying schema fields (unchanged); Control Mode is a UI-only classification layered on top — see [`docs/design/AUTONOMY-LEVELS-REFACTOR.md`](docs/design/AUTONOMY-LEVELS-REFACTOR.md).
+
+At any mode, an agent can signal uncertainty and escalate to a human. This isn't a failure mode — it's how the system maintains safety in production.
 
 ### What Agents Actually Do
 
@@ -69,14 +74,6 @@ The core decision point. Reviewers see full context from the agent's work and su
 
 <div align="center">
 <img src="docs/features/task-approve-flow.gif" alt="Task approval flow with agent context" width="720" />
-</div>
-
-### Autonomy Levels on Every Step
-
-Each step displays its autonomy configuration (L1–L4) so operators always know what's agent-driven and what requires human action.
-
-<div align="center">
-<img src="docs/features/run-detail-autonomy-badges.gif" alt="Process run with autonomy level badges" width="720" />
 </div>
 
 ## Why Open Source

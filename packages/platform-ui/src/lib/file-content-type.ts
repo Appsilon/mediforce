@@ -3,6 +3,7 @@
  * Single source for the extension → MIME map and the RFC 6266 attachment
  * header, shared by `/api/agent-output-file` and `/api/runs/[runId]/files/[...path]`.
  */
+import { extensionOf } from './file-extension';
 
 const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
   html: 'text/html; charset=utf-8',
@@ -22,8 +23,7 @@ const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
 };
 
 export function contentTypeForFilePath(filePath: string): string {
-  const extension = filePath.split('.').pop()?.toLowerCase() ?? '';
-  return CONTENT_TYPE_BY_EXTENSION[extension] ?? 'application/octet-stream';
+  return CONTENT_TYPE_BY_EXTENSION[extensionOf(filePath)] ?? 'application/octet-stream';
 }
 
 /**

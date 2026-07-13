@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WorkspaceReader, OUTPUT_FILES_REPO_ROOT } from '@mediforce/agent-runtime';
 import { HandlerError, NotFoundError, ValidationError } from '@mediforce/platform-api/errors';
-import { defaultBuildScope, defaultResolveCaller } from '@/lib/route-adapter';
+import { defaultBuildScope, defaultResolveCaller, jsonErrorResponse } from '@/lib/route-adapter';
 import { attachmentContentDisposition, contentTypeForFilePath } from '@/lib/file-content-type';
 
 interface RouteContext {
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest, ctx: RouteContext): Promise<NextResp
       repoRelativePath.startsWith(OUTPUT_FILES_PATH_PREFIX) &&
       repoRelativePath.length > OUTPUT_FILES_PATH_PREFIX.length;
     if (hasTraversalSegment === true || isUnderOutputRoot === false) {
-      return errorResponse(
+      return jsonErrorResponse(
         new ValidationError(
           `Output File paths must live under ${OUTPUT_FILES_PATH_PREFIX} and contain no ".." segments`,
         ),
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest, ctx: RouteContext): Promise<NextResp
 
     const run = await scope.runs.getById(runId);
     if (run === null) {
-      return errorResponse(new NotFoundError(`Run ${runId} not found`));
+      return jsonErrorResponse(new NotFoundError(`Run ${runId} not found`));
     }
 
     const fileBytes = await new WorkspaceReader().readOutputFile(
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest, ctx: RouteContext): Promise<NextResp
       repoRelativePath,
     );
     if (fileBytes === null) {
-      return errorResponse(new NotFoundError(`Output File ${repoRelativePath} not found for run ${runId}`));
+      return jsonErrorResponse(new NotFoundError(`Output File ${repoRelativePath} not found for run ${runId}`));
     }
 
     const fileName = repoRelativePath.split('/').pop() ?? 'download';
@@ -76,12 +76,8 @@ export async function GET(req: NextRequest, ctx: RouteContext): Promise<NextResp
       },
     });
   } catch (err) {
-    if (err instanceof HandlerError) return errorResponse(err);
+    if (err instanceof HandlerError) return jsonErrorResponse(err);
     console.error('[run-output-file-route] handler error:', err);
-    return errorResponse(new HandlerError('internal', 'Internal error'));
+    return jsonErrorResponse(new HandlerError('internal', 'Internal error'));
   }
-}
-
-function errorResponse(err: HandlerError): NextResponse {
-  return NextResponse.json(err.toEnvelope(), { status: err.statusCode });
 }
