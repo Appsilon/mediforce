@@ -4,6 +4,7 @@ import {
   InMemoryCronTriggerStateRepository,
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
+  buildProcessInstance,
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
@@ -188,5 +189,81 @@ describe('heartbeat handler', () => {
     });
     expect(fireWorkflow).not.toHaveBeenCalled();
     expect(kicker.kicks).toHaveLength(0);
+  });
+
+  it('re-kicks a running run stranded past the idle bound and emits an audit', async () => {
+    const strandedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-stranded',
+        namespace: 'team-alpha',
+        status: 'running',
+        currentStepId: 'arm-timer',
+        updatedAt: strandedAt,
+      }),
+    );
+
+    const kicker = noopRunKicker();
+    const scope = createTestScope({
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      cronTriggerStateRepo,
+      runKicker: kicker,
+    });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
+
+    const result = await heartbeat({}, scope);
+
+    expect(result.triggered).toHaveLength(0);
+    expect(result.skipped).toHaveLength(0);
+
+    expect(kicker.kicks).toEqual([
+      { instanceId: 'inst-stranded', triggeredBy: 'cron-heartbeat' },
+    ]);
+
+    const events = await auditRepo.getByProcess('inst-stranded');
+    const event = events.find((e) => e.action === 'instance.stranded_rekicked');
+    expect(event).toBeDefined();
+    expect(event!.actorId).toBe('cron-heartbeat');
+    expect(event!.actorType).toBe('system');
+    expect(event!.actorRole).toBe('scheduler');
+    expect(event!.entityType).toBe('processInstance');
+    expect(event!.entityId).toBe('inst-stranded');
+    expect(event!.processInstanceId).toBe('inst-stranded');
+    expect(event!.inputSnapshot).toMatchObject({
+      runId: 'inst-stranded',
+      currentStepId: 'arm-timer',
+      updatedAt: strandedAt,
+    });
+    expect(event!.outputSnapshot).toMatchObject({ reKick: true });
+  });
+
+  it('does not re-kick a recently-updated running run', async () => {
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-fresh',
+        namespace: 'team-alpha',
+        status: 'running',
+        currentStepId: 'arm-timer',
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+
+    const kicker = noopRunKicker();
+    const scope = createTestScope({
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      cronTriggerStateRepo,
+      runKicker: kicker,
+    });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
+
+    await heartbeat({}, scope);
+
+    expect(kicker.kicks).toHaveLength(0);
+    const events = await auditRepo.getByProcess('inst-fresh');
+    expect(events.filter((e) => e.action === 'instance.stranded_rekicked')).toEqual([]);
   });
 });
