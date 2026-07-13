@@ -1,7 +1,7 @@
 {
   "name": "mediforce-fullstack",
   "visibility": "private",
-  "title": "MediForce Fullstack (autonomous issue -> PR)",
+  "title": "Fixed re-triage on modified issues",
   "description": "Every 15 min: triage clones main and classifies un-triaged issues on Appsilon/mediforce against the actual code with persisted fullstack: labels (analysed once each), auto-closing ones it proves obsolete; then it autonomously implements confident ones as ready-for-review PRs, gates ambiguous ones for a human, self-reviews with a bounded revise loop, and auto-closes already-fixed issues. Idempotent + self-healing via labels and a 2h lease.",
   "roles": [
     "admin"
@@ -476,6 +476,11 @@
     }
   ],
   "triggers": [
+    {
+      "type": "cron",
+      "name": "every-15-min",
+      "schedule": "*/15 * * * *"
+    },
     {
       "type": "manual",
       "name": "manual"
