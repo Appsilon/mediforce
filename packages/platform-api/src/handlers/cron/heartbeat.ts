@@ -1,4 +1,5 @@
-import type { CronTriggerState, Trigger, WorkflowDefinition } from '@mediforce/platform-core';
+import type { CronTriggerState, ProcessInstance, Trigger, WorkflowDefinition } from '@mediforce/platform-core';
+import { resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 import { validateCronSchedule, isDue } from '@mediforce/workflow-engine';
 import type {
   HeartbeatInput,
@@ -11,6 +12,41 @@ import { ForbiddenError, PreconditionFailedError } from '../../errors';
 import { resumeWait } from '../processes/resume-wait';
 
 type Evaluation = { fire: true } | { fire: false; reason: string };
+
+// Grace added on top of a running step's own timeout before its instance is
+// treated as stranded. A live driver enforces the step timeout and then
+// advances or fails the step (refreshing `updatedAt`); this grace covers the
+// gap between the timeout firing and that write, plus queue/spawn latency, so a
+// driver about to enforce its own timeout is never pre-empted.
+const STRANDED_GRACE_MS = 15 * 60 * 1000;
+
+// Fallback age used only when a run's current step (or its definition) can't be
+// resolved. Mirrors the runtime's 30-minute default step timeout + grace. The
+// live path derives the bound from the current step's *configured* timeout
+// (`strandedBudgetMs`) so a step that legitimately runs longer than the default
+// is never mistaken for stranded.
+export const STRANDED_RUNNING_THRESHOLD_MS = 30 * 60 * 1000 + STRANDED_GRACE_MS;
+
+// Longest a `running` instance may sit idle (no `updatedAt` refresh) before its
+// driver is presumed dead: the current step's effective timeout + grace. Falls
+// back to the default bound when the step or its definition can't be loaded.
+async function strandedBudgetMs(
+  inst: ProcessInstance,
+  scope: CallerScope,
+): Promise<number> {
+  if (inst.currentStepId === null) return STRANDED_RUNNING_THRESHOLD_MS;
+  try {
+    const version = parseInt(inst.definitionVersion, 10);
+    const def = Number.isNaN(version)
+      ? null
+      : await scope.workflowDefinitions.get(inst.namespace ?? '', inst.definitionName, version);
+    const step = def?.steps.find((s) => s.id === inst.currentStepId);
+    if (step === undefined) return STRANDED_RUNNING_THRESHOLD_MS;
+    return resolveStepTimeoutMinutes(step) * 60_000 + STRANDED_GRACE_MS;
+  } catch {
+    return STRANDED_RUNNING_THRESHOLD_MS;
+  }
+}
 
 function evaluateTrigger(
   trigger: Trigger,
@@ -164,6 +200,51 @@ export async function heartbeat(
       console.log(`[cron-heartbeat] Escalated orphaned paused run '${inst.id}' (step: ${inst.currentStepId}) to failed`);
     } catch (err) {
       console.error(`[cron-heartbeat] Failed to escalate orphaned run '${inst.id}':`, err);
+    }
+  }
+
+  // Sweep: re-kick runs stranded in `running`. Their driving auto-runner
+  // request died mid-step, leaving status=running with no process advancing
+  // them — the paused sweeps above only query `paused`, so nothing else can
+  // ever see them and they sit at their current step indefinitely. A re-kick
+  // re-enters the /run loop from the current step. It is idempotent: /run
+  // rejects the POST with 409 while a live driver still holds the per-process
+  // lock, so this only advances runs whose driver is genuinely gone.
+  // (Contrast the orphan sweep above, which *fails* paused/null runs — a
+  // paused run cannot be re-kicked because /run requires status=running.)
+  const runningInstances = await scope.runs.getByStatus('running');
+
+  for (const inst of runningInstances) {
+    const idleMs = now.getTime() - new Date(inst.updatedAt).getTime();
+    // Derive the bound from the current step's own timeout so a step that
+    // legitimately runs longer than the default is never mistaken for stranded.
+    const budgetMs = await strandedBudgetMs(inst, scope);
+    if (idleMs < budgetMs) continue;
+
+    const idleMinutes = Math.round(idleMs / 60000);
+    try {
+      await scope.system.audit.append({
+        actorId: 'cron-heartbeat',
+        actorType: 'system',
+        actorRole: 'scheduler',
+        action: 'instance.stranded_rekicked',
+        // "attempted", not "re-kicked": runKicker.kick is fire-and-forget and
+        // gives no completion signal, so this records the sweep's action, not
+        // that the run necessarily advanced (a still-live driver 409s the POST).
+        description: `Stranded running run '${inst.id}' re-kick attempted (idle ${idleMinutes}m at step '${inst.currentStepId}')`,
+        timestamp: now.toISOString(),
+        inputSnapshot: { runId: inst.id, currentStepId: inst.currentStepId, idleMinutes },
+        outputSnapshot: {},
+        basis: 'Heartbeat stranded sweep: running run with no live auto-runner',
+        entityType: 'processInstance',
+        entityId: inst.id,
+        processInstanceId: inst.id,
+        processDefinitionVersion: inst.definitionVersion,
+      });
+      await scope.system.runKicker.kick(inst.id, { triggeredBy: 'cron-heartbeat-stranded' });
+      console.log(`[cron-heartbeat] Re-kick attempted for stranded running run '${inst.id}' (step: ${inst.currentStepId}, idle ${idleMinutes}m)`);
+    } catch (err) {
+      console.error(`[cron-heartbeat] Failed to re-kick stranded run '${inst.id}':`, err);
     }
   }
 

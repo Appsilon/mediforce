@@ -4,10 +4,11 @@ import {
   InMemoryCronTriggerStateRepository,
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
+  buildProcessInstance,
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { heartbeat } from '../heartbeat';
+import { heartbeat, STRANDED_RUNNING_THRESHOLD_MS } from '../heartbeat';
 import { ForbiddenError } from '../../../errors';
 import {
   createTestScope,
@@ -146,6 +147,191 @@ describe('heartbeat handler', () => {
     expect(kicker.kicks).toEqual([
       { instanceId: 'inst-new-1', triggeredBy: 'cron-heartbeat' },
     ]);
+  });
+
+  it('re-kicks a running instance stranded past the threshold (driver died mid-step)', async () => {
+    // status=running, but not updated for 2h — its auto-runner request died
+    // mid-step. The paused sweeps can never see it; without the stranded sweep
+    // it sits at its current step forever.
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-stranded',
+        namespace: 'team-alpha',
+        status: 'running',
+        currentStepId: 'arm-timer',
+        updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      }),
+    );
+    const kicker = noopRunKicker();
+    const scope = createTestScope({
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      cronTriggerStateRepo,
+      runKicker: kicker,
+    });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
+
+    await heartbeat({}, scope);
+
+    expect(kicker.kicks).toContainEqual(
+      expect.objectContaining({ instanceId: 'inst-stranded' }),
+    );
+    const events = await auditRepo.getByProcess('inst-stranded');
+    expect(events.map((e) => e.action)).toContain('instance.stranded_rekicked');
+  });
+
+  it('honors a step\'s configured timeout: no re-kick while within the custom budget', async () => {
+    // A step configured with a 90-minute timeout, idle 60m — over the 45m
+    // default bound but well within its own budget (90m + grace). A fixed bound
+    // would have mistaken this live run for stranded.
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'slow-wf',
+        namespace: 'team-alpha',
+        version: 1,
+        steps: [
+          {
+            id: 'slow-step',
+            name: 'Slow step',
+            type: 'creation',
+            executor: 'agent',
+            autonomyLevel: 'L4',
+            agent: { timeoutMinutes: 90 },
+          },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'slow-step', to: 'done' }],
+      }),
+    );
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-slow',
+        namespace: 'team-alpha',
+        definitionName: 'slow-wf',
+        definitionVersion: '1',
+        status: 'running',
+        currentStepId: 'slow-step',
+        updatedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      }),
+    );
+    const kicker = noopRunKicker();
+    const scope = createTestScope({
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      cronTriggerStateRepo,
+      runKicker: kicker,
+    });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
+
+    await heartbeat({}, scope);
+
+    expect(kicker.kicks).toHaveLength(0);
+  });
+
+  it('re-kicks a running instance past its step\'s configured timeout + grace', async () => {
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'slow-wf',
+        namespace: 'team-alpha',
+        version: 1,
+        steps: [
+          {
+            id: 'slow-step',
+            name: 'Slow step',
+            type: 'creation',
+            executor: 'agent',
+            autonomyLevel: 'L4',
+            agent: { timeoutMinutes: 90 },
+          },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'slow-step', to: 'done' }],
+      }),
+    );
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-slow-dead',
+        namespace: 'team-alpha',
+        definitionName: 'slow-wf',
+        definitionVersion: '1',
+        status: 'running',
+        currentStepId: 'slow-step',
+        // 120m idle > 90m timeout + 15m grace.
+        updatedAt: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
+      }),
+    );
+    const kicker = noopRunKicker();
+    const scope = createTestScope({
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      cronTriggerStateRepo,
+      runKicker: kicker,
+    });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
+
+    await heartbeat({}, scope);
+
+    expect(kicker.kicks).toContainEqual(
+      expect.objectContaining({ instanceId: 'inst-slow-dead' }),
+    );
+  });
+
+  it('does not re-kick a running instance just under the stranded threshold', async () => {
+    // Boundary guard: one minute short of the threshold must not be swept.
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-just-under',
+        namespace: 'team-alpha',
+        status: 'running',
+        currentStepId: 'implement',
+        updatedAt: new Date(
+          Date.now() - (STRANDED_RUNNING_THRESHOLD_MS - 60 * 1000),
+        ).toISOString(),
+      }),
+    );
+    const kicker = noopRunKicker();
+    const scope = createTestScope({
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      cronTriggerStateRepo,
+      runKicker: kicker,
+    });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
+
+    await heartbeat({}, scope);
+
+    expect(kicker.kicks).toHaveLength(0);
+  });
+
+  it('does not re-kick a running instance updated recently (step legitimately in progress)', async () => {
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-fresh',
+        namespace: 'team-alpha',
+        status: 'running',
+        currentStepId: 'implement',
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+    const kicker = noopRunKicker();
+    const scope = createTestScope({
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      cronTriggerStateRepo,
+      runKicker: kicker,
+    });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
+
+    await heartbeat({}, scope);
+
+    expect(kicker.kicks).toHaveLength(0);
+    const events = await auditRepo.getByProcess('inst-fresh');
+    expect(events.map((e) => e.action)).not.toContain('instance.stranded_rekicked');
   });
 
   it('skips a not-due trigger — no audit, no kick, reason="Not due"', async () => {
