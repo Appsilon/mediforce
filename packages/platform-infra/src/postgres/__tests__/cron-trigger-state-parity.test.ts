@@ -21,19 +21,22 @@ const skipPg = !DATABASE_URL;
 
 function stateBase(overrides: Partial<CronTriggerState> = {}): CronTriggerState {
   return {
+    namespace: 'acme',
     definitionName: 'nightly-cleanup',
     triggerName: 'nightly',
-    lastTriggeredAt: '2026-05-27T01:00:00.000Z',
+    schedule: '0 1 * * *',
+    enabled: true,
+    lastTriggeredAt: null,
     ...overrides,
   };
 }
 
 /**
- * Shared contract for CronTriggerStateRepository (ADR-0001 L2 parity).
+ * Shared contract for CronTriggerStateRepository (ADR-0010 L2 parity).
  * Both the in-memory double and Postgres backend MUST satisfy it.
  *
- * Cron-trigger-state is global (no workspace dimension) — the heartbeat
- * runs as system actor and reads across every workspace's definitions.
+ * Cron Triggers are keyed by (namespace, definitionName, triggerName). The
+ * heartbeat's `listAllEnabled` reads across every namespace in one system pass.
  */
 function contract(name: string, factory: () => Promise<CronTriggerStateRepository>) {
   describe(`${name} — CronTriggerStateRepository contract`, () => {
@@ -44,43 +47,81 @@ function contract(name: string, factory: () => Promise<CronTriggerStateRepositor
     });
 
     it('returns null for get when absent', async () => {
-      expect(await repo.get('missing', 'trigger')).toBeNull();
+      expect(await repo.get('acme', 'missing', 'trigger')).toBeNull();
     });
 
-    it('set + get round-trips the state', async () => {
-      await repo.set(stateBase());
-      const got = await repo.get('nightly-cleanup', 'nightly');
+    it('create + get round-trips the row', async () => {
+      await repo.create(stateBase());
+      const got = await repo.get('acme', 'nightly-cleanup', 'nightly');
       expect(got).toEqual(stateBase());
     });
 
-    it('set overwrites an existing row', async () => {
-      await repo.set(stateBase({ lastTriggeredAt: '2026-05-27T01:00:00.000Z' }));
-      await repo.set(stateBase({ lastTriggeredAt: '2026-05-27T02:00:00.000Z' }));
-      const got = await repo.get('nightly-cleanup', 'nightly');
+    it('update patches schedule and enabled without touching the cursor', async () => {
+      await repo.create(stateBase({ lastTriggeredAt: '2026-05-27T01:00:00.000Z' }));
+      await repo.update('acme', 'nightly-cleanup', 'nightly', {
+        schedule: '0 5 * * *',
+        enabled: false,
+      });
+      const got = await repo.get('acme', 'nightly-cleanup', 'nightly');
+      expect(got?.schedule).toBe('0 5 * * *');
+      expect(got?.enabled).toBe(false);
+      expect(got?.lastTriggeredAt).toBe('2026-05-27T01:00:00.000Z');
+    });
+
+    it('recordTriggered advances only the fire cursor', async () => {
+      await repo.create(stateBase());
+      await repo.recordTriggered('acme', 'nightly-cleanup', 'nightly', '2026-05-27T02:00:00.000Z');
+      const got = await repo.get('acme', 'nightly-cleanup', 'nightly');
       expect(got?.lastTriggeredAt).toBe('2026-05-27T02:00:00.000Z');
+      expect(got?.schedule).toBe('0 1 * * *');
     });
 
-    it('isolates by (definitionName, triggerName)', async () => {
-      await repo.set(stateBase({ definitionName: 'a', triggerName: 't' }));
-      await repo.set(stateBase({ definitionName: 'b', triggerName: 't' }));
-      await repo.set(stateBase({ definitionName: 'a', triggerName: 'u' }));
-
-      expect((await repo.get('a', 't'))?.definitionName).toBe('a');
-      expect((await repo.get('b', 't'))?.definitionName).toBe('b');
-      expect((await repo.get('a', 'u'))?.triggerName).toBe('u');
-      expect(await repo.get('a', 'missing')).toBeNull();
+    it('listByDefinition returns rows for one workflow only', async () => {
+      await repo.create(stateBase({ triggerName: 'nightly' }));
+      await repo.create(stateBase({ triggerName: 'hourly', schedule: '0 * * * *' }));
+      await repo.create(stateBase({ definitionName: 'other', triggerName: 'nightly' }));
+      const rows = await repo.listByDefinition('acme', 'nightly-cleanup');
+      expect(rows.map((r) => r.triggerName).sort()).toEqual(['hourly', 'nightly']);
     });
 
-    it('rejects set with invalid payload (empty definitionName)', async () => {
-      await expect(
-        repo.set(stateBase({ definitionName: '' })),
-      ).rejects.toThrow();
+    it('listAllEnabled returns enabled rows across every namespace', async () => {
+      await repo.create(stateBase({ namespace: 'acme', enabled: true }));
+      await repo.create(stateBase({ namespace: 'beta', enabled: true }));
+      await repo.create(stateBase({ namespace: 'gamma', enabled: false }));
+      const rows = await repo.listAllEnabled();
+      expect(rows.map((r) => r.namespace).sort()).toEqual(['acme', 'beta']);
     });
 
-    it('rejects set with invalid payload (non-ISO lastTriggeredAt)', async () => {
-      await expect(
-        repo.set(stateBase({ lastTriggeredAt: 'not-a-date' })),
-      ).rejects.toThrow();
+    it('delete removes one row', async () => {
+      await repo.create(stateBase());
+      await repo.delete('acme', 'nightly-cleanup', 'nightly');
+      expect(await repo.get('acme', 'nightly-cleanup', 'nightly')).toBeNull();
+    });
+
+    it('deleteByDefinition cascades every trigger of a workflow', async () => {
+      await repo.create(stateBase({ triggerName: 'nightly' }));
+      await repo.create(stateBase({ triggerName: 'hourly', schedule: '0 * * * *' }));
+      await repo.deleteByDefinition('acme', 'nightly-cleanup');
+      expect(await repo.listByDefinition('acme', 'nightly-cleanup')).toEqual([]);
+    });
+
+    it('isolates by (namespace, definitionName, triggerName)', async () => {
+      await repo.create(stateBase({ namespace: 'acme', definitionName: 'a', triggerName: 't' }));
+      await repo.create(stateBase({ namespace: 'beta', definitionName: 'a', triggerName: 't' }));
+      await repo.create(stateBase({ namespace: 'acme', definitionName: 'a', triggerName: 'u' }));
+
+      expect((await repo.get('acme', 'a', 't'))?.namespace).toBe('acme');
+      expect((await repo.get('beta', 'a', 't'))?.namespace).toBe('beta');
+      expect((await repo.get('acme', 'a', 'u'))?.triggerName).toBe('u');
+      expect(await repo.get('acme', 'a', 'missing')).toBeNull();
+    });
+
+    it('rejects create with invalid payload (empty namespace)', async () => {
+      await expect(repo.create(stateBase({ namespace: '' }))).rejects.toThrow();
+    });
+
+    it('rejects create with invalid payload (empty schedule)', async () => {
+      await expect(repo.create(stateBase({ schedule: '' }))).rejects.toThrow();
     });
   });
 }

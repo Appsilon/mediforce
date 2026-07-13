@@ -23,6 +23,7 @@ import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useWorkflowDefinitionApi } from '@/hooks/use-workflows-api';
 import { WorkflowSecretsEditor } from '@/components/workflows/workflow-secrets-editor';
+import { CronTriggersPanel } from './CronTriggersPanel';
 
 
 export default function ProcessDefinitionPage() {
@@ -469,7 +470,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
       {/* Tabs */}
       <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex flex-1 flex-col">
         <Tabs.List className="flex border-b px-6 gap-0">
-          {['runs', 'definitions', 'secrets'].map((tab) => (
+          {['runs', 'definitions', 'schedules', 'secrets'].map((tab) => (
             <Tabs.Trigger
               key={tab}
               value={tab}
@@ -478,14 +479,16 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 'text-muted-foreground border-transparent',
                 'data-[state=active]:text-foreground data-[state=active]:border-primary',
                 'hover:text-foreground',
-                tab === 'secrets' && 'flex items-center gap-1.5',
+                (tab === 'secrets' || tab === 'schedules') && 'flex items-center gap-1.5',
               )}
             >
               {tab === 'runs'
                 ? `Runs${runs.length > 0 ? ` (${runs.length})` : ''}`
                 : tab === 'secrets'
                   ? <><KeyRound className="h-3.5 w-3.5" />Secrets</>
-                  : 'Definitions'}
+                  : tab === 'schedules'
+                    ? <><Clock className="h-3.5 w-3.5" />Schedules</>
+                    : 'Definitions'}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
@@ -526,6 +529,13 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
         <Tabs.Content value="definitions" className="flex-1 p-6">
           <div className="max-w-2xl">
             <DefinitionsList workflowName={decodedName} />
+          </div>
+        </Tabs.Content>
+
+        {/* Schedules tab */}
+        <Tabs.Content value="schedules" className="flex-1 p-6">
+          <div className="max-w-2xl">
+            <CronTriggersPanel handle={handle} definitionName={decodedName} />
           </div>
         </Tabs.Content>
 

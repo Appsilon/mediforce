@@ -149,8 +149,11 @@ describe('createCallerScope', () => {
       agentOAuthTokenRepo,
     });
 
-    // Pass-throughs must be the same identity-equal objects we passed in.
-    expect(scope.cron).toBe(cronTriggerStateRepo);
+    // The heartbeat's raw cross-namespace store is an identity-equal
+    // pass-through on `scope.system.cron`; `scope.cron` is the namespace-gated
+    // wrapper for management (ADR-0010), so it is NOT the raw repo.
+    expect(scope.system.cron).toBe(cronTriggerStateRepo);
+    expect(scope.cron).not.toBe(cronTriggerStateRepo);
 
     // Workspace-scoped wrappers must exist and respond to one canonical
     // read each — if the wiring is wrong this throws or returns the wrong

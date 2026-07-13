@@ -79,6 +79,15 @@ describe('heartbeat handler', () => {
         ],
       }),
     );
+    // ADR-0010: the heartbeat fires from Cron Trigger rows, not def.triggers.
+    await cronTriggerStateRepo.create({
+      namespace: 'team-alpha',
+      definitionName: 'nightly-report',
+      triggerName: 'nightly',
+      schedule: '*/15 * * * *',
+      enabled: true,
+      lastTriggeredAt: null,
+    });
     const fireWorkflow = vi.fn().mockResolvedValue({
       instanceId: 'inst-new-1',
       status: 'created' as const,
@@ -115,14 +124,16 @@ describe('heartbeat handler', () => {
       }),
     );
 
-    // State persisted AFTER successful fire.
+    // Fire cursor advanced AFTER successful fire.
     const persistedState = await cronTriggerStateRepo.get(
+      'team-alpha',
       'nightly-report',
       'nightly',
     );
     expect(persistedState).not.toBeNull();
     expect(persistedState!.definitionName).toBe('nightly-report');
     expect(persistedState!.triggerName).toBe('nightly');
+    expect(persistedState!.lastTriggeredAt).not.toBeNull();
 
     // Audit event recorded.
     const events = await auditRepo.getByProcess('inst-new-1');
@@ -159,10 +170,14 @@ describe('heartbeat handler', () => {
         ],
       }),
     );
-    // Seed state so isDue's scan path is taken with a recent lastTriggeredAt.
-    await cronTriggerStateRepo.set({
+    // Seed a row with the rare schedule + a recent cursor so isDue's scan path
+    // is taken and yields "Not due".
+    await cronTriggerStateRepo.create({
+      namespace: 'team-alpha',
       definitionName: 'quarter-hourly',
       triggerName: 'beat',
+      schedule: '0 0 1 1 0',
+      enabled: true,
       lastTriggeredAt: new Date().toISOString(),
     });
 
@@ -188,5 +203,47 @@ describe('heartbeat handler', () => {
     });
     expect(fireWorkflow).not.toHaveBeenCalled();
     expect(kicker.kicks).toHaveLength(0);
+  });
+
+  it('skips a Cron Trigger whose workflow was deleted — no ghost fire', async () => {
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'gone',
+        namespace: 'team-alpha',
+        version: 1,
+        triggers: [{ type: 'cron', name: 'nightly', schedule: '*/15 * * * *' }],
+      }),
+    );
+    await processRepo.setWorkflowDeleted('team-alpha', 'gone', true);
+    await cronTriggerStateRepo.create({
+      namespace: 'team-alpha',
+      definitionName: 'gone',
+      triggerName: 'nightly',
+      schedule: '*/15 * * * *',
+      enabled: true,
+      lastTriggeredAt: null,
+    });
+
+    const fireWorkflow = vi.fn();
+    const kicker = noopRunKicker();
+    const scope = createTestScope({
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      cronTriggerStateRepo,
+      runKicker: kicker,
+    });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow } });
+
+    const result = await heartbeat({}, scope);
+
+    expect(result.triggered).toHaveLength(0);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]).toMatchObject({
+      definitionName: 'gone',
+      triggerName: 'nightly',
+      reason: 'Workflow deleted',
+    });
+    expect(fireWorkflow).not.toHaveBeenCalled();
   });
 });

@@ -59,6 +59,31 @@ _Avoid_: "Workflow Instance" (briefly proposed but inconsistent with the
 project's own "Run" vocabulary), "Process Instance" (legacy schema name
 only), "Workflow" alone (ambiguous — Definition or Run?).
 
+**Trigger** *(config; declared in a Workflow Definition)*:
+The declaration that a Workflow Definition can be started in a given way:
+`manual`, `webhook`, `event`, or `cron`. A Definition has at least one. For
+`cron`, the declared entry names a trigger and carries a seed schedule — it is
+a *seed*, not the live cadence (see Cron Trigger).
+_Avoid_: treating the declared cron entry as the source of truth for whether a
+schedule is running or at what cadence — that is the Cron Trigger's job.
+
+**Cron Trigger** *(operational; mutable; overlay-owned)*:
+The live, running schedule attached to a Workflow. A first-class mutable entity
+keyed by `(namespace, definitionName, triggerName)`, distinct from the immutable
+Workflow Definition that declares it. Owns `enabled` (start/stop), `schedule`
+(the live cadence), and `lastTriggeredAt` (fire cursor). Created by seeding from
+a Definition's declared cron Trigger on registration, or added ad-hoc to any
+existing Workflow. The heartbeat enumerates Cron Triggers (not Definition
+trigger arrays) to decide what fires, and instantiates the workflow's default
+version (fallback latest). Decoupled from versions, a Cron Trigger can be
+re-scheduled or stopped without registering a new Definition version (ADR-0010).
+_Code:_ persisted as `CronTriggerState` (`cron_trigger_state` table) — the
+symbol keeps its historical name because `CronTrigger` is the workflow-engine
+class that instantiates a run.
+_Avoid_: "trigger state" for the mutable entity (it is now the trigger itself,
+not a timestamp cache); conflating the declared Trigger (seed) with the live
+Cron Trigger.
+
 **Workflow Step** *(config; static)*:
 A node in a Workflow Definition's DAG. Defines `executor: human | agent |
 script | cowork | action`, optional autonomy level (agent steps),

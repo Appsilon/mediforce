@@ -31,6 +31,14 @@ import { runLogsCommand } from './commands/run-logs';
 import { runWatchCommand } from './commands/run-watch';
 import { workflowArchiveCommand } from './commands/workflow-archive';
 import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility';
+import {
+  workflowCronListCommand,
+  workflowCronAddCommand,
+  workflowCronUpdateCommand,
+  workflowCronStartCommand,
+  workflowCronStopCommand,
+  workflowCronRemoveCommand,
+} from './commands/workflow-cron';
 import { workflowCopyCommand } from './commands/workflow-copy';
 import { workflowDeleteCommand } from './commands/workflow-delete';
 import {
@@ -113,6 +121,12 @@ export const TREE: Record<string, BranchEntry> = {
       copy: { description: 'Copy workflow to another namespace', fn: workflowCopyCommand },
       archive: { description: 'Archive/unarchive workflow versions', fn: workflowArchiveCommand },
       delete: { description: 'Soft-delete a workflow + cascade', fn: workflowDeleteCommand },
+      'cron-list': { description: 'List a workflow\'s cron triggers', fn: workflowCronListCommand },
+      'cron-add': { description: 'Add a cron trigger to a workflow', fn: workflowCronAddCommand },
+      'cron-update': { description: 'Change a cron trigger schedule', fn: workflowCronUpdateCommand },
+      'cron-start': { description: 'Start (enable) a cron trigger', fn: workflowCronStartCommand },
+      'cron-stop': { description: 'Stop (disable) a cron trigger', fn: workflowCronStopCommand },
+      'cron-remove': { description: 'Delete a cron trigger', fn: workflowCronRemoveCommand },
     },
   },
   run: {

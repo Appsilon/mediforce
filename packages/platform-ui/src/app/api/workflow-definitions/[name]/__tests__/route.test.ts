@@ -7,6 +7,7 @@ const mockGetIdsByDefName = vi.fn();
 const mockSoftDeleteByDefName = vi.fn();
 const mockSetDeletedTasksByInstanceIds = vi.fn();
 const mockAuditAppend = vi.fn();
+const mockCronDeleteByDefinition = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
@@ -20,6 +21,8 @@ vi.mock('@/lib/platform-services', () => ({
     },
     humanTaskRepo: { setDeletedByInstanceIds: mockSetDeletedTasksByInstanceIds },
     auditRepo: { append: mockAuditAppend },
+    // ADR-0010: delete cascades to the workflow's Cron Trigger rows.
+    cronTriggerStateRepo: { deleteByDefinition: mockCronDeleteByDefinition },
     namespaceRepo: {},
   }),
 }));

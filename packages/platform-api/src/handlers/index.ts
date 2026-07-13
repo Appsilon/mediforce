@@ -58,6 +58,13 @@ export { importWorkflow } from './workflows/import-workflow';
 export { getManifest } from './workflows/get-manifest';
 export { getWorkflowRunCount } from './workflows/get-run-count';
 export { checkRetiredModels } from './workflows/retired-model-check';
+export {
+  listCronTriggers,
+  createCronTrigger,
+  updateCronTrigger,
+  setCronTriggerEnabled,
+  deleteCronTrigger,
+} from './workflows/cron-triggers';
 
 export { chatCoworkSession } from './cowork/chat';
 export { createVoiceEphemeralKey } from './cowork/voice-ephemeral-key';
