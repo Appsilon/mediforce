@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Fixed
+- `mediforce-fullstack` no longer re-triages the same declined (`fullstack:manual`) issue on every tick: the "re-judge on edit" check compared `issue.updated_at` against the manual label event, but `updated_at` is bumped by *any* activity — including a human adding an unrelated label — which latched issues like #425 into an endless re-triage loop. `fetch-candidates` now treats an issue as edited only when `updated_at` outruns the newest recorded issue *event* (label/assignment changes create an event at the same instant, so they are ignored; body edits and comments are the only changes that don't, so they still re-judge), and `apply-verdicts` re-stamps the label when re-declining an already-manual issue so a genuine edit re-judges exactly once instead of looping.
+
 ## [2026-07-05]
 
 ### Added

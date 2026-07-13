@@ -44,10 +44,24 @@ test('manual, not edited → skip', () => {
   const issue = { labels: lbl('fullstack:manual'), updated_at: hoursAgo(20) };
   assert.equal(classifyIssue(issue, events, NOW, 2, 3).action, 'skip');
 });
-test('manual, edited since decline → triage (re-judge)', () => {
+test('manual, genuine edit since decline (updated_at outruns every event) → triage (re-judge)', () => {
+  // A body edit or new comment bumps updated_at but creates no issue event (the
+  // events API omits both), so updated_at outruns the newest event → re-judge.
   const events = [{ event: 'labeled', label: { name: 'fullstack:manual' }, created_at: hoursAgo(10) }];
   const issue = { labels: lbl('fullstack:manual'), updated_at: hoursAgo(1) };
   assert.equal(classifyIssue(issue, events, NOW, 2, 3).action, 'triage');
+});
+test('manual, unrelated label added after decline → skip (label bump is not a content edit)', () => {
+  // Repro of #425: a human added an unrelated label a day after the bot declined.
+  // The label add bumped updated_at AND created a labeled event at the same instant,
+  // so it is not a content edit — comparing updated_at to the manual label event alone
+  // re-triaged it every tick forever. It must skip.
+  const events = [
+    { event: 'labeled', label: { name: 'fullstack:manual' }, created_at: hoursAgo(30) },
+    { event: 'labeled', label: { name: 'dogfooding' }, created_at: hoursAgo(3) },
+  ];
+  const issue = { labels: lbl('fullstack:manual', 'dogfooding'), updated_at: hoursAgo(3) };
+  assert.equal(classifyIssue(issue, events, NOW, 2, 3).action, 'skip');
 });
 test('bot-authored manual issue that keeps being edited → skip (no re-triage loop)', () => {
   // Renovate rewrites its "Dependency Dashboard" constantly, bumping updated_at far
@@ -129,6 +143,13 @@ test('re-judge manual → go strips manual + swaps prio', () => {
 test('newly manual flagged once; already-manual not', () => {
   assert.equal(reconcile([], { suitability: 'manual' }).newlyManual, true);
   assert.equal(reconcile(['fullstack:manual'], { suitability: 'manual' }).newlyManual, false);
+});
+test('re-declining an already-manual issue re-stamps the label; a fresh manual does not', () => {
+  // Re-stamping refreshes the manual label event so fetch-candidates' edited-since
+  // clock advances — otherwise a genuine edit that stays manual re-triages forever.
+  assert.equal(reconcile(['fullstack:manual'], { suitability: 'manual' }).restampManual, true);
+  assert.equal(reconcile([], { suitability: 'manual' }).restampManual, false);
+  assert.equal(reconcile(['fullstack:go'], { suitability: 'go', priority: 'high' }).restampManual, false);
 });
 test('manual carries no priority label', () => {
   const r = reconcile([], { suitability: 'manual', priority: 'high' });
