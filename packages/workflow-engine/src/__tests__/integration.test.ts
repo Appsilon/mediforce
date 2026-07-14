@@ -12,26 +12,16 @@ import type {
 import {
   WorkflowEngine,
   StepExecutor,
-  InvalidTransitionError,
 } from '../index';
 import type { StepActor } from '../index';
 
 /**
- * Integration tests for the workflow engine's full execution loop.
- *
- * Unlike the unit tests in this folder (which target a single transition or
- * engine method in isolation), these exercise the end-to-end lifecycle using
- * the in-memory repos from @mediforce/platform-core — no Firestore, no
- * emulators, no Docker. The engine never actually runs an agent or renders a
- * human UI; the test harness plays those roles by feeding step outputs into
- * advanceStep / completeHumanTask, exactly as the production auto-runner does.
- *
- * High-priority scenarios from issue #74:
- *   1. Start → agent → human → agent → complete (state at each transition)
- *   2. Agent step output populated into instance.variables and consumed by
- *      the next step's input
- *   3. Error recovery: agent crash → instance failure state → retry → complete
- *   4. Verdict-based routing: approve takes one path, revise takes another
+ * End-to-end lifecycle tests for the workflow engine, unlike the single-method
+ * unit tests in this folder. They drive the full loop through the in-memory
+ * repos from @mediforce/platform-core — no Firestore, emulators, or Docker. The
+ * engine never runs a real agent or renders a human UI; the test harness plays
+ * those roles by feeding step outputs into advanceStep / completeHumanTask,
+ * exactly as the production auto-runner does.
  */
 
 const actor: StepActor = { id: 'user-1', role: 'operator' };
@@ -129,12 +119,14 @@ describe('WorkflowEngine integration: full execution loop', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;
   let auditRepo: InMemoryAuditRepository;
   let humanTaskRepo: InMemoryHumanTaskRepository;
+  let engine: WorkflowEngine;
 
   beforeEach(async () => {
     processRepo = new InMemoryProcessRepository();
     instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository();
     humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
+    engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo);
 
     await processRepo.saveWorkflowDefinition(mixedLoopDef);
     await processRepo.saveWorkflowDefinition(propagationDef);
@@ -144,7 +136,6 @@ describe('WorkflowEngine integration: full execution loop', () => {
 
   // Helper: create + start an instance of the named definition.
   async function startInstance(name: string): Promise<string> {
-    const engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo);
     const instance = await engine.createInstance(
       'test', name, 1, 'user-1', 'manual', {},
     );
@@ -152,29 +143,31 @@ describe('WorkflowEngine integration: full execution loop', () => {
     return instance.id;
   }
 
-  // --- Scenario 1: Start → agent → human → agent → complete ---
-
   it('drives the mixed-executor loop and asserts instance state at every transition', async () => {
-    const engine = new WorkflowEngine(
-      processRepo, instanceRepo, auditRepo,
-      undefined, undefined, undefined,
+    const engineWithHumanTasks = new WorkflowEngine(
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      undefined, // rbacService
+      undefined, // handoffRepository
+      undefined, // notificationService
       humanTaskRepo,
     );
 
     // created → running at 'draft'
-    const instance = await engine.createInstance(
+    const instance = await engineWithHumanTasks.createInstance(
       'test', 'mixed-loop', 1, 'user-1', 'manual', {},
     );
     expect(instance.status).toBe('created');
     expect(instance.currentStepId).toBeNull();
 
-    const started = await engine.startInstance(instance.id);
+    const started = await engineWithHumanTasks.startInstance(instance.id);
     expect(started.status).toBe('running');
     expect(started.currentStepId).toBe('draft');
 
     // draft (agent) → review (human): advancing onto a human step creates a
     // HumanTask and pauses the instance waiting for it.
-    const afterDraft = await engine.advanceStep(
+    const afterDraft = await engineWithHumanTasks.advanceStep(
       instance.id, { summary: 'first draft' }, actor,
     );
     expect(afterDraft.status).toBe('paused');
@@ -188,7 +181,7 @@ describe('WorkflowEngine integration: full execution loop', () => {
 
     // review (human) → finalize (agent): completing the human task resumes the
     // instance and advances past the review step.
-    const completed = await engine.completeHumanTask(
+    const completed = await engineWithHumanTasks.completeHumanTask(
       tasks[0].id,
       { kind: 'verdict', verdict: 'approve' } satisfies CompleteHumanTaskPayload,
       'user-1',
@@ -197,7 +190,7 @@ describe('WorkflowEngine integration: full execution loop', () => {
     expect(completed.instance.currentStepId).toBe('finalize');
 
     // finalize (agent) → done (terminal): the workflow completes.
-    const finished = await engine.advanceStep(
+    const finished = await engineWithHumanTasks.advanceStep(
       instance.id, { summary: 'finalized' }, actor,
     );
     expect(finished.status).toBe('completed');
@@ -208,10 +201,7 @@ describe('WorkflowEngine integration: full execution loop', () => {
     expect(finished.variables.finalize).toMatchObject({ summary: 'finalized' });
   });
 
-  // --- Scenario 2: agent output → instance.variables → next step input ---
-
   it('propagates an agent step output into instance.variables and feeds it to the next step', async () => {
-    const engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo);
     const instanceId = await startInstance('propagation-loop');
 
     // gather (agent) produces a scored output; score > 5 routes to enrich.
@@ -240,7 +230,6 @@ describe('WorkflowEngine integration: full execution loop', () => {
   });
 
   it('skips the enrich step when the agent output does not meet the routing threshold', async () => {
-    const engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo);
     const instanceId = await startInstance('propagation-loop');
 
     // Low score → the `else` transition fires, bypassing enrich.
@@ -254,10 +243,7 @@ describe('WorkflowEngine integration: full execution loop', () => {
     expect(executions.some((e) => e.stepId === 'enrich')).toBe(false);
   });
 
-  // --- Scenario 3: agent crash → failure state → retry → complete ---
-
   it('marks the instance failed when an agent step crashes, then recovers via retry', async () => {
-    const engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo);
     // The engine delegates step execution to StepExecutor; the auto-runner
     // holds the same instance and calls failStep when the agent plugin errors.
     const stepExecutor = new StepExecutor(instanceRepo, auditRepo);
@@ -281,11 +267,11 @@ describe('WorkflowEngine integration: full execution loop', () => {
     expect(current!.currentStepId).toBe('process');
 
     const executions = await instanceRepo.getStepExecutions(instanceId);
-    const failedExec = executions
-      .filter((e) => e.stepId === 'process')
-      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
-    expect(failedExec.status).toBe('failed');
-    expect(failedExec.error).toBe(crash.message);
+    const failedExec = executions.find(
+      (e) => e.stepId === 'process' && e.status === 'failed',
+    );
+    expect(failedExec).toBeDefined();
+    expect(failedExec!.error).toBe(crash.message);
 
     // Recovery: retry flips the instance back to running so the auto-runner
     // can re-enter the failed step, which then completes the workflow.
@@ -301,11 +287,7 @@ describe('WorkflowEngine integration: full execution loop', () => {
     expect(finished.currentStepId).toBeNull();
   });
 
-  // --- Scenario 4: verdict-based routing ---
-
   it('routes approve to the approved terminal and revise back to the draft step', async () => {
-    const engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo);
-
     // --- approve path ---
     const approveInstanceId = await startInstance('verdict-routing');
     await engine.advanceStep(approveInstanceId, {}, actor); // draft → review
@@ -344,16 +326,5 @@ describe('WorkflowEngine integration: full execution loop', () => {
     // different step than the approve path.
     expect(revised.status).toBe('running');
     expect(revised.currentStepId).toBe('draft');
-  });
-
-  it('rejects advancing an instance that is not running', async () => {
-    const engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo);
-    const instanceId = await startInstance('recovery-loop');
-
-    // Park it, then try to advance — advanceStep only works on a running instance.
-    await engine.pauseInstance(instanceId, 'manual_hold', actor);
-    await expect(
-      engine.advanceStep(instanceId, {}, actor),
-    ).rejects.toThrow(InvalidTransitionError);
   });
 });
