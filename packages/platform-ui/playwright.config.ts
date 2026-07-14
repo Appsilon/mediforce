@@ -90,10 +90,9 @@ export default defineConfig({
     // `next dev` via `E2E_DEV_SERVER=true` for interactive iteration where
     // hot-reload beats suite speed (headed / --ui).
     // CI pre-builds in a separate step; locally, `start:e2e` rebuilds whenever
-    // `.next` is missing or stale relative to `HEAD` (`build:e2e` stamps the
-    // git SHA into `.next/BUILD_GIT_SHA`, so switching branches never serves a
-    // bundle that predates the current source). `reuseExistingServer: true`
-    // connects to a server the build step already started.
+    // the source no longer matches the built bundle (see "E2E build freshness"
+    // in docs/dev-quickref.md). `reuseExistingServer: true` connects to a
+    // server the build step already started.
     command: useEmulators
       ? process.env.E2E_DEV_SERVER === 'true'
         ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce MOCK_AGENT=true ALLOW_LOCAL_AGENTS=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${testPort} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npx next dev -p ${testPort}`
