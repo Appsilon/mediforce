@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
+import { GET } from '../../app/api/plugins/route';
 
 vi.mock('../../lib/platform-services', () => {
   const mockPlugins = new Map<string, { metadata?: PluginCapabilityMetadata }>();
@@ -43,7 +44,6 @@ describe('GET /api/plugins', () => {
   });
 
   it('[DATA] returns 200 with plugins array', async () => {
-    const { GET } = await import('../../app/api/plugins/route');
     const response = await GET(makeRequest(), undefined);
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -61,7 +61,6 @@ describe('GET /api/plugins', () => {
     };
     mockPlugins.set('sc/compliance-analyzer', { metadata: testMetadata });
 
-    const { GET } = await import('../../app/api/plugins/route');
     const response = await GET(makeRequest(), undefined);
     const body = await response.json();
 
@@ -74,7 +73,6 @@ describe('GET /api/plugins', () => {
   it('[DATA] returns plugin without metadata as undefined', async () => {
     mockPlugins.set('basic-plugin', {});
 
-    const { GET } = await import('../../app/api/plugins/route');
     const response = await GET(makeRequest(), undefined);
     const body = await response.json();
 
