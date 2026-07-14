@@ -180,7 +180,7 @@ importers:
         version: link:../platform-core
       bullmq:
         specifier: ^5.52.0
-        version: 5.79.2
+        version: 5.79.3
       zod:
         specifier: ^4.0.0
         version: 4.4.3
@@ -464,7 +464,7 @@ importers:
         version: 12.11.2(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(immer@11.1.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       bullmq:
         specifier: ^5.71.0
-        version: 5.79.2
+        version: 5.79.3
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -2897,8 +2897,8 @@ packages:
   buffer-from@1.1.2:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
 
-  bullmq@5.79.2:
-    resolution: {integrity: sha512-FebD+8XCZl/hnS1R4to24L4EAN70XSndKZO0776M36vGRk5MKVhKlNFM8/34zXLXKyYB4QaeIPFhVXSYYGTHpQ==}
+  bullmq@5.79.3:
+    resolution: {integrity: sha512-ol/zGeYw1AOKVWCgqGbElGAcvpO8ijc0qmTigXveEBOh+6yCiSwAG3ISI8zYW9Yu3sijnt58O/3JNtJGUYebLA==}
     engines: {node: '>=12.22.0'}
     peerDependencies:
       redis: '>=5.0.0'
@@ -7080,7 +7080,7 @@ snapshots:
 
   buffer-from@1.1.2: {}
 
-  bullmq@5.79.2:
+  bullmq@5.79.3:
     dependencies:
       cron-parser: 4.9.0
       ioredis: 5.10.1
