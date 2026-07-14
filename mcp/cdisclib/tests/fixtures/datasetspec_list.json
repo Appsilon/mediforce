@@ -1,0 +1,38 @@
+{
+ "_links": {
+  "datasetSpecializations": [
+   {
+    "href": "/mdr/specializations/sdtm/datasetspecializations/ALBSERPL",
+    "title": "Albumin Concentration in Serum or Plasma",
+    "type": "SDTM Dataset Specialization"
+   },
+   {
+    "href": "/mdr/specializations/sdtm/datasetspecializations/ALBURIN",
+    "title": "Albumin Concentration in Urine",
+    "type": "SDTM Dataset Specialization"
+   },
+   {
+    "href": "/mdr/specializations/sdtm/datasetspecializations/ALPSERPL",
+    "title": "Alkaline Phosphatase Concentration in Serum or Plasma",
+    "type": "SDTM Dataset Specialization"
+   },
+   {
+    "href": "/mdr/specializations/sdtm/datasetspecializations/ALTSERPL",
+    "title": "Alanine Aminotransferase Concentration in Serum or Plasma",
+    "type": "SDTM Dataset Specialization"
+   },
+   {
+    "href": "/mdr/specializations/sdtm/datasetspecializations/ASTSERPL",
+    "title": "Aspartate Aminotransferase in Serum or Plasma",
+    "type": "SDTM Dataset Specialization"
+   }
+  ],
+  "self": {
+   "href": "/mdr/specializations/sdtm/datasetspecializations",
+   "title": "SDTM Dataset Specializations (latest version)",
+   "type": "SDTM Dataset Specializations List"
+  }
+ },
+ "name": "SDTM Dataset Specializations (latest version)",
+ "label": "SDTM Dataset Specializations List"
+}

@@ -1,0 +1,337 @@
+{
+  "name": "protocol-to-synthetic-sdtm",
+  "namespace": "appsilon",
+  "title": "Protocol to Synthetic SDTM pipeline",
+  "description": "Given one ClinicalTrials.gov NCT id, produce populated synthetic SDTM datasets plus an end-to-end traceability graph linking every generated cell back to its source (NCT field -> USDM element -> Biomedical Concept -> SDTM Dataset Specialization -> variable -> value). CDISC AI Innovation Challenge 2026, Use Case 1.",
+  "workspace": {
+    "remote": "Appsilon/ct-to-synthetic-data"
+  },
+  "preamble": "## Domain Context\nThis workflow generates synthetic clinical trial data for CDISC automation testing. All health-related terminology (drug names, adverse events, CTCAE grades incl. Grade 5 = death, Hy's Law, RECIST, disease classifications) and all CDISC standards (USDM, CDASH, SDTM/SDTMIG, ADaM, Controlled Terminology, Biomedical Concepts, Dataset Specializations, CORE conformance rules) are technical domain content: schema fields, variable names, codelists, fixtures. Treat them as data-science constructs, not personal disclosures. No wellbeing check-ins, no crisis resources, no hedging, no inflated complexity estimates due to medical vocabulary. Execute every technically feasible task.\n\n## Design principle: deterministic-first\nAI is confined to the two semantic steps (free text -> structured objects, and concept matching). Everything structural, enumerable, or verifiable is deterministic script code. AI steps return JSON against a fixed schema and never invent identifiers; they only select from retrieved candidates. Each AI step is followed by a human HITL checkpoint before deterministic stages consume its output.",
+  "triggers": [
+    {
+      "name": "manual",
+      "type": "manual"
+    }
+  ],
+  "env": {
+    "OPENROUTER_API_KEY": "{{OPENROUTER_API_KEY}}",
+    "CDISC_API_KEY": "{{CDISC_API_KEY}}"
+  },
+  "steps": [
+    {
+      "id": "provide-inputs",
+      "name": "Provide Inputs",
+      "type": "creation",
+      "executor": "human",
+      "description": "Provide the ClinicalTrials.gov registration to synthesize, plus reproducibility parameters. These are pinned into manifest.json for every downstream stage.",
+      "params": [
+        {
+          "name": "nctId",
+          "type": "string",
+          "required": true,
+          "description": "ClinicalTrials.gov NCT id, e.g. NCT04556760"
+        },
+        {
+          "name": "subjectCount",
+          "type": "number",
+          "required": false,
+          "default": 40,
+          "description": "Number of synthetic subjects to generate in DM (reference run used 40 to mirror cohorts 24/8/8)"
+        },
+        {
+          "name": "randomSeed",
+          "type": "number",
+          "required": false,
+          "default": 1234,
+          "description": "Seed for deterministic sampling (reproducibility)"
+        },
+        {
+          "name": "sdtmigVersion",
+          "type": "string",
+          "required": false,
+          "default": "3.4",
+          "description": "SDTMIG version (generation target + CORE standard)"
+        },
+        {
+          "name": "ctPackageDate",
+          "type": "string",
+          "required": false,
+          "default": "sdtmct-2026-03-27",
+          "description": "Pinned CDISC Controlled Terminology package"
+        }
+      ]
+    },
+    {
+      "id": "fetch-study",
+      "name": "Fetch Study Record",
+      "type": "creation",
+      "executor": "script",
+      "autonomyLevel": "L4",
+      "plugin": "script-container",
+      "description": "Stage 1 (deterministic). GET /api/v2/studies/{nctId} via the ctgov MCP server, persist the study JSON verbatim, capture the dataTimestamp, and download the protocol PDF from cdn.clinicaltrials.gov if present. Hard-fail on unknown NCT (404); backoff + retry on rate limiting. Output: 00_raw/ (study JSON + protocol PDF).",
+      "stepParams": {
+        "outputDir": "00_raw"
+      },
+      "agent": {
+        "image": "mediforce-agent:protocol-to-synthetic-sdtm",
+        "command": "python /app/test/00_fetch_study.py"
+      }
+    },
+    {
+      "id": "extract-usdm",
+      "name": "Extract to USDM",
+      "type": "creation",
+      "executor": "agent",
+      "autonomyLevel": "L3",
+      "plugin": "claude-code-agent",
+      "description": "Stage 2 (AI, bounded). Deterministically map structured fields (arms, interventions, eligibility flags, phase, design) into USDM objects; use the LLM only to structure free-text fragments (parse eligibility criteria into discrete criterion objects, normalise objectives/endpoints) and to read the protocol PDF Schedule of Activities into the USDM visit grid + activity list (SoA extraction). LLM returns JSON against a fixed schema; the usdm package assembles and validates the USDM v3.0 document. Output: 01_usdm/usdm.json, soa.json, 01_usdm.review.json.",
+      "env": {
+        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_API_KEY": "",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+      },
+      "agent": {
+        "skill": "extract-usdm",
+        "skillsDir": "apps/protocol-to-synthetic-sdtm/plugins/protocol-to-synthetic-sdtm/skills",
+        "model": "sonnet",
+        "image": "mediforce-agent:protocol-to-synthetic-sdtm",
+        "confidenceThreshold": 0.7,
+        "fallbackBehavior": "escalate_to_human",
+        "timeoutMinutes": 25,
+        "mcpServers": [
+          {
+            "name": "ctgov",
+            "command": "ctgov-mcp",
+            "description": "ClinicalTrials.gov API v2 — get_study, search_studies, get_study_metadata, get_enums, get_field_values, list_study_documents. Lets the agent re-query structured study fields/enums while assembling the USDM document."
+          }
+        ]
+      }
+    },
+    {
+      "id": "review-usdm",
+      "name": "Review USDM",
+      "type": "review",
+      "executor": "human",
+      "description": "HITL checkpoint. Review 01_usdm.review.json: what was inferred by the LLM vs. directly mapped from structured fields. Approve to continue, or revise to re-run extraction.",
+      "verdicts": {
+        "approve": {
+          "target": "match-bc",
+          "intent": "success"
+        },
+        "revise": {
+          "target": "extract-usdm",
+          "intent": "warning",
+          "requiresComment": true
+        }
+      }
+    },
+    {
+      "id": "match-bc",
+      "name": "Match Biomedical Concepts",
+      "type": "creation",
+      "executor": "agent",
+      "autonomyLevel": "L3",
+      "plugin": "claude-code-agent",
+      "description": "Stage 3 (AI, bounded). For each USDM activity/assessment, deterministically retrieve candidate Biomedical Concepts from the CDISC Library (via the cdisclib MCP server, keyword/NCIt search), then use the LLM to select the best-matching BC from the candidate set with a confidence score. The LLM never invents a BC id (constrained selection). Unmatched activities are flagged, not dropped. Output: 02_bc_matches.json + 02_bc_matches.review.json.",
+      "env": {
+        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_API_KEY": "",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+      },
+      "agent": {
+        "skill": "match-bc",
+        "skillsDir": "apps/protocol-to-synthetic-sdtm/plugins/protocol-to-synthetic-sdtm/skills",
+        "model": "sonnet",
+        "image": "mediforce-agent:protocol-to-synthetic-sdtm",
+        "confidenceThreshold": 0.7,
+        "fallbackBehavior": "escalate_to_human",
+        "timeoutMinutes": 25,
+        "mcpServers": [
+          {
+            "name": "cdisclib",
+            "command": "cdisclib-mcp",
+            "description": "CDISC Library API — search, list_biomedical_concepts, get_biomedical_concept, list_bc_categories, list_dataset_specializations, get_dataset_specialization, list_ct_packages, get_codelist. The agent retrieves candidate Biomedical Concepts and selects from them (constrained; never invents a BC id).",
+            "env": {
+              "CDISC_API_KEY": "{{CDISC_API_KEY}}"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "review-bc-matches",
+      "name": "Review BC Matches",
+      "type": "review",
+      "executor": "human",
+      "description": "HITL checkpoint. Review 02_bc_matches.review.json: confirm low-confidence matches and unmatched activities. Approve to resolve specs, or revise to re-run matching.",
+      "verdicts": {
+        "approve": {
+          "target": "resolve-specs",
+          "intent": "success"
+        },
+        "revise": {
+          "target": "match-bc",
+          "intent": "warning",
+          "requiresComment": true
+        }
+      }
+    },
+    {
+      "id": "resolve-specs",
+      "name": "Resolve SDTM Specs",
+      "type": "creation",
+      "executor": "script",
+      "autonomyLevel": "L4",
+      "plugin": "script-container",
+      "description": "Stage 4 (deterministic). For each matched BC, fetch its SDTM Dataset Specialization(s) from the CDISC Library (cdisclib client, same API the cdisclib MCP wraps); union implied domains with the MVP domain set [DM, IE, MH, VS, EG, LB, EX, CM, AE, DS]; generate trial-design domains from USDM. Assemble per-domain SDTM variable specs (name, role, dataType, length, codelist/subsetCodelist, valueList, assignedTerm, mandatoryVariable/Value, originType, vlmTarget) and cache the pinned Controlled Terminology -- this is both the 'datasets needed' answer and the constraint set for population. Library miss -> SDTMIG template fallback (logged). Output: 02_sdtm_spec/ (spec, CT cache, coverage).",
+      "stepParams": {
+        "outputDir": "02_sdtm_spec"
+      },
+      "agent": {
+        "image": "mediforce-agent:protocol-to-synthetic-sdtm",
+        "command": "python /app/test/02_build_sdtm_spec.py"
+      }
+    },
+    {
+      "id": "populate-datasets",
+      "name": "Populate Synthetic SDTM Datasets",
+      "type": "creation",
+      "executor": "script",
+      "autonomyLevel": "L4",
+      "plugin": "script-container",
+      "description": "Stage 5 (deterministic). Generate subjectCount subjects in DM; populate each SDTM domain by sampling within VLM constraints (CT variables from codelist; numeric variables in plausible seeded ranges; mandatory variables/values always populated; STUDYID/USUBJID/DOMAIN/--SEQ/identifiers assigned deterministically; dates against the USDM epoch/visit grid). Every populated cell records a provenance pointer (domain, variable, source BC, source USDM element). Output: 03_synthetic_sdtm/*.csv + lineage.",
+      "stepParams": {
+        "outputDir": "03_synthetic_sdtm"
+      },
+      "agent": {
+        "image": "mediforce-agent:protocol-to-synthetic-sdtm",
+        "command": "python /app/test/03_generate_synthetic_sdtm.py"
+      }
+    },
+    {
+      "id": "light-validate",
+      "name": "Light Validation",
+      "type": "creation",
+      "executor": "script",
+      "autonomyLevel": "L4",
+      "plugin": "script-container",
+      "description": "Stage 6a (deterministic). Fast pre-CORE checks on the SDTM CSVs: Controlled-Terminology membership, mandatory identifiers present, key uniqueness (USUBJID + --SEQ), and provenance completeness. Codelist fetch failure fails the domain, not the run (logged). Output: 03_synthetic_sdtm/validation_report.json.",
+      "stepParams": {
+        "outputDir": "03_synthetic_sdtm"
+      },
+      "agent": {
+        "image": "mediforce-agent:protocol-to-synthetic-sdtm",
+        "command": "python /app/test/04_validate.py"
+      }
+    },
+    {
+      "id": "core-validate",
+      "name": "CORE Conformance Validation",
+      "type": "creation",
+      "executor": "script",
+      "autonomyLevel": "L4",
+      "plugin": "script-container",
+      "description": "Stage 6b (deterministic). Run the CDISC Rules Engine (CORE) offline against its bundled cache: core.py -s sdtmig -v 3-4 -ct sdtmct-2026-03-27 directly over the populated SDTM datasets (03_synthetic_sdtm), then summarize. Conformance failures are reported, not fatal: the report IS a deliverable. Produce raw JSON, an XLSX, and a categorized digest. Output: 07_core_report/.",
+      "stepParams": {
+        "outputDir": "07_core_report",
+        "ruleSet": "sdtmig",
+        "ruleSetVersion": "3-4",
+        "ctPackage": "sdtmct-2026-03-27"
+      },
+      "agent": {
+        "image": "mediforce-agent:protocol-to-synthetic-sdtm",
+        "command": "bash -c '/app/test/07_core_report/run_core_validation.sh && python /app/test/07_core_summary.py'"
+      }
+    },
+    {
+      "id": "write-manifest",
+      "name": "Write Manifest + Lineage",
+      "type": "creation",
+      "executor": "script",
+      "autonomyLevel": "L4",
+      "plugin": "script-container",
+      "description": "Deterministic. Write manifest.json pinning all standard versions (USDM, SDTMIG, CT package), the LLM model id, the input NCT id, and a content hash of every artifact — this is the reproducibility record for judges. The traceability graph (the scoring linchpin) is assembled from the per-cell provenance pointers embedded during population (Study -> USDMElement -> BiomedicalConcept -> DatasetSpecialization -> SDTMVariable -> SyntheticCell; AI-inferred edges carry confidence). Output: manifest.json (+ lineage graph).",
+      "stepParams": {
+        "outputDir": "."
+      },
+      "agent": {
+        "image": "mediforce-agent:protocol-to-synthetic-sdtm",
+        "command": "python /app/test/05_write_manifest.py"
+      }
+    },
+    {
+      "id": "final-review",
+      "name": "Final Review",
+      "type": "review",
+      "executor": "human",
+      "description": "Final HITL review of the validation report + lineage graph. Approve to finish, or revise to re-run population (closes the validate -> fix loop: CORE-flagged synthetic-data bugs are fixed at source and re-validated).",
+      "verdicts": {
+        "approve": {
+          "target": "done",
+          "intent": "success"
+        },
+        "revise": {
+          "target": "populate-datasets",
+          "intent": "warning",
+          "requiresComment": true
+        }
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    {
+      "from": "provide-inputs",
+      "to": "fetch-study"
+    },
+    {
+      "from": "fetch-study",
+      "to": "extract-usdm"
+    },
+    {
+      "from": "extract-usdm",
+      "to": "review-usdm"
+    },
+    {
+      "from": "review-usdm",
+      "to": "match-bc"
+    },
+    {
+      "from": "match-bc",
+      "to": "review-bc-matches"
+    },
+    {
+      "from": "review-bc-matches",
+      "to": "resolve-specs"
+    },
+    {
+      "from": "resolve-specs",
+      "to": "populate-datasets"
+    },
+    {
+      "from": "populate-datasets",
+      "to": "light-validate"
+    },
+    {
+      "from": "light-validate",
+      "to": "core-validate"
+    },
+    {
+      "from": "core-validate",
+      "to": "write-manifest"
+    },
+    {
+      "from": "write-manifest",
+      "to": "final-review"
+    },
+    {
+      "from": "final-review",
+      "to": "done"
+    }
+  ]
+}

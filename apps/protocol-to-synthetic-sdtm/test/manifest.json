@@ -1,0 +1,175 @@
+{
+  "pipeline": "protocol-to-synthetic-SDTM (MVP test run)",
+  "input": {
+    "nctId": "NCT04556760",
+    "sponsorStudyId": "D6470C00005",
+    "title": "Study to Assess the Effect on Glucose Homeostasis of Two Dose Levels of AZD9567, Compared to Prednisolone, in Adults With Type 2 Diabetes"
+  },
+  "provenance": {
+    "ctgovApiVersion": "2.0.5",
+    "ctgovDataTimestamp": "2026-06-05T09:00:05",
+    "protocolDocument": "Prot_000.pdf (Clinical Study Protocol v3.0, dated 2021-03-03)",
+    "protocolSoAPages": "20-24"
+  },
+  "standards": {
+    "usdmVersion": "3.0.0",
+    "ctPackage": "sdtmct-2026-03-27",
+    "sdtmigVersion": "3.4"
+  },
+  "parameters": {
+    "subjectCount": 40,
+    "randomSeed": 1234,
+    "cohorts": {
+      "Cohort 1": 24,
+      "Cohort 2": 8,
+      "Cohort 3": 8
+    },
+    "crossover": "two-way (AB/BA sequences)"
+  },
+  "tools": {
+    "ctgov": "ctgov MCP (ClinicalTrials.gov API v2)",
+    "cdisclib": "cdisclib client/MCP (CDISC Library API)"
+  },
+  "stages": {
+    "1_fetch": "00_raw/NCT04556760.json (+ protocol/Prot_000.pdf)",
+    "2_usdm": "01_usdm/usdm.json (+ soa.json)",
+    "3_4_sdtm_spec": "02_sdtm_spec/sdtm_spec.json (+ ct_cache.json, coverage.json)",
+    "5_populate": "03_synthetic_sdtm/*.csv (+ lineage.json, datasets_summary.json)",
+    "6a_validate": "03_synthetic_sdtm/validation_report.json",
+    "6b_export_core": "06_sdtm_xpt/*.xpt + 07_core_report/{core_sdtmig34.json, summary.json}"
+  },
+  "artifacts": {
+    "00_fetch_study.py": {
+      "sha256_16": "709184e4f6d53709",
+      "bytes": 4080
+    },
+    "00_raw\\ctgov_version.json": {
+      "sha256_16": "5932bc22e74f98d2",
+      "bytes": 74
+    },
+    "00_raw\\NCT04556760.json": {
+      "sha256_16": "b944f1506ada6a8d",
+      "bytes": 220725
+    },
+    "01_build_usdm.py": {
+      "sha256_16": "f4e03a5431c281af",
+      "bytes": 13970
+    },
+    "01_usdm\\soa.json": {
+      "sha256_16": "c37b9d08bfc9ea13",
+      "bytes": 9770
+    },
+    "01_usdm\\usdm.json": {
+      "sha256_16": "6ae2199935496b83",
+      "bytes": 41591
+    },
+    "02_build_sdtm_spec.py": {
+      "sha256_16": "3a19366f5d3494d9",
+      "bytes": 13210
+    },
+    "02_sdtm_spec\\coverage.json": {
+      "sha256_16": "96c58875556168fc",
+      "bytes": 573
+    },
+    "02_sdtm_spec\\ct_cache.json": {
+      "sha256_16": "087870f107327c9b",
+      "bytes": 498024
+    },
+    "02_sdtm_spec\\sdtm_spec.json": {
+      "sha256_16": "34b1ebfb3b3c5576",
+      "bytes": 31613
+    },
+    "03_generate_synthetic_sdtm.py": {
+      "sha256_16": "8e57bb2b7fa3c833",
+      "bytes": 33901
+    },
+    "03_synthetic_sdtm\\_datasets.csv": {
+      "sha256_16": "df9aa059fdb1b312",
+      "bytes": 179
+    },
+    "03_synthetic_sdtm\\_variables.csv": {
+      "sha256_16": "e2580286083c8db6",
+      "bytes": 4959
+    },
+    "03_synthetic_sdtm\\ae.csv": {
+      "sha256_16": "14117d24badce5da",
+      "bytes": 4242
+    },
+    "03_synthetic_sdtm\\cm.csv": {
+      "sha256_16": "63e3c1f89d97a121",
+      "bytes": 5911
+    },
+    "03_synthetic_sdtm\\datasets_summary.json": {
+      "sha256_16": "f77118e7d9f24689",
+      "bytes": 336
+    },
+    "03_synthetic_sdtm\\dm.csv": {
+      "sha256_16": "a7b120c829156491",
+      "bytes": 7546
+    },
+    "03_synthetic_sdtm\\ds.csv": {
+      "sha256_16": "6a5d1aec1f07fe2e",
+      "bytes": 3967
+    },
+    "03_synthetic_sdtm\\ex.csv": {
+      "sha256_16": "6808fae67d36bfe5",
+      "bytes": 8733
+    },
+    "03_synthetic_sdtm\\lb.csv": {
+      "sha256_16": "66437b58f4d907e0",
+      "bytes": 295653
+    },
+    "03_synthetic_sdtm\\lineage.json": {
+      "sha256_16": "c6f6179ebf30663e",
+      "bytes": 88480
+    },
+    "03_synthetic_sdtm\\mh.csv": {
+      "sha256_16": "fa14ebbf4919ad33",
+      "bytes": 7717
+    },
+    "03_synthetic_sdtm\\validation_report.json": {
+      "sha256_16": "c3fdf47a1778cc0c",
+      "bytes": 1854
+    },
+    "03_synthetic_sdtm\\vs.csv": {
+      "sha256_16": "83dc971a45a5536b",
+      "bytes": 90075
+    },
+    "04_validate.py": {
+      "sha256_16": "2b5c7bca9ac82a12",
+      "bytes": 3981
+    },
+    "05_write_manifest.py": {
+      "sha256_16": "3cd434d21539738f",
+      "bytes": 2465
+    },
+    "06_export_sdtm.py": {
+      "sha256_16": "cb5a389c73accdd3",
+      "bytes": 2212
+    },
+    "07_core_report\\core_sdtmig34.json": {
+      "sha256_16": "7f4fcbdcf066f43d",
+      "bytes": 141525
+    },
+    "07_core_report\\summary.json": {
+      "sha256_16": "426f9460e08c1afb",
+      "bytes": 3580
+    },
+    "07_core_summary.py": {
+      "sha256_16": "6030e25340a3a8ea",
+      "bytes": 4128
+    },
+    "ct_snapshot\\ct_cache.json": {
+      "sha256_16": "087870f107327c9b",
+      "bytes": 498024
+    },
+    "manifest.json": {
+      "sha256_16": "4a07f26a445b9c8b",
+      "bytes": 4969
+    },
+    "protocol\\Prot_000.pdf": {
+      "sha256_16": "060e0914d04058a8",
+      "bytes": 3693117
+    }
+  }
+}

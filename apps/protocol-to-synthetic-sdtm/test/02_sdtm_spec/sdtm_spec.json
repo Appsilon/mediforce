@@ -1,0 +1,1133 @@
+{
+  "studyId": "NCT04556760",
+  "sdtmigVersion": "3.4",
+  "ctPackage": "sdtmct-2026-03-27",
+  "source": "sdtmig_template_offline",
+  "note": "Per-domain SDTM variable specs derived from the SDTMIG 3.4 structure; CT reused from the pinned CDISC Library fetch. Live SDTM Dataset Specialization resolution is available when CDISC_API_KEY is set (cdisclib client).",
+  "domains": {
+    "DM": {
+      "label": "Demographics",
+      "sourceActivities": [
+        {
+          "activityId": "ACT_DM",
+          "activityName": "Demography",
+          "bcNcit": null,
+          "protocolPage": 20
+        }
+      ],
+      "variableCount": 20,
+      "variables": [
+        {
+          "name": "STUDYID",
+          "label": "Study Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "DOMAIN",
+          "label": "Domain Abbreviation",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "USUBJID",
+          "label": "Unique Subject Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "SUBJID",
+          "label": "Subject Identifier for the Study",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "RFSTDTC",
+          "label": "Subject Reference Start Date/Time",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "RFENDTC",
+          "label": "Subject Reference End Date/Time",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "RFXSTDTC",
+          "label": "Date/Time of First Study Treatment",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "RFXENDTC",
+          "label": "Date/Time of Last Study Treatment",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "SITEID",
+          "label": "Study Site Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "BRTHDTC",
+          "label": "Date/Time of Birth",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "AGE",
+          "label": "Age",
+          "role": "Record Qualifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "AGEU",
+          "label": "Age Units",
+          "role": "Variable Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "SEX",
+          "label": "Sex",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": "C66731",
+          "mandatory": true
+        },
+        {
+          "name": "RACE",
+          "label": "Race",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "ETHNIC",
+          "label": "Ethnicity",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "ARMCD",
+          "label": "Planned Arm Code",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "ARM",
+          "label": "Description of Planned Arm",
+          "role": "Synonym Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "ACTARMCD",
+          "label": "Actual Arm Code",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "ACTARM",
+          "label": "Description of Actual Arm",
+          "role": "Synonym Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "COUNTRY",
+          "label": "Country",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        }
+      ]
+    },
+    "VS": {
+      "label": "Vital Signs",
+      "sourceActivities": [
+        {
+          "activityId": "ACT_HTWT",
+          "activityName": "Height and weight",
+          "bcNcit": "C25347/C25208",
+          "protocolPage": 20
+        },
+        {
+          "activityId": "ACT_VS",
+          "activityName": "Vital signs (SBP, DBP, pulse, temperature)",
+          "bcNcit": "C54706",
+          "protocolPage": 20
+        }
+      ],
+      "variableCount": 17,
+      "variables": [
+        {
+          "name": "STUDYID",
+          "label": "Study Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "DOMAIN",
+          "label": "Domain Abbreviation",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "USUBJID",
+          "label": "Unique Subject Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "VSSEQ",
+          "label": "Sequence Number",
+          "role": "Identifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "VSTESTCD",
+          "label": "Vital Signs Test Short Name",
+          "role": "Topic",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "VSTEST",
+          "label": "Vital Signs Test Name",
+          "role": "Synonym Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "VSPOS",
+          "label": "Vital Signs Position of Subject",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": "C71148",
+          "mandatory": false
+        },
+        {
+          "name": "VSORRES",
+          "label": "Result or Finding in Original Units",
+          "role": "Result Qualifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "VSORRESU",
+          "label": "Original Units",
+          "role": "Variable Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "VSSTRESC",
+          "label": "Character Result/Finding in Std Format",
+          "role": "Result Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "VSSTRESN",
+          "label": "Numeric Result/Finding in Standard Units",
+          "role": "Result Qualifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "VSSTRESU",
+          "label": "Standard Units",
+          "role": "Variable Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "VISITNUM",
+          "label": "Visit Number",
+          "role": "Timing",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "VISIT",
+          "label": "Visit Name",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "EPOCH",
+          "label": "Epoch",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "VSDTC",
+          "label": "Date/Time of Measurements",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "VSDY",
+          "label": "Study Day of Vital Signs",
+          "role": "Timing",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        }
+      ]
+    },
+    "LB": {
+      "label": "Laboratory Test Results",
+      "sourceActivities": [
+        {
+          "activityId": "ACT_HEM",
+          "activityName": "Haematology",
+          "bcNcit": "C28133",
+          "protocolPage": 21
+        },
+        {
+          "activityId": "ACT_CHEM",
+          "activityName": "Clinical chemistry (incl. triglycerides, HDL-C)",
+          "bcNcit": "C49237",
+          "protocolPage": 21
+        },
+        {
+          "activityId": "ACT_COAG",
+          "activityName": "Coagulation (INR, PT, aPTT)",
+          "bcNcit": "C61367",
+          "protocolPage": 21
+        },
+        {
+          "activityId": "ACT_HBA1C",
+          "activityName": "HbA1c",
+          "bcNcit": "C64849",
+          "protocolPage": 21
+        },
+        {
+          "activityId": "ACT_MMTT",
+          "activityName": "MMTT (glucose, insulin, C-peptide, GLP-1, GIP, glucagon, FFAs)",
+          "bcNcit": "C105585",
+          "protocolPage": 23
+        },
+        {
+          "activityId": "ACT_CORT",
+          "activityName": "Serum cortisol",
+          "bcNcit": "C105443",
+          "protocolPage": 23
+        },
+        {
+          "activityId": "ACT_UNAK",
+          "activityName": "24-h urinary sodium & potassium (U-Na, U-K)",
+          "bcNcit": "C147062",
+          "protocolPage": 24
+        },
+        {
+          "activityId": "ACT_UA",
+          "activityName": "Urinalysis",
+          "bcNcit": "C17241",
+          "protocolPage": 24
+        },
+        {
+          "activityId": "ACT_PREG",
+          "activityName": "Pregnancy test (hCG)",
+          "bcNcit": "C25640",
+          "protocolPage": 21
+        }
+      ],
+      "variableCount": 21,
+      "variables": [
+        {
+          "name": "STUDYID",
+          "label": "Study Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "DOMAIN",
+          "label": "Domain Abbreviation",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "USUBJID",
+          "label": "Unique Subject Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "LBSEQ",
+          "label": "Sequence Number",
+          "role": "Identifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "LBTESTCD",
+          "label": "Lab Test or Examination Short Name",
+          "role": "Topic",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "LBTEST",
+          "label": "Lab Test or Examination Name",
+          "role": "Synonym Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "LBCAT",
+          "label": "Category for Lab Test",
+          "role": "Grouping Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "LBSPEC",
+          "label": "Specimen Type",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "LBORRES",
+          "label": "Result or Finding in Original Units",
+          "role": "Result Qualifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "LBORRESU",
+          "label": "Original Units",
+          "role": "Variable Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "LBSTRESC",
+          "label": "Character Result/Finding in Std Format",
+          "role": "Result Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "LBSTRESN",
+          "label": "Numeric Result/Finding in Standard Units",
+          "role": "Result Qualifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "LBSTRESU",
+          "label": "Standard Units",
+          "role": "Variable Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "LBORNRLO",
+          "label": "Reference Range Lower Limit",
+          "role": "Variable Qualifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "LBORNRHI",
+          "label": "Reference Range Upper Limit",
+          "role": "Variable Qualifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "LBFAST",
+          "label": "Fasting Status",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "VISITNUM",
+          "label": "Visit Number",
+          "role": "Timing",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "VISIT",
+          "label": "Visit Name",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "EPOCH",
+          "label": "Epoch",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "LBDTC",
+          "label": "Date/Time of Specimen Collection",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "LBDY",
+          "label": "Study Day of Specimen Collection",
+          "role": "Timing",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        }
+      ]
+    },
+    "EX": {
+      "label": "Exposure",
+      "sourceActivities": [
+        {
+          "activityId": "ACT_DOSE",
+          "activityName": "IMP administration (AZD9567 / prednisolone / placebo)",
+          "bcNcit": null,
+          "protocolPage": 22
+        }
+      ],
+      "variableCount": 15,
+      "variables": [
+        {
+          "name": "STUDYID",
+          "label": "Study Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "DOMAIN",
+          "label": "Domain Abbreviation",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "USUBJID",
+          "label": "Unique Subject Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "EXSEQ",
+          "label": "Sequence Number",
+          "role": "Identifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "EXTRT",
+          "label": "Name of Treatment",
+          "role": "Topic",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "EXDOSE",
+          "label": "Dose",
+          "role": "Record Qualifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "EXDOSU",
+          "label": "Dose Units",
+          "role": "Variable Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "EXROUTE",
+          "label": "Route of Administration",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": "C66729",
+          "mandatory": false
+        },
+        {
+          "name": "VISITNUM",
+          "label": "Visit Number",
+          "role": "Timing",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "VISIT",
+          "label": "Visit Name",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "EPOCH",
+          "label": "Epoch",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "EXSTDTC",
+          "label": "Start Date/Time of Treatment",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "EXENDTC",
+          "label": "End Date/Time of Treatment",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "EXSTDY",
+          "label": "Study Day of Start of Treatment",
+          "role": "Timing",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "EXENDY",
+          "label": "Study Day of End of Treatment",
+          "role": "Timing",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        }
+      ]
+    },
+    "CM": {
+      "label": "Concomitant/Prior Medications",
+      "sourceActivities": [
+        {
+          "activityId": "ACT_CM",
+          "activityName": "Concomitant medication",
+          "bcNcit": null,
+          "protocolPage": 21
+        }
+      ],
+      "variableCount": 12,
+      "variables": [
+        {
+          "name": "STUDYID",
+          "label": "Study Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "DOMAIN",
+          "label": "Domain Abbreviation",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "USUBJID",
+          "label": "Unique Subject Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "CMSEQ",
+          "label": "Sequence Number",
+          "role": "Identifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "CMTRT",
+          "label": "Reported Name of Drug, Med, or Therapy",
+          "role": "Topic",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "CMDOSE",
+          "label": "Dose per Administration",
+          "role": "Record Qualifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "CMDOSU",
+          "label": "Dose Units",
+          "role": "Variable Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "CMROUTE",
+          "label": "Route of Administration",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": "C66729",
+          "mandatory": false
+        },
+        {
+          "name": "CMINDC",
+          "label": "Indication",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "EPOCH",
+          "label": "Epoch",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "CMSTDTC",
+          "label": "Start Date/Time",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "CMSTDY",
+          "label": "Study Day of Start of Medication",
+          "role": "Timing",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        }
+      ]
+    },
+    "AE": {
+      "label": "Adverse Events",
+      "sourceActivities": [
+        {
+          "activityId": "ACT_AE",
+          "activityName": "Adverse events",
+          "bcNcit": null,
+          "protocolPage": 21
+        }
+      ],
+      "variableCount": 15,
+      "variables": [
+        {
+          "name": "STUDYID",
+          "label": "Study Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "DOMAIN",
+          "label": "Domain Abbreviation",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "USUBJID",
+          "label": "Unique Subject Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "AESEQ",
+          "label": "Sequence Number",
+          "role": "Identifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "AETERM",
+          "label": "Reported Term for the Adverse Event",
+          "role": "Topic",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "AESEV",
+          "label": "Severity/Intensity",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": "C66769",
+          "mandatory": false
+        },
+        {
+          "name": "AESER",
+          "label": "Serious Event",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": "C66742",
+          "mandatory": false
+        },
+        {
+          "name": "AEREL",
+          "label": "Causality",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": "C66742",
+          "mandatory": false
+        },
+        {
+          "name": "AEOUT",
+          "label": "Outcome of Adverse Event",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": "C66767",
+          "mandatory": false
+        },
+        {
+          "name": "AEACN",
+          "label": "Action Taken with Study Treatment",
+          "role": "Record Qualifier",
+          "dataType": "Char",
+          "codelistNcit": "C66767",
+          "mandatory": false
+        },
+        {
+          "name": "EPOCH",
+          "label": "Epoch",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "AESTDTC",
+          "label": "Start Date/Time of Adverse Event",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "AEENDTC",
+          "label": "End Date/Time of Adverse Event",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "AESTDY",
+          "label": "Study Day of Start of Adverse Event",
+          "role": "Timing",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "AEENDY",
+          "label": "Study Day of End of Adverse Event",
+          "role": "Timing",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        }
+      ]
+    },
+    "DS": {
+      "label": "Disposition",
+      "sourceActivities": [
+        {
+          "activityId": "ACT_RAND",
+          "activityName": "Randomisation (IVRS/IWRS)",
+          "bcNcit": null,
+          "protocolPage": 21
+        },
+        {
+          "activityId": "ACT_DISP",
+          "activityName": "Study completion / disposition",
+          "bcNcit": null,
+          "protocolPage": 24
+        }
+      ],
+      "variableCount": 10,
+      "variables": [
+        {
+          "name": "STUDYID",
+          "label": "Study Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "DOMAIN",
+          "label": "Domain Abbreviation",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "USUBJID",
+          "label": "Unique Subject Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "DSSEQ",
+          "label": "Sequence Number",
+          "role": "Identifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "DSCAT",
+          "label": "Category for Disposition Event",
+          "role": "Grouping Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "DSTERM",
+          "label": "Reported Term for the Disposition Event",
+          "role": "Topic",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "DSDECOD",
+          "label": "Standardized Disposition Term",
+          "role": "Synonym Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "EPOCH",
+          "label": "Epoch",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "DSSTDTC",
+          "label": "Start Date/Time of Disposition Event",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "DSSTDY",
+          "label": "Study Day of Start of Disposition Event",
+          "role": "Timing",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        }
+      ]
+    },
+    "MH": {
+      "label": "Medical History",
+      "sourceActivities": [
+        {
+          "activityId": "ACT_MH",
+          "activityName": "Medical History",
+          "bcNcit": null,
+          "protocolPage": 20
+        }
+      ],
+      "variableCount": 9,
+      "variables": [
+        {
+          "name": "STUDYID",
+          "label": "Study Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "DOMAIN",
+          "label": "Domain Abbreviation",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "USUBJID",
+          "label": "Unique Subject Identifier",
+          "role": "Identifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "MHSEQ",
+          "label": "Sequence Number",
+          "role": "Identifier",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "MHTERM",
+          "label": "Reported Term for the Medical History",
+          "role": "Topic",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": true
+        },
+        {
+          "name": "MHCAT",
+          "label": "Category for Medical History",
+          "role": "Grouping Qualifier",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "EPOCH",
+          "label": "Epoch",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "MHSTDTC",
+          "label": "Start Date/Time of History Event",
+          "role": "Timing",
+          "dataType": "Char",
+          "codelistNcit": null,
+          "mandatory": false
+        },
+        {
+          "name": "MHSTDY",
+          "label": "Study Day of Start of Medical History Event",
+          "role": "Timing",
+          "dataType": "Num",
+          "codelistNcit": null,
+          "mandatory": false
+        }
+      ]
+    }
+  }
+}

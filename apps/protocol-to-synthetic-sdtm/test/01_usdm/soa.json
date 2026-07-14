@@ -1,0 +1,438 @@
+{
+  "studyId": "NCT04556760",
+  "sponsorStudyId": "D6470C00005",
+  "source": "Clinical Study Protocol v3.0 (Prot_000.pdf), Section 1.3 Schedule of Activities, pp.20-24",
+  "epochs": [
+    {
+      "id": "EP_SCRN",
+      "name": "Screening",
+      "type": "SCREENING"
+    },
+    {
+      "id": "EP_TP1",
+      "name": "Treatment Period 1",
+      "type": "TREATMENT"
+    },
+    {
+      "id": "EP_WASH",
+      "name": "Washout",
+      "type": "WASHOUT"
+    },
+    {
+      "id": "EP_TP2",
+      "name": "Treatment Period 2",
+      "type": "TREATMENT"
+    },
+    {
+      "id": "EP_FU",
+      "name": "Follow-up",
+      "type": "FOLLOW_UP"
+    }
+  ],
+  "encounters": [
+    {
+      "id": "ENC_V1",
+      "name": "Visit 1",
+      "label": "Screening",
+      "epoch": "EP_SCRN",
+      "timing": "<= 14 days before start of IMP"
+    },
+    {
+      "id": "ENC_V2",
+      "name": "Visit 2",
+      "label": "Outpatient visit (Day -4)",
+      "epoch": "EP_TP1",
+      "timing": "Day -4"
+    },
+    {
+      "id": "ENC_V3",
+      "name": "Visit 3",
+      "label": "Residency in Unit (Treatment Period 1)",
+      "epoch": "EP_TP1",
+      "timing": "Days -2 to 4"
+    },
+    {
+      "id": "ENC_WASH",
+      "name": "Washout",
+      "label": "Washout (3 weeks)",
+      "epoch": "EP_WASH",
+      "timing": "3 weeks"
+    },
+    {
+      "id": "ENC_V4",
+      "name": "Visit 4",
+      "label": "Outpatient visit (Day 24)",
+      "epoch": "EP_TP2",
+      "timing": "Day 24 (-4)"
+    },
+    {
+      "id": "ENC_V5",
+      "name": "Visit 5",
+      "label": "Residency in Unit 2 (Treatment Period 2)",
+      "epoch": "EP_TP2",
+      "timing": "Days 26 to 31"
+    },
+    {
+      "id": "ENC_V6",
+      "name": "Visit 6",
+      "label": "Final/ET visit",
+      "epoch": "EP_FU",
+      "timing": "Follow-up Day 30 +/- 4 days after last dose"
+    }
+  ],
+  "activities": [
+    {
+      "id": "ACT_IC",
+      "name": "Informed consent",
+      "performedAt": [
+        "ENC_V1"
+      ],
+      "targetSdtmDomain": "IE",
+      "biomedicalConceptNcit": null,
+      "provenance": {
+        "protocolPage": 20,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_ELIG",
+      "name": "Verify eligibility criteria",
+      "performedAt": [
+        "ENC_V1",
+        "ENC_V4"
+      ],
+      "targetSdtmDomain": "IE",
+      "biomedicalConceptNcit": null,
+      "provenance": {
+        "protocolPage": 20,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_DM",
+      "name": "Demography",
+      "performedAt": [
+        "ENC_V1"
+      ],
+      "targetSdtmDomain": "DM",
+      "biomedicalConceptNcit": null,
+      "provenance": {
+        "protocolPage": 20,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_HTWT",
+      "name": "Height and weight",
+      "performedAt": [
+        "ENC_V1",
+        "ENC_V3",
+        "ENC_V5",
+        "ENC_V6"
+      ],
+      "targetSdtmDomain": "VS",
+      "biomedicalConceptNcit": "C25347/C25208",
+      "provenance": {
+        "protocolPage": 20,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_MH",
+      "name": "Medical History",
+      "performedAt": [
+        "ENC_V1"
+      ],
+      "targetSdtmDomain": "MH",
+      "biomedicalConceptNcit": null,
+      "provenance": {
+        "protocolPage": 20,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_PE",
+      "name": "Physical examination",
+      "performedAt": [
+        "ENC_V1",
+        "ENC_V3",
+        "ENC_V5",
+        "ENC_V6"
+      ],
+      "targetSdtmDomain": "PE",
+      "biomedicalConceptNcit": null,
+      "provenance": {
+        "protocolPage": 20,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_TOB",
+      "name": "Tobacco use",
+      "performedAt": [
+        "ENC_V1",
+        "ENC_V2",
+        "ENC_V5"
+      ],
+      "targetSdtmDomain": "SU",
+      "biomedicalConceptNcit": null,
+      "provenance": {
+        "protocolPage": 20,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_ECG",
+      "name": "Safety ECG (12-lead)",
+      "performedAt": [
+        "ENC_V1",
+        "ENC_V3",
+        "ENC_V5",
+        "ENC_V6"
+      ],
+      "targetSdtmDomain": "EG",
+      "biomedicalConceptNcit": "C71355",
+      "provenance": {
+        "protocolPage": 20,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_VS",
+      "name": "Vital signs (SBP, DBP, pulse, temperature)",
+      "performedAt": [
+        "ENC_V1",
+        "ENC_V3",
+        "ENC_V5",
+        "ENC_V6"
+      ],
+      "targetSdtmDomain": "VS",
+      "biomedicalConceptNcit": "C54706",
+      "provenance": {
+        "protocolPage": 20,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_RAND",
+      "name": "Randomisation (IVRS/IWRS)",
+      "performedAt": [
+        "ENC_V3"
+      ],
+      "targetSdtmDomain": "DS",
+      "biomedicalConceptNcit": null,
+      "provenance": {
+        "protocolPage": 21,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_AE",
+      "name": "Adverse events",
+      "performedAt": [
+        "ENC_V1",
+        "ENC_V2",
+        "ENC_V3",
+        "ENC_V4",
+        "ENC_V5",
+        "ENC_V6"
+      ],
+      "targetSdtmDomain": "AE",
+      "biomedicalConceptNcit": null,
+      "provenance": {
+        "protocolPage": 21,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_CM",
+      "name": "Concomitant medication",
+      "performedAt": [
+        "ENC_V1",
+        "ENC_V2",
+        "ENC_V3",
+        "ENC_V4",
+        "ENC_V5",
+        "ENC_V6"
+      ],
+      "targetSdtmDomain": "CM",
+      "biomedicalConceptNcit": null,
+      "provenance": {
+        "protocolPage": 21,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_HEM",
+      "name": "Haematology",
+      "performedAt": [
+        "ENC_V1",
+        "ENC_V3",
+        "ENC_V5",
+        "ENC_V6"
+      ],
+      "targetSdtmDomain": "LB",
+      "biomedicalConceptNcit": "C28133",
+      "provenance": {
+        "protocolPage": 21,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_CHEM",
+      "name": "Clinical chemistry (incl. triglycerides, HDL-C)",
+      "performedAt": [
+        "ENC_V1",
+        "ENC_V3",
+        "ENC_V5",
+        "ENC_V6"
+      ],
+      "targetSdtmDomain": "LB",
+      "biomedicalConceptNcit": "C49237",
+      "provenance": {
+        "protocolPage": 21,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_COAG",
+      "name": "Coagulation (INR, PT, aPTT)",
+      "performedAt": [
+        "ENC_V1"
+      ],
+      "targetSdtmDomain": "LB",
+      "biomedicalConceptNcit": "C61367",
+      "provenance": {
+        "protocolPage": 21,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_HBA1C",
+      "name": "HbA1c",
+      "performedAt": [
+        "ENC_V1"
+      ],
+      "targetSdtmDomain": "LB",
+      "biomedicalConceptNcit": "C64849",
+      "provenance": {
+        "protocolPage": 21,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_MMTT",
+      "name": "MMTT (glucose, insulin, C-peptide, GLP-1, GIP, glucagon, FFAs)",
+      "performedAt": [
+        "ENC_V3",
+        "ENC_V5"
+      ],
+      "targetSdtmDomain": "LB",
+      "biomedicalConceptNcit": "C105585",
+      "provenance": {
+        "protocolPage": 23,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_CORT",
+      "name": "Serum cortisol",
+      "performedAt": [
+        "ENC_V3",
+        "ENC_V5",
+        "ENC_V6"
+      ],
+      "targetSdtmDomain": "LB",
+      "biomedicalConceptNcit": "C105443",
+      "provenance": {
+        "protocolPage": 23,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_UNAK",
+      "name": "24-h urinary sodium & potassium (U-Na, U-K)",
+      "performedAt": [
+        "ENC_V3",
+        "ENC_V5"
+      ],
+      "targetSdtmDomain": "LB",
+      "biomedicalConceptNcit": "C147062",
+      "provenance": {
+        "protocolPage": 24,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_UA",
+      "name": "Urinalysis",
+      "performedAt": [
+        "ENC_V1",
+        "ENC_V3",
+        "ENC_V5",
+        "ENC_V6"
+      ],
+      "targetSdtmDomain": "LB",
+      "biomedicalConceptNcit": "C17241",
+      "provenance": {
+        "protocolPage": 24,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_PREG",
+      "name": "Pregnancy test (hCG)",
+      "performedAt": [
+        "ENC_V1",
+        "ENC_V6"
+      ],
+      "targetSdtmDomain": "LB",
+      "biomedicalConceptNcit": "C25640",
+      "provenance": {
+        "protocolPage": 21,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_PK",
+      "name": "PK sampling (AZD9567, prednisolone)",
+      "performedAt": [
+        "ENC_V3",
+        "ENC_V5"
+      ],
+      "targetSdtmDomain": "PC",
+      "biomedicalConceptNcit": null,
+      "provenance": {
+        "protocolPage": 22,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_DOSE",
+      "name": "IMP administration (AZD9567 / prednisolone / placebo)",
+      "performedAt": [
+        "ENC_V3",
+        "ENC_V5"
+      ],
+      "targetSdtmDomain": "EX",
+      "biomedicalConceptNcit": null,
+      "provenance": {
+        "protocolPage": 22,
+        "source": "SoA"
+      }
+    },
+    {
+      "id": "ACT_DISP",
+      "name": "Study completion / disposition",
+      "performedAt": [
+        "ENC_V6"
+      ],
+      "targetSdtmDomain": "DS",
+      "biomedicalConceptNcit": null,
+      "provenance": {
+        "protocolPage": 24,
+        "source": "SoA"
+      }
+    }
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "hasMore": true,
+  "hits": [
+    {
+      "@search.highlights": {
+        "definition": [
+          "A relative measurement (ratio or percentage) of radiolabeled <em>glucose</em> to total <em>glucose</em> in a biological specimen."
+        ]
+      },
+      "@search.score": 26.727253,
+      "codelist": "Laboratory Test Code",
+      "conceptId": "C186054",
+      "definition": "A relative measurement (ratio or percentage) of radiolabeled glucose to total glucose in a biological specimen.",
+      "href": "/mdr/ct/packages/sdtmct-2022-06-24/codelists/C65047/terms/C186054",
+      "label": "Radiolabeled Glucose to Glucose Ratio Measurement",
+      "links": [
+        {
+          "href": "/mdr/ct/packages/sdtmct-2022-06-24/codelists/C65047",
+          "linkName": "parentCodelist",
+          "title": "CDISC SDTM Laboratory Test Code Terminology",
+          "type": "Code List"
+        },
+        {
+          "href": "/mdr/ct/packages/sdtmct-2022-06-24",
+          "linkName": "parentPackage",
+          "title": "SDTM Controlled Terminology Package 50 Effective 2022-06-24",
+          "type": "Terminology"
+        },
+        {
+          "href": "/mdr/ct/packages/sdtmct-2022-03-25/codelists/C65047/terms/C186054",
+          "linkName": "priorVersion",
+          "title": "Radiolabeled Glucose to Glucose Ratio Measurement",
+          "type": "Code List Value"
+        },
+        {
+          "href": "/mdr/root/ct/sdtmct/codelists/C65047/terms/C186054",
+          "linkName": "rootItem",
+          "title": "Version-agnostic anchor resource for codelist term C65047.C186054",
+          "type": "Root Value"
+        },
+        {
+          "href": "/mdr/ct/packages/sdtmct-2022-06-24/codelists/C65047/terms/C186054",
+          "linkName": "self",
+          "title": "Radiolabeled Glucose to Glucose Ratio Measurement",
+          "type": "Code List Value"
+        }
+      ],
+      "name": "Radiolabeled Glucose to Glucose Ratio Measurement",
+      "parentHref": "/mdr/ct/packages/sdtmct-2022-06-24",
+      "parentName": "SDTM Controlled Terminology Package 50 Effective 2022-06-24",
+      "parentType": "Terminology",
+      "preferredTerm": "Radiolabeled Glucose to Glucose Ratio Measurement",
+      "product": "SDTM CT 2022-06-24",
+      "submissionValue": "GLURLGLU",
+      "synonyms": [
+        "Glucose, Enriched/Glucose",
+        "Glucose, Radiolabeled/Glucose"
+      ],
+      "type": "Code List Value"
+    },
+    {
+      "@search.highlights": {
+        "definition": [
+          "A relative measurement (ratio or percentage) of radiolabeled <em>glucose</em> to total <em>glucose</em> in a biological specimen."
+        ]
+      },
+      "@search.score": 26.727253,
+      "codelist": "Laboratory Test Code",
+      "conceptId": "C186054",
+      "definition": "A relative measurement (ratio or percentage) of radiolabeled glucose to total glucose in a biological specimen.",
+      "href": "/mdr/ct/packages/sdtmct-2026-03-27/codelists/C65047/terms/C186054",
+      "label": "Radiolabeled Glucose to Glucose Ratio Measurement",
+      "links": [
+        {
+          "href": "/mdr/ct/packages/sdtmct-2026-03-27/codelists/C65047",
+          "linkName": "parentCodelist",
+          "title": "CDISC SDTM Laboratory Test Code Terminology",
+          "type": "Code List"
+        },
+        {
+          "href": "/mdr/ct/packages/sdtmct-2026-03-27",
+          "linkName": "parentPackage",
+          "title": "SDTM Controlled Terminology Package 61 Effective 2026-03-27",
+          "type": "Terminology"
+        },
+        {
+          "href": "/mdr/ct/packages/sdtmct-2025-09-26/codelists/C65047/terms/C186054",
+          "linkName": "priorVersion",
+          "title": "Radiolabeled Glucose to Glucose Ratio Measurement",
+          "type": "Code List Value"
+        },
+        {
+          "href": "/mdr/root/ct/sdtmct/codelists/C65047/terms/C186054",
+          "linkName": "rootItem",
+          "title": "Version-agnostic anchor resource for codelist term C65047.C186054",
+          "type": "Root Value"
+        },
+        {
+          "href": "/mdr/ct/packages/sdtmct-2026-03-27/codelists/C65047/terms/C186054",
+          "linkName": "self",
+          "title": "Radiolabeled Glucose to Glucose Ratio Measurement",
+          "type": "Code List Value"
+        }
+      ],
+      "name": "Radiolabeled Glucose to Glucose Ratio Measurement",
+      "parentHref": "/mdr/ct/packages/sdtmct-2026-03-27",
+      "parentName": "SDTM Controlled Terminology Package 61 Effective 2026-03-27",
+      "parentType": "Terminology",
+      "preferredTerm": "Radiolabeled Glucose to Glucose Ratio Measurement",
+      "product": "SDTM CT 2026-03-27",
+      "submissionValue": "GLURLGLU",
+      "synonyms": [
+        "Glucose, Enriched/Glucose",
+        "Glucose, Radiolabeled/Glucose"
+      ],
+      "type": "Code List Value"
+    }
+  ],
+  "totalHits": 3182
+}

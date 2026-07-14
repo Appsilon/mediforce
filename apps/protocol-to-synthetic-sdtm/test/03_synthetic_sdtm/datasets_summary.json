@@ -1,0 +1,19 @@
+{
+  "studyId": "NCT04556760",
+  "sponsorStudyId": "D6470C00005",
+  "subjects": 40,
+  "seed": 1234,
+  "sdtmigVersion": "3.4",
+  "ctPackage": "sdtmct-2026-03-27",
+  "rowCounts": {
+    "DM": 40,
+    "VS": 720,
+    "LB": 2080,
+    "EX": 80,
+    "CM": 54,
+    "AE": 32,
+    "DS": 40,
+    "MH": 83
+  },
+  "totalRows": 3129
+}
