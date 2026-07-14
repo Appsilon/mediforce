@@ -227,6 +227,31 @@ describe('ClaudeCodeAgentPlugin', () => {
       const result = plugin.parseAgentOutput(stdout);
       expect(result).toBe('');
     });
+
+    it('[DATA] folds peak per-turn context (input + cache) into result usage', () => {
+      const stdout = [
+        JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 40_000, cache_read_input_tokens: 10_000, output_tokens: 200 } } }),
+        JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 90_000, cache_read_input_tokens: 60_000, cache_creation_input_tokens: 5_000, output_tokens: 300 } } }),
+        JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 20_000, output_tokens: 100 } } }),
+        JSON.stringify({ type: 'result', subtype: 'success', result: 'done', usage: { input_tokens: 20_000, output_tokens: 100 } }),
+      ].join('\n');
+
+      const parsed = JSON.parse(plugin.parseAgentOutput(stdout));
+      // Peak is the largest single turn's full prompt: 90k + 60k + 5k = 155k,
+      // not the final turn (20k) that result.usage would otherwise report.
+      expect(parsed.usage.peak_input_tokens).toBe(155_000);
+      expect(parsed.usage.input_tokens).toBe(20_000);
+    });
+
+    it('[DATA] leaves usage untouched when no assistant turn reports tokens', () => {
+      const stdout = [
+        JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'hi' }] } }),
+        JSON.stringify({ type: 'result', subtype: 'success', result: 'done', usage: { input_tokens: 5_000, output_tokens: 50 } }),
+      ].join('\n');
+
+      const parsed = JSON.parse(plugin.parseAgentOutput(stdout));
+      expect(parsed.usage).toEqual({ input_tokens: 5_000, output_tokens: 50 });
+    });
   });
 
   describe('run', () => {

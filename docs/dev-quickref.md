@@ -47,6 +47,21 @@ any workflows you registered there are **never touched**. If a journey creates a
 workspace handle that isn't in the cleanup list, add it to the `E2E_WORKSPACES` array
 in [e2e/helpers/postgres-seed.ts](../packages/platform-ui/e2e/helpers/postgres-seed.ts).
 
+### E2E build freshness
+
+`start:e2e` never serves a stale `.next`. `build:e2e` stamps a hash of the source
+tree into `.next/BUILD_SOURCE_HASH` (via `scripts/e2e_build_gate.py`, which hashes
+the same file set the CI cache key uses), and `start:e2e` rebuilds whenever that
+stamp is missing or no longer matches the working tree. Because the fingerprint is
+content-based, not `HEAD`-based, switching branches **and uncommitted source edits**
+both force a rebuild — the suite always runs against the current source, never a
+leftover bundle from an earlier state.
+
+CI keeps its source-hash `.next` cache: the cache key already encodes the source
+hash, so a restored bundle matches the current source. There the gate only checks
+that a build exists (`CI=true`) and never rebuilds in the test step, so a cache hit
+is not defeated.
+
 ## CLI cheat sheet
 
 Dogfood rule: **CLI > REST.** Full guide: [use-mediforce skill](../.claude/skills/use-mediforce/SKILL.md).
