@@ -652,6 +652,7 @@ describe('Mediforce', () => {
       const result = await mediforce.runs.start({
         definitionName: 'def-1',
         triggeredBy: 'user-1',
+        triggerName: 'manual',
       });
 
       expect(result.run.id).toBe('inst-a');

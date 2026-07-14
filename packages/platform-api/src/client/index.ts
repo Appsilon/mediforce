@@ -751,7 +751,7 @@ export class Mediforce {
         return this.sendJson(
           'POST',
           `/api/tasks/${encodeURIComponent(validated.taskId)}/complete`,
-          validated.payload as Record<string, unknown>,
+          validated.payload,
           CompleteTaskOutputSchema,
           'mediforce.tasks.complete',
         );
@@ -935,7 +935,7 @@ export class Mediforce {
         return this.sendJson(
           'POST',
           `/api/workflow-definitions${qs}`,
-          { ...validatedInput } as Record<string, unknown>,
+          { ...validatedInput },
           RegisterWorkflowOutputSchema,
           'mediforce.workflows.register',
         );
@@ -1129,7 +1129,7 @@ export class Mediforce {
         return this.sendJson(
           'PUT',
           `/api/agents/${encodeURIComponent(validatedInput.id)}`,
-          validatedBody as Record<string, unknown>,
+          validatedBody,
           UpdateAgentOutputSchema,
           'mediforce.agents.update',
         );
@@ -1139,7 +1139,7 @@ export class Mediforce {
         return this.sendJson(
           'POST',
           '/api/agents',
-          { ...v } as Record<string, unknown>,
+          { ...v },
           CreateAgentOutputSchema,
           'mediforce.agents.create',
         );
@@ -1155,7 +1155,7 @@ export class Mediforce {
         return this.sendJson(
           'PUT',
           `/api/agents/${encodeURIComponent(v.id)}/mcp-servers/${encodeURIComponent(v.name)}`,
-          v.binding as Record<string, unknown>,
+          v.binding,
           UpsertAgentMcpBindingOutputSchema,
           'mediforce.agents.upsertMcpBinding',
         );
@@ -1313,7 +1313,7 @@ export class Mediforce {
         return this.sendJson(
           'POST',
           '/api/processes',
-          validated as Record<string, unknown>,
+          validated,
           StartRunOutputSchema,
           'mediforce.runs.start',
         );
@@ -1838,7 +1838,7 @@ export class Mediforce {
   private async sendJson<TOut>(
     method: 'POST' | 'PATCH' | 'PUT' | 'DELETE',
     path: string,
-    body: Record<string, unknown> | undefined,
+    body: unknown,
     outputSchema: { parse: (b: unknown) => TOut },
     ctx: string,
   ): Promise<TOut> {
