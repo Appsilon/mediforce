@@ -19,6 +19,12 @@ export const TokenUsageSchema = z.object({
   // Cache-read input tokens are billed at the (much cheaper) cacheRead rate,
   // so they are tracked separately from full-price input tokens.
   cachedInputTokens: z.number().int().nonnegative().optional(),
+  // Largest single-turn prompt the model held during the run. Unlike
+  // `inputTokens` (summed across turns, for cost), this is the peak context
+  // occupancy — divide by the model's contextLength for the saturation ratio
+  // used to size agent batches. Only populated when the runner exposes
+  // per-turn token counts (e.g. OpenCode step_finish events).
+  peakInputTokens: z.number().int().nonnegative().optional(),
 });
 
 /** A reviewer-facing preview rendered by the platform. `markdown` flows

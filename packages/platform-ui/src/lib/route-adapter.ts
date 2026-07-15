@@ -121,8 +121,10 @@ export function createRouteAdapter<
 
 // `HandlerError.toEnvelope()` is the ADR-0005 §1 wire shape; `statusCode` is
 // derived from `code` via the §3 table inside the class. This adapter is the
-// only place that turns a HandlerError into an HTTP response.
-function jsonErrorResponse(err: HandlerError): NextResponse {
+// canonical place that turns a HandlerError into an HTTP response; the rare
+// binary routes that can't compose through `createRouteAdapter` reuse this so
+// their error envelopes stay byte-identical to the JSON routes'.
+export function jsonErrorResponse(err: HandlerError): NextResponse {
   return NextResponse.json(err.toEnvelope(), { status: err.statusCode });
 }
 

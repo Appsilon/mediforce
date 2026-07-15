@@ -144,6 +144,9 @@ function contract(
       expect(updated?.name).toBe('Updated');
       expect(updated?.clientId).toBe(original.clientId);
       expect(updated?.scopes).toEqual(original.scopes);
+      // A PATCH that omits clientSecret must preserve the stored secret —
+      // the "leave empty to keep current secret" edit flow depends on this.
+      expect(updated?.clientSecret).toBe(original.clientSecret);
       expect(new Date(updated!.updatedAt).getTime()).toBeGreaterThan(
         new Date(original.updatedAt).getTime(),
       );

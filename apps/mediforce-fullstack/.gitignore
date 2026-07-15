@@ -1,0 +1,5 @@
+# Local build env — copy build/env.example.json to build/env.json to override
+# non-secret literals locally. Secret VALUES never live here (they are {{refs}}
+# resolved from the platform secret store), but keep the local file untracked.
+build/env.json
+build/env.local.json
