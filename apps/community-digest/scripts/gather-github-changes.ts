@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { createGitHubApiError, GitHubApiError } from './github-api-error.js';
+import { GitHubApiError } from './github-api-error.js';
 
 interface GatherInput {
   repo: string;
@@ -62,18 +62,17 @@ async function githubFetch(url: string): Promise<Response> {
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  return fetch(url, { headers }).then((response) => {
-    if (!response.ok) {
-      throw createGitHubApiError({
-        url,
-        status: response.status,
-        statusText: response.statusText,
-        rateLimitRemaining: response.headers.get('X-RateLimit-Remaining'),
-        rateLimitReset: response.headers.get('X-RateLimit-Reset'),
-      });
-    }
-    return response;
-  });
+  const response = await fetch(url, { headers });
+  if (!response.ok) {
+    throw new GitHubApiError({
+      url,
+      status: response.status,
+      statusText: response.statusText,
+      rateLimitRemaining: response.headers.get('X-RateLimit-Remaining'),
+      rateLimitReset: response.headers.get('X-RateLimit-Reset'),
+    });
+  }
+  return response;
 }
 
 async function fetchBranches(repo: string): Promise<string[]> {
