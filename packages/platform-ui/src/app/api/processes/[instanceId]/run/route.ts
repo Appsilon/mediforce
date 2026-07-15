@@ -42,6 +42,33 @@ function releaseRunLock(instanceId: string): void {
   runLocks.delete(instanceId);
 }
 
+/**
+ * Fail the run when a step exceeds the persisted attempt cap (issue #868),
+ * bounding re-kick / re-dispatch loops that survive process deaths (e.g. a hung
+ * action with no timeout, a step re-kicked by the heartbeat). Returns true when
+ * the run was failed, so the caller breaks the auto-runner loop.
+ */
+async function failRunIfStepAttemptsExceeded(
+  instanceRepo: { update(id: string, data: Record<string, unknown>): Promise<unknown> },
+  instanceId: string,
+  stepId: string,
+  step: { review?: { maxIterations?: number } },
+  priorExecutionsForStep: number,
+): Promise<boolean> {
+  if (!hasExceededStepAttempts(priorExecutionsForStep, step.review?.maxIterations)) {
+    return false;
+  }
+  const cap = MAX_STEP_ATTEMPTS + (step.review?.maxIterations ?? 0);
+  const message = `Step '${stepId}' exceeded ${cap} attempts — failing run to prevent an unbounded retry loop`;
+  console.error(`[auto-runner] ${message}`);
+  await instanceRepo.update(instanceId, {
+    status: 'failed',
+    error: message,
+    updatedAt: new Date().toISOString(),
+  });
+  return true;
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ instanceId: string }> },
@@ -567,20 +594,7 @@ export async function POST(
             const priorExecutionsForStep = (await instanceRepo.getStepExecutions(instanceId))
               .filter((e) => e.stepId === instance.currentStepId).length;
 
-            // Persisted termination guarantee (issue #868): bound how many times a
-            // step may be attempted across process deaths / heartbeat re-kicks, so
-            // a step that is re-kicked and re-run forever (e.g. a hung action, a
-            // repeatedly-interrupted step) eventually fails the run instead of
-            // looping. Floats above a review step's maxIterations.
-            if (hasExceededStepAttempts(priorExecutionsForStep, currentStep.review?.maxIterations)) {
-              const cap = MAX_STEP_ATTEMPTS + (currentStep.review?.maxIterations ?? 0);
-              const message = `Step '${instance.currentStepId}' exceeded ${cap} attempts — failing run to prevent an unbounded retry loop`;
-              console.error(`[auto-runner] ${message}`);
-              await instanceRepo.update(instanceId, {
-                status: 'failed',
-                error: message,
-                updatedAt: new Date().toISOString(),
-              });
+            if (await failRunIfStepAttemptsExceeded(instanceRepo, instanceId, currentStep.id, currentStep, priorExecutionsForStep)) {
               break;
             }
 
@@ -742,7 +756,8 @@ export async function POST(
             // the timeout fallback (fail/escalate per fallbackBehavior). A running
             // execution not yet past its timeout is left untouched — the heartbeat
             // re-kicks once it is overdue — so we never double-run a live step.
-            const priorInFlight = (await instanceRepo.getStepExecutions(instanceId))
+            const stepExecutions = await instanceRepo.getStepExecutions(instanceId);
+            const priorInFlight = stepExecutions
               .find((e) => e.stepId === instance.currentStepId && e.status === 'running');
             if (priorInFlight) {
               const ageMs = Date.now() - new Date(priorInFlight.startedAt).getTime();
@@ -777,23 +792,10 @@ export async function POST(
             // Iteration count = number of prior executions of this same step on
             // this instance. Lets revise loops surface as iter 1, 2, 3 in audit
             // and UI rather than every execution showing as iter 0.
-            const priorExecutionsForStep = (await instanceRepo.getStepExecutions(instanceId))
+            const priorExecutionsForStep = stepExecutions
               .filter((e) => e.stepId === instance.currentStepId).length;
 
-            // Persisted termination guarantee (issue #868): bound how many times a
-            // step may be attempted across process deaths / heartbeat re-kicks, so
-            // a step that is re-kicked and re-run forever (e.g. a hung action, a
-            // repeatedly-interrupted step) eventually fails the run instead of
-            // looping. Floats above a review step's maxIterations.
-            if (hasExceededStepAttempts(priorExecutionsForStep, currentStep.review?.maxIterations)) {
-              const cap = MAX_STEP_ATTEMPTS + (currentStep.review?.maxIterations ?? 0);
-              const message = `Step '${instance.currentStepId}' exceeded ${cap} attempts — failing run to prevent an unbounded retry loop`;
-              console.error(`[auto-runner] ${message}`);
-              await instanceRepo.update(instanceId, {
-                status: 'failed',
-                error: message,
-                updatedAt: new Date().toISOString(),
-              });
+            if (await failRunIfStepAttemptsExceeded(instanceRepo, instanceId, currentStep.id, currentStep, priorExecutionsForStep)) {
               break;
             }
 

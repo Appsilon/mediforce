@@ -106,7 +106,7 @@ export class ScriptStepExecutor implements StepExecutor {
       const errorDetail = errorMessage ?? (fallbackReason === 'timeout' ? 'script execution timed out' : null);
       // Scripts have no escalation path (ADR-0008): a script that cannot complete
       // fails the run deterministically rather than leaving it `running` for the
-      // auto-runner loop-guard to eventually trip (issue #868, refinement #2).
+      // auto-runner loop-guard to eventually trip (issue #868).
       await instanceRepo.update(instanceId, {
         status: 'failed',
         ...(errorDetail !== null ? { error: `Script step '${stepId}' ${failLabel}: ${errorDetail}` } : {}),

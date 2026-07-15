@@ -62,7 +62,9 @@ Make the timeout **durable** by treating "stranded past deadline" and
    in-memory loop-guard, this survives process death and re-kicks). Exceeding it
    fails the run. No step type can loop forever.
 
-4. **SIGTERM fast-path for deploys.** A graceful-shutdown hook on `platform-ui`
+4. **SIGTERM fast-path for deploys.** *(Deferred — lands in a follow-up PR, not
+   the initial #868 implementation. Decisions 1–3 and 5 ship first, with the
+   timeout-reap as this path's backstop.)* A graceful-shutdown hook on `platform-ui`
    marks its in-flight runs' current execution `interrupted` (a new
    `StepExecution` status) before the process exits. A boot-time re-kick sweep
    then recovers them **immediately** as a **retry** (we know it was a deploy,
@@ -75,7 +77,9 @@ Make the timeout **durable** by treating "stranded past deadline" and
    timer (in-process spawn strategy **and** the BullMQ worker). This closes the
    `DEFAULT_TIMEOUT_MS = 20 min` vs `resolveStepTimeoutMinutes` default `30 min`
    wiring gap, under which an unconfigured step was SIGKILLed at 20 min and
-   misclassified as `error` instead of `timeout`.
+   misclassified as `error` instead of `timeout`. The script-container plugin's
+   own legacy last-resort default (`10 min`) is aligned to `30 min` for the same
+   reason, so no plugin's fallback silently disagrees with the resolver default.
 
 ## Alternatives considered
 

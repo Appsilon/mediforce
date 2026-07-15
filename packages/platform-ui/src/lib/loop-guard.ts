@@ -7,8 +7,9 @@ export const MAX_STEP_ATTEMPTS = 10;
  * Persisted, cross-re-kick cap on how many times a single step may be attempted
  * within one run. Unlike {@link isStuckLoop} (per-`/run`, in-memory, resets on
  * every heartbeat re-kick), this counts persisted StepExecution rows, so it
- * bounds a step that is re-kicked and re-run across process deaths — the
- * termination guarantee for the retry / action-re-dispatch paths (ADR-0010).
+ * bounds a step that is re-kicked and re-run across process deaths (e.g. a hung
+ * action with no timeout, a heartbeat-rekicked step) — the termination
+ * guarantee of ADR-0010.
  *
  * The ceiling floats above a review step's configured `maxIterations` so a
  * legitimate revise loop is never mistaken for a runaway.
