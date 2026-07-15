@@ -8,7 +8,7 @@ import { resolveCoworkOutputSchema, resolveStepTimeoutMinutes } from '@mediforce
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
-import { isStuckLoop, createLoopTracker, MAX_SAME_STEP_ITERATIONS } from '@/lib/loop-guard';
+import { isStuckLoop, createLoopTracker, MAX_SAME_STEP_ITERATIONS, hasExceededStepAttempts, MAX_STEP_ATTEMPTS } from '@/lib/loop-guard';
 
 interface RunProcessBody {
   appContext?: Record<string, unknown>;
@@ -566,6 +566,24 @@ export async function POST(
             // and UI rather than every execution showing as iter 0.
             const priorExecutionsForStep = (await instanceRepo.getStepExecutions(instanceId))
               .filter((e) => e.stepId === instance.currentStepId).length;
+
+            // Persisted termination guarantee (issue #868): bound how many times a
+            // step may be attempted across process deaths / heartbeat re-kicks, so
+            // a step that is re-kicked and re-run forever (e.g. a hung action, a
+            // repeatedly-interrupted step) eventually fails the run instead of
+            // looping. Floats above a review step's maxIterations.
+            if (hasExceededStepAttempts(priorExecutionsForStep, currentStep.review?.maxIterations)) {
+              const cap = MAX_STEP_ATTEMPTS + (currentStep.review?.maxIterations ?? 0);
+              const message = `Step '${instance.currentStepId}' exceeded ${cap} attempts — failing run to prevent an unbounded retry loop`;
+              console.error(`[auto-runner] ${message}`);
+              await instanceRepo.update(instanceId, {
+                status: 'failed',
+                error: message,
+                updatedAt: new Date().toISOString(),
+              });
+              break;
+            }
+
             await instanceRepo.addStepExecution(instanceId, {
               id: executionId,
               instanceId,
@@ -761,6 +779,24 @@ export async function POST(
             // and UI rather than every execution showing as iter 0.
             const priorExecutionsForStep = (await instanceRepo.getStepExecutions(instanceId))
               .filter((e) => e.stepId === instance.currentStepId).length;
+
+            // Persisted termination guarantee (issue #868): bound how many times a
+            // step may be attempted across process deaths / heartbeat re-kicks, so
+            // a step that is re-kicked and re-run forever (e.g. a hung action, a
+            // repeatedly-interrupted step) eventually fails the run instead of
+            // looping. Floats above a review step's maxIterations.
+            if (hasExceededStepAttempts(priorExecutionsForStep, currentStep.review?.maxIterations)) {
+              const cap = MAX_STEP_ATTEMPTS + (currentStep.review?.maxIterations ?? 0);
+              const message = `Step '${instance.currentStepId}' exceeded ${cap} attempts — failing run to prevent an unbounded retry loop`;
+              console.error(`[auto-runner] ${message}`);
+              await instanceRepo.update(instanceId, {
+                status: 'failed',
+                error: message,
+                updatedAt: new Date().toISOString(),
+              });
+              break;
+            }
+
             await instanceRepo.addStepExecution(instanceId, {
               id: executionId,
               instanceId,

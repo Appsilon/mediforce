@@ -257,6 +257,32 @@ describe('POST /api/processes/[instanceId]/run', () => {
       expect(mockInstanceAddStepExecution).not.toHaveBeenCalled();
     });
 
+    it('[DATA] fails the run when a step exceeds the persisted attempt cap (issue #868)', async () => {
+      mockInstanceGetById.mockResolvedValue({
+        id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest',
+        definitionVersion: '1', status: 'running', currentStepId: 'gather-data',
+        configName: undefined, variables: {}, triggerPayload: {},
+      });
+      mockGetWorkflowDefinition.mockResolvedValue(workflowDefinition);
+      // 10 prior completed attempts of the same step, none still running.
+      mockGetStepExecutions.mockResolvedValue(
+        Array.from({ length: 10 }, (_, i) => ({
+          id: `exec-${i}`, stepId: 'gather-data', status: 'completed',
+          startedAt: new Date(Date.now() - (i + 1) * 60_000).toISOString(),
+        })),
+      );
+
+      await POST(makeRequest(), { params: makeParams('inst-1') });
+      await afterCallback!();
+
+      expect(mockExecuteAgentStep).not.toHaveBeenCalled();
+      expect(mockInstanceAddStepExecution).not.toHaveBeenCalled();
+      expect(mockInstanceUpdate).toHaveBeenCalledWith('inst-1', expect.objectContaining({
+        status: 'failed',
+        error: expect.stringContaining('exceeded'),
+      }));
+    });
+
     it('[ERROR] stuck loop safety guard triggers after MAX_SAME_STEP_ITERATIONS', async () => {
       // Simulate: agent step runs but instance stays at same step (the old bug)
       mockInstanceGetById.mockResolvedValue({

@@ -1,5 +1,25 @@
 export const MAX_SAME_STEP_ITERATIONS = 3;
 
+/** Floor for the persisted per-step attempt cap (issue #868). */
+export const MAX_STEP_ATTEMPTS = 10;
+
+/**
+ * Persisted, cross-re-kick cap on how many times a single step may be attempted
+ * within one run. Unlike {@link isStuckLoop} (per-`/run`, in-memory, resets on
+ * every heartbeat re-kick), this counts persisted StepExecution rows, so it
+ * bounds a step that is re-kicked and re-run across process deaths — the
+ * termination guarantee for the retry / action-re-dispatch paths (ADR-0010).
+ *
+ * The ceiling floats above a review step's configured `maxIterations` so a
+ * legitimate revise loop is never mistaken for a runaway.
+ */
+export function hasExceededStepAttempts(
+  priorAttempts: number,
+  maxReviewIterations?: number,
+): boolean {
+  return priorAttempts >= MAX_STEP_ATTEMPTS + (maxReviewIterations ?? 0);
+}
+
 export interface LoopTracker {
   previousStepId: string | null;
   count: number;
