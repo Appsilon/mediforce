@@ -280,3 +280,33 @@ describe('ScriptStepExecutor', () => {
     expect(mockInstanceRepo.updateStepExecution).not.toHaveBeenCalled();
   });
 });
+
+describe('ScriptStepExecutor reap mode (issue #868)', () => {
+  let executor: ScriptStepExecutor;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    executor = new ScriptStepExecutor(mockPluginRunner as never);
+    mockInstanceRepo.getById.mockResolvedValue({
+      status: 'running', currentStepId: 'transform-data', definitionVersion: '1', variables: {},
+    });
+  });
+
+  it('reaps as timeout without running the plugin and fails the instance deterministically', async () => {
+    const reapMeta: StepExecutorMeta = { ...meta, stepExecutionId: 'exec-stranded', reapTimedOut: true };
+
+    const result = await executor.execute(mockPlugin, makeContext(), services, reapMeta);
+
+    expect(mockPluginRunner.execute).not.toHaveBeenCalled();
+    expect(result.fallbackReason).toBe('timeout');
+    expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+      'inst-001', 'exec-stranded', expect.objectContaining({ status: 'failed' }),
+    );
+    expect(mockInstanceRepo.update).toHaveBeenCalledWith(
+      'inst-001', expect.objectContaining({ status: 'failed' }),
+    );
+    expect(mockAuditRepo.append).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'script.step.started' }),
+    );
+  });
+});

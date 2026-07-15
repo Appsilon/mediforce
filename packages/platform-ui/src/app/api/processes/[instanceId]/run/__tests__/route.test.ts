@@ -20,6 +20,7 @@ const mockInstanceGetById = vi.fn();
 const mockInstanceUpdate = vi.fn();
 const mockInstanceAddStepExecution = vi.fn();
 const mockInstanceUpdateStepExecution = vi.fn();
+const mockGetStepExecutions = vi.fn();
 const mockAuditAppend = vi.fn();
 const mockGetWorkflowDefinition = vi.fn();
 const mockGetProcessDefinition = vi.fn();
@@ -42,7 +43,7 @@ vi.mock('@/lib/platform-services', () => ({
       update: mockInstanceUpdate,
       addStepExecution: mockInstanceAddStepExecution,
       updateStepExecution: mockInstanceUpdateStepExecution,
-      getStepExecutions: vi.fn().mockResolvedValue([]),
+      getStepExecutions: (...args: unknown[]) => mockGetStepExecutions(...args),
     },
     processRepo: {
       getWorkflowDefinition: mockGetWorkflowDefinition,
@@ -141,6 +142,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
     afterCallback = null;
     mockHumanTaskGetByInstanceId.mockResolvedValue([]);
     mockCoworkSessionGetByInstanceId.mockResolvedValue([]);
+    mockGetStepExecutions.mockResolvedValue([]);
   });
 
   describe('workflow instance (no configName)', () => {
@@ -202,6 +204,57 @@ describe('POST /api/processes/[instanceId]/run', () => {
         'inst-1',
         expect.objectContaining({ stepId: 'gather-data', status: 'running' }),
       );
+    });
+
+    it('[DATA] reaps a stranded running step past its timeout instead of re-running it (issue #868)', async () => {
+      let callCount = 0;
+      mockInstanceGetById.mockImplementation(() => {
+        callCount++;
+        const base = {
+          id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest',
+          definitionVersion: '1', configName: undefined, variables: {}, triggerPayload: {},
+        };
+        // Initial check + first loop read see `running`; after the reap the
+        // instance is paused (escalated), so the loop exits.
+        return Promise.resolve(callCount <= 2
+          ? { ...base, status: 'running', currentStepId: 'gather-data' }
+          : { ...base, status: 'paused', currentStepId: 'gather-data' });
+      });
+      mockGetWorkflowDefinition.mockResolvedValue(workflowDefinition);
+      mockGetStepExecutions.mockResolvedValue([
+        { id: 'exec-stranded', stepId: 'gather-data', status: 'running', startedAt: new Date(Date.now() - 40 * 60_000).toISOString() },
+      ]);
+      mockExecuteAgentStep.mockResolvedValue({
+        instanceId: 'inst-1', status: 'paused', currentStepId: 'gather-data', agentRunStatus: 'escalated',
+      });
+
+      await POST(makeRequest(), { params: makeParams('inst-1') });
+      await afterCallback!();
+
+      expect(mockExecuteAgentStep).toHaveBeenCalledWith(
+        'inst-1', 'gather-data', expect.objectContaining({ id: 'gather-data' }),
+        expect.anything(), expect.any(String), 'exec-stranded', { reapTimedOut: true },
+      );
+      // No fresh execution row created — the stranded one is reaped, not re-run.
+      expect(mockInstanceAddStepExecution).not.toHaveBeenCalled();
+    });
+
+    it('[DATA] defers a running step not yet past its timeout to the heartbeat — no double-run (issue #868)', async () => {
+      mockInstanceGetById.mockResolvedValue({
+        id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest',
+        definitionVersion: '1', status: 'running', currentStepId: 'gather-data',
+        configName: undefined, variables: {}, triggerPayload: {},
+      });
+      mockGetWorkflowDefinition.mockResolvedValue(workflowDefinition);
+      mockGetStepExecutions.mockResolvedValue([
+        { id: 'exec-fresh', stepId: 'gather-data', status: 'running', startedAt: new Date(Date.now() - 2 * 60_000).toISOString() },
+      ]);
+
+      await POST(makeRequest(), { params: makeParams('inst-1') });
+      await afterCallback!();
+
+      expect(mockExecuteAgentStep).not.toHaveBeenCalled();
+      expect(mockInstanceAddStepExecution).not.toHaveBeenCalled();
     });
 
     it('[ERROR] stuck loop safety guard triggers after MAX_SAME_STEP_ITERATIONS', async () => {

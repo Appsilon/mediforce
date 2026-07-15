@@ -164,6 +164,47 @@ export class AgentRunner {
   }
 
   /**
+   * Reap a stranded agent step whose driver died mid-run (issue #868).
+   *
+   * Produces the SAME `AgentRunResult` the live `Promise.race` timeout path
+   * produces — `fallbackReason='timeout'` routed through the `FallbackHandler`
+   * per the step's `fallbackBehavior` — but WITHOUT running the plugin (it is
+   * already gone). Any orphaned still-`running` Agent Run row for this step is
+   * transitioned to the fallback's terminal status so it no longer shows as
+   * running forever. Downstream `AgentStepExecutor` handling (L3 review routing,
+   * escalation audit, instance state) is identical to a live timeout.
+   */
+  async reapAsTimeout(context: WorkflowAgentContext): Promise<AgentRunResult> {
+    const { processInstanceId, stepId } = context;
+    const errorMessage =
+      'Step timed out — stranded past its timeout after its driver stopped';
+
+    const fallbackResult = await this.fallbackHandler.handleWithWorkflowStep(
+      'timeout', context, [], null,
+    );
+
+    if (this.agentRunRepository) {
+      const orphaned = (await this.agentRunRepository.getByInstanceId(processInstanceId))
+        .filter((run) => run.stepId === stepId && run.status === 'running');
+      for (const run of orphaned) {
+        // create() upserts on runId — recreating with the same id terminates
+        // the orphaned row rather than inserting a duplicate.
+        await this.agentRunRepository.create({
+          ...run,
+          status: fallbackResult.status,
+          fallbackReason: 'timeout',
+          completedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    await this.appendAuditEventFromWorkflowStep(
+      context, null, fallbackResult.status, 0, errorMessage,
+    );
+    return { ...fallbackResult, errorMessage };
+  }
+
+  /**
    * @deprecated Use runWithWorkflowStep instead. This method relies on the legacy
    * StepConfig model which is being replaced by WorkflowStep.
    */

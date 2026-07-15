@@ -24,29 +24,42 @@ export class ScriptStepExecutor implements StepExecutor {
     const { auditRepo, instanceRepo, engine, modelRegistryRepo } = services;
     const { instanceId, stepId, pluginId, triggeredBy, stepExecutionId, definitionVersion } = meta;
 
-    await auditRepo.append({
-      actorId: `script:${pluginId}`,
-      actorType: 'system',
-      actorRole: 'L4',
-      action: 'script.step.started',
-      description: `Script step '${stepId}' started (plugin: ${pluginId})`,
-      timestamp: new Date().toISOString(),
-      inputSnapshot: { stepId, pluginId, ...context.stepInput },
-      outputSnapshot: {},
-      basis: `Triggered by ${triggeredBy}`,
-      entityType: 'processInstance',
-      entityId: instanceId,
-      processInstanceId: instanceId,
-      stepId,
-      processDefinitionVersion: definitionVersion,
-      executorType: 'script',
-      reviewerType: 'none',
-    });
+    if (meta.reapTimedOut !== true) {
+      await auditRepo.append({
+        actorId: `script:${pluginId}`,
+        actorType: 'system',
+        actorRole: 'L4',
+        action: 'script.step.started',
+        description: `Script step '${stepId}' started (plugin: ${pluginId})`,
+        timestamp: new Date().toISOString(),
+        inputSnapshot: { stepId, pluginId, ...context.stepInput },
+        outputSnapshot: {},
+        basis: `Triggered by ${triggeredBy}`,
+        entityType: 'processInstance',
+        entityId: instanceId,
+        processInstanceId: instanceId,
+        stepId,
+        processDefinitionVersion: definitionVersion,
+        executorType: 'script',
+        reviewerType: 'none',
+      });
+    }
 
-    const timeoutMs = resolveStepTimeoutMinutes(context.step) * 60_000;
-    const { resultPayload, timedOut, errorMessage } = await this.pluginRunner.execute(
-      plugin, context, timeoutMs,
-    );
+    // Reap mode: the prior driver died with this step still running past its
+    // timeout — synthesize the timeout instead of launching the plugin (#868).
+    let resultPayload: unknown;
+    let timedOut: boolean;
+    let errorMessage: string | null;
+    if (meta.reapTimedOut === true) {
+      resultPayload = null;
+      timedOut = true;
+      errorMessage = 'Script step timed out — stranded past its timeout after its driver stopped';
+    } else {
+      const timeoutMs = resolveStepTimeoutMinutes(context.step) * 60_000;
+      ({ resultPayload, timedOut, errorMessage } = await this.pluginRunner.execute(
+        plugin, context, timeoutMs,
+      ));
+    }
 
     let envelope: StepOutputEnvelope | null = null;
     let fallbackReason: 'timeout' | 'error' | null = null;
@@ -91,12 +104,14 @@ export class ScriptStepExecutor implements StepExecutor {
     if (fallbackReason !== null) {
       const failLabel = fallbackReason === 'timeout' ? 'timed out' : 'failed';
       const errorDetail = errorMessage ?? (fallbackReason === 'timeout' ? 'script execution timed out' : null);
-      if (errorDetail !== null) {
-        await instanceRepo.update(instanceId, {
-          error: `Script step '${stepId}' ${failLabel}: ${errorDetail}`,
-          updatedAt: new Date().toISOString(),
-        });
-      }
+      // Scripts have no escalation path (ADR-0008): a script that cannot complete
+      // fails the run deterministically rather than leaving it `running` for the
+      // auto-runner loop-guard to eventually trip (issue #868, refinement #2).
+      await instanceRepo.update(instanceId, {
+        status: 'failed',
+        ...(errorDetail !== null ? { error: `Script step '${stepId}' ${failLabel}: ${errorDetail}` } : {}),
+        updatedAt: new Date().toISOString(),
+      });
 
       const truncatedError = errorDetail ? errorDetail.slice(0, 2000) : null;
       await auditRepo.append({

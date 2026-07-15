@@ -45,7 +45,13 @@ export async function executeAgentStep(
   appContext: Record<string, unknown>,
   triggeredBy: string,
   stepExecutionId?: string,
+  options?: { reapTimedOut?: boolean },
 ): Promise<WorkflowAgentStepResult> {
+  // Reap mode (issue #868): the prior driver died with this step stranded past
+  // its timeout. We route the existing execution through the timeout fallback
+  // without launching the plugin, so the plugin/MCP/OAuth resolution below is
+  // skipped entirely.
+  const reapTimedOut = options?.reapTimedOut === true;
   const {
     engine,
     agentRunner,
@@ -122,18 +128,20 @@ export async function executeAgentStep(
   // Pre-resolve MCP configuration from the agent definition + step restrictions
   // + tool catalog. undefined when step.agentId is unset. Namespace-scoped
   // catalog lookups use the workflow's namespace.
-  const resolvedMcpConfig = (await resolveMcpForStep(workflowStep, {
-    agentDefinitionRepo,
-    toolCatalogRepo,
-    namespace: workflowDefinition.namespace,
-  })) ?? undefined;
+  const resolvedMcpConfig = reapTimedOut
+    ? undefined
+    : (await resolveMcpForStep(workflowStep, {
+        agentDefinitionRepo,
+        toolCatalogRepo,
+        namespace: workflowDefinition.namespace,
+      })) ?? undefined;
 
   // Load and (lazily) refresh OAuth tokens for every HTTP binding that
   // requested OAuth auth. Done here, not in the runtime, so the runtime
   // stays decoupled from Firestore — queued-docker-spawn can serialize
   // the context over BullMQ once this is populated. Refresh failures
   // bubble up with actionable errors ("Reconnect via UI").
-  const oauthTokens = workflowStep.agentId !== undefined && resolvedMcpConfig !== undefined
+  const oauthTokens = !reapTimedOut && workflowStep.agentId !== undefined && resolvedMcpConfig !== undefined
     ? await loadOAuthTokens({
         namespace: workflowDefinition.namespace,
         agentId: workflowStep.agentId,
@@ -146,7 +154,7 @@ export async function executeAgentStep(
   // Resolve agent identity prompt (systemPrompt) from the AgentDefinition.
   // Returns undefined when step has no agentId or agent has no systemPrompt.
   let agentIdentityPrompt: string | undefined;
-  if (workflowStep.agentId !== undefined) {
+  if (!reapTimedOut && workflowStep.agentId !== undefined) {
     agentIdentityPrompt = await resolveAgentIdentity(workflowStep.agentId, agentDefinitionRepo);
   }
 
@@ -195,6 +203,7 @@ export async function executeAgentStep(
     triggeredBy,
     stepExecutionId,
     definitionVersion: instance.definitionVersion,
+    reapTimedOut,
   };
 
   // Dispatch to the right executor based on step type

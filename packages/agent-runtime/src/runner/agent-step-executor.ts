@@ -25,26 +25,34 @@ export class AgentStepExecutor implements StepExecutor {
     const autonomyLevel = context.autonomyLevel;
     const workflowStep = context.step;
 
-    await auditRepo.append({
-      actorId: `agent:${pluginId}`,
-      actorType: 'agent',
-      actorRole: autonomyLevel,
-      action: 'agent.step.started',
-      description: `Workflow agent step '${stepId}' started (plugin: ${pluginId}, autonomy: ${autonomyLevel})`,
-      timestamp: new Date().toISOString(),
-      inputSnapshot: { stepId, pluginId, autonomyLevel, ...context.stepInput },
-      outputSnapshot: {},
-      basis: `Triggered by ${triggeredBy}`,
-      entityType: 'processInstance',
-      entityId: instanceId,
-      processInstanceId: instanceId,
-      stepId,
-      processDefinitionVersion: definitionVersion,
-      executorType: 'agent',
-      reviewerType: 'none',
-    });
+    if (meta.reapTimedOut !== true) {
+      await auditRepo.append({
+        actorId: `agent:${pluginId}`,
+        actorType: 'agent',
+        actorRole: autonomyLevel,
+        action: 'agent.step.started',
+        description: `Workflow agent step '${stepId}' started (plugin: ${pluginId}, autonomy: ${autonomyLevel})`,
+        timestamp: new Date().toISOString(),
+        inputSnapshot: { stepId, pluginId, autonomyLevel, ...context.stepInput },
+        outputSnapshot: {},
+        basis: `Triggered by ${triggeredBy}`,
+        entityType: 'processInstance',
+        entityId: instanceId,
+        processInstanceId: instanceId,
+        stepId,
+        processDefinitionVersion: definitionVersion,
+        executorType: 'agent',
+        reviewerType: 'none',
+      });
+    }
 
-    const runResult = await this.agentRunner.runWithWorkflowStep(plugin, context);
+    // Reap mode: the prior driver died with this step still running past its
+    // timeout — synthesize the timeout fallback instead of launching the plugin
+    // (issue #868). The resulting AgentRunResult is identical to a live timeout,
+    // so all downstream routing below is shared.
+    const runResult = meta.reapTimedOut === true
+      ? await this.agentRunner.reapAsTimeout(context)
+      : await this.agentRunner.runWithWorkflowStep(plugin, context);
 
     const envelope = runResult.envelope;
     const costResult = envelope ? await estimateCostField(envelope, modelRegistryRepo, stepId) : {};

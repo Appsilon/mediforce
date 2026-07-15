@@ -4,7 +4,7 @@ import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { checkRetiredModels } from '@mediforce/platform-api/handlers';
-import { resolveCoworkOutputSchema } from '@mediforce/platform-core';
+import { resolveCoworkOutputSchema, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -717,6 +717,35 @@ export async function POST(
 
           if (currentStep.executor === 'agent' || currentStep.executor === 'script') {
             console.log(`[auto-runner] Executing workflow agent step '${instance.currentStepId}' on instance '${instanceId}' (iteration ${stepsExecuted})`);
+
+            // Reap guard (issue #868): a prior driver may have died with this step
+            // still `running`. Rather than launch a duplicate attempt, find the
+            // stranded execution and, once it is past its timeout, reap it through
+            // the timeout fallback (fail/escalate per fallbackBehavior). A running
+            // execution not yet past its timeout is left untouched — the heartbeat
+            // re-kicks once it is overdue — so we never double-run a live step.
+            const priorInFlight = (await instanceRepo.getStepExecutions(instanceId))
+              .find((e) => e.stepId === instance.currentStepId && e.status === 'running');
+            if (priorInFlight) {
+              const ageMs = Date.now() - new Date(priorInFlight.startedAt).getTime();
+              const timeoutMs = resolveStepTimeoutMinutes(currentStep) * 60_000;
+              if (ageMs >= timeoutMs) {
+                console.log(`[auto-runner] Reaping stranded step '${instance.currentStepId}' (running ${Math.round(ageMs / 60_000)}m ≥ ${Math.round(timeoutMs / 60_000)}m timeout) as timeout`);
+                await executeAgentStep(
+                  instanceId,
+                  instance.currentStepId,
+                  currentStep,
+                  appContext,
+                  triggeredBy ?? 'auto-runner',
+                  priorInFlight.id,
+                  { reapTimedOut: true },
+                );
+                stepsExecuted++;
+                continue;
+              }
+              console.log(`[auto-runner] Step '${instance.currentStepId}' has an in-flight execution not yet past its ${Math.round(timeoutMs / 60_000)}m timeout — deferring to heartbeat`);
+              break;
+            }
 
             const previousStepId = workflowDefinition.transitions.find(
               (t) => t.to === instance.currentStepId,

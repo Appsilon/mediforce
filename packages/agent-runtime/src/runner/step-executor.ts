@@ -77,4 +77,9 @@ export interface StepExecutorMeta {
   triggeredBy: string;
   stepExecutionId?: string;
   definitionVersion: string;
+  /** Reap mode (issue #868): a prior driver died mid-step and left this
+   *  execution `running` past its timeout. Instead of launching a fresh run,
+   *  reap the stranded execution through the timeout fallback path.
+   *  `stepExecutionId` then refers to the stranded execution, not a new one. */
+  reapTimedOut?: boolean;
 }
