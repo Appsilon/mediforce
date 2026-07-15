@@ -4,11 +4,15 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
 import type { AgentConfig, ScriptStepConfig, StepConfig, PluginCapabilityMetadata, Presentation } from '@mediforce/platform-core';
+import { resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, type ContainerPluginInit } from './container-plugin';
 import { isLocalExecutionAllowed } from './base-container-agent-plugin';
 
-const DEFAULT_TIMEOUT_MS = 10 * 60_000;
+// Last-resort for the legacy process-mode path only; the workflow path resolves
+// the timeout via resolveStepTimeoutMinutes. Aligned with that resolver's
+// default (30 min) so the two never silently disagree (issue #868).
+const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 
 /** Runtime → Docker image, file extension, and run command (as array for spawn). */
 const RUNTIME_CONFIG: Record<string, { image: string; ext: string; cmd: (path: string) => string[] }> = {
@@ -218,14 +222,21 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         await writeFile(scriptPath, this.inlineScript, 'utf-8');
       }
 
-      const timeoutMinutes = isWorkflowAgentContext(this.context)
-        ? this.context.step.script?.timeoutMinutes
-        : this.context.config.stepConfigs.find(
-            (sc: StepConfig) => sc.stepId === this.context.stepId,
-          )?.agentConfig?.timeoutMinutes;
-      const timeoutMs = typeof timeoutMinutes === 'number' && timeoutMinutes > 0
-        ? timeoutMinutes * 60_000
-        : DEFAULT_TIMEOUT_MS;
+      // Single source of truth (issue #868): the container-kill timer uses the
+      // same effective timeout as the PluginRunner Promise.race
+      // (resolveStepTimeoutMinutes). The legacy process-mode path has no
+      // WorkflowStep, so it falls back to its own timeoutMinutes / DEFAULT.
+      let timeoutMs: number;
+      if (isWorkflowAgentContext(this.context)) {
+        timeoutMs = resolveStepTimeoutMinutes(this.context.step) * 60_000;
+      } else {
+        const legacyMinutes = this.context.config.stepConfigs.find(
+          (sc: StepConfig) => sc.stepId === this.context.stepId,
+        )?.agentConfig?.timeoutMinutes;
+        timeoutMs = typeof legacyMinutes === 'number' && legacyMinutes > 0
+          ? legacyMinutes * 60_000
+          : DEFAULT_TIMEOUT_MS;
+      }
 
       const logsDir = join(tmpdir(), 'mediforce-step-logs');
       await mkdir(logsDir, { recursive: true });
