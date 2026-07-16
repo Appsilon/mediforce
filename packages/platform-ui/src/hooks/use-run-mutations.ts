@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { ProcessInstance } from '@mediforce/platform-core';
+import { CANCELLED_BY_USER_ERROR, type ProcessInstance } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { snapshotCache } from '@/lib/optimistic';
@@ -24,7 +24,7 @@ export function useCancelRun() {
 
       const { restore } = snapshotCache(qc, [detailKey]);
       qc.setQueryData<ProcessInstance | undefined>(detailKey, (old) =>
-        old ? { ...old, status: 'failed', error: 'Cancelled by user' } : old,
+        old ? { ...old, status: 'failed', error: CANCELLED_BY_USER_ERROR } : old,
       );
       return { restore };
     },

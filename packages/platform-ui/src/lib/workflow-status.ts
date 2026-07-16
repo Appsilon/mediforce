@@ -1,4 +1,4 @@
-import type { InstanceStatus } from '@mediforce/platform-core';
+import { CANCELLED_BY_USER_ERROR, type InstanceStatus } from '@mediforce/platform-core';
 
 export type WorkflowDisplayStatus = 'in_progress' | 'waiting_for_human' | 'error' | 'cancelled' | 'completed';
 
@@ -87,12 +87,8 @@ export function getWorkflowStatus(instance: {
   }
 
   if (instance.status === 'failed') {
-    // cancelProcess handler sets error='Cancelled by user' (default reason);
-    // string match is the cheapest gate. The default reason in
-    // packages/platform-api/src/handlers/processes/cancel-process.ts must not
-    // change without updating this check.
-    if (error === 'Cancelled by user') {
-      return { displayStatus: 'cancelled', reason: 'Cancelled by user', rawReason: null, isRetryable: false, hasDedicatedBanner: false };
+    if (error === CANCELLED_BY_USER_ERROR) {
+      return { displayStatus: 'cancelled', reason: CANCELLED_BY_USER_ERROR, rawReason: null, isRetryable: false, hasDedicatedBanner: false };
     }
     return { displayStatus: 'error', reason: error ?? 'Process failed', rawReason: null, isRetryable: false, hasDedicatedBanner: false };
   }

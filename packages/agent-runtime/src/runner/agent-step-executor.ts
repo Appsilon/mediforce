@@ -87,24 +87,25 @@ export class AgentStepExecutor implements StepExecutor {
       }
     }
 
-    // Persist output to instance.variables + accumulate cost
+    // Persist output to instance.variables + accumulate cost. Fetch the instance
+    // once here — the cancel-marker check below reuses the same read rather than
+    // issuing a back-to-back getById (status/error are not changed by this update,
+    // so the pre-update snapshot is valid for the marker check).
     const agentOutput = envelope?.result ?? null;
     const stepCost = costResult.estimatedCostUsd;
-    if (agentOutput !== null || stepCost !== undefined) {
-      const freshInstance = await instanceRepo.getById(instanceId);
-      if (freshInstance) {
-        await instanceRepo.update(instanceId, {
-          ...(agentOutput !== null ? {
-            variables: {
-              ...freshInstance.variables,
-              [stepId]: agentOutput,
-            },
-          } : {}),
-          ...(stepCost !== undefined ? {
-            totalCostUsd: (freshInstance.totalCostUsd ?? 0) + stepCost,
-          } : {}),
-        });
-      }
+    const instanceAfterRun = await instanceRepo.getById(instanceId);
+    if ((agentOutput !== null || stepCost !== undefined) && instanceAfterRun) {
+      await instanceRepo.update(instanceId, {
+        ...(agentOutput !== null ? {
+          variables: {
+            ...instanceAfterRun.variables,
+            [stepId]: agentOutput,
+          },
+        } : {}),
+        ...(stepCost !== undefined ? {
+          totalCostUsd: (instanceAfterRun.totalCostUsd ?? 0) + stepCost,
+        } : {}),
+      });
     }
 
     // The operator may cancel a run mid-step (cancelRun flips it to
@@ -116,11 +117,10 @@ export class AgentStepExecutor implements StepExecutor {
     // auto-runner's catch would clobber the cancellation reason with that
     // error. Returning here keeps the cancel reason intact and lets the
     // accumulated cost show in both the list and detail views.
-    const postRunInstance = await instanceRepo.getById(instanceId);
     const wasCancelledDuringStep =
-      postRunInstance !== null
-      && postRunInstance.status === 'failed'
-      && postRunInstance.error === CANCELLED_BY_USER_ERROR;
+      instanceAfterRun !== null
+      && instanceAfterRun.status === 'failed'
+      && instanceAfterRun.error === CANCELLED_BY_USER_ERROR;
     if (wasCancelledDuringStep) {
       return {
         status: 'completed',
@@ -128,7 +128,7 @@ export class AgentStepExecutor implements StepExecutor {
         appliedToWorkflow: false,
         fallbackReason: runResult.fallbackReason,
         executorType: 'agent',
-        instanceState: { status: 'failed', currentStepId: postRunInstance.currentStepId },
+        instanceState: { status: 'failed', currentStepId: instanceAfterRun.currentStepId },
       };
     }
 

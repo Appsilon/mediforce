@@ -314,10 +314,13 @@ describe('AgentStepExecutor', () => {
 
     const result = await executor.execute(mockPlugin, makeContext(), services, meta);
 
-    // Cost incurred up to cancellation is accumulated onto the run.
+    // Cost incurred up to cancellation is accumulated onto the run. Assert the
+    // concrete non-zero value (1000 input * 3 + 200 output * 15 = 6000, added to
+    // the run's prior totalCostUsd of 0) — expect.any(Number) would let a
+    // zero-cost regression (the exact failure mode #869 guards against) pass.
     expect(mockInstanceRepo.update).toHaveBeenCalledWith(
       'inst-001',
-      expect.objectContaining({ totalCostUsd: expect.any(Number) }),
+      expect.objectContaining({ totalCostUsd: 6000 }),
     );
     // And persisted onto the step execution so the detail view (which
     // recomputes from agentOutput.estimatedCostUsd) agrees with the list view.
@@ -326,7 +329,7 @@ describe('AgentStepExecutor', () => {
       'exec-001',
       expect.objectContaining({
         status: 'completed',
-        agentOutput: expect.objectContaining({ estimatedCostUsd: expect.any(Number) }),
+        agentOutput: expect.objectContaining({ estimatedCostUsd: 6000 }),
       }),
     );
     // The cancellation reason is preserved — advancing would throw
