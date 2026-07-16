@@ -57,6 +57,7 @@ export const ACTIONABLE_STATUSES: readonly HumanTaskStatus[] = ['pending', 'clai
 interface ListTasksFilters {
   stepId?: string;
   status?: HumanTaskStatus[];
+  namespace?: string;
 }
 
 /**
