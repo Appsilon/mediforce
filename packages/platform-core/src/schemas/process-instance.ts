@@ -8,6 +8,17 @@ export const InstanceStatusSchema = z.enum([
   'failed',
 ]);
 
+/**
+ * Error string cancelRun writes onto a cancelled run (`status: 'failed'`).
+ * Load-bearing: workflow-status.ts gates on this exact literal to distinguish
+ * operator cancellations from agent failures, and the agent step executor
+ * checks it to short-circuit routing when a run was cancelled mid-step — so
+ * the in-flight step's accumulated cost surfaces and the cancellation reason
+ * is not clobbered by a later InvalidTransitionError. Kept here so every
+ * caller references one symbol instead of drifting the literal.
+ */
+export const CANCELLED_BY_USER_ERROR = 'Cancelled by user';
+
 export const ProcessInstanceSchema = z.object({
   id: z.string().min(1),
   definitionName: z.string().min(1),

@@ -60,6 +60,7 @@ export {
   InstanceStatusSchema,
   ProcessInstanceSchema,
   RunNameEntrySchema,
+  CANCELLED_BY_USER_ERROR,
   type InstanceStatus,
   type ProcessInstance,
   type RunNameEntry,

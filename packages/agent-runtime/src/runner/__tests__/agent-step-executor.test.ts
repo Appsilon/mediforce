@@ -284,4 +284,54 @@ describe('AgentStepExecutor', () => {
       variables: { 'analyze-data': { summary: 'analysis complete' } },
     }));
   });
+
+  it('cancelled mid-step: accumulates cost, persists step cost, does NOT call advanceStep', async () => {
+    // Operator cancelled while the agent container was still running — the
+    // instance is already failed with the cancel reason by the time the run
+    // resolves. The step still produced a final envelope with token usage.
+    mockInstanceRepo.getById.mockResolvedValue({
+      status: 'failed',
+      currentStepId: 'analyze-data',
+      definitionVersion: '1',
+      variables: {},
+      totalCostUsd: 0,
+      error: 'Cancelled by user',
+    });
+    mockModelRegistryRepo.getById.mockResolvedValue({
+      pricing: { input: 3, output: 15, cacheRead: 0.3 },
+      contextLength: 200_000,
+    });
+    const envelopeWithUsage = buildAgentOutputEnvelope({
+      result: { summary: 'partial analysis' },
+      tokenUsage: { inputTokens: 1_000, outputTokens: 200 },
+    });
+    mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+      status: 'completed',
+      envelope: envelopeWithUsage,
+      appliedToWorkflow: false,
+      fallbackReason: null,
+    });
+
+    const result = await executor.execute(mockPlugin, makeContext(), services, meta);
+
+    // Cost incurred up to cancellation is accumulated onto the run.
+    expect(mockInstanceRepo.update).toHaveBeenCalledWith(
+      'inst-001',
+      expect.objectContaining({ totalCostUsd: expect.any(Number) }),
+    );
+    // And persisted onto the step execution so the detail view (which
+    // recomputes from agentOutput.estimatedCostUsd) agrees with the list view.
+    expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+      'inst-001',
+      'exec-001',
+      expect.objectContaining({
+        status: 'completed',
+        agentOutput: expect.objectContaining({ estimatedCostUsd: expect.any(Number) }),
+      }),
+    );
+    // The cancellation reason is preserved — advancing would throw
+    // InvalidTransitionError (instance is no longer running) and clobber it.
+    expect(mockEngine.advanceStep).not.toHaveBeenCalled();
+    expect(result.instanceState?.status).toBe('failed');
+  });
 });

@@ -28,6 +28,7 @@ export {
   InstanceStatusSchema,
   ProcessInstanceSchema,
   RunNameEntrySchema,
+  CANCELLED_BY_USER_ERROR,
   StepExecutionStatusSchema,
   GateResultSchema,
   ReviewVerdictSchema,

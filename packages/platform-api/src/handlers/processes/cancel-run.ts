@@ -1,11 +1,11 @@
-import type { HumanTaskStatus } from '@mediforce/platform-core';
+import { CANCELLED_BY_USER_ERROR, type HumanTaskStatus } from '@mediforce/platform-core';
 import type { CancelRunInput, CancelRunOutput } from '../../contract/processes';
 import { ACTIONABLE_STATUSES } from '../../contract/tasks';
 import type { CallerScope } from '../../repositories/index';
 import { PreconditionFailedError } from '../../errors';
 import { loadOr404 } from '../_helpers';
 
-const DEFAULT_REASON = 'Cancelled by user';
+const DEFAULT_REASON = CANCELLED_BY_USER_ERROR;
 const ACTIONABLE_TASK_STATUSES = new Set<HumanTaskStatus>(ACTIONABLE_STATUSES);
 
 export async function cancelRun(

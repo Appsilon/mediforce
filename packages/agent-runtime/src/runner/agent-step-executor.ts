@@ -1,5 +1,6 @@
 import {
   calculateEstimatedCost,
+  CANCELLED_BY_USER_ERROR,
   type AgentOutputEnvelope,
 } from '@mediforce/platform-core';
 import type { StepExecutorPlugin, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
@@ -104,6 +105,31 @@ export class AgentStepExecutor implements StepExecutor {
           } : {}),
         });
       }
+    }
+
+    // The operator may cancel a run mid-step (cancelRun flips it to
+    // status: 'failed' with error: 'Cancelled by user' while the agent
+    // container is still running). The step's recovered cost above is already
+    // persisted onto totalCostUsd and the step execution's agentOutput, so
+    // surface it rather than calling advanceStep — the instance is no longer
+    // 'running', so advancing would throw InvalidTransitionError and the
+    // auto-runner's catch would clobber the cancellation reason with that
+    // error. Returning here keeps the cancel reason intact and lets the
+    // accumulated cost show in both the list and detail views.
+    const postRunInstance = await instanceRepo.getById(instanceId);
+    const wasCancelledDuringStep =
+      postRunInstance !== null
+      && postRunInstance.status === 'failed'
+      && postRunInstance.error === CANCELLED_BY_USER_ERROR;
+    if (wasCancelledDuringStep) {
+      return {
+        status: 'completed',
+        envelope,
+        appliedToWorkflow: false,
+        fallbackReason: runResult.fallbackReason,
+        executorType: 'agent',
+        instanceState: { status: 'failed', currentStepId: postRunInstance.currentStepId },
+      };
     }
 
     // Helper: create a human review task for L3 escalation
