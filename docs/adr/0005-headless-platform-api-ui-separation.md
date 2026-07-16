@@ -184,6 +184,7 @@ Locked table (extensible by ADR amendment while status `Accepted`):
 | `forbidden` | 403 | known caller, denied (mutations only; reads use 404 anti-enum per Phase 1) |
 | `not_found` | 404 | resource missing OR caller can't see it (reads — anti-enum) |
 | `validation` | 400 | Zod parse failure on input |
+| `payload_too_large` | 413 | request body over the size limit — the app's `ATTACHMENT_MAX_BYTES` ceiling, or a body truncated by Next's `proxyClientMaxBodySize` before the handler runs |
 | `precondition_failed` | 409 | state-machine violation (task not claimed, run not pausable) |
 | `conflict` | 409 | concurrent-write race (stale version, duplicate create) |
 | `rate_limited` | 429 | per-caller rate cap |
@@ -193,6 +194,12 @@ Both `precondition_failed` and `conflict` map to 409 (HTTP-class
 correct; client branches on `code`, not the status nuance between 409
 and 412). `forbidden` on mutations is 403 — anti-enum payoff lower
 because the caller already proved intent by issuing the write.
+
+`payload_too_large` (413) was added by amendment for binary uploads
+(task attachments, ADR-0003): the multipart route can't rely on the Zod
+`validation` path because oversize bodies fail at `req.formData()` before
+any handler input parse. It reports both the explicit `ATTACHMENT_MAX_BYTES`
+check and a body truncated by Next's `proxyClientMaxBodySize` cap.
 
 ### 4. Adapter extension: single `HandlerError` catch in `createRouteAdapter`
 
