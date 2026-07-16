@@ -4,7 +4,11 @@ import {
   ListAttachmentsInputSchema,
   type ListAttachmentsInput,
 } from '@mediforce/platform-api/contract';
-import { HandlerError, ValidationError } from '@mediforce/platform-api/errors';
+import {
+  HandlerError,
+  PayloadTooLargeError,
+  ValidationError,
+} from '@mediforce/platform-api/errors';
 import {
   createRouteAdapter,
   defaultBuildScope,
@@ -69,7 +73,25 @@ export function makePOST(
     // becomes a 500 'internal' envelope — never Next's default 500 page.
     try {
       const { taskId } = await ctx.params;
-      const form = await req.formData();
+
+      // Next caps every request body at `proxyClientMaxBodySize` (next.config.mjs)
+      // in its router layer and TRUNCATES anything larger before this handler
+      // runs — which makes the multipart parse below fail. Translate that parse
+      // failure into a 413 so an oversize upload reads as "too large" instead of
+      // a generic "Internal error" (the truncation is the dominant cause here).
+      let form: FormData;
+      try {
+        form = await req.formData();
+      } catch (parseErr) {
+        console.warn(
+          '[task-attachment-upload-route] request body parse failed (likely exceeds the upload size limit):',
+          parseErr,
+        );
+        throw new PayloadTooLargeError(
+          'Could not read the uploaded file. It may exceed the maximum upload size.',
+        );
+      }
+
       const file = form.get('file');
       if (file instanceof File === false) {
         throw new ValidationError('file field is required');
