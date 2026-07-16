@@ -7,6 +7,7 @@ export const ApiErrorCodeSchema = z.enum([
   'forbidden',
   'not_found',
   'validation',
+  'payload_too_large',
   'precondition_failed',
   'conflict',
   'rate_limited',
@@ -106,6 +107,13 @@ export class ValidationError extends HandlerError {
   }
 }
 
+export class PayloadTooLargeError extends HandlerError {
+  constructor(message = 'Payload too large', details?: unknown) {
+    super('payload_too_large', message, details);
+    this.name = 'PayloadTooLargeError';
+  }
+}
+
 export function httpStatusForApiErrorCode(code: ApiErrorCode): number {
   switch (code) {
     case 'unauthorized':
@@ -116,6 +124,8 @@ export function httpStatusForApiErrorCode(code: ApiErrorCode): number {
       return 404;
     case 'validation':
       return 400;
+    case 'payload_too_large':
+      return 413;
     case 'precondition_failed':
       return 409;
     case 'conflict':
