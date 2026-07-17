@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
+import {
+  InMemoryAuditRepository,
+  InMemoryPlatformSettingsRepository,
+} from '@mediforce/platform-core/testing';
 import { resendInvite } from '../resend-invite';
 import {
   ForbiddenError,
@@ -93,6 +96,33 @@ describe('resendInvite handler', () => {
     expect(inviteService.resetInvitePassword).toHaveBeenCalledWith('uid-target');
     expect(notifier.sendInviteEmailCalls).toEqual([
       { toEmail: 'pending@example.test', temporaryPassword: 'Mf-RESET' },
+    ]);
+  });
+
+  it('passes the configured platform.baseUrl through to the resent invite email', async () => {
+    const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
+    await platformSettingsRepo.set('platform.baseUrl', 'https://phuse.mediforce.ai');
+    const inviteService = inviteServiceStub({
+      email: 'pending@example.test',
+      pending: true,
+      resetPassword: 'Mf-RESET',
+    });
+    const notifier = recordingNotifier();
+    const scope = createTestScope({
+      auditRepo,
+      inviteService,
+      inviteNotificationService: notifier,
+      platformSettingsRepo,
+    });
+
+    await resendInvite(baseInput, scope);
+
+    expect(notifier.sendInviteEmailCalls).toEqual([
+      {
+        toEmail: 'pending@example.test',
+        temporaryPassword: 'Mf-RESET',
+        baseUrl: 'https://phuse.mediforce.ai',
+      },
     ]);
   });
 

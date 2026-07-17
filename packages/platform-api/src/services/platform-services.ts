@@ -223,20 +223,27 @@ class EmailInviteNotificationService implements InviteNotificationService {
   ) {}
 
   async sendInviteEmail(input: SendInviteEmailInput): Promise<void> {
+    const appUrl = input.baseUrl ?? this.appUrl;
     await sendInviteEmail(
-      { ...input, appUrl: this.appUrl, senderName: this.senderName },
+      {
+        toEmail: input.toEmail,
+        temporaryPassword: input.temporaryPassword,
+        appUrl,
+        senderName: this.senderName,
+      },
       this.sendEmail,
     );
   }
 
   async sendWorkspaceNotificationEmail(input: SendWorkspaceNotificationEmailInput): Promise<void> {
+    const appUrl = input.baseUrl ?? this.appUrl;
     await sendWorkspaceNotificationEmail(
       {
         toEmail: input.toEmail,
         inviterName: input.inviterName,
         workspaceName: input.workspaceName,
-        workspaceUrl: `${this.appUrl}/${input.workspaceHandle}`,
-        appUrl: this.appUrl,
+        workspaceUrl: `${appUrl}/${input.workspaceHandle}`,
+        appUrl,
         senderName: this.senderName,
       },
       this.sendEmail,
