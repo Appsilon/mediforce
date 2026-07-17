@@ -481,6 +481,13 @@ steps:
         if (data.length === 0) return null;
         return data[0].created_at;
       }
+      async function searchIssueCount(repo, state) {
+        const q = encodeURIComponent(`repo:${repo} type:issue state:${state}`);
+        const response = await githubFetch(`https://api.github.com/search/issues?q=${q}&per_page=1`);
+        if (!response.ok) return null;
+        const data = await response.json();
+        return typeof data.total_count === "number" ? data.total_count : null;
+      }
       async function collectIssues(repo) {
         const since18m = monthsAgo(18).toISOString();
         const url = `https://api.github.com/repos/${repo}/issues?state=all&per_page=100&since=${since18m}`;
@@ -496,8 +503,12 @@ steps:
         if (!response.ok) return defaultIssues;
         const rawIssues = await response.json();
         const issues = rawIssues.filter((issue) => issue.pull_request === void 0);
-        const openCount = issues.filter((i) => i.state === "open").length;
-        const closedCount = issues.filter((i) => i.state === "closed").length;
+        const [openSearch, closedSearch] = await Promise.all([
+          searchIssueCount(repo, "open"),
+          searchIssueCount(repo, "closed")
+        ]);
+        const openCount = openSearch ?? issues.filter((i) => i.state === "open").length;
+        const closedCount = closedSearch ?? issues.filter((i) => i.state === "closed").length;
         const criticalResponseDays = [];
         const nonCriticalResponseDays = [];
         let unresolvedCriticalCount = 0;
@@ -669,7 +680,20 @@ steps:
         }
         return { hasManPages, usesRoxygen };
       }
-      async function collectContributors(repo) {
+      async function countCommitsSince(repo, branch, sinceIso) {
+        const url = `https://api.github.com/repos/${repo}/commits?sha=${encodeURIComponent(branch)}&since=${sinceIso}&per_page=1`;
+        const response = await githubFetch(url);
+        if (response.status === 409) return 0;
+        if (!response.ok) {
+          throw new Error(`commits API ${response.status} for ${repo}@${branch}`);
+        }
+        const link = response.headers.get("link");
+        const lastMatch = link?.match(/[?&]page=(\d+)>;\s*rel="last"/);
+        if (lastMatch) return Number.parseInt(lastMatch[1], 10);
+        const data = await response.json();
+        return Array.isArray(data) ? data.length : 0;
+      }
+      async function collectContributors(repo, defaultBranch) {
         const contribUrl = `https://api.github.com/repos/${repo}/contributors?per_page=100`;
         const contribResponse = await githubFetch(contribUrl);
         let total = 0;
@@ -677,26 +701,11 @@ steps:
           const data = await contribResponse.json();
           total = data.length;
         }
-        const activityUrl = `https://api.github.com/repos/${repo}/stats/commit_activity`;
-        const activityResponse = await githubFetch(activityUrl);
-        let commitsLast90Days = 0;
-        let commitsLast180Days = 0;
-        if (activityResponse.ok) {
-          if (activityResponse.status === 200) {
-            const weeks = await activityResponse.json();
-            const now = Date.now() / 1e3;
-            const cutoff90 = now - 90 * 24 * 60 * 60;
-            const cutoff180 = now - 180 * 24 * 60 * 60;
-            for (const week of weeks) {
-              if (week.week >= cutoff180) {
-                commitsLast180Days += week.total;
-              }
-              if (week.week >= cutoff90) {
-                commitsLast90Days += week.total;
-              }
-            }
-          }
-        }
+        const branch = defaultBranch || "main";
+        const [commitsLast90Days, commitsLast180Days] = await Promise.all([
+          countCommitsSince(repo, branch, daysAgo(90).toISOString()),
+          countCommitsSince(repo, branch, daysAgo(180).toISOString())
+        ]);
         return { total, commitsLast90Days, commitsLast180Days };
       }
       async function collectPackageMetrics(pkg) {
@@ -749,7 +758,7 @@ steps:
             mergedLast6Months: 0,
             medianReviewTimeDays: null
           }),
-          safe("contributors", () => collectContributors(pkg.repo), {
+          safe("contributors", () => collectContributors(pkg.repo, pkg.defaultBranch), {
             total: 0,
             commitsLast90Days: 0,
             commitsLast180Days: 0

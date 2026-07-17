@@ -317,7 +317,21 @@ interface RawIssue {
   pull_request?: unknown;
 }
 
+/**
+ * Accurate issue count via the Search API. `type:issue` excludes pull requests,
+ * and `total_count` is the full repo total — not limited to a page or an
+ * updated-since window. Returns null on failure so the caller can fall back.
+ */
+async function searchIssueCount(repo: string, state: 'open' | 'closed'): Promise<number | null> {
+  const q = encodeURIComponent(`repo:${repo} type:issue state:${state}`);
+  const response = await githubFetch(`https://api.github.com/search/issues?q=${q}&per_page=1`);
+  if (!response.ok) return null;
+  const data = (await response.json()) as { total_count?: number };
+  return typeof data.total_count === 'number' ? data.total_count : null;
+}
+
 async function collectIssues(repo: string): Promise<PackageMetrics['issues']> {
+  // Triage-time metrics are sampled over the last 18 months of active issues.
   const since18m = monthsAgo(18).toISOString();
   const url = `https://api.github.com/repos/${repo}/issues?state=all&per_page=100&since=${since18m}`;
   const response = await githubFetch(url);
@@ -337,8 +351,14 @@ async function collectIssues(repo: string): Promise<PackageMetrics['issues']> {
   // Filter out pull requests
   const issues = rawIssues.filter((issue) => issue.pull_request === undefined);
 
-  const openCount = issues.filter((i) => i.state === 'open').length;
-  const closedCount = issues.filter((i) => i.state === 'closed').length;
+  // Open/closed totals come from the Search API (accurate full-repo counts,
+  // PRs excluded); fall back to the windowed sample only if search is down.
+  const [openSearch, closedSearch] = await Promise.all([
+    searchIssueCount(repo, 'open'),
+    searchIssueCount(repo, 'closed'),
+  ]);
+  const openCount = openSearch ?? issues.filter((i) => i.state === 'open').length;
+  const closedCount = closedSearch ?? issues.filter((i) => i.state === 'closed').length;
 
   // Collect first-response times for critical and non-critical issues
   const criticalResponseDays: number[] = [];
@@ -603,7 +623,36 @@ async function collectDocumentation(repo: string): Promise<PackageMetrics['docum
 // 10. Contributor activity
 // ---------------------------------------------------------------------------
 
-async function collectContributors(repo: string): Promise<PackageMetrics['contributors']> {
+/**
+ * Count commits on `branch` since `sinceIso`, in real time.
+ *
+ * Uses the commits API (not /stats/commit_activity, which returns HTTP 202 with
+ * an empty body while GitHub recomputes its cache — silently reporting zero
+ * commits for active repos). With per_page=1 the `Link` header's rel="last"
+ * page number equals the total commit count in the window, so one request per
+ * window is enough. 409 means an empty repository (zero commits).
+ */
+async function countCommitsSince(repo: string, branch: string, sinceIso: string): Promise<number> {
+  const url = `https://api.github.com/repos/${repo}/commits?sha=${encodeURIComponent(branch)}&since=${sinceIso}&per_page=1`;
+  const response = await githubFetch(url);
+  if (response.status === 409) return 0; // empty repo
+  if (!response.ok) {
+    throw new Error(`commits API ${response.status} for ${repo}@${branch}`);
+  }
+
+  const link = response.headers.get('link');
+  const lastMatch = link?.match(/[?&]page=(\d+)>;\s*rel="last"/);
+  if (lastMatch) return Number.parseInt(lastMatch[1], 10);
+
+  // No pagination header → 0 or 1 commit in the window.
+  const data = (await response.json()) as unknown[];
+  return Array.isArray(data) ? data.length : 0;
+}
+
+async function collectContributors(
+  repo: string,
+  defaultBranch: string,
+): Promise<PackageMetrics['contributors']> {
   // Total contributors
   const contribUrl = `https://api.github.com/repos/${repo}/contributors?per_page=100`;
   const contribResponse = await githubFetch(contribUrl);
@@ -614,35 +663,11 @@ async function collectContributors(repo: string): Promise<PackageMetrics['contri
     total = data.length;
   }
 
-  // Commit activity (weekly breakdown for last year)
-  const activityUrl = `https://api.github.com/repos/${repo}/stats/commit_activity`;
-  const activityResponse = await githubFetch(activityUrl);
-
-  let commitsLast90Days = 0;
-  let commitsLast180Days = 0;
-
-  if (activityResponse.ok) {
-    // GitHub may return 202 while computing stats — treat as empty
-    if (activityResponse.status === 200) {
-      const weeks = (await activityResponse.json()) as Array<{
-        week: number; // unix timestamp of the start of the week
-        total: number;
-      }>;
-
-      const now = Date.now() / 1000;
-      const cutoff90 = now - 90 * 24 * 60 * 60;
-      const cutoff180 = now - 180 * 24 * 60 * 60;
-
-      for (const week of weeks) {
-        if (week.week >= cutoff180) {
-          commitsLast180Days += week.total;
-        }
-        if (week.week >= cutoff90) {
-          commitsLast90Days += week.total;
-        }
-      }
-    }
-  }
+  const branch = defaultBranch || 'main';
+  const [commitsLast90Days, commitsLast180Days] = await Promise.all([
+    countCommitsSince(repo, branch, daysAgo(90).toISOString()),
+    countCommitsSince(repo, branch, daysAgo(180).toISOString()),
+  ]);
 
   return { total, commitsLast90Days, commitsLast180Days };
 }
@@ -705,7 +730,7 @@ async function collectPackageMetrics(pkg: PackageInput): Promise<PackageMetrics>
       mergedLast6Months: 0,
       medianReviewTimeDays: null,
     }),
-    safe('contributors', () => collectContributors(pkg.repo), {
+    safe('contributors', () => collectContributors(pkg.repo, pkg.defaultBranch), {
       total: 0,
       commitsLast90Days: 0,
       commitsLast180Days: 0,
