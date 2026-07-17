@@ -827,3 +827,35 @@ export function resolveStepTimeoutMinutes(
     ?? step.databricks?.timeoutMinutes
     ?? 30;
 }
+
+/**
+ * Effective step timeout in milliseconds — the raw bound at which a stranded
+ * execution is reaped as a timeout (ADR-0010).
+ */
+export function resolveStepTimeoutMs(
+  step: Pick<WorkflowStep, 'agent' | 'script' | 'databricks'>,
+): number {
+  return resolveStepTimeoutMinutes(step) * 60_000;
+}
+
+/**
+ * Grace added on top of a step's own timeout before a `running` instance is
+ * treated as stranded. A live driver enforces the step timeout and then
+ * advances/fails the step (refreshing `updatedAt`); this grace covers the gap
+ * between the timeout firing and that write, plus queue/spawn latency, so a
+ * driver about to enforce its own timeout is never pre-empted by the heartbeat.
+ */
+export const STRANDED_STEP_GRACE_MS = 15 * 60_000;
+
+/**
+ * How long a `running` instance may sit idle before its driver is presumed dead
+ * and the heartbeat re-kicks it: the step's effective timeout + grace. Once
+ * re-kicked, the re-entered driver reaps anything past the raw
+ * {@link resolveStepTimeoutMs}. Single source so the heartbeat's sweep bound and
+ * the driver's reap bound derive from the same timeout and can never drift.
+ */
+export function resolveStrandedBudgetMs(
+  step: Pick<WorkflowStep, 'agent' | 'script' | 'databricks'>,
+): number {
+  return resolveStepTimeoutMs(step) + STRANDED_STEP_GRACE_MS;
+}

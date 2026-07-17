@@ -4,7 +4,7 @@ import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { checkRetiredModels } from '@mediforce/platform-api/handlers';
-import { resolveCoworkOutputSchema, resolveStepTimeoutMinutes, type WorkflowStep, type ProcessInstanceRepository } from '@mediforce/platform-core';
+import { resolveCoworkOutputSchema, resolveStepTimeoutMs, type WorkflowStep, type ProcessInstanceRepository } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -758,7 +758,7 @@ export async function POST(
             // not-yet-overdue live attempt, defer wholesale to the heartbeat — we
             // never reap rows out from under, or double-run, live work.
             const stepExecutions = await instanceRepo.getStepExecutions(instanceId);
-            const timeoutMs = resolveStepTimeoutMinutes(currentStep) * 60_000;
+            const timeoutMs = resolveStepTimeoutMs(currentStep);
             const inFlight = stepExecutions.filter(
               (e) => e.stepId === instance.currentStepId && e.status === 'running',
             );
