@@ -128,6 +128,34 @@ function hasFiles(input: Record<string, unknown>): input is Record<string, unkno
     typeof input.files[0].downloadUrl === 'string';
 }
 
+/** Platform base URL for server-side self-fetch. Mirrors the run-kicker
+ *  (`platform-services.ts`) so attachment downloads hit the same host the
+ *  auto-runner already reaches. `||` (not `??`) treats an empty-string env
+ *  as unset — Docker compose's `${VAR:-default}` can leave one behind. */
+function platformBaseUrl(): string {
+  return process.env.APP_BASE_URL || 'http://localhost:9003';
+}
+
+/** Resolve an attachment `downloadUrl` into an absolute URL + fetch headers.
+ *
+ *  Attachment URLs are minted browser-side (`file-upload-view.tsx`) as a
+ *  same-origin *relative* path (`/api/attachments/:id/blob`) — correct for the
+ *  browser, but Node's `fetch` rejects a relative URL with "Failed to parse
+ *  URL from ...". Resolve it against the platform base URL, and attach the
+ *  system `X-Api-Key` (browser session cookies aren't present server-side).
+ *  The key is only sent when the resolved origin matches our own base, so it
+ *  never leaks to a third-party host that supplied an absolute URL. */
+function resolveDownload(downloadUrl: string): { url: string; headers: Record<string, string> } {
+  const base = platformBaseUrl();
+  const url = new URL(downloadUrl, base);
+  const headers: Record<string, string> = {};
+  const apiKey = process.env.PLATFORM_API_KEY;
+  if (apiKey && url.origin === new URL(base).origin) {
+    headers['X-Api-Key'] = apiKey;
+  }
+  return { url: url.toString(), headers };
+}
+
 /** Download remote files to a temp directory and return updated input with localPath fields. */
 export async function downloadFilesToLocal(
   stepInput: Record<string, unknown>,
@@ -143,7 +171,8 @@ export async function downloadFilesToLocal(
 
   for (const file of stepInput.files) {
     const localPath = join(tempDir, file.name);
-    const response = await fetch(file.downloadUrl);
+    const { url, headers } = resolveDownload(file.downloadUrl);
+    const response = await fetch(url, { headers });
     if (!response.ok) {
       throw new Error(`Failed to download '${file.name}': HTTP ${response.status}`);
     }
