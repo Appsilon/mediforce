@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Automated Clinical Data Delivery</title>
-  <meta name="description" content="Autonomous ingest workflow for clinical trial data deliveries. An AI agent watches the CRO SFTP, validates every delivery against CDISC standards, and escalates only when human judgment is needed." />
+  <title>Automated Submission Document Collection</title>
+  <meta name="description" content="Autonomous workflow for collecting clinical submission documents from stakeholder teams. An AI agent sends the request, watches for deliveries, reviews content, and drafts every reminder and clarification - so nothing misses the deadline." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="preload" as="image" href="images/mediforce-lz-run-workflow.webp" />
+  <link rel="preload" as="image" href="submission-docs-workflow.webp" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -343,35 +343,6 @@
       color: var(--text-60);
       line-height: 1.65;
     }
-
-    /* ── Capabilities grid ── */
-    .regulated-grid {
-      display: grid;
-      gap: 1.5rem;
-      margin-top: 3rem;
-    }
-    @media (min-width: 640px) { .regulated-grid { grid-template-columns: repeat(2, 1fr); } }
-    @media (min-width: 1024px) { .regulated-grid { grid-template-columns: repeat(3, 1fr); } }
-    .regulated-item {
-      padding: 1.75rem;
-      border-radius: 0.75rem;
-      border: 1px solid var(--border);
-      background: var(--bg);
-      transition: border-color 0.2s;
-    }
-    .regulated-item:hover { border-color: rgba(13,148,136,0.2); }
-    .regulated-item h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
-    .regulated-item p { font-size: 0.875rem; color: var(--text-60); line-height: 1.7; }
-    .regulated-icon {
-      width: 2.5rem; height: 2.5rem;
-      border-radius: 0.625rem;
-      display: flex; align-items: center; justify-content: center;
-      margin-bottom: 1.125rem;
-      background: var(--accent-dim);
-      border: 1px solid rgba(13,148,136,0.15);
-      color: var(--accent);
-    }
-    .regulated-icon svg { width: 1.25rem; height: 1.25rem; }
 
     /* ── Custom validation code block visual ── */
     .code-visual {
@@ -718,22 +689,43 @@
     }
     .img-modal-close:hover { background: rgba(255,255,255,0.22); }
 
+    /* ── Video embed ── */
+    .video-section { padding: 4rem 0; }
+    .video-embed {
+      position: relative;
+      max-width: 52rem;
+      margin: 2.5rem auto 0;
+      border-radius: 0.875rem;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 72px rgba(0,0,0,0.13);
+      aspect-ratio: 16 / 9;
+    }
+    .video-embed iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+
     /* Mobile navigation injected by nav.js */
   </style>
 </head>
 <body>
-  <script src="nav.js"></script>
+  <script src="../../nav.js"></script>
 
   <!-- Hero -->
   <section class="hero">
     <div class="container">
       <div class="hero-badge">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-        Clinical Data Management
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Regulatory Submissions
       </div>
-      <h1>Automate <span class="gradient">Data Manager's</span><br>delivery review</h1>
+      <h1>Automate <span class="gradient">Submission</span><br>Document Collection</h1>
       <p class="hero-subtitle">
-        Your CRO sends data. Mediforce workflow reads files, validates it against CDISC standards, and AI suggest the best actions to your Data Managers.
+        Stakeholder teams send documents on their own schedule. Mediforce sends the request, watches for files to arrive, reviews what's submitted, and drafts every reminder and clarification - so nothing slips through before the deadline.
       </p>
       <div class="hero-ctas">
         <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer" class="btn btn--outline">
@@ -747,10 +739,10 @@
       </div>
       <div class="hero-preview">
         <img
-          src="images/mediforce-lz-run-workflow.webp"
-          alt="Mediforce workflows page — starting a CDISC data validation run"
-          width="1600"
-          height="798"
+          src="submission-docs-workflow.webp"
+          alt="Mediforce workflow diagram for collecting submission documents from stakeholders"
+          width="1800"
+          height="905"
           loading="eager"
           fetchpriority="high"
           decoding="async"
@@ -761,64 +753,58 @@
 
   <div class="hero-divider"></div>
 
-  <!-- Problem -->
-  <section class="section section--alt">
+  <!-- Watch it in action -->
+  <section class="video-section">
     <div class="container">
-      <div class="section-label">The Challenge</div>
-      <h2 class="section-title">Clinical data arrives in every format.<br>Fixed validation rule sets never catch all problems.</h2>
-      <p class="section-subtitle">Each CRO follows its own conventions - different file structures, controlled term variants, delivery schedules. Catching issues before they reach downstream pipelines requires coverage and speed that manual review can't sustain.</p>
-      <div class="problem-grid">
-        <div class="problem-item">
-          <div class="problem-icon problem-icon--orange">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          </div>
-          <h3>Format inconsistencies pile up</h3>
-          <p>Site IDs, controlled term casing, date formats - every CRO does them differently. A data manager has to download the files, run CDISC validation, and manually sift through hundreds of findings to decide what's safe to pass downstream.</p>
-        </div>
-        <div class="problem-item">
-          <div class="problem-icon problem-icon--yellow">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          </div>
-          <h3>Rejection loops cost days</h3>
-          <p>When a package fails validation - wrong structure, missing domains, inconsistent values - the manager writes a back-and-forth email to the CRO, waits for a redelivery, and retries the whole validation cycle from scratch.</p>
-        </div>
-        <div class="problem-item">
-          <div class="problem-icon problem-icon--red">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          </div>
-          <h3>Database lock pressure creates blind spots</h3>
-          <p>As the database lock deadline approaches, the pressure to accept or reject deliveries fast increases. Unresolved findings pile up without a clear owner. The tool gives the data manager a structured view of exactly what needs a decision - so they can close cleanly under pressure, not just quickly.</p>
-        </div>
-        <div class="problem-item">
-          <div class="problem-icon problem-icon--purple">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          </div>
-          <h3>Audit trails are assembled after the fact</h3>
-          <p>Documentation for regulators is reconstructed from emails and spreadsheets weeks after decisions were made. Gaps and inconsistencies are discovered during inspection, not during the review itself.</p>
-        </div>
+      <div class="section-label" style="display:block;text-align:center;margin:0 auto 0.75rem;width:fit-content;">Watch It In Action</div>
+      <h2 class="section-title" style="text-align:center;">See the full document collection workflow, end to end</h2>
+      <div class="video-embed">
+        <iframe
+          src="https://www.youtube.com/embed/Iao37oa1tRE"
+          title="Mediforce — Collecting Submission Documents walkthrough"
+          loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allowfullscreen
+        ></iframe>
       </div>
     </div>
   </section>
 
-  <!-- Showcase: Workflow Editor -->
-  <section class="section">
+  <!-- Problem -->
+  <section class="section section--alt">
     <div class="container">
-      <div class="showcase-layout">
-        <div class="showcase-text">
-          <div class="section-label">Visual Workflow Designer</div>
-          <h2>Design your process once.<br>Run it forever.</h2>
-          <p>Mediforce's visual workflow editor lets you wire together script steps, AI agents, and human review gates without writing infrastructure code. Every step type - SFTP poll, CDISC validation, human approval - is a node in the graph. Change the flow, not the code.</p>
+      <div class="section-label">The Challenge</div>
+      <h2 class="section-title">Collecting submission documents is a manual chase.<br>One person tracks it all in their head.</h2>
+      <p class="section-subtitle">Every study pulls documents from multiple stakeholder teams on different schedules. Keeping track of who was asked, who replied, and what still needs fixing doesn't scale past a handful of studies.</p>
+      <div class="problem-grid">
+        <div class="problem-item">
+          <div class="problem-icon problem-icon--orange">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 6 10 7 10-7"/></svg>
+          </div>
+          <h3>Manual outreach to every stakeholder team</h3>
+          <p>The submission coordinator hand-writes and sends individual requests to each team responsible for a piece of the package, then has to remember who was asked for what and by when.</p>
         </div>
-        <div class="showcase-visual">
-          <img
-            src="images/mediforce-lz-editor.webp"
-            alt="Mediforce visual workflow editor showing the CDISC data validation pipeline"
-            class="showcase-img"
-            width="1600"
-            height="798"
-            loading="lazy"
-            decoding="async"
-          />
+        <div class="problem-item">
+          <div class="problem-icon problem-icon--yellow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <h3>No visibility into who's actually submitted</h3>
+          <p>Files land in a shared drive with no notification. The coordinator has to keep checking manually to see what's arrived and who's still missing - or wait for someone to ask.</p>
+        </div>
+        <div class="problem-item">
+          <div class="problem-icon problem-icon--red">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          </div>
+          <h3>Wrong files slip through unnoticed</h3>
+          <p>A mislabeled or mismatched file - the wrong drug name on a template, for instance - can sit in the shared drive until someone happens to open it, costing days when it's caught late.</p>
+        </div>
+        <div class="problem-item">
+          <div class="problem-icon problem-icon--purple">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <h3>Reminders and follow-ups fall on one person</h3>
+          <p>As the deadline approaches, chasing slow responders and drafting clarification requests for issues found becomes a repetitive job with no system tracking who still needs a nudge.</p>
         </div>
       </div>
     </div>
@@ -828,77 +814,85 @@
   <section class="section" id="how-it-works">
     <div class="container">
       <div class="section-label">How It Works</div>
-      <h2 class="section-title">Always watching, always validating. Your data manager reviews only what needs a decision.</h2>
-      <p class="section-subtitle">An autonomous workflow takes ingest off the data manager's plate and surfaces only the decisions that actually require human judgment.</p>
+      <h2 class="section-title">One request goes out. Every file is checked. Every follow-up writes itself.</h2>
+      <p class="section-subtitle">An autonomous workflow runs the collection loop end to end, and surfaces only the decisions that need the coordinator's judgment.</p>
       <div class="steps-list">
 
         <div class="step-item">
           <div class="step-icon-wrap">
-            <div class="step-icon step-icon--script">
-              <!-- Script: cron/schedule icon -->
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <div class="step-icon step-icon--human">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </div>
-            <span class="step-role step-role--script">Script</span>
+            <span class="step-role step-role--human">Human</span>
           </div>
           <div class="step-body">
-            <h3>Watch for new files in SFTP server</h3>
-            <p>A cron-driven workflow polls the CRO SFTP, diffs against the previous run's file listing, and downloads new files only when something has changed. No manual checking, no missed deliveries.</p>
+            <h3>Define stakeholders, deadlines &amp; file specs</h3>
+            <p>The submission coordinator provides one JSON file: which teams are responsible for which documents, their deadlines, and any study-specific requirements. It's the only manual data entry in the whole workflow.</p>
           </div>
         </div>
 
         <div class="step-item">
           <div class="step-icon-wrap">
             <div class="step-icon step-icon--script">
-              <!-- Script: terminal/code icon -->
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             </div>
             <span class="step-role step-role--script">Script</span>
           </div>
           <div class="step-body">
-            <h3>Validate files</h3>
-            <p>Every delivery runs through the CDISC CORE rules engine. Findings are categorised by severity (Critical / Major / Minor / Warning), mapped to the regulatory target (FDA, PMDA, EMA), and turned into a structured report.</p>
-          </div>
-        </div>
-
-        <div class="step-item">
-          <div class="step-icon-wrap">
-            <div class="step-icon step-icon--agent">
-              <!-- Agent: robot icon -->
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><circle cx="9" cy="14" r="1.25" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.25" fill="currentColor" stroke="none"/><line x1="9" y1="18" x2="15" y2="18"/><line x1="12" y1="8" x2="12" y2="4"/><circle cx="12" cy="3" r="1.25"/></svg>
-            </div>
-            <span class="step-role step-role--agent">Agent</span>
-          </div>
-          <div class="step-body">
-            <h3>Validation Report</h3>
-            <p>An AI agent compiles the validation findings into a one-page HTML report - severity heatmap, top findings in priority order, and a clear classification. A notification is sent to the data manager with a direct link.</p>
+            <h3>Fill the request email from a shared template</h3>
+            <p>A markdown email template - held in the same repository as the workflow - has placeholders for study details, file specifications, and deadlines. The workflow fills them from the JSON values automatically.</p>
           </div>
         </div>
 
         <div class="step-item">
           <div class="step-icon-wrap">
             <div class="step-icon step-icon--human">
-              <!-- Human: person icon -->
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             </div>
             <span class="step-role step-role--human">Human</span>
           </div>
           <div class="step-body">
-            <h3>Human decides</h3>
-            <p>The data manager reviews the inline report and clicks <strong>Accept</strong> (with optional per-finding waivers on record) or <strong>Reject</strong>. The decision is logged with their identity and timestamp. That's the full extent of required human involvement for a clean delivery.</p>
+            <h3>Preview, approve, and send</h3>
+            <p>Before anything goes out, the workflow sends the coordinator a preview of the exact email, then a summary of who it'll reach. One approval, and it's sent to every stakeholder team at once.</p>
           </div>
         </div>
 
         <div class="step-item">
           <div class="step-icon-wrap">
             <div class="step-icon step-icon--agent">
-              <!-- Agent: robot icon -->
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><circle cx="9" cy="14" r="1.25" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.25" fill="currentColor" stroke="none"/><line x1="9" y1="18" x2="15" y2="18"/><line x1="12" y1="8" x2="12" y2="4"/><circle cx="12" cy="3" r="1.25"/></svg>
             </div>
             <span class="step-role step-role--agent">Agent</span>
           </div>
           <div class="step-body">
-            <h3>Agent drafts response to the CRO</h3>
-            <p>On rejection, an AI agent drafts a factual, bounded rejection note to the CRO in the operator's tone - scoped to the actual findings, ready to be reviewed and forwarded. No copy-pasting finding lists from a validator output.</p>
+            <h3>AI agent watches the shared drive</h3>
+            <p>Once the request is out, an AI agent periodically checks the SFTP / shared drive for incoming files, analyzes what's been submitted, and prepares a report - present or missing, and whether the content looks right.</p>
+          </div>
+        </div>
+
+        <div class="step-item">
+          <div class="step-icon-wrap">
+            <div class="step-icon step-icon--human">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <span class="step-role step-role--human">Human</span>
+          </div>
+          <div class="step-body">
+            <h3>Coordinator decides: wait, remind, or request a fix</h3>
+            <p>Reading the agent's report, the coordinator picks one of three outcomes: give stakeholders more time, trigger a deadline reminder, or flag a file that needs correcting - for example, a document filed under the wrong drug label.</p>
+          </div>
+        </div>
+
+        <div class="step-item">
+          <div class="step-icon-wrap">
+            <div class="step-icon step-icon--agent">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><circle cx="9" cy="14" r="1.25" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.25" fill="currentColor" stroke="none"/><line x1="9" y1="18" x2="15" y2="18"/><line x1="12" y1="8" x2="12" y2="4"/><circle cx="12" cy="3" r="1.25"/></svg>
+            </div>
+            <span class="step-role step-role--agent">Agent</span>
+          </div>
+          <div class="step-body">
+            <h3>Agent drafts and sends the follow-up</h3>
+            <p>On remind or request-fix, an AI agent drafts a scoped, factual email - a deadline nudge or a clarification request naming the exact issue - and sends it. The loop repeats until every file is in and correct, then the workflow closes with a cost and completion summary.</p>
           </div>
         </div>
 
@@ -906,77 +900,29 @@
     </div>
   </section>
 
-  <!-- Showcase: Validation Report -->
+  <!-- Coordinator Experience -->
   <section class="section section--alt">
     <div class="container">
-      <div class="showcase-layout showcase-layout--reverse">
-        <div class="showcase-text">
-          <div class="section-label">Human Review</div>
-          <h2>Everything the data manager needs.</h2>
-          <p>When a delivery needs a decision, the data manager sees a single-page validation report: severity heatmap, top findings by priority, and two buttons - Accept or Reject. Reject requires a brief note on what needs fixing; the agent uses it to draft the CRO rejection letter. The full audit record writes itself. No spreadsheets, no email threading, no re-running the validator to remember what the numbers were.</p>
-        </div>
-        <div class="showcase-visual">
-          <img
-            src="images/mediforce-lz-validation-report.webp"
-            alt="Data manager reviewing the CDISC validation report with Accept and Reject actions"
-            class="showcase-img"
-            width="1400"
-            height="698"
-            loading="lazy"
-            decoding="async"
-          />
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Showcase: New Rules -->
-  <section class="section">
-    <div class="container">
-      <div class="showcase-layout">
-        <div class="showcase-text">
-          <div class="section-label">Continuous Improvement</div>
-          <h2>Agents that learn from<br>every delivery.</h2>
-          <p>When the same fixable issue appears across multiple CRO deliveries - a site ID format variant, a controlled term mismatch - the agent proposes a new cleaning rule. Rules are surfaced as a readable suggestion, reviewed by a human before they go live. The system gets smarter without getting opaque.</p>
-        </div>
-        <div class="showcase-visual">
-          <img
-            src="images/mediforce-lz-new-rules.webp"
-            alt="AI agent proposing new CDISC validation rules based on observed delivery patterns"
-            class="showcase-img"
-            width="1600"
-            height="798"
-            loading="lazy"
-            decoding="async"
-          />
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Data Manager Experience -->
-  <section class="section section--alt">
-    <div class="container">
-      <div class="section-label">Data Manager Experience</div>
-      <h2 class="section-title">Four actions. No file triage.</h2>
-      <p class="section-subtitle">The work that used to take an afternoon takes a click and a copy-paste.</p>
+      <div class="section-label">Coordinator Experience</div>
+      <h2 class="section-title">One file to start. One click at every decision.</h2>
+      <p class="section-subtitle">The work that used to mean daily shared-drive checks and hand-written emails takes a JSON file and a handful of clicks.</p>
       <div class="dm-list">
-        <div class="dm-item">
-          <div class="dm-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          </div>
-          <div class="dm-item-body">
-            <h3>Notification arrives</h3>
-            <p>An email or task notification: "Delivery from CRO X arrived - 5 findings, classification: needs review." No manual polling of the SFTP, no waiting for someone to ping you.</p>
-          </div>
-        </div>
         <div class="dm-item">
           <div class="dm-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           </div>
           <div class="dm-item-body">
-            <h3>Review the report</h3>
-            <p>Follow the link to the HTML report - severity heatmap, top findings in priority order, and a status banner if validation itself hit an error. Everything in one page.</p>
+            <h3>Kick off with one JSON file</h3>
+            <p>Stakeholders, deadlines, and file specs go in once. The request email, addressed to everyone who needs it, comes out the other end.</p>
+          </div>
+        </div>
+        <div class="dm-item">
+          <div class="dm-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+          <div class="dm-item-body">
+            <h3>Get notified when files are checked</h3>
+            <p>No polling the shared drive. The agent's report lands in your inbox - what's in, what's missing, what looks wrong.</p>
           </div>
         </div>
         <div class="dm-item">
@@ -984,8 +930,8 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           </div>
           <div class="dm-item-body">
-            <h3>Click Accept or Reject</h3>
-            <p>Two buttons. Accept passes the delivery downstream - with optional per-finding waivers on record. Reject prompts for a brief note on what needs fixing; the agent uses that note to draft the CRO rejection letter. The decision is logged with your identity and timestamp.</p>
+            <h3>One click: wait, remind, or request a fix</h3>
+            <p>Every decision in the loop is a single choice. No drafting reminder emails or clarification notes by hand.</p>
           </div>
         </div>
         <div class="dm-item">
@@ -993,150 +939,21 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </div>
           <div class="dm-item-body">
-            <h3>Forward the rejection note</h3>
-            <p>If you rejected: a markdown rejection note is waiting in the next task, drafted by the agent, scoped to the actual findings. Copy, paste into email, send. Done.</p>
+            <h3>Follow-ups go out automatically</h3>
+            <p>The agent sends the reminder or clarification note it drafted. The loop keeps running until the package is complete.</p>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Capabilities -->
-  <section class="section">
-    <div class="container">
-      <div class="section-label">What's Included</div>
-      <h2 class="section-title">Enterprise-grade from day one.</h2>
-      <p class="section-subtitle">Built on Mediforce's governed AI platform - every capability ships with the audit trail and compliance controls already in place.</p>
-      <div class="regulated-grid">
-        <div class="regulated-item">
-          <div class="regulated-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          </div>
-          <h3>CDISC Standards Coverage</h3>
-          <p>Full CDISC CORE rules engine: Structure, Controlled Terminology, Consistency, and FDA / PMDA business rules. Findings classified as Critical, Major, Minor, or Warning.</p>
-        </div>
-        <div class="regulated-item">
-          <div class="regulated-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          </div>
-          <h3>Configurable Autonomy (L1 to L3)</h3>
-          <p>Start with every decision approved by a human. Dial up to periodic review once the team trusts the agent's judgment on a given CRO. Configurable per study, per data type.</p>
-        </div>
-        <div class="regulated-item">
-          <div class="regulated-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
-          </div>
-          <h3>Audit by Design</h3>
-          <p>Every delivery gets its own git branch. Every step is a commit. <code style="font-size:0.8125rem;background:rgba(13,148,136,0.08);padding:0.1em 0.35em;border-radius:0.25rem;">git log</code> is the audit record - no separate logging system to keep in sync.</p>
-        </div>
-        <div class="regulated-item">
-          <div class="regulated-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
-          </div>
-          <h3>Cleaning Rules as PRs</h3>
-          <p>Fixable mismatches - site ID formatting, controlled term variants - become pull requests against the study config repo. Reviewable, versioned, rolled back if wrong.</p>
-        </div>
-        <div class="regulated-item">
-          <div class="regulated-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-          </div>
-          <h3>Plug Into Existing SFTP</h3>
-          <p>Connects to any CRO-standard SFTP endpoint. No changes to CRO infrastructure required. GCS, S3, and Veeva Vault as output targets in production.</p>
-        </div>
-        <div class="regulated-item">
-          <div class="regulated-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          </div>
-          <h3>Regulatory Routing</h3>
-          <p>Findings are automatically mapped to the regulatory standard the study targets - FDA, PMDA, or EMA - so the report and escalation tone are always jurisdiction-appropriate.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Showcase: Custom Validation -->
-  <section class="section section--alt">
-    <div class="container">
-      <div class="showcase-layout">
-        <div class="showcase-text">
-          <div class="section-label">Custom Validation</div>
-          <h2>Bring your own rules - R, Python, any language.</h2>
-          <p>CDISC rules catch structural conformance. Study-specific logic - therapeutic-area thresholds, sponsor-defined derivation checks, site-level anomaly patterns - lives in your team's existing scripts. Mediforce runs R/pointblank, Python, or any containerized validator as a native pipeline step. Rules are versioned YAML files owned by data managers, not buried in tool configuration. The same accept/reject workflow applies; the same git audit trail captures every run.</p>
-        </div>
-        <div class="showcase-visual">
-          <div class="code-visual">
-            <div class="code-visual-header">
-              <span class="code-dot code-dot--red"></span>
-              <span class="code-dot code-dot--amber"></span>
-              <span class="code-dot code-dot--green"></span>
-              <span class="code-filename"><span class="c-badge c-badge--yaml">YAML</span>rules/ae-checks.yml</span>
-            </div>
-            <div class="code-body">
-              <pre><span class="c-comment"># Study-specific AE checks — owned by the DM team</span>
-<span class="c-key">checks</span><span class="c-punct">:</span>
-  <span class="c-punct">-</span> <span class="c-key">id</span><span class="c-punct">:</span> <span class="c-str">ae_severity_range</span>
-    <span class="c-key">description</span><span class="c-punct">:</span> <span class="c-str">AESEV must be Mild, Moderate, or Severe</span>
-    <span class="c-key">domain</span><span class="c-punct">:</span> <span class="c-str">AE</span>
-    <span class="c-key">script</span><span class="c-punct">:</span> <span class="c-str">ae_checks.R</span>
-    <span class="c-key">severity</span><span class="c-punct">:</span> <span class="c-str">critical</span>
-
-  <span class="c-punct">-</span> <span class="c-key">id</span><span class="c-punct">:</span> <span class="c-str">lb_outlier_screen</span>
-    <span class="c-key">description</span><span class="c-punct">:</span> <span class="c-str">Flag lab values &gt; 4 SD from site mean</span>
-    <span class="c-key">domain</span><span class="c-punct">:</span> <span class="c-str">LB</span>
-    <span class="c-key">script</span><span class="c-punct">:</span> <span class="c-str">lb_outliers.py</span>
-    <span class="c-key">severity</span><span class="c-punct">:</span> <span class="c-str">major</span></pre>
-            </div>
-            <div class="code-visual-header" style="border-top:1px solid rgba(255,255,255,0.06);border-bottom:none;">
-              <span class="code-filename"><span class="c-badge c-badge--r">R</span>rules/ae_checks.R</span>
-            </div>
-            <div class="code-body">
-              <pre><span class="c-fn">library</span><span class="c-punct">(</span><span class="c-arg">pointblank</span><span class="c-punct">)</span>
-<span class="c-key">ae</span> <span class="c-punct">&lt;-</span> <span class="c-fn">read_input</span><span class="c-punct">(</span><span class="c-str">"AE"</span><span class="c-punct">)</span>
-
-<span class="c-fn">create_agent</span><span class="c-punct">(</span><span class="c-key">tbl</span> <span class="c-punct">=</span> <span class="c-key">ae</span><span class="c-punct">)</span> <span class="c-punct">|&gt;</span>
-  <span class="c-fn">col_vals_in_set</span><span class="c-punct">(</span>
-    <span class="c-key">columns</span> <span class="c-punct">=</span> <span class="c-arg">AESEV</span><span class="c-punct">,</span>
-    <span class="c-key">set</span>     <span class="c-punct">=</span> <span class="c-fn">c</span><span class="c-punct">(</span><span class="c-str">"Mild"</span><span class="c-punct">,</span> <span class="c-str">"Moderate"</span><span class="c-punct">,</span> <span class="c-str">"Severe"</span><span class="c-punct">)</span>
-  <span class="c-punct">)</span> <span class="c-punct">|&gt;</span>
-  <span class="c-fn">interrogate</span><span class="c-punct">()</span> <span class="c-punct">|&gt;</span>
-  <span class="c-fn">write_result</span><span class="c-punct">()</span></pre>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Showcase: Pull Request -->
-  <section class="section section--alt">
-    <div class="container">
-      <div class="showcase-layout showcase-layout--reverse">
-        <div class="showcase-text">
-          <div class="section-label">Audit by Design</div>
-          <h2>Every rule is a PR.<br>Every change is reviewed.</h2>
-          <p>Proposed cleaning rules are opened as pull requests against the study config repository - reviewable in GitHub, versioned, and instantly reversible. The agent shows its reasoning; the reviewer approves or rejects. No shadow config files, no undocumented changes, no "who changed this and why" at inspection time.</p>
-        </div>
-        <div class="showcase-visual">
-          <img
-            src="images/mediforce-lz-pull-request.webp"
-            alt="GitHub pull request opened by the AI agent with proposed CDISC validation cleaning rules"
-            class="showcase-img"
-            width="1600"
-            height="798"
-            loading="lazy"
-            decoding="async"
-          />
-        </div>
-      </div>
-    </div>
-  </section>
 
   <!-- Demo Request Form -->
   <section class="demo-section section--alt">
     <div class="container">
       <div class="section-label">See It Live</div>
       <h2 class="section-title">Book a live walkthrough</h2>
-      <p class="section-subtitle">We'll run the full workflow - SFTP delivery to validated report - and walk you through each step so you can see exactly how it fits your team's process.</p>
+      <p class="section-subtitle">We'll run the full workflow - request email to completed package - and walk you through each step so you can see exactly how it fits your team's process.</p>
       <div class="demo-layout">
 
         <div class="demo-pitch">
@@ -1144,13 +961,13 @@
             <div class="demo-pitch-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.72 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.63 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.61a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
             </div>
-            <p><strong>30-minute video call.</strong> We run a live demo against the CDISC Pilot 3 dataset - a real study, real CDISC validation findings, real Accept / Reject decision flow.</p>
+            <p><strong>30-minute video call.</strong> We run a live demo of the document collection workflow - real stakeholder emails, real AI file review, real wait / remind / request-fix decision flow.</p>
           </div>
           <div class="demo-pitch-item">
             <div class="demo-pitch-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             </div>
-            <p><strong>Tailored to your workflow.</strong> Tell us your CRO setup and we'll show you how the config maps to your delivery structure, study contract, and validation rules.</p>
+            <p><strong>Tailored to your workflow.</strong> Tell us which stakeholder teams and file types are involved and we'll show you how the config maps to your submission structure.</p>
           </div>
           <div class="demo-pitch-item">
             <div class="demo-pitch-icon">
@@ -1163,9 +980,9 @@
         <div class="demo-form-card">
           <div class="demo-authors">
             <div class="demo-author-stack">
-              <img class="demo-author-avatar" src="images/author-1.jpg" alt="Author 1" />
-              <img class="demo-author-avatar" src="images/author-2.jpg" alt="Author 2" />
-              <img class="demo-author-avatar" src="images/author-3.jpg" alt="Author 3" />
+              <img class="demo-author-avatar" src="../../images/author-1.jpg" alt="Author 1" />
+              <img class="demo-author-avatar" src="../../images/author-2.jpg" alt="Author 2" />
+              <img class="demo-author-avatar" src="../../images/author-3.jpg" alt="Author 3" />
             </div>
             <div class="demo-authors-label">
               <strong>Meet the team</strong>
@@ -1187,7 +1004,7 @@
               </div>
               <div class="form-field">
                 <label for="demo-message">Tell us about your setup</label>
-                <textarea id="demo-message" name="message" placeholder="e.g. We receive weekly SDTM deliveries from two CROs, targeting FDA submission. Looking to reduce the 2-day validation cycle."></textarea>
+                <textarea id="demo-message" name="message" placeholder="e.g. We collect submission documents from 6 stakeholder teams per study, currently tracked over email and a shared drive."></textarea>
               </div>
               <button type="submit" id="demo-submit" class="form-submit">Request a Demo Call</button>
               <div id="demo-error" class="form-error-msg">Something went wrong - please try again or email us directly at mediforce@appsilon.com.</div>
@@ -1205,52 +1022,17 @@
     <div class="footer-inner">
       <span>Mediforce</span>
       <nav class="footer-links">
-        <a href="data-delivery.html">Data Delivery</a>
-        <a href="validated-ai.html">Validation</a>
-        <a href="security.html">Security</a>
-        <a href="fda-principles.html">FDA Alignment</a>
+        <a href="../data-delivery/">Data Delivery</a>
+        <a href="../collecting-documents/">Collecting Documents</a>
+        <a href="../../validated-ai.html">Validation</a>
+        <a href="../../security.html">Security</a>
+        <a href="../../fda-principles.html">FDA Alignment</a>
         <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer">GitHub</a>
         <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer">Discord</a>
         <a href="https://appsilon.com" target="_blank" rel="noopener noreferrer">Appsilon.com</a>
       </nav>
     </div>
   </footer>
-
-  <!-- Image modal -->
-  <div id="img-modal" class="img-modal" role="dialog" aria-modal="true" aria-label="Image preview">
-    <button class="img-modal-close" id="img-modal-close" aria-label="Close">&#x2715;</button>
-    <img id="img-modal-img" src="" alt="" />
-  </div>
-
-  <script>
-    (function () {
-      var modal    = document.getElementById('img-modal');
-      var modalImg = document.getElementById('img-modal-img');
-      var closeBtn = document.getElementById('img-modal-close');
-
-      document.querySelectorAll('.showcase-img').forEach(function (img) {
-        img.addEventListener('click', function () {
-          modalImg.src = img.src;
-          modalImg.alt = img.alt;
-          modal.classList.add('is-open');
-          document.body.style.overflow = 'hidden';
-        });
-      });
-
-      function closeModal() {
-        modal.classList.remove('is-open');
-        document.body.style.overflow = '';
-      }
-
-      closeBtn.addEventListener('click', closeModal);
-      modal.addEventListener('click', function (e) {
-        if (e.target === modal) closeModal();
-      });
-      document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') closeModal();
-      });
-    })();
-  </script>
 
   <!-- EmailJS — https://emailjs.com
        Setup (one time):

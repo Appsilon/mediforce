@@ -1,0 +1,45 @@
+Hi, in this video I will show you a new example of a process that can be automated with MediForce. We have the process of collecting submission documents and we heard from multiple pharmaceutical companies that this process can be very manual. The person responsible for this process is the submission coordinator.
+
+They send an email request to multiple teams responsible for sending their documents that will be included in the submission package. In this email, they read about the requirements and the deadlines for sending their files. Files are submitted to a shared drive where these files are reviewed and if something needs to be improved, stakeholders are asked for improvements and sometimes they are reminded that the deadline is coming and they need to upload their files.
+
+This process has multiple manual steps. This can be file review, requesting for fixes, reminders and I will show you how we automated these steps using MediForce. Before I run this workflow, let's take a look at its definition.
+
+Here we can see a diagram of our workflow and all steps defined here and the first step is to provide the values in the JSON format that contain details of the stakeholders who are responsible for sending files, their deadlines and other specifications that will be used to fill the email template. This is the email template. We have the values in curly braces highlighted in yellow that will be filled with our JSON values and this email contains study details, file specification, deadlines and other requirements for the stakeholders and we also have this email in the markdown format in our repository and this markdown file is a dependency for our workflow.
+
+When the email is ready, we review it and after we approve it, the workflow sends a preview email to ourselves and after that it prepares a summary for us so to which stakeholders it will be sent and after that we make a decision if we approve it. After that, the email is sent to everyone and after that the workflow reaches the following loop. An AI agent periodically verifies our shared drive for incoming files.
+
+For this demo, we used an SFTP server and here we can see how we define its IP address, the folder path and other credentials and how they are accessible by the workflow and after AI agent analyzes the files, it prepares a report for us and after reading this report, we make a decision. For example, we want to wait because stakeholders need more time to prepare their files. Another scenario is that we want to remind them because the deadline is coming so we, for example, set up scheduled time and after this time an AI agent drafts a reminder email and sends it to stakeholders.
+
+Another scenario is that we need some fixes for the files. So after scheduled time, an AI agent prepares a clarification request and sends it to the stakeholders. When everything is ready, we can complete the workflow.
+
+So now let's run it and see how it works. The first step is to provide our values in the JSON format. I have the JSON file template prepared in our repository.
+
+Here we have mocked data with artificial names and stakeholder emails. All emails will be sent to my inbox. The email is filled.
+
+Here we can see which step was completed and where we are in the workflow. Now it's our job to verify the field template. Everything looks good, so we can approve it.
+
+Now we should expect a preview email in our inbox. I can see it's available. Everything looks good.
+
+So I can approve sending the email to all stakeholders listed here. And now we are in the loop that I mentioned before. An AI agent now verifies our SFTP server.
+
+For now, it's empty, so I expect that the report will tell me that no files were found. No files? So let's wait some time until stakeholders send files to the shared drive. Again, there is no new files, so I will send a reminder.
+
+And because our platform uses Chrome in 15 minutes' periods, I will trigger it manually. The workflow prepares a reminder email. But after that, it will check again our SFTP server.
+
+OK, the email is sent. Let's take a look at the reminder. We can see it's subject, the content of the email, the reminder email looks good.
+
+So let's proceed with our workflow. And for the demo purposes, I will upload some files to our SFTP server. Here I have some example AMPD template.
+
+Let's upload it to our SFTP server. Let's go to the shared drive and see that the file is present. And let's see what we have in the report.
+
+All right, we can see that it summarized the AMPD template, but also the label, which seems wrong because the drag in our study is different. Here we have Paracetamol. So we need to ask for fixes.
+
+The file is wrong. And after scheduled time, I will trigger it manually. We should expect a clarification request email in our inbox.
+
+An AA agent prepares the clarification email. Now it's sent. All right, it's here.
+
+And we have an email with incorrect label file submitted and required correction. Let's move on. And now let's assume that all the files were fixed and we can finalize the workflow.
+
+After that, we can see the summary of our workflow. We can see the report. But we can see it's cost and the workflow is done.
+
+If you have other process that you would like to automate, reach out to us and we will be happy to implement it on MediForce.
