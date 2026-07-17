@@ -12,6 +12,7 @@
  *   2 — usage error (unknown command, missing required flag)
  */
 
+import { assistantAskCommand } from './commands/assistant-ask';
 import { workflowRegisterCommand } from './commands/workflow-register';
 import { workflowValidateCommand } from './commands/workflow-validate';
 import { workflowSchemaCommand } from './commands/workflow-schema';
@@ -96,6 +97,12 @@ interface BranchEntry {
 }
 
 export const TREE: Record<string, BranchEntry> = {
+  assistant: {
+    description: "Canvas-first workflow designer's AI Assistant (ADR-0011)",
+    leaves: {
+      ask: { description: 'Ask the assistant a question given the current canvas state', fn: assistantAskCommand },
+    },
+  },
   workflow: {
     description: 'Workflow definitions (register, list, get, copy, archive, delete, visibility)',
     leaves: {
