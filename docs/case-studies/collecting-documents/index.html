@@ -93,12 +93,13 @@
     .hero-badge svg { width: 0.875rem; height: 0.875rem; }
     .hero h1 {
       position: relative;
-      font-size: 3rem;
+      font-size: 2.5rem;
       font-weight: 800;
       letter-spacing: -0.035em;
-      line-height: 1.12;
-      max-width: 54rem;
+      line-height: 1.14;
+      max-width: 62rem;
       margin: 0 auto;
+      text-wrap: balance;
     }
     .hero h1 .gradient {
       background: linear-gradient(135deg, var(--accent) 0%, hsl(200,80%,70%) 50%, var(--discord) 100%);
@@ -127,13 +128,14 @@
       height: 1px;
       background: linear-gradient(90deg, transparent, rgba(13,148,136,0.25) 30%, rgba(88,101,242,0.2) 70%, transparent);
     }
-    @media (max-width: 639px) { .hero h1 { font-size: 1.75rem; } }
+    @media (max-width: 639px) { .hero h1 { font-size: 1.25rem; } }
+    @media (max-width: 359px) { .hero h1 { font-size: 1.0625rem; } }
     @media (min-width: 640px) {
       .hero { padding: 8rem 0 6rem; }
-      .hero h1 { font-size: 3.25rem; }
+      .hero h1 { font-size: 2rem; }
     }
     @media (min-width: 1024px) {
-      .hero h1 { font-size: 3.75rem; }
+      .hero h1 { font-size: 3rem; }
     }
 
     /* ── Buttons ── */
@@ -723,7 +725,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         Regulatory Submissions
       </div>
-      <h1>Automate <span class="gradient">Submission</span><br>Document Collection</h1>
+      <h1>Automate the <span class="gradient">Submission Coordinator's</span> document collection</h1>
       <p class="hero-subtitle">
         Stakeholder teams send documents on their own schedule. Mediforce sends the request, watches for files to arrive, reviews what's submitted, and drafts every reminder and clarification - so nothing slips through before the deadline.
       </p>
