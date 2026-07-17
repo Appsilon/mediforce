@@ -2,16 +2,21 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { X, HelpCircle, Save, KeyRound, Code2, Sparkles, ChevronRight, ChevronLeft, Plus } from 'lucide-react';
-import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
-import { yaml as yamlLang } from '@codemirror/lang-yaml';
+import { json as jsonLang } from '@codemirror/lang-json';
 import { tags } from '@lezer/highlight';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
-import { cn } from '@/lib/utils';
-import { WorkflowStepSchema, TransitionSchema } from '@mediforce/platform-core';
+import {
+  WorkflowStepSchema,
+  TransitionSchema,
+  mergeVerdictTransitions,
+  ensureEntryStepFirst,
+  toSlug,
+} from '@mediforce/platform-core';
+import { validateWorkflowGraphAndReferences } from '@mediforce/workflow-engine';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import type { NewStepPayload } from '@/lib/control-mode';
 import { BlockPicker } from './block-picker';
@@ -20,11 +25,7 @@ import { WorkflowSecretsEditor } from './workflow-secrets-editor';
 import { computeMoveEligibility, ensureTerminalConnected } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 
-// ---------------------------------------------------------------------------
-// YAML code editor (CodeMirror 6)
-// ---------------------------------------------------------------------------
-
-function YamlCodeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function JsonCodeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -38,7 +39,7 @@ function YamlCodeEditor({ value, onChange }: { value: string; onChange: (v: stri
       doc: value,
       extensions: [
         basicSetup,
-        yamlLang(),
+        jsonLang(),
         EditorView.updateListener.of((update) => {
           if (update.docChanged && !externalUpdateRef.current) {
             onChangeRef.current(update.state.doc.toString());
@@ -50,7 +51,6 @@ function YamlCodeEditor({ value, onChange }: { value: string; onChange: (v: stri
           '.cm-content': { padding: '8px 0' },
           '.cm-gutters': { borderRight: '1px solid var(--border)', background: 'transparent', color: 'hsl(var(--muted-foreground))', fontSize: '10px' },
           '.cm-activeLineGutter': { background: 'transparent' },
-          // Syntax token colours (using CSS vars so they adapt to light/dark)
           '.cm-tok-key':     { color: 'hsl(var(--primary))', fontWeight: '500' },
           '.cm-tok-string':  { color: 'hsl(var(--color-status-warn))' },
           '.cm-tok-number':  { color: 'hsl(38 75% 45%)' },
@@ -74,11 +74,9 @@ function YamlCodeEditor({ value, onChange }: { value: string; onChange: (v: stri
     const view = new EditorView({ state, parent: containerRef.current });
     viewRef.current = view;
     return () => { view.destroy(); viewRef.current = null; };
-    // init-only: value is synced via the second useEffect below
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sync externally-driven value changes into the editor
   useEffect(() => {
     const view = viewRef.current;
     if (!view || view.state.doc.toString() === value) return;
@@ -95,80 +93,47 @@ function YamlCodeEditor({ value, onChange }: { value: string; onChange: (v: stri
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 export interface WorkflowEditorCanvasProps {
-  /** Starting steps — component re-initialises whenever React key changes. */
   initialSteps: WorkflowStep[];
-  /** Starting transitions — same lifecycle as initialSteps. */
   initialTransitions: WorkflowDefinition['transitions'];
-  /**
-   * Extra fields merged into the YAML preview (name, description, triggers, …).
-   * Steps and transitions are always added on top.
-   */
-  yamlFields?: Record<string, unknown>;
-  /**
-   * Optional workflow name used to load available secret keys inside StepEditor.
-   * Pass undefined for new (unsaved) workflows.
-   */
+  wdJsonFields?: Record<string, unknown>;
   workflowName?: string;
-  /** Namespace handle — required for the in-editor secrets panel. */
   namespace?: string;
-  /**
-   * Render prop for save controls shown at the bottom of the YAML panel.
-   * Receives the current steps + transitions + a discard callback.
-   * Return null to hide the save panel.
-   */
   renderSavePanel?: (
     steps: WorkflowStep[],
     transitions: WorkflowDefinition['transitions'],
     onDiscard: () => void,
   ) => React.ReactNode;
-  /**
-   * Called whenever the edited steps or transitions change.
-   * Useful for lifting state up (e.g. to put a save button in the page header).
-   */
   onChange?: (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => void;
-  /**
-   * Field-level validation errors keyed by stepId → fieldName → message.
-   * Drives red highlights on diagram nodes and inline error text in StepEditor.
-   */
   stepErrors?: Record<string, Record<string, string>>;
 }
 
 export function WorkflowEditorCanvas({
   initialSteps,
   initialTransitions,
-  yamlFields,
+  wdJsonFields,
   workflowName,
   namespace,
   renderSavePanel,
   onChange,
   stepErrors,
 }: WorkflowEditorCanvasProps) {
-  // ── State ──────────────────────────────────────────────────────────────────
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
-  const [rightPanelView, setRightPanelView] = useState<'yaml' | 'secrets' | 'add-block' | null>(null);
+  const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'add-block' | null>(null);
   const [addBlockContext, setAddBlockContext] = useState<{ fromId: string; toId: string } | null>(null);
   const [aiPaneOpen, setAiPaneOpen] = useState(false);
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>(() => structuredClone(initialTransitions));
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [editHistory, setEditHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
   const [redoHistory, setRedoHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
-  const [yamlDraft, setYamlDraft] = useState('');
-  const [yamlError, setYamlError] = useState<string | null>(null);
-  // Tracks the last value we pushed into yamlDraft from the diagram,
-  // so we can distinguish "user edits" from "diagram-driven updates".
-  const lastSyncedYamlRef = useRef('');
+  const [jsonDraft, setJsonDraft] = useState('');
+  const [jsonError, setJsonError] = useState<string | null>(null);
+  const lastSyncedJsonRef = useRef('');
 
   const selectedStep = editedSteps.find((s) => s.id === selectedStepId) ?? null;
 
-  // ── Move eligibility (all steps, used by diagram hover buttons) ─────────────
   const { canMoveUp: canMoveUpSet, canMoveDown: canMoveDownSet } = computeMoveEligibility(editedSteps, editedTransitions);
 
-  // ── Docker image warnings ─────────────────────────────────────────────────
   const { images: dockerImages, isAvailable: dockerAvailable } = useDockerImages();
   const warningStepIds = useMemo(() => {
     if (!dockerAvailable) return undefined;
@@ -182,10 +147,6 @@ export function WorkflowEditorCanvas({
     return map.size > 0 ? map : undefined;
   }, [dockerAvailable, dockerImages, editedSteps]);
 
-  // ── History ────────────────────────────────────────────────────────────────
-  // Keep refs in sync so saveSnapshot can read current state without being
-  // recreated on every steps/transitions change (which would cascade to
-  // addStep, removeStep, moveStep, etc.).
   const editedStepsRef = useRef(editedSteps);
   const editedTransitionsRef = useRef(editedTransitions);
   useEffect(() => { editedStepsRef.current = editedSteps; }, [editedSteps]);
@@ -226,7 +187,6 @@ export function WorkflowEditorCanvas({
     setSelectedStepId(null);
   }, [initialSteps, initialTransitions]);
 
-  // ── Ctrl+Z / Ctrl+Shift+Z ──────────────────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
@@ -241,40 +201,34 @@ export function WorkflowEditorCanvas({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [undoEdit, redoEdit]);
 
-  // ── Notify parent of changes ───────────────────────────────────────────────
   useEffect(() => {
     onChange?.(editedSteps, editedTransitions);
   }, [editedSteps, editedTransitions, onChange]);
 
-  // ── Auto-select first errored step ─────────────────────────────────────────
   useEffect(() => {
     if (!stepErrors || Object.keys(stepErrors).length === 0) return;
     setSelectedStepId(Object.keys(stepErrors)[0]);
   }, [stepErrors]);
 
-  // ── Ensure terminal step always exists + auto-connect orphaned steps ──────────
   useEffect(() => {
     const { steps: nextSteps, transitions: nextTransitions } = ensureTerminalConnected(editedSteps, editedTransitions);
     if (nextSteps !== editedSteps) setEditedSteps(nextSteps);
     if (nextTransitions !== editedTransitions) setEditedTransitions(nextTransitions);
   }, [editedSteps, editedTransitions]);
 
-  // ── Sync yamlPreview → yamlDraft when diagram changes (not user edits) ───────
-  const yamlPreviewForSync = yamlStringify(
-    { ...(yamlFields ?? {}), steps: editedSteps, transitions: editedTransitions },
-    { indent: 2 },
+  const jsonPreviewForSync = JSON.stringify(
+    { ...(wdJsonFields ?? {}), steps: editedSteps, transitions: editedTransitions },
+    null,
+    2,
   );
   useEffect(() => {
-    if (yamlDraft === lastSyncedYamlRef.current) {
-      setYamlDraft(yamlPreviewForSync);
-      lastSyncedYamlRef.current = yamlPreviewForSync;
+    if (jsonDraft === lastSyncedJsonRef.current) {
+      setJsonDraft(jsonPreviewForSync);
+      lastSyncedJsonRef.current = jsonPreviewForSync;
     }
-  // yamlDraft intentionally omitted — we only want to run this when the diagram changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [yamlPreviewForSync]);
+  }, [jsonPreviewForSync]);
 
-
-  // ── Mutations ──────────────────────────────────────────────────────────────
   const updateStep = useCallback((stepId: string, patch: Partial<WorkflowStep>) => {
     setEditedSteps((prev) =>
       prev.map((s) => (s.id === stepId ? { ...s, ...patch } : s)),
@@ -304,7 +258,14 @@ export function WorkflowEditorCanvas({
     }
   }, []);
 
-  const stepCounterRef = useRef(0);
+  // Seeded from existing `new-step-N` ids, not hardcoded to 0 — otherwise
+  // reopening a canvas with prior AI-generated steps collides on `new-step-1`.
+  const stepCounterRef = useRef(
+    initialSteps.reduce((max, s) => {
+      const match = /^new-step-(\d+)$/.exec(s.id);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0),
+  );
 
   const addStep = useCallback((payload: NewStepPayload, insertAfterId: string | null = null, insertBeforeId: string | null = null) => {
     const terminalStep = editedSteps.find((s) => s.type === 'terminal');
@@ -312,31 +273,31 @@ export function WorkflowEditorCanvas({
     saveSnapshot();
     stepCounterRef.current += 1;
     const stepNum = stepCounterRef.current;
-    const newId = `new-step-${stepNum}`;
+    const nameSlug = payload.name ? toSlug(payload.name) : '';
+    let newId = nameSlug || `new-step-${stepNum}`;
+    if (nameSlug) {
+      let suffix = 2;
+      while (editedSteps.some((s) => s.id === newId)) {
+        newId = `${nameSlug}-${suffix}`;
+        suffix += 1;
+      }
+    }
     const newStep: WorkflowStep = {
+      ...payload,
       id: newId,
-      name: `New Step ${stepNum}`,
-      type: payload.type,
-      executor: payload.executor,
-      ...(payload.autonomyLevel ? { autonomyLevel: payload.autonomyLevel as WorkflowStep['autonomyLevel'] } : {}),
-      ...(payload.agentId ? { agentId: payload.agentId } : {}),
-      ...(payload.executor === 'agent' && !payload.autonomyLevel ? { plugin: 'opencode-agent', autonomyLevel: 'L2' } : {}),
-      ...(payload.executor === 'agent' && payload.autonomyLevel ? { plugin: 'opencode-agent' } : {}),
-      ...(payload.executor === 'script' ? { plugin: 'script-container' } : {}),
+      name: payload.name || `New Step ${stepNum}`,
+      ...(payload.executor === 'agent' ? { plugin: payload.plugin ?? 'opencode-agent', autonomyLevel: payload.autonomyLevel ?? 'L2' } : {}),
+      ...(payload.executor === 'script' ? { plugin: payload.plugin ?? 'script-container' } : {}),
       ...(payload.executor === 'cowork' ? { cowork: payload.cowork ?? { agent: 'chat' as const } } : {}),
     };
 
-    // When inserting via an edge button, insertAfterId is set explicitly.
-    // Otherwise fall back to the currently selected step.
     const resolvedInsertAfterId = insertAfterId ?? selectedStepId;
 
     if (!terminalStep) {
-      // No terminal yet: append at end
       const lastId = editedSteps[editedSteps.length - 1]?.id;
       setEditedSteps((prev) => [...prev, newStep]);
       setEditedTransitions((prev) => lastId ? [...prev, { from: lastId, to: newId }] : prev);
     } else if (resolvedInsertAfterId && resolvedInsertAfterId !== terminalStep.id) {
-      // Insert after the target step
       const insertIdx = editedSteps.findIndex((s) => s.id === resolvedInsertAfterId);
       setEditedSteps((prev) => {
         const next = [...prev];
@@ -345,19 +306,15 @@ export function WorkflowEditorCanvas({
       });
       setEditedTransitions((prev) => {
         if (insertBeforeId) {
-          // Edge-button path: only splice into the one clicked edge A→B.
-          // Other outgoing transitions from A (e.g. back-edges) stay on A.
           const others = prev.filter((t) => !(t.from === resolvedInsertAfterId && t.to === insertBeforeId));
           return [...others, { from: resolvedInsertAfterId, to: newId }, { from: newId, to: insertBeforeId }];
         }
-        // Selected-step fallback: rewire all outgoing transitions through newStep.
         const outgoing = prev.filter((t) => t.from === resolvedInsertAfterId);
         const others = prev.filter((t) => t.from !== resolvedInsertAfterId);
         const rewired = outgoing.map((t) => ({ from: newId, to: t.to }));
         return [...others, { from: resolvedInsertAfterId, to: newId }, ...rewired];
       });
     } else {
-      // No step selected: insert immediately before the terminal step
       const terminalIdx = editedSteps.findIndex((s) => s.id === terminalStep.id);
       setEditedSteps((prev) => {
         const next = [...prev];
@@ -365,7 +322,6 @@ export function WorkflowEditorCanvas({
         return next;
       });
       setEditedTransitions((prev) => {
-        // Redirect all edges that previously pointed at terminal → now point at newStep
         const rewired = prev.map((t) =>
           t.to === terminalStep.id ? { ...t, to: newId } : t,
         );
@@ -373,11 +329,10 @@ export function WorkflowEditorCanvas({
       });
     }
 
-    // Only auto-select the new step when not inserting via an edge button
-    // (edge button should leave the right panel unchanged).
     if (insertAfterId === null) {
       setSelectedStepId(newId);
     }
+    return newId;
   }, [editedSteps, selectedStepId, saveSnapshot]);
 
   const removeStep = useCallback((stepId: string) => {
@@ -451,38 +406,54 @@ export function WorkflowEditorCanvas({
     });
   }, [saveSnapshot]);
 
-  // ── Diagram definition ─────────────────────────────────────────────────────
   const diagramDefinition = useMemo(() => ({
     steps: editedSteps,
     transitions: editedTransitions,
   }) as WorkflowDefinition, [editedSteps, editedTransitions]);
 
-
-
   const savePanel = renderSavePanel?.(editedSteps, editedTransitions, discardChanges) ?? null;
 
-  const applyYaml = () => {
+  const applyJson = () => {
     try {
-      const doc = yamlParse(yamlDraft) as Record<string, unknown>;
+      const doc = JSON.parse(jsonDraft) as Record<string, unknown>;
       const stepsResult = WorkflowStepSchema.array().safeParse(doc?.steps);
       if (!stepsResult.success) {
-        setYamlError(`steps: ${stepsResult.error.issues[0]?.message ?? 'invalid'}`);
+        setJsonError(`steps: ${stepsResult.error.issues[0]?.message ?? 'invalid'}`);
         return;
       }
       const transitionsResult = TransitionSchema.array().safeParse(
         Array.isArray(doc?.transitions) ? doc.transitions : [],
       );
       if (!transitionsResult.success) {
-        setYamlError(`transitions: ${transitionsResult.error.issues[0]?.message ?? 'invalid'}`);
+        setJsonError(`transitions: ${transitionsResult.error.issues[0]?.message ?? 'invalid'}`);
         return;
       }
+
+      const mergedTransitions = mergeVerdictTransitions(stepsResult.data, transitionsResult.data);
+      const orderedSteps = ensureEntryStepFirst(stepsResult.data, mergedTransitions);
+      const { errors: validationErrors } = validateWorkflowGraphAndReferences({
+        name: 'canvas-preview',
+        version: 1,
+        namespace: namespace ?? '',
+        visibility: 'private',
+        steps: orderedSteps,
+        transitions: mergedTransitions,
+        triggers: [{ type: 'manual', name: 'start' }],
+      });
+      if (validationErrors.length > 0) {
+        setJsonError(validationErrors[0]);
+        return;
+      }
+
+      // Apply the same ordered/merged graph that was validated, so the canvas
+      // stores exactly what passed the gate (not the raw, pre-normalisation input).
       saveSnapshot();
-      setEditedSteps(stepsResult.data);
-      setEditedTransitions(transitionsResult.data);
-      lastSyncedYamlRef.current = yamlDraft;
-      setYamlError(null);
+      setEditedSteps(orderedSteps);
+      setEditedTransitions(mergedTransitions);
+      lastSyncedJsonRef.current = jsonDraft;
+      setJsonError(null);
     } catch (err) {
-      setYamlError(err instanceof Error ? err.message : 'Invalid YAML');
+      setJsonError(err instanceof Error ? err.message : 'Invalid JSON');
     }
   };
 
@@ -507,14 +478,11 @@ export function WorkflowEditorCanvas({
     setRightPanelView(null);
   }, []);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-1 flex-col min-h-0">
 
-      {/* ── Unified sticky toolbar ── */}
       <div className="shrink-0 border-b px-4 py-1.5 flex items-center gap-1.5 flex-wrap bg-white dark:bg-background">
 
-        {/* Right-aligned: Secrets + Workflow source code */}
         <div className="ml-auto flex items-center gap-1.5">
           <button
             onClick={() => setRightPanelView('secrets')}
@@ -527,7 +495,7 @@ export function WorkflowEditorCanvas({
 
           <span className="group relative inline-flex">
             <button
-              onClick={() => setRightPanelView('yaml')}
+              onClick={() => setRightPanelView('json')}
               className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground"
             >
               <Code2 className="h-3.5 w-3.5" />
@@ -535,7 +503,7 @@ export function WorkflowEditorCanvas({
               <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40 ml-0.5" />
             </button>
             <span className="pointer-events-none absolute top-full right-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
-              <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
+              <p>Mediforce workflows are defined as <strong>wd.json</strong> — the same JSON format used by every workflow package in the repo, capturing every step, transition, and configuration.</p>
               <p>You can author workflows three ways:</p>
               <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
                 <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
@@ -545,12 +513,10 @@ export function WorkflowEditorCanvas({
             </span>
           </span>
         </div>
-      </div>{/* end unified toolbar */}
+      </div>
 
-      {/* ── Canvas + settings pane + AI pane ── */}
       <div className="flex flex-1 min-h-0">
 
-        {/* Canvas — takes all remaining width, XYFlow owns the height */}
         <div className="flex-1 min-h-0">
           <WorkflowDiagram
             definition={diagramDefinition}
@@ -579,7 +545,6 @@ export function WorkflowEditorCanvas({
           />
         </div>
 
-        {/* Settings pane — step editor or add-block. Floats above the canvas; closeable; hidden by default. */}
         {(selectedStep || rightPanelView === 'add-block') && (
           <div className="w-80 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col min-h-0">
             {selectedStep ? (
@@ -631,7 +596,6 @@ export function WorkflowEditorCanvas({
           </div>
         )}
 
-        {/* AI pane — floats above the canvas, independent of settings pane; collapses to a thin strip */}
         {aiPaneOpen ? (
           <div className="w-80 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col min-h-0">
             <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b">
@@ -674,9 +638,8 @@ export function WorkflowEditorCanvas({
           </button>
         )}
 
-      </div>{/* end canvas + settings pane + AI pane */}
+      </div>
 
-      {/* ── Secrets modal ── */}
       {rightPanelView === 'secrets' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setRightPanelView(null)} />
@@ -705,15 +668,14 @@ export function WorkflowEditorCanvas({
         </div>
       )}
 
-      {/* ── Workflow source code modal ── */}
-      {rightPanelView === 'yaml' && (
+      {rightPanelView === 'json' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setRightPanelView(null)} />
           <div className="relative bg-background border rounded-xl shadow-xl p-6 w-full max-w-2xl mx-4 space-y-4 max-h-[85vh] flex flex-col">
             <div className="shrink-0 flex items-start justify-between gap-4">
               <div className="flex items-center gap-2">
                 <Code2 className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-semibold">Workflow source code</h2>
+                <h2 className="text-sm font-semibold">Workflow source code (wd.json)</h2>
               </div>
               <button
                 onClick={() => setRightPanelView(null)}
@@ -723,9 +685,9 @@ export function WorkflowEditorCanvas({
               </button>
             </div>
             <div className="flex-1 overflow-y-auto space-y-4">
-              <YamlCodeEditor
-                value={yamlDraft}
-                onChange={(v) => { setYamlDraft(v); setYamlError(null); }}
+              <JsonCodeEditor
+                value={jsonDraft}
+                onChange={(v) => { setJsonDraft(v); setJsonError(null); }}
               />
               {savePanel && (
                 <div className="border-t pt-4">
@@ -734,15 +696,15 @@ export function WorkflowEditorCanvas({
               )}
             </div>
             <div className="shrink-0 flex items-center justify-end gap-2 pt-1">
-              {yamlError && (
-                <p className="text-xs text-red-600 dark:text-red-400 mr-auto">{yamlError}</p>
+              {jsonError && (
+                <p className="text-xs text-red-600 dark:text-red-400 mr-auto">{jsonError}</p>
               )}
               <button
-                onClick={applyYaml}
+                onClick={applyJson}
                 className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border hover:bg-muted text-foreground transition-colors"
               >
                 <Save className="h-3.5 w-3.5" />
-                Apply YAML to canvas
+                Apply JSON to canvas
               </button>
             </div>
           </div>
@@ -751,4 +713,3 @@ export function WorkflowEditorCanvas({
     </div>
   );
 }
-

@@ -111,11 +111,12 @@ export function controlModeToSchema(
   }
 }
 
-/** Payload for creating a new step from the wizard popover. */
-export type NewStepPayload = {
-  type: 'creation' | 'decision';
+/**
+ * Payload for creating a new step from the wizard popover. Widened to accept any
+ * WorkflowStep field (minus id) so the picker can seed plugin/cowork/agent config
+ * in one shot; `type` and `executor` are always required.
+ */
+export type NewStepPayload = Partial<Omit<WorkflowStep, 'id'>> & {
+  type: WorkflowStep['type'];
   executor: Executor;
-  autonomyLevel?: string;
-  agentId?: string;
-  cowork?: { agent: 'chat' | 'voice-realtime' };
 };

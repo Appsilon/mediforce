@@ -8,13 +8,13 @@ import { trackPageErrors } from '../helpers/page-errors';
  * Workflow author opens a step whose agent has a stdio MCP binding
  * (`mcp-test-agent.mcpServers.filesystem`) and narrows it at step level:
  * disables the server on one step, then adds a denyTools entry on another
- * step. Verifies the YAML source panel reflects both changes.
+ * step. Verifies the wd.json source reflects both changes.
  */
 
 const WORKFLOW_URL = `/${TEST_ORG_HANDLE}/workflows/MCP%20Restrictions%20Test/definitions/1`;
 
 test.describe('Step MCP Restrictions Journey', () => {
-  test('agent step shows restrictions panel, disable + denyTools surface in YAML', async ({ page }) => {
+  test('agent step shows restrictions panel, disable + denyTools surface in wd.json', async ({ page }) => {
     trackPageErrors(page);
 
     await page.goto(WORKFLOW_URL);
@@ -52,11 +52,11 @@ test.describe('Step MCP Restrictions Journey', () => {
     // Deselect the step, then open the source modal — it reflects both edits.
     await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
     await page.getByRole('button', { name: /workflow source code/i }).click();
-    const yamlContent = page.locator('.cm-content');
-    await expect(yamlContent).toBeVisible({ timeout: 10_000 });
-    await expect(yamlContent).toContainText('mcpRestrictions', { timeout: 5_000 });
-    await expect(yamlContent).toContainText('filesystem');
-    await expect(yamlContent).toContainText('disable');
-    await expect(yamlContent).toContainText('write');
+    const jsonContent = page.locator('.cm-content');
+    await expect(jsonContent).toBeVisible({ timeout: 10_000 });
+    await expect(jsonContent).toContainText('mcpRestrictions', { timeout: 5_000 });
+    await expect(jsonContent).toContainText('filesystem');
+    await expect(jsonContent).toContainText('disable');
+    await expect(jsonContent).toContainText('write');
   });
 });

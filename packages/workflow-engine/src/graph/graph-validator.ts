@@ -1,4 +1,5 @@
-import type { ProcessDefinition } from '@mediforce/platform-core';
+import type { ProcessDefinition, WorkflowDefinition, ReferenceIssue } from '@mediforce/platform-core';
+import { toProcessDefinition, validateStepReferences } from '@mediforce/platform-core';
 
 export interface ValidationResult {
   valid: boolean;
@@ -158,4 +159,39 @@ export function validateStepGraph(definition: ProcessDefinition): ValidationResu
     valid: errors.length === 0,
     errors,
   };
+}
+
+export interface WorkflowGraphValidation {
+  /** Human-readable error strings ready to display or throw. Empty = valid. */
+  errors: string[];
+  /** All reference issues (incl. warnings) so callers can surface warnings separately. */
+  referenceIssues: ReferenceIssue[];
+}
+
+/**
+ * Run the two gates a caller needs before persisting or applying a workflow
+ * definition: structural graph validation and step-reference validation. Graph
+ * errors short-circuit reference errors (matching the historical check order),
+ * and `referenceIssues` is always returned so callers can report warnings even
+ * when there are no errors.
+ */
+export function validateWorkflowGraphAndReferences(
+  definition: WorkflowDefinition,
+): WorkflowGraphValidation {
+  const referenceIssues = validateStepReferences(definition.steps, definition.transitions);
+  const graphResult = validateStepGraph(toProcessDefinition(definition));
+  if (!graphResult.valid) {
+    return {
+      errors: [`Workflow graph is incomplete: ${graphResult.errors.join('; ')}`],
+      referenceIssues,
+    };
+  }
+  const referenceErrors = referenceIssues.filter((issue) => issue.severity === 'error');
+  if (referenceErrors.length > 0) {
+    return {
+      errors: [`Broken step references: ${referenceErrors.map((issue) => issue.message).join(' ')}`],
+      referenceIssues,
+    };
+  }
+  return { errors: [], referenceIssues };
 }

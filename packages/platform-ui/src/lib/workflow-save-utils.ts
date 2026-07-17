@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { WorkflowStep } from '@mediforce/platform-core';
 import type { RegistrationWarning } from '@mediforce/platform-api/contract';
 import type { ToastOpts } from '@/components/command-palette/types';
+import { formatStepName } from '@/lib/format';
 
 /**
  * A serialized Zod issue as it survives the API boundary in
@@ -23,7 +24,14 @@ type ValidationIssue = z.infer<typeof ValidationIssueSchema>;
 
 const MAX_REPORTED_ISSUES = 4;
 
-type Transitions = { from: string; to: string; when?: string }[];
+export const DISPLAY_NAME_KEY = 'displayName';
+
+export function workflowDisplayName(
+  def: { name: string; metadata?: Record<string, unknown> | null },
+): string {
+  const dn = def.metadata?.[DISPLAY_NAME_KEY];
+  return typeof dn === 'string' && dn.trim().length > 0 ? dn : formatStepName(def.name);
+}
 
 /**
  * Maps server-side validation issues back to per-step field errors.
@@ -122,6 +130,15 @@ export function validateSteps(steps: WorkflowStep[]): string | null {
     return `Plugin required for agent/script steps: ${missingPlugin.map((s) => `"${s.name}"`).join(', ')}`;
   }
 
+  const missingAction = steps.filter((s) => s.executor === 'action' && !s.action);
+  if (missingAction.length > 0) {
+    return `Action config required: ${missingAction.map((s) => `"${s.name}"`).join(', ')}`;
+  }
+  const missingScript = steps.filter((s) => s.executor === 'script' && !s.script && !s.databricks);
+  if (missingScript.length > 0) {
+    return `Script config required: ${missingScript.map((s) => `"${s.name}"`).join(', ')}`;
+  }
+
   const emptyIds = steps.filter((s) => !s.id);
   if (emptyIds.length > 0) {
     return `Step ID is empty for: ${emptyIds.map((s) => `"${s.name}"`).join(', ')}`;
@@ -137,25 +154,6 @@ export function validateSteps(steps: WorkflowStep[]): string | null {
   return null;
 }
 
-/**
- * Adds implicit transitions derived from review-step verdicts so the saved
- * definition graph is complete even when the canvas only shows one outgoing
- * edge per review step.
- */
-export function mergeVerdictTransitions(steps: WorkflowStep[], transitions: Transitions): Transitions {
-  const merged = [...transitions];
-  for (const step of steps) {
-    if (step.type === 'review' && step.verdicts) {
-      for (const verdict of Object.values(step.verdicts)) {
-        if (verdict.target && !merged.some((t) => t.from === step.id && t.to === verdict.target)) {
-          merged.push({ from: step.id, to: verdict.target });
-        }
-      }
-    }
-  }
-  return merged;
-}
-
 export function toastRegistrationWarnings(
   warnings: RegistrationWarning[] | undefined,
   toast: (opts: ToastOpts) => void,
@@ -167,3 +165,4 @@ export function toastRegistrationWarnings(
     variant: 'warning',
   });
 }
+
