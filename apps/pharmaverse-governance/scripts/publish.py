@@ -23,9 +23,8 @@ Optional env (with defaults):
   VISIBILITY            public | private   (default: private)
 
 Secrets (each set only if the env var is present):
-  OPENROUTER_API_KEY    LLM auth for the two agent steps.
-  GITHUB_TOKEN          GitHub API for discover/collect/apply steps.
-  SENDGRID_API_KEY      Email for notify-maintainers.
+  OPENROUTER_API_KEY    LLM auth for the agent steps.
+  GITHUB_TOKEN          GitHub API for the discover/collect steps.
 
 Flags:
   --dry-run             Regenerate + validate only. No secrets, no register.
@@ -48,7 +47,7 @@ NAMESPACE = os.environ.get("NAMESPACE", "pharmaverse")
 VISIBILITY = os.environ.get("VISIBILITY", "private")
 WORKFLOW_NAME = "pharmaverse-governance"
 
-SECRET_ENV_VARS = ["OPENROUTER_API_KEY", "GITHUB_TOKEN", "SENDGRID_API_KEY"]
+SECRET_ENV_VARS = ["OPENROUTER_API_KEY", "GITHUB_TOKEN"]
 
 
 def run(cmd, *, cwd=None, input_bytes=None, env=None):
@@ -83,8 +82,8 @@ def step_secrets():
     print("== 3. Set secrets ==")
     present = [k for k in SECRET_ENV_VARS if os.environ.get(k)]
     if not present:
-        print("   No secret env vars present — skipping. Set OPENROUTER_API_KEY, "
-              "GITHUB_TOKEN, SENDGRID_API_KEY in env to push them.")
+        print("   No secret env vars present — skipping. Set OPENROUTER_API_KEY "
+              "and/or GITHUB_TOKEN in env to push them.")
         return
     for key in present:
         run(
