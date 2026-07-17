@@ -220,6 +220,20 @@ export {
 } from './workflow-definition';
 
 export {
+  AddStepToolSchema,
+  UpdateStepToolSchema,
+  RemoveStepToolSchema,
+  ListModelsToolSchema,
+  WORKFLOW_ASSISTANT_TOOLS,
+  WORKFLOW_ASSISTANT_DEFAULT_MODEL,
+  type AddStepTool,
+  type UpdateStepTool,
+  type RemoveStepTool,
+  type ListModelsTool,
+  type WorkflowAssistantToolName,
+} from './workflow-assistant-tools';
+
+export {
   ConversationTurnSchema,
   HumanTurnSchema,
   AgentTurnSchema,
