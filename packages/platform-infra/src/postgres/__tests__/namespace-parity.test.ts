@@ -67,6 +67,9 @@ function contract(name: string, factory: () => Promise<NamespaceRepository>) {
         displayName: 'Full NS',
         avatarUrl: 'https://example.com/a.png',
         icon: 'rocket',
+        logo: 'data:image/png;base64,iVBORw0KGgo=',
+        brandPrimaryColor: '#0d9488',
+        brandAccentColor: '#f59e0b',
         linkedUserId: 'user-99',
         bio: 'A whole namespace.',
       });

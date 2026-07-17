@@ -45,6 +45,12 @@ function OrgCard({
                 </div>
               );
             }
+            if (namespace.logo !== undefined && namespace.logo !== '') {
+              return (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={namespace.logo} alt={label} className="h-full w-full object-cover" />
+              );
+            }
             const Icon = getWorkspaceIcon(namespace.icon);
             return (
               <div className="h-full w-full flex items-center justify-center bg-primary/10">

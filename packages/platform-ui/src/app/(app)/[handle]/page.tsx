@@ -357,7 +357,12 @@ function UserWorkspaces({ namespace }: { namespace: Namespace }) {
             href={`/${ws.handle}`}
             className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
           >
-            {(() => { const Icon = getWorkspaceIcon(ws.icon); return <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />; })()}
+            {ws.logo !== undefined && ws.logo !== '' ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={ws.logo} alt="" className="h-3.5 w-3.5 shrink-0 rounded object-cover" />
+            ) : (
+              (() => { const Icon = getWorkspaceIcon(ws.icon); return <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />; })()
+            )}
             <span className="font-medium truncate">{ws.displayName}</span>
             <span className="text-xs text-muted-foreground ml-auto shrink-0">@{ws.handle}</span>
           </Link>
@@ -606,6 +611,14 @@ export default function ProfilePage() {
       <div className="flex items-start gap-4">
         {(() => {
           if (namespace.type === 'organization') {
+            if (namespace.logo !== undefined && namespace.logo !== '') {
+              return (
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/10">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={namespace.logo} alt={namespace.displayName} className="h-full w-full object-cover" />
+                </div>
+              );
+            }
             const Icon = getWorkspaceIcon(namespace.icon);
             return (
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">

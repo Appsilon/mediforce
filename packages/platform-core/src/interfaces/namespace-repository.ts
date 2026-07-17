@@ -8,6 +8,9 @@ import type { Namespace, NamespaceMember, NamespaceMembership } from '../schemas
 export interface NamespaceUpdates {
   readonly displayName?: string;
   readonly icon?: string;
+  readonly logo?: string;
+  readonly brandPrimaryColor?: string;
+  readonly brandAccentColor?: string;
   readonly bio?: string;
   readonly avatarUrl?: string;
 }

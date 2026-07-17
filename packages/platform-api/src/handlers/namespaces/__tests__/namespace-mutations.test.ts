@@ -90,6 +90,41 @@ describe('updateNamespace handler', () => {
     expect(namespaceRepo.namespaces.get(HANDLE)?.bio).toBe('');
   });
 
+  it('updates logo and brand colors, returns the entity-echo', async () => {
+    const scope = createTestScope({ namespaceRepo, auditRepo, caller: ownerCaller });
+    const logo = 'data:image/png;base64,iVBORw0KGgo=';
+    const result = await updateNamespace(
+      { handle: HANDLE, logo, brandPrimaryColor: '#0d9488', brandAccentColor: '#f59e0b' },
+      scope,
+    );
+    expect(result.namespace).toMatchObject({
+      logo,
+      brandPrimaryColor: '#0d9488',
+      brandAccentColor: '#f59e0b',
+    });
+    expect(namespaceRepo.namespaces.get(HANDLE)?.logo).toBe(logo);
+  });
+
+  it('clears logo and brand colors when passed empty strings', async () => {
+    const scope = createTestScope({ namespaceRepo, auditRepo, caller: ownerCaller });
+    await updateNamespace(
+      { handle: HANDLE, logo: 'data:image/png;base64,iVBORw0KGgo=', brandPrimaryColor: '#0d9488' },
+      scope,
+    );
+    await updateNamespace({ handle: HANDLE, logo: '', brandPrimaryColor: '' }, scope);
+    expect(namespaceRepo.namespaces.get(HANDLE)?.logo).toBe('');
+    expect(namespaceRepo.namespaces.get(HANDLE)?.brandPrimaryColor).toBe('');
+  });
+
+  it('does not dump the base64 logo into the audit snapshot', async () => {
+    const scope = createTestScope({ namespaceRepo, auditRepo, caller: ownerCaller });
+    const logo = `data:image/png;base64,${'A'.repeat(4096)}`;
+    await updateNamespace({ handle: HANDLE, logo }, scope);
+    const event = auditRepo.getAll().find((e) => e.action === 'namespace.updated');
+    expect(event?.inputSnapshot).toMatchObject({ handle: HANDLE, logo: 'updated' });
+    expect(JSON.stringify(event?.inputSnapshot).length).toBeLessThan(200);
+  });
+
   it('admins may edit (not just owners)', async () => {
     const scope = createTestScope({ namespaceRepo, auditRepo, caller: adminCaller });
     await expect(

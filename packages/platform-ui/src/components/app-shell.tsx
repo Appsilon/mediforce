@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check, ArrowLeft, ChevronRight, Wrench, Database } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
+import { BrandTheme } from './brand-theme';
 import * as Popover from '@radix-ui/react-popover';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
@@ -169,7 +170,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-label="Switch namespace"
             >
               {(() => {
-                const avatarSrc = activeNamespace?.avatarUrl ?? (activeNamespace?.type === 'personal' ? firebaseUser?.photoURL : undefined) ?? undefined;
+                const orgLogo = activeNamespace?.type === 'organization' ? activeNamespace.logo : undefined;
+                const avatarSrc = (orgLogo && orgLogo !== '' ? orgLogo : undefined)
+                  ?? activeNamespace?.avatarUrl
+                  ?? (activeNamespace?.type === 'personal' ? firebaseUser?.photoURL : undefined)
+                  ?? undefined;
                 const avatarFallback = (
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-semibold">
                     {activeNamespace !== null && activeNamespace.type === 'organization' ? (
@@ -240,7 +245,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           isActive ? 'text-foreground' : 'text-muted-foreground',
                         )}
                       >
-                        {(() => { const Icon = getWorkspaceIcon(ns.icon); return <Icon className="h-4 w-4 shrink-0" />; })()}
+                        {ns.logo && ns.logo !== '' ? (
+                          <ImgWithFallback
+                            src={ns.logo}
+                            className="h-4 w-4 shrink-0 rounded object-cover"
+                            fallback={(() => { const Icon = getWorkspaceIcon(ns.icon); return <Icon className="h-4 w-4 shrink-0" />; })()}
+                          />
+                        ) : (
+                          (() => { const Icon = getWorkspaceIcon(ns.icon); return <Icon className="h-4 w-4 shrink-0" />; })()
+                        )}
                         <span className="flex-1 truncate">
                           <span className="block font-medium text-foreground">{ns.displayName}</span>
                           <span className="block text-xs text-muted-foreground">@{ns.handle}</span>
@@ -333,6 +346,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen flex-col bg-background">
+      <BrandTheme
+        primaryColor={activeNamespace?.brandPrimaryColor}
+        accentColor={activeNamespace?.brandAccentColor}
+      />
       {showRankingsBanner && (
         <div className="flex items-center justify-between bg-amber-100 dark:bg-amber-950/50 px-4 py-1.5 text-xs text-amber-800 dark:text-amber-300 border-b border-amber-200 dark:border-amber-900/50">
           <span>

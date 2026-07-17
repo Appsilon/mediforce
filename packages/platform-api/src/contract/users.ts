@@ -24,6 +24,9 @@ export const MeNamespaceSchema = z.object({
   role: z.enum(['owner', 'admin', 'member']),
   avatarUrl: z.string().url().optional(),
   icon: z.string().optional(),
+  logo: z.string().optional(),
+  brandPrimaryColor: z.string().optional(),
+  brandAccentColor: z.string().optional(),
 });
 
 export const GetMeOutputSchema = z.object({

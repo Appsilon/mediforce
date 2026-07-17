@@ -21,9 +21,11 @@ import type {
 } from '../../contract/namespaces';
 
 /**
- * Edit workspace `displayName`, `bio`, `icon`. Owner/admin only.
- * Two-state semantics: undefined leaves the field untouched, any string
- * overwrites it (empty string is the cleared state for `bio`).
+ * Edit workspace `displayName`, `bio`, `icon`, `logo`, and brand colors.
+ * Owner/admin only. Two-state semantics: undefined leaves the field untouched,
+ * any string overwrites it (empty string is the cleared state for `bio`, `logo`,
+ * and the brand colors — cleared branding falls back to the icon + default
+ * palette).
  */
 export async function updateNamespace(
   input: UpdateNamespaceInput,
@@ -37,6 +39,9 @@ export async function updateNamespace(
   const updates: NamespaceUpdates = {
     ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
     ...(input.icon !== undefined ? { icon: input.icon } : {}),
+    ...(input.logo !== undefined ? { logo: input.logo } : {}),
+    ...(input.brandPrimaryColor !== undefined ? { brandPrimaryColor: input.brandPrimaryColor } : {}),
+    ...(input.brandAccentColor !== undefined ? { brandAccentColor: input.brandAccentColor } : {}),
     ...(input.bio !== undefined ? { bio: input.bio } : {}),
   };
 
@@ -45,10 +50,15 @@ export async function updateNamespace(
   const namespace = await scope.workspaces.getNamespace(input.handle);
   if (namespace === null) throw new NotFoundError(`Namespace "${input.handle}" not found`);
 
+  // The logo is a multi-KB base64 data URL; record only whether it was set or
+  // cleared so the audit snapshot stays small.
+  const { logo, ...auditableUpdates } = updates;
+  const logoSnapshot = logo === undefined ? {} : { logo: logo === '' ? 'cleared' : 'updated' };
+
   await emitAudit(scope.system.audit, scope.caller, {
     action: 'namespace.updated',
     description: `Namespace '${input.handle}' updated`,
-    inputSnapshot: { handle: input.handle, ...updates },
+    inputSnapshot: { handle: input.handle, ...auditableUpdates, ...logoSnapshot },
     outputSnapshot: { handle: namespace.handle, displayName: namespace.displayName },
     basis: 'Owner/admin edited workspace via API',
     entityType: 'namespace',

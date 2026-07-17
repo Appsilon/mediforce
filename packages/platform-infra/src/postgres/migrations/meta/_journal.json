@@ -204,6 +204,13 @@
       "when": 1782391535832,
       "tag": "0028_task_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1782391535833,
+      "tag": "0029_workspace_branding",
+      "breakpoints": true
     }
   ]
 }
