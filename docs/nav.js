@@ -6,7 +6,13 @@
   const p = src.replace(/nav\.js$/, '');
 
   const LINKS = [
-    { href: 'data-delivery.html', label: 'Data Delivery' },
+    {
+      label: 'Case Studies',
+      children: [
+        { href: 'case-studies/data-delivery/', label: 'Data Delivery' },
+        { href: 'case-studies/collecting-documents/', label: 'Collecting Documents' },
+      ],
+    },
     { href: 'validated-ai.html', label: 'Validation' },
     { href: 'security.html', label: 'Security' },
     { href: 'fda-principles.html', label: 'FDA Alignment' },
@@ -24,14 +30,35 @@
     if (href.endsWith('/')) return path.startsWith(full);
     return path.endsWith(href) || path.endsWith(href.replace('.html', ''));
   }
+  function groupActive(l) {
+    return l.children.some(c => isActive(c.href));
+  }
 
-  const desktopLinks = LINKS.map(l =>
-    `<a href="${p}${l.href}" class="header-link${isActive(l.href) ? ' header-link--active' : ''}">${l.label}</a>`
-  ).join('');
+  const chevronIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="header-dropdown-chevron"><polyline points="6 9 12 15 18 9"/></svg>';
 
-  const mobileLinks = LINKS.map(l =>
-    `<a href="${p}${l.href}"${isActive(l.href) ? ' style="color:var(--accent,#0D9488);font-weight:600"' : ''}>${l.label}</a>`
-  ).join('');
+  const desktopLinks = LINKS.map(l => {
+    if (l.children) {
+      const active = groupActive(l);
+      const items = l.children.map(c =>
+        `<a href="${p}${c.href}" class="header-dropdown-item${isActive(c.href) ? ' header-dropdown-item--active' : ''}">${c.label}</a>`
+      ).join('');
+      return `<div class="header-dropdown">
+        <button type="button" class="header-link header-dropdown-trigger${active ? ' header-link--active' : ''}" aria-haspopup="true" aria-expanded="false">${l.label}${chevronIcon}</button>
+        <div class="header-dropdown-menu">${items}</div>
+      </div>`;
+    }
+    return `<a href="${p}${l.href}" class="header-link${isActive(l.href) ? ' header-link--active' : ''}">${l.label}</a>`;
+  }).join('');
+
+  const mobileLinks = LINKS.map(l => {
+    if (l.children) {
+      const items = l.children.map(c =>
+        `<a href="${p}${c.href}" class="mobile-nav-sublink"${isActive(c.href) ? ' style="color:var(--accent,#0D9488);font-weight:600"' : ''}>${c.label}</a>`
+      ).join('');
+      return `<div class="mobile-nav-group-label">${l.label}</div>${items}`;
+    }
+    return `<a href="${p}${l.href}"${isActive(l.href) ? ' style="color:var(--accent,#0D9488);font-weight:600"' : ''}>${l.label}</a>`;
+  }).join('');
 
   const html = `
 <header class="site-header" id="site-header">
@@ -71,6 +98,17 @@
 .site-header .header-link--icon{display:flex;align-items:center;padding:0.375rem 0.5rem;color:#9CA3AF}
 .site-header .header-link--icon:hover{color:#111827;background:rgba(0,0,0,0.04)}
 .site-header .header-link--icon svg{width:1.125rem;height:1.125rem}
+.site-header .header-dropdown{position:relative}
+.site-header .header-dropdown-trigger{display:inline-flex;align-items:center;gap:0.25rem;font-family:inherit;background:none;border:none;cursor:pointer}
+.site-header .header-dropdown-chevron{width:0.75rem;height:0.75rem;transition:transform 0.15s}
+.site-header .header-dropdown.is-open .header-dropdown-chevron,.site-header .header-dropdown:hover .header-dropdown-chevron,.site-header .header-dropdown:focus-within .header-dropdown-chevron{transform:rotate(180deg)}
+.site-header .header-dropdown-menu{display:none;position:absolute;top:calc(100% + 0.375rem);left:0;min-width:12rem;padding:0.375rem;border-radius:0.625rem;border:1px solid #E5E7EB;background:#fff;box-shadow:0 12px 32px rgba(0,0,0,0.1);z-index:1001}
+.site-header .header-dropdown.is-open .header-dropdown-menu,.site-header .header-dropdown:hover .header-dropdown-menu,.site-header .header-dropdown:focus-within .header-dropdown-menu{display:block}
+.site-header .header-dropdown-item{display:block;font-size:0.8125rem;font-weight:500;color:#4B5563;padding:0.5rem 0.625rem;border-radius:0.375rem;text-decoration:none;white-space:nowrap}
+.site-header .header-dropdown-item:hover{background:rgba(0,0,0,0.04);color:#111827}
+.site-header .header-dropdown-item--active{color:#0D9488;font-weight:600;background:rgba(13,148,136,0.07)}
+.site-header .mobile-nav-group-label{font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;padding:0.625rem 0.75rem 0.25rem}
+.site-header .mobile-nav-sublink{padding-left:1.5rem!important}
 .site-header .header-link--discord{background:#5865F2;color:#fff;display:inline-flex;align-items:center;gap:0.375rem;margin-left:0.25rem}
 .site-header .header-link--discord:hover{background:#4752C4;color:#fff}
 .site-header .header-link--discord svg{width:1rem;height:1rem}
@@ -99,11 +137,41 @@
     this.setAttribute('aria-expanded', open);
   });
 
+  const dropdowns = document.querySelectorAll('.header-dropdown');
+  dropdowns.forEach(function (dropdown) {
+    const trigger = dropdown.querySelector('.header-dropdown-trigger');
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      const open = dropdown.classList.toggle('is-open');
+      trigger.setAttribute('aria-expanded', open);
+      dropdowns.forEach(function (other) {
+        if (other !== dropdown) {
+          other.classList.remove('is-open');
+          other.querySelector('.header-dropdown-trigger').setAttribute('aria-expanded', false);
+        }
+      });
+    });
+  });
+
+  function closeDropdowns() {
+    dropdowns.forEach(function (dropdown) {
+      dropdown.classList.remove('is-open');
+      dropdown.querySelector('.header-dropdown-trigger').setAttribute('aria-expanded', false);
+    });
+  }
+
   document.addEventListener('click', function (e) {
     if (mobileNav.classList.contains('is-open') &&
         !mobileNav.contains(e.target) && !toggle.contains(e.target)) {
       mobileNav.classList.remove('is-open');
       toggle.setAttribute('aria-expanded', false);
     }
+    if (!Array.from(dropdowns).some(function (d) { return d.contains(e.target); })) {
+      closeDropdowns();
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeDropdowns();
   });
 })();
