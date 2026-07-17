@@ -1,4 +1,5 @@
 import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
+import { validateWorkflowGraphAndReferences } from '@mediforce/workflow-engine';
 import type {
   RegisterWorkflowInput,
   RegisterWorkflowOutput,
@@ -19,7 +20,6 @@ interface RegisterScopedInput extends RegisterWorkflowInput {
   namespace: string;
 }
 
-/** Default Docker image for agent steps that specify neither `image` nor `repo`+`commit`. */
 const DEFAULT_AGENT_IMAGE = 'mediforce-golden-image';
 
 export async function registerWorkflow(
@@ -75,6 +75,11 @@ export async function registerWorkflow(
     createdAt: new Date().toISOString(),
   };
 
+  const { errors: validationErrors, referenceIssues } = validateWorkflowGraphAndReferences(definition);
+  if (validationErrors.length > 0) {
+    throw new ValidationError(validationErrors[0]);
+  }
+
   try {
     await scope.workflowDefinitions.save(definition);
   } catch (err) {
@@ -101,6 +106,12 @@ export async function registerWorkflow(
   });
 
   const warnings: RegistrationWarning[] = [];
+
+  for (const issue of referenceIssues) {
+    if (issue.severity === 'warning') {
+      warnings.push({ code: 'reference-warning', message: issue.message, stepName: '' });
+    }
+  }
 
   const hasDockerSteps = definition.steps.some(
     (s) => s.executor === 'agent' || s.executor === 'script',

@@ -9,8 +9,9 @@ function workflowDefinition(name: string) {
     description: 'API journey test for namespace-scoped workflow storage',
     steps: [
       { id: 'noop', name: 'No-op Human Step', type: 'creation', executor: 'human' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
     ],
-    transitions: [],
+    transitions: [{ from: 'noop', to: 'done' }],
     triggers: [{ type: 'manual', name: 'start' }],
   };
 }

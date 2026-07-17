@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 
+import { toSlug } from '@mediforce/platform-core';
 import type { WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
@@ -19,14 +20,6 @@ import {
 import { CoworkSection } from './cowork-section';
 import { FieldRow, FieldGroup, Section, PillToggle, inputBase, inputBaseMono, selectBase, textareaBase, humanizeToken } from './step-editor-fields';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-export function toSlug(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
 
 function friendlyFieldError(message: string): string {
   if (/too small|>=1|at least 1/i.test(message)) return 'This field cannot be empty.';
@@ -248,6 +241,8 @@ export function StepEditor({
   const isCowork = step.executor === 'cowork';
   const isAction = step.executor === 'action';
   const isReview = step.type === 'review';
+  const isDecision = step.type === 'decision';
+  const hasVerdicts = isReview || isDecision;
   const isTerminal = step.type === 'terminal';
 
   const httpAction    = step.action?.kind === 'http'    ? step.action : undefined;
@@ -1013,7 +1008,7 @@ export function StepEditor({
       {isCowork && <CoworkSection step={step} onChange={onChange} isNewStep={isNewStep} />}
 
       {/* ── Verdicts ─────────────────────────────────────────────── */}
-      {isReview && (
+      {hasVerdicts && (
         <Section title="Verdicts">
           <FieldGroup>
             {Object.entries(step.verdicts ?? {}).map(([verdictName, verdict]) => (

@@ -8,11 +8,12 @@ import { useWorkflowVersion } from '@/hooks/use-workflow-versions';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { StartRunButton } from '@/components/processes/start-run-button';
-import { mediforce, ApiError } from '@/lib/mediforce';
-import { parseStepErrors, validateSteps, mergeVerdictTransitions, toastRegistrationWarnings } from '@/lib/workflow-save-utils';
+import { mediforce } from '@/lib/mediforce';
+import { validateSteps, toastRegistrationWarnings, reportSaveError, workflowDisplayName } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
+import { mergeVerdictTransitions, ensureEntryStepFirst } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
 type SaveState =
@@ -39,6 +40,7 @@ export default function WorkflowDefinitionVersionPage() {
   const currentStepsRef = useRef<WorkflowStep[]>([]);
   const currentTransitionsRef = useRef<WorkflowDefinition['transitions']>([]);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startAfterSaveResolverRef = useRef<((version: number | undefined) => void) | null>(null);
 
   useEffect(() => () => { if (redirectTimerRef.current !== null) clearTimeout(redirectTimerRef.current); }, []);
 
@@ -63,23 +65,22 @@ export default function WorkflowDefinitionVersionPage() {
     [],
   );
 
-  const handleSave = useCallback(async (title: string, setAsDefault: boolean) => {
-    if (!definition) return;
+  const saveCurrentCanvas = useCallback(async (title: string, setAsDefault: boolean) => {
+    if (!definition) throw new Error('Definition not loaded');
     const steps = currentStepsRef.current;
     const transitions = currentTransitionsRef.current;
 
     const validationError = validateSteps(steps);
     if (validationError !== null) {
-      setDialogOpen(false);
       setSaveState({ status: 'error', message: validationError });
-      return;
+      throw new Error(validationError);
     }
 
-    setDialogOpen(false);
     setStepErrors({});
     setSaveState({ status: 'saving' });
 
     const mergedTransitions = mergeVerdictTransitions(steps, transitions);
+    const orderedSteps = ensureEntryStepFirst(steps, mergedTransitions);
 
     try {
       const result = await mediforce.workflows.register(
@@ -87,7 +88,7 @@ export default function WorkflowDefinitionVersionPage() {
           name: definition.name,
           title: title || undefined,
           description: editedDescription.trim() || undefined,
-          steps,
+          steps: orderedSteps,
           transitions: mergedTransitions,
           triggers: definition.triggers,
           roles: definition.roles,
@@ -108,26 +109,40 @@ export default function WorkflowDefinitionVersionPage() {
       }
       setSaveState({ status: 'saved', version: result.version });
       toastRegistrationWarnings(result.warnings, toast);
-      redirectTimerRef.current = setTimeout(() => {
-        router.push(`/${handle}/workflows/${name}/definitions/${result.version}`);
-      }, 500);
+      return { name: definition.name, version: result.version };
     } catch (err) {
-      const issues = err instanceof ApiError && Array.isArray(err.details)
-        ? (err.details as Array<{ path: (string | number)[]; message: string }>)
-        : [];
-      const parsed = parseStepErrors(issues, steps);
+      const { displayMessage, stepErrors: parsed } = reportSaveError(err, orderedSteps, toast);
       setStepErrors(parsed);
-      const message = err instanceof ApiError ? err.message
-        : err instanceof Error ? err.message : 'Unknown error';
-      setSaveState({
-        status: 'error',
-        message: Object.keys(parsed).length > 0
-          ? 'Some steps have errors — check the highlighted steps in the diagram.'
-          : message,
-      });
+      setSaveState({ status: 'error', message: displayMessage });
+      throw err;
     }
-  }, [definition, editedDescription, name, handle, router]);
+  }, [definition, editedDescription, toast]);
 
+  const handleSave = useCallback(async (title: string, setAsDefault: boolean) => {
+    setDialogOpen(false);
+    const startResolver = startAfterSaveResolverRef.current;
+    startAfterSaveResolverRef.current = null;
+    try {
+      const result = await saveCurrentCanvas(title, setAsDefault);
+      if (startResolver) {
+        startResolver(result.version);
+      } else {
+        redirectTimerRef.current = setTimeout(() => {
+          router.push(`/${handle}/workflows/${name}/definitions/${result.version}`);
+        }, 500);
+      }
+    } catch {
+      if (startResolver) startResolver(undefined);
+    }
+  }, [saveCurrentCanvas, name, handle, router]);
+
+  const handleDialogClose = useCallback(() => {
+    setDialogOpen(false);
+    if (startAfterSaveResolverRef.current) {
+      startAfterSaveResolverRef.current(undefined);
+      startAfterSaveResolverRef.current = null;
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -158,7 +173,7 @@ export default function WorkflowDefinitionVersionPage() {
           {/* Left: workflow identity */}
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold tracking-tight text-foreground truncate">
-              {decodedName}
+              {workflowDisplayName(definition)}
             </h1>
             <input
               value={editedDescription}
@@ -187,12 +202,6 @@ export default function WorkflowDefinitionVersionPage() {
 
           {/* Right: save controls */}
           <div className="flex items-center gap-3 shrink-0 pt-0.5">
-            <StartRunButton
-              workflowName={decodedName}
-              version={definition.version}
-              hasManualTrigger={definition.triggers?.some((trigger) => trigger.type === 'manual') ?? false}
-              archived={definition.archived === true}
-            />
             {saveState.status === 'saved' && (
               <span className="text-sm text-green-600 dark:text-green-400 font-medium">
                 Saved as v{saveState.version}
@@ -207,13 +216,24 @@ export default function WorkflowDefinitionVersionPage() {
               onClick={() => setDialogOpen(true)}
               disabled={saveState.status === 'saving'}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
+                'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors whitespace-nowrap',
                 saveState.status === 'saving' && 'opacity-50 cursor-not-allowed',
               )}
             >
               <Save className="h-3.5 w-3.5" />
-              {saveState.status === 'saving' ? 'Saving…' : 'Save new version'}
+              {saveState.status === 'saving' ? 'Saving…' : 'Save'}
             </button>
+            <StartRunButton
+              workflowName={decodedName}
+              version={definition.version}
+              hasManualTrigger={definition.triggers?.some((trigger) => trigger.type === 'manual') ?? false}
+              archived={definition.archived === true}
+              label="Save & Start Run"
+              onBeforeStart={() => new Promise<number | undefined>((resolve) => {
+                startAfterSaveResolverRef.current = resolve;
+                setDialogOpen(true);
+              })}
+            />
           </div>
         </div>
       </div>
@@ -225,7 +245,7 @@ export default function WorkflowDefinitionVersionPage() {
         initialTransitions={definition.transitions}
         workflowName={decodedName}
         namespace={handle}
-        yamlFields={{ ...definition, version: undefined, createdAt: undefined } as Record<string, unknown>}
+        wdJsonFields={{ ...definition, version: undefined, createdAt: undefined } as Record<string, unknown>}
         onChange={handleCanvasChange}
         stepErrors={stepErrors}
       />
@@ -234,7 +254,7 @@ export default function WorkflowDefinitionVersionPage() {
         open={dialogOpen}
         nextVersion={definition.version + 1}
         confirmLabel="Save new version"
-        onClose={() => setDialogOpen(false)}
+        onClose={handleDialogClose}
         onConfirm={handleSave}
       />
     </div>

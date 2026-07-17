@@ -11,7 +11,12 @@ export {
 export type { ResolvedTransition, TransitionContext } from './engine/transition-resolver';
 
 // Graph
-export { validateStepGraph, type ValidationResult } from './graph/graph-validator';
+export {
+  validateStepGraph,
+  validateWorkflowGraphAndReferences,
+  type ValidationResult,
+  type WorkflowGraphValidation,
+} from './graph/graph-validator';
 
 // Engine
 export { WorkflowEngine } from './engine/workflow-engine';

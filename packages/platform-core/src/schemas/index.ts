@@ -320,3 +320,11 @@ export {
   type TableEditorRow,
   type CompleteHumanTaskPayload,
 } from './task-completion';
+
+export {
+  toProcessDefinition,
+  mergeVerdictTransitions,
+  ensureEntryStepFirst,
+  validateStepReferences,
+  type ReferenceIssue,
+} from './workflow-graph';

@@ -67,6 +67,24 @@ describe('registerWorkflow handler', () => {
     expect(events[0].actorId).toBe('user-42');
   });
 
+  it('rejects a workflow whose graph is incomplete — a step with no outgoing transition and unreachable from later steps', async () => {
+    const scope = buildScope();
+    const body = buildWorkflowDefinition({
+      name: 'flow-broken-graph',
+      namespace: 'team-alpha',
+      transitions: [{ from: 'intake', to: 'review' }],
+    });
+    const { version: _omitVersion, createdAt: _omitCreatedAt, namespace: _omitNamespace, ...input } = body;
+
+    await expect(registerWorkflow(
+      { ...input, namespace: 'team-alpha' },
+      scope,
+    )).rejects.toThrow(ValidationError);
+
+    const stored = await processRepo.getWorkflowDefinition('team-alpha', 'flow-broken-graph', 1);
+    expect(stored).toBeNull();
+  });
+
   it('rejects workflow with retired model in agent step', async () => {
     const retiredModelRepo = new InMemoryModelRegistryRepository();
     await retiredModelRepo.upsert({
