@@ -201,9 +201,7 @@ The result.json must contain:
       "confidence": "high",
       "dataGaps": [],
       "flags": [],
-      "earlyWarnings": [],
-
-      "report": "## admiral\n\n**Status: Stable** (no change)\n..."
+      "earlyWarnings": []
     }
   ],
   "summary": {
@@ -225,8 +223,7 @@ The result.json must contain:
 - Clearly distinguish data-driven assessments from items requiring human judgment.
 - For RC-1 (value proposition) and RC-4 (adoption evidence), flag as "requires-council-judgment" rather than making unsupported claims.
 - If a package has data collection errors, note them as data gaps but still assess with available information.
-- Generate a markdown report per package suitable for human review.
-- The report should be concise but include all evidence needed for council decision-making.
+- Do **not** emit a free-text narrative/markdown report per package. The human-readable per-package report is generated downstream from the structured fields (status, badges, evidence). Keep every `evidence` string to one concise sentence — this output is aggregated across all packages, so verbosity here breaks the council-summary step's prompt budget.
 
 ## Reference
 

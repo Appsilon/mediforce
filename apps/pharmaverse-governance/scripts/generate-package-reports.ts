@@ -58,8 +58,6 @@ interface PackageAssessment {
   dataGaps: string[];
   flags: string[];
   earlyWarnings: string[];
-
-  report: string;
 }
 
 interface PackageMetrics {
