@@ -103,6 +103,10 @@ function githubHeaders(): Record<string, string> {
 }
 
 function updateRateLimit(response: Response): void {
+  // The Search API reports a separate, much smaller rate budget (~30/min) in the
+  // same header. Letting it overwrite the core-API counter (5000/hr) would either
+  // trigger spurious 60s pauses or mask real core exhaustion — so ignore it here.
+  if (response.url.includes('/search/')) return;
   const remaining = response.headers.get('X-RateLimit-Remaining');
   if (remaining !== null) {
     rateLimitRemaining = parseInt(remaining, 10);
@@ -318,16 +322,36 @@ interface RawIssue {
 }
 
 /**
- * Accurate issue count via the Search API. `type:issue` excludes pull requests,
- * and `total_count` is the full repo total — not limited to a page or an
- * updated-since window. Returns null on failure so the caller can fall back.
+ * Accurate count via the Search API `total_count` — the full-repo total, not
+ * limited to a page or an updated-since window. `qualifier` is appended to
+ * `repo:<repo>` (e.g. `type:issue state:open`, `type:pr is:merged merged:>=…`).
+ * `type:issue` / `type:pr` disambiguate issues from PRs. Returns null on
+ * failure so the caller can fall back to a local count.
  */
-async function searchIssueCount(repo: string, state: 'open' | 'closed'): Promise<number | null> {
-  const q = encodeURIComponent(`repo:${repo} type:issue state:${state}`);
+async function searchCount(repo: string, qualifier: string): Promise<number | null> {
+  const q = encodeURIComponent(`repo:${repo} ${qualifier}`);
   const response = await githubFetch(`https://api.github.com/search/issues?q=${q}&per_page=1`);
   if (!response.ok) return null;
   const data = (await response.json()) as { total_count?: number };
   return typeof data.total_count === 'number' ? data.total_count : null;
+}
+
+/**
+ * Fetch every open issue (paginated, PRs excluded). Needed for accurate
+ * unresolved-critical and oldest-unresolved metrics, which a windowed/capped
+ * sample silently undercounts.
+ */
+async function fetchAllOpenIssues(repo: string): Promise<RawIssue[]> {
+  const all: RawIssue[] = [];
+  for (let page = 1; page <= 20; page++) {
+    const url = `https://api.github.com/repos/${repo}/issues?state=open&per_page=100&page=${page}`;
+    const response = await githubFetch(url);
+    if (!response.ok) break;
+    const batch = (await response.json()) as RawIssue[];
+    all.push(...batch);
+    if (batch.length < 100) break;
+  }
+  return all.filter((issue) => issue.pull_request === undefined);
 }
 
 async function collectIssues(repo: string): Promise<PackageMetrics['issues']> {
@@ -348,47 +372,44 @@ async function collectIssues(repo: string): Promise<PackageMetrics['issues']> {
   if (!response.ok) return defaultIssues;
 
   const rawIssues = (await response.json()) as RawIssue[];
-  // Filter out pull requests
-  const issues = rawIssues.filter((issue) => issue.pull_request === undefined);
+  // Windowed sample (PRs excluded) — used only for response-time medians.
+  const sampleIssues = rawIssues.filter((issue) => issue.pull_request === undefined);
 
-  // Open/closed totals come from the Search API (accurate full-repo counts,
-  // PRs excluded); fall back to the windowed sample only if search is down.
-  const [openSearch, closedSearch] = await Promise.all([
-    searchIssueCount(repo, 'open'),
-    searchIssueCount(repo, 'closed'),
+  // Open/closed totals from the Search API (accurate full-repo counts, PRs
+  // excluded); fall back to the windowed sample only if search is unavailable.
+  const [openSearch, closedSearch, allOpenIssues] = await Promise.all([
+    searchCount(repo, 'type:issue state:open'),
+    searchCount(repo, 'type:issue state:closed'),
+    fetchAllOpenIssues(repo),
   ]);
-  const openCount = openSearch ?? issues.filter((i) => i.state === 'open').length;
-  const closedCount = closedSearch ?? issues.filter((i) => i.state === 'closed').length;
+  const openCount = openSearch ?? sampleIssues.filter((i) => i.state === 'open').length;
+  const closedCount = closedSearch ?? sampleIssues.filter((i) => i.state === 'closed').length;
 
-  // Collect first-response times for critical and non-critical issues
-  const criticalResponseDays: number[] = [];
-  const nonCriticalResponseDays: number[] = [];
+  // Unresolved-critical and oldest-unresolved computed over ALL open issues,
+  // not the windowed/capped sample (which silently undercounts active repos).
   let unresolvedCriticalCount = 0;
   let oldestUnresolvedDays: number | null = null;
+  for (const issue of allOpenIssues) {
+    if (!isCriticalIssue(issue.labels.map((l) => l.name))) continue;
+    unresolvedCriticalCount++;
+    const ageDays = daysBetween(new Date(issue.created_at), new Date());
+    if (oldestUnresolvedDays === null || ageDays > oldestUnresolvedDays) {
+      oldestUnresolvedDays = ageDays;
+    }
+  }
 
-  // Fetch first comment times — use GitHub concurrency limiter
-  const commentTasks = issues.map((issue) => {
+  // First-response-time medians from the recent windowed sample (fetching first
+  // comments for every historical issue would be prohibitively expensive).
+  const criticalResponseDays: number[] = [];
+  const nonCriticalResponseDays: number[] = [];
+  const commentTasks = sampleIssues.map((issue) => {
     return async () => {
-      const labels = issue.labels.map((l) => l.name);
-      const critical = isCriticalIssue(labels);
+      const critical = isCriticalIssue(issue.labels.map((l) => l.name));
       const createdAt = new Date(issue.created_at);
-
-      if (critical && issue.state === 'open') {
-        unresolvedCriticalCount++;
-        const ageDays = daysBetween(createdAt, new Date());
-        if (oldestUnresolvedDays === null || ageDays > oldestUnresolvedDays) {
-          oldestUnresolvedDays = ageDays;
-        }
-      }
-
       const firstCommentTime = await fetchFirstCommentTime(repo, issue.number);
       if (firstCommentTime !== null) {
         const responseDays = daysBetween(createdAt, new Date(firstCommentTime));
-        if (critical) {
-          criticalResponseDays.push(responseDays);
-        } else {
-          nonCriticalResponseDays.push(responseDays);
-        }
+        (critical ? criticalResponseDays : nonCriticalResponseDays).push(responseDays);
       }
     };
   });
@@ -428,15 +449,23 @@ async function collectPullRequests(repo: string): Promise<PackageMetrics['pullRe
     return { openCount: 0, mergedLast6Months: 0, medianReviewTimeDays: null };
   }
 
+  // The 50-item page (sorted by updated) is only a sample for the review-time
+  // median. Open and merged-6-month counts come from the Search API, which is
+  // not capped by the page window.
   const prs = (await response.json()) as RawPR[];
 
-  const openCount = prs.filter((pr) => pr.state === 'open').length;
   const sixMonthsAgo = monthsAgo(6);
-  const mergedLast6Months = prs.filter(
+  const mergedSinceDate = sixMonthsAgo.toISOString().slice(0, 10); // YYYY-MM-DD for merged:>=
+  const [openSearch, mergedSearch] = await Promise.all([
+    searchCount(repo, 'type:pr state:open'),
+    searchCount(repo, `type:pr is:merged merged:>=${mergedSinceDate}`),
+  ]);
+  const openCount = openSearch ?? prs.filter((pr) => pr.state === 'open').length;
+  const mergedLast6Months = mergedSearch ?? prs.filter(
     (pr) => pr.merged_at !== null && new Date(pr.merged_at) >= sixMonthsAgo,
   ).length;
 
-  // Fetch first review time for merged PRs to compute median review time
+  // Fetch first review time for a sample of recent merged PRs (median only).
   const mergedPrs = prs.filter((pr) => pr.merged_at !== null).slice(0, 20);
   const reviewTimeDays: number[] = [];
 

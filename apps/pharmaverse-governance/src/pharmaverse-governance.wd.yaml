@@ -341,6 +341,7 @@ steps:
         return headers;
       }
       function updateRateLimit(response) {
+        if (response.url.includes("/search/")) return;
         const remaining = response.headers.get("X-RateLimit-Remaining");
         if (remaining !== null) {
           rateLimitRemaining = parseInt(remaining, 10);
@@ -481,12 +482,24 @@ steps:
         if (data.length === 0) return null;
         return data[0].created_at;
       }
-      async function searchIssueCount(repo, state) {
-        const q = encodeURIComponent(`repo:${repo} type:issue state:${state}`);
+      async function searchCount(repo, qualifier) {
+        const q = encodeURIComponent(`repo:${repo} ${qualifier}`);
         const response = await githubFetch(`https://api.github.com/search/issues?q=${q}&per_page=1`);
         if (!response.ok) return null;
         const data = await response.json();
         return typeof data.total_count === "number" ? data.total_count : null;
+      }
+      async function fetchAllOpenIssues(repo) {
+        const all = [];
+        for (let page = 1; page <= 20; page++) {
+          const url = `https://api.github.com/repos/${repo}/issues?state=open&per_page=100&page=${page}`;
+          const response = await githubFetch(url);
+          if (!response.ok) break;
+          const batch = await response.json();
+          all.push(...batch);
+          if (batch.length < 100) break;
+        }
+        return all.filter((issue) => issue.pull_request === void 0);
       }
       async function collectIssues(repo) {
         const since18m = monthsAgo(18).toISOString();
@@ -502,37 +515,34 @@ steps:
         };
         if (!response.ok) return defaultIssues;
         const rawIssues = await response.json();
-        const issues = rawIssues.filter((issue) => issue.pull_request === void 0);
-        const [openSearch, closedSearch] = await Promise.all([
-          searchIssueCount(repo, "open"),
-          searchIssueCount(repo, "closed")
+        const sampleIssues = rawIssues.filter((issue) => issue.pull_request === void 0);
+        const [openSearch, closedSearch, allOpenIssues] = await Promise.all([
+          searchCount(repo, "type:issue state:open"),
+          searchCount(repo, "type:issue state:closed"),
+          fetchAllOpenIssues(repo)
         ]);
-        const openCount = openSearch ?? issues.filter((i) => i.state === "open").length;
-        const closedCount = closedSearch ?? issues.filter((i) => i.state === "closed").length;
-        const criticalResponseDays = [];
-        const nonCriticalResponseDays = [];
+        const openCount = openSearch ?? sampleIssues.filter((i) => i.state === "open").length;
+        const closedCount = closedSearch ?? sampleIssues.filter((i) => i.state === "closed").length;
         let unresolvedCriticalCount = 0;
         let oldestUnresolvedDays = null;
-        const commentTasks = issues.map((issue) => {
+        for (const issue of allOpenIssues) {
+          if (!isCriticalIssue(issue.labels.map((l) => l.name))) continue;
+          unresolvedCriticalCount++;
+          const ageDays = daysBetween(new Date(issue.created_at), /* @__PURE__ */ new Date());
+          if (oldestUnresolvedDays === null || ageDays > oldestUnresolvedDays) {
+            oldestUnresolvedDays = ageDays;
+          }
+        }
+        const criticalResponseDays = [];
+        const nonCriticalResponseDays = [];
+        const commentTasks = sampleIssues.map((issue) => {
           return async () => {
-            const labels = issue.labels.map((l) => l.name);
-            const critical = isCriticalIssue(labels);
+            const critical = isCriticalIssue(issue.labels.map((l) => l.name));
             const createdAt = new Date(issue.created_at);
-            if (critical && issue.state === "open") {
-              unresolvedCriticalCount++;
-              const ageDays = daysBetween(createdAt, /* @__PURE__ */ new Date());
-              if (oldestUnresolvedDays === null || ageDays > oldestUnresolvedDays) {
-                oldestUnresolvedDays = ageDays;
-              }
-            }
             const firstCommentTime = await fetchFirstCommentTime(repo, issue.number);
             if (firstCommentTime !== null) {
               const responseDays = daysBetween(createdAt, new Date(firstCommentTime));
-              if (critical) {
-                criticalResponseDays.push(responseDays);
-              } else {
-                nonCriticalResponseDays.push(responseDays);
-              }
+              (critical ? criticalResponseDays : nonCriticalResponseDays).push(responseDays);
             }
           };
         });
@@ -553,9 +563,14 @@ steps:
           return { openCount: 0, mergedLast6Months: 0, medianReviewTimeDays: null };
         }
         const prs = await response.json();
-        const openCount = prs.filter((pr) => pr.state === "open").length;
         const sixMonthsAgo = monthsAgo(6);
-        const mergedLast6Months = prs.filter(
+        const mergedSinceDate = sixMonthsAgo.toISOString().slice(0, 10);
+        const [openSearch, mergedSearch] = await Promise.all([
+          searchCount(repo, "type:pr state:open"),
+          searchCount(repo, `type:pr is:merged merged:>=${mergedSinceDate}`)
+        ]);
+        const openCount = openSearch ?? prs.filter((pr) => pr.state === "open").length;
+        const mergedLast6Months = mergedSearch ?? prs.filter(
           (pr) => pr.merged_at !== null && new Date(pr.merged_at) >= sixMonthsAgo
         ).length;
         const mergedPrs = prs.filter((pr) => pr.merged_at !== null).slice(0, 20);
