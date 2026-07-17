@@ -10,7 +10,7 @@ import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-stra
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, formatExitInfo, type ContainerPluginInit } from './container-plugin';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
-import { createLineStreamReader } from '@mediforce/platform-core';
+import { createLineStreamReader, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 
 /** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`
  *  but the agent context carries no OAuth token entry for that server. The
@@ -34,7 +34,12 @@ export class OAuthTokenUnavailableError extends Error {
 const __filename_base = fileURLToPath(import.meta.url);
 const __dirname_base = dirname(__filename_base);
 
-export const DEFAULT_TIMEOUT_MS = 20 * 60_000;
+// Last-resort container-kill timeout. Kept in lock-step with
+// resolveStepTimeoutMinutes' default (30) so an unconfigured step is never
+// SIGKILLed before the PluginRunner Promise.race classifies it as `timeout`
+// rather than `error` (ADR-0010). The workflow path never reaches this — it
+// resolves the timeout from the step via resolveStepTimeoutMinutes.
+export const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 
 /** Container-side path for bind-mounted Claude Code plugin roots. */
 export const CONTAINER_PLUGIN_MOUNT = '/plugin';
@@ -668,7 +673,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         skill: stepAgent.skill,
         prompt: stepAgent.prompt,
         skillsDir: stepAgent.skillsDir,
-        timeoutMs: stepAgent.timeoutMs ?? (stepAgent.timeoutMinutes ? stepAgent.timeoutMinutes * 60_000 : undefined),
+        timeoutMs: stepAgent.timeoutMs ?? resolveStepTimeoutMinutes(context.step) * 60_000,
         image: stepAgent.image,
         repo: stepAgent.repo,
         commit: stepAgent.commit,

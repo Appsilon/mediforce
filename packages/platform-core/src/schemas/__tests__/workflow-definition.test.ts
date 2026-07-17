@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   WorkflowDefinitionSchema,
   resolveStepTimeoutMinutes,
+  resolveStepTimeoutMs,
+  resolveStrandedBudgetMs,
+  STRANDED_STEP_GRACE_MS,
   type WorkflowStep,
 } from '../workflow-definition';
 
@@ -433,6 +436,29 @@ describe('resolveStepTimeoutMinutes', () => {
 
   it('defaults to 30 when no config carries a timeout', () => {
     expect(resolveStepTimeoutMinutes(baseStep)).toBe(30);
+  });
+});
+
+describe('reap / stranded budgets', () => {
+  const baseStep: WorkflowStep = {
+    id: 'step-1',
+    name: 'Step 1',
+    type: 'creation',
+    executor: 'script',
+  };
+
+  it('resolveStepTimeoutMs is the effective timeout in milliseconds', () => {
+    expect(resolveStepTimeoutMs({ ...baseStep, script: { command: 'run', timeoutMinutes: 10 } })).toBe(10 * 60_000);
+    expect(resolveStepTimeoutMs(baseStep)).toBe(30 * 60_000);
+  });
+
+  it('resolveStrandedBudgetMs is the effective timeout plus the shared grace', () => {
+    expect(resolveStrandedBudgetMs({ ...baseStep, script: { command: 'run', timeoutMinutes: 10 } }))
+      .toBe(10 * 60_000 + STRANDED_STEP_GRACE_MS);
+  });
+
+  it('resolveStrandedBudgetMs on a timeout-less step is the default-timeout fallback bound', () => {
+    expect(resolveStrandedBudgetMs({})).toBe(30 * 60_000 + STRANDED_STEP_GRACE_MS);
   });
 });
 

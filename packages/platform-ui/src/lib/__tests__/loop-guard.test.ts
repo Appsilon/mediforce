@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isStuckLoop, createLoopTracker, MAX_SAME_STEP_ITERATIONS } from '../loop-guard';
+import { isStuckLoop, createLoopTracker, MAX_SAME_STEP_ITERATIONS, hasExceededStepAttempts, MAX_STEP_ATTEMPTS } from '../loop-guard';
 
 describe('isStuckLoop', () => {
   it('[DATA] returns false for first execution of a step', () => {
@@ -55,5 +55,18 @@ describe('isStuckLoop', () => {
     expect(isStuckLoop(null, tracker)).toBe(false); // count=1
     expect(isStuckLoop(null, tracker)).toBe(false); // count=2
     expect(isStuckLoop(null, tracker)).toBe(true);  // count=3 → stuck
+  });
+});
+
+describe('hasExceededStepAttempts (issue #868)', () => {
+  it('[DATA] fires at the flat cap when no review maxIterations', () => {
+    expect(hasExceededStepAttempts(MAX_STEP_ATTEMPTS - 1)).toBe(false);
+    expect(hasExceededStepAttempts(MAX_STEP_ATTEMPTS)).toBe(true);
+  });
+
+  it('[DATA] floats the ceiling above a review step maxIterations so revise loops never false-fail', () => {
+    const maxIterations = 50;
+    expect(hasExceededStepAttempts(maxIterations + MAX_STEP_ATTEMPTS - 1, maxIterations)).toBe(false);
+    expect(hasExceededStepAttempts(maxIterations + MAX_STEP_ATTEMPTS, maxIterations)).toBe(true);
   });
 });

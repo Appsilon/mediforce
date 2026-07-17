@@ -885,4 +885,67 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(spec.args).not.toContain('--mcp-config');
     });
   });
+
+  // Issue #868: resolveStepTimeoutMinutes must be the single source feeding both
+  // the PluginRunner Promise.race AND the container-kill timer. The emitted prompt's
+  // "approximately N minutes" budget derives from the same timeoutMs the container
+  // kill uses, so it is a faithful proxy for the effective timeout.
+  describe('timeout single-source (issue #868)', () => {
+    function buildWorkflowContext(agentOverrides: Record<string, unknown>): WorkflowAgentContext {
+      return {
+        stepId: 'triage',
+        processInstanceId: 'pi-868',
+        runNamespace: 'test-namespace',
+        definitionVersion: 'v1',
+        stepInput: {},
+        autonomyLevel: 'L2',
+        workflowDefinition: {
+          name: 'wf',
+          version: 1,
+          namespace: 'test-namespace',
+          visibility: 'private',
+          steps: [],
+          transitions: [],
+          triggers: [],
+        },
+        step: {
+          id: 'triage',
+          name: 'Triage',
+          type: 'creation',
+          executor: 'agent',
+          agent: {
+            skill: 'trial-metadata-extractor',
+            skillsDir: '/plugins/protocol-to-tfl/skills',
+            image: 'mediforce-agent:protocol-to-tfl',
+            ...agentOverrides,
+          },
+        },
+        llm: { complete: vi.fn() },
+        getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
+      } as unknown as WorkflowAgentContext;
+    }
+
+    async function captureBudgetMinutes(agentOverrides: Record<string, unknown>): Promise<string> {
+      const context = buildWorkflowContext(agentOverrides);
+      await plugin.initialize(context);
+      mockReadSkill(plugin).mockResolvedValue('# Skill');
+      const spawnSpy = mockSpawn(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [],
+      });
+      const { emit } = buildEmitSpy();
+      await plugin.run(emit);
+      const [prompt] = spawnSpy.mock.calls[0];
+      return prompt as string;
+    }
+
+    it('[DATA] defaults an unconfigured step to resolveStepTimeoutMinutes (30), not DEFAULT_TIMEOUT_MS (20)', async () => {
+      const prompt = await captureBudgetMinutes({});
+      expect(prompt).toContain('approximately 30 minutes');
+    });
+
+    it('[DATA] honours an explicit step timeoutMinutes', async () => {
+      const prompt = await captureBudgetMinutes({ timeoutMinutes: 45 });
+      expect(prompt).toContain('approximately 45 minutes');
+    });
+  });
 });
