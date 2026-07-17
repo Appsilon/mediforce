@@ -191,6 +191,25 @@ describe('attachments routes ↔ FilesystemBlobStore (route-level integration)',
     expect(rows).toHaveLength(0);
   });
 
+  it('unparseable body: 413 payload_too_large envelope, nothing persisted', async () => {
+    // Next truncates request bodies over `proxyClientMaxBodySize` before the
+    // route runs, which makes `req.formData()` throw. A multipart content-type
+    // with no boundary reproduces that same parse failure deterministically.
+    const req = new NextRequest(`http://localhost/api/tasks/${TASK_ID}/attachments`, {
+      method: 'POST',
+      headers: { 'content-type': 'multipart/form-data' },
+      body: 'truncated-multipart-body',
+    });
+    const res = await uploadRoute()(req, { params: Promise.resolve({ taskId: TASK_ID }) });
+
+    expect(res.status).toBe(413);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('payload_too_large');
+
+    const rows = await attachmentRepo.list(TASK_ID);
+    expect(rows).toHaveLength(0);
+  });
+
   it('foreign workspace: list / blob / delete all return 404 envelope', async () => {
     const upload = await uploadFile('secret.txt', 'text/plain', Buffer.from('classified'));
     const { attachment } = (await upload.json()) as { attachment: { id: string } };
