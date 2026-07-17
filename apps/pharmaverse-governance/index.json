@@ -1,0 +1,10 @@
+{
+  "workflows": [
+    {
+      "name": "pharmaverse-governance",
+      "path": "src/pharmaverse-governance.wd.json",
+      "description": "Semiannual Track B governance review for pharmaverse R packages: discover, collect metrics, assess against governance criteria, council summary, per-package HTML reports, and maintainer notifications.",
+      "tags": ["governance", "pharmaverse", "r-packages"]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+version: "1.0"
+generated: "2026-04-01"
+standard: "agentskills.io/specification"
+total_skills: 2
+
+domains:
+  package-governance:
+    description: Pharmaverse package governance semiannual review skills
+    skills:
+      - id: assess-package-governance
+        path: assess-package-governance/SKILL.md
+        complexity: advanced
+        language: multi
+        description: Assess pharmaverse packages against governance criteria and propose status tags and quality badges
+      - id: generate-council-summary
+        path: generate-council-summary/SKILL.md
+        complexity: advanced
+        language: multi
+        description: Aggregate package assessments into a council-ready meeting summary
