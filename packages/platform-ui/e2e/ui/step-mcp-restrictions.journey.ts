@@ -28,7 +28,7 @@ test.describe('Step MCP Restrictions Journey', () => {
     // MCP Restrictions section appears with one server hydrated from
     // /api/agents/mcp-test-agent/mcp-servers. Section titles in the
     // step editor render as styled <p> labels, not semantic headings.
-    const sidePanel = page.locator('div.border-l');
+    const sidePanel = page.locator('[data-testid="step-editor"]');
     await expect(sidePanel.getByText('MCP Restrictions', { exact: true })).toBeVisible({ timeout: 10_000 });
     // The binding list hydrates after an API call to
     // /api/agents/mcp-test-agent/mcp-servers. On cold compile this
@@ -49,8 +49,9 @@ test.describe('Step MCP Restrictions Journey', () => {
     await denyInput.press('Enter');
     await expect(sidePanel.getByText('write').first()).toBeVisible();
 
-    // Deselect step — YAML panel returns and reflects both edits.
+    // Deselect the step, then open the source modal — it reflects both edits.
     await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
+    await page.getByRole('button', { name: /workflow source code/i }).click();
     const yamlContent = page.locator('.cm-content');
     await expect(yamlContent).toBeVisible({ timeout: 10_000 });
     await expect(yamlContent).toContainText('mcpRestrictions', { timeout: 5_000 });
