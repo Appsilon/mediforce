@@ -47,7 +47,7 @@ export async function executeAgentStep(
   stepExecutionId?: string,
   options?: { reapTimedOut?: boolean },
 ): Promise<WorkflowAgentStepResult> {
-  // Reap mode (issue #868): the prior driver died with this step stranded past
+  // Reap mode (ADR-0010): the prior driver died with this step stranded past
   // its timeout. We route the existing execution through the timeout fallback
   // without launching the plugin, so the plugin/MCP/OAuth resolution below is
   // skipped entirely.

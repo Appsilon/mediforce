@@ -11,7 +11,7 @@ import { isLocalExecutionAllowed } from './base-container-agent-plugin';
 
 // Last-resort for the legacy process-mode path only; the workflow path resolves
 // the timeout via resolveStepTimeoutMinutes. Aligned with that resolver's
-// default (30 min) so the two never silently disagree (issue #868).
+// default (30 min) so the two never silently disagree (ADR-0010).
 const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 
 /** Runtime → Docker image, file extension, and run command (as array for spawn). */
@@ -222,7 +222,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         await writeFile(scriptPath, this.inlineScript, 'utf-8');
       }
 
-      // Single source of truth (issue #868): the container-kill timer uses the
+      // Single source of truth (ADR-0010): the container-kill timer uses the
       // same effective timeout as the PluginRunner Promise.race
       // (resolveStepTimeoutMinutes). The legacy process-mode path has no
       // WorkflowStep, so it falls back to its own timeoutMinutes / DEFAULT.

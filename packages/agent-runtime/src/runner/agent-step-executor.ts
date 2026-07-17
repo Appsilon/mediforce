@@ -48,7 +48,7 @@ export class AgentStepExecutor implements StepExecutor {
 
     // Reap mode: the prior driver died with this step still running past its
     // timeout — synthesize the timeout fallback instead of launching the plugin
-    // (issue #868). The resulting AgentRunResult is identical to a live timeout,
+    // (ADR-0010). The resulting AgentRunResult is identical to a live timeout,
     // so all downstream routing below is shared.
     const runResult = meta.reapTimedOut === true
       ? await this.agentRunner.reapAsTimeout(context)

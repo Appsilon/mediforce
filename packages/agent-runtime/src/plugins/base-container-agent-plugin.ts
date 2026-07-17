@@ -37,7 +37,7 @@ const __dirname_base = dirname(__filename_base);
 // Last-resort container-kill timeout. Kept in lock-step with
 // resolveStepTimeoutMinutes' default (30) so an unconfigured step is never
 // SIGKILLed before the PluginRunner Promise.race classifies it as `timeout`
-// rather than `error` (issue #868). The workflow path never reaches this — it
+// rather than `error` (ADR-0010). The workflow path never reaches this — it
 // resolves the timeout from the step via resolveStepTimeoutMinutes.
 export const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 

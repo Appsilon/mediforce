@@ -257,6 +257,104 @@ describe('POST /api/processes/[instanceId]/run', () => {
       expect(mockInstanceAddStepExecution).not.toHaveBeenCalled();
     });
 
+    it('[DATA] reaps every in-flight row when multiple executions are stranded past their timeout (issue #868)', async () => {
+      let callCount = 0;
+      mockInstanceGetById.mockImplementation(() => {
+        callCount++;
+        const base = {
+          id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest',
+          definitionVersion: '1', configName: undefined, variables: {}, triggerPayload: {},
+        };
+        // Initial check + first loop read see `running`; after the reap the
+        // instance is paused (escalated), so the loop exits.
+        return Promise.resolve(callCount <= 2
+          ? { ...base, status: 'running', currentStepId: 'gather-data' }
+          : { ...base, status: 'paused', currentStepId: 'gather-data' });
+      });
+      mockGetWorkflowDefinition.mockResolvedValue(workflowDefinition);
+      mockGetStepExecutions.mockResolvedValue([
+        { id: 'exec-stranded-a', stepId: 'gather-data', status: 'running', startedAt: new Date(Date.now() - 40 * 60_000).toISOString() },
+        { id: 'exec-stranded-b', stepId: 'gather-data', status: 'running', startedAt: new Date(Date.now() - 50 * 60_000).toISOString() },
+      ]);
+      mockExecuteAgentStep.mockResolvedValue({
+        instanceId: 'inst-1', status: 'paused', currentStepId: 'gather-data', agentRunStatus: 'escalated',
+      });
+
+      await POST(makeRequest(), { params: makeParams('inst-1') });
+      await afterCallback!();
+
+      // Both stranded rows reaped — neither left showing running forever.
+      expect(mockExecuteAgentStep).toHaveBeenCalledTimes(2);
+      expect(mockExecuteAgentStep).toHaveBeenCalledWith(
+        'inst-1', 'gather-data', expect.objectContaining({ id: 'gather-data' }),
+        expect.anything(), expect.any(String), 'exec-stranded-a', { reapTimedOut: true },
+      );
+      expect(mockExecuteAgentStep).toHaveBeenCalledWith(
+        'inst-1', 'gather-data', expect.objectContaining({ id: 'gather-data' }),
+        expect.anything(), expect.any(String), 'exec-stranded-b', { reapTimedOut: true },
+      );
+      expect(mockInstanceAddStepExecution).not.toHaveBeenCalled();
+    });
+
+    it('[DATA] defers when a live attempt runs alongside a stranded row — reaps nothing (issue #868)', async () => {
+      mockInstanceGetById.mockResolvedValue({
+        id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest',
+        definitionVersion: '1', status: 'running', currentStepId: 'gather-data',
+        configName: undefined, variables: {}, triggerPayload: {},
+      });
+      mockGetWorkflowDefinition.mockResolvedValue(workflowDefinition);
+      // One overdue row and one live (not-yet-overdue) attempt for the same step.
+      mockGetStepExecutions.mockResolvedValue([
+        { id: 'exec-stranded', stepId: 'gather-data', status: 'running', startedAt: new Date(Date.now() - 40 * 60_000).toISOString() },
+        { id: 'exec-live', stepId: 'gather-data', status: 'running', startedAt: new Date(Date.now() - 2 * 60_000).toISOString() },
+      ]);
+
+      await POST(makeRequest(), { params: makeParams('inst-1') });
+      await afterCallback!();
+
+      // A live attempt exists — defer wholesale, reap nothing, dispatch nothing.
+      expect(mockExecuteAgentStep).not.toHaveBeenCalled();
+      expect(mockInstanceAddStepExecution).not.toHaveBeenCalled();
+    });
+
+    it('[DATA] advances past a continue_with_flag reap instead of re-dispatching the timed-out step (issue #868)', async () => {
+      let callCount = 0;
+      mockInstanceGetById.mockImplementation(() => {
+        callCount++;
+        const base = {
+          id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest',
+          definitionVersion: '1', configName: undefined, variables: {}, triggerPayload: {},
+        };
+        // Reap + afterReap read the run still `running` on the same step
+        // (continue_with_flag leaves it there). Once advanced, the loop lands on
+        // the terminal step and exits.
+        return Promise.resolve(callCount <= 3
+          ? { ...base, status: 'running', currentStepId: 'gather-data' }
+          : { ...base, status: 'running', currentStepId: 'done' });
+      });
+      mockGetWorkflowDefinition.mockResolvedValue(workflowDefinition);
+      mockGetStepExecutions.mockResolvedValue([
+        { id: 'exec-stranded', stepId: 'gather-data', status: 'running', startedAt: new Date(Date.now() - 40 * 60_000).toISOString() },
+      ]);
+      // executeAgentStep (reap) does not move the instance off the step — mirrors
+      // the continue_with_flag fallback returning status 'flagged'.
+      mockExecuteAgentStep.mockResolvedValue({
+        instanceId: 'inst-1', status: 'running', currentStepId: 'gather-data', agentRunStatus: 'flagged',
+      });
+
+      await POST(makeRequest(), { params: makeParams('inst-1') });
+      await afterCallback!();
+
+      // Reaped once, then advanced past the flagged step — no fresh attempt.
+      expect(mockExecuteAgentStep).toHaveBeenCalledTimes(1);
+      expect(mockExecuteAgentStep).toHaveBeenCalledWith(
+        'inst-1', 'gather-data', expect.objectContaining({ id: 'gather-data' }),
+        expect.anything(), expect.any(String), 'exec-stranded', { reapTimedOut: true },
+      );
+      expect(mockAdvanceStep).toHaveBeenCalledWith('inst-1', {}, { id: 'auto-runner', role: 'system' });
+      expect(mockInstanceAddStepExecution).not.toHaveBeenCalled();
+    });
+
     it('[DATA] fails the run when a step exceeds the persisted attempt cap (issue #868)', async () => {
       mockInstanceGetById.mockResolvedValue({
         id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest',

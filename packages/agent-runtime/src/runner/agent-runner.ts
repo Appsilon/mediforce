@@ -164,7 +164,7 @@ export class AgentRunner {
   }
 
   /**
-   * Reap a stranded agent step whose driver died mid-run (issue #868).
+   * Reap a stranded agent step whose driver died mid-run (ADR-0010).
    *
    * Produces the SAME `AgentRunResult` the live `Promise.race` timeout path
    * produces — `fallbackReason='timeout'` routed through the `FallbackHandler`

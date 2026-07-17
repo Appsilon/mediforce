@@ -1,6 +1,6 @@
 export const MAX_SAME_STEP_ITERATIONS = 3;
 
-/** Floor for the persisted per-step attempt cap (issue #868). */
+/** Floor for the persisted per-step attempt cap (ADR-0010). */
 export const MAX_STEP_ATTEMPTS = 10;
 
 /**
@@ -14,11 +14,20 @@ export const MAX_STEP_ATTEMPTS = 10;
  * The ceiling floats above a review step's configured `maxIterations` so a
  * legitimate revise loop is never mistaken for a runaway.
  */
+/**
+ * Effective attempt cap for a step: the floor plus the step's own review
+ * `maxIterations` headroom. Single source so the predicate below and any
+ * user-facing "exceeded N attempts" message can't drift apart.
+ */
+export function resolveStepAttemptCap(maxReviewIterations?: number): number {
+  return MAX_STEP_ATTEMPTS + (maxReviewIterations ?? 0);
+}
+
 export function hasExceededStepAttempts(
   priorAttempts: number,
   maxReviewIterations?: number,
 ): boolean {
-  return priorAttempts >= MAX_STEP_ATTEMPTS + (maxReviewIterations ?? 0);
+  return priorAttempts >= resolveStepAttemptCap(maxReviewIterations);
 }
 
 export interface LoopTracker {
