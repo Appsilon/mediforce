@@ -11,6 +11,7 @@ interface ModelPickerProps {
   onChange: (model: string | undefined) => void;
   defaultModel?: string;
   className?: string;
+  requireToolSupport?: boolean;
 }
 
 function formatContext(tokens: number): string {
@@ -27,8 +28,12 @@ function formatPrice(perToken: number): string {
 
 const TOP_PICKS_COUNT = 20;
 
-export function ModelPicker({ value, onChange, defaultModel, className }: ModelPickerProps) {
-  const [models, setModels] = useState<ModelRegistryEntry[]>([]);
+export function ModelPicker({ value, onChange, defaultModel, className, requireToolSupport }: ModelPickerProps) {
+  const [allModels, setModels] = useState<ModelRegistryEntry[]>([]);
+  const models = useMemo(
+    () => (requireToolSupport ? allModels.filter((m) => m.supportsTools) : allModels),
+    [allModels, requireToolSupport],
+  );
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [customInput, setCustomInput] = useState(false);
@@ -50,9 +55,6 @@ export function ModelPicker({ value, onChange, defaultModel, className }: ModelP
       .finally(() => setLoading(false));
   }, []);
 
-  // Prefer models with usage history, but fall back to the full (non-retired)
-  // registry when no usage stats exist yet (e.g. a freshly-synced registry) —
-  // otherwise the picker looks empty/broken even though models are available.
   const topPicks = useMemo(() => {
     const withUsage = models
       .filter((m) => m.retiredAt === null)
