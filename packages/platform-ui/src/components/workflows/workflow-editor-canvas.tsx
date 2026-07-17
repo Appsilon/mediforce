@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { X, HelpCircle, Save, KeyRound, Code2, Sparkles, ChevronRight, ChevronLeft, Plus } from 'lucide-react';
+import { X, HelpCircle, Save, KeyRound, Code2, Sparkles, ChevronRight, ChevronLeft, Plus, Send, Loader2, Bot, User, Settings, Check } from 'lucide-react';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
@@ -9,9 +9,11 @@ import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { json as jsonLang } from '@codemirror/lang-json';
 import { tags } from '@lezer/highlight';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
+import { cn } from '@/lib/utils';
 import {
   WorkflowStepSchema,
   TransitionSchema,
+  WORKFLOW_ASSISTANT_DEFAULT_MODEL,
   mergeVerdictTransitions,
   ensureEntryStepFirst,
   toSlug,
@@ -21,9 +23,21 @@ import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core'
 import type { NewStepPayload } from '@/lib/control-mode';
 import { BlockPicker } from './block-picker';
 import { StepEditor } from './workflow-editor/step-editor';
+import { ModelPicker } from './workflow-editor/model-picker';
+import { selectBase } from './workflow-editor/step-editor-fields';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
 import { computeMoveEligibility, ensureTerminalConnected } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
+import { mediforce, ApiError } from '@/lib/mediforce';
+import { validateSteps } from '@/lib/workflow-save-utils';
+import { applyWorkflowAssistantToolCalls } from '@mediforce/platform-api/contract';
+import type { WorkflowAssistantToolCall } from '@mediforce/platform-api/contract';
+
+interface AssistantMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  changes?: string;
+}
 
 function JsonCodeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -350,6 +364,82 @@ export function WorkflowEditorCanvas({
     if (selectedStepId === stepId) setSelectedStepId(null);
   }, [selectedStepId, saveSnapshot]);
 
+  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
+  const [assistantInput, setAssistantInput] = useState('');
+  const [assistantModel, setAssistantModel] = useState<string | undefined>(undefined);
+  const [assistantSettingsOpen, setAssistantSettingsOpen] = useState(false);
+  const [assistantLoading, setAssistantLoading] = useState(false);
+  const [assistantError, setAssistantError] = useState<string | null>(null);
+  const assistantInputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = assistantInputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${String(el.scrollHeight)}px`;
+  }, [assistantInput]);
+
+  // Applies the whole batch through the server-validated reducer in one atomic
+  // update, avoiding the stale-state bugs an imperative addStep/updateStep loop hit.
+  const applyAssistantToolCalls = useCallback((toolCalls: WorkflowAssistantToolCall[]) => {
+    const result = applyWorkflowAssistantToolCalls(editedStepsRef.current, editedTransitionsRef.current, toolCalls);
+    saveSnapshot();
+    setEditedSteps(result.steps);
+    setEditedTransitions(result.transitions);
+    const lastAdded = result.addedStepIds[result.addedStepIds.length - 1];
+    if (lastAdded) setSelectedStepId(lastAdded);
+
+    const errors = result.outcomes.flatMap((o) => (o.error ? [o.error] : []));
+    if (errors.length > 0) return errors.join(' ');
+    const counts = result.outcomes.reduce(
+      (acc, o) => ({ ...acc, [o.tool]: (acc[o.tool] ?? 0) + 1 }),
+      {} as Record<string, number>,
+    );
+    const parts: string[] = [];
+    if (counts.add_step) parts.push(`added ${String(counts.add_step)} step${counts.add_step > 1 ? 's' : ''}`);
+    if (counts.update_step) parts.push(`updated ${String(counts.update_step)} step${counts.update_step > 1 ? 's' : ''}`);
+    if (counts.remove_step) parts.push(`removed ${String(counts.remove_step)} step${counts.remove_step > 1 ? 's' : ''}`);
+    return parts.length > 0 ? `Updated the workflow — ${parts.join(', ')}.` : '';
+  }, [saveSnapshot]);
+
+  const sendAssistantMessage = useCallback(async () => {
+    const content = assistantInput.trim();
+    if (!content || assistantLoading || !namespace) return;
+
+    const nextMessages: AssistantMessage[] = [...assistantMessages, { role: 'user', content }];
+    setAssistantMessages(nextMessages);
+    setAssistantInput('');
+    setAssistantError(null);
+    setAssistantLoading(true);
+
+    try {
+      const result = await mediforce.assistant.ask(
+        {
+          messages: nextMessages,
+          model: assistantModel,
+          workflowDefinition: { steps: editedSteps, transitions: editedTransitions },
+        },
+        { namespace },
+      );
+      const changes = result.toolCalls ? applyAssistantToolCalls(result.toolCalls) : '';
+      const replyText = result.reply || (changes ? 'Done.' : '');
+      setAssistantMessages((prev) => [...prev, { role: 'assistant', content: replyText, ...(changes ? { changes } : {}) }]);
+      if (result.toolCalls) {
+        // editedStepsRef only settles one macrotask after the state update commits.
+        setTimeout(() => {
+          const issue = validateSteps(editedStepsRef.current);
+          if (issue) {
+            setAssistantMessages((prev) => [...prev, { role: 'assistant', content: `Heads up — this won't save yet: ${issue}` }]);
+          }
+        }, 0);
+      }
+    } catch (err) {
+      setAssistantError(err instanceof ApiError || err instanceof Error ? err.message : 'Failed to reach the assistant');
+    } finally {
+      setAssistantLoading(false);
+    }
+  }, [assistantInput, assistantLoading, assistantMessages, assistantModel, namespace, editedSteps, editedTransitions, applyAssistantToolCalls]);
+
   const moveStep = useCallback((stepId: string, direction: 'up' | 'down') => {
     saveSnapshot();
     setEditedTransitions((prev) => {
@@ -599,28 +689,116 @@ export function WorkflowEditorCanvas({
         {aiPaneOpen ? (
           <div className="w-80 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col min-h-0">
             <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <span className="text-sm font-semibold">AI Assistant</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <Sparkles className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-sm font-semibold shrink-0">AI Assistant</span>
               </div>
-              <button
-                onClick={() => setAiPaneOpen(false)}
-                className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                title="Collapse AI Assistant"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => setAssistantSettingsOpen((prev) => !prev)}
+                  className={cn(
+                    'rounded-md p-1 hover:bg-muted transition-colors',
+                    assistantSettingsOpen ? 'text-foreground bg-muted' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                  title="Assistant settings"
+                >
+                  <Settings className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setAiPaneOpen(false)}
+                  className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  title="Collapse AI Assistant"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-            <div className="flex-1 flex items-center justify-center p-6">
-              <p className="text-sm text-muted-foreground text-center">To be implemented</p>
+            {assistantSettingsOpen && (
+              <div className="shrink-0 px-4 py-2 border-b space-y-1.5">
+                <span className="text-xs font-medium text-muted-foreground">Model</span>
+                <ModelPicker
+                  value={assistantModel}
+                  onChange={setAssistantModel}
+                  defaultModel={WORKFLOW_ASSISTANT_DEFAULT_MODEL}
+                  requireToolSupport
+                  className={selectBase}
+                />
+              </div>
+            )}
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {assistantMessages.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  Describe the workflow you want to build, or ask a question.
+                </p>
+              ) : (
+                assistantMessages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={cn('flex gap-2 text-sm', message.role === 'user' ? 'flex-row-reverse' : 'flex-row')}
+                  >
+                    <div
+                      className={cn(
+                        'flex h-6 w-6 shrink-0 items-center justify-center rounded-full',
+                        message.role === 'user' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
+                      )}
+                    >
+                      {message.role === 'user' ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
+                    </div>
+                    <div className="flex flex-col gap-1 max-w-[85%] min-w-0">
+                      {message.content && (
+                        <div
+                          className={cn(
+                            'rounded-lg px-3 py-2 whitespace-pre-wrap break-words',
+                            message.role === 'user' ? 'bg-primary/10' : 'bg-muted',
+                          )}
+                        >
+                          {message.content}
+                        </div>
+                      )}
+                      {message.changes && (
+                        <div className="inline-flex items-start gap-1.5 rounded-md border border-green-500/30 bg-green-500/10 px-2.5 py-1.5 text-xs text-green-700 dark:text-green-400">
+                          <Check className="h-3.5 w-3.5 shrink-0 mt-px" />
+                          <span>{message.changes}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+              {assistantLoading && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Thinking…
+                </div>
+              )}
+              {assistantError && (
+                <p className="text-sm text-destructive">{assistantError}</p>
+              )}
             </div>
             <div className="shrink-0 border-t p-3">
-              <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 opacity-50 cursor-not-allowed">
-                <input
-                  disabled
-                  placeholder="Ask AI to build your workflow…"
-                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              <div className="flex items-end gap-2 rounded-lg border bg-muted/40 px-3 py-2">
+                <textarea
+                  ref={assistantInputRef}
+                  value={assistantInput}
+                  onChange={(e) => setAssistantInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      void sendAssistantMessage();
+                    }
+                  }}
+                  rows={1}
+                  disabled={assistantLoading || !namespace}
+                  placeholder={namespace ? 'Ask AI to build your workflow…' : 'Save the workflow first'}
+                  className="flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed max-h-48 overflow-y-auto leading-relaxed"
                 />
+                <button
+                  onClick={() => void sendAssistantMessage()}
+                  disabled={assistantLoading || !namespace || assistantInput.trim().length === 0}
+                  className="shrink-0 pb-0.5 text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
               </div>
             </div>
           </div>
@@ -713,3 +891,4 @@ export function WorkflowEditorCanvas({
     </div>
   );
 }
+
