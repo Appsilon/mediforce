@@ -21,6 +21,7 @@ export type {
 } from './agent-run-repository';
 export type { CoworkSessionRepository } from './cowork-session-repository';
 export type { CronTriggerStateRepository } from './cron-trigger-state-repository';
+export type { TriggerRepository, TriggerUpdate } from './trigger-repository';
 export type { ToolCatalogRepository } from './tool-catalog-repository';
 export type { NamespaceRepository, NamespaceUpdates } from './namespace-repository';
 export type { NamespaceSecretsRepository } from './namespace-secrets-repository';

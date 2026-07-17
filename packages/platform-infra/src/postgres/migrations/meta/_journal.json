@@ -211,6 +211,13 @@
       "when": 1782391535833,
       "tag": "0029_audit_actor_index",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1782391535834,
+      "tag": "0030_triggers",
+      "breakpoints": true
     }
   ]
 }

@@ -25,6 +25,7 @@ export { PostgresAuditRepository } from './postgres/repositories/audit-repositor
 export { PostgresOAuthProviderRepository } from './postgres/repositories/oauth-provider-repository';
 export { PostgresAgentOAuthTokenRepository } from './postgres/repositories/agent-oauth-token-repository';
 export { PostgresCronTriggerStateRepository } from './postgres/repositories/cron-trigger-state-repository';
+export { PostgresTriggerRepository } from './postgres/repositories/trigger-repository';
 export { PostgresAgentRunRepository } from './postgres/repositories/agent-run-repository';
 export { PostgresAgentEventRepository } from './postgres/repositories/agent-event-repository';
 export { PostgresHumanTaskRepository } from './postgres/repositories/human-task-repository';

@@ -12,6 +12,7 @@ import {
   PostgresOAuthProviderRepository,
   PostgresAgentOAuthTokenRepository,
   PostgresCronTriggerStateRepository,
+  PostgresTriggerRepository,
   PostgresAgentRunRepository,
   PostgresHumanTaskRepository,
   PostgresTaskAttachmentRepository,
@@ -39,6 +40,7 @@ import type {
   BlobStore,
   CoworkSessionRepository,
   CronTriggerStateRepository,
+  TriggerRepository,
   EmailProviderInfo,
   HandoffRepository,
   HumanTaskRepository,
@@ -128,6 +130,7 @@ export interface PlatformServices {
   agentDefinitionRepo: AgentDefinitionRepository;
   coworkSessionRepo: CoworkSessionRepository;
   cronTriggerStateRepo: CronTriggerStateRepository;
+  triggerRepo: TriggerRepository;
   toolCatalogRepo: ToolCatalogRepository;
   namespaceRepo: NamespaceRepository;
   userProfileRepo: UserProfileRepository;
@@ -271,6 +274,7 @@ export function getPlatformServices(): PlatformServices {
     new PostgresCoworkSessionRepository(pg, instanceRepo);
   const cronTriggerStateRepo: CronTriggerStateRepository =
     new PostgresCronTriggerStateRepository(pg);
+  const triggerRepo: TriggerRepository = new PostgresTriggerRepository(pg);
   const toolCatalogRepo: ToolCatalogRepository = new PostgresToolCatalogRepository(pg);
   const namespaceRepo: NamespaceRepository = new PostgresNamespaceRepository(pg);
   const userProfileRepo: UserProfileRepository = new PostgresUserProfileRepository(pg);
@@ -487,6 +491,7 @@ export function getPlatformServices(): PlatformServices {
     agentDefinitionRepo,
     coworkSessionRepo,
     cronTriggerStateRepo,
+    triggerRepo,
     toolCatalogRepo,
     namespaceRepo,
     userProfileRepo,

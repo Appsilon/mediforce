@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Added
+- Unified `triggers` data model — the plumbing for the triggers-detachment epic ([#927](https://github.com/Appsilon/mediforce/issues/927)). A `TriggerResource` schema (discriminated union over `manual` / `webhook` / `cron`, `event` reserved), `TriggerRepository` interface + in-memory double, a Postgres `triggers` table (migration `0030`, keyed by `(namespace, workflow_name, trigger_name)`, partial webhook-path uniqueness + partial enabled-by-type index) with a parity-tested repo, and an authorized wrapper reachable at `scope.triggers` (workspace-gated) and `scope.system.triggers` (heartbeat's cross-namespace `listEnabledByType('cron')`). No user-visible behaviour change — nothing reads or writes the table yet; the cron-only `cron_trigger_state` overlay is left untouched. See [ADR-0011](docs/adr/0011-triggers-detached-unified-resource.md) [#928](https://github.com/Appsilon/mediforce/issues/928).
 - Integration test coverage for the workflow engine's full execution loop (`packages/workflow-engine/src/__tests__/integration.test.ts`): mixed agent → human → agent → terminal lifecycle with state asserted at every transition, agent-output propagation into `instance.variables` and the downstream step's input, agent-crash → failure → retry → complete recovery, and verdict-based routing (approve vs revise) — all driven through the in-memory repos, no emulators [#794](https://github.com/Appsilon/mediforce/pull/794).
 
 ### Fixed

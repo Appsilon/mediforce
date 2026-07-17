@@ -282,6 +282,22 @@ export {
 } from './cron-trigger-state';
 
 export {
+  TriggerTypeSchema,
+  TriggerResourceSchema,
+  CronTriggerResourceSchema,
+  WebhookTriggerResourceSchema,
+  ManualTriggerResourceSchema,
+  CronTriggerConfigSchema,
+  ManualTriggerConfigSchema,
+  type TriggerType,
+  type TriggerResource,
+  type CronTriggerResource,
+  type WebhookTriggerResource,
+  type ManualTriggerResource,
+  type TriggerConfig,
+} from './trigger';
+
+export {
   ModelRegistryEntrySchema,
   ModelRegistryMetaSchema,
   CreateModelRegistryEntryInputSchema,

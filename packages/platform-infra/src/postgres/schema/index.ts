@@ -4,6 +4,7 @@ export * from './audit-event';
 export * from './oauth-provider';
 export * from './agent-oauth-token';
 export * from './cron-trigger-state';
+export * from './trigger';
 export * from './agent-run';
 export * from './human-task';
 export * from './task-attachment';

@@ -7,6 +7,7 @@ import type {
   ModelRegistryRepository,
   NamespaceRepository,
   PlatformSettingsRepository,
+  TriggerRepository,
   UserDirectoryService,
   UserProfileRepository,
 } from '@mediforce/platform-core';
@@ -31,6 +32,7 @@ import type { AuthorizedHumanTaskRepository } from './authorized-human-task-repo
 import type { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
 import type { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';
 import type { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
+import type { AuthorizedTriggerRepository } from './authorized-trigger-repository';
 import type { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository';
 import type { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository';
 import type { AuthorizedWorkflowSecretRepository } from './authorized-workflow-secret-repository';
@@ -74,6 +76,7 @@ export interface CallerScope {
   readonly agentOAuthTokens: AuthorizedAgentOAuthTokenRepository;
   readonly workspaceSecrets: AuthorizedWorkspaceSecretRepository;
   readonly workflowSecrets: AuthorizedWorkflowSecretRepository;
+  readonly triggers: AuthorizedTriggerRepository;
 
   // Deployment-global pass-throughs
   readonly models: ModelRegistryRepository;
@@ -104,6 +107,12 @@ export interface SystemServices {
   readonly manualTrigger: ManualTrigger;
   readonly cronTrigger: CronTrigger;
   readonly webhookRouter: WebhookRouter;
+  /**
+   * Unwrapped {@link TriggerRepository} for the cron heartbeat's
+   * cross-namespace `listEnabledByType('cron')` sweep (system-actor only,
+   * ADR-0011). Workspace-scoped callers use `scope.triggers`.
+   */
+  readonly triggers: TriggerRepository;
   readonly agentRunner: AgentRunner;
   /**
    * Unscoped byte store for task attachments (ADR-0003). Reached only after a
