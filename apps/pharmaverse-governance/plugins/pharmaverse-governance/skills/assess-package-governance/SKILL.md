@@ -22,7 +22,7 @@ For each package in the input:
 The input is a JSON object with a `packages` array. Each package has:
 - `packageName`, `repo`, `repoUrl` — identity
 - `currentState` — current governance properties from GitHub (may be null if first review)
-- `releases` — release dates, counts, major bumps
+- `releases` — `latest` and `earliest` {tag, date}, `totalCount`, `countLast18Months`, `majorBumps` (the full release list is intentionally not included)
 - `issues` — response times, open/closed counts
 - `pullRequests` — PR activity
 - `cranChecks` — R CMD check results from CRAN

@@ -491,9 +491,10 @@ steps:
         }
         return {
           latest: releases.length > 0 ? releases[0] : null,
+          earliest: releases.length > 0 ? releases[releases.length - 1] : null,
+          totalCount: releases.length,
           countLast18Months,
-          majorBumps,
-          allReleases: releases
+          majorBumps
         };
       }
       const CRITICAL_LABELS = ["bug", "critical", "breaking", "urgent", "security"];
@@ -784,9 +785,10 @@ steps:
           }),
           safe("releases", () => collectReleases(pkg.repo), {
             latest: null,
+            earliest: null,
+            totalCount: 0,
             countLast18Months: 0,
-            majorBumps: [],
-            allReleases: []
+            majorBumps: []
           }),
           safe("issues", () => collectIssues(pkg.repo), {
             openCount: 0,
@@ -924,7 +926,7 @@ steps:
       The input is a JSON object with a `packages` array. Each package has:
       - `packageName`, `repo`, `repoUrl` — identity
       - `currentState` — current governance properties from GitHub (may be null if first review)
-      - `releases` — release dates, counts, major bumps
+      - `releases` — `latest` and `earliest` {tag, date}, `totalCount`, `countLast18Months`, `majorBumps` (the full release list is intentionally not included)
       - `issues` — response times, open/closed counts
       - `pullRequests` — PR activity
       - `cranChecks` — R CMD check results from CRAN

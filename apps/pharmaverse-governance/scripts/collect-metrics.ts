@@ -31,9 +31,10 @@ interface PackageMetrics {
 
   releases: {
     latest: { tag: string; date: string } | null;
+    earliest: { tag: string; date: string } | null;
+    totalCount: number;
     countLast18Months: number;
     majorBumps: { from: string; to: string; date: string }[];
-    allReleases: { tag: string; date: string }[];
   };
 
   issues: {
@@ -319,11 +320,15 @@ async function collectReleases(repo: string): Promise<PackageMetrics['releases']
     }
   }
 
+  // Emit first/last/count rather than the full list — the complete release
+  // history per package blows up the assessment agent's prompt for no benefit
+  // (assessment only uses latest, count, and major bumps).
   return {
     latest: releases.length > 0 ? releases[0] : null,
+    earliest: releases.length > 0 ? releases[releases.length - 1] : null,
+    totalCount: releases.length,
     countLast18Months,
     majorBumps,
-    allReleases: releases,
   };
 }
 
@@ -782,9 +787,10 @@ async function collectPackageMetrics(pkg: PackageInput): Promise<PackageMetrics>
     }),
     safe('releases', () => collectReleases(pkg.repo), {
       latest: null,
+      earliest: null,
+      totalCount: 0,
       countLast18Months: 0,
       majorBumps: [],
-      allReleases: [],
     }),
     safe('issues', () => collectIssues(pkg.repo), {
       openCount: 0,
