@@ -162,6 +162,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { daysSinceUpdate, loading: rankingsLoading } = useRankingsAge();
   const [rankingsBannerDismissed, setRankingsBannerDismissed] = React.useState(false);
   const showRankingsBanner = canAdmin && !rankingsLoading && !rankingsBannerDismissed
+    && process.env.NEXT_PUBLIC_USE_EMULATORS !== 'true'
     && (daysSinceUpdate === null || daysSinceUpdate > 21);
 
   const SidebarContent = () => (

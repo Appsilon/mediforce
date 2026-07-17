@@ -143,7 +143,7 @@ test.describe('Workflow Editor Journey', () => {
     const initialNodeCount = await page.locator('.react-flow__node').count();
 
     // Undo starts disabled (empty history)
-    const undoButton = page.getByRole('button', { name: /^undo$/i });
+    const undoButton = page.getByRole('button', { name: /undo/i });
     await expect(undoButton).toBeDisabled();
 
     // Add a step via edge "+" button
@@ -172,8 +172,8 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
     const initialNodeCount = await page.locator('.react-flow__node').count();
 
-    const undoButton = page.getByRole('button', { name: /^undo$/i });
-    const redoButton = page.getByRole('button', { name: /^redo$/i });
+    const undoButton = page.getByRole('button', { name: /undo/i });
+    const redoButton = page.getByRole('button', { name: /redo/i });
 
     // Redo starts disabled (empty redo history)
     await expect(redoButton).toBeDisabled();
@@ -223,41 +223,42 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount - 1, { timeout: 5_000 });
   });
 
-  // ── YAML panel ───────────────────────────────────────────────────────────
+  // ── Source code modal ─────────────────────────────────────────────────────
 
-  test('yaml panel shows live preview in code editor', async ({ page }) => {
+  test('workflow source code modal shows live yaml preview', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
 
-    // Right panel shows CodeMirror editor when no step is selected
-    const yamlEditor = page.locator('.cm-editor');
-    await expect(yamlEditor).toBeVisible({ timeout: 10_000 });
+    // Open the source-code modal from the toolbar
+    await page.getByRole('button', { name: /workflow source code/i }).click();
+
+    // Modal shows the CodeMirror editor
+    await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
 
     // YAML content contains step IDs from the seeded definition
     const yamlContent = page.locator('.cm-content');
     await expect(yamlContent).toContainText('vendor-assessment', { timeout: 5_000 });
     await expect(yamlContent).toContainText('human-review');
 
-    // Apply YAML button and source code label are visible in toolbar when no step is selected
+    // Apply button is available inside the modal
     await expect(page.getByRole('button', { name: /apply yaml/i })).toBeVisible();
-    await expect(page.getByText('Workflow source code')).toBeVisible();
   });
 
-  // ── YAML hidden when step selected ───────────────────────────────────────
+  // ── Source editor is modal-gated (not an always-open panel) ───────────────
 
-  test('yaml editor and save button hide when a step is selected', async ({ page }) => {
+  test('source code editor is hidden until the modal is opened', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
 
-    // YAML editor visible when no step selected
+    // No always-open editor: the CodeMirror editor is not shown by default
+    await expect(page.locator('.cm-editor')).not.toBeVisible();
+
+    // It appears only after opening the source-code modal
+    await page.getByRole('button', { name: /workflow source code/i }).click();
     await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: /apply yaml/i })).toBeVisible();
-
-    // Select a step — YAML editor and Save YAML button are hidden
-    await page.locator('.react-flow__node').first().click();
-    await expect(page.locator('[data-testid="step-editor"]')).toBeVisible({ timeout: 5_000 });
-    await expect(page.locator('.cm-editor')).not.toBeVisible();
-    await expect(page.getByRole('button', { name: /apply yaml/i })).not.toBeVisible();
   });
 
   // ── Create new workflow ───────────────────────────────────────────────────
@@ -274,13 +275,13 @@ test.describe('Workflow Editor Journey', () => {
     await expect(saveButton).toBeDisabled();
 
     // Fill Workflow name
-    await page.getByPlaceholder('Workflow name…').fill('e2e-test-workflow');
+    await page.getByPlaceholder('Add a Workflow Name…').fill('e2e-test-workflow');
 
     // Still disabled — description missing
     await expect(saveButton).toBeDisabled();
 
     // Fill Description
-    await page.getByPlaceholder('Add a description…').fill('End-to-end test workflow created by Playwright');
+    await page.getByPlaceholder('Add a workflow description…').fill('End-to-end test workflow created by Playwright');
 
     // Name + description filled → save enabled
     await expect(saveButton).toBeEnabled();
@@ -317,10 +318,10 @@ test.describe('Workflow Editor Journey', () => {
     const saveButton = page.getByRole('button', { name: /publish workflow/i });
 
     // Workflow name that slugifies to empty (only special chars → '')
-    await page.getByPlaceholder('Workflow name…').fill('---');
+    await page.getByPlaceholder('Add a Workflow Name…').fill('---');
 
     // Fill description — button still disabled because name slugifies to empty
-    await page.getByPlaceholder('Add a description…').fill('Some description');
+    await page.getByPlaceholder('Add a workflow description…').fill('Some description');
 
     // Button must remain disabled — toWorkflowId('---') === ''
     await expect(saveButton).toBeDisabled();
@@ -328,22 +329,19 @@ test.describe('Workflow Editor Journey', () => {
 
   // ── Pane click deselects step ─────────────────────────────────────────────
 
-  test('clicking canvas pane deselects step and restores YAML panel', async ({ page }) => {
+  test('clicking canvas pane deselects the selected step', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
 
-    // YAML editor is visible initially (no step selected)
-    await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
 
-    // Click a node — step editor opens, YAML editor hides
+    // Click a node — step editor opens
     await page.locator('.react-flow__node').first().click();
     await expect(page.locator('[data-testid="step-editor"]')).toBeVisible({ timeout: 5_000 });
-    await expect(page.locator('.cm-editor')).not.toBeVisible();
 
-    // Click empty canvas space — pane click triggers deselect, YAML editor returns
+    // Click empty canvas space — pane click deselects, step editor closes
     await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
-    await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator('[data-testid="step-editor"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="step-editor"]')).not.toBeVisible({ timeout: 5_000 });
   });
 
   // ── Executor switching clears stale YAML fields ───────────────────────────
@@ -372,8 +370,9 @@ test.describe('Workflow Editor Journey', () => {
     // The icon header shows the Agent label (exact match avoids tooltip text false positives)
     await expect(stepEditor.getByText('Agent', { exact: true })).toBeVisible();
 
-    // Deselect and verify YAML reflects agent executor with plugin field
+    // Deselect, then open the source modal to verify YAML reflects the agent executor
     await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
+    await page.getByRole('button', { name: /workflow source code/i }).click();
     const yamlContent = page.locator('.cm-content');
     await expect(yamlContent).toBeVisible({ timeout: 10_000 });
     await expect(yamlContent).toContainText('executor: agent');
@@ -414,8 +413,9 @@ test.describe('Workflow Editor Journey', () => {
     // Verify the value was accepted
     await expect(systemPromptTextarea).toHaveValue('You are a helpful clinical trial data analyst.');
 
-    // Deselect to see YAML — verify executor is reflected in source code
+    // Deselect, then open the source modal to verify the cowork executor
     await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
+    await page.getByRole('button', { name: /workflow source code/i }).click();
     const yamlContent = page.locator('.cm-content');
     await expect(yamlContent).toBeVisible({ timeout: 10_000 });
     await expect(yamlContent).toContainText('executor: cowork', { timeout: 5_000 });
@@ -439,7 +439,7 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.getByText(/What is a Cowork step/i)).toBeVisible({ timeout: 3_000 });
 
     // Scope MCP edits to the step editor side panel.
-    const sidePanel = page.locator('div.border-l');
+    const sidePanel = page.locator('[data-testid="step-editor"]');
 
     // Empty-state hint is visible before adding any server.
     await expect(sidePanel.getByText(/No MCP servers configured/i)).toBeVisible();
