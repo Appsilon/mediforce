@@ -242,24 +242,64 @@ async function collectGovernanceState(
 // 2. Releases
 // ---------------------------------------------------------------------------
 
-async function collectReleases(repo: string): Promise<PackageMetrics['releases']> {
-  const url = `https://api.github.com/repos/${repo}/releases?per_page=100`;
-  const response = await githubFetch(url);
+/** Committer date of a tag's target commit — used to date tags that have no
+ *  corresponding GitHub Release. */
+async function fetchCommitDate(repo: string, sha: string): Promise<string | null> {
+  const response = await githubFetch(`https://api.github.com/repos/${repo}/commits/${sha}`);
+  if (!response.ok) return null;
+  const data = (await response.json()) as { commit?: { committer?: { date?: string } } };
+  return data.commit?.committer?.date ?? null;
+}
 
-  if (!response.ok) {
-    return { latest: null, countLast18Months: 0, majorBumps: [], allReleases: [] };
+/** Version-like tag: contains at least `major.minor` (e.g. v1.2, 0.1.0,
+ *  cran-0.9.1). Excludes non-version tags (latest, milestone names, …). */
+function isVersionTag(tag: string): boolean {
+  return /\d+\.\d+/.test(tag);
+}
+
+async function collectReleases(repo: string): Promise<PackageMetrics['releases']> {
+  // Dates from GitHub Releases (when the maintainer publishes them)...
+  const releaseByTag = new Map<string, string>();
+  const releaseResponse = await githubFetch(`https://api.github.com/repos/${repo}/releases?per_page=100`);
+  if (releaseResponse.ok) {
+    const data = (await releaseResponse.json()) as Array<{
+      tag_name: string;
+      published_at: string | null;
+      draft: boolean;
+    }>;
+    for (const r of data) {
+      if (!r.draft && r.published_at) releaseByTag.set(r.tag_name, r.published_at);
+    }
   }
 
-  const data = (await response.json()) as Array<{
-    tag_name: string;
-    published_at: string;
-    draft: boolean;
-  }>;
+  // ...but git tags are the real version source — many R packages tag versions
+  // without ever publishing a GitHub Release.
+  const tags: Array<{ name: string; commit: { sha: string } }> = [];
+  for (let page = 1; page <= 3; page++) {
+    const tagResponse = await githubFetch(`https://api.github.com/repos/${repo}/tags?per_page=100&page=${page}`);
+    if (!tagResponse.ok) break;
+    const batch = (await tagResponse.json()) as Array<{ name: string; commit: { sha: string } }>;
+    tags.push(...batch);
+    if (batch.length < 100) break;
+  }
 
-  const releases = data
-    .filter((r) => !r.draft)
-    .map((r) => ({ tag: r.tag_name, date: r.published_at }))
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // Date every version tag: prefer its Release date, else its commit date.
+  const versionTags = tags.filter((t) => isVersionTag(t.name));
+  const dateTasks = versionTags.map((tag) => async (): Promise<{ tag: string; date: string } | null> => {
+    const date = releaseByTag.get(tag.name) ?? (await fetchCommitDate(repo, tag.commit.sha));
+    return date ? { tag: tag.name, date } : null;
+  });
+  let releases = (await withGithubConcurrency(dateTasks))
+    .filter((r): r is { tag: string; date: string } => r !== null);
+
+  // Fallback: repo exposes Releases but the tags listing was empty/unavailable.
+  if (releases.length === 0 && releaseByTag.size > 0) {
+    releases = [...releaseByTag.entries()]
+      .filter(([tag]) => isVersionTag(tag))
+      .map(([tag, date]) => ({ tag, date }));
+  }
+
+  releases.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const cutoff18m = monthsAgo(18);
   const countLast18Months = releases.filter(

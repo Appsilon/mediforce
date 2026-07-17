@@ -437,14 +437,42 @@ steps:
         }
         return defaultState;
       }
-      async function collectReleases(repo) {
-        const url = `https://api.github.com/repos/${repo}/releases?per_page=100`;
-        const response = await githubFetch(url);
-        if (!response.ok) {
-          return { latest: null, countLast18Months: 0, majorBumps: [], allReleases: [] };
-        }
+      async function fetchCommitDate(repo, sha) {
+        const response = await githubFetch(`https://api.github.com/repos/${repo}/commits/${sha}`);
+        if (!response.ok) return null;
         const data = await response.json();
-        const releases = data.filter((r) => !r.draft).map((r) => ({ tag: r.tag_name, date: r.published_at })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return data.commit?.committer?.date ?? null;
+      }
+      function isVersionTag(tag) {
+        return /\d+\.\d+/.test(tag);
+      }
+      async function collectReleases(repo) {
+        const releaseByTag = /* @__PURE__ */ new Map();
+        const releaseResponse = await githubFetch(`https://api.github.com/repos/${repo}/releases?per_page=100`);
+        if (releaseResponse.ok) {
+          const data = await releaseResponse.json();
+          for (const r of data) {
+            if (!r.draft && r.published_at) releaseByTag.set(r.tag_name, r.published_at);
+          }
+        }
+        const tags = [];
+        for (let page = 1; page <= 3; page++) {
+          const tagResponse = await githubFetch(`https://api.github.com/repos/${repo}/tags?per_page=100&page=${page}`);
+          if (!tagResponse.ok) break;
+          const batch = await tagResponse.json();
+          tags.push(...batch);
+          if (batch.length < 100) break;
+        }
+        const versionTags = tags.filter((t) => isVersionTag(t.name));
+        const dateTasks = versionTags.map((tag) => async () => {
+          const date = releaseByTag.get(tag.name) ?? await fetchCommitDate(repo, tag.commit.sha);
+          return date ? { tag: tag.name, date } : null;
+        });
+        let releases = (await withGithubConcurrency(dateTasks)).filter((r) => r !== null);
+        if (releases.length === 0 && releaseByTag.size > 0) {
+          releases = [...releaseByTag.entries()].filter(([tag]) => isVersionTag(tag)).map(([tag, date]) => ({ tag, date }));
+        }
+        releases.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         const cutoff18m = monthsAgo(18);
         const countLast18Months = releases.filter(
           (r) => new Date(r.date) >= cutoff18m
