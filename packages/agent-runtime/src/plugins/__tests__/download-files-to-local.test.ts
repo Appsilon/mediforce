@@ -53,6 +53,17 @@ describe('downloadFilesToLocal', () => {
     expect(await readFile(file.localPath, 'utf8')).toBe('usdm-bytes');
   });
 
+  it('attaches the API key to an already-absolute same-origin URL', async () => {
+    const calls = stubFetch();
+    const { tempDir: td } = await downloadFilesToLocal({
+      files: [{ name: 'y.json', downloadUrl: 'https://cdisc.mediforce.ai/api/attachments/abc-123/blob' }],
+    });
+    tempDir = td;
+
+    expect(calls[0].url).toBe('https://cdisc.mediforce.ai/api/attachments/abc-123/blob');
+    expect(calls[0].headers['X-Api-Key']).toBe('test-key');
+  });
+
   it('does not send the API key to a third-party absolute URL', async () => {
     const calls = stubFetch();
     const { tempDir: td } = await downloadFilesToLocal({
