@@ -1,6 +1,12 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
-const TEST_FILTER = ['rhino'];
+// Optional safety filter: set NOTIFY_PACKAGE_FILTER to a comma-separated list of
+// package names to restrict who gets emailed (useful for a workshop/demo). When
+// unset, every reviewed package's maintainer is notified.
+const NOTIFY_FILTER = (process.env.NOTIFY_PACKAGE_FILTER ?? '')
+  .split(',')
+  .map((name) => name.trim())
+  .filter((name) => name.length > 0);
 
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'governance@pharmaverse.org';
@@ -102,9 +108,13 @@ async function main(): Promise<void> {
   const monthYear = formatMonthYear();
   const notifications: NotificationResult[] = [];
 
-  const filteredReports = input.reports.filter((report) => TEST_FILTER.includes(report.packageName));
+  const filteredReports = NOTIFY_FILTER.length > 0
+    ? input.reports.filter((report) => NOTIFY_FILTER.includes(report.packageName))
+    : input.reports;
   console.log(
-    `Processing ${filteredReports.length} reports (filtered from ${input.reports.length} total, TEST_FILTER: ${TEST_FILTER.join(', ')})`,
+    NOTIFY_FILTER.length > 0
+      ? `Processing ${filteredReports.length} of ${input.reports.length} reports (NOTIFY_PACKAGE_FILTER: ${NOTIFY_FILTER.join(', ')})`
+      : `Processing all ${filteredReports.length} reports`,
   );
 
   for (const report of filteredReports) {

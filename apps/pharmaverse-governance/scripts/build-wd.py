@@ -82,7 +82,12 @@ def inline_summary() -> str:
     return skill + "\n\n## Council Report Template\n\n" + template
 
 
+def inline_resolve() -> str:
+    return read(SKILLS / "resolve-package-selection" / "SKILL.md")
+
+
 AGENT_PROMPTS = {
+    "resolve-package-selection": inline_resolve,
     "assess-packages": inline_assess,
     "generate-council-summary": inline_summary,
 }

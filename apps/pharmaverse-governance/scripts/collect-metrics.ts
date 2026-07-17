@@ -756,14 +756,13 @@ async function collectPackageMetrics(pkg: PackageInput): Promise<PackageMetrics>
 // Main
 // ---------------------------------------------------------------------------
 
-// Testing filter: only process these packages to save API calls and time
-const TEST_FILTER = ['admiral', 'rhino'];
-
 async function main(): Promise<void> {
   const inputRaw = await readFile('/output/input.json', 'utf-8');
   const input = JSON.parse(inputRaw) as DiscoverResult;
 
-  let packages = input.packages;
+  // Packages come from the upstream resolve-package-selection step (the reviewer's
+  // resolved selection). No hardcoded filter — whatever was selected is collected.
+  const packages = input.packages;
 
   // Derive repoUrl if missing (backward compat with older discover-packages output)
   for (const pkg of packages) {
@@ -773,13 +772,6 @@ async function main(): Promise<void> {
     if (!pkg.defaultBranch) {
       pkg.defaultBranch = 'main';
     }
-  }
-
-  // Apply test filter
-  if (TEST_FILTER.length > 0) {
-    const before = packages.length;
-    packages = packages.filter((pkg) => TEST_FILTER.includes(pkg.name));
-    console.log(`Test filter active: ${before} packages → ${packages.length} (${TEST_FILTER.join(', ')})`);
   }
 
   console.log(`Collecting metrics for ${packages.length} packages...`);

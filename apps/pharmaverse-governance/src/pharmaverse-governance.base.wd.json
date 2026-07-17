@@ -28,12 +28,41 @@
       }
     },
     {
+      "id": "select-packages",
+      "name": "Select Packages to Review",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["governance-lead", "council-member"],
+      "description": "Describe which pharmaverse packages to review this cycle. Free text, e.g. 'all packages', 'the admiral family', 'admiral, rhino', or 'all ADaM packages'. Say 'all' / 'everything' to review every discovered package. The next step resolves your description against the discovered list.",
+      "params": [
+        {
+          "name": "selection",
+          "type": "textarea",
+          "required": true,
+          "description": "Which packages to review. Say 'all packages' for every discovered pharmaverse package, or name specific packages or families."
+        }
+      ]
+    },
+    {
+      "id": "resolve-package-selection",
+      "name": "Resolve Package Selection",
+      "type": "creation",
+      "executor": "agent",
+      "autonomyLevel": "L4",
+      "plugin": "claude-code-agent",
+      "description": "Interpret the reviewer's free-text selection against the discovered package list and produce the filtered set of packages to collect metrics for. 'all' / 'everything' resolves to the full discovered list.",
+      "agent": {
+        "image": "mediforce-golden-image",
+        "timeoutMinutes": 10
+      }
+    },
+    {
       "id": "collect-metrics",
       "name": "Collect Per-Package Metrics",
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "description": "For each discovered package, collect governance properties, releases, issue response times, PR activity, CRAN checks, test coverage, vignette presence, documentation state, contributor activity. NOTE: For testing, only admiral and rhino are processed.",
+      "description": "For each selected package, collect governance properties, releases, issue response times, PR activity, CRAN checks, test coverage, vignette presence, documentation state, and contributor activity.",
       "env": {
         "GITHUB_TOKEN": "{{GITHUB_TOKEN}}"
       },
@@ -98,7 +127,7 @@
       "type": "review",
       "executor": "human",
       "allowedRoles": ["governance-lead"],
-      "description": "Review the generated per-package reports and approve sending notification emails to maintainers. For testing, only the rhino maintainer will be notified. Verify the email content and HTML report attachments before approving.",
+      "description": "Review the generated per-package reports and approve sending notification emails to maintainers. Every reviewed package's maintainer is notified unless NOTIFY_PACKAGE_FILTER restricts it. Verify the email content and HTML report attachments before approving.",
       "verdicts": {
         "approve": { "target": "notify-maintainers" },
         "revise": { "target": "generate-package-reports" }
@@ -110,7 +139,7 @@
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "description": "Send governance report HTML files to package maintainers via email. NOTE: For testing, only rhino maintainer is notified.",
+      "description": "Send governance report HTML files to package maintainers via email. Notifies every reviewed package by default; set NOTIFY_PACKAGE_FILTER (comma-separated package names) to restrict recipients.",
       "env": {
         "SENDGRID_API_KEY": "{{SENDGRID_API_KEY}}"
       },
@@ -142,7 +171,9 @@
     }
   ],
   "transitions": [
-    { "from": "discover-packages", "to": "collect-metrics" },
+    { "from": "discover-packages", "to": "select-packages" },
+    { "from": "select-packages", "to": "resolve-package-selection" },
+    { "from": "resolve-package-selection", "to": "collect-metrics" },
     { "from": "collect-metrics", "to": "assess-packages" },
     { "from": "assess-packages", "to": "generate-council-summary" },
     { "from": "generate-council-summary", "to": "review-council-summary" },

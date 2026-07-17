@@ -1,12 +1,17 @@
 version: "1.0"
 generated: "2026-04-01"
 standard: "agentskills.io/specification"
-total_skills: 2
+total_skills: 3
 
 domains:
   package-governance:
     description: Pharmaverse package governance semiannual review skills
     skills:
+      - id: resolve-package-selection
+        path: resolve-package-selection/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Translate a reviewer's free-text package description into a filtered list of pharmaverse packages
       - id: assess-package-governance
         path: assess-package-governance/SKILL.md
         complexity: advanced

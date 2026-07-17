@@ -221,12 +221,105 @@ steps:
         console.error("Fatal error:", error);
         process.exit(1);
       });
+- id: select-packages
+  name: Select Packages to Review
+  type: creation
+  executor: human
+  allowedRoles:
+  - governance-lead
+  - council-member
+  description: Describe which pharmaverse packages to review this cycle. Free text, e.g. 'all packages', 'the admiral family', 'admiral, rhino', or 'all ADaM packages'. Say 'all' / 'everything' to review every discovered package. The next step resolves your description against the discovered list.
+  params:
+  - name: selection
+    type: textarea
+    required: true
+    description: Which packages to review. Say 'all packages' for every discovered pharmaverse package, or name specific packages or families.
+- id: resolve-package-selection
+  name: Resolve Package Selection
+  type: creation
+  executor: agent
+  autonomyLevel: L4
+  plugin: claude-code-agent
+  description: Interpret the reviewer's free-text selection against the discovered package list and produce the filtered set of packages to collect metrics for. 'all' / 'everything' resolves to the full discovered list.
+  agent:
+    image: mediforce-golden-image
+    timeoutMinutes: 10
+    prompt: |-
+      ---
+      name: resolve-package-selection
+      description: Translate a human user's natural-language description of which pharmaverse packages to evaluate into a concrete filtered list of package objects.
+      ---
+
+      # Resolve Package Selection
+
+      You are given two things:
+      1. A full list of discovered pharmaverse packages (from the `discover-packages` step)
+      2. A single free-text response from a human, describing which subset they want to evaluate in this governance review cycle
+
+      Your job is to return a filtered list of packages matching the user's intent.
+
+      ## Input
+
+      Read `/output/input.json`. The relevant fields:
+
+      - `steps["discover-packages"].packages` — array of `{ name, repo, repoUrl, defaultBranch, docs, task, details, maintainerName, maintainerEmail }`
+      - `steps["select-packages"].selection` — the user's free-text response
+
+      ## Interpretation guidelines
+
+      Be **flexible and forgiving**. Accept all of the following kinds of input:
+
+      | User input | Expected result |
+      |---|---|
+      | `admiral, rhino` | exactly those two |
+      | `all admiral family` / `admiral*` / `admiral and its variants` | admiral, admiralmetabolic, admiralneuro, admiralonco, admiralophtha, admiralpeds, admiralvaccine |
+      | `everything` / `all` / `all packages` | full list |
+      | `all ADaM packages` / `the adam ones` | packages where `task` ~ "ADaM" (case-insensitive match on the `task` field) |
+      | `all tlg` / `tlg stuff` | `task ~ "tlg"` / `task ~ "TLG"` |
+      | `the admiral one and rhino please` | admiral + rhino |
+      | Exact match of `repo` (e.g. `pharmaverse/cards`) | that package |
+      | A typo like `admeral` | resolve to the closest match (admiral) if clearly intended |
+
+      When the user lists items separated by commas, semicolons, slashes, "and", "+", or newlines — treat each as a separate entry.
+
+      If input is genuinely ambiguous, **prefer to include more packages rather than fewer**. It is better to collect extra metrics than to silently drop one the user wanted.
+
+      If the user's text is empty or can't be parsed at all, fall back to returning the full list (with an explanatory note in `selectionInterpretation`).
+
+      ## Output
+
+      Write `/output/result.json` with this exact shape (matching `discover-packages` for downstream compatibility):
+
+      ```json
+      {
+        "packages": [
+          { "name": "...", "repo": "...", "repoUrl": "...", "defaultBranch": "...", "docs": "...", "task": "...", "details": "...", "maintainerName": null, "maintainerEmail": null }
+        ],
+        "metadata": {
+          "totalDiscovered": 20,
+          "totalSelected": 7,
+          "userInput": "... the original user selection text ...",
+          "selectionInterpretation": "Plain-English explanation of how you parsed the request — e.g. 'Matched `all admiral family` to the 7 packages whose name starts with `admiral`.'",
+          "unmatchedTokens": ["any tokens in user input that didn't map to any package"],
+          "resolvedAt": "ISO-8601 timestamp"
+        }
+      }
+      ```
+
+      - Each entry in `packages` MUST be a full copy of the corresponding discover-packages entry — do not summarize fields.
+      - The downstream `collect-metrics` step reads `packages[*].name`, `.repo`, `.repoUrl`, `.defaultBranch`; keep those intact.
+    model: anthropic/claude-sonnet-4.5
+  env:
+    OPENROUTER_API_KEY: '{{OPENROUTER_API_KEY}}'
+    ANTHROPIC_AUTH_TOKEN: '{{OPENROUTER_API_KEY}}'
+    ANTHROPIC_BASE_URL: https://openrouter.ai/api
+    ANTHROPIC_API_KEY: ''
 - id: collect-metrics
   name: Collect Per-Package Metrics
   type: creation
   executor: script
   plugin: script-container
-  description: 'For each discovered package, collect governance properties, releases, issue response times, PR activity, CRAN checks, test coverage, vignette presence, documentation state, contributor activity. NOTE: For testing, only admiral and rhino are processed.'
+  description: For each selected package, collect governance properties, releases, issue response times, PR activity, CRAN checks, test coverage, vignette presence, documentation state, and contributor activity.
   env:
     GITHUB_TOKEN: '{{GITHUB_TOKEN}}'
   script:
@@ -699,11 +792,10 @@ steps:
           errors
         };
       }
-      const TEST_FILTER = ["admiral", "rhino"];
       async function main() {
         const inputRaw = await readFile("/output/input.json", "utf-8");
         const input = JSON.parse(inputRaw);
-        let packages = input.packages;
+        const packages = input.packages;
         for (const pkg of packages) {
           if (!pkg.repoUrl && pkg.repo) {
             pkg.repoUrl = `https://github.com/${pkg.repo}`;
@@ -711,11 +803,6 @@ steps:
           if (!pkg.defaultBranch) {
             pkg.defaultBranch = "main";
           }
-        }
-        if (TEST_FILTER.length > 0) {
-          const before = packages.length;
-          packages = packages.filter((pkg) => TEST_FILTER.includes(pkg.name));
-          console.log(`Test filter active: ${before} packages \u2192 ${packages.length} (${TEST_FILTER.join(", ")})`);
         }
         console.log(`Collecting metrics for ${packages.length} packages...`);
         const results = [];
@@ -2168,7 +2255,7 @@ steps:
   executor: human
   allowedRoles:
   - governance-lead
-  description: Review the generated per-package reports and approve sending notification emails to maintainers. For testing, only the rhino maintainer will be notified. Verify the email content and HTML report attachments before approving.
+  description: Review the generated per-package reports and approve sending notification emails to maintainers. Every reviewed package's maintainer is notified unless NOTIFY_PACKAGE_FILTER restricts it. Verify the email content and HTML report attachments before approving.
   verdicts:
     approve:
       target: notify-maintainers
@@ -2179,7 +2266,7 @@ steps:
   type: creation
   executor: script
   plugin: script-container
-  description: 'Send governance report HTML files to package maintainers via email. NOTE: For testing, only rhino maintainer is notified.'
+  description: Send governance report HTML files to package maintainers via email. Notifies every reviewed package by default; set NOTIFY_PACKAGE_FILTER (comma-separated package names) to restrict recipients.
   env:
     SENDGRID_API_KEY: '{{SENDGRID_API_KEY}}'
   script:
@@ -2187,7 +2274,7 @@ steps:
     image: mediforce-golden-image
     inlineScript: |-
       import { readFile, writeFile } from "node:fs/promises";
-      const TEST_FILTER = ["rhino"];
+      const NOTIFY_FILTER = (process.env.NOTIFY_PACKAGE_FILTER ?? "").split(",").map((name) => name.trim()).filter((name) => name.length > 0);
       const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
       const FROM_EMAIL = process.env.FROM_EMAIL || "governance@pharmaverse.org";
       function formatMonthYear() {
@@ -2243,9 +2330,9 @@ steps:
         }
         const monthYear = formatMonthYear();
         const notifications = [];
-        const filteredReports = input.reports.filter((report) => TEST_FILTER.includes(report.packageName));
+        const filteredReports = NOTIFY_FILTER.length > 0 ? input.reports.filter((report) => NOTIFY_FILTER.includes(report.packageName)) : input.reports;
         console.log(
-          `Processing ${filteredReports.length} reports (filtered from ${input.reports.length} total, TEST_FILTER: ${TEST_FILTER.join(", ")})`
+          NOTIFY_FILTER.length > 0 ? `Processing ${filteredReports.length} of ${input.reports.length} reports (NOTIFY_PACKAGE_FILTER: ${NOTIFY_FILTER.join(", ")})` : `Processing all ${filteredReports.length} reports`
         );
         for (const report of filteredReports) {
           const pkg = packagesByName.get(report.packageName);
@@ -2495,6 +2582,10 @@ steps:
   executor: human
 transitions:
 - from: discover-packages
+  to: select-packages
+- from: select-packages
+  to: resolve-package-selection
+- from: resolve-package-selection
   to: collect-metrics
 - from: collect-metrics
   to: assess-packages
