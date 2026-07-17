@@ -2,6 +2,15 @@
 
 Complete criteria specification with stable IDs and measurable thresholds.
 
+> **Data availability governs every threshold below.** The `Measurable` column
+> assumes the metric is present. When a metric is `null`, its source is
+> `"unknown"`, or its field is in the package's `errors` array, the criterion is
+> **unknown** — not met and not failed. See "Handling Missing, Null, or Unknown
+> Data" in the skill. In particular: null `coverage.percent` does not fail QR-1 /
+> SS-1; `cranChecks.status == "unknown"` or `cranStatus == "not-on-cran"` does
+> not satisfy QR-0 via default zero counts; a null response-time median does not
+> satisfy AM-1 / AM-2 / ST-2.
+
 ## Status Tags
 
 ### Stable (ST)

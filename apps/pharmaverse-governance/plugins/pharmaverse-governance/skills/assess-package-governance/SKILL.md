@@ -33,6 +33,25 @@ The input is a JSON object with a `packages` array. Each package has:
 - `contributors` — counts and commit activity
 - `errors` — any data collection errors (assess with available data, flag gaps)
 
+## Handling Missing, Null, or Unknown Data
+
+Metrics are often missing. Treat a missing metric as **unknown** — never as a pass and never as a fail. A criterion whose required metric is unknown is itself **unknown**: exclude it from the badge/status decision, record it in `dataGaps`, and lower `confidence`. Do not let an absent metric move a package up or down.
+
+A metric is **unknown** when any of these hold:
+- its value is `null`;
+- a source reports unknown — `coverage.source == "unknown"` or `cranChecks.status == "unknown"`;
+- the corresponding field appears in the package's `errors` array — a `0`, `false`, or empty value that resulted from a collection error is unknown, **not** a real zero.
+
+Specific rules (these override the raw threshold tables):
+
+- **Coverage null/unknown** (`coverage.percent == null` or `coverage.source == "unknown"`): SS-1 and QR-1 are **unknown**, not failed. Do not downgrade Technical Quality or Submission Readiness solely because coverage is missing — record "coverage unknown" as a data gap.
+- **CRAN checks unknown, or package not on CRAN** (`cranChecks.status == "unknown"`, or `cranStatus == "not-on-cran"` with no check data): QR-0 is **unknown**, not met. Never read the default `errorCount == 0 && warningCount == 0` as "clean" when there was no CRAN data — absence of errors is not evidence of a passing check. A non-CRAN package's R CMD check status requires CI evidence the council must supply.
+- **Response-time medians null** (`criticalResponseMedianDays` / `nonCriticalTriageMedianDays == null`): the value could not be measured — it is **not** proof of fast response. Treat AM-1, AM-2, ST-2, and LM-1 as **unknown** unless issue counts show there were issues to respond to; never assert "responds within threshold" from a null median.
+- **Zero commits / zero releases**: treat `contributors.commitsLast90Days == 0` (MA-2) or `releases.countLast18Months == 0` (AM-3 / LM-2) as a real signal **only** when `contributors` / `releases` are absent from `errors`. If the field errored, mark it unknown instead.
+- **`currentState` all null**: this is the first review — mark `initial-assessment` (Step 4). This is expected, not a data gap.
+
+When too many criteria for a dimension are unknown to assign a badge responsibly, output that badge as `null` with a data gap and `confidence: "low"` — never guess "Low Maintenance" or "Submission-Caution" from missing data.
+
 ## Assessment Process
 
 ### Step 1: Status Tag Assessment

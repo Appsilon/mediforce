@@ -32,9 +32,9 @@ interface PackageAssessment {
   statusEvidence: EvidenceItem[];
 
   proposedBadges: {
-    submissionReadiness: string;
-    maintenanceHealth: string;
-    technicalQuality: string;
+    submissionReadiness: string | null;
+    maintenanceHealth: string | null;
+    technicalQuality: string | null;
   };
   badgeEvidence: BadgeEvidence;
 
@@ -167,13 +167,19 @@ function statusBadgeClass(status: string): string {
   return 'badge-neutral';
 }
 
-function qualityBadgeClass(badge: string): string {
+function qualityBadgeClass(badge: string | null | undefined): string {
+  if (!badge) return 'badge-neutral';
   const normalized = badge.toLowerCase();
   if (normalized.includes('suitable') || normalized.includes('actively') || normalized.includes('quality reviewed')) return 'badge-stable';
   if (normalized.includes('caution') || normalized.includes('pending')) return 'badge-watch';
   if (normalized.includes('low')) return 'badge-at-risk';
   if (normalized.includes('not assessed')) return 'badge-neutral';
   return 'badge-neutral';
+}
+
+/** Display label for a badge that may be null/unknown after the assessment. */
+function badgeLabel(badge: string | null | undefined): string {
+  return badge && badge.trim().length > 0 ? badge : 'Unknown';
 }
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -443,15 +449,15 @@ function generatePackageHtml(
     <div class="badges-row">
       <div class="badge-card">
         <div class="dim-label">Submission Readiness</div>
-        <div class="dim-value"><span class="badge ${qualityBadgeClass(assessment.proposedBadges.submissionReadiness)}">${escapeHtml(assessment.proposedBadges.submissionReadiness)}</span></div>
+        <div class="dim-value"><span class="badge ${qualityBadgeClass(assessment.proposedBadges.submissionReadiness)}">${escapeHtml(badgeLabel(assessment.proposedBadges.submissionReadiness))}</span></div>
       </div>
       <div class="badge-card">
         <div class="dim-label">Maintenance Health</div>
-        <div class="dim-value"><span class="badge ${qualityBadgeClass(assessment.proposedBadges.maintenanceHealth)}">${escapeHtml(assessment.proposedBadges.maintenanceHealth)}</span></div>
+        <div class="dim-value"><span class="badge ${qualityBadgeClass(assessment.proposedBadges.maintenanceHealth)}">${escapeHtml(badgeLabel(assessment.proposedBadges.maintenanceHealth))}</span></div>
       </div>
       <div class="badge-card">
         <div class="dim-label">Technical Quality</div>
-        <div class="dim-value"><span class="badge ${qualityBadgeClass(assessment.proposedBadges.technicalQuality)}">${escapeHtml(assessment.proposedBadges.technicalQuality)}</span></div>
+        <div class="dim-value"><span class="badge ${qualityBadgeClass(assessment.proposedBadges.technicalQuality)}">${escapeHtml(badgeLabel(assessment.proposedBadges.technicalQuality))}</span></div>
       </div>
     </div>
   </div>
