@@ -104,14 +104,24 @@ export class ScriptStepExecutor implements StepExecutor {
     if (fallbackReason !== null) {
       const failLabel = fallbackReason === 'timeout' ? 'timed out' : 'failed';
       const errorDetail = errorMessage ?? (fallbackReason === 'timeout' ? 'script execution timed out' : null);
-      // Scripts have no escalation path (ADR-0008): a script that cannot complete
-      // fails the run deterministically rather than leaving it `running` for the
-      // auto-runner loop-guard to eventually trip (ADR-0010).
-      await instanceRepo.update(instanceId, {
-        status: 'failed',
-        ...(errorDetail !== null ? { error: `Script step '${stepId}' ${failLabel}: ${errorDetail}` } : {}),
-        updatedAt: new Date().toISOString(),
-      });
+      if (fallbackReason === 'timeout') {
+        // A timed-out (or reaped) script fails the run deterministically:
+        // scripts have no escalation path (ADR-0008), so a dead-driver timeout
+        // must terminate the run rather than leave it `running` for the
+        // auto-runner loop-guard to eventually trip (ADR-0010). A live `error`
+        // keeps its pre-ADR-0010 behaviour (record the error, stay `running`);
+        // whether it should also hard-fail is tracked in #924.
+        await instanceRepo.update(instanceId, {
+          status: 'failed',
+          error: `Script step '${stepId}' ${failLabel}: ${errorDetail}`,
+          updatedAt: new Date().toISOString(),
+        });
+      } else if (errorDetail !== null) {
+        await instanceRepo.update(instanceId, {
+          error: `Script step '${stepId}' ${failLabel}: ${errorDetail}`,
+          updatedAt: new Date().toISOString(),
+        });
+      }
 
       const truncatedError = errorDetail ? errorDetail.slice(0, 2000) : null;
       await auditRepo.append({

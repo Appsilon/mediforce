@@ -189,6 +189,26 @@ describe('ScriptStepExecutor', () => {
     );
   });
 
+  it('live error leaves the instance running for the loop-guard — does not hard-fail the run (#924)', async () => {
+    mockPluginRunner.execute.mockResolvedValue({
+      resultPayload: null,
+      timedOut: false,
+      errorMessage: 'ENOENT: script not found',
+    });
+
+    await executor.execute(mockPlugin, makeContext(), services, meta);
+
+    // The instance error is recorded, but status is NOT flipped to 'failed':
+    // only the timeout/reap path hard-fails (ADR-0010). A live error keeps its
+    // pre-ADR-0010 behaviour and stays `running` for the loop-guard (#924).
+    expect(mockInstanceRepo.update).toHaveBeenCalledWith('inst-001', expect.objectContaining({
+      error: expect.stringContaining('ENOENT: script not found'),
+    }));
+    expect(mockInstanceRepo.update).not.toHaveBeenCalledWith('inst-001', expect.objectContaining({
+      status: 'failed',
+    }));
+  });
+
   it('plugin timeout: returns escalated with timeout fallback', async () => {
     mockPluginRunner.execute.mockResolvedValue({
       resultPayload: null,
