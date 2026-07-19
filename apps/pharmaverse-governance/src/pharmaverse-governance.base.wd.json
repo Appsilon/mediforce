@@ -88,13 +88,12 @@
       "id": "generate-council-summary",
       "name": "Generate Council Summary",
       "type": "creation",
-      "executor": "agent",
-      "autonomyLevel": "L4",
-      "plugin": "claude-code-agent",
-      "description": "Aggregate assessments into a council-ready summary with consent agenda, proposed changes, early warnings, and action items. Tracks council decisions across revision cycles.",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Deterministically aggregate assessments into a council-ready summary (overview, per-package detail, early warnings, action items) and an HTML presentation. Records council decisions parsed from the review comment across revision cycles.",
       "agent": {
         "image": "mediforce-golden-image",
-        "timeoutMinutes": 20
+        "command": "node /app/generate-council-summary.js"
       }
     },
     {

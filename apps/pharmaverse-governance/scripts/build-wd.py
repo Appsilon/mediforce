@@ -76,12 +76,6 @@ def inline_assess() -> str:
     return skill
 
 
-def inline_summary() -> str:
-    skill = read(SKILLS / "generate-council-summary" / "SKILL.md")
-    template = read(SKILLS / "generate-council-summary" / "references" / "council-report-template.md")
-    return skill + "\n\n## Council Report Template\n\n" + template
-
-
 def inline_resolve() -> str:
     return read(SKILLS / "resolve-package-selection" / "SKILL.md")
 
@@ -89,7 +83,6 @@ def inline_resolve() -> str:
 AGENT_PROMPTS = {
     "resolve-package-selection": inline_resolve,
     "assess-packages": inline_assess,
-    "generate-council-summary": inline_summary,
 }
 
 
