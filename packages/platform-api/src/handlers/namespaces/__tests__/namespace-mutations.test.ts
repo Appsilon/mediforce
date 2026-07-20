@@ -125,6 +125,45 @@ describe('updateNamespace handler', () => {
     expect(JSON.stringify(event?.inputSnapshot).length).toBeLessThan(200);
   });
 
+  it.each(['icon', 'logo', 'brandPrimaryColor', 'brandAccentColor'] as const)(
+    'rejects %s on a personal namespace',
+    async (field) => {
+      namespaceRepo.seedNamespace({
+        handle: 'jane',
+        type: 'personal',
+        displayName: 'Jane',
+        linkedUserId: 'uid-jane',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      });
+      const scope = createTestScope({
+        namespaceRepo,
+        auditRepo,
+        caller: userCaller('uid-jane', ['jane'], new Map([['jane', 'owner']])),
+      });
+      await expect(
+        updateNamespace({ handle: 'jane', [field]: '#0d9488' }, scope),
+      ).rejects.toThrow(PreconditionFailedError);
+      expect(namespaceRepo.namespaces.get('jane')?.[field]).toBeUndefined();
+    },
+  );
+
+  it('still allows displayName and bio edits on a personal namespace', async () => {
+    namespaceRepo.seedNamespace({
+      handle: 'jane',
+      type: 'personal',
+      displayName: 'Jane',
+      linkedUserId: 'uid-jane',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      caller: userCaller('uid-jane', ['jane'], new Map([['jane', 'owner']])),
+    });
+    await updateNamespace({ handle: 'jane', displayName: 'Jane Doe', bio: 'Hi' }, scope);
+    expect(namespaceRepo.namespaces.get('jane')?.displayName).toBe('Jane Doe');
+  });
+
   it('admins may edit (not just owners)', async () => {
     const scope = createTestScope({ namespaceRepo, auditRepo, caller: adminCaller });
     await expect(

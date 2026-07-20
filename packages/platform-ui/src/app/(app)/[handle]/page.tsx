@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Pencil, Check, X, Settings, GitBranch, Plus, Download } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
+import { WorkspaceAvatar } from '@/components/workspace-avatar';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useNamespace } from '@/hooks/use-namespace';
 import { useUserProfiles } from '@/hooks/use-users';
@@ -357,12 +358,11 @@ function UserWorkspaces({ namespace }: { namespace: Namespace }) {
             href={`/${ws.handle}`}
             className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
           >
-            {ws.logo !== undefined && ws.logo !== '' ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={ws.logo} alt="" className="h-3.5 w-3.5 shrink-0 rounded object-cover" />
-            ) : (
-              (() => { const Icon = getWorkspaceIcon(ws.icon); return <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />; })()
-            )}
+            <WorkspaceAvatar
+              source={ws.logo}
+              className="h-3.5 w-3.5 shrink-0 rounded object-cover"
+              fallback={(() => { const Icon = getWorkspaceIcon(ws.icon); return <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />; })()}
+            />
             <span className="font-medium truncate">{ws.displayName}</span>
             <span className="text-xs text-muted-foreground ml-auto shrink-0">@{ws.handle}</span>
           </Link>
@@ -575,7 +575,6 @@ export default function ProfilePage() {
   const { role: currentRole, canAdmin: canEdit, loading: roleLoading } = useNamespaceRole(handle ?? '');
   const isMember = currentRole !== null;
   const userProfiles = useUserProfiles(handle);
-  const [profileImgError, setProfileImgError] = useState(false);
 
   if (loading || roleLoading) {
     return (
@@ -611,36 +610,28 @@ export default function ProfilePage() {
       <div className="flex items-start gap-4">
         {(() => {
           if (namespace.type === 'organization') {
-            if (namespace.logo !== undefined && namespace.logo !== '') {
-              return (
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/10">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={namespace.logo} alt={namespace.displayName} className="h-full w-full object-cover" />
-                </div>
-              );
-            }
             const Icon = getWorkspaceIcon(namespace.icon);
             return (
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                <Icon className="h-7 w-7 text-primary" />
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/10">
+                <WorkspaceAvatar
+                  source={namespace.logo}
+                  alt={namespace.displayName}
+                  className="h-full w-full object-cover"
+                  fallback={<Icon className="h-7 w-7 text-primary" />}
+                />
               </div>
             );
           }
           const linkedUserPhoto = namespace.linkedUserId !== undefined
             ? userProfiles.get(namespace.linkedUserId)?.photoURL
             : undefined;
-          const avatarSrc = namespace.avatarUrl ?? linkedUserPhoto ?? undefined;
-          return avatarSrc !== undefined && avatarSrc !== '' && !profileImgError ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={avatarSrc}
+          return (
+            <WorkspaceAvatar
+              source={namespace.avatarUrl ?? linkedUserPhoto}
               alt={namespace.displayName}
-              referrerPolicy="no-referrer"
-              onError={() => setProfileImgError(true)}
               className="h-14 w-14 rounded-full object-cover shrink-0"
+              fallback={<InitialsAvatar displayName={namespace.displayName} />}
             />
-          ) : (
-            <InitialsAvatar displayName={namespace.displayName} />
           );
         })()}
 

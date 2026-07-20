@@ -43,6 +43,12 @@ function loadImage(dataUrl: string): Promise<HTMLImageElement> {
  * budget would make it *worse* on high-DPI screens, and they are already tiny.
  * Rasters are re-encoded as PNG to preserve logo transparency.
  *
+ * An animated GIF is therefore **flattened to its first frame**: `drawImage`
+ * paints one frame and the PNG re-encode cannot carry animation. This is
+ * intended — an animating workspace logo in the sidebar would be a distraction,
+ * and the alternative (pass GIFs through like SVGs) skips downscaling on the
+ * format most likely to be multi-megabyte.
+ *
  * Throws `LogoTooLargeError` when the result still exceeds the schema cap.
  */
 export async function fileToLogoDataUrl(file: File): Promise<string> {

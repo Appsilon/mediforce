@@ -30,6 +30,8 @@ import {
 import { WORKSPACE_ICONS, WORKSPACE_ICON_KEYS, getWorkspaceIcon, WORKSPACE_DEFAULT_KEY } from '@/lib/workspace-icons';
 import type { NamespaceMember } from '@mediforce/platform-core';
 import { fileToLogoDataUrl, LOGO_MAX_EDGE_PX, LogoTooLargeError } from '@/lib/logo-image';
+import { readableForegroundTriple } from '@/lib/brand-color';
+import { WorkspaceAvatar } from '@/components/workspace-avatar';
 import { cn } from '@/lib/utils';
 import { NamespaceSecretsEditor } from '@/components/namespace/namespace-secrets-editor';
 
@@ -96,6 +98,26 @@ function RoleBadge({ role }: { role: NamespaceMember['role'] }) {
       ].join(' ')}
     >
       {role}
+    </span>
+  );
+}
+
+/**
+ * Preview chip for a picked brand color. The label colour is derived from the
+ * swatch itself, so a light brand colour stays legible instead of showing white
+ * text on near-white.
+ */
+function BrandSwatch({ color, label }: { color: string; label: string }) {
+  const foreground = readableForegroundTriple(color);
+  return (
+    <span
+      className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium"
+      style={{
+        backgroundColor: color,
+        color: foreground !== null ? `hsl(${foreground})` : undefined,
+      }}
+    >
+      {label}
     </span>
   );
 }
@@ -278,7 +300,6 @@ export default function WorkspaceConfigPage() {
   const updateNamespace = useUpdateNamespace(handle);
   const savingProfile = updateNamespace.isPending;
 
-  // ── Branding (logo + brand colors) ──────────────────────────────────────────
   const [primaryColor, setPrimaryColor] = useState(DEFAULT_PRIMARY_HEX);
   const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT_HEX);
   const [logoError, setLogoError] = useState<string | null>(null);
@@ -290,8 +311,16 @@ export default function WorkspaceConfigPage() {
       setProfileDisplayName(namespace.displayName);
       setProfileBio(namespace.bio ?? '');
       setProfileIcon(namespace.icon ?? 'Building2');
-      setPrimaryColor(namespace.brandPrimaryColor && namespace.brandPrimaryColor !== '' ? namespace.brandPrimaryColor : DEFAULT_PRIMARY_HEX);
-      setAccentColor(namespace.brandAccentColor && namespace.brandAccentColor !== '' ? namespace.brandAccentColor : DEFAULT_ACCENT_HEX);
+      setPrimaryColor(
+        namespace.brandPrimaryColor !== undefined && namespace.brandPrimaryColor !== ''
+          ? namespace.brandPrimaryColor
+          : DEFAULT_PRIMARY_HEX,
+      );
+      setAccentColor(
+        namespace.brandAccentColor !== undefined && namespace.brandAccentColor !== ''
+          ? namespace.brandAccentColor
+          : DEFAULT_ACCENT_HEX,
+      );
     }
   }, [namespace]);
 
@@ -621,15 +650,15 @@ export default function WorkspaceConfigPage() {
                   </p>
                   <div className="mt-4 flex items-center gap-6">
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/10">
-                      {namespace.logo && namespace.logo !== '' ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={namespace.logo} alt="Workspace logo" className="h-full w-full object-cover" />
-                      ) : (
-                        (() => {
+                      <WorkspaceAvatar
+                        source={namespace.logo}
+                        alt="Workspace logo"
+                        className="h-full w-full object-cover"
+                        fallback={(() => {
                           const Icon = getWorkspaceIcon(profileIcon);
                           return <Icon className="h-7 w-7 text-primary" />;
-                        })()
-                      )}
+                        })()}
+                      />
                     </div>
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2">
@@ -644,7 +673,7 @@ export default function WorkspaceConfigPage() {
                             disabled={savingProfile}
                           />
                         </label>
-                        {namespace.logo && namespace.logo !== '' && (
+                        {namespace.logo !== undefined && namespace.logo !== '' && (
                           <button
                             type="button"
                             onClick={handleRemoveLogo}
@@ -658,7 +687,7 @@ export default function WorkspaceConfigPage() {
                       </div>
                       <p className="text-[11px] text-muted-foreground">
                         PNG, JPG, SVG, WebP or GIF · large images are resized to{' '}
-                        {LOGO_MAX_EDGE_PX}px.
+                        {LOGO_MAX_EDGE_PX}px · animated GIFs use their first frame.
                       </p>
                       {logoError !== null && <p className="text-[11px] text-destructive">{logoError}</p>}
                     </div>
@@ -703,18 +732,8 @@ export default function WorkspaceConfigPage() {
                     </div>
                     {/* Live preview using the picked colors directly */}
                     <div className="flex items-center gap-2">
-                      <span
-                        className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium text-white"
-                        style={{ backgroundColor: primaryColor }}
-                      >
-                        Main
-                      </span>
-                      <span
-                        className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium text-white"
-                        style={{ backgroundColor: accentColor }}
-                      >
-                        Auxiliary
-                      </span>
+                      <BrandSwatch color={primaryColor} label="Main" />
+                      <BrandSwatch color={accentColor} label="Auxiliary" />
                     </div>
                   </div>
                   <div className="mt-4 flex items-center gap-3">

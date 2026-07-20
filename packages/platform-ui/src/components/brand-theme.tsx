@@ -75,7 +75,7 @@ export function BrandTheme({
 }) {
   const light = declarationsFor('light', primaryColor, accentColor);
   const dark = declarationsFor('dark', primaryColor, accentColor);
-  if (light === '') return null;
+  if (light === '' && dark === '') return null;
 
   const css = `:root{${light}}\n.dark{${dark}}`;
 

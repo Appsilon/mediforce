@@ -20,12 +20,15 @@ import type {
   UpdateNamespaceOutput,
 } from '../../contract/namespaces';
 
+const BRANDING_FIELDS = ['icon', 'logo', 'brandPrimaryColor', 'brandAccentColor'] as const;
+
 /**
  * Edit workspace `displayName`, `bio`, `icon`, `logo`, and brand colors.
  * Owner/admin only. Two-state semantics: undefined leaves the field untouched,
  * any string overwrites it (empty string is the cleared state for `bio`, `logo`,
  * and the brand colors — cleared branding falls back to the icon + default
- * palette).
+ * palette). Branding is organization-only: a personal namespace renders the
+ * linked user's avatar, so icon/logo/colors have nowhere to show.
  */
 export async function updateNamespace(
   input: UpdateNamespaceInput,
@@ -35,6 +38,16 @@ export async function updateNamespace(
 
   const existing = await scope.workspaces.getNamespace(input.handle);
   if (existing === null) throw new NotFoundError(`Namespace "${input.handle}" not found`);
+
+  if (existing.type === 'personal') {
+    const attempted = BRANDING_FIELDS.filter((field) => input[field] !== undefined);
+    if (attempted.length > 0) {
+      throw new PreconditionFailedError(
+        `Branding (${attempted.join(', ')}) can only be set on an organization workspace.`,
+        { handle: input.handle, type: existing.type, fields: attempted },
+      );
+    }
+  }
 
   const updates: NamespaceUpdates = {
     ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),

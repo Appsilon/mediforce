@@ -1,6 +1,9 @@
 import { test, expect } from '../helpers/test-fixtures';
-import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { WORKSPACE_LOGO_MAX_CHARS } from '@mediforce/platform-core';
+import {
+  seedPostgresOrganizationNamespace,
+  seedPostgresPersonalNamespace,
+} from '../helpers/postgres-seed';
 
 /**
  * API-level journey for workspace branding (logo + brand colors).
@@ -13,20 +16,25 @@ test.describe('workspace branding API journey', () => {
   // Locally bootstrap_e2e.py writes `test-api-key`; CI overrides via env.
   const apiKey = process.env.PLATFORM_API_KEY ?? 'test-api-key';
   const authHeaders = { 'X-Api-Key': apiKey };
-  const namespaceUrl = `/api/namespaces/${TEST_ORG_HANDLE}`;
+
+  // Branding is organization-only, and the shared `test` fixture is a *personal*
+  // namespace despite the TEST_ORG_HANDLE name, so this journey seeds its own
+  // organization. Each test gets its OWN org: these tests write and clear
+  // branding on the same fields, so a shared handle lets one test's write race
+  // another's clear. `postgres-seed` drops `branding-org%` between runs.
+  let namespaceUrl = '';
+
+  test.beforeEach(async ({}, testInfo) => {
+    const orgHandle = `branding-org-${testInfo.testId}`;
+    await seedPostgresOrganizationNamespace(orgHandle, `uid-${orgHandle}`, 'Branding Org');
+    namespaceUrl = `/api/namespaces/${orgHandle}`;
+  });
 
   const logoDataUrl =
     'data:image/svg+xml;base64,' +
     Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"/>').toString(
       'base64',
     );
-
-  test.afterEach(async ({ request }) => {
-    await request.patch(namespaceUrl, {
-      headers: authHeaders,
-      data: { logo: '', brandPrimaryColor: '', brandAccentColor: '' },
-    });
-  });
 
   test('logo and brand colors persist through PATCH → GET', async ({ request }) => {
     const patchRes = await request.patch(namespaceUrl, {
@@ -90,6 +98,21 @@ test.describe('workspace branding API journey', () => {
       data: { brandPrimaryColor: 'teal' },
     });
     expect(res.status(), await res.text()).toBe(400);
+  });
+
+  test('rejects branding on a personal namespace', async ({ request }) => {
+    const personalHandle = 'branding-personal';
+    await seedPostgresPersonalNamespace(personalHandle, 'uid-branding-personal', 'Branding Personal');
+
+    const res = await request.patch(`/api/namespaces/${personalHandle}`, {
+      headers: authHeaders,
+      data: { logo: logoDataUrl, brandPrimaryColor: '#0d9488' },
+    });
+    expect(res.status(), await res.text()).toBe(409);
+
+    const getRes = await request.get(`/api/namespaces/${personalHandle}`, { headers: authHeaders });
+    const { namespace } = (await getRes.json()) as { namespace: { logo?: string } };
+    expect(namespace.logo ?? '').toBe('');
   });
 
   test('rejects an unauthenticated write', async ({ request }) => {
