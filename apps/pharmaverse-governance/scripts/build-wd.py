@@ -63,26 +63,17 @@ def command_to_script(command: str) -> Path:
     return SCRIPTS / (js_name[:-3] + ".ts" if js_name.endswith(".js") else js_name)
 
 
-def inline_assess() -> str:
-    skill = read(SKILLS / "assess-package-governance" / "SKILL.md")
-    criteria = read(SKILLS / "assess-package-governance" / "references" / "governance-criteria.md")
-    # Replace the single "See references/..." pointer with the actual criteria content.
-    marker = "See `references/governance-criteria.md` for the complete criteria specification with all IDs and thresholds."
-    replacement = "## Complete Governance Criteria Specification\n\n" + criteria
-    if marker in skill:
-        skill = skill.replace(marker, replacement)
-    else:
-        skill = skill + "\n\n" + replacement
-    return skill
-
-
 def inline_resolve() -> str:
     return read(SKILLS / "resolve-package-selection" / "SKILL.md")
 
 
+def inline_recommendations() -> str:
+    return read(SKILLS / "assess-recommendations" / "SKILL.md")
+
+
 AGENT_PROMPTS = {
     "resolve-package-selection": inline_resolve,
-    "assess-packages": inline_assess,
+    "assess-recommendations": inline_recommendations,
 }
 
 

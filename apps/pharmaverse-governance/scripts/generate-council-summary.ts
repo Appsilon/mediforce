@@ -42,6 +42,7 @@ interface PackageAssessment {
   dataGaps: string[];
   flags: string[];
   earlyWarnings: string[];
+  recommendations?: string[];
 }
 
 interface CouncilDecision {
@@ -51,12 +52,26 @@ interface CouncilDecision {
   source: string;
 }
 
+interface Recommendation {
+  packageName: string;
+  recommendations: string[];
+  flags: string[];
+}
+
 interface InputData {
   assessments?: PackageAssessment[];
+  recommendations?: Recommendation[];
   verdict?: string;
   comment?: string;
   reviewDate?: string;
-  steps?: Record<string, { assessments?: PackageAssessment[]; councilSummary?: { councilDecisions?: CouncilDecision[] } } | undefined>;
+  steps?: Record<
+    string,
+    {
+      assessments?: PackageAssessment[];
+      recommendations?: Recommendation[];
+      councilSummary?: { councilDecisions?: CouncilDecision[] };
+    } | undefined
+  >;
 }
 
 // ---------------------------------------------------------------------------
@@ -274,6 +289,12 @@ function packageSection(a: PackageAssessment, decision: CouncilDecision | undefi
   parts.push(`<div class="dim-label">Technical Quality: <span class="b ${badgeClass(a.proposedBadges.technicalQuality)}">${escapeHtml(badgeLabel(a.proposedBadges.technicalQuality))}</span></div>${evidenceTable(a.badgeEvidence.technicalQuality)}`);
   parts.push(`<div class="dim-label">Maintenance Health: <span class="b ${badgeClass(a.proposedBadges.maintenanceHealth)}">${escapeHtml(badgeLabel(a.proposedBadges.maintenanceHealth))}</span></div>${evidenceTable(a.badgeEvidence.maintenanceHealth)}`);
   parts.push(`<div class="dim-label">Submission Readiness: <span class="b ${badgeClass(a.proposedBadges.submissionReadiness)}">${escapeHtml(badgeLabel(a.proposedBadges.submissionReadiness))}</span></div>${evidenceTable(a.badgeEvidence.submissionReadiness)}`);
+  if (a.recommendations && a.recommendations.length > 0) {
+    parts.push(`<div class="rec"><strong>Recommendations:</strong><ul style="margin:0.25rem 0 0 1rem;padding:0">${a.recommendations.map((r) => `<li>${escapeHtml(r)}</li>`).join('')}</ul></div>`);
+  }
+  if (a.flags.length > 0) {
+    parts.push(`<div class="rec caution"><strong>Flags:</strong> ${a.flags.map(escapeHtml).join('; ')}</div>`);
+  }
   if (renewalTriggers.length > 0) {
     parts.push(`<div class="rec caution"><strong>Renewal triggers:</strong> ${renewalTriggers.map(escapeHtml).join(', ')}</div>`);
   }
@@ -297,18 +318,31 @@ function packageSection(a: PackageAssessment, decision: CouncilDecision | undefi
 </details>`;
 }
 
-/** Locate the assessments array: top-level (flattened previous step), the
- *  assess-packages step output, or — as a fallback — any step whose output
- *  carries an `assessments` array. */
+/** Locate the deterministic assessments array (from classify-packages), tolerant
+ *  of top-level flattening or any step that carries an `assessments` array. */
 function resolveAssessments(input: InputData): PackageAssessment[] {
-  if (Array.isArray(input.assessments) && input.assessments.length > 0) return input.assessments;
-  const direct = input.steps?.['assess-packages']?.assessments;
+  const direct = input.steps?.['classify-packages']?.assessments;
   if (Array.isArray(direct) && direct.length > 0) return direct;
+  if (Array.isArray(input.assessments) && input.assessments.length > 0) return input.assessments;
   for (const step of Object.values(input.steps ?? {})) {
     const candidate = (step as { assessments?: unknown } | undefined)?.assessments;
     if (Array.isArray(candidate) && candidate.length > 0) return candidate as PackageAssessment[];
   }
   return input.assessments ?? direct ?? [];
+}
+
+/** Merge the agent's recommendations/flags (from assess-recommendations) into
+ *  each assessment by package name. Never overrides classification fields. */
+function applyRecommendations(assessments: PackageAssessment[], input: InputData): void {
+  const recs = input.recommendations
+    ?? input.steps?.['assess-recommendations']?.recommendations
+    ?? [];
+  const byName = new Map(recs.map((r) => [r.packageName, r]));
+  for (const a of assessments) {
+    const rec = byName.get(a.packageName);
+    a.recommendations = rec?.recommendations ?? [];
+    if (rec?.flags?.length) a.flags = [...a.flags, ...rec.flags];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -319,9 +353,10 @@ async function main(): Promise<void> {
   const input = JSON.parse(await readFile('/output/input.json', 'utf-8')) as InputData;
 
   const assessments = resolveAssessments(input);
+  applyRecommendations(assessments, input);
 
   if (assessments.length === 0) {
-    console.warn('No assessments found in input — check that assess-packages wrote its assessments array to /output/result.json.');
+    console.warn('No assessments found in input — check that classify-packages wrote its assessments array to /output/result.json.');
   }
 
   const reviewDateObj = input.reviewDate ? new Date(input.reviewDate) : new Date();
@@ -418,10 +453,12 @@ async function main(): Promise<void> {
     <table>
       <tr><th>Package</th><th>Status</th><th>Warning</th><th>Recommendation</th></tr>
       ${warned
-        .map(
-          (a) =>
-            `<tr><td>${escapeHtml(a.packageName)}</td><td><span class="b ${statusClass(a.proposedStatus)}">${escapeHtml(a.proposedStatus)}</span></td><td>${a.earlyWarnings.map(escapeHtml).join('; ')}</td><td>Assign maintainer outreach for ${escapeHtml(a.packageName)}</td></tr>`,
-        )
+        .map((a) => {
+          const rec = a.recommendations && a.recommendations.length > 0
+            ? a.recommendations.map(escapeHtml).join('; ')
+            : `Assign maintainer outreach for ${escapeHtml(a.packageName)}`;
+          return `<tr><td>${escapeHtml(a.packageName)}</td><td><span class="b ${statusClass(a.proposedStatus)}">${escapeHtml(a.proposedStatus)}</span></td><td>${a.earlyWarnings.map(escapeHtml).join('; ')}</td><td>${rec}</td></tr>`;
+        })
         .join('')}
     </table>
   </div>

@@ -891,383 +891,237 @@ steps:
         console.error("Fatal error:", error);
         process.exit(1);
       });
-- id: assess-packages
-  name: Assess Package Governance Status
+- id: classify-packages
+  name: Classify Package Governance Status
+  type: creation
+  executor: script
+  plugin: script-container
+  description: Deterministically compute each package's status tag, quality badges, per-criterion evidence, renewal triggers, change type, confidence, and objective early warnings from the collected metrics. No LLM — identical metrics always yield the identical classification.
+  script:
+    runtime: javascript
+    image: mediforce-golden-image
+    inlineScript: |-
+      import { readFile, writeFile } from "node:fs/promises";
+      const CRITICAL_RESPONSE_THRESHOLD = 30;
+      const NONCRITICAL_TRIAGE_THRESHOLD = 90;
+      const COVERAGE_THRESHOLD = 70;
+      const OLD_ISSUE_DAYS = 365;
+      function errored(metrics, key) {
+        return metrics.errors.some((e) => e.toLowerCase().includes(key));
+      }
+      function num(n) {
+        return n === null ? "N/A" : (Math.round(n * 100) / 100).toString();
+      }
+      function classify(m, now) {
+        const dataGaps = [];
+        const coverageKnown = m.coverage.percent !== null && m.coverage.source !== "unknown" && !errored(m, "coverage");
+        if (!coverageKnown) dataGaps.push("coverage unknown");
+        const cranKnown = m.cranChecks.status !== "unknown" && m.cranStatus === "published" && !errored(m, "cran");
+        if (m.cranChecks.status === "unknown") dataGaps.push("CRAN check data unavailable");
+        const critMedianKnown = m.issues.criticalResponseMedianDays !== null;
+        const nonCritMedianKnown = m.issues.nonCriticalTriageMedianDays !== null;
+        const am1Fail = critMedianKnown && m.issues.criticalResponseMedianDays > CRITICAL_RESPONSE_THRESHOLD;
+        const am2Fail = nonCritMedianKnown && m.issues.nonCriticalTriageMedianDays > NONCRITICAL_TRIAGE_THRESHOLD;
+        const am3Met = m.releases.countLast18Months >= 1;
+        const maintenanceHealth = am1Fail || am2Fail || !am3Met ? "Low Maintenance" : "Actively Maintained";
+        const maintenanceEvidence = [
+          { criteriaId: "AM-1", met: !am1Fail, evidence: `Critical response median = ${num(m.issues.criticalResponseMedianDays)}d (threshold: ${CRITICAL_RESPONSE_THRESHOLD})` },
+          { criteriaId: "AM-2", met: !am2Fail, evidence: `Non-critical triage median = ${num(m.issues.nonCriticalTriageMedianDays)}d (threshold: ${NONCRITICAL_TRIAGE_THRESHOLD})` },
+          { criteriaId: "AM-3", met: am3Met, evidence: `${m.releases.countLast18Months} release(s) in last 18 months (threshold: 1)` }
+        ];
+        const qr0Fail = cranKnown && (m.cranChecks.errorCount > 0 || m.cranChecks.warningCount > 0);
+        const qr1Fail = coverageKnown && m.coverage.percent < COVERAGE_THRESHOLD;
+        const qr2Fail = !m.hasVignettes;
+        const qr4Fail = !(m.documentation.hasManPages && m.documentation.usesRoxygen);
+        const technicalQuality = qr0Fail || qr1Fail || qr2Fail || qr4Fail ? "Review Pending" : "Quality Reviewed";
+        const technicalEvidence = [
+          { criteriaId: "QR-0", met: !qr0Fail, evidence: cranKnown ? `CRAN checks: ${m.cranChecks.okCount} OK, ${m.cranChecks.errorCount} errors, ${m.cranChecks.warningCount} warnings` : "CRAN check status unknown" },
+          { criteriaId: "QR-1", met: !qr1Fail, evidence: coverageKnown ? `Coverage: ${num(m.coverage.percent)}% (threshold: ${COVERAGE_THRESHOLD}%)` : "Coverage unknown" },
+          { criteriaId: "QR-2", met: !qr2Fail, evidence: m.hasVignettes ? "Vignettes present" : "No vignettes found" },
+          { criteriaId: "QR-4", met: !qr4Fail, evidence: `Man pages: ${m.documentation.hasManPages ? "yes" : "no"}, roxygen2: ${m.documentation.usesRoxygen ? "yes" : "no"}` }
+        ];
+        const prev = m.currentState.governanceStatus;
+        let proposedStatus;
+        if (prev) {
+          proposedStatus = prev;
+        } else {
+          proposedStatus = m.cranStatus === "published" && am3Met && maintenanceHealth === "Actively Maintained" ? "Stable" : "Maturing";
+        }
+        const statusEvidence = [
+          { criteriaId: "ST-1", met: m.releases.majorBumps.length === 0, evidence: m.releases.majorBumps.length === 0 ? "No major version bumps in last 18 months" : `${m.releases.majorBumps.length} major bump(s)` },
+          { criteriaId: "ST-2", met: !am1Fail && !am2Fail, evidence: `Issue response within thresholds (critical ${num(m.issues.criticalResponseMedianDays)}d / non-critical ${num(m.issues.nonCriticalTriageMedianDays)}d)` },
+          { criteriaId: "ST-3", met: am3Met, evidence: `${m.releases.countLast18Months} release(s) in last 18 months` },
+          { criteriaId: "ST-5", met: !qr4Fail, evidence: `Documentation ${qr4Fail ? "incomplete" : "present"}` }
+        ];
+        let submissionReadiness;
+        const submissionEvidence = [];
+        if (proposedStatus !== "Stable") {
+          submissionReadiness = "Not Assessed";
+          submissionEvidence.push({ criteriaId: "SS-0", met: false, evidence: "Submission readiness assessed for Stable packages only" });
+        } else {
+          const ss1Met = coverageKnown && m.coverage.percent >= COVERAGE_THRESHOLD && m.hasVignettes;
+          submissionReadiness = ss1Met ? "Submission-Suitable" : "Submission-Caution";
+          submissionEvidence.push({
+            criteriaId: ss1Met ? "SS-1" : "SC-1",
+            met: ss1Met,
+            evidence: coverageKnown ? `Coverage ${num(m.coverage.percent)}%, vignettes ${m.hasVignettes ? "present" : "absent"}` : "Coverage unknown \u2014 cannot confirm validation artifacts"
+          });
+        }
+        let rt1 = false;
+        if (m.currentState.endorsementTermStart) {
+          const start = new Date(m.currentState.endorsementTermStart);
+          const expiry = new Date(start.getTime());
+          expiry.setMonth(expiry.getMonth() + 18);
+          rt1 = expiry <= now;
+        }
+        const renewalTriggers = { rt1_termExpired: rt1, rt2_majorRelease: m.releases.majorBumps.length > 0, rt3_councilInitiated: false };
+        const firstReview = m.currentState.governanceStatus === null;
+        const proposedChanges = [];
+        if (!firstReview) {
+          if (m.currentState.governanceStatus !== proposedStatus) proposedChanges.push({ field: "governanceStatus", from: m.currentState.governanceStatus, to: proposedStatus });
+          if (m.currentState.maintenanceHealth !== maintenanceHealth) proposedChanges.push({ field: "maintenanceHealth", from: m.currentState.maintenanceHealth, to: maintenanceHealth });
+          if (m.currentState.technicalQuality !== technicalQuality) proposedChanges.push({ field: "technicalQuality", from: m.currentState.technicalQuality, to: technicalQuality });
+          if (submissionReadiness !== null && m.currentState.submissionReadiness !== submissionReadiness) proposedChanges.push({ field: "submissionReadiness", from: m.currentState.submissionReadiness, to: submissionReadiness });
+        }
+        const changeType = firstReview ? "initial-assessment" : proposedChanges.length > 0 ? "proposed-change" : "consent-agenda";
+        const earlyWarnings = [];
+        if (m.issues.oldestUnresolvedDays !== null && m.issues.oldestUnresolvedDays > OLD_ISSUE_DAYS) {
+          earlyWarnings.push(`Unresolved issue older than 1 year (${Math.round(m.issues.oldestUnresolvedDays)} days)`);
+        }
+        if (m.issues.unresolvedCriticalCount > 0) {
+          earlyWarnings.push(`${m.issues.unresolvedCriticalCount} unresolved critical issues`);
+        }
+        if (m.errors.length > 0) dataGaps.push(`${m.errors.length} metric collection error(s)`);
+        const confidence = dataGaps.length === 0 ? "high" : dataGaps.length <= 2 ? "medium" : "low";
+        return {
+          proposedStatus,
+          statusEvidence,
+          proposedBadges: { submissionReadiness, maintenanceHealth, technicalQuality },
+          badgeEvidence: { submissionReadiness: submissionEvidence, maintenanceHealth: maintenanceEvidence, technicalQuality: technicalEvidence },
+          renewalTriggers,
+          renewalAssessment: null,
+          changeType,
+          previousState: m.currentState,
+          proposedChanges,
+          confidence,
+          dataGaps,
+          flags: [],
+          earlyWarnings
+        };
+      }
+      function resolvePackages(input) {
+        if (Array.isArray(input.packages) && input.packages.length > 0) return input.packages;
+        const direct = input.steps?.["collect-metrics"]?.packages;
+        if (Array.isArray(direct)) return direct;
+        for (const step of Object.values(input.steps ?? {})) {
+          const c = step?.packages;
+          if (Array.isArray(c) && c.length > 0 && c[0].cranStatus !== void 0) return c;
+        }
+        return [];
+      }
+      async function main() {
+        const input = JSON.parse(await readFile("/output/input.json", "utf-8"));
+        const packages = resolvePackages(input);
+        const now = /* @__PURE__ */ new Date();
+        const assessments = packages.map((m) => ({
+          packageName: m.packageName,
+          repo: m.repo,
+          repoUrl: m.repoUrl,
+          ...classify(m, now)
+        }));
+        const stable = assessments.filter((a) => a.proposedStatus === "Stable").length;
+        const maturing = assessments.filter((a) => a.proposedStatus === "Maturing").length;
+        const result = {
+          output_file: "/output/result.json",
+          summary: `Classified ${assessments.length} packages: ${stable} Stable, ${maturing} Maturing`,
+          assessments,
+          summaryStats: {
+            totalPackages: assessments.length,
+            stable,
+            maturing,
+            lowMaintenance: assessments.filter((a) => a.proposedBadges.maintenanceHealth === "Low Maintenance").length,
+            reviewPending: assessments.filter((a) => a.proposedBadges.technicalQuality === "Review Pending").length,
+            earlyWarnings: assessments.filter((a) => a.earlyWarnings.length > 0).length
+          },
+          classifiedAt: now.toISOString()
+        };
+        await writeFile("/output/result.json", JSON.stringify(result, null, 2), "utf-8");
+        console.log(`Done: ${assessments.length} classified (${stable} Stable, ${maturing} Maturing)`);
+      }
+      main().catch((error) => {
+        console.error("Fatal error:", error);
+        process.exit(1);
+      });
+- id: assess-recommendations
+  name: Assess Recommendations
   type: creation
   executor: agent
   autonomyLevel: L4
   plugin: claude-code-agent
-  description: Apply governance criteria to each package's metrics. Propose status tags, quality badges, and flag items needing council attention.
+  description: 'Judgment layer: turn the deterministic classifications and raw metrics into concise council recommendations and interpretive flags. Does not compute or change status or badges.'
   agent:
     image: mediforce-golden-image
-    timeoutMinutes: 30
+    timeoutMinutes: 20
     prompt: |-
       ---
-      name: assess-package-governance
-      description: Assess pharmaverse R packages against governance criteria and propose status tags, quality badges, and council action items
+      name: assess-recommendations
+      description: Turn deterministic package classifications plus raw metrics into concise council recommendations and interpretive flags. Does not compute or change status or badges.
       ---
 
-      # Assess Package Governance Status
+      # Assess Recommendations
 
-      You are given per-package metrics collected from the pharmaverse GitHub org and CRAN. Your job is to apply the pharmaverse governance criteria systematically to each package and produce a structured assessment.
-
-      ## Task
-
-      For each package in the input:
-
-      1. **Evaluate the current governance status tag** against the criteria
-      2. **Assess all three quality badge dimensions**
-      3. **Check renewal triggers**
-      4. **Compare proposed state against current state** to detect changes
-      5. **Flag items requiring council attention**
+      The status tags, quality badges, per-criterion evidence, renewal triggers, and
+      factual early warnings have **already been computed deterministically** in the
+      `classify-packages` step. Your job is the judgment layer only: for each package,
+      write short, actionable **council recommendations** and any **interpretive
+      flags** a human reviewer should see. You MUST NOT recompute or contradict the
+      classification — treat status and badges as fixed inputs.
 
       ## Input
 
-      The input is a JSON object with a `packages` array. Each package has:
-      - `packageName`, `repo`, `repoUrl` — identity
-      - `currentState` — current governance properties from GitHub (may be null if first review)
-      - `releases` — `latest` and `earliest` {tag, date}, `totalCount`, `countLast18Months`, `majorBumps` (the full release list is intentionally not included)
-      - `issues` — response times, open/closed counts
-      - `pullRequests` — PR activity
-      - `cranChecks` — R CMD check results from CRAN
-      - `cranStatus` — whether published on CRAN
-      - `coverage` — test coverage percentage
-      - `hasVignettes` — boolean
-      - `documentation` — man pages, roxygen usage
-      - `contributors` — counts and commit activity
-      - `errors` — any data collection errors (assess with available data, flag gaps)
+      Read `/output/input.json`:
+      - `steps["classify-packages"].assessments` — one object per package with
+        `packageName`, `proposedStatus`, `proposedBadges`, `badgeEvidence`,
+        `renewalTriggers`, `changeType`, `dataGaps`, `earlyWarnings`.
+      - `steps["collect-metrics"].packages` — the raw metrics, if you need detail.
 
-      ## Handling Missing, Null, or Unknown Data
+      ## Task
 
-      Metrics are often missing. Treat a missing metric as **unknown** — never as a pass and never as a fail. A criterion whose required metric is unknown is itself **unknown**: exclude it from the badge/status decision, record it in `dataGaps`, and lower `confidence`. Do not let an absent metric move a package up or down.
+      For each package, produce:
+      - **recommendations**: 0–3 short imperative sentences for the council
+        (e.g. "Assign maintainer outreach — 8 unresolved critical issues.",
+        "Confirm CRAN submission readiness before endorsing as Submission-Suitable.").
+        Base them on the classification: Low Maintenance, Review Pending, non-empty
+        `earlyWarnings`, fired `renewalTriggers`, or notable `dataGaps`. A healthy
+        package with no concerns gets an empty list.
+      - **flags**: 0–2 short interpretive notes needing human attention that are NOT
+        already stated as an early warning (e.g. "Active development but no CRAN
+        release — monitor for maturation."). Empty when nothing applies.
 
-      A metric is **unknown** when any of these hold:
-      - its value is `null`;
-      - a source reports unknown — `coverage.source == "unknown"` or `cranChecks.status == "unknown"`;
-      - the corresponding field appears in the package's `errors` array — a `0`, `false`, or empty value that resulted from a collection error is unknown, **not** a real zero.
+      Rules:
+      - Be terse. One sentence per item. No narrative paragraphs, no restating metrics
+        the report already shows.
+      - Do not invent data. Only reference values present in the input.
+      - Never output status or badge values — those belong to `classify-packages`.
 
-      Specific rules (these override the raw threshold tables):
+      ## Output
 
-      - **Coverage null/unknown** (`coverage.percent == null` or `coverage.source == "unknown"`): SS-1 and QR-1 are **unknown**, not failed. Do not downgrade Technical Quality or Submission Readiness solely because coverage is missing — record "coverage unknown" as a data gap.
-      - **CRAN checks unknown, or package not on CRAN** (`cranChecks.status == "unknown"`, or `cranStatus == "not-on-cran"` with no check data): QR-0 is **unknown**, not met. Never read the default `errorCount == 0 && warningCount == 0` as "clean" when there was no CRAN data — absence of errors is not evidence of a passing check. A non-CRAN package's R CMD check status requires CI evidence the council must supply.
-      - **Response-time medians null** (`criticalResponseMedianDays` / `nonCriticalTriageMedianDays == null`): the value could not be measured — it is **not** proof of fast response. Treat AM-1, AM-2, ST-2, and LM-1 as **unknown** unless issue counts show there were issues to respond to; never assert "responds within threshold" from a null median.
-      - **Zero commits / zero releases**: treat `contributors.commitsLast90Days == 0` (MA-2) or `releases.countLast18Months == 0` (AM-3 / LM-2) as a real signal **only** when `contributors` / `releases` are absent from `errors`. If the field errored, mark it unknown instead.
-      - **`currentState` all null**: this is the first review — mark `initial-assessment` (Step 4). This is expected, not a data gap.
-
-      When too many criteria for a dimension are unknown to assign a badge responsibly, output that badge as `null` with a data gap and `confidence: "low"` — never guess "Low Maintenance" or "Submission-Caution" from missing data.
-
-      ## Assessment Process
-
-      ### Step 1: Status Tag Assessment
-
-      Walk through the criteria for each status level. The tag should reflect the **most accurate description** of the package's current state.
-
-      **Stable (ST-1..ST-5):**
-      - ST-1: Settled, production-ready API — no major breaking changes expected
-      - ST-2: Actively responding to issues (critical ≤30 days, non-critical ≤90 days)
-      - ST-3: At least one release within the current 18-month endorsement term
-      - ST-4: All three quality badge dimensions actively assessed
-      - ST-5: Documentation current with latest release
-
-      **Maturing (MA-1..MA-5):**
-      - MA-1: Approved through RFC, signed Maintainer Covenant
-      - MA-2: Under active development (commits, issues addressed, releases)
-      - MA-3: Submission-Suitability NOT assessed at this stage
-      - MA-4: Maintenance Health and Technical Quality reflect current state
-      - MA-5: Must achieve Quality Reviewed within 12 months of entry
-
-      **Watch (WA-1..WA-4):**
-      - WA-1: Documented concern raised (maintenance gap, quality decline, value doubt)
-      - WA-2: Placed by majority council vote
-      - WA-3: Maintainer team notified before public announcement
-      - WA-4: 30-day appeal window
-
-      **At Risk (AR-1..AR-5):**
-      - AR-1: On Watch for at least one quarter with insufficient improvement
-      - AR-2: Placed by majority council vote
-      - AR-3: Must submit remediation plan within one quarter
-      - AR-4: 30-day appeal window
-      - AR-5: Council seeks steward if maintainer absent
-
-      **Archived (AV-1..AV-4):**
-      - AV-1: Automatic if At Risk with no remediation plan by next review
-      - AV-2: Direct path via 2/3 supermajority for egregious cases
-      - AV-3: No quality badges displayed
-      - AV-4: Retained for reference
-
-      **Important**: You can only **propose** a tag. You cannot place Watch, At Risk, or Archived — those require council votes. Instead, flag packages where the evidence suggests a status change is warranted and present the evidence for the council.
-
-      ### Step 2: Quality Badge Assessment
-
-      Assess each dimension independently:
-
-      **Dimension 1 — Submission Readiness** (Stable packages only):
-      - Submission-Suitable: SS-1 (validation artifacts), SS-2 (CDISC compliance), SS-3 (versioning stability), SS-4 (regulatory context awareness)
-      - Submission-Caution: SC-1 (unvalidated), SC-2 (dependency risks), SC-3 (regulatory grey areas)
-      - For Maturing packages: output "Not Assessed"
-
-      **Dimension 2 — Maintenance Health** (all packages):
-      - Actively Maintained: AM-1 (critical issues ≤30d), AM-2 (non-critical ≤90d), AM-3 (≥1 release per term), AM-4 (2-quarter deprecation notice), AM-5 (responsive to community)
-      - Low Maintenance: LM-1 (response times exceed thresholds), LM-2 (no releases in term), LM-3 (unresponsive), LM-4 (may trigger proactive outreach)
-
-      **Dimension 3 — Technical Quality** (all packages):
-      - Quality Reviewed: QR-0 (R CMD check clean), QR-1 (coverage ≥70%), QR-2 (vignettes present), QR-3 (maintainable code), QR-4 (documentation current)
-      - Review Pending: RP-1 (expected for Maturing), RP-2 (concern if long-standing for Stable), RP-3 (multiple terms without progress grounds for non-renewal)
-
-      ### Step 3: Renewal Trigger Check
-
-      - RT-1: Is the package past its 18-month endorsement term? (Check `endorsementTermStart` + 18 months vs today)
-      - RT-2: Has there been a major version release since last review? (Check `releases.majorBumps`)
-      - RT-3: Are there credible concerns warranting council-initiated review?
-
-      If any trigger fires, include a renewal assessment section evaluating:
-      - RC-1: Value proposition (does the gap still exist? — flag this as requiring human judgment)
-      - RC-2: Maintenance covenant (data-driven from metrics)
-      - RC-3: Quality badges (compare trajectory)
-      - RC-4: User adoption (community engagement, commit trends — partially data-driven)
-
-      ### Step 4: Change Detection
-
-      Compare proposed tags/badges against `currentState`:
-      - If any tag or badge would change, mark as "proposed-change"
-      - If this is the first review (currentState fields are null), mark as "initial-assessment"
-      - Healthy packages with no changes go to "consent-agenda"
-
-      ### Step 5: Confidence and Data Gaps
-
-      For each assessment, indicate confidence:
-      - **high**: All relevant metrics available, clear criteria match
-      - **medium**: Some metrics missing but enough for reasonable assessment
-      - **low**: Significant data gaps, assessment is tentative
-
-      List specific data gaps (e.g., "coverage unknown", "no CRAN check data").
-
-      ## Output Format
-
-      Write a **single** JSON file to `/output/result.json` containing the full
-      `assessments` array. This exact file is the step's structured output — the
-      downstream council-summary and report steps read `assessments` from it. Do
-      **not** split the assessments into a separate file (e.g. a markdown summary) and
-      leave `/output/result.json` holding only a short summary; if you do, every
-      downstream step receives zero packages.
+      Write `/output/result.json` with exactly this shape (keep it compact — one entry
+      per package, only packages that have at least one recommendation or flag may be
+      included; packages with none can be omitted):
 
       ```json
       {
-        "summary": "Assessed N packages: X consent agenda, Y proposed changes, Z renewals due",
-        "assessments": [
+        "summary": "Recommendations for N packages",
+        "recommendations": [
           {
-            "packageName": "admiral",
-            "repo": "admiral",
-            "repoUrl": "https://github.com/pharmaverse/admiral",
-
-            "proposedStatus": "Stable",
-            "statusEvidence": [
-              { "criteriaId": "ST-1", "met": true, "evidence": "No major version bump in current term" },
-              { "criteriaId": "ST-2", "met": true, "evidence": "Median critical issue response: 5 days" }
-            ],
-
-            "proposedBadges": {
-              "submissionReadiness": "Suitable",
-              "maintenanceHealth": "Actively Maintained",
-              "technicalQuality": "Quality Reviewed"
-            },
-            "badgeEvidence": {
-              "submissionReadiness": [
-                { "criteriaId": "SS-1", "met": true, "evidence": "Comprehensive test suite, 87% coverage" }
-              ],
-              "maintenanceHealth": [
-                { "criteriaId": "AM-1", "met": true, "evidence": "Median critical response: 5 days (threshold: 30)" }
-              ],
-              "technicalQuality": [
-                { "criteriaId": "QR-0", "met": true, "evidence": "CRAN checks: 12 OK, 0 errors, 0 warnings" }
-              ]
-            },
-
-            "renewalTriggers": {
-              "rt1_termExpired": false,
-              "rt2_majorRelease": false,
-              "rt3_councilInitiated": false
-            },
-            "renewalAssessment": null,
-
-            "changeType": "consent-agenda",
-            "previousState": {
-              "governanceStatus": "Stable",
-              "submissionReadiness": "Suitable",
-              "maintenanceHealth": "Actively Maintained",
-              "technicalQuality": "Quality Reviewed"
-            },
-            "proposedChanges": [],
-
-            "confidence": "high",
-            "dataGaps": [],
-            "flags": [],
-            "earlyWarnings": []
+            "packageName": "aNCA",
+            "recommendations": ["Assign maintainer outreach — 8 unresolved critical issues."],
+            "flags": ["Active development but not yet released to CRAN — monitor for maturation."]
           }
-        ],
-        "summaryStats": {
-          "totalPackages": 40,
-          "consentAgenda": 32,
-          "proposedChanges": 5,
-          "renewalsDue": 3,
-          "earlyWarnings": 4,
-          "initialAssessments": 2
-        },
-        "assessedAt": "2026-04-01T08:30:00Z"
+        ]
       }
       ```
-
-      ## Rules
-
-      - Be conservative: the default is **no change**. Only propose a status change when evidence is clear.
-      - Reference specific criteria IDs in all evidence (e.g., "AM-1: critical response median 5 days vs 30-day threshold").
-      - Clearly distinguish data-driven assessments from items requiring human judgment.
-      - For RC-1 (value proposition) and RC-4 (adoption evidence), flag as "requires-council-judgment" rather than making unsupported claims.
-      - If a package has data collection errors, note them as data gaps but still assess with available information.
-      - Do **not** emit a free-text narrative/markdown report per package. The human-readable per-package report is generated downstream from the structured fields (status, badges, evidence). Keep every `evidence` string to one concise sentence — this output is aggregated across all packages, so verbosity here breaks the council-summary step's prompt budget.
-
-      ## Reference
-
-      ## Complete Governance Criteria Specification
-
-      # Pharmaverse Governance Criteria Reference
-
-      Complete criteria specification with stable IDs and measurable thresholds.
-
-      > **Data availability governs every threshold below.** The `Measurable` column
-      > assumes the metric is present. When a metric is `null`, its source is
-      > `"unknown"`, or its field is in the package's `errors` array, the criterion is
-      > **unknown** — not met and not failed. See "Handling Missing, Null, or Unknown
-      > Data" in the skill. In particular: null `coverage.percent` does not fail QR-1 /
-      > SS-1; `cranChecks.status == "unknown"` or `cranStatus == "not-on-cran"` does
-      > not satisfy QR-0 via default zero counts; a null response-time median does not
-      > satisfy AM-1 / AM-2 / ST-2.
-
-      ## Status Tags
-
-      ### Stable (ST)
-      | ID | Criterion | Measurable |
-      |----|-----------|------------|
-      | ST-1 | Settled, production-ready API — no major breaking changes expected in current term | Check releases.majorBumps is empty |
-      | ST-2 | Actively responding: critical issues ≤30 days, non-critical ≤90 days | issues.criticalResponseMedianDays ≤ 30, issues.nonCriticalTriageMedianDays ≤ 90 |
-      | ST-3 | At least one release within current 18-month endorsement term | releases.countLast18Months ≥ 1 |
-      | ST-4 | All three quality badge dimensions actively assessed | All badges non-null |
-      | ST-5 | Documentation current with latest release | documentation.hasManPages && documentation.usesRoxygen |
-
-      ### Maturing (MA)
-      | ID | Criterion | Measurable |
-      |----|-----------|------------|
-      | MA-1 | Approved through RFC with signed Maintainer Covenant | currentState.governanceStatus == "Maturing" |
-      | MA-2 | Under active development | contributors.commitsLast90Days > 0 |
-      | MA-3 | Submission-Suitability NOT assessed | Output "Not Assessed" for submission readiness |
-      | MA-4 | Maintenance Health and Technical Quality reflect current state | Assess AM/QR criteria |
-      | MA-5 | Must achieve Quality Reviewed within 12 months of entry | Check endorsementTermStart + 12 months |
-
-      ### Watch (WA)
-      | ID | Criterion | Notes |
-      |----|-----------|-------|
-      | WA-1 | Documented concern raised | Propose based on evidence; council votes |
-      | WA-2 | Placed by majority council vote | Cannot be auto-assigned |
-      | WA-3 | Maintainer team notified before public announcement | Process requirement |
-      | WA-4 | 30-day appeal window | Process requirement |
-
-      ### At Risk (AR)
-      | ID | Criterion | Notes |
-      |----|-----------|-------|
-      | AR-1 | On Watch for ≥1 quarter with insufficient improvement | Check currentState + lastReviewDate |
-      | AR-2 | Placed by majority council vote | Cannot be auto-assigned |
-      | AR-3 | Remediation plan required within 1 quarter | Process requirement |
-      | AR-4 | 30-day appeal window | Process requirement |
-      | AR-5 | Council seeks steward if maintainer absent | Process requirement |
-
-      ### Archived (AV)
-      | ID | Criterion | Notes |
-      |----|-----------|-------|
-      | AV-1 | Automatic: At Risk + no remediation plan by next review | Check timeline |
-      | AV-2 | Direct: 2/3 supermajority for egregious cases | Cannot be auto-assigned |
-      | AV-3 | No quality badges displayed | Output all badges as null |
-      | AV-4 | Retained for reference | No action needed |
-
-      ## Quality Badges
-
-      ### Dimension 1 — Submission Readiness (Stable only)
-
-      **Submission-Suitable (SS)**
-      | ID | Criterion | Measurable |
-      |----|-----------|------------|
-      | SS-1 | Validation artifacts: comprehensive test coverage, requirements traceability, risk assessment | coverage.percent ≥ 70, hasVignettes |
-      | SS-2 | CDISC compliance where relevant | Requires human judgment |
-      | SS-3 | Stability & versioning: semantic versioning, pinned dependencies, archived releases | releases data |
-      | SS-4 | Regulatory context awareness in documentation | Requires human judgment |
-
-      **Submission-Caution (SC)**
-      | ID | Criterion | Measurable |
-      |----|-----------|------------|
-      | SC-1 | Unvalidated — validation artifacts incomplete or absent | coverage.percent < 70 or !hasVignettes |
-      | SC-2 | Upstream dependency risks | Requires dependency analysis |
-      | SC-3 | Regulatory grey areas | Requires human judgment |
-
-      ### Dimension 2 — Maintenance Health (all packages)
-
-      **Actively Maintained (AM)**
-      | ID | Criterion | Threshold |
-      |----|-----------|-----------|
-      | AM-1 | Critical issues acknowledged within 30 days | criticalResponseMedianDays ≤ 30 |
-      | AM-2 | Non-critical issues triaged within 90 days | nonCriticalTriageMedianDays ≤ 90 |
-      | AM-3 | At least one release per 18-month term | countLast18Months ≥ 1 |
-      | AM-4 | Breaking changes communicated with 2-quarter deprecation notice | Requires human judgment |
-      | AM-5 | Responsive to community questions and PRs | pullRequests.medianReviewTimeDays reasonable |
-
-      **Low Maintenance (LM)**
-      | ID | Criterion | Threshold |
-      |----|-----------|-----------|
-      | LM-1 | Response times exceed covenant thresholds | criticalResponseMedianDays > 30 OR nonCriticalTriageMedianDays > 90 |
-      | LM-2 | No release in current term or cadence significantly slowed | countLast18Months == 0 |
-      | LM-3 | Unresponsive to community | No PR reviews, no issue responses |
-      | LM-4 | May trigger proactive outreach | Early warning signal |
-
-      ### Dimension 3 — Technical Quality (all packages)
-
-      **Quality Reviewed (QR)**
-      | ID | Criterion | Threshold |
-      |----|-----------|-----------|
-      | QR-0 | R CMD check: no errors or warnings | cranChecks.errorCount == 0 && cranChecks.warningCount == 0 |
-      | QR-1 | Test coverage ≥70% for core functionality | coverage.percent ≥ 70 |
-      | QR-2 | Vignettes demonstrating pharma use case | hasVignettes == true |
-      | QR-3 | Maintainable code: clear structure, consistent style | Requires human judgment |
-      | QR-4 | Documentation covers all exported functions | documentation.hasManPages && documentation.usesRoxygen |
-
-      **Review Pending (RP)**
-      | ID | Criterion | Notes |
-      |----|-----------|-------|
-      | RP-1 | Expected initial state for Maturing | Not a concern |
-      | RP-2 | Long-standing for Stable is a concern | Flag if Stable + Review Pending for >1 term |
-      | RP-3 | Multiple terms without progress grounds for non-renewal | Flag at renewal |
-
-      ## Renewal
-
-      ### Triggers
-      | ID | Trigger | Check |
-      |----|---------|-------|
-      | RT-1 | 18-month calendar limit | endorsementTermStart + 18 months ≤ today |
-      | RT-2 | Major version release | releases.majorBumps not empty since last review |
-      | RT-3 | Council-initiated | Flag based on evidence severity |
-
-      ### Assessment Dimensions
-      | ID | Dimension | Data-driven? |
-      |----|-----------|-------------|
-      | RC-1 | Value proposition still holds | Partially (competing packages) — mostly council judgment |
-      | RC-2 | Maintenance covenant met | Yes — AM criteria |
-      | RC-3 | Quality badges trajectory | Yes — compare current vs previous |
-      | RC-4 | User adoption evidence | Partially (commits, PRs, stars) — mostly council judgment |
-
-      ### Outcomes
-      | ID | Outcome | Vote |
-      |----|---------|------|
-      | RO-1 | Renewed (new 18-month term) | Majority |
-      | RO-2 | Renewed with conditions (1 quarter) | Majority |
-      | RO-3 | Grace period (Watch + remediation) | Majority |
-      | RO-4 | Endorsement withdrawn (Archived) | 2/3 supermajority |
     model: anthropic/claude-sonnet-4.5
   env:
     OPENROUTER_API_KEY: '{{OPENROUTER_API_KEY}}'
@@ -1463,6 +1317,12 @@ steps:
         parts.push(`<div class="dim-label">Technical Quality: <span class="b ${badgeClass(a.proposedBadges.technicalQuality)}">${escapeHtml(badgeLabel(a.proposedBadges.technicalQuality))}</span></div>${evidenceTable(a.badgeEvidence.technicalQuality)}`);
         parts.push(`<div class="dim-label">Maintenance Health: <span class="b ${badgeClass(a.proposedBadges.maintenanceHealth)}">${escapeHtml(badgeLabel(a.proposedBadges.maintenanceHealth))}</span></div>${evidenceTable(a.badgeEvidence.maintenanceHealth)}`);
         parts.push(`<div class="dim-label">Submission Readiness: <span class="b ${badgeClass(a.proposedBadges.submissionReadiness)}">${escapeHtml(badgeLabel(a.proposedBadges.submissionReadiness))}</span></div>${evidenceTable(a.badgeEvidence.submissionReadiness)}`);
+        if (a.recommendations && a.recommendations.length > 0) {
+          parts.push(`<div class="rec"><strong>Recommendations:</strong><ul style="margin:0.25rem 0 0 1rem;padding:0">${a.recommendations.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}</ul></div>`);
+        }
+        if (a.flags.length > 0) {
+          parts.push(`<div class="rec caution"><strong>Flags:</strong> ${a.flags.map(escapeHtml).join("; ")}</div>`);
+        }
         if (renewalTriggers.length > 0) {
           parts.push(`<div class="rec caution"><strong>Renewal triggers:</strong> ${renewalTriggers.map(escapeHtml).join(", ")}</div>`);
         }
@@ -1485,20 +1345,30 @@ steps:
       </details>`;
       }
       function resolveAssessments(input) {
-        if (Array.isArray(input.assessments) && input.assessments.length > 0) return input.assessments;
-        const direct = input.steps?.["assess-packages"]?.assessments;
+        const direct = input.steps?.["classify-packages"]?.assessments;
         if (Array.isArray(direct) && direct.length > 0) return direct;
+        if (Array.isArray(input.assessments) && input.assessments.length > 0) return input.assessments;
         for (const step of Object.values(input.steps ?? {})) {
           const candidate = step?.assessments;
           if (Array.isArray(candidate) && candidate.length > 0) return candidate;
         }
         return input.assessments ?? direct ?? [];
       }
+      function applyRecommendations(assessments, input) {
+        const recs = input.recommendations ?? input.steps?.["assess-recommendations"]?.recommendations ?? [];
+        const byName = new Map(recs.map((r) => [r.packageName, r]));
+        for (const a of assessments) {
+          const rec = byName.get(a.packageName);
+          a.recommendations = rec?.recommendations ?? [];
+          if (rec?.flags?.length) a.flags = [...a.flags, ...rec.flags];
+        }
+      }
       async function main() {
         const input = JSON.parse(await readFile("/output/input.json", "utf-8"));
         const assessments = resolveAssessments(input);
+        applyRecommendations(assessments, input);
         if (assessments.length === 0) {
-          console.warn("No assessments found in input \u2014 check that assess-packages wrote its assessments array to /output/result.json.");
+          console.warn("No assessments found in input \u2014 check that classify-packages wrote its assessments array to /output/result.json.");
         }
         const reviewDateObj = input.reviewDate ? new Date(input.reviewDate) : /* @__PURE__ */ new Date();
         const reviewDate = isoDate(reviewDateObj);
@@ -1567,9 +1437,10 @@ steps:
         <div class="det-body">
           <table>
             <tr><th>Package</th><th>Status</th><th>Warning</th><th>Recommendation</th></tr>
-            ${warned.map(
-          (a) => `<tr><td>${escapeHtml(a.packageName)}</td><td><span class="b ${statusClass(a.proposedStatus)}">${escapeHtml(a.proposedStatus)}</span></td><td>${a.earlyWarnings.map(escapeHtml).join("; ")}</td><td>Assign maintainer outreach for ${escapeHtml(a.packageName)}</td></tr>`
-        ).join("")}
+            ${warned.map((a) => {
+          const rec = a.recommendations && a.recommendations.length > 0 ? a.recommendations.map(escapeHtml).join("; ") : `Assign maintainer outreach for ${escapeHtml(a.packageName)}`;
+          return `<tr><td>${escapeHtml(a.packageName)}</td><td><span class="b ${statusClass(a.proposedStatus)}">${escapeHtml(a.proposedStatus)}</span></td><td>${a.earlyWarnings.map(escapeHtml).join("; ")}</td><td>${rec}</td></tr>`;
+        }).join("")}
           </table>
         </div>
       </details>`;
@@ -1726,6 +1597,11 @@ steps:
         if (assessment.flags.length > 0) {
           for (const flag of assessment.flags) {
             items.push(`<div class="recommendation caution"><strong>Flag:</strong> ${escapeHtml(flag)}</div>`);
+          }
+        }
+        if (assessment.recommendations && assessment.recommendations.length > 0) {
+          for (const rec of assessment.recommendations) {
+            items.push(`<div class="recommendation"><strong>Recommendation:</strong> ${escapeHtml(rec)}</div>`);
           }
         }
         if (assessment.dataGaps.length > 0) {
@@ -2119,9 +1995,18 @@ steps:
           throw new Error("Missing councilSummary in input.json \u2014 not found at top level or in steps.generate-council-summary");
         }
         const reviewDate = councilSummary.reviewDate ?? (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-        const assessments = input.steps?.["assess-packages"]?.assessments ?? [];
+        const assessments = input.steps?.["classify-packages"]?.assessments ?? [];
         const metricsPackages = input.steps?.["collect-metrics"]?.packages ?? [];
         const discoveredPackages = input.steps?.["discover-packages"]?.packages ?? [];
+        const recMap = /* @__PURE__ */ new Map();
+        for (const rec of input.steps?.["assess-recommendations"]?.recommendations ?? []) {
+          recMap.set(rec.packageName, rec);
+        }
+        for (const a of assessments) {
+          const rec = recMap.get(a.packageName);
+          a.recommendations = rec?.recommendations ?? [];
+          if (rec?.flags?.length) a.flags = [...a.flags, ...rec.flags];
+        }
         if (assessments.length === 0) {
           console.warn("No package assessments found in input. Writing empty result.");
           const emptyResult = {
@@ -2204,8 +2089,10 @@ transitions:
 - from: resolve-package-selection
   to: collect-metrics
 - from: collect-metrics
-  to: assess-packages
-- from: assess-packages
+  to: classify-packages
+- from: classify-packages
+  to: assess-recommendations
+- from: assess-recommendations
   to: generate-council-summary
 - from: generate-council-summary
   to: review-council-summary

@@ -12,8 +12,8 @@ domains:
         complexity: intermediate
         language: multi
         description: Translate a reviewer's free-text package description into a filtered list of pharmaverse packages
-      - id: assess-package-governance
-        path: assess-package-governance/SKILL.md
-        complexity: advanced
+      - id: assess-recommendations
+        path: assess-recommendations/SKILL.md
+        complexity: intermediate
         language: multi
-        description: Assess pharmaverse packages against governance criteria and propose status tags and quality badges
+        description: Turn deterministic classifications into concise council recommendations and interpretive flags

@@ -72,16 +72,28 @@
       }
     },
     {
-      "id": "assess-packages",
-      "name": "Assess Package Governance Status",
+      "id": "classify-packages",
+      "name": "Classify Package Governance Status",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Deterministically compute each package's status tag, quality badges, per-criterion evidence, renewal triggers, change type, confidence, and objective early warnings from the collected metrics. No LLM — identical metrics always yield the identical classification.",
+      "agent": {
+        "image": "mediforce-golden-image",
+        "command": "node /app/classify-packages.js"
+      }
+    },
+    {
+      "id": "assess-recommendations",
+      "name": "Assess Recommendations",
       "type": "creation",
       "executor": "agent",
       "autonomyLevel": "L4",
       "plugin": "claude-code-agent",
-      "description": "Apply governance criteria to each package's metrics. Propose status tags, quality badges, and flag items needing council attention.",
+      "description": "Judgment layer: turn the deterministic classifications and raw metrics into concise council recommendations and interpretive flags. Does not compute or change status or badges.",
       "agent": {
         "image": "mediforce-golden-image",
-        "timeoutMinutes": 30
+        "timeoutMinutes": 20
       }
     },
     {
@@ -131,8 +143,9 @@
     { "from": "discover-packages", "to": "select-packages" },
     { "from": "select-packages", "to": "resolve-package-selection" },
     { "from": "resolve-package-selection", "to": "collect-metrics" },
-    { "from": "collect-metrics", "to": "assess-packages" },
-    { "from": "assess-packages", "to": "generate-council-summary" },
+    { "from": "collect-metrics", "to": "classify-packages" },
+    { "from": "classify-packages", "to": "assess-recommendations" },
+    { "from": "assess-recommendations", "to": "generate-council-summary" },
     { "from": "generate-council-summary", "to": "review-council-summary" },
     { "from": "generate-package-reports", "to": "done" }
   ]

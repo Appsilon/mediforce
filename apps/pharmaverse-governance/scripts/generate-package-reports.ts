@@ -58,6 +58,7 @@ interface PackageAssessment {
   dataGaps: string[];
   flags: string[];
   earlyWarnings: string[];
+  recommendations?: string[];
 }
 
 interface PackageMetrics {
@@ -113,11 +114,20 @@ interface CouncilSummary {
   councilDecisions: CouncilDecision[];
 }
 
+interface Recommendation {
+  packageName: string;
+  recommendations: string[];
+  flags: string[];
+}
+
 interface InputData {
   councilSummary?: CouncilSummary;
   steps?: {
-    'assess-packages'?: {
+    'classify-packages'?: {
       assessments: PackageAssessment[];
+    };
+    'assess-recommendations'?: {
+      recommendations: Recommendation[];
     };
     'collect-metrics'?: {
       packages: PackageMetrics[];
@@ -247,6 +257,12 @@ function buildRecommendations(
   if (assessment.flags.length > 0) {
     for (const flag of assessment.flags) {
       items.push(`<div class="recommendation caution"><strong>Flag:</strong> ${escapeHtml(flag)}</div>`);
+    }
+  }
+
+  if (assessment.recommendations && assessment.recommendations.length > 0) {
+    for (const rec of assessment.recommendations) {
+      items.push(`<div class="recommendation"><strong>Recommendation:</strong> ${escapeHtml(rec)}</div>`);
     }
   }
 
@@ -691,9 +707,20 @@ async function main(): Promise<void> {
   const reviewDate = councilSummary.reviewDate ?? new Date().toISOString().slice(0, 10);
 
   // Extract assessment data from steps
-  const assessments: PackageAssessment[] = input.steps?.['assess-packages']?.assessments ?? [];
+  const assessments: PackageAssessment[] = input.steps?.['classify-packages']?.assessments ?? [];
   const metricsPackages: PackageMetrics[] = input.steps?.['collect-metrics']?.packages ?? [];
   const discoveredPackages = input.steps?.['discover-packages']?.packages ?? [];
+
+  // Merge in the agent's recommendations/flags (judgment layer) by package name.
+  const recMap = new Map<string, Recommendation>();
+  for (const rec of input.steps?.['assess-recommendations']?.recommendations ?? []) {
+    recMap.set(rec.packageName, rec);
+  }
+  for (const a of assessments) {
+    const rec = recMap.get(a.packageName);
+    a.recommendations = rec?.recommendations ?? [];
+    if (rec?.flags?.length) a.flags = [...a.flags, ...rec.flags];
+  }
 
   if (assessments.length === 0) {
     console.warn('No package assessments found in input. Writing empty result.');
