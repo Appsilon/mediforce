@@ -28,8 +28,8 @@ import {
   useUpdateNamespace,
 } from '@/hooks/use-namespace-mutations';
 import { WORKSPACE_ICONS, WORKSPACE_ICON_KEYS, getWorkspaceIcon, WORKSPACE_DEFAULT_KEY } from '@/lib/workspace-icons';
-import { WORKSPACE_LOGO_MAX_CHARS } from '@mediforce/platform-core';
 import type { NamespaceMember } from '@mediforce/platform-core';
+import { fileToLogoDataUrl, LOGO_MAX_EDGE_PX, LogoTooLargeError } from '@/lib/logo-image';
 import { cn } from '@/lib/utils';
 import { NamespaceSecretsEditor } from '@/components/namespace/namespace-secrets-editor';
 
@@ -61,10 +61,6 @@ interface ResendResult {
 // so "Save colors" without a change persists the current look.
 const DEFAULT_PRIMARY_HEX = '#1c8779';
 const DEFAULT_ACCENT_HEX = '#f59f0a';
-
-// Cap the raw upload so the base64 data URL stays under the schema's character
-// limit (base64 inflates bytes ~4/3). Logos should be small optimised assets.
-const LOGO_MAX_BYTES = Math.floor((WORKSPACE_LOGO_MAX_CHARS * 3) / 4) - 512;
 
 function formatDate(isoString: string): string {
   return new Date(isoString).toLocaleDateString(undefined, {
@@ -308,16 +304,15 @@ export default function WorkspaceConfigPage() {
       setLogoError('Please choose an image file.');
       return;
     }
-    if (file.size > LOGO_MAX_BYTES) {
-      setLogoError(`Image is too large (max ${Math.floor(LOGO_MAX_BYTES / 1024)} KB).`);
+    let dataUrl: string;
+    try {
+      dataUrl = await fileToLogoDataUrl(file);
+    } catch (error) {
+      setLogoError(
+        error instanceof LogoTooLargeError ? error.message : 'Image could not be read.',
+      );
       return;
     }
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
     try {
       await updateNamespace.mutateAsync({ handle, logo: dataUrl });
     } catch {
@@ -662,7 +657,8 @@ export default function WorkspaceConfigPage() {
                         )}
                       </div>
                       <p className="text-[11px] text-muted-foreground">
-                        PNG, JPG, SVG, WebP or GIF · max {Math.floor(LOGO_MAX_BYTES / 1024)} KB.
+                        PNG, JPG, SVG, WebP or GIF · large images are resized to{' '}
+                        {LOGO_MAX_EDGE_PX}px.
                       </p>
                       {logoError !== null && <p className="text-[11px] text-destructive">{logoError}</p>}
                     </div>

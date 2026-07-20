@@ -16,9 +16,13 @@ export const BrandColorSchema = z
  * A workspace logo, stored inline as a base64 `data:` image URL (or `""` to
  * clear). Kept on the workspace record rather than the blob store so it travels
  * with the already-authenticated `namespaces.get` / `users.me` payloads and
- * renders via a plain `<img src>` — no separate authenticated fetch. The
- * ~256 KiB char cap keeps that payload small; logos should be optimised
- * (SVG/PNG) assets, not photos.
+ * renders via a plain `<img src>` — no separate authenticated fetch.
+ *
+ * The cap is a backstop, not the thing that keeps payloads small: the settings
+ * upload downscales rasters to `LOGO_MAX_EDGE_PX` before encoding, so stored
+ * logos land in the single-digit KB range and a user in ten branded workspaces
+ * stays well under a megabyte on `users.me`. Uploads that would exceed this
+ * even after downscaling are rejected.
  */
 export const WORKSPACE_LOGO_MAX_CHARS = 512 * 1024;
 export const WorkspaceLogoSchema = z

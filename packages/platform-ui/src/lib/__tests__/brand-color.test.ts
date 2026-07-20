@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hexToHslTriple, readableForegroundTriple } from '../brand-color';
+import { brandTokenTriples, hexToHslTriple, readableForegroundTriple } from '../brand-color';
 
 describe('hexToHslTriple', () => {
   it('converts primary/secondary colors to HSL triples', () => {
@@ -40,5 +40,51 @@ describe('readableForegroundTriple', () => {
   it('returns null for invalid input', () => {
     expect(readableForegroundTriple('')).toBeNull();
     expect(readableForegroundTriple('nope')).toBeNull();
+  });
+});
+
+describe('brandTokenTriples', () => {
+  it('passes the color through untouched when no bounds apply', () => {
+    expect(brandTokenTriples('#0d9488')).toEqual({
+      color: '175 84% 32%',
+      foreground: '0 0% 100%',
+    });
+  });
+
+  it('lifts a dark brand color to the dark-mode minimum lightness', () => {
+    // #0d9488 is 32% light — unreadable on a dark background without the lift.
+    const dark = brandTokenTriples('#0d9488', { minLightness: 55 });
+    expect(dark?.color).toBe('175 84% 55%');
+  });
+
+  it('leaves an already-light color alone at the same bound', () => {
+    // #5eead4 is 64% light, above the floor, so it must not be pulled down.
+    expect(brandTokenTriples('#5eead4', { minLightness: 55 })?.color).toBe('171 77% 64%');
+  });
+
+  it('clamps a saturated color into the dark hover-surface band', () => {
+    const accent = brandTokenTriples('#f59e0b', {
+      maxSaturation: 33,
+      minLightness: 14,
+      maxLightness: 20,
+    });
+    expect(accent?.color).toBe('38 33% 20%');
+  });
+
+  it('derives the foreground from the adjusted color, not the input', () => {
+    // Amber alone reads as "light" (dark text), but clamped to a 20%-lightness
+    // hover surface it needs white text.
+    expect(readableForegroundTriple('#f59e0b')).toBe('222 47% 11%');
+    expect(
+      brandTokenTriples('#f59e0b', { maxSaturation: 33, minLightness: 14, maxLightness: 20 })
+        ?.foreground,
+    ).toBe('0 0% 100%');
+  });
+
+  it('returns null for invalid, empty, or nullish input', () => {
+    expect(brandTokenTriples('')).toBeNull();
+    expect(brandTokenTriples('teal')).toBeNull();
+    expect(brandTokenTriples(undefined)).toBeNull();
+    expect(brandTokenTriples(null)).toBeNull();
   });
 });

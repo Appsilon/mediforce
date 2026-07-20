@@ -20,16 +20,13 @@ function parseHex(hex: string): Rgb | null {
   return { r: (int >> 16) & 0xff, g: (int >> 8) & 0xff, b: int & 0xff };
 }
 
-/**
- * Convert a `#rrggbb` hex color to a CSS HSL triple (`"H S% L%"`), the shape
- * the design tokens expect. Returns `null` for anything that is not a valid
- * 6-digit hex color (including the empty "cleared" state).
- */
-export function hexToHslTriple(hex: string | undefined | null): string | null {
-  if (hex === undefined || hex === null) return null;
-  const rgb = parseHex(hex);
-  if (rgb === null) return null;
+interface Hsl {
+  h: number;
+  s: number;
+  l: number;
+}
 
+function rgbToHsl(rgb: Rgb): Hsl {
   const r = rgb.r / 255;
   const g = rgb.g / 255;
   const b = rgb.b / 255;
@@ -53,10 +50,93 @@ export function hexToHslTriple(hex: string | undefined | null): string | null {
     if (hue < 0) hue += 360;
   }
 
-  const h = Math.round(hue);
-  const s = Math.round(saturation * 100);
-  const l = Math.round(lightness * 100);
+  return {
+    h: Math.round(hue),
+    s: Math.round(saturation * 100),
+    l: Math.round(lightness * 100),
+  };
+}
+
+function hslToRgb({ h, s, l }: Hsl): Rgb {
+  const saturation = s / 100;
+  const lightness = l / 100;
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const secondary = chroma * (1 - Math.abs(((h / 60) % 2) - 1));
+  const match = lightness - chroma / 2;
+
+  const sector = Math.floor(h / 60) % 6;
+  const [r, g, b] = (
+    [
+      [chroma, secondary, 0],
+      [secondary, chroma, 0],
+      [0, chroma, secondary],
+      [0, secondary, chroma],
+      [secondary, 0, chroma],
+      [chroma, 0, secondary],
+    ] as const
+  )[sector]!;
+
+  return {
+    r: Math.round((r + match) * 255),
+    g: Math.round((g + match) * 255),
+    b: Math.round((b + match) * 255),
+  };
+}
+
+function foregroundForRgb(rgb: Rgb): string {
+  const perceived = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+  return perceived > 150 ? '222 47% 11%' : '0 0% 100%';
+}
+
+/**
+ * Convert a `#rrggbb` hex color to a CSS HSL triple (`"H S% L%"`), the shape
+ * the design tokens expect. Returns `null` for anything that is not a valid
+ * 6-digit hex color (including the empty "cleared" state).
+ */
+export function hexToHslTriple(hex: string | undefined | null): string | null {
+  if (hex === undefined || hex === null) return null;
+  const rgb = parseHex(hex);
+  if (rgb === null) return null;
+  const { h, s, l } = rgbToHsl(rgb);
   return `${h} ${s}% ${l}%`;
+}
+
+/**
+ * Bounds a brand color must respect to work in the slot it is overriding. The
+ * defaults in `globals.css` differ per mode — dark `--primary` is deliberately
+ * lighter than its light counterpart, and dark `--accent` is a near-black
+ * low-saturation hover surface — so a raw brand color cannot be dropped into
+ * both.
+ */
+export interface BrandTokenBounds {
+  minLightness?: number;
+  maxLightness?: number;
+  maxSaturation?: number;
+}
+
+/**
+ * Fit a brand color into one token slot, returning the HSL triple to emit and a
+ * readable foreground for it. The foreground is derived from the *adjusted*
+ * color, not the input, so a brand color that was lightened for dark mode still
+ * gets legible text on top.
+ */
+export function brandTokenTriples(
+  hex: string | undefined | null,
+  bounds: BrandTokenBounds = {},
+): { color: string; foreground: string } | null {
+  if (hex === undefined || hex === null) return null;
+  const rgb = parseHex(hex);
+  if (rgb === null) return null;
+
+  const hsl = rgbToHsl(rgb);
+  const s = Math.min(hsl.s, bounds.maxSaturation ?? 100);
+  const l = Math.min(Math.max(hsl.l, bounds.minLightness ?? 0), bounds.maxLightness ?? 100);
+  const adjusted = { h: hsl.h, s, l };
+
+  return {
+    color: `${adjusted.h} ${adjusted.s}% ${adjusted.l}%`,
+    foreground: foregroundForRgb(hslToRgb(adjusted)),
+  };
 }
 
 /**
@@ -68,6 +148,5 @@ export function readableForegroundTriple(hex: string | undefined | null): string
   if (hex === undefined || hex === null) return null;
   const rgb = parseHex(hex);
   if (rgb === null) return null;
-  const perceived = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
-  return perceived > 150 ? '222 47% 11%' : '0 0% 100%';
+  return foregroundForRgb(rgb);
 }
