@@ -16,6 +16,7 @@ CREATE TABLE "triggers" (
 	CONSTRAINT "triggers_namespace_workflow_name_trigger_name_pk" PRIMARY KEY("namespace","workflow_name","trigger_name")
 );
 --> statement-breakpoint
+ALTER TABLE "triggers" ADD CONSTRAINT "triggers_namespace_workspaces_handle_fk" FOREIGN KEY ("namespace") REFERENCES "workspaces"("handle") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 -- One webhook per (namespace, workflow, path): the path discriminates when a
 -- workflow has multiple webhook triggers.
 CREATE UNIQUE INDEX "triggers_webhook_path_uq" ON "triggers" USING btree ("namespace","workflow_name",("config"->>'path')) WHERE "type" = 'webhook';--> statement-breakpoint

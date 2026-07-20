@@ -13,6 +13,7 @@ import type {
 } from '@mediforce/platform-core';
 import { InMemoryTriggerRepository } from '@mediforce/platform-core/testing';
 import { PostgresTriggerRepository } from '../repositories/trigger-repository';
+import { PostgresNamespaceRepository } from '../repositories/namespace-repository';
 import * as schema from '../schema/index';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -215,7 +216,29 @@ describe.skipIf(skipPg)('PostgresTriggerRepository (parity)', () => {
 
   contract('PostgresTriggerRepository', async () => {
     const db = drizzle(testClient, { schema });
-    await testClient.unsafe(`TRUNCATE TABLE "${schemaName}"."triggers"`);
+    await testClient.unsafe(
+      `TRUNCATE TABLE "${schemaName}"."triggers", "${schemaName}"."workspaces" CASCADE`,
+    );
+    // Seed the workspace every trigger row references (triggers.namespace FK).
+    await db
+      .insert(schema.workspaces)
+      .values({ handle: 'acme', type: 'organization', displayName: 'acme' });
     return new PostgresTriggerRepository(db);
+  });
+
+  it('deleting the workspace cascades away its triggers', async () => {
+    const db = drizzle(testClient, { schema });
+    await testClient.unsafe(
+      `TRUNCATE TABLE "${schemaName}"."triggers", "${schemaName}"."workspaces" CASCADE`,
+    );
+    await db
+      .insert(schema.workspaces)
+      .values({ handle: 'acme', type: 'organization', displayName: 'acme' });
+    const triggers = new PostgresTriggerRepository(db);
+    await triggers.create(cron());
+
+    await new PostgresNamespaceRepository(db).deleteNamespaceCascade('acme');
+
+    expect(await triggers.listEnabledByType('cron')).toEqual([]);
   });
 });

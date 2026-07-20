@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   index,
 } from 'drizzle-orm/pg-core';
+import { workspaces } from './workspace';
 
 /**
  * Unified `triggers` table (ADR-0011). One row per
@@ -24,7 +25,9 @@ import {
 export const triggers = pgTable(
   'triggers',
   {
-    namespace: text('namespace').notNull(),
+    namespace: text('namespace')
+      .notNull()
+      .references(() => workspaces.handle, { onDelete: 'cascade' }),
     workflowName: text('workflow_name').notNull(),
     triggerName: text('trigger_name').notNull(),
     type: text('type').notNull(),
