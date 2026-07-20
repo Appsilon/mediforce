@@ -21,7 +21,10 @@ function makeProvider(overrides: Partial<OAuthProviderConfig> = {}): OAuthProvid
   };
 }
 
-describe('ProviderForm', () => {
+// The submit cases drive `userEvent` through many fields; the default 5s
+// per-test timeout is too tight once the full monorepo suite runs its packages
+// in parallel and saturates CPU.
+describe('ProviderForm', { timeout: 15_000 }, () => {
   it('renders empty create form when provider and preset are null', () => {
     render(
       <ProviderForm
