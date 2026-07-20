@@ -90,7 +90,10 @@ function emitSpy(): { emit: EmitFn; events: EmitPayload[] } {
   return { emit, events };
 }
 
-describe.skipIf(!dockerAvailable())('WorkspaceManager + Docker end-to-end', () => {
+// Each case runs one or more real Docker containers (the "step 2" case runs
+// two sequentially), so the default 5s per-test timeout is too tight once the
+// full monorepo suite runs its packages in parallel and saturates CPU.
+describe.skipIf(!dockerAvailable())('WorkspaceManager + Docker end-to-end', { timeout: 60_000 }, () => {
   let dataDir: string;
   const originalDataDir = process.env.MEDIFORCE_DATA_DIR;
 

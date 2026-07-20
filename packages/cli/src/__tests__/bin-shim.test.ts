@@ -24,7 +24,10 @@ function runBin(args: string[]) {
   });
 }
 
-describe.skipIf(!tsxResolvable)('bin shim — spawned process', () => {
+// Each case spawns a real `node + tsx + CLI` subprocess (~2s solo), so the
+// default 5s per-test timeout is too tight once the full monorepo suite runs
+// its packages in parallel and saturates CPU.
+describe.skipIf(!tsxResolvable)('bin shim — spawned process', { timeout: 20_000 }, () => {
   it('--help exits 0 and prints usage on stdout', () => {
     const result = runBin(['--help']);
     expect(result.status).toBe(0);
