@@ -24,5 +24,6 @@ FROM node:24-slim
 WORKDIR /app
 
 COPY --from=builder /app/apps/community-digest/dist/gather-github-changes.js /app/gather-github-changes.js
+COPY --from=builder /app/apps/community-digest/dist/github-api-error.js /app/github-api-error.js
 
 RUN mkdir -p /output

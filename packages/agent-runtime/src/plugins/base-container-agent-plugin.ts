@@ -10,7 +10,7 @@ import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-stra
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, formatExitInfo, type ContainerPluginInit } from './container-plugin';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
-import { createLineStreamReader } from '@mediforce/platform-core';
+import { createLineStreamReader, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 
 /** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`
  *  but the agent context carries no OAuth token entry for that server. The
@@ -34,7 +34,12 @@ export class OAuthTokenUnavailableError extends Error {
 const __filename_base = fileURLToPath(import.meta.url);
 const __dirname_base = dirname(__filename_base);
 
-export const DEFAULT_TIMEOUT_MS = 20 * 60_000;
+// Last-resort container-kill timeout. Kept in lock-step with
+// resolveStepTimeoutMinutes' default (30) so an unconfigured step is never
+// SIGKILLed before the PluginRunner Promise.race classifies it as `timeout`
+// rather than `error` (ADR-0010). The workflow path never reaches this — it
+// resolves the timeout from the step via resolveStepTimeoutMinutes.
+export const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 
 /** Container-side path for bind-mounted Claude Code plugin roots. */
 export const CONTAINER_PLUGIN_MOUNT = '/plugin';
@@ -128,6 +133,34 @@ function hasFiles(input: Record<string, unknown>): input is Record<string, unkno
     typeof input.files[0].downloadUrl === 'string';
 }
 
+/** Platform base URL for server-side self-fetch. Mirrors the run-kicker
+ *  (`platform-services.ts`) so attachment downloads hit the same host the
+ *  auto-runner already reaches. `||` (not `??`) treats an empty-string env
+ *  as unset — Docker compose's `${VAR:-default}` can leave one behind. */
+function platformBaseUrl(): string {
+  return process.env.APP_BASE_URL || 'http://localhost:9003';
+}
+
+/** Resolve an attachment `downloadUrl` into an absolute URL + fetch headers.
+ *
+ *  Attachment URLs are minted browser-side (`file-upload-view.tsx`) as a
+ *  same-origin *relative* path (`/api/attachments/:id/blob`) — correct for the
+ *  browser, but Node's `fetch` rejects a relative URL with "Failed to parse
+ *  URL from ...". Resolve it against the platform base URL, and attach the
+ *  system `X-Api-Key` (browser session cookies aren't present server-side).
+ *  The key is only sent when the resolved origin matches our own base, so it
+ *  never leaks to a third-party host that supplied an absolute URL. */
+function resolveDownload(downloadUrl: string): { url: string; headers: Record<string, string> } {
+  const base = platformBaseUrl();
+  const url = new URL(downloadUrl, base);
+  const headers: Record<string, string> = {};
+  const apiKey = process.env.PLATFORM_API_KEY;
+  if (apiKey && url.origin === new URL(base).origin) {
+    headers['X-Api-Key'] = apiKey;
+  }
+  return { url: url.toString(), headers };
+}
+
 /** Download remote files to a temp directory and return updated input with localPath fields. */
 export async function downloadFilesToLocal(
   stepInput: Record<string, unknown>,
@@ -143,7 +176,8 @@ export async function downloadFilesToLocal(
 
   for (const file of stepInput.files) {
     const localPath = join(tempDir, file.name);
-    const response = await fetch(file.downloadUrl);
+    const { url, headers } = resolveDownload(file.downloadUrl);
+    const response = await fetch(url, { headers });
     if (!response.ok) {
       throw new Error(`Failed to download '${file.name}': HTTP ${response.status}`);
     }
@@ -639,7 +673,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         skill: stepAgent.skill,
         prompt: stepAgent.prompt,
         skillsDir: stepAgent.skillsDir,
-        timeoutMs: stepAgent.timeoutMs ?? (stepAgent.timeoutMinutes ? stepAgent.timeoutMinutes * 60_000 : undefined),
+        timeoutMs: stepAgent.timeoutMs ?? resolveStepTimeoutMinutes(context.step) * 60_000,
         image: stepAgent.image,
         repo: stepAgent.repo,
         commit: stepAgent.commit,
