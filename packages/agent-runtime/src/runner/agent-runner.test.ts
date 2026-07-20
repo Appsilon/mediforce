@@ -3,6 +3,7 @@ import { AgentRunner } from './agent-runner';
 import {
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
+  InMemoryAgentRunRepository,
   type WorkflowStep,
 } from '@mediforce/platform-core';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
@@ -615,5 +616,52 @@ describe('AgentRunner', () => {
         reviewerType: 'none',
       });
     }
+  });
+});
+
+describe('AgentRunner.reapAsTimeout (issue #868)', () => {
+  it('terminates the orphaned running AgentRun and routes through the timeout fallback', async () => {
+    const instanceRepository = new InMemoryProcessInstanceRepository();
+    const auditRepository = new InMemoryAuditRepository();
+    const eventLog = new InMemoryAgentEventLog();
+    const agentRunRepo = new InMemoryAgentRunRepository();
+    await createTestInstance(instanceRepository);
+    const runner = new AgentRunner(instanceRepository, auditRepository, eventLog, agentRunRepo);
+
+    await agentRunRepo.create({
+      id: 'run-stranded',
+      processInstanceId: 'instance-1',
+      stepId: 'step-1',
+      pluginId: 'test-plugin',
+      autonomyLevel: 'L4',
+      status: 'running',
+      envelope: null,
+      fallbackReason: null,
+      startedAt: new Date(Date.now() - 60 * 60_000).toISOString(),
+      completedAt: null,
+    });
+
+    const step: WorkflowStep = {
+      id: 'step-1',
+      name: 'Review output',
+      type: 'review',
+      executor: 'agent',
+      plugin: 'test-plugin',
+      agent: { model: 'anthropic/claude-sonnet-4', fallbackBehavior: 'escalate_to_human' },
+    };
+
+    const result = await runner.reapAsTimeout(makeWorkflowContext({ step }));
+
+    expect(result.fallbackReason).toBe('timeout');
+    expect(result.status).toBe('escalated');
+
+    const stranded = await agentRunRepo.getById('run-stranded');
+    expect(stranded?.status).toBe('escalated');
+    expect(stranded?.fallbackReason).toBe('timeout');
+    expect(stranded?.completedAt).not.toBeNull();
+
+    const inst = await instanceRepository.getById('instance-1');
+    expect(inst?.status).toBe('paused');
+    expect(inst?.pauseReason).toBe('agent_escalated');
   });
 });

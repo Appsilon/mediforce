@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { InMemoryAuditRepository } from '@mediforce/platform-core/testing';
+import {
+  InMemoryAuditRepository,
+  InMemoryPlatformSettingsRepository,
+} from '@mediforce/platform-core/testing';
 import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index';
 import { inviteUser } from '../invite-user';
 import { ForbiddenError, PreconditionFailedError } from '../../../errors';
@@ -304,6 +307,99 @@ describe('inviteUser handler', () => {
     expect(result.uid).toBe('uid-new');
     // Member still recorded.
     expect(namespaceRepo.members.get('alpha')).toHaveLength(1);
+  });
+
+  it('passes the configured platform.baseUrl through to the invite email', async () => {
+    const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
+    await platformSettingsRepo.set('platform.baseUrl', 'https://phuse.mediforce.ai');
+    const inviteService = inviteServiceReturning({
+      uid: 'uid-new',
+      temporaryPassword: 'Mf-XYZ',
+      isExisting: false,
+    });
+    const notifier = recordingNotifier();
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      inviteService,
+      inviteNotificationService: notifier,
+      platformSettingsRepo,
+    });
+
+    await inviteUser(baseInput, scope);
+
+    expect(notifier.sendInviteEmailCalls).toEqual([
+      {
+        toEmail: 'newbie@example.test',
+        temporaryPassword: 'Mf-XYZ',
+        baseUrl: 'https://phuse.mediforce.ai',
+      },
+    ]);
+  });
+
+  it('passes the configured platform.baseUrl through to the workspace-notification email (trailing slash trimmed)', async () => {
+    const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
+    await platformSettingsRepo.set('platform.baseUrl', 'https://phuse.mediforce.ai/');
+    const inviteService = inviteServiceReturning({
+      uid: 'uid-existing',
+      temporaryPassword: '',
+      isExisting: true,
+    });
+    const notifier = recordingNotifier();
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      inviteService,
+      inviteNotificationService: notifier,
+      platformSettingsRepo,
+    });
+
+    await inviteUser({ ...baseInput, inviterName: 'Marek' }, scope);
+
+    expect(notifier.sendWorkspaceCalls[0]).toMatchObject({
+      baseUrl: 'https://phuse.mediforce.ai',
+    });
+  });
+
+  it('omits baseUrl when platform.baseUrl is unset', async () => {
+    const inviteService = inviteServiceReturning({
+      uid: 'uid-new',
+      temporaryPassword: 'Mf-XYZ',
+      isExisting: false,
+    });
+    const notifier = recordingNotifier();
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      inviteService,
+      inviteNotificationService: notifier,
+    });
+
+    await inviteUser(baseInput, scope);
+
+    expect(notifier.sendInviteEmailCalls[0].baseUrl).toBeUndefined();
+  });
+
+  it('omits baseUrl when platform.baseUrl is cleared to whitespace (falls back, never an empty URL)', async () => {
+    const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
+    await platformSettingsRepo.set('platform.baseUrl', '   ');
+    const inviteService = inviteServiceReturning({
+      uid: 'uid-new',
+      temporaryPassword: 'Mf-XYZ',
+      isExisting: false,
+    });
+    const notifier = recordingNotifier();
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      inviteService,
+      inviteNotificationService: notifier,
+      platformSettingsRepo,
+    });
+
+    await inviteUser(baseInput, scope);
+
+    expect(notifier.sendInviteEmailCalls[0].baseUrl).toBeUndefined();
   });
 
   it('writes an invitation.created audit event attributed to the caller', async () => {

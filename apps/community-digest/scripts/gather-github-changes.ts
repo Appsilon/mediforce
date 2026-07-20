@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
+import { GitHubApiError } from './github-api-error.js';
 
 interface GatherInput {
   repo: string;
@@ -61,7 +62,17 @@ async function githubFetch(url: string): Promise<Response> {
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  return fetch(url, { headers });
+  const response = await fetch(url, { headers });
+  if (!response.ok) {
+    throw new GitHubApiError({
+      url,
+      status: response.status,
+      statusText: response.statusText,
+      rateLimitRemaining: response.headers.get('X-RateLimit-Remaining'),
+      rateLimitReset: response.headers.get('X-RateLimit-Reset'),
+    });
+  }
+  return response;
 }
 
 async function fetchBranches(repo: string): Promise<string[]> {
@@ -70,10 +81,6 @@ async function fetchBranches(repo: string): Promise<string[]> {
   while (true) {
     const url = `https://api.github.com/repos/${repo}/branches?per_page=100&page=${page}`;
     const response = await githubFetch(url);
-    if (!response.ok) {
-      console.error(`Failed to fetch branches: ${response.status} ${response.statusText}`);
-      break;
-    }
     const data = (await response.json()) as Array<{ name: string }>;
     if (data.length === 0) break;
     branches.push(...data.map((branch) => branch.name));
@@ -90,13 +97,15 @@ async function fetchCommitsForBranch(
   until: string,
 ): Promise<GitHubCommit[]> {
   const url = `https://api.github.com/repos/${repo}/commits?sha=${encodeURIComponent(branch)}&since=${since}&until=${until}&per_page=100`;
-  const response = await githubFetch(url);
-  if (!response.ok) {
-    // Branch may have been deleted between listing and fetching
-    if (response.status !== 409) {
-      console.error(`Failed to fetch commits for branch '${branch}': ${response.status} ${response.statusText}`);
+  let response: Response;
+  try {
+    response = await githubFetch(url);
+  } catch (error) {
+    // 409 = branch deleted between listing and fetching — non-fatal, skip this branch
+    if (error instanceof GitHubApiError && error.status === 409) {
+      return [];
     }
-    return [];
+    throw error;
   }
   const data = (await response.json()) as Array<{
     sha: string;
@@ -141,10 +150,6 @@ async function fetchCommits(repo: string, since: string, until: string): Promise
 async function fetchPullRequests(repo: string, since: string): Promise<GitHubPR[]> {
   const url = `https://api.github.com/repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=50`;
   const response = await githubFetch(url);
-  if (!response.ok) {
-    console.error(`Failed to fetch PRs: ${response.status} ${response.statusText}`);
-    return [];
-  }
   const data = (await response.json()) as Array<{
     number: number;
     title: string;
@@ -171,10 +176,6 @@ async function fetchPullRequests(repo: string, since: string): Promise<GitHubPR[
 async function fetchIssues(repo: string, since: string): Promise<GitHubIssue[]> {
   const url = `https://api.github.com/repos/${repo}/issues?state=all&since=${since}&sort=updated&direction=desc&per_page=50`;
   const response = await githubFetch(url);
-  if (!response.ok) {
-    console.error(`Failed to fetch issues: ${response.status} ${response.statusText}`);
-    return [];
-  }
   const data = (await response.json()) as Array<{
     number: number;
     title: string;

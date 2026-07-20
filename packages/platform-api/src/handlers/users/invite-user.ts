@@ -2,7 +2,7 @@ import { assertCallerIsNamespaceAdmin } from '../../auth';
 import { PreconditionFailedError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type { InviteUserInput, InviteUserOutput } from '../../contract/users';
-import { actorFromCaller } from '../_helpers';
+import { actorFromCaller, resolveConfiguredBaseUrl } from '../_helpers';
 
 /**
  * Invite a user to a workspace.
@@ -61,6 +61,7 @@ export async function inviteUser(
   const notify = scope.system.inviteNotificationService;
   if (notify !== null) {
     try {
+      const baseUrl = await resolveConfiguredBaseUrl(scope);
       if (isExisting) {
         const namespace = await scope.workspaces.getNamespace(input.namespaceHandle);
         const workspaceName = namespace?.displayName ?? input.namespaceHandle;
@@ -73,9 +74,14 @@ export async function inviteUser(
           inviterName,
           workspaceName,
           workspaceHandle: input.namespaceHandle,
+          ...(baseUrl !== undefined ? { baseUrl } : {}),
         });
       } else {
-        await notify.sendInviteEmail({ toEmail: email, temporaryPassword });
+        await notify.sendInviteEmail({
+          toEmail: email,
+          temporaryPassword,
+          ...(baseUrl !== undefined ? { baseUrl } : {}),
+        });
       }
       emailSent = true;
     } catch (emailErr) {

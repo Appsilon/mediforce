@@ -189,6 +189,26 @@ describe('ScriptStepExecutor', () => {
     );
   });
 
+  it('live error leaves the instance running for the loop-guard — does not hard-fail the run (#924)', async () => {
+    mockPluginRunner.execute.mockResolvedValue({
+      resultPayload: null,
+      timedOut: false,
+      errorMessage: 'ENOENT: script not found',
+    });
+
+    await executor.execute(mockPlugin, makeContext(), services, meta);
+
+    // The instance error is recorded, but status is NOT flipped to 'failed':
+    // only the timeout/reap path hard-fails (ADR-0010). A live error keeps its
+    // pre-ADR-0010 behaviour and stays `running` for the loop-guard (#924).
+    expect(mockInstanceRepo.update).toHaveBeenCalledWith('inst-001', expect.objectContaining({
+      error: expect.stringContaining('ENOENT: script not found'),
+    }));
+    expect(mockInstanceRepo.update).not.toHaveBeenCalledWith('inst-001', expect.objectContaining({
+      status: 'failed',
+    }));
+  });
+
   it('plugin timeout: returns escalated with timeout fallback', async () => {
     mockPluginRunner.execute.mockResolvedValue({
       resultPayload: null,
@@ -278,5 +298,35 @@ describe('ScriptStepExecutor', () => {
     await executor.execute(mockPlugin, makeContext(), services, metaNoExec);
 
     expect(mockInstanceRepo.updateStepExecution).not.toHaveBeenCalled();
+  });
+});
+
+describe('ScriptStepExecutor reap mode (issue #868)', () => {
+  let executor: ScriptStepExecutor;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    executor = new ScriptStepExecutor(mockPluginRunner as never);
+    mockInstanceRepo.getById.mockResolvedValue({
+      status: 'running', currentStepId: 'transform-data', definitionVersion: '1', variables: {},
+    });
+  });
+
+  it('reaps as timeout without running the plugin and fails the instance deterministically', async () => {
+    const reapMeta: StepExecutorMeta = { ...meta, stepExecutionId: 'exec-stranded', reapTimedOut: true };
+
+    const result = await executor.execute(mockPlugin, makeContext(), services, reapMeta);
+
+    expect(mockPluginRunner.execute).not.toHaveBeenCalled();
+    expect(result.fallbackReason).toBe('timeout');
+    expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+      'inst-001', 'exec-stranded', expect.objectContaining({ status: 'failed' }),
+    );
+    expect(mockInstanceRepo.update).toHaveBeenCalledWith(
+      'inst-001', expect.objectContaining({ status: 'failed' }),
+    );
+    expect(mockAuditRepo.append).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'script.step.started' }),
+    );
   });
 });

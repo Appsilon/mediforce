@@ -77,5 +77,9 @@ export const auditEvents = pgTable(
       table.processInstanceId,
       table.timestamp.asc(),
     ),
+    actorIdx: index('audit_events_actor_idx').on(
+      table.actorId,
+      table.timestamp.desc(),
+    ),
   }),
 );

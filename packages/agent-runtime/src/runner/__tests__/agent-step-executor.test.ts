@@ -7,6 +7,7 @@ import type { WorkflowStep } from '@mediforce/platform-core';
 
 const mockAgentRunner = {
   runWithWorkflowStep: vi.fn(),
+  reapAsTimeout: vi.fn(),
 };
 
 const mockAuditRepo = { append: vi.fn() };
@@ -283,5 +284,39 @@ describe('AgentStepExecutor', () => {
     expect(mockInstanceRepo.update).toHaveBeenCalledWith('inst-001', expect.objectContaining({
       variables: { 'analyze-data': { summary: 'analysis complete' } },
     }));
+  });
+});
+
+describe('AgentStepExecutor reap mode (issue #868)', () => {
+  let executor: AgentStepExecutor;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    executor = new AgentStepExecutor(mockAgentRunner as never);
+    mockInstanceRepo.getById.mockResolvedValue({
+      status: 'paused', currentStepId: 'analyze-data', definitionVersion: '1', variables: {},
+    });
+    mockAgentRunner.reapAsTimeout.mockResolvedValue({
+      status: 'escalated', envelope: null, appliedToWorkflow: false,
+      fallbackReason: 'timeout', errorMessage: 'stranded',
+    });
+  });
+
+  it('reaps via reapAsTimeout instead of running the plugin, and does not emit a started audit', async () => {
+    const reapMeta: StepExecutorMeta = { ...meta, stepExecutionId: 'exec-stranded', reapTimedOut: true };
+
+    const result = await executor.execute(mockPlugin, makeContext(), services, reapMeta);
+
+    expect(mockAgentRunner.reapAsTimeout).toHaveBeenCalledWith(
+      expect.objectContaining({ stepId: 'analyze-data' }),
+    );
+    expect(mockAgentRunner.runWithWorkflowStep).not.toHaveBeenCalled();
+    expect(result.fallbackReason).toBe('timeout');
+    expect(mockAuditRepo.append).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'agent.step.started' }),
+    );
+    expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+      'inst-001', 'exec-stranded', expect.objectContaining({ status: 'failed' }),
+    );
   });
 });

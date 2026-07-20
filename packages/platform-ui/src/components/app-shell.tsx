@@ -15,6 +15,7 @@ import { useRankingsAge } from '@/hooks/use-rankings-age';
 import { ThemeToggle } from './theme-toggle';
 import { CommandPaletteTrigger } from './command-palette';
 import { cn } from '@/lib/utils';
+import { workspaceSwitchHref } from '@/lib/workspace-switch';
 
 const NAV_ITEMS = [
   { href: '', label: 'Workflows', icon: GitBranch, badge: null, exact: true },
@@ -213,7 +214,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <>
                     <Popover.Close asChild>
                       <Link
-                        href={`/${personalNamespace.handle}`}
+                        href={workspaceSwitchHref(pathname, handleFromPath, personalNamespace.handle)}
                         className={cn(
                           'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
                           handleFromPath === personalNamespace.handle ? 'text-foreground' : 'text-muted-foreground',
@@ -239,7 +240,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   return (
                     <Popover.Close asChild key={ns.handle}>
                       <Link
-                        href={`/${ns.handle}`}
+                        href={workspaceSwitchHref(pathname, handleFromPath, ns.handle)}
                         className={cn(
                           'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
                           isActive ? 'text-foreground' : 'text-muted-foreground',

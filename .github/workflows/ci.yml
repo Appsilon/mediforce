@@ -136,7 +136,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('packages/platform-ui/pnpm-lock.yaml', 'pnpm-lock.yaml') }}
@@ -170,7 +170,7 @@ jobs:
       # them as a literal suffix. Bump the suffix if you change any value below.
       - name: Cache .next build for E2E
         id: next-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: packages/platform-ui/.next
           key: next-e2e-v1-${{ runner.os }}-${{ hashFiles('packages/*/src/**/*.ts', 'packages/*/src/**/*.tsx', 'packages/*/src/**/*.js', 'packages/*/src/**/*.jsx', 'packages/*/src/**/*.css', 'packages/platform-ui/public/**', 'packages/platform-ui/next.config.mjs', 'packages/*/tsconfig.json', 'tsconfig.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml') }}-env-fake-api-key-localhost-demo-mediforce-demo-mediforce.appspot.com-000000000000-1:000000000000:web:fake-true-http://localhost:9007

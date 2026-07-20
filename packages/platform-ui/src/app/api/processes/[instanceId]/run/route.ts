@@ -4,11 +4,11 @@ import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { checkRetiredModels } from '@mediforce/platform-api/handlers';
-import { resolveCoworkOutputSchema } from '@mediforce/platform-core';
+import { resolveCoworkOutputSchema, resolveStepTimeoutMs, type WorkflowStep, type ProcessInstanceRepository } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
-import { isStuckLoop, createLoopTracker, MAX_SAME_STEP_ITERATIONS } from '@/lib/loop-guard';
+import { isStuckLoop, createLoopTracker, MAX_SAME_STEP_ITERATIONS, hasExceededStepAttempts, resolveStepAttemptCap } from '@/lib/loop-guard';
 
 interface RunProcessBody {
   appContext?: Record<string, unknown>;
@@ -40,6 +40,33 @@ function tryAcquireRunLock(instanceId: string): boolean {
 
 function releaseRunLock(instanceId: string): void {
   runLocks.delete(instanceId);
+}
+
+/**
+ * Fail the run when a step exceeds the persisted attempt cap (ADR-0010),
+ * bounding re-kick / re-dispatch loops that survive process deaths (e.g. a hung
+ * action with no timeout, a step re-kicked by the heartbeat). Returns true when
+ * the run was failed, so the caller breaks the auto-runner loop.
+ */
+async function failRunIfStepAttemptsExceeded(
+  instanceRepo: ProcessInstanceRepository,
+  instanceId: string,
+  stepId: string,
+  step: WorkflowStep,
+  priorExecutionsForStep: number,
+): Promise<boolean> {
+  if (!hasExceededStepAttempts(priorExecutionsForStep, step.review?.maxIterations)) {
+    return false;
+  }
+  const cap = resolveStepAttemptCap(step.review?.maxIterations);
+  const message = `Step '${stepId}' exceeded ${cap} attempts — failing run to prevent an unbounded retry loop`;
+  console.error(`[auto-runner] ${message}`);
+  await instanceRepo.update(instanceId, {
+    status: 'failed',
+    error: message,
+    updatedAt: new Date().toISOString(),
+  });
+  return true;
 }
 
 export async function POST(
@@ -566,6 +593,11 @@ export async function POST(
             // and UI rather than every execution showing as iter 0.
             const priorExecutionsForStep = (await instanceRepo.getStepExecutions(instanceId))
               .filter((e) => e.stepId === instance.currentStepId).length;
+
+            if (await failRunIfStepAttemptsExceeded(instanceRepo, instanceId, currentStep.id, currentStep, priorExecutionsForStep)) {
+              break;
+            }
+
             await instanceRepo.addStepExecution(instanceId, {
               id: executionId,
               instanceId,
@@ -718,6 +750,59 @@ export async function POST(
           if (currentStep.executor === 'agent' || currentStep.executor === 'script') {
             console.log(`[auto-runner] Executing workflow agent step '${instance.currentStepId}' on instance '${instanceId}' (iteration ${stepsExecuted})`);
 
+            // Reap guard (ADR-0010): a prior driver (or drivers) may have died
+            // with this step still `running`. Rather than launch a duplicate
+            // attempt, gather EVERY still-running execution of this step and, once
+            // they are all past their timeout, reap each through the timeout
+            // fallback (fail/escalate/flag per fallbackBehavior). If any row is a
+            // not-yet-overdue live attempt, defer wholesale to the heartbeat — we
+            // never reap rows out from under, or double-run, live work.
+            const stepExecutions = await instanceRepo.getStepExecutions(instanceId);
+            const timeoutMs = resolveStepTimeoutMs(currentStep);
+            const inFlight = stepExecutions.filter(
+              (e) => e.stepId === instance.currentStepId && e.status === 'running',
+            );
+            if (inFlight.length > 0) {
+              const hasLiveAttempt = inFlight.some(
+                (e) => Date.now() - new Date(e.startedAt).getTime() < timeoutMs,
+              );
+              if (hasLiveAttempt) {
+                console.log(`[auto-runner] Step '${instance.currentStepId}' has an in-flight execution not yet past its ${Math.round(timeoutMs / 60_000)}m timeout — deferring to heartbeat`);
+                break;
+              }
+
+              // All in-flight rows are stranded past the timeout — reap every one
+              // so none is left showing running forever.
+              console.log(`[auto-runner] Reaping ${inFlight.length} stranded execution(s) of step '${instance.currentStepId}' as timeout (all past their ${Math.round(timeoutMs / 60_000)}m timeout)`);
+              for (const stranded of inFlight) {
+                await executeAgentStep(
+                  instanceId,
+                  instance.currentStepId,
+                  currentStep,
+                  appContext,
+                  triggeredBy ?? 'auto-runner',
+                  stranded.id,
+                  { reapTimedOut: true },
+                );
+              }
+              stepsExecuted++;
+
+              // A `continue_with_flag` fallback reaps to status 'flagged' and
+              // leaves the instance running on the same step. Without advancing,
+              // the loop would re-enter with no running execution and dispatch a
+              // fresh attempt — restarting the very step we just timed out. Move
+              // the run forward with an empty envelope so it leaves the stranded
+              // state. Escalate/pause fallbacks already paused the instance and
+              // fall through to the loop's status check on the next pass.
+              const afterReap = await instanceRepo.getById(instanceId);
+              if (afterReap?.status === 'running' && afterReap.currentStepId === instance.currentStepId) {
+                console.log(`[auto-runner] Reaped step '${instance.currentStepId}' left the run on the same step (continue_with_flag) — advancing past it`);
+                const { engine } = getPlatformServices();
+                await engine.advanceStep(instanceId, {}, { id: 'auto-runner', role: 'system' });
+              }
+              continue;
+            }
+
             const previousStepId = workflowDefinition.transitions.find(
               (t) => t.to === instance.currentStepId,
             )?.from ?? null;
@@ -730,8 +815,13 @@ export async function POST(
             // Iteration count = number of prior executions of this same step on
             // this instance. Lets revise loops surface as iter 1, 2, 3 in audit
             // and UI rather than every execution showing as iter 0.
-            const priorExecutionsForStep = (await instanceRepo.getStepExecutions(instanceId))
+            const priorExecutionsForStep = stepExecutions
               .filter((e) => e.stepId === instance.currentStepId).length;
+
+            if (await failRunIfStepAttemptsExceeded(instanceRepo, instanceId, currentStep.id, currentStep, priorExecutionsForStep)) {
+              break;
+            }
+
             await instanceRepo.addStepExecution(instanceId, {
               id: executionId,
               instanceId,

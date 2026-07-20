@@ -56,6 +56,14 @@ const nextConfig = {
     // cost is paid once at startup, not on each first-hit. Default `true` in
     // Next 16.2; set explicitly to guard against future default flips.
     preloadEntriesOnStart: true,
+    // Next caps every incoming request body at `proxyClientMaxBodySize`
+    // (default 10 MiB) in the router layer — bodies over it make
+    // `req.formData()` throw before any route handler runs. Task-attachment
+    // uploads (ADR-0003) allow files up to ATTACHMENT_MAX_BYTES (100 MiB,
+    // platform-core), so the default silently 500s any dataset over 10 MiB.
+    // Lift the cap above the attachment ceiling + multipart overhead. Keep in
+    // sync with ATTACHMENT_MAX_BYTES.
+    proxyClientMaxBodySize: 110 * 1024 * 1024,
   },
   typescript: {
     ignoreBuildErrors: false,

@@ -1,5 +1,20 @@
 import { NotFoundError } from '../errors';
+import { PLATFORM_BASE_URL_SETTING_KEY, normalizeBaseUrl } from '../contract/config';
 import type { CallerScope } from '../repositories/index';
+
+/**
+ * Resolve the deployment's configured public base URL from platform settings,
+ * or `undefined` when unset. Notification adapters use this to override their
+ * construction-time `NEXT_PUBLIC_PLATFORM_URL`/localhost fallback so invite
+ * links point at the real host. A trailing slash is stripped so callers can
+ * safely append `/login` etc.
+ */
+export async function resolveConfiguredBaseUrl(
+  scope: CallerScope,
+): Promise<string | undefined> {
+  const value = await scope.system.platformSettings.get(PLATFORM_BASE_URL_SETTING_KEY);
+  return normalizeBaseUrl(value);
+}
 
 export async function loadOr404<T>(
   lookup: Promise<T | null>,

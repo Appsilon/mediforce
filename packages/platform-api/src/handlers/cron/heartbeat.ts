@@ -1,5 +1,5 @@
 import type { CronTriggerState, ProcessInstance, Trigger, WorkflowDefinition } from '@mediforce/platform-core';
-import { resolveStepTimeoutMinutes } from '@mediforce/platform-core';
+import { resolveStrandedBudgetMs } from '@mediforce/platform-core';
 import { validateCronSchedule, isDue } from '@mediforce/workflow-engine';
 import type {
   HeartbeatInput,
@@ -13,23 +13,19 @@ import { resumeWait } from '../processes/resume-wait';
 
 type Evaluation = { fire: true } | { fire: false; reason: string };
 
-// Grace added on top of a running step's own timeout before its instance is
-// treated as stranded. A live driver enforces the step timeout and then
-// advances or fails the step (refreshing `updatedAt`); this grace covers the
-// gap between the timeout firing and that write, plus queue/spawn latency, so a
-// driver about to enforce its own timeout is never pre-empted.
-const STRANDED_GRACE_MS = 15 * 60 * 1000;
-
 // Fallback age used only when a run's current step (or its definition) can't be
-// resolved. Mirrors the runtime's 30-minute default step timeout + grace. The
-// live path derives the bound from the current step's *configured* timeout
-// (`strandedBudgetMs`) so a step that legitimately runs longer than the default
-// is never mistaken for stranded.
-export const STRANDED_RUNNING_THRESHOLD_MS = 30 * 60 * 1000 + STRANDED_GRACE_MS;
+// resolved: the runtime's default step timeout + grace, derived from the same
+// shared budget helper as the live path (`resolveStrandedBudgetMs`) by passing a
+// step with no configured timeout. The live path below derives the bound from
+// the current step's *configured* timeout so a step that legitimately runs
+// longer than the default is never mistaken for stranded.
+export const STRANDED_RUNNING_THRESHOLD_MS = resolveStrandedBudgetMs({});
 
 // Longest a `running` instance may sit idle (no `updatedAt` refresh) before its
 // driver is presumed dead: the current step's effective timeout + grace. Falls
 // back to the default bound when the step or its definition can't be loaded.
+// Single-sources the timeout + grace with the driver's reap bound (ADR-0010) via
+// resolveStrandedBudgetMs so the sweep and reap thresholds can't drift.
 async function strandedBudgetMs(
   inst: ProcessInstance,
   scope: CallerScope,
@@ -42,7 +38,7 @@ async function strandedBudgetMs(
       : await scope.workflowDefinitions.get(inst.namespace ?? '', inst.definitionName, version);
     const step = def?.steps.find((s) => s.id === inst.currentStepId);
     if (step === undefined) return STRANDED_RUNNING_THRESHOLD_MS;
-    return resolveStepTimeoutMinutes(step) * 60_000 + STRANDED_GRACE_MS;
+    return resolveStrandedBudgetMs(step);
   } catch {
     return STRANDED_RUNNING_THRESHOLD_MS;
   }
