@@ -297,6 +297,20 @@ function packageSection(a: PackageAssessment, decision: CouncilDecision | undefi
 </details>`;
 }
 
+/** Locate the assessments array: top-level (flattened previous step), the
+ *  assess-packages step output, or — as a fallback — any step whose output
+ *  carries an `assessments` array. */
+function resolveAssessments(input: InputData): PackageAssessment[] {
+  if (Array.isArray(input.assessments) && input.assessments.length > 0) return input.assessments;
+  const direct = input.steps?.['assess-packages']?.assessments;
+  if (Array.isArray(direct) && direct.length > 0) return direct;
+  for (const step of Object.values(input.steps ?? {})) {
+    const candidate = (step as { assessments?: unknown } | undefined)?.assessments;
+    if (Array.isArray(candidate) && candidate.length > 0) return candidate as PackageAssessment[];
+  }
+  return input.assessments ?? direct ?? [];
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -304,11 +318,10 @@ function packageSection(a: PackageAssessment, decision: CouncilDecision | undefi
 async function main(): Promise<void> {
   const input = JSON.parse(await readFile('/output/input.json', 'utf-8')) as InputData;
 
-  const assessments: PackageAssessment[] =
-    input.assessments ?? input.steps?.['assess-packages']?.assessments ?? [];
+  const assessments = resolveAssessments(input);
 
   if (assessments.length === 0) {
-    console.warn('No assessments in input.');
+    console.warn('No assessments found in input — check that assess-packages wrote its assessments array to /output/result.json.');
   }
 
   const reviewDateObj = input.reviewDate ? new Date(input.reviewDate) : new Date();

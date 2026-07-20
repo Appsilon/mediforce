@@ -1044,19 +1044,16 @@ steps:
 
       ## Output Format
 
-      Write a JSON file to `/output/result.json` with this structure:
+      Write a **single** JSON file to `/output/result.json` containing the full
+      `assessments` array. This exact file is the step's structured output — the
+      downstream council-summary and report steps read `assessments` from it. Do
+      **not** split the assessments into a separate file (e.g. a markdown summary) and
+      leave `/output/result.json` holding only a short summary; if you do, every
+      downstream step receives zero packages.
 
       ```json
       {
-        "output_file": "/output/result.json",
-        "summary": "Assessed N packages: X consent agenda, Y proposed changes, Z renewals due"
-      }
-      ```
-
-      The result.json must contain:
-
-      ```json
-      {
+        "summary": "Assessed N packages: X consent agenda, Y proposed changes, Z renewals due",
         "assessments": [
           {
             "packageName": "admiral",
@@ -1108,7 +1105,7 @@ steps:
             "earlyWarnings": []
           }
         ],
-        "summary": {
+        "summaryStats": {
           "totalPackages": 40,
           "consentAgenda": 32,
           "proposedChanges": 5,
@@ -1487,11 +1484,21 @@ steps:
         </div>
       </details>`;
       }
+      function resolveAssessments(input) {
+        if (Array.isArray(input.assessments) && input.assessments.length > 0) return input.assessments;
+        const direct = input.steps?.["assess-packages"]?.assessments;
+        if (Array.isArray(direct) && direct.length > 0) return direct;
+        for (const step of Object.values(input.steps ?? {})) {
+          const candidate = step?.assessments;
+          if (Array.isArray(candidate) && candidate.length > 0) return candidate;
+        }
+        return input.assessments ?? direct ?? [];
+      }
       async function main() {
         const input = JSON.parse(await readFile("/output/input.json", "utf-8"));
-        const assessments = input.assessments ?? input.steps?.["assess-packages"]?.assessments ?? [];
+        const assessments = resolveAssessments(input);
         if (assessments.length === 0) {
-          console.warn("No assessments in input.");
+          console.warn("No assessments found in input \u2014 check that assess-packages wrote its assessments array to /output/result.json.");
         }
         const reviewDateObj = input.reviewDate ? new Date(input.reviewDate) : /* @__PURE__ */ new Date();
         const reviewDate = isoDate(reviewDateObj);

@@ -140,19 +140,16 @@ List specific data gaps (e.g., "coverage unknown", "no CRAN check data").
 
 ## Output Format
 
-Write a JSON file to `/output/result.json` with this structure:
+Write a **single** JSON file to `/output/result.json` containing the full
+`assessments` array. This exact file is the step's structured output — the
+downstream council-summary and report steps read `assessments` from it. Do
+**not** split the assessments into a separate file (e.g. a markdown summary) and
+leave `/output/result.json` holding only a short summary; if you do, every
+downstream step receives zero packages.
 
 ```json
 {
-  "output_file": "/output/result.json",
-  "summary": "Assessed N packages: X consent agenda, Y proposed changes, Z renewals due"
-}
-```
-
-The result.json must contain:
-
-```json
-{
+  "summary": "Assessed N packages: X consent agenda, Y proposed changes, Z renewals due",
   "assessments": [
     {
       "packageName": "admiral",
@@ -204,7 +201,7 @@ The result.json must contain:
       "earlyWarnings": []
     }
   ],
-  "summary": {
+  "summaryStats": {
     "totalPackages": 40,
     "consentAgenda": 32,
     "proposedChanges": 5,
