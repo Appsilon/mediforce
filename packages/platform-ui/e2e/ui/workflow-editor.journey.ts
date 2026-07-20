@@ -25,7 +25,7 @@ function stepTypeButton(page: import('@playwright/test').Page, type: 'creation' 
 }
 
 /**
- * Returns an executor button in the Add Step popover's Section 2 ("Who executes this step?").
+ * Returns an executor button in the Add Step popover's "Executor" section.
  * 'agent' maps to "Autonomous agent" (L4).
  */
 function executorButton(page: import('@playwright/test').Page, executor: 'human' | 'agent' | 'script' | 'cowork') {
@@ -117,7 +117,7 @@ test.describe('Workflow Editor Journey', () => {
     // Open Add Step popover via the "+" button on an edge
     await page.getByLabel('Add step here').first().click();
     // Both sections visible simultaneously — wait for the executor section header
-    await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
 
     // Section 1: step type toggles (Creation active by default, Decision available)
     await expect(stepTypeButton(page, 'creation')).toBeVisible();
@@ -148,7 +148,7 @@ test.describe('Workflow Editor Journey', () => {
 
     // Add a step via edge "+" button
     await page.getByLabel('Add step here').first().click();
-    await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
     await executorButton(page, 'human').click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
@@ -180,7 +180,7 @@ test.describe('Workflow Editor Journey', () => {
 
     // Add a step via edge "+" button
     await page.getByLabel('Add step here').first().click();
-    await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
     await executorButton(page, 'human').click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
@@ -236,10 +236,11 @@ test.describe('Workflow Editor Journey', () => {
     // Modal shows the CodeMirror editor
     await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
 
-    // YAML content contains step IDs from the seeded definition
+    // YAML content contains the entry step id. (CodeMirror virtualizes: only
+    // on-screen lines are in the DOM, so assert the top-of-document step, not
+    // one further down like human-review.)
     const yamlContent = page.locator('.cm-content');
     await expect(yamlContent).toContainText('vendor-assessment', { timeout: 5_000 });
-    await expect(yamlContent).toContainText('human-review');
 
     // Apply button is available inside the modal
     await expect(page.getByRole('button', { name: /apply yaml/i })).toBeVisible();
@@ -355,7 +356,7 @@ test.describe('Workflow Editor Journey', () => {
 
     // Add an agent step via edge "+" button
     await page.getByLabel('Add step here').first().click();
-    await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
     await executorButton(page, 'agent').click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
@@ -367,8 +368,11 @@ test.describe('Workflow Editor Journey', () => {
     // Executor is shown as a read-only locked field (no toggle buttons)
     await expect(stepEditor.getByText('executor')).toBeVisible();
     await expect(stepEditor.getByTitle(/executor is set at creation/i)).toBeVisible();
-    // The icon header shows the Agent label (exact match avoids tooltip text false positives)
-    await expect(stepEditor.getByText('Agent', { exact: true })).toBeVisible();
+    // The locked executor field shows the Agent label (scoped to the executor
+    // row — "Agent" also appears in the step-editor metadata row).
+    await expect(
+      stepEditor.getByTitle(/executor is set at creation/i).getByText('Agent', { exact: true }),
+    ).toBeVisible();
 
     // Deselect, then open the source modal to verify YAML reflects the agent executor
     await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
@@ -390,7 +394,7 @@ test.describe('Workflow Editor Journey', () => {
 
     // Add a cowork step via edge "+" button
     await page.getByLabel('Add step here').first().click();
-    await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
     await executorButton(page, 'cowork').click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
@@ -430,7 +434,7 @@ test.describe('Workflow Editor Journey', () => {
 
     // Add a cowork step
     await page.getByLabel('Add step here').first().click();
-    await expect(page.getByText(/Who executes this step\?/i)).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByText('Executor', { exact: true })).toBeVisible({ timeout: 3_000 });
     await executorButton(page, 'cowork').click();
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
@@ -461,12 +465,12 @@ test.describe('Workflow Editor Journey', () => {
     await expect(commandInput).toHaveValue('tealflow-mcp');
 
     // Transport toggle switches the visible input to URL mode and back.
-    const transportToggle = sidePanel.getByRole('button', { name: /^stdio$/ });
+    const transportToggle = sidePanel.getByRole('button', { name: /^stdio$/i });
     await transportToggle.click();
     await expect(sidePanel.getByPlaceholder(/localhost:8080\/mcp/)).toBeVisible();
     await expect(sidePanel.getByPlaceholder(/e\.g\. tealflow-mcp/)).not.toBeVisible();
 
-    await sidePanel.getByRole('button', { name: /^http$/ }).click();
+    await sidePanel.getByRole('button', { name: /^http$/i }).click();
     await expect(sidePanel.getByPlaceholder(/e\.g\. tealflow-mcp/)).toBeVisible();
 
     // Remove — empty state returns.
