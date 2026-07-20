@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { InMemoryPlatformSettingsRepository } from '@mediforce/platform-core/testing';
-import { createTestScope } from '../../../repositories/__tests__/create-test-scope';
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
+import { ForbiddenError } from '../../../errors';
 import { getConfig, getConfigByPrefix } from '../index';
 
 describe('getConfig', () => {
@@ -8,6 +9,17 @@ describe('getConfig', () => {
     const scope = createTestScope();
     const result = await getConfig({ key: 'unknown.key' }, scope);
     expect(result).toEqual({ key: 'unknown.key', value: null });
+  });
+
+  it('[AUTHZ] rejects a non-system user caller — platform settings may hold secrets', async () => {
+    const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
+    await platformSettingsRepo.set('alert.webhook.url', 'https://hooks.slack.com/secret');
+    const scope = createTestScope({
+      platformSettingsRepo,
+      caller: userCaller('user-1', ['acme'], new Map([['acme', 'owner']])),
+    });
+    await expect(getConfig({ key: 'alert.webhook.url' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(getConfigByPrefix({ prefix: 'alert.webhook.' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it('returns the stored value for a known key', async () => {

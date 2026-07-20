@@ -35,6 +35,12 @@ export interface InviteService {
 export interface SendInviteEmailInput {
   readonly toEmail: string;
   readonly temporaryPassword: string;
+  /**
+   * Overrides the adapter's construction-time app URL when the deployment has
+   * configured a `platform.baseUrl` setting. Absent → the adapter falls back to
+   * `NEXT_PUBLIC_PLATFORM_URL` → localhost.
+   */
+  readonly baseUrl?: string;
 }
 
 export interface SendWorkspaceNotificationEmailInput {
@@ -42,6 +48,8 @@ export interface SendWorkspaceNotificationEmailInput {
   readonly inviterName: string;
   readonly workspaceName: string;
   readonly workspaceHandle: string;
+  /** See {@link SendInviteEmailInput.baseUrl}. */
+  readonly baseUrl?: string;
 }
 
 /**

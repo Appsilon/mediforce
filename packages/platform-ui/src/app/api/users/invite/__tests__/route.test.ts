@@ -34,6 +34,7 @@ vi.mock('@/lib/platform-services', () => ({
     },
     instanceRepo: { getById: vi.fn() },
     auditRepo: { append: mockAuditAppend },
+    platformSettingsRepo: { get: vi.fn().mockResolvedValue(null) },
     toolCatalogRepo: {},
     oauthProviderRepo: {},
     agentOAuthTokenRepo: {},

@@ -2,7 +2,7 @@ import { assertCallerIsNamespaceAdmin } from '../../auth';
 import { HandlerError, PreconditionFailedError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type { ResendInviteInput, ResendInviteOutput } from '../../contract/users';
-import { actorFromCaller } from '../_helpers';
+import { actorFromCaller, resolveConfiguredBaseUrl } from '../_helpers';
 
 /**
  * Re-issue an invite for a pending workspace member.
@@ -53,7 +53,12 @@ export async function resendInvite(
   const notify = scope.system.inviteNotificationService;
   if (notify !== null) {
     try {
-      await notify.sendInviteEmail({ toEmail: email, temporaryPassword });
+      const baseUrl = await resolveConfiguredBaseUrl(scope);
+      await notify.sendInviteEmail({
+        toEmail: email,
+        temporaryPassword,
+        ...(baseUrl !== undefined ? { baseUrl } : {}),
+      });
       emailSent = true;
     } catch (emailErr) {
       console.error('[resend-invite] Failed to send email:', emailErr);
