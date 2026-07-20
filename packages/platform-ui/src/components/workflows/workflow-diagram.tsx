@@ -1039,8 +1039,9 @@ function FlowCanvas({ className, style, height, localNodes, edges, onNodesChange
         onNodesChange={onNodesChange}
         onNodeClick={handleNodeClick}
         onPaneClick={onPaneClick}
+        minZoom={0.2}
         fitView
-        fitViewOptions={{ minZoom: 0.95, maxZoom: 0.95 }}
+        fitViewOptions={{ padding: 0.15, maxZoom: 0.95 }}
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={1} className="!bg-white dark:!bg-background" />
