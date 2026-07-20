@@ -1,5 +1,5 @@
 import { NotFoundError } from '../errors';
-import { PLATFORM_BASE_URL_SETTING_KEY } from '../contract/config';
+import { PLATFORM_BASE_URL_SETTING_KEY, normalizeBaseUrl } from '../contract/config';
 import type { CallerScope } from '../repositories/index';
 
 /**
@@ -13,8 +13,7 @@ export async function resolveConfiguredBaseUrl(
   scope: CallerScope,
 ): Promise<string | undefined> {
   const value = await scope.system.platformSettings.get(PLATFORM_BASE_URL_SETTING_KEY);
-  const trimmed = value?.trim().replace(/\/+$/, '') ?? '';
-  return trimmed === '' ? undefined : trimmed;
+  return normalizeBaseUrl(value);
 }
 
 export async function loadOr404<T>(

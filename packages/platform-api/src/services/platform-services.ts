@@ -63,6 +63,7 @@ import {
   type DockerImagesService,
 } from './docker-images-service';
 import { sendInviteEmail, sendWorkspaceNotificationEmail } from './invite-emails';
+import { normalizeBaseUrl } from '../contract/config';
 import type {
   InviteNotificationService,
   InviteService,
@@ -223,7 +224,7 @@ class EmailInviteNotificationService implements InviteNotificationService {
   ) {}
 
   async sendInviteEmail(input: SendInviteEmailInput): Promise<void> {
-    const appUrl = input.baseUrl ?? this.appUrl;
+    const appUrl = normalizeBaseUrl(input.baseUrl) ?? this.appUrl;
     await sendInviteEmail(
       {
         toEmail: input.toEmail,
@@ -236,7 +237,7 @@ class EmailInviteNotificationService implements InviteNotificationService {
   }
 
   async sendWorkspaceNotificationEmail(input: SendWorkspaceNotificationEmailInput): Promise<void> {
-    const appUrl = input.baseUrl ?? this.appUrl;
+    const appUrl = normalizeBaseUrl(input.baseUrl) ?? this.appUrl;
     await sendWorkspaceNotificationEmail(
       {
         toEmail: input.toEmail,
