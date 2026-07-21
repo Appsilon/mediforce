@@ -3,7 +3,9 @@ import type { NewStepPayload } from '@/lib/control-mode';
 export type CMRowButton = {
   label: string;
   color: string;
-  payload: NewStepPayload;
+  // The step type (creation/decision) is chosen by the picker toggle and merged
+  // in at add time, so presets only carry the executor-shaped fields.
+  payload: Omit<NewStepPayload, 'type'>;
 };
 
 export type CMRow = {
@@ -25,9 +27,9 @@ export const CM_ROWS: CMRow[] = [
     color: 'orange',
     description: 'No AI involved',
     buttons: [
-      { label: 'Human',  color: 'orange', payload: { type: 'creation', executor: 'human' } },
-      { label: 'Script', color: 'yellow', payload: { type: 'creation', executor: 'script' } },
-      { label: 'Action', color: 'pink',   payload: { type: 'creation', executor: 'action' } },
+      { label: 'Human',  color: 'orange', payload: { executor: 'human' } },
+      { label: 'Script', color: 'yellow', payload: { executor: 'script' } },
+      { label: 'Action', color: 'pink',   payload: { executor: 'action' } },
     ],
   },
   {
@@ -35,24 +37,24 @@ export const CM_ROWS: CMRow[] = [
     color: 'lime',
     description: 'Human executes, AI reviews — coming soon',
     disabled: true,
-    buttons: [{ label: 'Assist', color: 'lime', payload: { type: 'creation', executor: 'human' } }],
+    buttons: [{ label: 'Assist', color: 'lime', payload: { executor: 'human' } }],
   },
   {
     cm: 'CM2',
     color: 'teal',
     description: 'Human and AI collaborate in real time',
-    buttons: [{ label: 'Cowork', color: 'teal', payload: { type: 'creation', executor: 'cowork', cowork: { agent: 'chat' } } }],
+    buttons: [{ label: 'Cowork', color: 'teal', payload: { executor: 'cowork', cowork: { agent: 'chat' } } }],
   },
   {
     cm: 'CM3',
     color: 'indigo',
     description: 'AI executes, human reviews before proceeding',
-    buttons: [{ label: 'Human review', color: 'indigo', payload: { type: 'creation', executor: 'agent', autonomyLevel: 'L3' } }],
+    buttons: [{ label: 'Human review', color: 'indigo', payload: { executor: 'agent', autonomyLevel: 'L3' } }],
   },
   {
     cm: 'CM4',
     color: 'violet',
     description: 'AI executes without waiting for human review',
-    buttons: [{ label: 'Autonomous agent', color: 'violet', payload: { type: 'creation', executor: 'agent', autonomyLevel: 'L4' } }],
+    buttons: [{ label: 'Autonomous agent', color: 'violet', payload: { executor: 'agent', autonomyLevel: 'L4' } }],
   },
 ];

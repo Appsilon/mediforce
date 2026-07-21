@@ -539,7 +539,7 @@ export function WorkflowEditorCanvas({
               <p>You can author workflows three ways:</p>
               <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
                 <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
-                <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
+                <li>Generate with the <strong className="text-foreground">AI Assistant</strong> pane on the right</li>
                 <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
               </ul>
             </span>
