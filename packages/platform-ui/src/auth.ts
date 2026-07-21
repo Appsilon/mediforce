@@ -7,9 +7,9 @@ import { DrizzleAdapter } from '@auth/drizzle-adapter';
 import Google from 'next-auth/providers/google';
 import Credentials from 'next-auth/providers/credentials';
 import { compare } from 'bcryptjs';
-import { eq } from 'drizzle-orm';
 import {
   getSharedPostgresClient,
+  findPasswordCredentialByEmail,
   authUsers,
   authAccounts,
   authSessions,
@@ -70,9 +70,7 @@ function buildProviders(): Provider[] {
           const email = credentials?.email;
           const password = credentials?.password;
           if (typeof email !== 'string' || typeof password !== 'string') return null;
-          const user = await db.query.authUsers.findFirst({
-            where: eq(authUsers.email, email),
-          });
+          const user = await findPasswordCredentialByEmail(db, email);
           if (!user?.passwordHash) return null;
           const ok = await compare(password, user.passwordHash);
           if (!ok) return null;

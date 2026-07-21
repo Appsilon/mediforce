@@ -23,3 +23,34 @@ export async function setUserPasswordHash(
     .returning({ id: authUsers.id });
   return updated.length > 0;
 }
+
+export type PasswordCredentialRecord = {
+  id: string;
+  email: string | null;
+  name: string | null;
+  image: string | null;
+  passwordHash: string | null;
+};
+
+/**
+ * Look up the credential record the Credentials provider's `authorize` needs
+ * (ADR-0002 §4). Returns `null` when no user has that email; the caller
+ * compares the bcrypt hash.
+ */
+export async function findPasswordCredentialByEmail(
+  db: Database,
+  email: string,
+): Promise<PasswordCredentialRecord | null> {
+  const [user] = await db
+    .select({
+      id: authUsers.id,
+      email: authUsers.email,
+      name: authUsers.name,
+      image: authUsers.image,
+      passwordHash: authUsers.passwordHash,
+    })
+    .from(authUsers)
+    .where(eq(authUsers.email, email))
+    .limit(1);
+  return user ?? null;
+}

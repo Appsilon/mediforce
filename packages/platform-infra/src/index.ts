@@ -13,7 +13,7 @@ export {
   createDatabaseSession,
   SESSION_TTL_MS,
 } from './auth/session-store';
-export { setUserPasswordHash } from './auth/credentials-store';
+export { setUserPasswordHash, findPasswordCredentialByEmail } from './auth/credentials-store';
 export type {
   FirebaseUserExport,
   FirebaseCustomClaims,
