@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-07-19]
+
 ### Added
 - Integration test coverage for the workflow engine's full execution loop (`packages/workflow-engine/src/__tests__/integration.test.ts`): mixed agent → human → agent → terminal lifecycle with state asserted at every transition, agent-output propagation into `instance.variables` and the downstream step's input, agent-crash → failure → retry → complete recovery, and verdict-based routing (approve vs revise) — all driven through the in-memory repos, no emulators [#794](https://github.com/Appsilon/mediforce/pull/794).
 
