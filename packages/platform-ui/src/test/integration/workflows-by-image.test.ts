@@ -50,9 +50,8 @@ vi.mock('@/lib/platform-services', () => ({
 }));
 
 vi.mock('@mediforce/platform-infra', () => ({
-  getAdminAuth: () => ({
-    verifyIdToken: async () => ({ uid: 'user-1' }),
-  }),
+  getSharedPostgresClient: () => ({ db: {} }),
+  resolveSessionUserId: async () => 'user-1',
 }));
 
 import { GET } from '@/app/api/workflow-definitions/by-image/route';
@@ -79,7 +78,7 @@ function makeWorkflow(
 function req(image: string): NextRequest {
   return new NextRequest(
     `http://localhost/api/workflow-definitions/by-image?image=${encodeURIComponent(image)}`,
-    { headers: { Authorization: 'Bearer valid-token' } },
+    { headers: { cookie: 'authjs.session-token=tok-123' } },
   );
 }
 
@@ -91,7 +90,7 @@ describe('GET /api/workflow-definitions/by-image', () => {
   it('returns 400 when image param missing', async () => {
     const res = await GET(
       new NextRequest('http://localhost/api/workflow-definitions/by-image', {
-        headers: { Authorization: 'Bearer valid-token' },
+        headers: { cookie: 'authjs.session-token=tok-123' },
       }),
     );
     expect(res.status).toBe(400);

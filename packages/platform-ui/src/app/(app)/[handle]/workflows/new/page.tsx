@@ -64,8 +64,8 @@ export default function NewWorkflowPage() {
   const { handle } = useParams<{ handle: string }>();
   const router = useRouter();
   const { toast } = useToast();
-  const { firebaseUser } = useAuth();
-  const { namespaces, loading: namespacesLoading } = useAllUserNamespaces(firebaseUser?.uid);
+  const { user } = useAuth();
+  const { namespaces, loading: namespacesLoading } = useAllUserNamespaces(user?.id);
 
   const [workflowName, setWorkflowName] = useState('');
   const [namespace, setNamespace] = useState('');

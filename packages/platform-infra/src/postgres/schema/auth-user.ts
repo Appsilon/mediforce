@@ -3,26 +3,33 @@ import { pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 /**
  * Authenticated user identity (ADR-0002 §1.1, keep-uid §7).
  *
- * PR1 ships a deliberately MINIMAL subset: only the columns the PG
- * `UserDirectoryService` needs to return `{ uid, email, displayName }` once
- * Firebase Auth stops being read for the directory. `id` IS the Firebase uid
- * (text, never uuid) so every existing reference (`workspace_members.uid`,
- * `*.assigned_user_id`, `created_by`, audit actor) stays valid with no rewrite.
+ * `id` IS the Firebase uid for migrated users (text, never uuid) so every
+ * existing reference (`workspace_members.uid`, `*.assigned_user_id`,
+ * `created_by`, audit actor) stays valid with no rewrite. New users created
+ * after the NextAuth cutover get an adapter-generated uuid via `$defaultFn`
+ * below — mixed id shapes are harmless (both are opaque `text`, ADR-0002 §7).
  *
- * `image` is included now (not deferred) so the directory's `getUserMetadata`
- * keeps returning the member-list avatar fallback — dropping it would be a
- * silent regression. `lastSignInTime` has no PG source until NextAuth sessions
- * land (PR2), so the directory returns it as `null` in PR1.
+ * `image` keeps the directory's `getUserMetadata` member-list avatar fallback.
  *
- * PR2 (NextAuth cutover) ALTERs this table to add the remaining
- * `@auth/drizzle-adapter` columns (`email_verified`, `password_hash`) — it
- * must ALTER, not CREATE, because PR1 already created the table.
+ * PR2 (NextAuth cutover) ALTERs this table (migration 0030) to add the two
+ * remaining `@auth/drizzle-adapter` columns:
+ *   - `email_verified` — the adapter's `emailVerified` timestamp.
+ *   - `password_hash`  — bcrypt hash, only set when the Credentials provider
+ *     is used (ADR-0002 §4). NextAuth tolerates the extra column.
+ *
+ * The property names (`emailVerified`) match the `@auth/drizzle-adapter`
+ * schema contract exactly — the adapter references `usersTable.emailVerified`
+ * by property, so it must not be renamed.
  */
 export const authUsers = pgTable('auth_users', {
-  id: text('id').primaryKey(),
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   email: text('email').notNull().unique(),
   name: text('name'),
+  emailVerified: timestamp('email_verified', { withTimezone: true, mode: 'date' }),
   image: text('image'),
+  passwordHash: text('password_hash'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

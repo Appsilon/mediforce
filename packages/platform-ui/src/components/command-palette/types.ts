@@ -19,8 +19,6 @@ export type CommandContext = {
   user: { uid: string; displayName: string | null; email: string | null };
   close: () => void;
   toast: (opts: ToastOpts) => void;
-  /** Returns a fresh Firebase ID token for server-authenticated calls. */
-  getIdToken: () => Promise<string | null>;
 };
 
 export type CommandViewProps = {

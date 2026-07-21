@@ -1,7 +1,7 @@
 # Getting Started
 
 Get the app running locally in minutes. Start with mocked agents and demo data,
-then move to the full local stack (Postgres data layer + Firebase Auth) and
+then move to the full local stack (Postgres data layer + NextAuth) and
 build your own workflows.
 
 Agents / quick lookups: see [docs/dev-quickref.md](docs/dev-quickref.md).
@@ -14,8 +14,9 @@ Agents / quick lookups: see [docs/dev-quickref.md](docs/dev-quickref.md).
   Docker Desktop (macOS/Windows) bundles Compose. On a Linux engine-only install
   (Ubuntu's `docker.io`) Compose is a separate package — install both:
   `sudo apt install docker.io docker-compose-v2`. Verify with `docker compose version`.
-- **Firebase service account** — only for cloud Auth (the optional path below).
-  **Not** needed for data: all server data lives in Postgres (ADR-0001).
+- **Google OAuth client** — only for the Google sign-in path (optional; the
+  password provider needs none). **Not** needed for data: all server data lives
+  in Postgres (ADR-0001).
 - **`MEDIFORCE_API_KEY`** — only for the CLI (section 3) or calling the API
   directly. Not needed for `pnpm dev:mock` UI-only exploration.
 - **Local agent images** — only if you'll run a workflow with `script`
@@ -33,10 +34,9 @@ pnpm dev:mock
 
 Open **http://localhost:9007**.
 
-Zero cloud, zero Docker, zero Postgres: the launcher starts local Firebase
-emulator (Auth), seeds demo data, runs the UI, and mocks agent
-execution. Best for UI work and exploring the app before configuring anything
-real.
+Zero cloud, zero Docker, zero Postgres: the launcher seeds demo data, runs the
+UI, and mocks agent execution. Sign in with the seeded demo password user. Best
+for UI work and exploring the app before configuring anything real.
 
 ---
 
@@ -65,13 +65,13 @@ The UI starts **empty** — create workflows via the UI or CLI to populate it
 
 ### Demo sign-in
 
-When running against emulators (`dev:mock`, or the optional emulator path
-below), use:
+The demo user signs in via the NextAuth password provider
+(`ENABLE_PASSWORD_AUTH=true`) — no Firebase. Use:
 
 - **Email**: `test@mediforce.dev`
 - **Password**: `test123456`
 
-A real Firebase project uses your own accounts.
+Google or OIDC providers use your own accounts.
 
 ### Build images for script-executor steps
 
@@ -105,7 +105,7 @@ fails with `Unable to find image '...' locally`.
 | Command              | What runs                                                   | Port | When to use                                  |
 |----------------------|-------------------------------------------------------------|------|----------------------------------------------|
 | `pnpm dev`           | Postgres + auto-migrate + UI, Docker agents                 | 9003 | Default full local stack                     |
-| `pnpm dev:mock`      | Mocked agents, in-memory data, Firebase emulators (no Docker) | 9007 | Fastest; best for UI work                 |
+| `pnpm dev:mock`      | Mocked agents, in-memory data, NextAuth password provider (no Docker) | 9007 | Fastest; best for UI work          |
 | `pnpm dev:no-docker` | UI + host `claude` CLI agents, **no** Docker                | 9003 | Agent debugging without containers           |
 | `pnpm dev:queue`     | `pnpm dev` + Redis + BullMQ queue worker                    | 9003 | Testing queue-based agent runs               |
 
@@ -342,41 +342,49 @@ Create it if you're building a custom plugin, or reference an existing one like
 
 ## Auth & test setup (optional)
 
-You only need this for cloud Firebase Auth or for running the E2E
+Authentication runs on NextAuth (Auth.js v5), backed by the Postgres `auth_*`
+tables. You only need this section to enable a provider or to run the E2E
 suite — **not** for the data layer (Postgres covers that).
 
-### Firebase emulators (for E2E / auth tests)
+### Password provider (for E2E / local auth)
 
-The Firebase Auth emulator backs authentication in `dev:mock` and the
-Playwright suite. It is **not** a data backend.
+The Credentials provider backs authentication in `dev:mock` and the Playwright
+suite — no emulator. Seeded users authenticate with a bcrypt hash in
+`auth_users.password_hash`. Enable it in `packages/platform-ui/.env.local`:
 
 ```bash
-pnpm emulators     # Auth :9099
+ENABLE_PASSWORD_AUTH=true
+AUTH_SECRET=your-secret        # generate: openssl rand -hex 32
 ```
 
-### Your own Firebase project (cloud Auth)
+### Google sign-in (cloud Auth)
 
-To run against real Firebase Auth instead of emulators:
+To sign in with Google accounts instead:
 
-1. [Firebase Console](https://console.firebase.google.com/) → Add project.
-2. Enable **Authentication** → Email/Password provider.
-3. Project Settings → General → Your apps (`</>`) → copy the web config.
-4. Project Settings → Service Accounts → **Generate new private key**; save the
-   JSON outside the repo (e.g. `~/.config/mediforce/firebase-sa.json`).
+1. [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services →
+   Credentials → **Create OAuth client ID** (Web application).
+2. Add the authorized redirect URI `<AUTH_URL>/api/auth/callback/google`
+   (e.g. `http://localhost:9003/api/auth/callback/google`).
+3. Copy the client ID and secret into `.env.local`.
+4. Set `ALLOWED_EMAIL_DOMAINS` to gate who can sign in — the `signIn` callback
+   rejects any address outside the allowlist.
 
 Configure `packages/platform-ui/.env.local`:
 
 ```bash
-NEXT_PUBLIC_FIREBASE_API_KEY=your-api-key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project
+AUTH_SECRET=your-secret               # generate: openssl rand -hex 32
+AUTH_URL=http://localhost:9003        # optional; inferred in dev
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+ENABLE_PASSWORD_AUTH=true             # optional; email+password provider
+ALLOWED_EMAIL_DOMAINS=mediforce.dev   # optional; comma-separated allowlist
+# OIDC provider (optional, alternative to Google):
+#   OIDC_ISSUER=https://issuer.example.com
+#   OIDC_CLIENT_ID=your-client-id
+#   OIDC_CLIENT_SECRET=your-client-secret
 PLATFORM_API_KEY=your-secret-key
-GOOGLE_APPLICATION_CREDENTIALS=/Users/<you>/.config/mediforce/firebase-sa.json
 # optional: OPENROUTER_API_KEY for agent LLM calls
 ```
-
-Use an absolute path for `GOOGLE_APPLICATION_CREDENTIALS` — the server validates
-the file exists on startup.
 
 ---
 
@@ -427,11 +435,12 @@ Wipes the persistent Postgres volume and starts fresh:
 docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v && pnpm dev
 ```
 
-### Emulators fail to start
+### Sign-in fails
 
-Re-run `pnpm emulators`. If a port is occupied it prompts to kill the blocker;
-if Java is missing, `brew install openjdk@21` (macOS) or
-`apt-get install openjdk-21-jre` (Linux).
+Check that `AUTH_SECRET` is set and at least one provider is enabled
+(`ENABLE_PASSWORD_AUTH=true`, or `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`) in
+`packages/platform-ui/.env.local`. If `ALLOWED_EMAIL_DOMAINS` is set, confirm
+your address matches the allowlist.
 
 ### Workflow POST returns 400
 
@@ -457,17 +466,16 @@ images for script-executor steps](#build-images-for-script-executor-steps)).
 | Command                | Description                                       |
 |------------------------|---------------------------------------------------|
 | `pnpm install`         | Install dependencies                              |
-| `pnpm dev:mock`        | Mocked agents + emulator demo data, port 9007     |
+| `pnpm dev:mock`        | Mocked agents + demo data, port 9007              |
 | `pnpm dev`             | Full local stack: Postgres + migrate + UI, 9003   |
 | `pnpm dev:no-docker`   | Docker-free; UI + host `claude` agents (needs Postgres on :5432) |
 | `pnpm dev:queue`       | `dev` + Redis + BullMQ queued agent execution     |
-| `pnpm emulators`       | Firebase Auth emulator                            |
 | `pnpm db:generate`     | Generate a migration (drizzle-kit)                |
 | `pnpm db:migrate`      | Apply migrations                                  |
 | `pnpm test:unit`       | vitest unit + integration                         |
 | `pnpm test:affected`   | vitest, only changed files                        |
 | `pnpm test:e2e`        | All Playwright E2E (L3 + L4)                       |
-| `pnpm build:e2e`       | Rebuild the Next.js bundle for E2E (emulator URLs baked in). Run after any schema, Zod, or handler change — `test:e2e` reuses the existing `.next` build and will silently run stale code otherwise. |
+| `pnpm build:e2e`       | Rebuild the Next.js bundle for E2E (NextAuth env baked in). Run after any schema, Zod, or handler change — `test:e2e` reuses the existing `.next` build and will silently run stale code otherwise. |
 | `pnpm test`            | Everything (unit + e2e)                           |
 
 ---

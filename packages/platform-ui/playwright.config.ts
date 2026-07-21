@@ -4,19 +4,25 @@ import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/te
 // (Next.js reads it for the server, but Playwright's Node runner doesn't).
 try { process.loadEnvFile('.env.local'); } catch { /* file may not exist in CI */ }
 
-const useEmulators = process.env.NEXT_PUBLIC_USE_EMULATORS === 'true';
+// Gate for the full E2E suite (setup + api + ui projects). The `test:e2e` npm
+// script still sets `NEXT_PUBLIC_USE_EMULATORS=true` to flip this on; the name
+// is historical — auth runs on NextAuth now (ADR-0002 PR2), no Firebase
+// emulator is involved.
+const runFullSuite = process.env.NEXT_PUBLIC_USE_EMULATORS === 'true';
 
-// When using emulators, run on a separate port so we don't reuse a dev server
-// that connects to production Firebase. This is the #1 cause of "data not found"
-// failures: seed data goes into the emulator but the reused dev server reads
-// from production.
-const testPort = useEmulators
+// The full suite runs on a separate port so it never reuses a plain `pnpm dev`
+// server (which may point at other data). Its server is seeded by auth-setup.
+const testPort = runFullSuite
   ? Number(process.env.E2E_PORT ?? 9007)
   : Number(process.env.PORT ?? 9003);
 
+// Fixed, test-only NextAuth signing secret for the E2E server. Never a real
+// deployment secret — the E2E server is plain http on localhost.
+const E2E_AUTH_SECRET = 'e2e-test-auth-secret-not-for-production-000000000000000000000000';
+
 const projects: PlaywrightTestConfig['projects'] = [];
 
-if (useEmulators) {
+if (runFullSuite) {
   projects.push({
     name: 'setup',
     testMatch: 'auth-setup.ts',
@@ -29,9 +35,10 @@ projects.push({
   testMatch: 'smoke.spec.ts',
 });
 
-if (useEmulators) {
-  // L3 API E2E — real Next + emulators over HTTP, no browser launched.
-  // Tests authenticate via X-Api-Key (no user session storageState).
+if (runFullSuite) {
+  // L3 API E2E — real Next + Postgres over HTTP, no browser launched.
+  // Tests authenticate via X-Api-Key, or a NextAuth session cookie for the
+  // `user`-kind anti-enumeration probes (see helpers/multi-namespace.ts).
   // Future: bump workers via `--workers=4` once per-test data isolation
   // is audited (currently single MEDIFORCE_DATA_DIR shared on the server).
   projects.push({
@@ -41,7 +48,7 @@ if (useEmulators) {
     dependencies: ['setup'],
   });
 
-  // L4 UI E2E — real Next + emulators + Chromium. Sparse, main user
+  // L4 UI E2E — real Next + Postgres + Chromium. Sparse, main user
   // journeys only. Mocked agent (MOCK_AGENT=true). See AGENTS.md.
   projects.push({
     name: 'authenticated',
@@ -66,8 +73,8 @@ export default defineConfig({
   // The mock OAuth server (Step 5) starts in globalSetup and stops in
   // globalTeardown. Its URL is written to e2e/.mock-oauth-url so both
   // auth-setup (fixture seeding) and journey code can read it.
-  globalSetup: useEmulators ? './e2e/global-setup.ts' : undefined,
-  globalTeardown: useEmulators ? './e2e/global-teardown.ts' : undefined,
+  globalSetup: runFullSuite ? './e2e/global-setup.ts' : undefined,
+  globalTeardown: runFullSuite ? './e2e/global-teardown.ts' : undefined,
   use: {
     baseURL: `http://localhost:${testPort}`,
     headless: true,
@@ -93,11 +100,21 @@ export default defineConfig({
     // the source no longer matches the built bundle (see "E2E build freshness"
     // in docs/dev-quickref.md). `reuseExistingServer: true` connects to a
     // server the build step already started.
-    command: useEmulators
+    command: runFullSuite
       ? process.env.E2E_DEV_SERVER === 'true'
-        ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce MOCK_AGENT=true ALLOW_LOCAL_AGENTS=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${testPort} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npx next dev -p ${testPort}`
+        ? `MOCK_AGENT=true ALLOW_LOCAL_AGENTS=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${testPort} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npx next dev -p ${testPort}`
         : `pnpm start:e2e`
       : 'pnpm dev',
+    // NextAuth server env for E2E (ADR-0002 PR2): the Credentials provider is
+    // on so seeded password users authenticate, and a fixed test signing
+    // secret is supplied. DATABASE_URL is passed through when set (auth-setup
+    // and the server must share one database); everything else inherits from
+    // the parent process env.
+    env: {
+      ENABLE_PASSWORD_AUTH: 'true',
+      AUTH_SECRET: process.env.AUTH_SECRET ?? E2E_AUTH_SECRET,
+      ...(process.env.DATABASE_URL ? { DATABASE_URL: process.env.DATABASE_URL } : {}),
+    },
     port: testPort,
     reuseExistingServer: true,
     timeout: 120_000,

@@ -10,7 +10,7 @@ Terse command-first reference for agents and devs. For zero-to-running setup see
 
 | Command              | Backend                                   | Agents            | Docker | Port | Use when                                  |
 |----------------------|-------------------------------------------|-------------------|--------|------|-------------------------------------------|
-| `pnpm dev:mock`      | In-memory + Firebase emulators            | Mocked            | No     | 9007 | UI work, fastest spin-up (~30s)           |
+| `pnpm dev:mock`      | In-memory + NextAuth (password provider)  | Mocked            | No     | 9007 | UI work, fastest spin-up (~30s)           |
 | `pnpm dev`           | Postgres (auto-migrate)                   | Docker containers | Yes    | 9003 | Default full stack — most realistic       |
 | `pnpm dev:no-docker` | Postgres on :5432 (must already be up)    | Host `claude` CLI | No     | 9003 | Agent debugging without containers        |
 | `pnpm dev:queue`     | Postgres + Redis                          | BullMQ worker     | Yes    | 9003 | Queue-based agent runs (bull-board :3100) |
@@ -22,6 +22,10 @@ Notes:
   the same `localhost:5432` URL but does **not** start Postgres — run `pnpm dev` once first
   (or bring your own DB on :5432).
 - `dev:mock` is the only mode that runs without `DATABASE_URL`.
+- Auth is NextAuth / Auth.js v5 (ADR-0002) — no Firebase emulator. Set
+  `AUTH_SECRET` plus a provider: `ENABLE_PASSWORD_AUTH=true` for local
+  email/password, or `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` for Google.
+  See `packages/platform-ui/.env.example`.
 - Port override: `PORT=9999 pnpm dev`.
 
 ## Test levels
@@ -33,7 +37,7 @@ Notes:
 | `pnpm test:unit`     | vitest L1 + L2 (unit + integration)    |
 | `pnpm test:e2e:api`  | L3 API E2E, no browser                 |
 | `pnpm test:e2e:ui`   | L4 UI E2E (Chromium)                   |
-| `pnpm test:e2e`      | L3 + L4 (emulators on :9007)           |
+| `pnpm test:e2e`      | L3 + L4 (NextAuth on :9007)            |
 | `pnpm test`          | Everything (unit + e2e)                |
 
 Level definitions (L1–L5) + the rules: [E2E-STRATEGY.md](E2E-STRATEGY.md).
@@ -135,7 +139,6 @@ Requires SSH access to the staging host (uses `deploy` user by default, override
 | 9007 | e2e + `dev:mock` UI              |
 | 5432 | Postgres                         |
 | 6379 | Redis (`dev:queue`)             |
-| 9099 | Firebase Auth emulator          |
 | 3100 | bull-board (`dev:queue`)        |
 | 6006 | Phoenix trace viewer (opt-in)   |
 

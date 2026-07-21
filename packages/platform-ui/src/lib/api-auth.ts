@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getAdminAuth } from '@mediforce/platform-infra';
+import { getSharedPostgresClient, resolveSessionUserId } from '@mediforce/platform-infra';
 import type { NamespaceRepository } from '@mediforce/platform-core';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
+import { getSessionCookieFromHeader } from './session-cookie';
 
 // Re-export the canonical type from platform-api so route handlers can import
 // it from a single place. Pure-handler code in @mediforce/platform-api uses
@@ -11,9 +12,11 @@ export type { CallerIdentity };
 export { callerCanAccess, assertNamespaceAccess, filterByCaller } from '@mediforce/platform-api/auth';
 
 /**
- * Resolve caller identity from request headers.
- * API-key callers get unrestricted access. Firebase-token callers get their
- * namespace membership set. Returns NextResponse 401 on auth failure.
+ * Resolve caller identity from a request.
+ * API-key callers get unrestricted access. Browser callers are resolved from
+ * the NextAuth httpOnly session cookie (ADR-0002 §6) — no `Authorization`
+ * header — into their namespace membership. Returns NextResponse 401 on auth
+ * failure.
  *
  * For routes built on `createRouteAdapter`, the adapter calls this internally —
  * you don't need to invoke it directly. Inline (non-adapted) routes still
@@ -40,18 +43,15 @@ export async function resolveCallerIdentity(
     return { kind: 'apiKey', isSystemActor: true };
   }
 
-  const authHeader = request.headers.get('Authorization') ?? '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  if (token === '') {
+  const sessionToken = getSessionCookieFromHeader(request.headers.get('cookie'));
+  if (sessionToken === null) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let uid: string;
-  try {
-    const decoded = await getAdminAuth().verifyIdToken(token);
-    uid = decoded.uid;
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized — invalid token' }, { status: 401 });
+  const { db } = getSharedPostgresClient();
+  const uid = await resolveSessionUserId(db, sessionToken);
+  if (uid === null) {
+    return NextResponse.json({ error: 'Unauthorized — invalid session' }, { status: 401 });
   }
 
   const memberships = await namespaceRepo.getMembershipsForUser(uid);
@@ -62,6 +62,20 @@ export async function resolveCallerIdentity(
     namespaceRoles: new Map(memberships.map((m) => [m.handle, m.role] as const)),
     isSystemActor: false,
   };
+}
+
+/**
+ * Resolve the signed-in user's uid from the NextAuth session cookie (ADR-0002
+ * §6), or `null` when there is no valid session. For routes that only need the
+ * uid (not the full `CallerIdentity` membership set) — file-serving and the
+ * agent-OAuth routes verify the session here as defence-in-depth on top of the
+ * proxy gate.
+ */
+export async function resolveSessionUid(request: Request): Promise<string | null> {
+  const sessionToken = getSessionCookieFromHeader(request.headers.get('cookie'));
+  if (sessionToken === null) return null;
+  const { db } = getSharedPostgresClient();
+  return resolveSessionUserId(db, sessionToken);
 }
 
 /**

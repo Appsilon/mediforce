@@ -9,8 +9,8 @@ export {
 export type {
   InviteService,
   InvitedUser,
+  SeedInviteInput,
   InviteNotificationService,
-  SendInviteEmailInput,
   SendWorkspaceNotificationEmailInput,
 } from './invite-notification';
 export {

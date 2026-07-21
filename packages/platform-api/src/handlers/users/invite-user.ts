@@ -7,26 +7,23 @@ import { actorFromCaller, resolveConfiguredBaseUrl } from '../_helpers';
 /**
  * Invite a user to a workspace.
  *
- * Behavior (preserves the legacy `/api/users/invite` route, minus inline
- * Firebase / Mailgun coupling):
+ * Seed-based model (ADR-0002 §3.1) — replaces the legacy Firebase temp-password
+ * flow:
  *
  *   1. Caller must be `owner`/`admin` of `namespaceHandle` (apiKey bypass).
- *   2. Create or look up the Firebase Auth user via
- *      `scope.system.inviteService.createInvitedUser`. Returns
- *      `isExisting: true` for pre-existing accounts (no password issued).
- *   3. Add the user to the namespace via `scope.workspaces.addMember` — the
- *      Firestore impl also denormalizes the handle into
- *      `users/{uid}.organizations` so `getUserNamespaces` sees them.
- *   4. Best-effort email delivery via `scope.system.inviteNotificationService`:
- *      pre-existing user → workspace-notification email,
- *      new user → invite-credentials email. Email failures don't fail the
- *      response — `emailSent` flips to `false` and the temp password is
- *      still returned so the admin can hand it over manually.
- *   5. Append `invitation.created` to the audit log.
+ *   2. Pre-seed the invitee via `scope.system.inviteService.seedInvite`: it
+ *      writes the `auth_users` row + the workspace membership + any global
+ *      roles in one transaction. No temp password is issued; `isExisting` is
+ *      `true` when the account already existed (idempotent on email collision).
+ *   3. Best-effort workspace-notification email via
+ *      `scope.system.inviteNotificationService`. The invitee signs in later via
+ *      Google (verified-email auto-link) or by setting a password — there is no
+ *      credentials email. Email failures don't fail the response — `emailSent`
+ *      flips to `false`.
+ *   4. Append `invitation.created` to the audit log.
  *
  * `scope.system.inviteService === null` → `PreconditionFailedError` (the
- * deployment isn't wired for Firebase Auth — surface clearly rather than
- * 500).
+ * deployment isn't wired for invites — surface clearly rather than 500).
  */
 export async function inviteUser(
   input: InviteUserInput,
@@ -45,16 +42,12 @@ export async function inviteUser(
       ? input.displayName.trim()
       : undefined;
 
-  const { uid, temporaryPassword, isExisting } = await invite.createInvitedUser(
+  const { uid, isExisting } = await invite.seedInvite({
     email,
-    displayName,
-  );
-
-  await scope.workspaces.addMember(input.namespaceHandle, {
-    uid,
-    role: input.role,
     ...(displayName !== undefined ? { displayName } : {}),
-    joinedAt: new Date().toISOString(),
+    workspaceHandle: input.namespaceHandle,
+    membership: input.role,
+    roles: [],
   });
 
   let emailSent = false;
@@ -62,27 +55,19 @@ export async function inviteUser(
   if (notify !== null) {
     try {
       const baseUrl = await resolveConfiguredBaseUrl(scope);
-      if (isExisting) {
-        const namespace = await scope.workspaces.getNamespace(input.namespaceHandle);
-        const workspaceName = namespace?.displayName ?? input.namespaceHandle;
-        const inviterName =
-          typeof input.inviterName === 'string' && input.inviterName.trim() !== ''
-            ? input.inviterName.trim()
-            : workspaceName;
-        await notify.sendWorkspaceNotificationEmail({
-          toEmail: email,
-          inviterName,
-          workspaceName,
-          workspaceHandle: input.namespaceHandle,
-          ...(baseUrl !== undefined ? { baseUrl } : {}),
-        });
-      } else {
-        await notify.sendInviteEmail({
-          toEmail: email,
-          temporaryPassword,
-          ...(baseUrl !== undefined ? { baseUrl } : {}),
-        });
-      }
+      const namespace = await scope.workspaces.getNamespace(input.namespaceHandle);
+      const workspaceName = namespace?.displayName ?? input.namespaceHandle;
+      const inviterName =
+        typeof input.inviterName === 'string' && input.inviterName.trim() !== ''
+          ? input.inviterName.trim()
+          : workspaceName;
+      await notify.sendWorkspaceNotificationEmail({
+        toEmail: email,
+        inviterName,
+        workspaceName,
+        workspaceHandle: input.namespaceHandle,
+        ...(baseUrl !== undefined ? { baseUrl } : {}),
+      });
       emailSent = true;
     } catch (emailErr) {
       console.error('[invite-user] Failed to send email:', emailErr);
@@ -108,5 +93,5 @@ export async function inviteUser(
     namespace: input.namespaceHandle,
   });
 
-  return { uid, email, temporaryPassword, emailSent, isExisting };
+  return { uid, email, emailSent, isExisting };
 }

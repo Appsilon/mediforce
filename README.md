@@ -98,7 +98,7 @@ We're building the standard for human-agent collaboration in pharma — and we'r
 
 ## Development
 
-**[Getting Started Guide](GETTING-STARTED.md)** — Quick start with emulators and demo data, no setup required.
+**[Getting Started Guide](GETTING-STARTED.md)** — Quick start with demo data, no setup required.
 
 > **Datastore (ADR-0001).** Server data layer runs on self-hosted Postgres.
 > See [`docs/postgres-local-dev.md`](docs/postgres-local-dev.md) and
@@ -109,17 +109,17 @@ We're building the standard for human-agent collaboration in pharma — and we'r
 
 ```bash
 pnpm install
-pnpm dev:mock        # port 9007, mocked agents, local emulators + demo data
+pnpm dev:mock        # port 9007, mocked agents, in-memory data + demo data
 ```
 
-Open `http://localhost:9007`. Use this to click through the UI without configuring a Firebase project, cloud keys, Docker, or real agents.
+Open `http://localhost:9007`. Use this to click through the UI without configuring cloud keys, Docker, or real agents.
 
 ### Dev modes
 
 | Command | What it gives you |
 |---|---|
-| `pnpm dev` | Default full local stack. Boots a local Postgres via the docker overlay, runs migrations, then starts the UI; agents run inline via Docker (no Redis). Firebase Auth/Storage + the `users/{uid}` profile collection still come from `.env.local`. The main dev loop. |
-| `pnpm dev:mock` | Mocked agents + seeded local emulator data, port 9007. No cloud keys, no Docker, no Firebase project. |
+| `pnpm dev` | Default full local stack. Boots a local Postgres via the docker overlay, runs migrations, then starts the UI; agents run inline via Docker (no Redis). Auth via NextAuth (Postgres `auth_*` tables). The main dev loop. |
+| `pnpm dev:mock` | In-memory data + mocked agents, port 9007. Sign in via NextAuth's password provider (seeded user). No cloud keys, no Docker. |
 | `pnpm dev:no-docker` | Docker-free, UI-only. Agents run via host `claude` CLI instead of Docker. |
 | `pnpm dev:queue` | Like `dev`, but agent execution goes through the BullMQ queue (production architecture). Boots `redis` alongside Postgres; requires the worker running — see below. |
 
@@ -148,10 +148,10 @@ from main. Same script runs inside `pnpm dev` and inside the
 production Dockerfile's CMD, so dev and prod share the migration path.
 See [Staging / production ops](#staging--production-ops-postgres) below.
 
-Firebase Auth is still required (until [ADR-0002](docs/adr/) lands a NextAuth
-replacement); set the `NEXT_PUBLIC_FIREBASE_*` vars in `.env.local` as usual.
-Firebase Emulators are **not** required for the Postgres data path — only for
-the auth flow if you don't want to use a real Firebase project.
+Authentication runs on NextAuth ([ADR-0002](docs/adr/)) — no Firebase project or
+emulator needed. Set `AUTH_SECRET` (generate with `openssl rand -hex 32`) plus a
+provider in `.env.local`: either `ENABLE_PASSWORD_AUTH=true` for email+password,
+or `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` for Google sign-in.
 
 Migration mechanics, schema authoring, and troubleshooting live in
 [`docs/postgres-local-dev.md`](docs/postgres-local-dev.md).
@@ -166,16 +166,18 @@ pnpm dev:queue             # native UI pointed at compose Redis
 docker compose down        # stop infra when you're done
 ```
 
-### Emulator + own seed data (legacy Firestore demo path)
+### Own seed data
 
 ```bash
 cp packages/platform-ui/.env.example packages/platform-ui/.env.local
-pnpm emulators                                   # terminal 1
-pnpm seed                                        # terminal 2 — seeds demo workflows + data
-NEXT_PUBLIC_USE_EMULATORS=true pnpm dev          # terminal 2
+pnpm seed                                        # seeds demo workflows + data
+pnpm dev                                         # start the app
 ```
 
-Demo credentials: `test@mediforce.dev` / `test123456`. For production Firebase setup, see the [Getting Started Guide](GETTING-STARTED.md).
+Demo credentials: `test@mediforce.dev` / `test123456` — sign in via NextAuth's
+password provider (seeded user; needs `ENABLE_PASSWORD_AUTH=true`). For NextAuth
+provider setup (Google client / `AUTH_SECRET`), see the
+[Getting Started Guide](GETTING-STARTED.md).
 
 ### Tests
 
@@ -183,7 +185,7 @@ Demo credentials: `test@mediforce.dev` / `test123456`. For production Firebase s
 pnpm typecheck       # type checking (~5s)
 pnpm test:unit       # vitest L1+L2 (~9s)
 pnpm test:affected   # vitest, only files changed since main (<1s)
-pnpm test:e2e        # Playwright L3+L4 (~4min, requires Firebase emulator)
+pnpm test:e2e        # Playwright L3+L4 (~4min, NextAuth password provider, no emulator)
 pnpm test            # everything: test:unit + test:e2e
 ```
 
@@ -292,7 +294,7 @@ migration step in the deploy pipeline.
 
 | | |
 |---|---|
-| **[Getting Started](GETTING-STARTED.md)** | Set up your development environment — local Postgres data layer plus Firebase Auth/Storage |
+| **[Getting Started](GETTING-STARTED.md)** | Set up your development environment — local Postgres data layer plus NextAuth |
 | **[Vision](docs/vision.md)** | Why this needs to exist, what agents actually do in pharma, and where we're headed |
 | **[Architecture](docs/architecture.md)** | Processes, steps, agents, compliance — the technical foundation |
 | **[How We Work](docs/how-we-work.md)** | Building bottom-up, in public, with real processes |

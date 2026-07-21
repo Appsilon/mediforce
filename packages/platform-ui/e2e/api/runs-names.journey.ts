@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
-  bearerHeaders,
+  sessionCookieHeaders,
   setupMultiNamespaceCallers,
   TEST_ORG_HANDLE,
   type MultiNamespaceFixture,
@@ -70,7 +70,7 @@ test.describe('GET /api/runs/names — API E2E', () => {
 
   test('non-member caller: empty list, NOT a 403 (intersection semantics)', async ({ request }) => {
     const res = await request.get(`/api/runs/names?namespace=${TEST_ORG_HANDLE}`, {
-      headers: bearerHeaders(callers.outsider),
+      headers: sessionCookieHeaders(callers.outsider),
     });
     expect(res.status(), await res.text()).toBe(200);
 

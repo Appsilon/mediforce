@@ -1,28 +1,18 @@
-import { getFirebaseIdToken } from './firebase-id-token';
-
 /**
- * Client-side fetch wrapper that attaches the current user's Firebase ID token
- * as `Authorization: Bearer <token>` so proxy.ts can authenticate the
- * request without requiring the server-only PLATFORM_API_KEY.
+ * Client-side fetch wrapper for browser-initiated calls to internal `/api/*`
+ * routes that have not yet been migrated onto the typed `Mediforce` client.
  *
- * Use this for browser-initiated calls to internal `/api/*` routes that have
- * not yet been migrated onto the typed `Mediforce` client. Once an endpoint
- * lives in `@mediforce/platform-api/contract`, prefer `mediforce.X.y()` from
- * `lib/mediforce.ts` — both paths share the same `getFirebaseIdToken()`
- * helper, so the wire-level auth header is identical.
+ * After the Firebase Auth exit (ADR-0002 §6) the browser authenticates with
+ * the NextAuth httpOnly session cookie, which rides same-origin requests
+ * automatically — this wrapper no longer attaches an `Authorization` header.
+ * It stays as the sanctioned browser fetch entry point (prefer `mediforce.X.y()`
+ * once an endpoint lives in `@mediforce/platform-api/contract`); `credentials:
+ * 'same-origin'` is pinned so the session cookie is always sent even if a caller
+ * passes a cross-cutting `init`.
  *
  * Server-to-server calls (route handlers, cron, queue workers) use
- * `X-Api-Key: ${PLATFORM_API_KEY}` instead — middleware accepts either.
+ * `X-Api-Key: ${PLATFORM_API_KEY}` instead — the proxy accepts either.
  */
 export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
-  const headers = new Headers(init.headers ?? {});
-
-  if (!headers.has('Authorization')) {
-    const token = await getFirebaseIdToken();
-    if (token !== null) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
-  }
-
-  return fetch(input, { ...init, headers });
+  return fetch(input, { credentials: 'same-origin', ...init });
 }

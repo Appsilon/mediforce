@@ -2,12 +2,11 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { updatePassword, signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { apiFetch } from '@/lib/api-fetch';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function ChangePasswordPage() {
-  const { firebaseUser, loading, mustChangePassword, clearMustChangePassword } = useAuth();
+  const { user, loading, mustChangePassword, clearMustChangePassword } = useAuth();
   const router = useRouter();
 
   const [newPassword, setNewPassword] = React.useState('');
@@ -17,7 +16,7 @@ export default function ChangePasswordPage() {
 
   React.useEffect(() => {
     if (loading) return;
-    if (!firebaseUser) {
+    if (!user) {
       router.replace('/login');
       return;
     }
@@ -25,7 +24,7 @@ export default function ChangePasswordPage() {
     if (!mustChangePassword) {
       router.replace('/workspace-selection');
     }
-  }, [loading, firebaseUser, mustChangePassword, router]);
+  }, [loading, user, mustChangePassword, router]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,38 +41,27 @@ export default function ChangePasswordPage() {
 
     setPending(true);
     try {
-      const currentUser = auth.currentUser;
-      if (currentUser === null) throw new Error('Not signed in.');
-      const email = currentUser.email;
-      if (email === null) throw new Error('Account has no email address.');
-      await updatePassword(currentUser, newPassword);
-      // updatePassword revokes every existing ID token for the user (their
-      // `validSince` moves to now), so the cached session token the client
-      // keeps serving is rejected and the next authenticated call 401s.
-      // Re-authenticate with the new password to establish a fresh session
-      // whose token clearMustChangePassword and the landing page reuse.
-      await signInWithEmailAndPassword(auth, email, newPassword);
+      // Set the bcrypt password hash server-side (ADR-0002 §4), then clear the
+      // forced-change flag. The NextAuth session cookie rides both calls.
+      const response = await apiFetch('/api/users/set-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword }),
+      });
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(data?.error ?? 'Failed to update password.');
+      }
       await clearMustChangePassword();
       router.replace('/workspace-selection');
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        const code = (err as { code?: string }).code ?? '';
-        if (code === 'auth/requires-recent-login') {
-          setError('Session expired. Please sign out and sign in again to change your password.');
-        } else if (code === 'auth/weak-password') {
-          setError('Password is too weak. Please choose a longer or more complex password.');
-        } else {
-          setError(err.message);
-        }
-      } else {
-        setError('Failed to update password.');
-      }
+      setError(err instanceof Error ? err.message : 'Failed to update password.');
     } finally {
       setPending(false);
     }
   }
 
-  if (loading || !firebaseUser || !mustChangePassword) {
+  if (loading || !user || !mustChangePassword) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-sm text-muted-foreground animate-pulse">Loading…</div>
@@ -87,7 +75,7 @@ export default function ChangePasswordPage() {
         <div className="space-y-2 text-center">
           <h1 className="text-2xl font-headline font-semibold tracking-tight">Set your password</h1>
           <p className="text-sm text-muted-foreground">
-            You signed in with a temporary password. Choose a permanent password to continue.
+            Choose a password to continue.
           </p>
         </div>
 
