@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { apiFetch } from '@/lib/api-fetch';
+import { mediforce } from '@/lib/mediforce';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function ChangePasswordPage() {
@@ -43,15 +43,7 @@ export default function ChangePasswordPage() {
     try {
       // Set the bcrypt password hash server-side (ADR-0002 §4), then clear the
       // forced-change flag. The NextAuth session cookie rides both calls.
-      const response = await apiFetch('/api/users/set-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newPassword }),
-      });
-      if (!response.ok) {
-        const data = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(data?.error ?? 'Failed to update password.');
-      }
+      await mediforce.users.setPassword({ newPassword });
       await clearMustChangePassword();
       router.replace('/workspace-selection');
     } catch (err: unknown) {

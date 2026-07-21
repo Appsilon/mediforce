@@ -63,7 +63,7 @@ CI runs the same suite (job `postgres-repository-tests`) plus an L3 API E2E job
 - **`DATABASE_URL is required` at boot** — any non-mock mode needs it
   (`validateEnv` in `instrumentation-node.ts` fails fast). `pnpm dev` wires it
   automatically; for `pnpm dev:no-docker` start Postgres first or set the URL.
-  `pnpm dev:mock` is the only mode that runs without it.
+  `pnpm dev:mock` defaults it to the dev container and starts Postgres itself.
 - **Migration applied but table missing** — duplicate `idx` in `_journal.json`
   from a rebase. See [PLAN-0001 §10.1](adr/PLAN-0001.md#101-migration-filename-rule).
 - **Too many connections** — bump `POOL_MAX` in

@@ -26,6 +26,7 @@
     "@mediforce/platform-core": "workspace:*",
     "@mediforce/platform-infra": "workspace:*",
     "@mediforce/workflow-engine": "workspace:*",
+    "bcryptjs": "^3.0.3",
     "zod": "^4.0.0"
   },
   "devDependencies": {

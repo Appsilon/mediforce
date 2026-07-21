@@ -38,7 +38,8 @@ function hasValidApiKey(req: NextRequest): boolean {
  * verification: the browser carries the httpOnly session cookie, resolved to a
  * uid via a single indexed `auth_sessions` lookup. An expired or revoked
  * session fails here exactly as an invalid token used to. Runs on the Node
- * runtime (see `config.runtime`) so the Postgres driver is available.
+ * runtime — Next always runs the proxy there — so the Postgres driver is
+ * available.
  */
 async function hasValidSession(req: NextRequest): Promise<boolean> {
   const token = getSessionCookie(req.cookies);
@@ -102,5 +103,4 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
 
 export const config = {
   matcher: '/api/:path*',
-  runtime: 'nodejs',
 };

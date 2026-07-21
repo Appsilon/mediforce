@@ -78,11 +78,18 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
    - **Google OAuth** (`GOOGLE_CLIENT_ID`) — parity with today's
      `signInWithPopup(googleProvider)`. The default for the current
      Mediforce user base.
-   - **Credentials / email + password** (`ENABLE_PASSWORD_AUTH=true`) —
+   - **Password / email + password** (`ENABLE_PASSWORD_AUTH=true`) —
      real password auth (bcrypt-hashed in `auth_users`). A first-class,
      production-supported option (not demo-only) — it is also load-bearing
      for local dev, E2E, and air-gapped demos, replacing today's Firebase
-     Auth emulator password users. **Heavy password policy** (complexity,
+     Auth emulator password users. **Implementation note (found during the
+     cutover):** this is NOT an Auth.js Credentials provider. Auth.js
+     refuses to combine a Credentials provider with the database session
+     strategy (`UnsupportedStrategy`) and fails the entire `/api/auth/*`
+     surface at config load when you try — Google included. Password
+     sign-in is therefore its own route, `POST /api/auth/password-login`,
+     which does the same bcrypt check and opens the same `auth_sessions`
+     row, so §3's one-row revocation model still covers every provider. **Heavy password policy** (complexity,
      rotation, lockout, history) is **deferred to a future ADR** — built
      when a real password-in-production deployment needs 21 CFR-grade
      controls. The MVP provider is honest, not crippled, but minimal.
@@ -219,11 +226,22 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
      Firebase claims so `getUsersByRole` notifications keep working. Firebase
      stays the auth source. De-risks PR2 by pulling role/directory complexity
      out of the cutover.
-   - **PR2 — NextAuth atomic cutover.** `auth_*` tables + `user_profiles`
-     reshape + Google/Credentials providers + text-id drizzle adapter +
+   - **PR2 — NextAuth atomic cutover.** `auth_*` tables + Google OAuth +
+     the password-login route + text-id drizzle adapter +
      `resolveCallerIdentity`→cookie + client rewrite + login page + the §7
      user seed on staging + e2e auth-setup → NextAuth + delete Firebase Auth /
      firebase-admin / emulator. Gate: `grep firebase/auth → 0`.
+
+     **Shipped as one PR with PR1.** PR1 alone is not mergeable in isolation:
+     it moves the user directory to Postgres while Firebase is still the auth
+     source, so nothing exercises the new tables until the cutover lands.
+
+     **`user_profiles` was NOT reshaped.** The planned `deployment_admin` /
+     `current_workspace` columns were dropped from scope: nothing in the
+     codebase reads a deployment-admin flag (every "admin" check is
+     `workspace_members` governance) and the current workspace is URL-driven.
+     The session therefore carries `user.id` + `user.roles` and nothing else.
+     Add the column when a feature needs it.
 
    A dual-run window (`resolveCallerIdentity` accepting both a Firebase Bearer
    and a NextAuth cookie at once) was **considered and rejected**: ADR-0003's
@@ -294,8 +312,7 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
 - **Federated logout / single sign-out** — supported by NextAuth for OIDC
   but needs wiring. Future ADR.
 - **Firebase Auth password hash migration** — explicitly deferred. Active
-  password users re-enroll via magic link or the (optional) Credentials
-  provider.
+  password users re-enroll via magic link or set a new password.
 
 ## Open questions for review
 

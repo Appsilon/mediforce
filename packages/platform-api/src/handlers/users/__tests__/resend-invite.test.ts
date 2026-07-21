@@ -89,13 +89,12 @@ describe('resendInvite handler', () => {
     ]);
   });
 
-  it('passes the configured platform.baseUrl through to the resent invite email', async () => {
+  it('passes the configured platform.baseUrl through to the resent workspace-notification email', async () => {
     const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
     await platformSettingsRepo.set('platform.baseUrl', 'https://phuse.mediforce.ai');
     const inviteService = inviteServiceStub({
       email: 'pending@example.test',
       pending: true,
-      resetPassword: 'Mf-RESET',
     });
     const notifier = recordingNotifier();
     const scope = createTestScope({
@@ -107,10 +106,12 @@ describe('resendInvite handler', () => {
 
     await resendInvite(baseInput, scope);
 
-    expect(notifier.sendInviteEmailCalls).toEqual([
+    expect(notifier.sendWorkspaceCalls).toEqual([
       {
         toEmail: 'pending@example.test',
-        temporaryPassword: 'Mf-RESET',
+        inviterName: 'alpha',
+        workspaceName: 'alpha',
+        workspaceHandle: 'alpha',
         baseUrl: 'https://phuse.mediforce.ai',
       },
     ]);

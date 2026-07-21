@@ -109,7 +109,7 @@ We're building the standard for human-agent collaboration in pharma — and we'r
 
 ```bash
 pnpm install
-pnpm dev:mock        # port 9007, mocked agents, in-memory data + demo data
+pnpm dev:mock        # port 9007, mocked agents, demo data seeded
 ```
 
 Open `http://localhost:9007`. Use this to click through the UI without configuring cloud keys, Docker, or real agents.
@@ -119,7 +119,7 @@ Open `http://localhost:9007`. Use this to click through the UI without configuri
 | Command | What it gives you |
 |---|---|
 | `pnpm dev` | Default full local stack. Boots a local Postgres via the docker overlay, runs migrations, then starts the UI; agents run inline via Docker (no Redis). Auth via NextAuth (Postgres `auth_*` tables). The main dev loop. |
-| `pnpm dev:mock` | In-memory data + mocked agents, port 9007. Sign in via NextAuth's password provider (seeded user). No cloud keys, no Docker. |
+| `pnpm dev:mock` | Mocked agents + seeded demo data, port 9007. Sign in as the seeded password user. No cloud keys. Starts the dev Postgres container like `pnpm dev`. |
 | `pnpm dev:no-docker` | Docker-free, UI-only. Agents run via host `claude` CLI instead of Docker. |
 | `pnpm dev:queue` | Like `dev`, but agent execution goes through the BullMQ queue (production architecture). Boots `redis` alongside Postgres; requires the worker running — see below. |
 

@@ -270,14 +270,10 @@ describe('inviteUser handler', () => {
     expect(inviteService.seedInvite).toHaveBeenCalledTimes(1);
   });
 
-  it('passes the configured platform.baseUrl through to the invite email', async () => {
+  it('passes the configured platform.baseUrl through to the workspace-notification email', async () => {
     const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
     await platformSettingsRepo.set('platform.baseUrl', 'https://phuse.mediforce.ai');
-    const inviteService = inviteServiceReturning({
-      uid: 'uid-new',
-      temporaryPassword: 'Mf-XYZ',
-      isExisting: false,
-    });
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const notifier = recordingNotifier();
     const scope = createTestScope({
       namespaceRepo,
@@ -289,10 +285,12 @@ describe('inviteUser handler', () => {
 
     await inviteUser(baseInput, scope);
 
-    expect(notifier.sendInviteEmailCalls).toEqual([
+    expect(notifier.sendWorkspaceCalls).toEqual([
       {
         toEmail: 'newbie@example.test',
-        temporaryPassword: 'Mf-XYZ',
+        inviterName: 'alpha',
+        workspaceName: 'alpha',
+        workspaceHandle: 'alpha',
         baseUrl: 'https://phuse.mediforce.ai',
       },
     ]);
@@ -303,7 +301,6 @@ describe('inviteUser handler', () => {
     await platformSettingsRepo.set('platform.baseUrl', 'https://phuse.mediforce.ai/');
     const inviteService = inviteServiceReturning({
       uid: 'uid-existing',
-      temporaryPassword: '',
       isExisting: true,
     });
     const notifier = recordingNotifier();
@@ -323,11 +320,7 @@ describe('inviteUser handler', () => {
   });
 
   it('omits baseUrl when platform.baseUrl is unset', async () => {
-    const inviteService = inviteServiceReturning({
-      uid: 'uid-new',
-      temporaryPassword: 'Mf-XYZ',
-      isExisting: false,
-    });
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const notifier = recordingNotifier();
     const scope = createTestScope({
       namespaceRepo,
@@ -338,17 +331,13 @@ describe('inviteUser handler', () => {
 
     await inviteUser(baseInput, scope);
 
-    expect(notifier.sendInviteEmailCalls[0].baseUrl).toBeUndefined();
+    expect(notifier.sendWorkspaceCalls[0].baseUrl).toBeUndefined();
   });
 
   it('omits baseUrl when platform.baseUrl is cleared to whitespace (falls back, never an empty URL)', async () => {
     const platformSettingsRepo = new InMemoryPlatformSettingsRepository();
     await platformSettingsRepo.set('platform.baseUrl', '   ');
-    const inviteService = inviteServiceReturning({
-      uid: 'uid-new',
-      temporaryPassword: 'Mf-XYZ',
-      isExisting: false,
-    });
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const notifier = recordingNotifier();
     const scope = createTestScope({
       namespaceRepo,
@@ -360,7 +349,7 @@ describe('inviteUser handler', () => {
 
     await inviteUser(baseInput, scope);
 
-    expect(notifier.sendInviteEmailCalls[0].baseUrl).toBeUndefined();
+    expect(notifier.sendWorkspaceCalls[0].baseUrl).toBeUndefined();
   });
 
   it('writes an invitation.created audit event attributed to the caller', async () => {

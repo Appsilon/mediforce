@@ -15,12 +15,16 @@
  *      SAME pure mapping (`buildUserRolesSeed`) the L2 tests pin against the
  *      Firebase filter.
  *
- * NOT seeded here (deferred): `user_profiles.deployment_admin` /
- * `.current_workspace` (PLAN §4). The `user_profiles` reshape (§1.2) adding
- * those columns is a separate Drizzle migration owned by the NextAuth-cutover
- * change; until it lands the columns do not exist. Once they do, add the
- * profile upsert (deployment_admin = customClaims.role === 'admin') here — the
- * per-user `customClaims.role` is available on the `FirebaseUserExport`.
+ * Input is a Firebase CLI export file, NOT the Admin SDK — the NextAuth cutover
+ * removed all Firebase Admin wiring from the codebase. The operator produces the
+ * file with the Firebase CLI and passes its path:
+ *
+ *   firebase auth:export users.json --project <project-id>
+ *
+ * NOT seeded here: `user_profiles.deployment_admin` / `.current_workspace`.
+ * Those columns were deliberately never added — nothing reads them. If a future
+ * change introduces them, the raw `customClaims.role` is available on each
+ * `FirebaseUserExport` to derive `deployment_admin = role === 'admin'`.
  * `password_hash` stays null (Firebase scrypt is proprietary; passwords are
  * test-only) — email/password users reset if they want one.
  *
@@ -33,40 +37,98 @@
  * NOTHING. Safe to re-run.
  *
  * Usage:
- *   npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts            # dry-run
- *   npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts --apply    # write
+ *   npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts users.json
+ *   npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts users.json --apply
  *
- * Requires: GOOGLE_APPLICATION_CREDENTIALS (or Firebase admin env) + DATABASE_URL.
+ * Requires: DATABASE_URL (only for `--apply`) + the export file.
  */
-import { getAdminAuth, getSharedPostgresClient, buildUserRolesSeed } from '@mediforce/platform-infra';
-import type { FirebaseUserExport } from '@mediforce/platform-infra';
+import { readFileSync } from 'node:fs';
+import { z } from 'zod';
+import { buildUserRolesSeed } from '../../packages/platform-infra/src/auth/seed-user-roles';
+import type { FirebaseUserExport } from '../../packages/platform-infra/src/auth/seed-user-roles';
+import { getSharedPostgresClient } from '../../packages/platform-infra/src/postgres/client';
 import { authUsers } from '../../packages/platform-infra/src/postgres/schema/auth-user';
 import { userRoles } from '../../packages/platform-infra/src/postgres/schema/user-role';
 
-async function listAllFirebaseUsers(): Promise<FirebaseUserExport[]> {
-  const auth = getAdminAuth();
-  const users: FirebaseUserExport[] = [];
-  let pageToken: string | undefined;
-  do {
-    const page = await auth.listUsers(1000, pageToken);
-    for (const u of page.users) {
-      users.push({
-        uid: u.uid,
-        email: u.email ?? null,
-        displayName: u.displayName ?? null,
-        photoURL: u.photoURL ?? null,
-        customClaims: (u.customClaims as FirebaseUserExport['customClaims']) ?? null,
-      });
-    }
-    pageToken = page.pageToken;
-  } while (pageToken);
-  return users;
+/**
+ * Shape of `firebase auth:export`. Only the fields the seed needs are pinned;
+ * every other field of the export is ignored. `customAttributes` is a JSON
+ * *string* of the custom claims in this format, not an object.
+ */
+const exportedUserSchema = z.object({
+  localId: z.string().min(1),
+  email: z.string().optional(),
+  displayName: z.string().optional(),
+  photoUrl: z.string().optional(),
+  customAttributes: z.string().optional(),
+});
+
+const exportFileSchema = z.object({
+  users: z.array(exportedUserSchema),
+});
+
+const customClaimsSchema = z.object({
+  role: z.unknown().optional(),
+  roles: z.unknown().optional(),
+});
+
+function parseCustomClaims(raw: string | undefined): FirebaseUserExport['customClaims'] {
+  if (raw === undefined || raw.trim() === '') return null;
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const claims = customClaimsSchema.safeParse(decoded);
+  return claims.success ? claims.data : null;
+}
+
+function readFirebaseExport(path: string): FirebaseUserExport[] {
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch (cause) {
+    throw new Error(`Cannot read Firebase Auth export file "${path}": ${String(cause)}`);
+  }
+
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(raw);
+  } catch (cause) {
+    throw new Error(`Firebase Auth export "${path}" is not valid JSON: ${String(cause)}`);
+  }
+
+  const parsed = exportFileSchema.safeParse(decoded);
+  if (!parsed.success) {
+    throw new Error(
+      `Firebase Auth export "${path}" does not match the expected \`firebase auth:export\` ` +
+        `shape ({"users": [{"localId", "email", ...}]}):\n${z.prettifyError(parsed.error)}`,
+    );
+  }
+
+  return parsed.data.users.map((user) => ({
+    uid: user.localId,
+    email: user.email ?? null,
+    displayName: user.displayName ?? null,
+    photoURL: user.photoUrl ?? null,
+    customClaims: parseCustomClaims(user.customAttributes),
+  }));
 }
 
 async function main(): Promise<void> {
-  const apply = process.argv.includes('--apply');
+  const args = process.argv.slice(2);
+  const apply = args.includes('--apply');
+  const exportPath = args.find((arg) => arg.startsWith('--') === false);
+  if (exportPath === undefined) {
+    throw new Error(
+      'Missing Firebase Auth export path.\n' +
+        'Produce it with: firebase auth:export users.json --project <project-id>\n' +
+        'Usage: npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts <users.json> [--apply]',
+    );
+  }
 
-  const exported = await listAllFirebaseUsers();
+  const exported = readFirebaseExport(exportPath);
   const seed = buildUserRolesSeed(exported);
 
   console.log(`Firebase users read:        ${exported.length}`);
@@ -103,7 +165,7 @@ async function main(): Promise<void> {
 main().then(
   () => process.exit(0),
   (err) => {
-    console.error(err);
+    console.error(err instanceof Error ? err.message : err);
     process.exit(1);
   },
 );

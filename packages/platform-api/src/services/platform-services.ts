@@ -1,6 +1,7 @@
 import {
   PostgresAgentEventRepository,
   PostgresUserProfileRepository,
+  PostgresCredentialsRepository,
   PostgresHandoffRepository,
   PostgresAgentDefinitionRepository,
   PostgresModelRegistryRepository,
@@ -55,6 +56,7 @@ import type {
   ToolCatalogRepository,
   UserDirectoryService,
   UserProfileRepository,
+  CredentialsRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import {
@@ -132,6 +134,7 @@ export interface PlatformServices {
   toolCatalogRepo: ToolCatalogRepository;
   namespaceRepo: NamespaceRepository;
   userProfileRepo: UserProfileRepository;
+  credentialsRepo: CredentialsRepository;
   oauthProviderRepo: OAuthProviderRepository;
   agentOAuthTokenRepo: AgentOAuthTokenRepository;
   modelRegistryRepo: ModelRegistryRepository;
@@ -210,6 +213,7 @@ export function getPlatformServices(): PlatformServices {
   const toolCatalogRepo: ToolCatalogRepository = new PostgresToolCatalogRepository(pg);
   const namespaceRepo: NamespaceRepository = new PostgresNamespaceRepository(pg);
   const userProfileRepo: UserProfileRepository = new PostgresUserProfileRepository(pg);
+  const credentialsRepo: CredentialsRepository = new PostgresCredentialsRepository(pg);
   const oauthProviderRepo: OAuthProviderRepository = new PostgresOAuthProviderRepository(pg);
   const agentOAuthTokenRepo: AgentOAuthTokenRepository =
     new PostgresAgentOAuthTokenRepository(pg);
@@ -426,6 +430,7 @@ export function getPlatformServices(): PlatformServices {
     toolCatalogRepo,
     namespaceRepo,
     userProfileRepo,
+    credentialsRepo,
     oauthProviderRepo,
     agentOAuthTokenRepo,
     modelRegistryRepo,

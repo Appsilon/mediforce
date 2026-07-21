@@ -34,8 +34,10 @@ export interface SeededInvite {
  * invitee unable to sign in. Wiring behind the (reshaped) invite port happens
  * in PR2.
  *
- * Idempotent: re-seeding the same email reuses the existing uid and leaves
- * the existing membership/roles untouched.
+ * Idempotent: re-seeding the same email reuses the existing uid. A re-invite
+ * with a different membership updates the existing workspace membership row
+ * (role parity with the pre-cutover Firebase `addMember` upsert); roles are
+ * additive.
  */
 export class PostgresInviteService {
   constructor(private readonly db: Database) {}
@@ -67,8 +69,9 @@ export class PostgresInviteService {
           membership: input.membership,
           ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
         })
-        .onConflictDoNothing({
+        .onConflictDoUpdate({
           target: [workspaceMembers.workspace, workspaceMembers.uid],
+          set: { membership: input.membership },
         });
 
       for (const role of input.roles ?? []) {

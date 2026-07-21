@@ -98,8 +98,8 @@ Commit the test file with the feature code in the same PR.
 
 ## Debugging Failures
 
-- Use `agent-browser` on `localhost:9007` (emulator mode) to see what the UI shows
-- Check emulators running: `curl -s http://127.0.0.1:9099` and `:8080`
-- Start emulators: `pnpm emulators`
+- Use `agent-browser` on `localhost:9007` (the E2E server) to see what the UI shows
+- Check Postgres is reachable: `psql "$DATABASE_URL" -c 'select 1'`
 - Strict mode error → use `.first()` or more specific locator
-- Auth issue → re-run (flaky emulator state, CI retries handle this)
+- Auth issue → the `setup` project seeds `auth_users` + `auth_sessions`; re-run it
+  (`pnpm test:e2e -- --project=setup`) and confirm `e2e/.auth/user.json` exists

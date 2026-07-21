@@ -9,7 +9,6 @@
   "dependencies": {
     "@mediforce/platform-core": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "firebase-admin": "^14.0.0",
     "nodemailer": "^9.0.0",
     "postgres": "^3.4.9",
     "zod": "^4.0.0"

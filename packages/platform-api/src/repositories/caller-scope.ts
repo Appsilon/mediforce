@@ -2,6 +2,7 @@ import type { AgentRunner, PluginRegistry } from '@mediforce/agent-runtime';
 import type {
   AuditRepository,
   BlobStore,
+  CredentialsRepository,
   CronTriggerStateRepository,
   EmailProviderInfo,
   ModelRegistryRepository,
@@ -83,6 +84,7 @@ export interface CallerScope {
   readonly plugins: PluginsRegistryView;
   readonly workspaces: NamespaceRepository;
   readonly userProfiles: UserProfileRepository;
+  readonly credentials: CredentialsRepository;
   readonly cron: CronTriggerStateRepository;
 
   // System services (engine, manual trigger, etc.) — handlers use these

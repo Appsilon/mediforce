@@ -1,8 +1,7 @@
 // Auth wiring. Firebase Auth is fully removed (ADR-0002 PR2); identity + the
 // user directory + invites + sessions run on Postgres (NextAuth database
-// sessions). The `seed-user-roles`/migration script still reads Firebase Auth
-// via `firebase-admin` as a one-time export source (ADR-0002 §4, PLAN §8.2
-// grep exception).
+// sessions). The one-time `seed-user-roles` migration script reads a
+// `firebase auth:export` JSON file, not the Admin SDK (ADR-0002 §4, PLAN §8.2).
 export { PostgresUserDirectoryService } from './auth/postgres-user-directory-service';
 export { PostgresInviteService } from './auth/postgres-invite-service';
 export type { SeedInviteInput, SeededInvite } from './auth/postgres-invite-service';
@@ -51,6 +50,7 @@ export { PostgresModelRegistryRepository } from './postgres/repositories/model-r
 export { PostgresNamespaceSecretsRepository } from './postgres/repositories/namespace-secrets-repository';
 export { PostgresWorkflowSecretsRepository } from './postgres/repositories/workflow-secrets-repository';
 export { PostgresUserProfileRepository } from './postgres/repositories/user-profile-repository';
+export { PostgresCredentialsRepository } from './postgres/repositories/credentials-repository';
 export { PostgresPlatformSettingsRepository } from './postgres/repositories/platform-settings-repository';
 export { createPostgresClient, getSharedPostgresClient } from './postgres/client';
 export type { Database } from './postgres/client';

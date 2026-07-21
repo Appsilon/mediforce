@@ -20,14 +20,14 @@ a remap** — no uid column is rewritten. Two things depend on it:
    tests pin against the old Firebase filter, so post-seed `getUsersByRole`
    output is identical to today's.
 
-## Not covered (deferred)
+## Not covered
 
-`user_profiles.deployment_admin` / `.current_workspace` (PLAN §4) are **not**
-seeded here. The `user_profiles` reshape (ADR-0002 §1.2) that adds those columns
-is part of the NextAuth-cutover migration; until it lands the columns don't
-exist. Once it lands, add the profile upsert
-(`deployment_admin = customClaims.role === 'admin'`) to the script — the raw
-`customClaims.role` is already carried on each `FirebaseUserExport`.
+`user_profiles.deployment_admin` / `.current_workspace` are **not** seeded — the
+`user_profiles` reshape that would add those columns was deliberately not done in
+the NextAuth cutover, because nothing reads them. If a later change introduces
+them, the raw `customClaims.role` is already carried on each `FirebaseUserExport`
+so the profile upsert (`deployment_admin = customClaims.role === 'admin'`) can be
+added to the script then.
 
 Passwords are not migrated (Firebase scrypt is proprietary; passwords are
 test-only). `password_hash` stays null; email/password users reset if they want
@@ -35,15 +35,30 @@ one.
 
 ## Run
 
-```bash
-# dry-run (default): prints counts, writes nothing
-npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts
+The script reads a **Firebase CLI export file** — the codebase no longer contains
+any Firebase Admin wiring, so there is no live Admin SDK call. Produce the file
+first with the Firebase CLI:
 
-# apply
-npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts --apply
+```bash
+firebase auth:export users.json --project <project-id>
 ```
 
-Requires `DATABASE_URL` + Firebase admin credentials. Idempotent
+Then pass its path as the first argument:
+
+```bash
+# dry-run (default): prints counts, writes nothing
+npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts users.json
+
+# apply
+npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts users.json --apply
+```
+
+The file shape (`{"users": [{"localId", "email", "displayName", "photoUrl",
+"customAttributes"}]}`) is validated with Zod; a malformed file fails loudly
+instead of seeding a partial set. `customAttributes` is a JSON *string* of the
+custom claims — a missing or unparseable value is treated as "no claims".
+
+Requires `DATABASE_URL` (only for `--apply`). Idempotent
 (`auth_users` upserts `email_verified` on conflict; `user_roles` is
 `ON CONFLICT DO NOTHING`).
 

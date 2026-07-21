@@ -5,10 +5,9 @@ import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/te
 try { process.loadEnvFile('.env.local'); } catch { /* file may not exist in CI */ }
 
 // Gate for the full E2E suite (setup + api + ui projects). The `test:e2e` npm
-// script still sets `NEXT_PUBLIC_USE_EMULATORS=true` to flip this on; the name
-// is historical — auth runs on NextAuth now (ADR-0002 PR2), no Firebase
-// emulator is involved.
-const runFullSuite = process.env.NEXT_PUBLIC_USE_EMULATORS === 'true';
+// scripts set `E2E_FULL_SUITE=true` to flip this on; without it only the
+// browser smoke spec runs against a plain `pnpm dev` server.
+const runFullSuite = process.env.E2E_FULL_SUITE === 'true';
 
 // The full suite runs on a separate port so it never reuses a plain `pnpm dev`
 // server (which may point at other data). Its server is seeded by auth-setup.

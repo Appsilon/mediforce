@@ -6,18 +6,16 @@
     "dev": "NEXT_PUBLIC_GIT_SHA=$(git rev-parse --short HEAD) NEXT_PUBLIC_GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) next dev -p ${PORT:-9003}",
     "dev:mock": "python3 scripts/dev-mock.py",
     "build": "rm -rf .next && next build",
-    "build:e2e": "NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce NEXT_PUBLIC_APP_URL=http://localhost:${E2E_PORT:-9007} next build && python3 scripts/e2e_build_gate.py stamp",
+    "build:e2e": "NEXT_PUBLIC_APP_URL=http://localhost:${E2E_PORT:-9007} next build && python3 scripts/e2e_build_gate.py stamp",
     "start:e2e": "python3 scripts/e2e_build_gate.py ensure && MOCK_AGENT=true ALLOW_LOCAL_AGENTS=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${E2E_PORT:-9007} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 next start -p ${E2E_PORT:-9007}",
     "start": "next start -p ${PORT:-3000}",
     "typecheck": "tsc --noEmit",
     "test:external": "vitest run --config vitest.config.external.ts",
     "test:action-flows": "vitest run --config vitest.config.action-flows.ts",
-    "test:e2e": "NODE_OPTIONS='--conditions=@mediforce/source' NEXT_PUBLIC_USE_EMULATORS=true playwright test",
-    "test:e2e:headed": "NODE_OPTIONS='--conditions=@mediforce/source' NEXT_PUBLIC_USE_EMULATORS=true E2E_DEV_SERVER=true playwright test --headed",
+    "test:e2e": "NODE_OPTIONS='--conditions=@mediforce/source' E2E_FULL_SUITE=true playwright test",
+    "test:e2e:headed": "NODE_OPTIONS='--conditions=@mediforce/source' E2E_FULL_SUITE=true E2E_DEV_SERVER=true playwright test --headed",
     "test:e2e:ui": "NODE_OPTIONS='--conditions=@mediforce/source' E2E_DEV_SERVER=true playwright test --ui",
-    "emulators": "bash scripts/start-emulators.sh",
-    "seed:dev": "npx tsx scripts/seed-dev-data.ts",
-    "deploy": "pnpm build && firebase deploy --only hosting"
+    "seed:dev": "npx tsx scripts/seed-dev-data.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "1.11.2",

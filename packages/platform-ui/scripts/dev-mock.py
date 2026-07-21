@@ -3,31 +3,29 @@
 
 from __future__ import annotations
 
-import json
 import os
-import shutil
 import signal
 import socket
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 PLATFORM_UI = Path(__file__).resolve().parent.parent
-ROOT = PLATFORM_UI.parent.parent
-FIREBASE_CONFIG = Path("/tmp/mediforce-dev-mock-firebase.json")
+REPO_ROOT = PLATFORM_UI.parent.parent
 
-AUTH_PORT = 9099
 NEXT_PORT = 9007
+DEV_DATABASE_URL = "postgresql://mediforce:mediforce@localhost:5432/mediforce"
 
+# Identity is NextAuth over Postgres (ADR-0002). The seeded demo user signs in
+# with a password, so password auth is on and a fixed throwaway signing secret
+# is supplied — never a real deployment secret.
+#
+# What "mock" means here: mocked agents, no cloud keys, no OpenRouter, no email.
+# It does NOT mean "no database" — every repository has been Postgres-only since
+# ADR-0001, so this starts the same dev Postgres container `pnpm dev` uses.
 DEMO_ENV: dict[str, str] = {
-    "NEXT_PUBLIC_USE_EMULATORS": "true",
-    "NEXT_PUBLIC_FIREBASE_API_KEY": "fake-api-key-for-emulators",
-    "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN": "demo-mediforce.firebaseapp.com",
-    "NEXT_PUBLIC_FIREBASE_PROJECT_ID": "demo-mediforce",
-    "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "000000000000",
-    "NEXT_PUBLIC_FIREBASE_APP_ID": "1:000000000000:web:0000000000000000",
-    "FIREBASE_AUTH_EMULATOR_HOST": f"127.0.0.1:{AUTH_PORT}",
+    "ENABLE_PASSWORD_AUTH": "true",
+    "AUTH_SECRET": "dev-mock-auth-secret-not-for-production-00000000000000000000",
     "MOCK_AGENT": "true",
     "MEDIFORCE_DATA_DIR": "/tmp/mediforce-e2e-data",
     "NEXT_PUBLIC_APP_URL": f"http://localhost:{NEXT_PORT}",
@@ -52,94 +50,20 @@ def port_open(port: int) -> bool:
         return False
 
 
-def wait_for_ports(ports: list[int], timeout_seconds: int) -> bool:
-    deadline = time.monotonic() + timeout_seconds
-    while time.monotonic() < deadline:
-        if all(port_open(port) for port in ports):
-            return True
-        time.sleep(0.5)
-    return False
-
-
-def write_firebase_config() -> None:
-    config = {
-        "emulators": {
-            "auth": {"port": AUTH_PORT},
-            "ui": {"enabled": False},
-        },
-    }
-    FIREBASE_CONFIG.write_text(json.dumps(config, indent=2))
-
-
-def command_exists(command: str) -> bool:
-    return shutil.which(command) is not None
-
-
-def with_local_java(env: dict[str, str]) -> dict[str, str]:
-    if env.get("JAVA_HOME") or command_exists("java"):
-        return env
-
-    for java_home in [
-        Path("/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"),
-        Path("/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"),
-    ]:
-        java_bin = java_home / "bin"
-        if java_bin.exists():
-            return {
-                **env,
-                "JAVA_HOME": str(java_home),
-                "PATH": f"{java_bin}{os.pathsep}{env.get('PATH', '')}",
-            }
-
-    return env
-
-
-def start_emulators(env: dict[str, str]) -> subprocess.Popen[bytes] | None:
-    emulator_ports = [AUTH_PORT]
-    open_ports = [port for port in emulator_ports if port_open(port)]
-    if len(open_ports) == len(emulator_ports):
-        log("Firebase Auth emulator already running on 9099.")
-        return None
-
-    if open_ports:
-        ports = ", ".join(str(port) for port in open_ports)
-        missing = ", ".join(str(port) for port in emulator_ports if port not in open_ports)
-        raise RuntimeError(
-            f"Some emulator ports are already in use ({ports}), but others are missing ({missing}). "
-            "Stop the stale emulator process and run pnpm dev:mock again."
-        )
-
-    if not command_exists("pnpm"):
-        raise RuntimeError("pnpm is required to run dev:mock.")
-
-    write_firebase_config()
-    log("Starting local Firebase emulators...")
-    proc = subprocess.Popen(
-        [
-            "pnpm",
-            "exec",
-            "firebase",
-            "emulators:start",
-            "--project",
-            "demo-mediforce",
-            "--only",
-            "auth",
-            "--config",
-            str(FIREBASE_CONFIG),
-        ],
-        cwd=str(PLATFORM_UI),
+def start_database(env: dict[str, str]) -> None:
+    log("Starting dev Postgres and applying migrations...")
+    subprocess.run(
+        ["python3", "scripts/dev-infra.py"],
+        cwd=str(REPO_ROOT),
         env=env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        check=True,
     )
-    if not wait_for_ports(emulator_ports, 45):
-        proc.terminate()
-        raise RuntimeError(
-            "Firebase emulators did not become ready within 45 seconds. "
-            "Run `pnpm --filter @mediforce/platform-ui emulators` for full logs."
-        )
-    log("Firebase emulators are ready.")
-    return proc
+    subprocess.run(
+        ["pnpm", "db:migrate"],
+        cwd=str(REPO_ROOT),
+        env=env,
+        check=True,
+    )
 
 
 def seed_demo_data(env: dict[str, str]) -> None:
@@ -171,14 +95,16 @@ def run_next(env: dict[str, str]) -> int:
 
 
 def main() -> int:
-    env = with_local_java({**os.environ, **DEMO_ENV})
-    emulator_proc: subprocess.Popen[bytes] | None = None
+    # An ambient DATABASE_URL wins so a developer can point mock mode at their
+    # own database; otherwise the shared dev container is used.
+    env = {**os.environ, **DEMO_ENV}
+    env.setdefault("DATABASE_URL", DEV_DATABASE_URL)
     try:
         if port_open(NEXT_PORT):
             raise RuntimeError(
                 f"Port {NEXT_PORT} is already in use. Stop that process and run pnpm dev:mock again."
             )
-        emulator_proc = start_emulators(env)
+        start_database(env)
         seed_demo_data(env)
         return run_next(env)
     except subprocess.CalledProcessError as error:
@@ -187,14 +113,6 @@ def main() -> int:
     except RuntimeError as error:
         log(str(error))
         return 1
-    finally:
-        if emulator_proc is not None and emulator_proc.poll() is None:
-            log("Stopping Firebase emulators...")
-            emulator_proc.terminate()
-            try:
-                emulator_proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                emulator_proc.kill()
 
 
 if __name__ == "__main__":

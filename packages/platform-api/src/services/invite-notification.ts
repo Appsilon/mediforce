@@ -26,7 +26,8 @@ export interface InviteService {
    * roles (ADR-0002 §3.1). No temporary password and no credentials email —
    * the invitee signs in later via Google (verified-email auto-link) or by
    * setting a password. Idempotent on email collision — returns the existing
-   * uid with `isExisting: true` and leaves the existing membership untouched.
+   * uid with `isExisting: true`; a re-invite with a different `membership`
+   * updates the existing workspace membership.
    */
   seedInvite(input: SeedInviteInput): Promise<InvitedUser>;
 

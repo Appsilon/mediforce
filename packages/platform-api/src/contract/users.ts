@@ -131,3 +131,22 @@ export const ClearMustChangePasswordOutputSchema = z.object({
 
 export type ClearMustChangePasswordInput = z.infer<typeof ClearMustChangePasswordInputSchema>;
 export type ClearMustChangePasswordOutput = z.infer<typeof ClearMustChangePasswordOutputSchema>;
+
+export const SetPasswordInputSchema = z
+  .object({
+    newPassword: z.string().min(8, 'Password must be at least 8 characters.'),
+    /**
+     * Server-to-server escape hatch, same rule as
+     * `ClearMustChangePasswordInputSchema`: an apiKey caller must name the
+     * target uid, a user caller must either omit it or pass their own.
+     */
+    uid: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const SetPasswordOutputSchema = z.object({
+  user: z.object({ uid: z.string() }),
+});
+
+export type SetPasswordInput = z.infer<typeof SetPasswordInputSchema>;
+export type SetPasswordOutput = z.infer<typeof SetPasswordOutputSchema>;

@@ -25,7 +25,7 @@ Agents / quick lookups: see [docs/dev-quickref.md](docs/dev-quickref.md).
 
 ---
 
-## 1. Fastest start — `pnpm dev:mock` (~30s, no Docker)
+## 1. Fastest start — `pnpm dev:mock`
 
 ```bash
 pnpm install
@@ -105,7 +105,7 @@ fails with `Unable to find image '...' locally`.
 | Command              | What runs                                                   | Port | When to use                                  |
 |----------------------|-------------------------------------------------------------|------|----------------------------------------------|
 | `pnpm dev`           | Postgres + auto-migrate + UI, Docker agents                 | 9003 | Default full local stack                     |
-| `pnpm dev:mock`      | Mocked agents, in-memory data, NextAuth password provider (no Docker) | 9007 | Fastest; best for UI work          |
+| `pnpm dev:mock`      | Mocked agents, seeded demo data, password sign-in                    | 9007 | Fastest; best for UI work          |
 | `pnpm dev:no-docker` | UI + host `claude` CLI agents, **no** Docker                | 9003 | Agent debugging without containers           |
 | `pnpm dev:queue`     | `pnpm dev` + Redis + BullMQ queue worker                    | 9003 | Testing queue-based agent runs               |
 
@@ -348,7 +348,7 @@ suite — **not** for the data layer (Postgres covers that).
 
 ### Password provider (for E2E / local auth)
 
-The Credentials provider backs authentication in `dev:mock` and the Playwright
+Password sign-in backs authentication in `dev:mock` and the Playwright
 suite — no emulator. Seeded users authenticate with a bcrypt hash in
 `auth_users.password_hash`. Enable it in `packages/platform-ui/.env.local`:
 
@@ -392,9 +392,8 @@ PLATFORM_API_KEY=your-secret-key
 
 ### `DATABASE_URL is required` (FATAL at boot)
 
-You're in a non-mock mode without a database. Run `pnpm dev` (starts Postgres),
-or set `DATABASE_URL` if you have your own. `pnpm dev:mock` is the only mode that
-runs without it.
+You're in a mode that never started Postgres. Run `pnpm dev` (starts it), or set
+`DATABASE_URL` if you have your own. `pnpm dev:mock` starts that container too.
 
 ### Port 9003 already in use
 

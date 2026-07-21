@@ -111,6 +111,30 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
     expect(await db.select().from(userRoles).where(eq(userRoles.uid, first.uid))).toHaveLength(1);
   });
 
+  it('re-inviting with a different membership updates the existing role', async () => {
+    const first = await service.seedInvite({
+      email: 'promoted@acme.com',
+      workspaceHandle: 'acme',
+      membership: 'member',
+    });
+
+    const second = await service.seedInvite({
+      email: 'promoted@acme.com',
+      workspaceHandle: 'acme',
+      membership: 'admin',
+    });
+
+    expect(second.uid).toBe(first.uid);
+    expect(second.isExisting).toBe(true);
+
+    const members = await db
+      .select()
+      .from(workspaceMembers)
+      .where(eq(workspaceMembers.uid, first.uid));
+    expect(members).toHaveLength(1);
+    expect(members[0]).toMatchObject({ workspace: 'acme', membership: 'admin' });
+  });
+
   it('getUserEmail returns the seeded email and null for unknown uids', async () => {
     const { uid } = await service.seedInvite({
       email: 'lookup@acme.com',

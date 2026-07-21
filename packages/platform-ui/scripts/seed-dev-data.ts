@@ -6,15 +6,14 @@
  *   pnpm seed:dev
  *
  * Requires:
- *   - Firebase Auth emulator running (port 9099)
- *   - Postgres running with the latest migrations applied (`pnpm db:migrate`)
+ *   - Postgres running with the latest migrations applied (`pnpm db:migrate`),
+ *     reachable via DATABASE_URL
  *
- * The server-side data layer lives entirely in Postgres after the
- * zero-Firestore cutover (ADR-0001 #534). Only the Auth emulator + Postgres
- * are seeded here.
+ * Everything lives in Postgres: identity in `auth_users` (ADR-0002) and the
+ * workspace fixture in the domain tables (ADR-0001 #534).
  */
 
-import { clearEmulators, createTestUser } from '../e2e/helpers/emulator';
+import { createTestUser } from '../e2e/helpers/emulator';
 import { seedPostgresNamespace } from '../e2e/helpers/postgres-seed';
 
 const TEST_EMAIL = 'test@mediforce.dev';
@@ -25,14 +24,12 @@ async function main() {
   console.log('\nSeeding development data...\n');
 
   try {
-    // 1. Clear the Auth emulator
-    await clearEmulators();
-
-    // 2. Create test user
+    // 1. Upsert the `auth_users` row with a bcrypt password hash so the
+    // NextAuth Credentials provider (`ENABLE_PASSWORD_AUTH=true`) can sign in.
     const testUserId = await createTestUser(TEST_EMAIL, TEST_PASSWORD, TEST_DISPLAY_NAME);
     console.log(`  User created: ${testUserId}\n`);
 
-    // 3. Seed the full fixture into Postgres (the server-side data layer).
+    // 2. Seed the full fixture into Postgres (the server-side data layer).
     console.log('Seeding Postgres:');
     await seedPostgresNamespace(testUserId);
     console.log('  Postgres seed complete');

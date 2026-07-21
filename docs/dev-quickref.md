@@ -10,7 +10,7 @@ Terse command-first reference for agents and devs. For zero-to-running setup see
 
 | Command              | Backend                                   | Agents            | Docker | Port | Use when                                  |
 |----------------------|-------------------------------------------|-------------------|--------|------|-------------------------------------------|
-| `pnpm dev:mock`      | In-memory + NextAuth (password provider)  | Mocked            | No     | 9007 | UI work, fastest spin-up (~30s)           |
+| `pnpm dev:mock`      | Postgres + NextAuth (password sign-in)    | Mocked            | Yes    | 9007 | UI work, fastest spin-up                  |
 | `pnpm dev`           | Postgres (auto-migrate)                   | Docker containers | Yes    | 9003 | Default full stack — most realistic       |
 | `pnpm dev:no-docker` | Postgres on :5432 (must already be up)    | Host `claude` CLI | No     | 9003 | Agent debugging without containers        |
 | `pnpm dev:queue`     | Postgres + Redis                          | BullMQ worker     | Yes    | 9003 | Queue-based agent runs (bull-board :3100) |
@@ -21,7 +21,7 @@ Notes:
 - `DATABASE_URL` is hardcoded in the `dev` / `dev:queue` scripts; `dev:no-docker` defaults to
   the same `localhost:5432` URL but does **not** start Postgres — run `pnpm dev` once first
   (or bring your own DB on :5432).
-- `dev:mock` is the only mode that runs without `DATABASE_URL`.
+- `dev:mock` defaults `DATABASE_URL` to the dev container and starts it for you; every mode needs a database (ADR-0001 left no in-memory backend).
 - Auth is NextAuth / Auth.js v5 (ADR-0002) — no Firebase emulator. Set
   `AUTH_SECRET` plus a provider: `ENABLE_PASSWORD_AUTH=true` for local
   email/password, or `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` for Google.
