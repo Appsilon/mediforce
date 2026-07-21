@@ -84,6 +84,18 @@
       }
     },
     {
+      "id": "digest-packages",
+      "name": "Digest Classifications for Review",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "description": "Project the full classification down to a compact per-package digest (status, badges, warnings, gaps, headline metrics) for the recommendations agent. Keeps the agent's inlined input small; the report steps still read the full classification.",
+      "agent": {
+        "image": "mediforce-golden-image",
+        "command": "node /app/digest-packages.js"
+      }
+    },
+    {
       "id": "assess-recommendations",
       "name": "Assess Recommendations",
       "type": "creation",
@@ -144,7 +156,8 @@
     { "from": "select-packages", "to": "resolve-package-selection" },
     { "from": "resolve-package-selection", "to": "collect-metrics" },
     { "from": "collect-metrics", "to": "classify-packages" },
-    { "from": "classify-packages", "to": "assess-recommendations" },
+    { "from": "classify-packages", "to": "digest-packages" },
+    { "from": "digest-packages", "to": "assess-recommendations" },
     { "from": "assess-recommendations", "to": "generate-council-summary" },
     { "from": "generate-council-summary", "to": "review-council-summary" },
     { "from": "generate-package-reports", "to": "done" }

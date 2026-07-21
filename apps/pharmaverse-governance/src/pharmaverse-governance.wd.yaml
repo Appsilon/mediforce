@@ -1052,6 +1052,66 @@ steps:
         console.error("Fatal error:", error);
         process.exit(1);
       });
+- id: digest-packages
+  name: Digest Classifications for Review
+  type: creation
+  executor: script
+  plugin: script-container
+  description: Project the full classification down to a compact per-package digest (status, badges, warnings, gaps, headline metrics) for the recommendations agent. Keeps the agent's inlined input small; the report steps still read the full classification.
+  script:
+    runtime: javascript
+    image: mediforce-golden-image
+    inlineScript: |-
+      import { readFile, writeFile } from "node:fs/promises";
+      function firedTriggers(t) {
+        const out = [];
+        if (t.rt1_termExpired) out.push("RT-1 term expired");
+        if (t.rt2_majorRelease) out.push("RT-2 major release");
+        if (t.rt3_councilInitiated) out.push("RT-3 council-initiated");
+        return out;
+      }
+      async function main() {
+        const input = JSON.parse(await readFile("/output/input.json", "utf-8"));
+        const assessments = input.assessments ?? input.steps?.["classify-packages"]?.assessments ?? [];
+        const metrics = /* @__PURE__ */ new Map();
+        for (const m of input.steps?.["collect-metrics"]?.packages ?? []) metrics.set(m.packageName, m);
+        const packages = assessments.map((a) => {
+          const m = metrics.get(a.packageName);
+          return {
+            packageName: a.packageName,
+            status: a.proposedStatus,
+            badges: {
+              submission: a.proposedBadges.submissionReadiness,
+              maintenance: a.proposedBadges.maintenanceHealth,
+              technical: a.proposedBadges.technicalQuality
+            },
+            changeType: a.changeType,
+            earlyWarnings: a.earlyWarnings,
+            dataGaps: a.dataGaps,
+            renewalTriggers: firedTriggers(a.renewalTriggers),
+            metrics: m ? {
+              cranStatus: m.cranStatus,
+              releasesLast18Months: m.releases.countLast18Months,
+              openIssues: m.issues.openCount,
+              unresolvedCritical: m.issues.unresolvedCriticalCount,
+              oldestUnresolvedDays: m.issues.oldestUnresolvedDays,
+              coveragePercent: m.coverage.percent,
+              commitsLast90Days: m.contributors.commitsLast90Days
+            } : null
+          };
+        });
+        const result = {
+          output_file: "/output/result.json",
+          summary: `Digest for ${packages.length} packages`,
+          packages
+        };
+        await writeFile("/output/result.json", JSON.stringify(result, null, 2), "utf-8");
+        console.log(`Done: digested ${packages.length} packages`);
+      }
+      main().catch((error) => {
+        console.error("Fatal error:", error);
+        process.exit(1);
+      });
 - id: assess-recommendations
   name: Assess Recommendations
   type: creation
@@ -1079,11 +1139,17 @@ steps:
 
       ## Input
 
-      Read `/output/input.json`:
-      - `steps["classify-packages"].assessments` — one object per package with
-        `packageName`, `proposedStatus`, `proposedBadges`, `badgeEvidence`,
-        `renewalTriggers`, `changeType`, `dataGaps`, `earlyWarnings`.
-      - `steps["collect-metrics"].packages` — the raw metrics, if you need detail.
+      Read `/output/input.json`. It contains a compact digest under `packages` (also
+      available at `steps["digest-packages"].packages`) — one entry per package with:
+      - `packageName`, `status`, `changeType`
+      - `badges` — `{ submission, maintenance, technical }`
+      - `earlyWarnings`, `dataGaps`, `renewalTriggers`
+      - `metrics` — headline numbers: `cranStatus`, `releasesLast18Months`,
+        `openIssues`, `unresolvedCritical`, `oldestUnresolvedDays`, `coveragePercent`,
+        `commitsLast90Days`
+
+      This digest is the complete set of facts available to you — the full evidence
+      lives elsewhere and is not needed here.
 
       ## Task
 
@@ -2091,6 +2157,8 @@ transitions:
 - from: collect-metrics
   to: classify-packages
 - from: classify-packages
+  to: digest-packages
+- from: digest-packages
   to: assess-recommendations
 - from: assess-recommendations
   to: generate-council-summary

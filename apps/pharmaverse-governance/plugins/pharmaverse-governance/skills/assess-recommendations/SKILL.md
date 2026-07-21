@@ -14,11 +14,17 @@ classification — treat status and badges as fixed inputs.
 
 ## Input
 
-Read `/output/input.json`:
-- `steps["classify-packages"].assessments` — one object per package with
-  `packageName`, `proposedStatus`, `proposedBadges`, `badgeEvidence`,
-  `renewalTriggers`, `changeType`, `dataGaps`, `earlyWarnings`.
-- `steps["collect-metrics"].packages` — the raw metrics, if you need detail.
+Read `/output/input.json`. It contains a compact digest under `packages` (also
+available at `steps["digest-packages"].packages`) — one entry per package with:
+- `packageName`, `status`, `changeType`
+- `badges` — `{ submission, maintenance, technical }`
+- `earlyWarnings`, `dataGaps`, `renewalTriggers`
+- `metrics` — headline numbers: `cranStatus`, `releasesLast18Months`,
+  `openIssues`, `unresolvedCritical`, `oldestUnresolvedDays`, `coveragePercent`,
+  `commitsLast90Days`
+
+This digest is the complete set of facts available to you — the full evidence
+lives elsewhere and is not needed here.
 
 ## Task
 
