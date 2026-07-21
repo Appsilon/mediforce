@@ -1261,6 +1261,8 @@ function generateScript() {
   s += `  echo "MAILGUN_DOMAIN=${emailEnabled ? val('mailgun-domain') : ''}"\n`;
   s += `  echo "MAILGUN_FROM_EMAIL=${emailEnabled ? val('mailgun-from') : ''}"\n`;
   s += `  echo "MAILGUN_SENDER_NAME=${emailEnabled ? (val('mailgun-sender') || 'Mediforce') : 'Mediforce'}"\n`;
+  // Without this the server refuses to boot when no email provider is set.
+  s += `  echo "MEDIFORCE_DISABLE_EMAIL=${emailEnabled ? 'false' : 'true'}"\n`;
   s += '} >> "$DEPLOY_DIR/.env"\n';
   s += 'chmod 600 "$DEPLOY_DIR/.env"\n';
   s += 'chown deploy:deploy "$DEPLOY_DIR/.env"\n\n';

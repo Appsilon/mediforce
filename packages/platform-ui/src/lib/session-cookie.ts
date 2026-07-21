@@ -21,20 +21,23 @@ export function sessionCookieName(secure: boolean): string {
  * `__Secure-` name).
  *
  * Deployments terminate TLS at Caddy and forward plain http to the container,
- * so `request.url` is http even when the browser is on https. Auth.js
- * (`trustHost: true`) trusts `x-forwarded-proto` for exactly this reason, and
- * password sign-in has to agree with it — otherwise Auth.js writes and clears
- * `__Secure-authjs.session-token` while this route writes the unprefixed name,
- * and signing out silently fails to revoke the session.
+ * so `request.url` is http even when the browser is on https. Password sign-in
+ * must reach the same answer as Auth.js or it writes a cookie under a name
+ * Auth.js never clears, and signing out silently leaves the session alive.
+ *
+ * The precedence mirrors Auth.js exactly: it replaces the request origin with
+ * `AUTH_URL` when set (`reqWithEnvURL`) and only otherwise derives the protocol
+ * from `x-forwarded-proto`. Checking them in the other order would agree under
+ * Caddy and diverge the moment the two disagree.
  */
 export function isSecureRequest(request: Request): boolean {
-  const forwardedProto = request.headers.get('x-forwarded-proto');
-  if (forwardedProto !== null && forwardedProto !== '') {
-    return forwardedProto.split(',')[0]?.trim() === 'https';
-  }
   const configuredUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
   if (configuredUrl !== undefined && configuredUrl !== '') {
     return configuredUrl.startsWith('https://');
+  }
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  if (forwardedProto !== null && forwardedProto !== '') {
+    return forwardedProto.split(',')[0]?.trim() === 'https';
   }
   return new URL(request.url).protocol === 'https:';
 }

@@ -1,5 +1,5 @@
 -- ADR-0002 PR2 — NextAuth (Auth.js v5) atomic cutover schema.
--- ALTERs auth_users (created by 0029) to add the remaining @auth/drizzle-adapter
+-- ALTERs auth_users (created by 0030) to add the remaining @auth/drizzle-adapter
 -- columns, creates the three adapter-required tables, and renames the
 -- workspace_members governance column off the process-role collision.
 

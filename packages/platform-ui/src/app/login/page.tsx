@@ -69,8 +69,9 @@ function LoginForm() {
     setError(null);
     setPending(true);
     try {
+      // Where to go next is the redirect effect's job — it knows about
+      // mustChangePassword, which this path would otherwise skip.
       await signInWithEmail(email.trim(), password);
-      router.replace('/workspace-selection');
     } catch (err: unknown) {
       setError(err instanceof CredentialsSignInError ? 'Incorrect email or password.' : 'Sign in failed.');
     } finally {

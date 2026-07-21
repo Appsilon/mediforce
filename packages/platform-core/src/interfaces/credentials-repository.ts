@@ -2,9 +2,12 @@
  * Password-credential writes for a user (ADR-0002 §4).
  *
  * Distinct from `UserProfileRepository`, which owns application-level profile
- * fields: this port owns the authentication material the
- * `/api/auth/password-login` route reads. Hashing is the caller's job — the port stores an
- * already-hashed value so no plaintext password ever crosses this boundary.
+ * fields: this port owns a user's password credential and their sessions, as
+ * the `setPassword` handler needs them. (Sign-in itself does not come through
+ * here — `/api/auth/password-login` reads the credential directly, since it
+ * runs outside the handler layer to set a cookie.) Hashing is the caller's job:
+ * the port stores an already-hashed value, so no plaintext crosses this
+ * boundary.
  */
 export interface CredentialsRepository {
   /**

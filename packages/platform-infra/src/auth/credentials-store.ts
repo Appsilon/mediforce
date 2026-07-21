@@ -8,7 +8,7 @@ import { authUsers } from '../postgres/schema/auth-user';
  * only write path for it (seed-based invites leave it null, so a user adds a
  * password via the change-password flow). Returns `true` when a row matched.
  *
- * The caller owns hashing — bcrypt runs in the route (platform-ui) so this
+ * The caller owns hashing — bcrypt runs in the `setPassword` handler so this
  * module stays a thin, testable DB primitive.
  */
 export async function setUserPasswordHash(

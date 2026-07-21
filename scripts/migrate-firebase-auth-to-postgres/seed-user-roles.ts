@@ -109,7 +109,10 @@ function readFirebaseExport(path: string): FirebaseUserExport[] {
 
   return parsed.data.users.map((user) => ({
     uid: user.localId,
-    email: user.email ?? null,
+    // Lower-cased to match the case-insensitive uniqueness index (migration
+    // 0033). Firebase normalises already, but this is the one bulk write that
+    // runs after it, and a single mixed-case row would abort the whole --apply.
+    email: user.email?.toLowerCase() ?? null,
     displayName: user.displayName ?? null,
     photoURL: user.photoUrl ?? null,
     customClaims: parseCustomClaims(user.customAttributes),

@@ -1244,6 +1244,7 @@ def _render_compose_env(ctx: Context) -> str:
         "",
         "# Email — provider + credentials (Mailgun or SMTP)",
         f"EMAIL_PROVIDER={ctx.collected.get('EMAIL_PROVIDER', '')}",
+        f"MEDIFORCE_DISABLE_EMAIL={ctx.collected.get('MEDIFORCE_DISABLE_EMAIL', 'true')}",
         f"MAILGUN_API_KEY={ctx.collected.get('MAILGUN_API_KEY', '')}",
         f"MAILGUN_DOMAIN={ctx.collected.get('MAILGUN_DOMAIN', '')}",
         f"MAILGUN_FROM_EMAIL={ctx.collected.get('MAILGUN_FROM_EMAIL', '')}",
@@ -1374,8 +1375,12 @@ def _ensure_api_keys(ctx: Context) -> None:
                 ctx.collected["SMTP_FROM_EMAIL"] = ask("From email address (e.g. noreply@example.com)")
                 ctx.collected["SMTP_SECURE"] = ask("Use implicit TLS? (true for port 465, false for STARTTLS on 587)", default="false")
                 ok("SMTP config accepted")
+            ctx.collected["MEDIFORCE_DISABLE_EMAIL"] = "false"
         else:
             ctx.collected["EMAIL_PROVIDER"] = ""
+            # Without this the server refuses to boot: validateEnv demands an
+            # email provider unless email is explicitly disabled.
+            ctx.collected["MEDIFORCE_DISABLE_EMAIL"] = "true"
 
 
 def step_env_local(ctx: Context) -> None:

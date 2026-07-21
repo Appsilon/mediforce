@@ -86,7 +86,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS),
   );
   const passwordMatches = await compare(password, user?.passwordHash ?? DUMMY_HASH);
-  if (!allowed || user?.passwordHash == null || !passwordMatches) {
+  if (!allowed || user === null || user.passwordHash === null || !passwordMatches) {
     return NextResponse.json(INVALID_CREDENTIALS, { status: 401 });
   }
 

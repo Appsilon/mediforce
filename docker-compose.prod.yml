@@ -137,6 +137,8 @@ services:
       # directory must exist before first launch:
       #   sudo mkdir -p /var/lib/mediforce
       - MEDIFORCE_DATA_DIR=/var/lib/mediforce
+      # Boot refuses to start without an email provider unless this is true.
+      - MEDIFORCE_DISABLE_EMAIL=${MEDIFORCE_DISABLE_EMAIL:-}
       - EMAIL_PROVIDER=${EMAIL_PROVIDER:-}
       - MAILGUN_API_KEY=${MAILGUN_API_KEY:-}
       - MAILGUN_DOMAIN=${MAILGUN_DOMAIN:-}
