@@ -355,6 +355,54 @@ describe('POST /api/processes/[instanceId]/run', () => {
       expect(mockInstanceAddStepExecution).not.toHaveBeenCalled();
     });
 
+    it('[DATA] retries a deploy-interrupted step as a fresh attempt, not a timeout reap (issue #907)', async () => {
+      let callCount = 0;
+      mockInstanceGetById.mockImplementation(() => {
+        callCount++;
+        const base = {
+          id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest',
+          definitionVersion: '1', configName: undefined, variables: {}, triggerPayload: {},
+        };
+        // Initial check + first loop read see `running` on the step; after the
+        // fresh attempt the run pauses at the human step so the loop exits.
+        return Promise.resolve(callCount <= 2
+          ? { ...base, status: 'running', currentStepId: 'gather-data' }
+          : { ...base, status: 'paused', currentStepId: 'human-review' });
+      });
+      mockGetWorkflowDefinition.mockResolvedValue(workflowDefinition);
+      // The prior execution was marked `interrupted` by the SIGTERM hook — no
+      // running row remains. Started long ago, so under the reap logic this
+      // would be past its timeout; the retry branch must ignore that and NOT
+      // route it through the timeout reap.
+      mockGetStepExecutions.mockResolvedValue([
+        { id: 'exec-interrupted', stepId: 'gather-data', status: 'interrupted', startedAt: new Date(Date.now() - 40 * 60_000).toISOString() },
+      ]);
+      mockExecuteAgentStep.mockResolvedValue({
+        instanceId: 'inst-1', status: 'paused', currentStepId: 'human-review', agentRunStatus: 'completed',
+      });
+
+      await POST(makeRequest(), { params: makeParams('inst-1') });
+      await afterCallback!();
+
+      // A brand-new execution row is created (fresh attempt) — the interrupted
+      // row is left as a historical record, not reaped.
+      expect(mockInstanceAddStepExecution).toHaveBeenCalledTimes(1);
+      expect(mockInstanceAddStepExecution).toHaveBeenCalledWith(
+        'inst-1',
+        expect.objectContaining({ stepId: 'gather-data', status: 'running' }),
+      );
+      // executeAgentStep is called for a fresh run (no reapTimedOut option), and
+      // never with the interrupted row's id under reap mode.
+      expect(mockExecuteAgentStep).toHaveBeenCalledTimes(1);
+      expect(mockExecuteAgentStep).not.toHaveBeenCalledWith(
+        expect.anything(), expect.anything(), expect.anything(),
+        expect.anything(), expect.anything(), 'exec-interrupted', { reapTimedOut: true },
+      );
+      const [, , , , , freshExecId, reapOpts] = mockExecuteAgentStep.mock.calls[0];
+      expect(freshExecId).not.toBe('exec-interrupted');
+      expect(reapOpts).toBeUndefined();
+    });
+
     it('[DATA] fails the run when a step exceeds the persisted attempt cap (issue #868)', async () => {
       mockInstanceGetById.mockResolvedValue({
         id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest',

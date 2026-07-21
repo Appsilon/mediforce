@@ -62,15 +62,20 @@ Make the timeout **durable** by treating "stranded past deadline" and
    in-memory loop-guard, this survives process death and re-kicks). Exceeding it
    fails the run. No step type can loop forever.
 
-4. **SIGTERM fast-path for deploys.** *(Deferred — lands in a follow-up PR, not
-   the initial #868 implementation. Decisions 1–3 and 5 ship first, with the
-   timeout-reap as this path's backstop.)* A graceful-shutdown hook on `platform-ui`
-   marks its in-flight runs' current execution `interrupted` (a new
-   `StepExecution` status) before the process exits. A boot-time re-kick sweep
+4. **SIGTERM fast-path for deploys.** *(Shipped in #907, follow-up to the
+   initial #868/#906 implementation.)* A `SIGTERM` graceful-shutdown hook on
+   `platform-ui` (wired in `instrumentation.register()`) marks its in-flight
+   runs' current execution `interrupted` (a new `StepExecution` status) before
+   the process exits — a handful of cheap DB writes within the ~10s stop grace,
+   driven by a shared in-flight registry (`instanceId → executionId`, backed by
+   `globalThis` so the shutdown hook and the auto-runner share one map across
+   Next's separate instrumentation/route bundles). A boot-time re-kick sweep
    then recovers them **immediately** as a **retry** (we know it was a deploy,
    not a genuine timeout), collapsing the ~45-min "hang then fail" into a
-   seconds-long retry. The timeout-reap is the backstop for deaths SIGTERM can't
-   observe (SIGKILL, OOM, crash).
+   seconds-long retry; the auto-runner's reap guard treats an `interrupted`
+   prior execution as a fresh attempt rather than a timeout-reap, bounded by the
+   same `MAX_STEP_ATTEMPTS` cap (the interrupted row counts). The timeout-reap is
+   the backstop for deaths SIGTERM can't observe (SIGKILL, OOM, crash).
 
 5. **Single-source timeout.** `resolveStepTimeoutMinutes(step)` is the one
    source feeding both the `PluginRunner` `Promise.race` and the container-kill

@@ -9,6 +9,7 @@ import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/c
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
 import { isStuckLoop, createLoopTracker, MAX_SAME_STEP_ITERATIONS, hasExceededStepAttempts, resolveStepAttemptCap } from '@/lib/loop-guard';
+import { markStepInFlight, clearStepInFlight } from '@/lib/in-flight-registry';
 
 interface RunProcessBody {
   appContext?: Record<string, unknown>;
@@ -803,6 +804,20 @@ export async function POST(
               continue;
             }
 
+            // Retry branch (ADR-0010 §4): a prior execution marked `interrupted`
+            // by the SIGTERM shutdown hook means we KNOW the driver was recycled
+            // by a deploy, not that the step genuinely timed out. Unlike the
+            // reap-as-timeout path above (which honours `fallbackBehavior`), an
+            // interrupted step gets a fresh attempt below. The interrupted rows
+            // stay as terminal-ish records and count toward the persisted
+            // `MAX_STEP_ATTEMPTS` cap, so this retry can't loop unbounded.
+            const interruptedForStep = stepExecutions.filter(
+              (e) => e.stepId === instance.currentStepId && e.status === 'interrupted',
+            );
+            if (interruptedForStep.length > 0) {
+              console.log(`[auto-runner] Step '${instance.currentStepId}' has ${interruptedForStep.length} execution(s) interrupted by a prior shutdown (deploy) — retrying with a fresh attempt`);
+            }
+
             const previousStepId = workflowDefinition.transitions.find(
               (t) => t.to === instance.currentStepId,
             )?.from ?? null;
@@ -855,14 +870,23 @@ export async function POST(
             });
 
             const mergedAppContext = { ...appContext, ...stepInput };
-            await executeAgentStep(
-              instanceId,
-              instance.currentStepId,
-              currentStep,
-              mergedAppContext,
-              triggeredBy ?? 'auto-runner',
-              executionId,
-            );
+            // Register this execution as in-flight for the shutdown hook
+            // (ADR-0010 §4): if a deploy SIGTERMs this process while the plugin
+            // is running, the hook marks `executionId` interrupted so the next
+            // boot retries it in seconds instead of waiting out the timeout+grace.
+            markStepInFlight(instanceId, executionId);
+            try {
+              await executeAgentStep(
+                instanceId,
+                instance.currentStepId,
+                currentStep,
+                mergedAppContext,
+                triggeredBy ?? 'auto-runner',
+                executionId,
+              );
+            } finally {
+              clearStepInFlight(instanceId);
+            }
 
             stepsExecuted++;
           } else if (

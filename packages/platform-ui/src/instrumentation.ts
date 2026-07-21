@@ -13,6 +13,15 @@ export async function register(): Promise<void> {
     // is set. See instrumentation-otel.ts.
     const { initOpenTelemetry } = await import('./instrumentation-otel');
     await initOpenTelemetry();
+
+    // Deploy fast-path (ADR-0010 §4): mark in-flight step executions
+    // `interrupted` on SIGTERM, and immediately re-kick any run left
+    // interrupted by the previous process so it retries in seconds instead of
+    // waiting out the timeout. The boot sweep is scheduled (not awaited) so it
+    // fires once the HTTP server is listening. See graceful-shutdown.ts.
+    const { registerGracefulShutdown, scheduleBootRekickSweep } = await import('./lib/graceful-shutdown');
+    registerGracefulShutdown();
+    scheduleBootRekickSweep();
   }
 }
 

@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Added
+- Deploy-interrupted agent/script steps now recover in **seconds as a retry** instead of hanging ~45 min then failing as a timeout (ADR-0010 §4). Staging redeploys `platform-ui` on every merge to `main` and agent steps run 20–30 min, so a deploy landing mid-step is common. A new `SIGTERM` graceful-shutdown hook (wired in `instrumentation.register()`) marks each in-flight step execution `interrupted` — a new terminal-ish `StepExecution` status, distinct from `running`/`failed` — before the process exits, driven by a shared `globalThis`-backed in-flight registry (`instanceId → executionId`) that both the auto-runner and the hook see. A boot-time sweep then immediately re-kicks any run left `interrupted`, and the auto-runner's reap guard retries an `interrupted` prior execution as a **fresh attempt** (we know it was a deploy, not a genuine timeout) rather than reaping it as a timeout failure — still bounded by the persisted `MAX_STEP_ATTEMPTS` cap since the interrupted row counts. The #906 timeout-reap remains the backstop for deaths SIGTERM can't observe (SIGKILL, OOM, hard crash) [#907](https://github.com/Appsilon/mediforce/issues/907).
+
 ## [2026-07-19]
 
 ### Added
