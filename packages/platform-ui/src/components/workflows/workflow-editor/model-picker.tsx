@@ -55,6 +55,9 @@ export function ModelPicker({ value, onChange, defaultModel, className, requireT
       .finally(() => setLoading(false));
   }, []);
 
+  // Prefer models with usage history, but fall back to the full (non-retired)
+  // registry when no usage stats exist yet (e.g. a freshly-synced registry) —
+  // otherwise the picker looks empty/broken even though models are available.
   const topPicks = useMemo(() => {
     const withUsage = models
       .filter((m) => m.retiredAt === null)

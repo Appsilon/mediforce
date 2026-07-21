@@ -37,6 +37,7 @@ interface AssistantMessage {
   role: 'user' | 'assistant';
   content: string;
   changes?: string;
+  error?: string;
 }
 
 function JsonCodeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -379,9 +380,10 @@ export function WorkflowEditorCanvas({
     el.style.height = `${String(el.scrollHeight)}px`;
   }, [assistantInput]);
 
-  // Applies the whole batch through the server-validated reducer in one atomic
-  // update, avoiding the stale-state bugs an imperative addStep/updateStep loop hit.
-  const applyAssistantToolCalls = useCallback((toolCalls: WorkflowAssistantToolCall[]) => {
+  // Applies the whole batch through the shared reducer in one atomic state
+  // update. Returns a success summary and any tool-call errors separately so the
+  // UI never presents a failure as a confirmed change.
+  const applyAssistantToolCalls = useCallback((toolCalls: WorkflowAssistantToolCall[]): { summary: string; error: string | null } => {
     const result = applyWorkflowAssistantToolCalls(editedStepsRef.current, editedTransitionsRef.current, toolCalls);
     saveSnapshot();
     setEditedSteps(result.steps);
@@ -390,7 +392,6 @@ export function WorkflowEditorCanvas({
     if (lastAdded) setSelectedStepId(lastAdded);
 
     const errors = result.outcomes.flatMap((o) => (o.error ? [o.error] : []));
-    if (errors.length > 0) return errors.join(' ');
     const counts = result.outcomes.reduce(
       (acc, o) => ({ ...acc, [o.tool]: (acc[o.tool] ?? 0) + 1 }),
       {} as Record<string, number>,
@@ -399,7 +400,10 @@ export function WorkflowEditorCanvas({
     if (counts.add_step) parts.push(`added ${String(counts.add_step)} step${counts.add_step > 1 ? 's' : ''}`);
     if (counts.update_step) parts.push(`updated ${String(counts.update_step)} step${counts.update_step > 1 ? 's' : ''}`);
     if (counts.remove_step) parts.push(`removed ${String(counts.remove_step)} step${counts.remove_step > 1 ? 's' : ''}`);
-    return parts.length > 0 ? `Updated the workflow — ${parts.join(', ')}.` : '';
+    return {
+      summary: parts.length > 0 ? `Updated the workflow — ${parts.join(', ')}.` : '',
+      error: errors.length > 0 ? errors.join(' ') : null,
+    };
   }, [saveSnapshot]);
 
   const sendAssistantMessage = useCallback(async () => {
@@ -421,9 +425,14 @@ export function WorkflowEditorCanvas({
         },
         { namespace },
       );
-      const changes = result.toolCalls ? applyAssistantToolCalls(result.toolCalls) : '';
-      const replyText = result.reply || (changes ? 'Done.' : '');
-      setAssistantMessages((prev) => [...prev, { role: 'assistant', content: replyText, ...(changes ? { changes } : {}) }]);
+      const applied = result.toolCalls ? applyAssistantToolCalls(result.toolCalls) : { summary: '', error: null };
+      const replyText = result.reply || (applied.summary ? 'Done.' : '');
+      setAssistantMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: replyText,
+        ...(applied.summary ? { changes: applied.summary } : {}),
+        ...(applied.error ? { error: applied.error } : {}),
+      }]);
       if (result.toolCalls) {
         // editedStepsRef only settles one macrotask after the state update commits.
         setTimeout(() => {
@@ -761,6 +770,12 @@ export function WorkflowEditorCanvas({
                           <span>{message.changes}</span>
                         </div>
                       )}
+                      {message.error && (
+                        <div className="inline-flex items-start gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-xs text-red-700 dark:text-red-400">
+                          <X className="h-3.5 w-3.5 shrink-0 mt-px" />
+                          <span>{message.error}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))
@@ -891,4 +906,3 @@ export function WorkflowEditorCanvas({
     </div>
   );
 }
-
