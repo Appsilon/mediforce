@@ -317,7 +317,7 @@ export function WorkflowEditorCanvas({
       id: newId,
       name: `New Step ${stepNum}`,
       type: payload.type,
-      executor: payload.executor as WorkflowStep['executor'],
+      executor: payload.executor,
       ...(payload.autonomyLevel ? { autonomyLevel: payload.autonomyLevel as WorkflowStep['autonomyLevel'] } : {}),
       ...(payload.agentId ? { agentId: payload.agentId } : {}),
       ...(payload.executor === 'agent' && !payload.autonomyLevel ? { plugin: 'opencode-agent', autonomyLevel: 'L2' } : {}),

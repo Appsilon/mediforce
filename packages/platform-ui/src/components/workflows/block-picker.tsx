@@ -3,16 +3,14 @@
 import React, { useState } from 'react';
 import { User, Bot, Terminal, Zap, PenLine, GitBranch, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { CONTROL_MODE_LABELS, type ControlMode, type NewStepPayload } from '@/lib/control-mode';
+import { CONTROL_MODE_LABELS, CONTROL_MODE_NUMBER, CONTROL_MODE_DISABLED, type ControlMode, type Executor, type NewStepPayload } from '@/lib/control-mode';
 import { CM_ROWS, STEP_TYPE_OPTIONS, type CMRow } from '@/lib/block-presets';
 
-const CM_TO_CONTROL_MODE: Record<CMRow['cm'], ControlMode> = {
-  CM0: 'no-agent',
-  CM1: 'assist',
-  CM2: 'cowork',
-  CM3: 'human-review',
-  CM4: 'autonomous-agent',
-};
+// Inverse of CONTROL_MODE_NUMBER (control mode → CM label), derived so the two
+// never drift.
+const CM_TO_CONTROL_MODE = Object.fromEntries(
+  (Object.entries(CONTROL_MODE_NUMBER) as [ControlMode, string][]).map(([mode, cm]) => [cm, mode]),
+) as Record<CMRow['cm'], ControlMode>;
 
 // Full Tailwind class strings — must not be constructed dynamically (purge safety).
 const BUTTON_CLASSES: Record<string, string> = {
@@ -59,7 +57,7 @@ const ICON_COLOR: Record<string, string> = {
   violet: 'text-violet-500 dark:text-violet-400',
 };
 
-const EXECUTOR_ICON: Partial<Record<string, React.ReactNode>> = {
+const EXECUTOR_ICON: Partial<Record<Executor, React.ReactNode>> = {
   human:  <User className="h-3 w-3 shrink-0" />,
   script: <Terminal className="h-3 w-3 shrink-0" />,
   action: <Zap className="h-3 w-3 shrink-0" />,
@@ -133,13 +131,16 @@ export function BlockPicker({ onAdd }: Props) {
       {/* CM rows — stacked cards, one per control mode */}
       <div className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Executor</p>
-        {CM_ROWS.map((row) => (
+        {CM_ROWS.map((row) => {
+          const controlMode = CM_TO_CONTROL_MODE[row.cm];
+          const disabled = CONTROL_MODE_DISABLED[controlMode];
+          return (
           <div
             key={row.cm}
             className={cn(
               'rounded-xl border px-3 py-2.5 space-y-2 transition-opacity',
               CM_BORDER[row.color],
-              row.disabled && 'opacity-50',
+              disabled && 'opacity-50',
             )}
           >
             <div className="flex items-center gap-2 min-w-0">
@@ -147,10 +148,10 @@ export function BlockPicker({ onAdd }: Props) {
                 <CMRowIcon cm={row.cm} color={row.color} />
               </span>
               <span className={cn('text-[11px] font-bold shrink-0', CM_LABEL_COLOR[row.color])}>
-                {CONTROL_MODE_LABELS[CM_TO_CONTROL_MODE[row.cm]]}
+                {CONTROL_MODE_LABELS[controlMode]}
               </span>
               <span className="text-[10px] text-muted-foreground truncate">
-                {row.disabled
+                {disabled
                   ? <>{row.description.replace(' — coming soon', '')} — <em>coming soon</em></>
                   : row.description}
               </span>
@@ -160,11 +161,11 @@ export function BlockPicker({ onAdd }: Props) {
               {row.buttons.map((btn) => (
                 <button
                   key={btn.label}
-                  disabled={row.disabled}
+                  disabled={disabled}
                   onClick={() => handleAdd(btn.payload)}
                   className={cn(
                     'inline-flex items-center gap-1 rounded-lg py-1 px-2.5 text-xs font-semibold border transition-all whitespace-nowrap',
-                    row.disabled ? 'cursor-not-allowed' : BUTTON_CLASSES[btn.color],
+                    disabled ? 'cursor-not-allowed' : BUTTON_CLASSES[btn.color],
                   )}
                 >
                   {EXECUTOR_ICON[btn.payload.executor]}
@@ -173,7 +174,8 @@ export function BlockPicker({ onAdd }: Props) {
               ))}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

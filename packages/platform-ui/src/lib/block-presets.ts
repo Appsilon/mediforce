@@ -12,7 +12,6 @@ export type CMRow = {
   cm: 'CM0' | 'CM1' | 'CM2' | 'CM3' | 'CM4';
   color: string;
   description: string;
-  disabled?: boolean;
   buttons: CMRowButton[];
 };
 
@@ -36,7 +35,6 @@ export const CM_ROWS: CMRow[] = [
     cm: 'CM1',
     color: 'lime',
     description: 'Human executes, AI reviews — coming soon',
-    disabled: true,
     buttons: [{ label: 'Assist', color: 'lime', payload: { executor: 'human' } }],
   },
   {
