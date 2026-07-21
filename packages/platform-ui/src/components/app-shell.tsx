@@ -51,7 +51,7 @@ function NavItem({
         'flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition-colors',
         active
           ? 'bg-primary-subtle text-primary'
-          : 'text-muted-foreground hover:bg-[#e9ebef] hover:text-foreground',
+          : 'text-muted-foreground hover:bg-accent hover:text-foreground',
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
@@ -69,7 +69,7 @@ function ActionItem({ href, label, icon: Icon }: { href: string; label: string; 
   return (
     <Link
       href={href}
-      className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-[#e9ebef] hover:text-foreground"
+      className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
     >
       <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
       <span className="flex-1">{label}</span>
