@@ -5,7 +5,7 @@ import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
  * Catch-all webhook endpoint:
  *   /api/triggers/webhook/<namespace>/<workflowName>/<triggerSuffix...>
  *
- * Mediforce middleware already enforces auth (X-Api-Key or Firebase ID token),
+ * The proxy already enforces auth (X-Api-Key or the NextAuth session cookie),
  * so this handler only owns URL parsing, delegating to WebhookRouter, and
  * fire-and-forget kicking the auto-runner. Decision B5: full async — the
  * caller polls /api/runs/<runId> for completion.

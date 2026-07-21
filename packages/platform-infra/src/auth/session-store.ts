@@ -9,7 +9,7 @@ import { userRoles } from '../postgres/schema/user-role';
  *
  * These back the auth boundary (`proxy.ts` coarse gate + `resolveCallerIdentity`
  * per-route resolver both resolve the caller uid from the httpOnly session
- * cookie) and the Credentials-provider session workaround in `auth.ts`. They
+ * cookie) and the `/api/auth/password-login` route. They
  * live here — not in `auth.ts` — so they are shared by the machine-facing
  * boundary and covered by L2 tests against real Postgres, independent of the
  * NextAuth wiring.
@@ -41,7 +41,7 @@ export async function resolveSessionUserId(
 }
 
 /**
- * Global process-domain roles for a user (`user_roles`, ADR-0002 §1.4). Feeds
+ * Global process-domain roles for a user (`user_roles`, PLAN-0002 §1.4). Feeds
  * the NextAuth `session` callback so the browser's `useViewerIdentity` reads
  * `session.user.roles` instead of the old Firebase custom claim.
  */

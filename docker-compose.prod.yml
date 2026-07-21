@@ -95,13 +95,30 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-mediforce}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mediforce}
       # NEXT_PUBLIC_* — injected at container start by docker-entrypoint.sh
       # (replaces __PLACEHOLDER__ values in pre-built registry images).
-      - NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY}
-      - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
-      - NEXT_PUBLIC_FIREBASE_PROJECT_ID=${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
-      - NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}
-      - NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
       - NEXT_PUBLIC_GIT_SHA
+      # --- Authentication: NextAuth / Auth.js v5 (ADR-0002) ---
+      # Server-side only. `instrumentation-node.ts` refuses to boot without
+      # AUTH_SECRET and without at least one provider (Google / password /
+      # OIDC), and refuses to boot with an OAuth provider on while
+      # ALLOWED_EMAIL_DOMAINS is empty.
+      - AUTH_SECRET=${AUTH_SECRET}
+      # Auth.js derives its own origin from the X-Forwarded-* headers Caddy
+      # sets (`trustHost: true` in src/auth.ts), so this is only an override
+      # for setups where the proxy does not forward them.
+      - AUTH_URL=${AUTH_URL:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      # Comma-separated allowlist enforced in the signIn callback for every
+      # provider (ADR-0002 §4a). With Google on, this is what stops any Google
+      # account on earth signing in.
+      - ALLOWED_EMAIL_DOMAINS=${ALLOWED_EMAIL_DOMAINS:-}
+      - ENABLE_PASSWORD_AUTH=${ENABLE_PASSWORD_AUTH:-}
+      # Customer SSO — dormant until OIDC_ISSUER is set.
+      - OIDC_ISSUER=${OIDC_ISSUER:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_DISPLAY_NAME=${OIDC_DISPLAY_NAME:-}
       - PLATFORM_API_KEY=${PLATFORM_API_KEY}
       - SECRETS_ENCRYPTION_KEY=${SECRETS_ENCRYPTION_KEY}
       - DOCKER_DEEPSEEK_API_KEY=${DOCKER_DEEPSEEK_API_KEY}
@@ -132,14 +149,10 @@ services:
       - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
       - SMTP_SECURE=${SMTP_SECURE:-true}
       - SMTP_SENDER_NAME=${SMTP_SENDER_NAME:-Mediforce}
-      # Firebase Admin SDK credentials for server-side Firestore/Auth access.
-      # Mounted read-only from host ./secrets/firebase-admin-sa.json.
-      - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-sa.json
     volumes:
       - /tmp:/tmp
       - /var/lib/mediforce:/var/lib/mediforce
       - .:/repo:ro
-      - ./secrets/firebase-admin-sa.json:/run/secrets/firebase-sa.json:ro
     depends_on:
       redis:
         condition: service_healthy

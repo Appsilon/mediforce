@@ -8,7 +8,8 @@ import { attachmentContentDisposition, contentTypeForFilePath } from '@/lib/file
 /**
  * Serves agent output files from allowed directories.
  *
- * Two query modes are supported, both authenticated via Firebase ID token:
+ * Two query modes are supported, both authenticated via the NextAuth
+ * session cookie:
  *
  *   1. Explicit path:   `?path=<absolute>&instanceId=<id>`
  *      The path must start with one of the instance-specific allowed

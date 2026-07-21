@@ -2,7 +2,8 @@ import { pgTable, text, timestamp, index } from 'drizzle-orm/pg-core';
 import { authUsers } from './auth-user';
 
 /**
- * Database-strategy session rows (ADR-0002 §1.1, §3 — `session: 'database'`).
+ * Database-strategy session rows (PLAN-0002 §1.1; ADR-0002 §3 —
+ * `session: 'database'`).
  * Required by `@auth/drizzle-adapter`: `createSession` / `getSessionAndUser` /
  * `updateSession` / `deleteSession`.
  *

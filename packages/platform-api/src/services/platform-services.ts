@@ -147,9 +147,9 @@ export interface PlatformServices {
   emailProviderInfo: EmailProviderInfo | null;
   dockerImages: DockerImagesService;
   /**
-   * Firebase Auth metadata lookup (uid → email, lastSignInTime). Always wired
-   * in production (depends on Firebase Auth, not Mailgun). Handlers consume
-   * via `scope.system.userDirectory`.
+   * User metadata lookup (uid → email, lastSignInTime) against `auth_users`.
+   * Always wired in production (depends on Postgres, not Mailgun). Handlers
+   * consume via `scope.system.userDirectory`.
    */
   userDirectory: UserDirectoryService;
 }
@@ -333,10 +333,11 @@ export function getPlatformServices(): PlatformServices {
   const notificationService = emailSender
     ? new EmailNotificationService(emailSender)
     : undefined;
-  // ADR-0002 PR1: reads the global `user_roles` + `auth_users` from Postgres
+  // ADR-0002: reads the global `user_roles` + `auth_users` from Postgres
   // (off Firebase Auth) behind the same port. `getUsersByRole` targeting
   // depends on the one-time `seed-user-roles` having populated `user_roles`.
-  // `lastSignInTime` is null until NextAuth sessions land (PR2).
+  // `lastSignInTime` comes from `auth_users.last_sign_in_at`, stamped by
+  // `recordSignIn` on every successful sign-in.
   const userDirectoryService: UserDirectoryService = new PostgresUserDirectoryService(pg);
 
   const engine = new WorkflowEngine(
@@ -381,7 +382,7 @@ export function getPlatformServices(): PlatformServices {
 
   const webhookRouter = new WebhookRouter(engine, processRepo);
 
-  // Seed-based invite (ADR-0002 §3.1): pre-seeds `auth_users` + workspace
+  // Seed-based invite (PLAN-0002 §3.1): pre-seeds `auth_users` + workspace
   // membership + global roles in Postgres. No temp password, no credentials
   // email — the invitee signs in later via Google (verified-email auto-link)
   // or by setting a password. `PostgresInviteService` structurally implements

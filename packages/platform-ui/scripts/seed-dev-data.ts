@@ -24,8 +24,8 @@ async function main() {
   console.log('\nSeeding development data...\n');
 
   try {
-    // 1. Upsert the `auth_users` row with a bcrypt password hash so the
-    // NextAuth Credentials provider (`ENABLE_PASSWORD_AUTH=true`) can sign in.
+    // 1. Upsert the `auth_users` row with a bcrypt password hash so
+    // `/api/auth/password-login` (`ENABLE_PASSWORD_AUTH=true`) can sign in.
     const testUserId = await createTestUser(TEST_EMAIL, TEST_PASSWORD, TEST_DISPLAY_NAME);
     console.log(`  User created: ${testUserId}\n`);
 

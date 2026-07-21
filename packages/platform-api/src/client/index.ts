@@ -427,8 +427,9 @@ export type { ApiErrorCode };
  *                     (test loopback where middleware is bypassed). `baseUrl`
  *                     is optional — the injected fetch owns URL resolution.
  *
- * Firebase is never imported by this class — a browser wrapper that reads
- * Firebase ID tokens lives in `packages/platform-ui/src/lib/mediforce.ts`.
+ * This class carries no browser auth of its own — same-origin browser calls
+ * ride the NextAuth session cookie via the wrapper in
+ * `packages/platform-ui/src/lib/mediforce.ts`.
  */
 
 interface BaseClientConfig {

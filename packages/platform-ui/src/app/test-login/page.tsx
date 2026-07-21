@@ -17,8 +17,8 @@ export default function TestLoginPage() {
   }, [loading, user, router]);
 
   // Password auth is the dev / E2E / air-gapped path (ADR-0002 §4). This page
-  // only functions when the Credentials provider is enabled
-  // (`ENABLE_PASSWORD_AUTH=true`).
+  // posts to `/api/auth/password-login`, which only answers when password auth
+  // is enabled (`ENABLE_PASSWORD_AUTH=true`).
   if (emailAuthEnabled === false) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">

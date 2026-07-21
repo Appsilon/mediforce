@@ -30,8 +30,7 @@
       "esbuild",
       "sharp",
       "protobufjs",
-      "msgpackr-extract",
-      "@firebase/util"
+      "msgpackr-extract"
     ],
     "overrides": {
       "axios": ">=1.15.0",

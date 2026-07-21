@@ -9,7 +9,7 @@ import { authUsers } from '../postgres/schema/auth-user';
 import { userRoles } from '../postgres/schema/user-role';
 
 /**
- * Postgres-backed UserDirectoryService (ADR-0002 §5, §3.1, PR1).
+ * Postgres-backed UserDirectoryService (ADR-0002 §5, PLAN-0002 §3.1).
  * Replaces FirebaseUserDirectoryService behind the same port — no consumer
  * (`workflow-engine` escalation, `caller-scope`) changes.
  *

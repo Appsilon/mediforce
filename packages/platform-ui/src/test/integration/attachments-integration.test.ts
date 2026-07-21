@@ -11,8 +11,8 @@
 // `makeGET` (binary blob stream + list), `makeDELETE` (soft-delete) — through
 // the real `createRouteAdapter` / custom-route auth-scope pipeline, backed by a
 // real `FilesystemBlobStore` on disk. The only stub is the caller resolution +
-// scope build (the route factories' test seams), so no Firebase / env-gated
-// services are pulled in, exactly like `api-integration.test.ts`.
+// scope build (the route factories' test seams), so no env-gated services are
+// pulled in, exactly like `api-integration.test.ts`.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -60,7 +60,7 @@ describe('attachments routes ↔ FilesystemBlobStore (route-level integration)',
 
   // Route factories wired to the per-test scope. `resolveCaller` / `buildScope`
   // are the exact seams `createRouteAdapter` exposes; production binds the real
-  // Firebase + services defaults instead.
+  // session resolution + services defaults instead.
   function uploadRoute(caller: CallerIdentity = memberCaller) {
     return makePOST({
       resolveCaller: async () => caller,

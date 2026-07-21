@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 
 /**
- * Authenticated user identity (ADR-0002 §1.1, keep-uid §7).
+ * Authenticated user identity (PLAN-0002 §1.1; keep-uid per ADR-0002 §7).
  *
  * `id` IS the Firebase uid for migrated users (text, never uuid) so every
  * existing reference (`workspace_members.uid`, `*.assigned_user_id`,
@@ -11,11 +11,12 @@ import { pgTable, text, timestamp } from 'drizzle-orm/pg-core';
  *
  * `image` keeps the directory's `getUserMetadata` member-list avatar fallback.
  *
- * PR2 (NextAuth cutover) ALTERs this table (migration 0030) to add the two
- * remaining `@auth/drizzle-adapter` columns:
+ * The NextAuth cutover added (migration 0030) the two remaining
+ * `@auth/drizzle-adapter` columns:
  *   - `email_verified` — the adapter's `emailVerified` timestamp.
- *   - `password_hash`  — bcrypt hash, only set when the Credentials provider
- *     is used (ADR-0002 §4). NextAuth tolerates the extra column.
+ *   - `password_hash`  — bcrypt hash, written only for users who set a
+ *     password and read by `/api/auth/password-login` (ADR-0002 §4). NextAuth
+ *     tolerates the extra column.
  *
  * The property names (`emailVerified`) match the `@auth/drizzle-adapter`
  * schema contract exactly — the adapter references `usersTable.emailVerified`

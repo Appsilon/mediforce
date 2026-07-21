@@ -3,8 +3,8 @@ import type { Database } from '../postgres/client';
 import { authUsers } from '../postgres/schema/auth-user';
 
 /**
- * Set (or replace) a user's bcrypt password hash on `auth_users` (ADR-0002 §4,
- * PR2). The Credentials provider reads this hash in `authorize`; this is the
+ * Set (or replace) a user's bcrypt password hash on `auth_users` (ADR-0002 §4).
+ * The `/api/auth/password-login` route compares against this hash; this is the
  * only write path for it (seed-based invites leave it null, so a user adds a
  * password via the change-password flow). Returns `true` when a row matched.
  *

@@ -2,7 +2,7 @@ import { pgTable, text, primaryKey, index } from 'drizzle-orm/pg-core';
 import { authUsers } from './auth-user';
 
 /**
- * Global process-domain roles (ADR-0002 §1.4, §5).
+ * Global process-domain roles (PLAN-0002 §1.4; ADR-0002 §5).
  *
  * Replaces Firebase `customClaims.roles: string[]`. Global, NOT
  * workspace-scoped: `getUsersByRole(role)` is a deployment-wide query with no

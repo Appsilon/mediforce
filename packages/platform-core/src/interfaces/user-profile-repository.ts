@@ -1,10 +1,9 @@
 /**
- * Per-user, Mediforce-side profile fields stored under `users/{uid}`.
+ * Per-user, Mediforce-side profile fields (`user_profiles`).
  *
- * Distinct from `UserDirectoryService`, which surfaces Firebase Auth metadata
- * (email, lastSignInTime). `UserProfileRepository` owns the mutable
- * application-level fields that live on the same doc but are written by the
- * Mediforce app itself — today only `mustChangePassword`, but future profile
+ * Distinct from `UserDirectoryService`, which surfaces identity metadata from
+ * `auth_users` (email, lastSignInTime). `UserProfileRepository` owns the
+ * mutable application-level fields written by the Mediforce app itself — today only `mustChangePassword`, but future profile
  * fields (preferences, default workspace, etc.) hang here too.
  */
 export interface UserProfile {

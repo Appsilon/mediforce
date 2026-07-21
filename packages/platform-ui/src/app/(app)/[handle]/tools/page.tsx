@@ -191,8 +191,8 @@ export default function ToolsPage() {
   }, [handle]);
 
   useEffect(() => {
-    // Wait for Firebase auth state to settle so apiFetch can attach a Bearer
-    // token — middleware 401s /api/admin/* requests without it.
+    // Wait for the session to resolve before fetching — the proxy 401s
+    // /api/admin/* requests made before the user is known to be signed in.
     if (authLoading || user === null) return;
     void refresh();
   }, [authLoading, user, refresh]);

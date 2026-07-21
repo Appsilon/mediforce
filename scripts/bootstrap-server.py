@@ -313,10 +313,6 @@ class State:
     repo: str = ""
     branch: str = DEFAULT_BRANCH
     github_deploy_key_id: Optional[int] = None
-    firebase_account: str = ""
-    firebase_project_id: str = ""
-    firebase_web_config: dict = field(default_factory=dict)
-    firebase_sa_path: str = ""
     domain: str = ""
     completed_steps: list[str] = field(default_factory=list)
     last_step: str = ""
@@ -374,11 +370,6 @@ OPTIONAL_LOCAL_TOOLS = {
         "why": "registers the server's deploy key with the GitHub repo (step 6)",
         "install_darwin": "brew install gh",
         "install_linux": "see https://github.com/cli/cli#installation",
-    },
-    "firebase": {
-        "why": "lists/creates Firebase projects and pulls client config (step 8)",
-        "install_darwin": "npm install -g firebase-tools",
-        "install_linux": "npm install -g firebase-tools",
     },
 }
 
@@ -923,301 +914,12 @@ def step_clone_repo(ctx: Context) -> None:
     ok(f"cloned at {sha}")
 
 
-FIREBASE_CONFIG_FIELDS = [
-    "apiKey", "authDomain", "projectId",
-    "messagingSenderId", "appId",
-]
-
-
-def _fb(account: str, *args: str) -> list[str]:
-    """Build a firebase CLI invocation, optionally scoped to an account."""
-    base = ["firebase"]
-    if account:
-        base += ["--account", account]
-    return base + list(args)
-
-
-def _firebase_login_accounts() -> tuple[Optional[str], list[str]]:
-    """Return (active_account, other_accounts). Both None/[] if nobody is logged in.
-
-    Parses the plain-text output of `firebase login:list`. The CLI doesn't have
-    a --json variant for this subcommand as of firebase-tools 13.x, so format
-    changes in a future release would break this. If that happens, the caller
-    will see (None, []) and fall through to the login-add flow; we additionally
-    print the raw output as a debugging aid so the operator can recognize drift.
-    """
-    result = run(["firebase", "login:list"], check=False)
-    text = (result.stdout or "") + "\n" + (result.stderr or "")
-    active_match = re.search(r"Logged in as\s+([\w.+\-]+@[\w.\-]+)", text)
-    others = re.findall(r"^\s*-\s+([\w.+\-]+@[\w.\-]+)", text, re.MULTILINE)
-    if active_match or others:
-        return (active_match.group(1) if active_match else None), others
-    if "no authorized accounts" in text.lower() or "not currently logged in" in text.lower():
-        return None, []
-    # Neither matches nor known "nothing logged in" marker — could be a CLI
-    # format change. Surface the raw output so the operator can see.
-    warn("Couldn't parse `firebase login:list` output — the CLI format may have changed.")
-    info(f"Raw output (first 300 chars): {text[:300]!r}")
-    return None, []
-
-
-def _firebase_list_projects(account: str) -> list[dict]:
-    result = run(_fb(account, "projects:list", "--json"), check=True)
-    data = json.loads(result.stdout)
-    return data.get("result", [])
-
-
-def _firebase_pick_account(ctx: Context) -> str:
-    """Make user pick a Google account for the rest of the Firebase flow."""
-    active, others = _firebase_login_accounts()
-    while True:
-        options: list[tuple[str, str]] = []
-        if active:
-            options.append((active, f"{active}  (currently active)"))
-        for email in others:
-            options.append((email, email))
-        options.append(("__add__", "add a different Google account (firebase login:add)"))
-        if not active and not others:
-            info("No Firebase accounts on this machine yet — adding one now.")
-            run(["firebase", "login"], capture=False)
-            active, others = _firebase_login_accounts()
-            continue
-        choice = menu("Which Google account should Firebase use?", options)
-        if choice == "__add__":
-            run(["firebase", "login:add"], capture=False)
-            active, others = _firebase_login_accounts()
-            continue
-        return choice
-
-
-def step_firebase(ctx: Context) -> None:
-    if not shutil.which("firebase"):
-        error("`firebase` CLI not installed — run step 1's install hint and retry this step.")
-        raise SystemExit(1)
-
-    # Pick the Google account to use.
-    account = ctx.state.firebase_account
-    if account:
-        info(f"Using Firebase account from state: {account}")
-        if not confirm("Keep using this account?", default=True):
-            account = ""
-    if not account:
-        account = _firebase_pick_account(ctx)
-        ctx.state.firebase_account = account
-        ctx.state.save()
-    ok(f"firebase account: {account}")
-
-    # Pick or create a project — scoped to the chosen account.
-    project_id = ctx.state.firebase_project_id
-    if project_id:
-        info(f"Using Firebase project from state: {project_id}")
-    else:
-        projects = _firebase_list_projects(account)
-        if not projects:
-            info("No Firebase projects visible to this account — you'll need to create one.")
-            project_id = _firebase_create_project_flow(ctx, account)
-        else:
-            options = [(p["projectId"], f"{p.get('displayName') or p['projectId']} ({p['projectId']})")
-                       for p in projects]
-            options.append(("__new__", "create a new project"))
-            options.append(("__manual__", "enter a project ID manually"))
-            choice = menu("Which Firebase project for this deployment?", options)
-            if choice == "__new__":
-                project_id = _firebase_create_project_flow(ctx, account)
-            elif choice == "__manual__":
-                project_id = ask("Firebase project ID")
-            else:
-                project_id = choice
-        ctx.state.firebase_project_id = project_id
-        ctx.state.save()
-        ok(f"selected project: {project_id}")
-
-    # Ensure a web app exists and pull its SDK config.
-    config = _firebase_get_web_config(ctx, account, project_id)
-    missing = [k for k in FIREBASE_CONFIG_FIELDS if not config.get(k)]
-    if missing:
-        warn(f"Web SDK config is missing fields: {missing} — step 10 will halt if these are required.")
-    ctx.collected["firebase_config"] = config
-    ctx.state.firebase_web_config = config
-    ctx.state.save()
-    ok("web SDK config captured ({} fields, persisted to state)".format(
-        sum(1 for k in FIREBASE_CONFIG_FIELDS if config.get(k))
-    ))
-
-    # Ensure Email/Password sign-in is enabled — required for user invites.
-    print()
-    info("Firebase Authentication must have Email/Password sign-in enabled.")
-    info(f"  Console: https://console.firebase.google.com/project/{project_id}/authentication/providers")
-    info("  Steps:")
-    info("    1. Click 'Get started' if Authentication isn't enabled yet")
-    info("    2. Go to Sign-in method tab")
-    info("    3. Enable 'Email/Password' provider")
-    if not confirm("Have you enabled Email/Password authentication?", default=False):
-        warn("Skipped — remember to enable it before inviting users.")
-
-    # Authorized domain — Firebase blocks sign-in from domains not on this list.
-    domain = ctx.state.domain or ctx.collected.get("domain", "")
-    if domain:
-        print()
-        info("Firebase must authorize your domain for sign-in to work.")
-        info(f"  Console: https://console.firebase.google.com/project/{project_id}/authentication/settings")
-        info("  Steps:")
-        info(f"    1. Go to Authorized domains")
-        info(f"    2. Click 'Add domain'")
-        info(f"    3. Enter: {domain}")
-        if not confirm(f"Have you added {domain} to Authorized domains?", default=False):
-            warn(f"Skipped — sign-in will fail until {domain} is added to Firebase Authorized domains.")
-
-
-def _firebase_create_project_flow(ctx: Context, account: str) -> str:
-    suggested = ask(
-        "New project ID (lowercase, hyphens, 6-30 chars)",
-        default=f"mediforce-{re.sub(r'[^a-z0-9]+', '-', ctx.host.lower()).strip('-')[:20]}",
-        validate=lambda s: None if re.fullmatch(r"[a-z][a-z0-9-]{5,29}", s) else "must be lowercase a-z, 0-9, hyphens, 6-30 chars",
-    )
-    display = ask("Display name", default=suggested.replace("-", " ").title())
-    info(f"Creating Firebase project {suggested!r} — this can fail if the project-id is taken or you hit the 'projects per account' quota.")
-    result = run(
-        _fb(account, "projects:create", suggested, "--display-name", display),
-        check=False, capture=False,
-    )
-    if not result.ok:
-        def _verify_project_visible() -> tuple[bool, str]:
-            visible = any(p["projectId"] == suggested for p in _firebase_list_projects(account))
-            if visible:
-                return True, f"Project {suggested!r} visible to firebase CLI"
-            return False, f"Still don't see project {suggested!r} — make sure it's created under {account}"
-
-        handoff(
-            what="Create the Firebase project manually",
-            where="https://console.firebase.google.com/",
-            steps=[
-                f"Make sure you're signed in as {account}",
-                "Click 'Add project'",
-                f"Use project ID: {suggested}",
-                f"Display name: {display}",
-                "Complete the creation wizard (Google Analytics is optional)",
-            ],
-            verify=_verify_project_visible,
-        )
-    return suggested
-
-
-def _firebase_get_web_config(ctx: Context, account: str, project_id: str) -> dict:
-    result = run(
-        _fb(account, "apps:sdkconfig", "web", "--project", project_id, "--json"),
-        check=False,
-    )
-    if result.ok:
-        payload = json.loads(result.stdout)
-        # CLI returns { "status":..., "result": { "sdkConfig": {...} } }
-        cfg = payload.get("result", {}).get("sdkConfig") or payload.get("result", {})
-        if cfg.get("projectId"):
-            return cfg
-
-    # No web app — create one.
-    info("No web app registered on this project — creating one")
-    app_nick = f"mediforce-{re.sub(r'[^a-z0-9-]+', '-', project_id)}-web"
-    create = run(
-        _fb(account, "apps:create", "web", app_nick, "--project", project_id),
-        check=False, capture=False,
-    )
-    if not create.ok:
-        def _verify_web_app() -> tuple[bool, str]:
-            r = run(_fb(account, "apps:sdkconfig", "web", "--project", project_id, "--json"), check=False)
-            if r.ok:
-                return True, "web app now registered"
-            return False, "still no web app — try again in the Console"
-
-        handoff(
-            what="Register a Web app on the Firebase project",
-            where=f"https://console.firebase.google.com/project/{project_id}/settings/general",
-            steps=[
-                "Scroll to 'Your apps' section",
-                "Click the Web icon (</>)",
-                f"Give it a nickname (e.g. '{app_nick}')",
-                "Skip Firebase Hosting setup (we run our own)",
-                "Click 'Register app'",
-            ],
-            verify=_verify_web_app,
-        )
-
-    retry = run(
-        _fb(account, "apps:sdkconfig", "web", "--project", project_id, "--json"),
-        check=True,
-    )
-    payload = json.loads(retry.stdout)
-    return payload.get("result", {}).get("sdkConfig") or payload.get("result", {})
-
-
 def _looks_like_key(value: str, prefix: str) -> Optional[str]:
     if not value.startswith(prefix):
         return f"expected key starting with {prefix!r}"
     if len(value) < len(prefix) + 16:
         return "key looks too short"
     return None
-
-
-def step_firebase_sa(ctx: Context) -> None:
-    """Upload Firebase Admin SDK service account key to the server.
-
-    Required for server-side Auth (token verification, user management).
-    docker-compose.prod.yml mounts secrets/firebase-admin-sa.json into
-    the platform-ui container at /run/secrets/firebase-sa.json.
-    """
-    remote_dir = f"{REMOTE_DEPLOY_DIR}/secrets"
-    remote_path = f"{remote_dir}/firebase-admin-sa.json"
-
-    probe = ssh(ctx, f"test -f {shlex.quote(remote_path)} && echo HAVE || echo NONE")
-    if "HAVE" in probe.stdout:
-        ok(f"{remote_path} already present")
-        return
-
-    project_id = ctx.state.firebase_project_id or "(unknown)"
-    console_url = f"https://console.firebase.google.com/project/{project_id}/settings/serviceaccounts/adminsdk"
-
-    print()
-    info("The platform needs a Firebase Admin SDK service account key for server-side Auth.")
-    info(f"  Console: {console_url}")
-    info("  Steps:")
-    info("    1. Go to Project Settings → Service Accounts")
-    info("    2. Click 'Generate new private key'")
-    info("    3. Save the downloaded JSON file somewhere locally")
-
-    if ctx.dry_run:
-        info("[dry-run] would upload service account JSON to server")
-        return
-
-    local_path_str = ask(
-        "Path to the downloaded service account JSON",
-        validate=lambda p: None if Path(p).expanduser().exists() else "file not found",
-    )
-    local_path = Path(local_path_str).expanduser()
-
-    # Validate it looks like a service account key.
-    try:
-        sa_data = json.loads(local_path.read_text())
-        if sa_data.get("type") != "service_account":
-            warn(f"JSON 'type' field is {sa_data.get('type')!r}, expected 'service_account' — are you sure this is the right file?")
-            if not confirm("Upload anyway?", default=False):
-                raise SystemExit("aborted — wrong file type")
-    except json.JSONDecodeError:
-        error("File is not valid JSON.")
-        raise SystemExit(1)
-
-    ssh(ctx, f"mkdir -p {shlex.quote(remote_dir)} && chown deploy:deploy {shlex.quote(remote_dir)}", check=True)
-    scp_upload(ctx, local_path, remote_path, mode="0600")
-    if ctx.user != "deploy":
-        ssh(ctx, f"{_sudo_prefix(ctx)}chown deploy:deploy {shlex.quote(remote_path)}", check=True)
-
-    # Verify.
-    verify = ssh(ctx, f"test -f {shlex.quote(remote_path)} && echo OK || echo MISSING")
-    if "OK" not in verify.stdout:
-        raise RuntimeError(f"upload verification failed — {remote_path} not found on server")
-
-    ctx.state.firebase_sa_path = remote_path
-    ctx.state.save()
-    ok(f"uploaded to {remote_path} (0600, owned by deploy)")
 
 
 def step_api_keys(ctx: Context) -> None:
@@ -1367,18 +1069,123 @@ def _caddy_site(ctx: Context) -> str:
     return ctx.collected.get("domain") or ctx.state.domain or ctx.host
 
 
+def _validate_email_domains(value: str) -> Optional[str]:
+    """Each comma-separated entry must look like a bare domain (no @, no scheme)."""
+    entries = [e.strip() for e in value.split(",") if e.strip()]
+    if not entries:
+        return "at least one domain is required"
+    for entry in entries:
+        if not re.fullmatch(r"[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+", entry.lower()):
+            return f"{entry!r} is not a bare domain — use e.g. appsilon.com, not @appsilon.com"
+    return None
+
+
+def _ensure_auth(ctx: Context) -> None:
+    """Collect NextAuth / Auth.js v5 config (ADR-0002). Idempotent.
+
+    Firebase Auth is gone: identity lives in Postgres (auth_* tables) and
+    NextAuth owns sign-in. Nothing here is persisted to local state — same rule
+    as the API keys, so this is the single place the values are collected and
+    step_env_local calls back through here on resumed runs.
+
+    The Google callback URL depends on the domain, so this must run after
+    step_domain.
+    """
+    if not ctx.collected.get("AUTH_SECRET"):
+        ctx.collected["AUTH_SECRET"] = secrets.token_hex(32)
+        ok("AUTH_SECRET auto-generated (32 bytes hex) — rotating it signs every user out")
+
+    base_url = _public_base_url(ctx)
+    callback_url = f"{base_url}/api/auth/callback/google"
+
+    if "GOOGLE_CLIENT_ID" not in ctx.collected:
+        print()
+        info("Sign-in runs on NextAuth (ADR-0002). Google is the primary provider.")
+        info("  Where: https://console.cloud.google.com/apis/credentials")
+        info("  Steps:")
+        info("    1. Create credentials → OAuth client ID → Web application")
+        info(f"    2. Authorised JavaScript origin: {base_url}")
+        info(f"    3. Authorised redirect URI (exactly, including the path): {callback_url}")
+        info("    4. Copy the client ID and the client secret")
+        if confirm("Configure Google sign-in now?", default=True):
+            ctx.collected["GOOGLE_CLIENT_ID"] = ask(
+                "Google OAuth client ID",
+                validate=lambda v: None if v.endswith(".apps.googleusercontent.com")
+                else "expected an ID ending in .apps.googleusercontent.com",
+            )
+            ctx.collected["GOOGLE_CLIENT_SECRET"] = ask("Google OAuth client secret", secret=True)
+            ok("Google OAuth client accepted")
+        else:
+            ctx.collected["GOOGLE_CLIENT_ID"] = ""
+            ctx.collected["GOOGLE_CLIENT_SECRET"] = ""
+            warn("No Google provider — you'll need password sign-in or OIDC below.")
+
+    if "OIDC_ISSUER" not in ctx.collected:
+        if confirm("Configure customer SSO over OIDC (Keycloak / Entra / Okta)?", default=False):
+            ctx.collected["OIDC_ISSUER"] = ask(
+                "OIDC issuer URL (e.g. https://login.acme.com/realms/acme)",
+                validate=lambda v: None if v.startswith("https://") else "must be an https:// URL",
+            )
+            ctx.collected["OIDC_CLIENT_ID"] = ask("OIDC client ID")
+            ctx.collected["OIDC_CLIENT_SECRET"] = ask("OIDC client secret", secret=True)
+            ctx.collected["OIDC_DISPLAY_NAME"] = ask("Sign-in button label", default="Sign in with SSO")
+            info(f"Register this redirect URI with the IdP: {base_url}/api/auth/callback/customer-sso")
+            ok("OIDC provider accepted")
+        else:
+            ctx.collected["OIDC_ISSUER"] = ""
+            ctx.collected["OIDC_CLIENT_ID"] = ""
+            ctx.collected["OIDC_CLIENT_SECRET"] = ""
+            ctx.collected["OIDC_DISPLAY_NAME"] = ""
+
+    oauth_enabled = bool(ctx.collected.get("GOOGLE_CLIENT_ID") or ctx.collected.get("OIDC_ISSUER"))
+    if "ALLOWED_EMAIL_DOMAINS" not in ctx.collected:
+        if oauth_enabled:
+            print()
+            info("ALLOWED_EMAIL_DOMAINS gates every OAuth sign-in (ADR-0002 §4a).")
+            info("Leave it empty and any account at the identity provider — i.e. any")
+            info("Google account on earth — could sign in, so platform-ui refuses to")
+            info("boot with an OAuth provider configured and the list empty.")
+            ctx.collected["ALLOWED_EMAIL_DOMAINS"] = ask(
+                "Allowed email domains (comma-separated, e.g. appsilon.com)",
+                validate=_validate_email_domains,
+            )
+            ok(f"allowlist: {ctx.collected['ALLOWED_EMAIL_DOMAINS']}")
+        else:
+            ctx.collected["ALLOWED_EMAIL_DOMAINS"] = ""
+
+    if "ENABLE_PASSWORD_AUTH" not in ctx.collected:
+        enabled = confirm(
+            "Enable email + password sign-in as well?",
+            default=not oauth_enabled,
+        )
+        ctx.collected["ENABLE_PASSWORD_AUTH"] = "true" if enabled else ""
+
+    if not oauth_enabled and ctx.collected.get("ENABLE_PASSWORD_AUTH") != "true":
+        error("No auth provider configured — platform-ui refuses to boot (ADR-0002 §4).")
+        info("Re-run this step and enable Google, OIDC, or password sign-in.")
+        raise SystemExit(1)
+
+
+def step_auth(ctx: Context) -> None:
+    _ensure_auth(ctx)
+
+
 def _render_env_local(ctx: Context) -> str:
     """Contents of packages/platform-ui/.env.local — read by Next.js."""
-    fb = ctx.collected.get("firebase_config", {})
     lines = [
         "# Auto-generated by scripts/bootstrap-server.py",
         f"# Host: {ctx.host}   Generated: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}",
         "",
-        f"NEXT_PUBLIC_FIREBASE_API_KEY={fb.get('apiKey', '')}",
-        f"NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN={fb.get('authDomain', '')}",
-        f"NEXT_PUBLIC_FIREBASE_PROJECT_ID={fb.get('projectId', '')}",
-        f"NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID={fb.get('messagingSenderId', '')}",
-        f"NEXT_PUBLIC_FIREBASE_APP_ID={fb.get('appId', '')}",
+        "# NextAuth / Auth.js v5 (ADR-0002)",
+        f"AUTH_SECRET={ctx.collected.get('AUTH_SECRET', '')}",
+        f"GOOGLE_CLIENT_ID={ctx.collected.get('GOOGLE_CLIENT_ID', '')}",
+        f"GOOGLE_CLIENT_SECRET={ctx.collected.get('GOOGLE_CLIENT_SECRET', '')}",
+        f"ALLOWED_EMAIL_DOMAINS={ctx.collected.get('ALLOWED_EMAIL_DOMAINS', '')}",
+        f"ENABLE_PASSWORD_AUTH={ctx.collected.get('ENABLE_PASSWORD_AUTH', '')}",
+        f"OIDC_ISSUER={ctx.collected.get('OIDC_ISSUER', '')}",
+        f"OIDC_CLIENT_ID={ctx.collected.get('OIDC_CLIENT_ID', '')}",
+        f"OIDC_CLIENT_SECRET={ctx.collected.get('OIDC_CLIENT_SECRET', '')}",
+        f"OIDC_DISPLAY_NAME={ctx.collected.get('OIDC_DISPLAY_NAME', '')}",
         "",
         f"OPENROUTER_API_KEY={ctx.collected.get('OPENROUTER_API_KEY', '')}",
         f"OPENAI_API_KEY={ctx.collected.get('OPENAI_API_KEY', '')}",
@@ -1393,20 +1200,30 @@ def _render_env_local(ctx: Context) -> str:
 def _render_compose_env(ctx: Context) -> str:
     """Contents of /opt/mediforce/.env — read by `docker compose` for ${VAR}
     substitution in docker-compose.prod.yml (build args + container env)."""
-    fb = ctx.collected.get("firebase_config", {})
     openrouter = ctx.collected.get("OPENROUTER_API_KEY", "")
     lines = [
         "# Auto-generated by scripts/bootstrap-server.py",
         f"# Host: {ctx.host}   Generated: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}",
         "# Read by `docker compose` for ${VAR} substitution in docker-compose.prod.yml.",
         "",
-        "# Firebase config — passed as build-args to platform-ui Dockerfile",
-        f"NEXT_PUBLIC_FIREBASE_API_KEY={fb.get('apiKey', '')}",
-        f"NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN={fb.get('authDomain', '')}",
-        f"NEXT_PUBLIC_FIREBASE_PROJECT_ID={fb.get('projectId', '')}",
-        f"NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID={fb.get('messagingSenderId', '')}",
-        f"NEXT_PUBLIC_FIREBASE_APP_ID={fb.get('appId', '')}",
+        "# Client bundle config — the only value passed as a build-arg to the",
+        "# platform-ui Dockerfile (NEXT_PUBLIC_* is inlined at build time).",
         f"NEXT_PUBLIC_APP_URL={_public_base_url(ctx)}",
+        "",
+        "# NextAuth / Auth.js v5 (ADR-0002) — server-side runtime env, never",
+        "# build args. platform-ui refuses to boot without AUTH_SECRET, without",
+        "# at least one provider, or with an OAuth provider on and",
+        "# ALLOWED_EMAIL_DOMAINS empty.",
+        f"AUTH_SECRET={ctx.collected.get('AUTH_SECRET', '')}",
+        f"AUTH_URL={_public_base_url(ctx)}",
+        f"GOOGLE_CLIENT_ID={ctx.collected.get('GOOGLE_CLIENT_ID', '')}",
+        f"GOOGLE_CLIENT_SECRET={ctx.collected.get('GOOGLE_CLIENT_SECRET', '')}",
+        f"ALLOWED_EMAIL_DOMAINS={ctx.collected.get('ALLOWED_EMAIL_DOMAINS', '')}",
+        f"ENABLE_PASSWORD_AUTH={ctx.collected.get('ENABLE_PASSWORD_AUTH', '')}",
+        f"OIDC_ISSUER={ctx.collected.get('OIDC_ISSUER', '')}",
+        f"OIDC_CLIENT_ID={ctx.collected.get('OIDC_CLIENT_ID', '')}",
+        f"OIDC_CLIENT_SECRET={ctx.collected.get('OIDC_CLIENT_SECRET', '')}",
+        f"OIDC_DISPLAY_NAME={ctx.collected.get('OIDC_DISPLAY_NAME', '')}",
         "",
         "# Runtime env for platform-ui / agent-worker containers",
         f"PLATFORM_API_KEY={ctx.collected.get('PLATFORM_API_KEY', '')}",
@@ -1562,29 +1379,20 @@ def _ensure_api_keys(ctx: Context) -> None:
 
 
 def step_env_local(ctx: Context) -> None:
-    # --- Hydrate firebase config from state on resumed runs ---
-    if not ctx.collected.get("firebase_config"):
-        if ctx.state.firebase_web_config:
-            ctx.collected["firebase_config"] = ctx.state.firebase_web_config
-            info(f"Loaded Firebase web SDK config from state ({ctx.state.firebase_project_id})")
-        elif ctx.state.firebase_project_id and ctx.state.firebase_account:
-            info("State has project but no web config — re-fetching from Firebase CLI")
-            config = _firebase_get_web_config(
-                ctx, ctx.state.firebase_account, ctx.state.firebase_project_id,
-            )
-            ctx.collected["firebase_config"] = config
-            ctx.state.firebase_web_config = config
-            ctx.state.save()
-        else:
-            error("Firebase config missing from memory and state — rerun step 8 first (--from-step 8).")
-            raise SystemExit(1)
+    # --- Re-prompt for auth config not collected in this session ---
+    # Same reasoning as the API keys below: auth secrets are never persisted to
+    # local state, so a resumed run past the `auth` step arrives here empty.
+    if not ctx.collected.get("AUTH_SECRET"):
+        info("Auth config wasn't collected this session (resumed past the auth step) — prompting now.")
+        _ensure_auth(ctx)
 
     # --- Re-prompt for API keys not collected in this session ---
-    # Secrets aren't in state by design, so on --from-step ≥ 11 they're empty.
-    # Running through the same collection flow keeps the script the single
-    # source of prompts (no server-side read, no silent empty uploads).
+    # Secrets aren't in state by design, so a run resumed past the `api_keys`
+    # step arrives here empty. Running through the same collection flow keeps
+    # the script the single source of prompts (no server-side read, no silent
+    # empty uploads).
     if not ctx.collected.get("OPENROUTER_API_KEY"):
-        info("API keys weren't collected this session (resumed past step 9) — prompting now.")
+        info("API keys weren't collected this session (resumed past the api_keys step) — prompting now.")
         _ensure_api_keys(ctx)
 
     env_local = _render_env_local(ctx)
@@ -1836,10 +1644,11 @@ STEPS: list[tuple[str, str, Callable[[Context], None]]] = [
     ("deploy_user",      "deploy user",                          step_deploy_user),
     ("github_access",    "GitHub deploy key",                    step_github_access),
     ("clone_repo",       "Clone repo to /opt/mediforce",         step_clone_repo),
-    ("firebase",         "Firebase project + web SDK config",    step_firebase),
-    ("firebase_sa",      "Firebase Admin service account key",   step_firebase_sa),
     ("api_keys",         "API keys",                             step_api_keys),
     ("domain",           "Domain",                               step_domain),
+    # After `domain` — the Google OAuth redirect URI the operator has to
+    # register is derived from the public base URL.
+    ("auth",             "Sign-in (NextAuth / Google OAuth)",    step_auth),
     ("env_local",        "Assemble and upload env files",        step_env_local),
     ("postgres_dir",     "Postgres data dir (bind mount)",       step_postgres_dir),
     ("firewall",         "Firewall (UFW)",                       step_firewall),

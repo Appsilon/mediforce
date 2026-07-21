@@ -12,8 +12,10 @@ const PERSONAL_HANDLE_FALLBACK = 'user';
  *
  * Lazy bootstrap: when the caller has no personal namespace, the handler
  * creates one inline (idempotent) before returning, emitting
- * `user.personal_namespace_created` exactly once. Bootstrap moves to
- * `events.createUser` when ADR-0002 (NextAuth) lands.
+ * `user.personal_namespace_created` exactly once. This stayed the single
+ * bootstrap site through the NextAuth cutover — the `signIn` callback only
+ * gates the email domain, so handle generation lives here alone (ADR-0002
+ * §4a).
  *
  * apiKey callers are rejected — there's no uid to attribute the response to.
  */
@@ -64,8 +66,8 @@ async function ensurePersonalNamespace(
   const baseHandle = generateHandle(user.email ?? user.uid);
   let handle = baseHandle;
   let attempt = 1;
-  // Bounded retry — Firestore handle collisions are rare and resolved by
-  // suffixing; an unbounded loop here would hide a deeper outage.
+  // Bounded retry — handle collisions are rare and resolved by suffixing;
+  // an unbounded loop here would hide a deeper outage.
   for (let i = 0; i < 16; i += 1) {
     const existing = await scope.workspaces.getNamespace(handle);
     if (existing === null) break;

@@ -7,7 +7,8 @@ import { actorFromCaller, resolveConfiguredBaseUrl } from '../_helpers';
 /**
  * Invite a user to a workspace.
  *
- * Seed-based model (ADR-0002 §3.1) — replaces the legacy Firebase temp-password
+ * Seed-based model (PLAN-0002 §3.1, on the ADR-0002 §4b verified-email
+ * auto-link) — replaces the legacy Firebase temp-password
  * flow:
  *
  *   1. Caller must be `owner`/`admin` of `namespaceHandle` (apiKey bypass).

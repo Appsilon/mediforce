@@ -18,9 +18,9 @@ import { getAppBaseUrl } from './app-base-url';
  *
  * Pipeline (in order, short-circuits on first failure):
  *
- *   1. Auth — `resolveCallerIdentity` reads `X-Api-Key` or a Firebase ID
- *      token. Failure → 401. The resolved `CallerIdentity` is threaded into
- *      the handler so domain code can enforce namespace policy.
+ *   1. Auth — `resolveCallerIdentity` reads `X-Api-Key` or the NextAuth
+ *      session cookie. Failure → 401. The resolved `CallerIdentity` is
+ *      threaded into the handler so domain code can enforce namespace policy.
  *   2. Input — `inputFromRequest(req, ctx)` returns a raw object; the Zod
  *      schema validates it. Failure → 400 with the first issue's message.
  *      Note: `ctx` is Next.js's `RouteContext` shape (`{ params: Promise<…> }`)
@@ -36,9 +36,9 @@ import { getAppBaseUrl } from './app-base-url';
  * resolution step is what turns those credentials into a typed
  * `CallerIdentity` for namespace policy. Both run today; do not remove either.
  *
- * Test seams: pass `options.resolveCaller` to bypass real Firebase /
- * Firestore auth, or `options.buildScope` to substitute a stub scope without
- * spinning up services. Production code never sets either.
+ * Test seams: pass `options.resolveCaller` to bypass the real session /
+ * API-key resolution, or `options.buildScope` to substitute a stub scope
+ * without spinning up services. Production code never sets either.
  *
  * The `NarrowInput` generic defaults to `z.infer<InputSchema>`. Pass it
  * explicitly when the handler expects a narrower type than the schema's

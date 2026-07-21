@@ -24,4 +24,4 @@ export { emitAudit, auditActorFrom } from './audit-helpers';
 
 // Services (factory + seeding) intentionally NOT re-exported here — import from
 // `@mediforce/platform-api/services` so consumers of `/contract` or `/handlers`
-// never evaluate Firestore/Firebase-admin wiring transitively.
+// never evaluate the Postgres / email / Docker wiring transitively.

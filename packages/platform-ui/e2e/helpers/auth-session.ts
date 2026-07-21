@@ -17,7 +17,7 @@ import {
  * `resolveSessionUserId`), but without a browser round trip.
  *
  * Session creation goes through `createDatabaseSession` — the single primitive
- * shared by the auth boundary and the Credentials-provider workaround — so the
+ * shared by the auth boundary and the `/api/auth/password-login` route — so the
  * seeded session is byte-identical to a production one.
  *
  * Resolution note: the `@mediforce/source` condition (set by the `test:e2e`

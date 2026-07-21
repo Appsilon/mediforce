@@ -9,9 +9,9 @@ export const GetMeInputSchema = z
   .object({
     /**
      * Server-to-server escape hatch: an apiKey caller has no user identity of
-     * its own, so it must name the user whose `me` view it wants. Bearer-token
-     * callers always derive the uid from the verified token; if `uid` is set
-     * for a user caller it MUST match `caller.uid` or the handler 403s.
+     * its own, so it must name the user whose `me` view it wants. User callers
+     * always derive the uid from the verified session; if `uid` is set for a
+     * user caller it MUST match `caller.uid` or the handler 403s.
      */
     uid: z.string().min(1).optional(),
   })
@@ -60,7 +60,7 @@ export const ListNamespaceMembersInputSchema = NamespaceQuery;
 export const NamespaceMemberWithAuthSchema = NamespaceMemberSchema.extend({
   /**
    * Resolved display name for the member: the workspace-scoped `displayName`
-   * on the member doc when set, otherwise the Firebase Auth profile name
+   * on the member doc when set, otherwise the `auth_users` profile name
    * looked up via `userDirectory.getUserMetadata`, otherwise `null`. UI
    * chains `?? member.uid` to render a stable fallback.
    */

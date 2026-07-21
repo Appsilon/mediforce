@@ -104,8 +104,8 @@ export default defineConfig({
         ? `MOCK_AGENT=true ALLOW_LOCAL_AGENTS=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${testPort} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npx next dev -p ${testPort}`
         : `pnpm start:e2e`
       : 'pnpm dev',
-    // NextAuth server env for E2E (ADR-0002 PR2): the Credentials provider is
-    // on so seeded password users authenticate, and a fixed test signing
+    // NextAuth server env for E2E (ADR-0002): password sign-in is on so seeded
+    // password users authenticate via `/api/auth/password-login`, and a fixed test signing
     // secret is supplied. DATABASE_URL is passed through when set (auth-setup
     // and the server must share one database); everything else inherits from
     // the parent process env.

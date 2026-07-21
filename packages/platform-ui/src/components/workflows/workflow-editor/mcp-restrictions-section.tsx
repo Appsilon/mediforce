@@ -22,8 +22,8 @@ export function McpRestrictionsSection({ agentId, restrictions, onChange }: McpR
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Wait for Firebase auth to settle — middleware 401s /api/agents
-    // without a Bearer token when the user is signed in as a Firebase user.
+    // Wait for the session to resolve — the proxy 401s /api/agents for a
+    // request made before the user is known to be signed in.
     if (authLoading) return;
     let cancelled = false;
     setLoading(true);

@@ -17,7 +17,7 @@ import { parseAllowedDomains, isEmailDomainAllowed } from '@/lib/email-allowlist
 
 /**
  * NextAuth (Auth.js v5) — the single source of truth for authentication after
- * the Firebase Auth exit (ADR-0002 §2.1, PR2).
+ * the Firebase Auth exit (ADR-0002 §1, PLAN-0002 §2.1).
  *
  * Providers are env-gated and additive (ADR-0002 §4): Google OAuth and a
  * dormant OIDC provider for pharma SSO. Password sign-in (dev / E2E /

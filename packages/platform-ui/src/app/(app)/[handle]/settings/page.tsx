@@ -165,7 +165,7 @@ export default function WorkspaceConfigPage() {
   // API fetch for lastSignInTime + email + auth-enriched displayName.
   // Owner member docs created before the createNamespace handler started
   // persisting displayName lack it locally; the listMembers handler falls
-  // back to the Firebase Auth profile name, and we merge that override
+  // back to the `auth_users` profile name, and we merge that override
   // here so legacy workspaces show a human name instead of the uid.
   const [lastSignInMap, setLastSignInMap] = useState<Map<string, string | null>>(new Map());
   const [emailMap, setEmailMap] = useState<Map<string, string | null>>(new Map());

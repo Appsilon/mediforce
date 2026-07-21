@@ -21,22 +21,18 @@ export interface SeededInvite {
 }
 
 /**
- * Postgres seed-based invite (ADR-0002 §3.1, §5, PR1).
+ * Postgres seed-based invite (PLAN-0002 §3.1; global roles per ADR-0002 §5).
  *
  * Replaces the Firebase create-user-with-temp-password flow. An invite
  * pre-seeds an `auth_users` row + the invitee's `workspace_members`
  * membership + any global `user_roles`, all in one transaction. No temp
- * password and no magic-link email — the invitee signs in later (Google
- * verified-email auto-link in PR2) onto the pre-seeded row.
- *
- * Built and unit-tested in PR1 but NOT wired live: Firebase is still the
- * login source until the PR2 cutover, so a seed-only invite would leave a new
- * invitee unable to sign in. Wiring behind the (reshaped) invite port happens
- * in PR2.
+ * password and no magic-link email — the invitee signs in later via Google
+ * verified-email auto-link (ADR-0002 §4b) onto the pre-seeded row, or by
+ * setting a password.
  *
  * Idempotent: re-seeding the same email reuses the existing uid. A re-invite
  * with a different membership updates the existing workspace membership row
- * (role parity with the pre-cutover Firebase `addMember` upsert); roles are
+ * (role parity with the pre-cutover `addMember` upsert); roles are
  * additive.
  */
 export class PostgresInviteService {
@@ -100,7 +96,7 @@ export class PostgresInviteService {
 
   /**
    * A seed-based invite is "pending" while the invitee still needs to
-   * establish a session (ADR-0002 §3.1): no `auth_sessions` row exists for the
+   * establish a session (PLAN-0002 §3.1): no `auth_sessions` row exists for the
    * uid AND no password has been set (`auth_users.password_hash` is null, i.e.
    * they never signed in via Credentials and never linked Google). An unknown
    * uid is treated as not pending so resend-invite surfaces a clean

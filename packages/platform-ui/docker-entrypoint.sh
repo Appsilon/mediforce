@@ -2,9 +2,8 @@
 set -euo pipefail
 
 # Replace __NEXT_PUBLIC_*__ build-time placeholders with runtime env vars.
-# This lets a single Docker image serve any deployment (different Firebase
-# projects, different domains) — config is injected at container start, not
-# baked at build time.
+# This lets a single Docker image serve any deployment (different domains) —
+# config is injected at container start, not baked at build time.
 #
 # Only runs when placeholders are detected (i.e. image was built without
 # real values). Local `docker compose build` with real build args skips this.

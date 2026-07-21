@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, primaryKey } from 'drizzle-orm/pg-core';
 
 /**
- * Verification tokens (ADR-0002 §1.1). Required by the `@auth/drizzle-adapter`
+ * Verification tokens (PLAN-0002 §1.1). Required by the `@auth/drizzle-adapter`
  * schema contract even though the MVP defers the Email (magic-link) provider
  * (ADR-0002 §4) — the table is never written until that provider is enabled,
  * but the adapter needs the drizzle object to construct.

@@ -27,9 +27,9 @@ function connect(): postgres.Sql {
 
 /**
  * Upsert an `auth_users` row for an email/password test user and return its id.
- * The password is bcrypt-hashed into `password_hash` so the NextAuth
- * Credentials provider (`ENABLE_PASSWORD_AUTH=true`) authenticates the same
- * user through the login page. `email_verified` is set so a later Google
+ * The password is bcrypt-hashed into `password_hash` so the
+ * `/api/auth/password-login` route (`ENABLE_PASSWORD_AUTH=true`) authenticates
+ * the same user through the login page. `email_verified` is set so a later Google
  * sign-in would link by verified email (ADR-0002 §4b).
  *
  * Idempotent: re-running upserts the name + password and returns the stable

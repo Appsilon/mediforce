@@ -11,7 +11,7 @@ const PRODUCTION_ORIGINS = (process.env.ALLOWED_ORIGINS ?? '')
 const PUBLIC_ROUTES = new Set<string>(['/api/health']);
 const PUBLIC_ROUTE_PATTERNS: RegExp[] = [
   // NextAuth's own endpoints (sign-in, callback, session, csrf, sign-out) —
-  // you cannot present a session while obtaining one (ADR-0002 §2.2).
+  // you cannot present a session while obtaining one (PLAN-0002 §2.2).
   /^\/api\/auth\//,
   // Per-provider OAuth callback — no user session at this point; the signed
   // state HMAC inside the callback handler is the sole integrity check.

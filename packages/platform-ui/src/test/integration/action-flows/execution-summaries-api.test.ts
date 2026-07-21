@@ -11,7 +11,7 @@
  *    httpbin, no network).
  *
  * What this test deliberately skips:
- *  - Firebase: in-memory repos via vi.mock'd platform-services.
+ *  - Real data layer: in-memory repos via vi.mock'd platform-services.
  *  - Auto-runner kick: the catch-all webhook handler does a fire-and-forget
  *    `fetch(<baseUrl>/api/processes/<id>/run)`. The test mocks global fetch
  *    so that internal hop calls the run handler synchronously instead of

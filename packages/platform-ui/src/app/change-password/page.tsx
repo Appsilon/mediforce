@@ -4,11 +4,18 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { mediforce } from '@/lib/mediforce';
 import { useAuth } from '@/contexts/auth-context';
+import { useUserMe } from '@/hooks/use-user-me';
 
 export default function ChangePasswordPage() {
   const { user, loading, mustChangePassword, clearMustChangePassword } = useAuth();
   const router = useRouter();
+  // `hasPassword` decides whether this is a replacement (re-authentication
+  // required) or a first-time set. Fail closed: until `me` resolves we assume
+  // a password exists, so the field is asked for rather than silently skipped.
+  const userMe = useUserMe({ enabled: user !== null });
+  const hasPassword = userMe.data?.user.hasPassword !== false;
 
+  const [currentPassword, setCurrentPassword] = React.useState('');
   const [newPassword, setNewPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
@@ -39,11 +46,20 @@ export default function ChangePasswordPage() {
       return;
     }
 
+    if (hasPassword && currentPassword === '') {
+      setError('Enter your current password.');
+      return;
+    }
+
     setPending(true);
     try {
       // Set the bcrypt password hash server-side (ADR-0002 §4), then clear the
-      // forced-change flag. The NextAuth session cookie rides both calls.
-      await mediforce.users.setPassword({ newPassword });
+      // forced-change flag. The NextAuth session cookie rides both calls — the
+      // handler revokes the user's OTHER sessions only, so this one survives.
+      await mediforce.users.setPassword({
+        newPassword,
+        ...(hasPassword ? { currentPassword } : {}),
+      });
       await clearMustChangePassword();
       router.replace('/workspace-selection');
     } catch (err: unknown) {
@@ -76,6 +92,22 @@ export default function ChangePasswordPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {hasPassword && (
+            <div className="space-y-1.5">
+              <label htmlFor="currentPassword" className="text-sm font-medium">Current password</label>
+              <input
+                id="currentPassword"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Your current password"
+                autoComplete="current-password"
+                required
+                disabled={pending}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+              />
+            </div>
+          )}
           <div className="space-y-1.5">
             <label htmlFor="newPassword" className="text-sm font-medium">New password</label>
             <input

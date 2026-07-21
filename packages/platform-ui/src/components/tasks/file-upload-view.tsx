@@ -34,7 +34,7 @@ export function FileUploadView({ task }: TaskBodyProps) {
       // then complete the task with the resulting descriptors. Completion still
       // writes `completion_data.files` / `stepOutput.files`, the surface
       // downstream workflow steps read — the descriptors now point at the blob
-      // endpoint instead of a Firebase download URL.
+      // endpoint instead of a Firebase Storage download URL.
       const attachments: Attachment[] = [];
       for (let index = 0; index < files.length; index++) {
         const file = files[index];
@@ -182,9 +182,9 @@ function AttachmentRow({
     setDownloading(true);
     setDownloadError(null);
     try {
-      // A bare `<a href>` would not carry the Firebase Bearer token; the blob
-      // route authenticates it, so fetch through `apiFetch` and hand the browser
-      // a transient object URL — same pattern as run Output Files.
+      // Fetch through `apiFetch` and hand the browser a transient object URL,
+      // so a non-200 from the blob route surfaces as an error instead of a
+      // broken download — same pattern as run Output Files.
       await downloadViaApiFetch(mediforce.attachments.blobUrl(attachment.id), attachment.name);
     } catch (err) {
       setDownloadError(err instanceof Error ? err.message : 'Download failed');

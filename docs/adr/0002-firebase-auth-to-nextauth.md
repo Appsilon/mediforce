@@ -1,8 +1,9 @@
 # 0002 — Move authentication from Firebase Auth to NextAuth (Auth.js v5)
 
-- **Status:** Proposed (grilled & reshaped 2026-06-29; supersedes the
-  2026-06-16 greenfield-uuid + remap draft — see §7)
-- **Date:** 2026-05-19 (reshaped 2026-06-16, 2026-06-29)
+- **Status:** Accepted (2026-07-21 — shipped; supersedes the 2026-06-16
+  greenfield-uuid + remap draft, see §7). Deviations found during the cutover
+  are marked **Shipped as** inline.
+- **Date:** 2026-05-19 (reshaped 2026-06-16, 2026-06-29; implemented 2026-07-21)
 - **Authors:** Marek Rogala (@marekrogala)
 - **Reviewers:** Filip Stachura (@filipstachura), Paweł Przytuła (@przytu1)
 - **Depends on:** [ADR-0001](./0001-firestore-to-postgres.md) (Postgres + Drizzle is the adapter target)
@@ -59,12 +60,16 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
 
 2. **Adapter target.** Drizzle, writing to the same Postgres database
    established by ADR-0001. New tables: `auth_users`, `auth_accounts`,
-   `auth_sessions`, `auth_verification_tokens`. A Mediforce-side
-   `user_profiles` table joins by `user_id` and owns domain fields
-   (`current_workspace`, `deployment_admin`, `must_change_password`).
-   This **split** (auth tables vs domain profile) is the standard NextAuth
-   pattern and keeps schema changes from the upstream library separated from
-   Mediforce concerns.
+   `auth_sessions`, `auth_verification_tokens`. The Mediforce-side
+   `user_profiles` table (already created by ADR-0001) keys by the same uid and
+   owns domain fields. This **split** (auth tables vs domain profile) is the
+   standard NextAuth pattern and keeps schema changes from the upstream library
+   separated from Mediforce concerns.
+
+   **Shipped as:** the four `auth_*` tables, plus the global `user_roles` table
+   (§5). `user_profiles` was **not reshaped** — the planned `current_workspace`
+   and `deployment_admin` columns were dropped from scope because nothing reads
+   them (see §8); the table still carries only `uid` + `must_change_password`.
 
 3. **Session strategy.** **Database sessions**, not JWT. Server-side
    revocation works in one HTTP round-trip; session create/destroy is a row
@@ -116,9 +121,18 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
    allowlist is what closes that open door (staging restricts to
    `appsilon.com`; a customer deployment restricts to its domain, or relies on
    its OIDC IdP). It is a deployment-operator security policy (env var,
-   boot-validated in `instrumentation.ts`, enforced in the same `signIn`
-   callback as the personal-workspace bootstrap), never a per-workspace
-   in-app setting.
+   boot-validated in `instrumentation-node.ts`), never a per-workspace in-app
+   setting.
+
+   **Shipped as:** the `signIn` callback in `auth.ts` does the allowlist gate
+   and **nothing else**. The **personal-workspace bootstrap did not move here**
+   (the pre-implementation plan, PLAN-0002 §6, proposed a transactional
+   `ensureUserProfile` in this callback): it stayed the lazy, idempotent
+   bootstrap in the `getMe` handler (`GET /api/users/me`), so handle generation
+   lives in exactly one place and applies to every caller regardless of how the
+   session was opened. The standalone password-login route (§4) repeats the
+   same allowlist check itself, answering with the same 401 as a bad password
+   so an anonymous caller cannot enumerate the allowed domains.
 
 4b. **Account linking by verified email (decision 2026-06-29).** A Google
    sign-in whose email matches an existing `auth_users` row (a migration-seeded
@@ -134,7 +148,12 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
 5. **Role / claim resolution.** Firebase custom claims map onto three
    different storage locations:
 
-   - `customClaims.role === 'admin'` → `user_profiles.deployment_admin: boolean`
+   - `customClaims.role === 'admin'` → `user_profiles.deployment_admin: boolean`.
+     **Shipped as: dropped** — no column was added and the claim is not carried
+     anywhere. Nothing in the codebase read a deployment-admin flag; every
+     "admin" check is `workspace_members` governance (§8). The seed script keeps
+     the raw `customClaims.role` reachable in the Firebase export if a future
+     feature needs it.
    - `customClaims.roles: string[]` → a **global** `user_roles(uid, role)` table
      (one indexed row per (user, role)). **These claims are global today and
      `getUsersByRole(role)` is called with no namespace context**
@@ -157,9 +176,13 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
    API key or PAT). Concretely:
 
    - `hasValidFirebaseToken()` in `proxy.ts` is **replaced** by a NextAuth
-     session-cookie check (`auth()` / session-token lookup). The browser
-     carries NextAuth's `authjs.session-token` httpOnly cookie; no
-     `Authorization` header on same-origin `/api/*` calls.
+     session-cookie check. The browser carries NextAuth's
+     `authjs.session-token` httpOnly cookie (`__Secure-`-prefixed over https);
+     no `Authorization` header on same-origin `/api/*` calls. Under the
+     database strategy the cookie value **is** the `auth_sessions.session_token`
+     verbatim, so both `proxy.ts` and `resolveCallerIdentity` resolve it with a
+     single indexed lookup (`resolveSessionUserId`) rather than calling
+     `auth()`.
    - `hasValidApiKey()` in `proxy.ts` (the `PLATFORM_API_KEY` path, and the
      per-user PATs from #376) **stays untouched** — out of scope of this ADR.
    - `lib/api-auth.ts` `resolveCallerIdentity` resolves `uid` from the
@@ -188,16 +211,23 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
    `text`, **not** `uuid` — the only impl constraint), and **every reference
    stays valid with zero data rewrite**:
 
-   - **Structural changes ship as Drizzle migrations** (create `auth_*` +
-     `user_profiles` reshape; `workspace_members` rename `role` → `membership`;
-     create the global `user_roles` table). The uid columns are **not** touched.
-   - **Migration = a tiny one-time seed**, not a remap: a script reads Firebase
-     Auth (`listUsers`) and inserts one `auth_users` row per existing user
-     (`id = uid`, `email`, `name`) so a Google sign-in **links by verified
-     email** (§4b) onto the pre-existing uid. It also seeds `user_roles` from
-     today's `customClaims.roles` and `user_profiles.deployment_admin` from
-     `customClaims.role === 'admin'`. No uid columns rewritten, no mapping
-     table, no `audit_events`/`human_tasks`/… churn.
+   - **Structural changes ship as Drizzle migrations** (create `auth_*`;
+     `workspace_members` rename `role` → `membership`; create the global
+     `user_roles` table). The uid columns are **not** touched, and the planned
+     `user_profiles` reshape was dropped (§2, §8).
+   - **Migration = a tiny one-time seed**, not a remap: a script reads the
+     Firebase Auth user list and inserts one `auth_users` row per existing user
+     (`id = uid`, `email`, `name`, `email_verified`) so a Google sign-in **links
+     by verified email** (§4b) onto the pre-existing uid. It also seeds
+     `user_roles` from today's `customClaims.roles`. No uid columns rewritten,
+     no mapping table, no `audit_events`/`human_tasks`/… churn.
+
+     **Shipped as** `scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts`,
+     reading a `firebase auth:export` JSON file rather than calling `listUsers`
+     — the cutover deleted every Firebase Admin dependency from the repo, so
+     the operator produces the export with the Firebase CLI and passes its path.
+     It is dry-run by default. `user_profiles.deployment_admin` is **not**
+     seeded: the column was never added (§5).
    - New users created after cutover get an adapter-generated `uuid` id —
      mixed id shapes (Firebase strings + uuids) are harmless: both are opaque
      `text`, no consumer cares.

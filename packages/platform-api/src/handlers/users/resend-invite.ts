@@ -6,7 +6,7 @@ import { actorFromCaller, resolveConfiguredBaseUrl } from '../_helpers';
 
 /**
  * Re-send the workspace-notification email for a pending workspace member
- * (ADR-0002 §3.1 seed-based model).
+ * (seed-based model, PLAN-0002 §3.1).
  *
  *   1. Caller must be `owner`/`admin` of `namespaceHandle` (apiKey bypass).
  *   2. Look up the target user's email via

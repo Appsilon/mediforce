@@ -2,7 +2,7 @@ import { pgTable, text, integer, primaryKey } from 'drizzle-orm/pg-core';
 import { authUsers } from './auth-user';
 
 /**
- * OAuth / OIDC account links (ADR-0002 §1.1). Required by
+ * OAuth / OIDC account links (PLAN-0002 §1.1). Required by
  * `@auth/drizzle-adapter`: `linkAccount` / `getUserByAccount` / `unlinkAccount`
  * read and write this table.
  *
