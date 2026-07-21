@@ -14,8 +14,6 @@ export type {
   SendWorkspaceNotificationEmailInput,
 } from './invite-notification';
 export {
-  sendInviteEmail,
   sendWorkspaceNotificationEmail,
-  type SendInviteEmailParams,
   type SendWorkspaceNotificationEmailParams,
 } from './invite-emails';

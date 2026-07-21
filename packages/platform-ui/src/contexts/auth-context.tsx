@@ -10,6 +10,8 @@ import { useUserMe } from '@/hooks/use-user-me';
 
 export type SessionUser = Session['user'];
 
+const PASSWORD_LOGIN_PATH = '/api/auth/password-login';
+
 interface AuthContextValue {
   user: SessionUser | null;
   loading: boolean;
@@ -34,7 +36,7 @@ export class CredentialsSignInError extends Error {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession();
+  const { data: session, status, update: refreshSession } = useSession();
   const [emailAuthEnabled, setEmailAuthEnabled] = React.useState<boolean | null>(null);
   const [googleAuthEnabled, setGoogleAuthEnabled] = React.useState<boolean | null>(null);
   const qc = useQueryClient();
@@ -42,21 +44,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const user = session?.user ?? null;
   const isAuthenticated = status === 'authenticated';
 
-  // Which providers this deployment enabled (ADR-0002 §4). NextAuth exposes the
-  // enabled set at /api/auth/providers, so the login page gates its buttons off
-  // real config instead of probing Firebase.
+  // Which sign-in methods this deployment enabled (ADR-0002 §4). OAuth comes
+  // from NextAuth's own /api/auth/providers; password sign-in is not an Auth.js
+  // provider (see `/api/auth/password-login`) so it reports itself.
   React.useEffect(() => {
     let active = true;
     getProviders()
       .then((providers) => {
-        if (!active) return;
-        setEmailAuthEnabled(providers?.credentials !== undefined);
-        setGoogleAuthEnabled(providers?.google !== undefined);
+        if (active) setGoogleAuthEnabled(providers?.google !== undefined);
       })
       .catch(() => {
-        if (!active) return;
-        setEmailAuthEnabled(false);
-        setGoogleAuthEnabled(false);
+        if (active) setGoogleAuthEnabled(false);
+      });
+    fetch(PASSWORD_LOGIN_PATH)
+      .then((res) => res.json())
+      .then((body: { enabled?: boolean }) => {
+        if (active) setEmailAuthEnabled(body.enabled === true);
+      })
+      .catch(() => {
+        if (active) setEmailAuthEnabled(false);
       });
     return () => {
       active = false;
@@ -94,12 +100,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signIn('google', { callbackUrl: '/' });
   }, []);
 
-  const signInWithEmail = React.useCallback(async (email: string, password: string) => {
-    const result = await signIn('credentials', { email, password, redirect: false });
-    if (result?.error) {
-      throw new CredentialsSignInError();
-    }
-  }, []);
+  const signInWithEmail = React.useCallback(
+    async (email: string, password: string) => {
+      // Not `signIn('credentials', …)`: password auth is a plain route because
+      // Auth.js forbids a Credentials provider under database sessions. The
+      // route sets the same session cookie, so a session refetch picks it up.
+      const res = await fetch(PASSWORD_LOGIN_PATH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) {
+        throw new CredentialsSignInError();
+      }
+      await refreshSession();
+    },
+    [refreshSession],
+  );
 
   const clearMustChangePassword = React.useCallback(async () => {
     await mediforce.users.clearMustChangePassword();

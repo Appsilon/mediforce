@@ -4,7 +4,7 @@
 
 - **Node.js** 20+
 - **pnpm** 10+ (`corepack enable && corepack prepare pnpm@latest --activate`)
-- **Firebase CLI** (`npm i -g firebase-tools`)
+- **Docker** (local Postgres + agent containers)
 
 ## Setup
 
@@ -17,20 +17,23 @@ pnpm install
 ### Environment variables
 
 ```bash
-cp packages/platform-ui/.env.local.example packages/platform-ui/.env.local
+cp packages/platform-ui/.env.example packages/platform-ui/.env.local
 ```
 
-Fill in your Firebase project values. Get them from: Firebase Console > Project Settings > General > Your apps.
+Authentication is NextAuth / Auth.js v5 with Postgres-backed database sessions
+(ADR-0002) — there is no Firebase project to configure.
 
 | Variable | Description |
 |----------|-------------|
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase API key |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Firebase auth domain |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Firebase project ID |
-| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID |
-| `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase app ID |
+| `AUTH_SECRET` | NextAuth session signing secret (`openssl rand -hex 32`) |
+| `ENABLE_PASSWORD_AUTH` | `true` enables the email + password (Credentials) provider — simplest local path |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google sign-in provider (optional) |
+| `ALLOWED_EMAIL_DOMAINS` | Comma-separated email-domain allowlist (optional) |
+| `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | Customer SSO, dormant until `OIDC_ISSUER` is set |
 | `OPENROUTER_API_KEY` | OpenRouter API key (for agent LLM calls) |
-| `PLATFORM_API_KEY` | Platform API key (for server actions) |
+| `PLATFORM_API_KEY` | Platform API key (server-to-server `X-Api-Key`) |
+
+The full annotated list lives in `packages/platform-ui/.env.example`.
 
 ## Monorepo structure
 
@@ -38,7 +41,7 @@ Fill in your Firebase project values. Get them from: Firebase Console > Project 
 packages/
   platform-core/       # Shared types, domain models, test factories
   platform-ui/         # Next.js UI — the main web application
-  platform-infra/      # Postgres infrastructure (Drizzle ORM) + Firebase Auth
+  platform-infra/      # Postgres infrastructure (Drizzle ORM) + NextAuth stores
   platform-api/        # API contract schemas + pure handlers (framework-free)
   agent-runtime/       # Agent execution engine
   workflow-engine/     # Process orchestration engine
@@ -116,17 +119,17 @@ pnpm test
 
 ### Contract tests
 
-Handlers in `platform-api` are tested against in-memory repositories from `@mediforce/platform-core/testing` — no mocks, no HTTP, no Firebase emulators, no dev server. The real win over E2E is not raw wall-clock time but zero ceremony: run the file, get the answer. Each handler is a pure function `(input, deps) => Promise<output>` with per-handler dependency injection, so tests read like the spec: set up repo state, call handler, assert on the return value. The canonical example is `packages/platform-api/src/handlers/tasks/__tests__/list-tasks.test.ts`, which exercises the `listTasks` handler backing `GET /api/tasks`.
+Handlers in `platform-api` are tested against in-memory repositories from `@mediforce/platform-core/testing` — no mocks, no HTTP, no database, no dev server. The real win over E2E is not raw wall-clock time but zero ceremony: run the file, get the answer. Each handler is a pure function `(input, deps) => Promise<output>` with per-handler dependency injection, so tests read like the spec: set up repo state, call handler, assert on the return value. The canonical example is `packages/platform-api/src/handlers/tasks/__tests__/list-tasks.test.ts`, which exercises the `listTasks` handler backing `GET /api/tasks`.
 
 ### E2E tests (Playwright)
 
 E2E tests live in `packages/platform-ui/e2e/`.
 
-```bash
-# Terminal 1 — start emulators
-pnpm emulators
+A local Postgres must be up (`pnpm dev` once, or your own DB on `:5432`).
+No emulator is involved — Playwright's `globalSetup` applies the Drizzle
+migrations and starts the mock OAuth server itself.
 
-# Terminal 2 — run tests
+```bash
 pnpm test:e2e               # all E2E (L3 + L4)
 pnpm test:e2e:api           # L3 only — API E2E, no browser (~30s)
 pnpm test:e2e:ui            # L4 only — UI E2E with real Chromium (~3min)
@@ -139,16 +142,16 @@ pnpm test:e2e:headed        # with browser visible
 pnpm test:e2e:ui            # interactive Playwright UI mode
 ```
 
-The emulator setup automatically:
-1. Creates a test user (`test@mediforce.dev` / `test123456`)
-2. Seeds Firestore with test data (tasks, process instances, agent runs, audit events)
-3. Authenticates and saves auth state for all tests
+`e2e/auth-setup.ts` automatically:
+1. Seeds Postgres with test data (workspaces, workflow definitions, tasks, process instances, agent runs, audit events)
+2. Upserts the test user's `auth_users` row and opens a NextAuth database session for it (`e2e/helpers/auth-session.ts`)
+3. Writes that session token as the `authjs.session-token` cookie into Playwright `storageState`, authenticating every downstream journey
 
 **Test structure:**
 - `e2e/smoke.spec.ts` — unauthenticated tests
 - `e2e/api/*.journey.ts` — L3 API E2E
 - `e2e/ui/*.journey.ts` — L4 UI E2E
-- `e2e/helpers/` — emulator REST API helpers and seed data
+- `e2e/helpers/` — Postgres seed + NextAuth session helpers
 
 ### Recommended workflow
 

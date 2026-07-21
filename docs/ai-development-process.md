@@ -62,7 +62,7 @@ UI features follow a tight TDD loop where the E2E journey test comes first:
 2. **GREEN** — Implement until the test passes
 3. **Ship** — test + feature code in the same PR
 
-Quality gates run after every change: typecheck (~5s), affected tests (<1s), full suite (~9s). E2E with Firebase emulators (~60s) before merging UI changes.
+Quality gates run after every change: typecheck (~5s), affected tests (<1s), full suite (~9s). E2E against a real Next + Postgres stack (~4min) before merging UI changes.
 
 ## Adding New Instructions
 

@@ -16,10 +16,3 @@ declare module 'next-auth' {
     } & DefaultSession['user'];
   }
 }
-
-declare module 'next-auth/jwt' {
-  interface JWT {
-    /** Set for Credentials logins so `jwt.encode` returns the DB session token. */
-    sessionId?: string;
-  }
-}

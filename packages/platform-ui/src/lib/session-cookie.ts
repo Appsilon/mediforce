@@ -10,6 +10,12 @@
  */
 const COOKIE_NAMES = ['__Secure-authjs.session-token', 'authjs.session-token'] as const;
 
+/** The cookie name to WRITE — `__Secure-`-prefixed over https, matching what
+ *  Auth.js itself sets for its own providers. */
+export function sessionCookieName(secure: boolean): string {
+  return secure ? COOKIE_NAMES[0] : COOKIE_NAMES[1];
+}
+
 interface CookieJar {
   get(name: string): { value: string } | undefined;
 }

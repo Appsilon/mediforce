@@ -227,10 +227,10 @@
       "breakpoints": true
     },
     {
-      "idx": 31,
+      "idx": 32,
       "version": "7",
-      "when": 1782391535835,
-      "tag": "0031_nextauth_tables",
+      "when": 1782391535836,
+      "tag": "0032_nextauth_tables",
       "breakpoints": true
     }
   ]
