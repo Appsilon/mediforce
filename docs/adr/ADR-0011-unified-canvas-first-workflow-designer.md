@@ -30,7 +30,7 @@ The XYFlow canvas occupies the full main area. The workflow structure — not th
 The chat panel lives in a collapsible right sidebar and does not drive the interface. However it can add blocks, wire transitions, and construct a full workflow on the user's behalf — the same power the Co-Work Workflow Designer Workflow had. The canvas remains the source of truth; the assistant is one way to build it, not the only way.
 
 **Step config in the right sidebar.**
-Selecting a node surfaces its configuration in the same right sidebar. The AI Assistant yields to the step editor when a node is selected and returns when the selection is cleared.
+Selecting a node surfaces its configuration in the right sidebar. Once the AI Assistant is wired (Phase 4), it will share that sidebar — yielding to the step editor when a node is selected and returning when the selection is cleared. In this phase the Assistant is a placeholder shell, so the two panels render independently.
 
 **Two ways to add a block coexist.**
 "Add Block" (bottom toolbar) places an unconnected node anywhere on the canvas. The "+" edge button connects a new node inline at a specific position. Neither replaces the other.
