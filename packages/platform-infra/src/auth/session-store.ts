@@ -1,6 +1,7 @@
-import { and, eq, gt } from 'drizzle-orm';
+import { and, eq, gt, ne } from 'drizzle-orm';
 import type { Database } from '../postgres/client';
 import { authSessions } from '../postgres/schema/auth-session';
+import { authUsers } from '../postgres/schema/auth-user';
 import { userRoles } from '../postgres/schema/user-role';
 
 /**
@@ -50,10 +51,21 @@ export async function getUserRoles(db: Database, uid: string): Promise<string[]>
 }
 
 /**
- * Insert a database session row. Used by the Credentials-provider workaround
- * (Auth.js does not persist a database session for credential logins on its
- * own) and by the E2E setup that seeds a session directly. The caller owns the
- * token; use a cryptographically random value.
+ * Stamp `auth_users.last_sign_in_at`. Called from the Auth.js `signIn` event
+ * (OAuth) and from the password-login route, which are the only two ways a
+ * session is born. It lives on the user rather than being derived from
+ * `auth_sessions` because signing out deletes the session row, and "last seen"
+ * must survive that.
+ */
+export async function recordSignIn(db: Database, uid: string): Promise<void> {
+  await db.update(authUsers).set({ lastSignInAt: new Date() }).where(eq(authUsers.id, uid));
+}
+
+/**
+ * Insert a database session row. Used by the password-login route (Auth.js
+ * only persists sessions for its own providers) and by the E2E setup that
+ * seeds a session directly. The caller owns the token; use a
+ * cryptographically random value.
  */
 export async function createDatabaseSession(
   db: Database,
@@ -64,4 +76,31 @@ export async function createDatabaseSession(
     userId: params.userId,
     expires: params.expires,
   });
+}
+
+/**
+ * Delete a user's database sessions, optionally sparing one token. This is the
+ * revocation primitive behind a password change: the new credential must kick
+ * every device the old one could still be driving, while the session that
+ * performed the change survives (`exceptSessionToken`) so the user is not
+ * bounced out of the flow they just completed.
+ *
+ * Because `resolveSessionUserId` reads `auth_sessions` on every request, a
+ * deleted row is an immediate 401 on the next request from that device.
+ * Returns the number of sessions deleted.
+ */
+export async function deleteUserSessions(
+  db: Database,
+  params: { userId: string; exceptSessionToken: string | null },
+): Promise<number> {
+  const ownedByUser = eq(authSessions.userId, params.userId);
+  const deleted = await db
+    .delete(authSessions)
+    .where(
+      params.exceptSessionToken === null || params.exceptSessionToken === ''
+        ? ownedByUser
+        : and(ownedByUser, ne(authSessions.sessionToken, params.exceptSessionToken)),
+    )
+    .returning({ sessionToken: authSessions.sessionToken });
+  return deleted.length;
 }

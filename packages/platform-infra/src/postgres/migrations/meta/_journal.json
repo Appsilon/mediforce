@@ -232,6 +232,20 @@
       "when": 1782391535836,
       "tag": "0032_nextauth_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1782391535836,
+      "tag": "0032_auth_users_last_sign_in",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1782391535837,
+      "tag": "0033_auth_users_email_ci",
+      "breakpoints": true
     }
   ]
 }

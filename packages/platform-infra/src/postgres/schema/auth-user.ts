@@ -30,6 +30,10 @@ export const authUsers = pgTable('auth_users', {
   emailVerified: timestamp('email_verified', { withTimezone: true, mode: 'date' }),
   image: text('image'),
   passwordHash: text('password_hash'),
+  // Stamped by `recordSignIn` on every successful sign-in (migration 0032) so
+  // the member list can show when someone was last here. Sessions cannot carry
+  // this: signing out deletes the row.
+  lastSignInAt: timestamp('last_sign_in_at', { withTimezone: true, mode: 'date' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

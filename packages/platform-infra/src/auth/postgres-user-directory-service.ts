@@ -18,10 +18,11 @@ import { userRoles } from '../postgres/schema/user-role';
  * silently stops escalation notifications, so the one-time seed
  * (`seed-user-roles`) MUST run when this goes live.
  *
- * `getUserMetadata.lastSignInTime` is `null` in PR1: there is no PG sign-in
- * record until NextAuth database sessions land (PR2). `photoURL` comes from
- * `auth_users.image` (seeded from Firebase `photoURL`) so the member-list
- * avatar fallback does not regress.
+ * `getUserMetadata.lastSignInTime` reads `auth_users.last_sign_in_at`, stamped
+ * by `recordSignIn` on every sign-in. Migrated users show `null` until they
+ * next sign in — Firebase's own timestamps are not carried over. `photoURL`
+ * comes from `auth_users.image` (seeded from Firebase `photoURL`) so the
+ * member-list avatar fallback does not regress.
  */
 export class PostgresUserDirectoryService implements UserDirectoryService {
   constructor(private readonly db: Database) {}
@@ -36,11 +37,15 @@ export class PostgresUserDirectoryService implements UserDirectoryService {
   }
 
   async resolveUser(identifier: string): Promise<DirectoryUser | null> {
-    const column = identifier.includes('@') ? authUsers.email : authUsers.id;
+    // Emails are stored lower-cased (migration 0033); uids are opaque and
+    // case-sensitive, so only the email branch normalises.
+    const isEmail = identifier.includes('@');
+    const column = isEmail ? authUsers.email : authUsers.id;
+    const value = isEmail ? identifier.toLowerCase() : identifier;
     const rows = await this.db
       .select({ uid: authUsers.id, email: authUsers.email, name: authUsers.name })
       .from(authUsers)
-      .where(eq(column, identifier))
+      .where(eq(column, value))
       .limit(1);
     const row = rows[0];
     return row ? toDirectoryUser(row) : null;
@@ -48,7 +53,12 @@ export class PostgresUserDirectoryService implements UserDirectoryService {
 
   async getUserMetadata(uid: string): Promise<UserAuthMetadata | null> {
     const rows = await this.db
-      .select({ email: authUsers.email, name: authUsers.name, image: authUsers.image })
+      .select({
+        email: authUsers.email,
+        name: authUsers.name,
+        image: authUsers.image,
+        lastSignInAt: authUsers.lastSignInAt,
+      })
       .from(authUsers)
       .where(eq(authUsers.id, uid))
       .limit(1);
@@ -57,7 +67,7 @@ export class PostgresUserDirectoryService implements UserDirectoryService {
     return {
       email: row.email !== '' ? row.email : null,
       displayName: row.name !== null && row.name !== '' ? row.name : null,
-      lastSignInTime: null,
+      lastSignInTime: row.lastSignInAt?.toISOString() ?? null,
       photoURL: row.image ?? null,
     };
   }

@@ -1,3 +1,5 @@
+import { parseAllowedDomains } from '@/lib/email-allowlist';
+
 // Node-only: contains process.exit, kept out of the Edge module graph so
 // Turbopack never parses it for the Edge runtime build. Dynamic-imported from
 // instrumentation.ts only inside the NEXT_RUNTIME === 'nodejs' branch.
@@ -50,20 +52,22 @@ export function validateEnv(): void {
         + '(ADR-0002 §4) — otherwise no one can sign in.',
       );
     }
+  }
 
-    // --- ALLOWED_EMAIL_DOMAINS mandatory when Google is on (ADR-0002 §4a) ---
-    if (googleEnabled) {
-      const allowlist = (process.env.ALLOWED_EMAIL_DOMAINS ?? '')
-        .split(',')
-        .map((d) => d.trim())
-        .filter((d) => d !== '');
-      if (allowlist.length === 0) {
-        errors.push(
-          'GOOGLE_CLIENT_ID is set but ALLOWED_EMAIL_DOMAINS is empty. With Google enabled, any Google account '
-          + 'on earth could sign in — set ALLOWED_EMAIL_DOMAINS to your domain(s) (ADR-0002 §4a).',
-        );
-      }
-    }
+  // --- ALLOWED_EMAIL_DOMAINS mandatory whenever an OAuth provider is on ---
+  // Deliberately OUTSIDE the production block: `isEmailDomainAllowed` fails
+  // open on an empty allowlist, so this check is the only thing closing the
+  // door. A staging or preview container built as `development` with Google
+  // configured is exactly the case that must not be exempt (ADR-0002 §4a).
+  const oauthEnabled =
+    (typeof process.env.GOOGLE_CLIENT_ID === 'string' && process.env.GOOGLE_CLIENT_ID !== '')
+    || (typeof process.env.OIDC_ISSUER === 'string' && process.env.OIDC_ISSUER !== '');
+  if (oauthEnabled && parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS).length === 0) {
+    errors.push(
+      'An OAuth provider (GOOGLE_CLIENT_ID / OIDC_ISSUER) is configured but ALLOWED_EMAIL_DOMAINS is empty. '
+      + 'Any account at the identity provider could sign in — set ALLOWED_EMAIL_DOMAINS to your domain(s) '
+      + '(ADR-0002 §4a).',
+    );
   }
 
   // --- DATABASE_URL (ADR-0001: Postgres-only, always required) ---

@@ -22,6 +22,15 @@ export type CallerIdentity =
       readonly uid: string;
       readonly namespaces: ReadonlySet<string>;
       readonly namespaceRoles: ReadonlyMap<string, NamespaceRole>;
+      /**
+       * The database-session token this request authenticated with, when the
+       * boundary resolved one from the session cookie. Handlers must not use
+       * it as an identity (the uid is that); its single purpose is letting a
+       * session-revoking handler spare the caller's own session — see
+       * `setPassword`. Optional so non-cookie caller shapes (tests, future
+       * per-user PATs) stay constructible.
+       */
+      readonly sessionToken?: string;
       readonly isSystemActor: false;
     };
 

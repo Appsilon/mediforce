@@ -38,6 +38,13 @@ export const GetMeOutputSchema = z.object({
      * `POST /api/users/me/clear-must-change-password`.
      */
     mustChangePassword: z.boolean(),
+    /**
+     * `true` when the user already has a password credential. The
+     * change-password form uses it to decide whether to ask for the current
+     * password — `false` means first-time set (seeded invite, OAuth-only
+     * account), which `POST /api/users/set-password` accepts without one.
+     */
+    hasPassword: z.boolean(),
   }),
   namespaces: z.array(MeNamespaceSchema),
 });
@@ -135,6 +142,21 @@ export type ClearMustChangePasswordOutput = z.infer<typeof ClearMustChangePasswo
 export const SetPasswordInputSchema = z
   .object({
     newPassword: z.string().min(8, 'Password must be at least 8 characters.'),
+    /**
+     * Re-authentication for a user caller who already has a password: the
+     * handler bcrypt-compares this against the stored hash and 403s on a
+     * mismatch, so a stolen session cookie cannot be converted into a
+     * permanent password credential.
+     *
+     * Omitted in exactly two cases, both asymmetric on purpose:
+     *  - the target has no `password_hash` yet (invite / first-time set /
+     *    `mustChangePassword` on a seeded account) — there is nothing to
+     *    re-authenticate against;
+     *  - the caller is an apiKey (admin / system path) — it has already
+     *    proven operator-level trust at the auth boundary and by definition
+     *    does not know the user's password.
+     */
+    currentPassword: z.string().min(1).optional(),
     /**
      * Server-to-server escape hatch, same rule as
      * `ClearMustChangePasswordInputSchema`: an apiKey caller must name the

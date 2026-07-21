@@ -60,6 +60,9 @@ export async function resolveCallerIdentity(
     uid,
     namespaces: new Set(memberships.map((m) => m.handle)),
     namespaceRoles: new Map(memberships.map((m) => [m.handle, m.role] as const)),
+    // Carried so a handler that revokes the user's sessions (password change)
+    // can spare the one making the request.
+    sessionToken,
     isSystemActor: false,
   };
 }

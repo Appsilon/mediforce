@@ -24,6 +24,21 @@ export async function setUserPasswordHash(
   return updated.length > 0;
 }
 
+/**
+ * The user's stored bcrypt hash, or `null` when they have none (seeded invite,
+ * OAuth-only account) or the uid does not exist. Backs the re-authentication
+ * check on password change: a user who already has a credential must prove the
+ * old one before replacing it.
+ */
+export async function getUserPasswordHash(db: Database, uid: string): Promise<string | null> {
+  const [user] = await db
+    .select({ passwordHash: authUsers.passwordHash })
+    .from(authUsers)
+    .where(eq(authUsers.id, uid))
+    .limit(1);
+  return user?.passwordHash ?? null;
+}
+
 export type PasswordCredentialRecord = {
   id: string;
   email: string | null;
@@ -33,9 +48,11 @@ export type PasswordCredentialRecord = {
 };
 
 /**
- * Look up the credential record the Credentials provider's `authorize` needs
- * (ADR-0002 §4). Returns `null` when no user has that email; the caller
- * compares the bcrypt hash.
+ * Look up the credential record password sign-in needs (ADR-0002 §4). Returns
+ * `null` when no user has that email; the caller compares the bcrypt hash.
+ *
+ * The email is lower-cased to match the case-insensitive uniqueness index
+ * (migration 0033) — addresses differing only in case are one account.
  */
 export async function findPasswordCredentialByEmail(
   db: Database,
@@ -50,7 +67,7 @@ export async function findPasswordCredentialByEmail(
       passwordHash: authUsers.passwordHash,
     })
     .from(authUsers)
-    .where(eq(authUsers.email, email))
+    .where(eq(authUsers.email, email.toLowerCase()))
     .limit(1);
   return user ?? null;
 }

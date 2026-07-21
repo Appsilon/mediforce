@@ -111,6 +111,26 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
     expect(await db.select().from(userRoles).where(eq(userRoles.uid, first.uid))).toHaveLength(1);
   });
 
+  it('treats addresses differing only in case as one account', async () => {
+    // Google hands back a lower-cased address, so a mixed-case invite has to
+    // land on the same row or the invitee gets a second, empty identity.
+    const first = await service.seedInvite({
+      email: 'Mixed.Case@acme.com',
+      workspaceHandle: 'acme',
+      membership: 'member',
+    });
+    const second = await service.seedInvite({
+      email: 'mixed.case@acme.com',
+      workspaceHandle: 'acme',
+      membership: 'member',
+    });
+
+    expect(second.uid).toBe(first.uid);
+    expect(second.isExisting).toBe(true);
+    const stored = await db.select().from(authUsers).where(eq(authUsers.id, first.uid));
+    expect(stored[0]?.email).toBe('mixed.case@acme.com');
+  });
+
   it('re-inviting with a different membership updates the existing role', async () => {
     const first = await service.seedInvite({
       email: 'promoted@acme.com',

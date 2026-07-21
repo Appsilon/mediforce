@@ -21,13 +21,15 @@ export async function getMe(input: GetMeInput, scope: CallerScope): Promise<GetM
   const uid = resolveUid(input, scope);
 
   const directory = scope.system.userDirectory;
-  const [metadata, profile] = await Promise.all([
+  const [metadata, profile, passwordHash] = await Promise.all([
     directory === null ? Promise.resolve(null) : directory.getUserMetadata(uid).catch(() => null),
     scope.userProfiles.getProfile(uid),
+    scope.credentials.getPasswordHash(uid),
   ]);
   const email = metadata?.email ?? null;
   const displayName = metadata?.displayName ?? null;
   const mustChangePassword = profile?.mustChangePassword ?? false;
+  const hasPassword = passwordHash !== null;
 
   let namespaces = await scope.workspaces.getNamespacesByUser(uid);
   let personal = namespaces.find((n) => n.type === 'personal' && n.linkedUserId === uid);
@@ -50,7 +52,7 @@ export async function getMe(input: GetMeInput, scope: CallerScope): Promise<GetM
   }));
 
   return {
-    user: { uid, email, displayName, mustChangePassword },
+    user: { uid, email, displayName, mustChangePassword, hasPassword },
     namespaces: responseNamespaces,
   };
 }

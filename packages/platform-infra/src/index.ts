@@ -10,9 +10,15 @@ export {
   resolveSessionUserId,
   getUserRoles,
   createDatabaseSession,
+  recordSignIn,
+  deleteUserSessions,
   SESSION_TTL_MS,
 } from './auth/session-store';
-export { setUserPasswordHash, findPasswordCredentialByEmail } from './auth/credentials-store';
+export {
+  setUserPasswordHash,
+  getUserPasswordHash,
+  findPasswordCredentialByEmail,
+} from './auth/credentials-store';
 export type {
   FirebaseUserExport,
   FirebaseCustomClaims,

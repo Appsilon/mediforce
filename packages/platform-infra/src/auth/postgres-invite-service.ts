@@ -43,11 +43,15 @@ export class PostgresInviteService {
   constructor(private readonly db: Database) {}
 
   async seedInvite(input: SeedInviteInput): Promise<SeededInvite> {
+    // Case-insensitive identity (migration 0033): inviting `Alice@corp.com`
+    // must reach the same account her Google sign-in creates as
+    // `alice@corp.com`, or the invite silently orphans.
+    const normalisedEmail = input.email.toLowerCase();
     return this.db.transaction(async (tx) => {
       const existing = await tx
         .select({ id: authUsers.id })
         .from(authUsers)
-        .where(eq(authUsers.email, input.email))
+        .where(eq(authUsers.email, normalisedEmail))
         .limit(1);
 
       const isExisting = existing.length > 0;
@@ -56,7 +60,7 @@ export class PostgresInviteService {
       if (!isExisting) {
         await tx.insert(authUsers).values({
           id: uid,
-          email: input.email,
+          email: normalisedEmail,
           name: input.displayName ?? null,
         });
       }

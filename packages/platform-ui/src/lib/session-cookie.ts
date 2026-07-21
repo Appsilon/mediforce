@@ -16,6 +16,29 @@ export function sessionCookieName(secure: boolean): string {
   return secure ? COOKIE_NAMES[0] : COOKIE_NAMES[1];
 }
 
+/**
+ * Whether the session cookie must be written `Secure` (and therefore under the
+ * `__Secure-` name).
+ *
+ * Deployments terminate TLS at Caddy and forward plain http to the container,
+ * so `request.url` is http even when the browser is on https. Auth.js
+ * (`trustHost: true`) trusts `x-forwarded-proto` for exactly this reason, and
+ * password sign-in has to agree with it — otherwise Auth.js writes and clears
+ * `__Secure-authjs.session-token` while this route writes the unprefixed name,
+ * and signing out silently fails to revoke the session.
+ */
+export function isSecureRequest(request: Request): boolean {
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  if (forwardedProto !== null && forwardedProto !== '') {
+    return forwardedProto.split(',')[0]?.trim() === 'https';
+  }
+  const configuredUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
+  if (configuredUrl !== undefined && configuredUrl !== '') {
+    return configuredUrl.startsWith('https://');
+  }
+  return new URL(request.url).protocol === 'https:';
+}
+
 interface CookieJar {
   get(name: string): { value: string } | undefined;
 }

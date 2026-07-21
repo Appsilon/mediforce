@@ -64,6 +64,33 @@ describe('/api/auth/password-login', () => {
     expect(res.headers.get('set-cookie') ?? '').toContain('__Secure-authjs.session-token=');
   });
 
+  it('trusts x-forwarded-proto, so TLS terminated at the proxy still gets a Secure cookie', async () => {
+    // Production forwards plain http from Caddy to the container; without this
+    // the cookie name would disagree with the one Auth.js reads and clears.
+    const request = new Request('http://platform-ui:3000/api/auth/password-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-proto': 'https' },
+      body: JSON.stringify({ email: 'alice@example.com', password: PASSWORD }),
+    });
+
+    const cookie = (await POST(request)).headers.get('set-cookie') ?? '';
+    expect(cookie).toContain('__Secure-authjs.session-token=');
+    expect(cookie).toContain('Secure');
+  });
+
+  it('refuses a non-JSON content type, blocking cross-site form login CSRF', async () => {
+    const request = new Request('http://localhost/api/auth/password-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'email=alice@example.com&password=' + PASSWORD,
+    });
+
+    const res = await POST(request);
+
+    expect(res.status).toBe(415);
+    expect(mockCreateDatabaseSession).not.toHaveBeenCalled();
+  });
+
   it('rejects a wrong password without opening a session', async () => {
     const res = await POST(loginRequest({ email: 'alice@example.com', password: 'wrong' }));
 
@@ -95,12 +122,15 @@ describe('/api/auth/password-login', () => {
     expect(mockCreateDatabaseSession).not.toHaveBeenCalled();
   });
 
-  it('enforces ALLOWED_EMAIL_DOMAINS like the OAuth sign-in callback', async () => {
+  it('enforces ALLOWED_EMAIL_DOMAINS, and hides it behind the generic rejection', async () => {
     process.env.ALLOWED_EMAIL_DOMAINS = 'mediforce.io';
 
     const res = await POST(loginRequest({ email: 'alice@example.com', password: PASSWORD }));
 
-    expect(res.status).toBe(403);
+    // Same status and body as a wrong password: a distinct response would tell
+    // an anonymous caller which domains this deployment accepts.
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'Incorrect email or password.' });
     expect(mockCreateDatabaseSession).not.toHaveBeenCalled();
   });
 

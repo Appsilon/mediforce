@@ -11,6 +11,7 @@ import {
   authSessions,
   authVerificationTokens,
   getUserRoles,
+  recordSignIn,
 } from '@mediforce/platform-infra';
 import { parseAllowedDomains, isEmailDomainAllowed } from '@/lib/email-allowlist';
 
@@ -101,6 +102,13 @@ export function buildAuthConfig(): NextAuthConfig {
         session.user.id = user.id;
         session.user.roles = await getUserRoles(db, user.id);
         return session;
+      },
+    },
+    events: {
+      // Fires once per sign-in, unlike the `session` callback which runs on
+      // every session read — see `recordSignIn`.
+      async signIn({ user }) {
+        if (typeof user.id === 'string') await recordSignIn(db, user.id);
       },
     },
   };
