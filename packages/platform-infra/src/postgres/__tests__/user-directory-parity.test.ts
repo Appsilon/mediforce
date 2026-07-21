@@ -5,12 +5,9 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Auth } from 'firebase-admin/auth';
 import type { UserDirectoryService } from '@mediforce/platform-core';
 import { InMemoryUserDirectoryService } from '@mediforce/platform-core/testing';
 import { PostgresUserDirectoryService } from '../../auth/postgres-user-directory-service';
-import { FirebaseUserDirectoryService } from '../../auth/firebase-user-directory-service';
-import { buildUserRolesSeed, type FirebaseUserExport } from '../../auth/seed-user-roles';
 import { authUsers } from '../schema/auth-user';
 import { userRoles } from '../schema/user-role';
 import * as schema from '../schema/index';
@@ -156,31 +153,4 @@ describe.skipIf(skipPg)('PostgresUserDirectoryService (parity)', () => {
     });
     return new PostgresUserDirectoryService(db);
   });
-
-  // Non-breaking guard: the Postgres directory, seeded from a Firebase export
-  // via `buildUserRolesSeed`, returns the SAME getUsersByRole set as the
-  // Firebase directory did — no silent change to escalation targeting.
-  it('getUsersByRole matches FirebaseUserDirectoryService on the same export', async () => {
-    const exported: FirebaseUserExport[] = [
-      { uid: 'f1', email: 'f1@x.com', displayName: 'F One', customClaims: { roles: ['reviewer', 'approver'], role: 'admin' } },
-      { uid: 'f2', email: 'f2@x.com', customClaims: { roles: ['reviewer'] } },
-      { uid: 'f3', email: 'f3@x.com', customClaims: { role: 'auditor' } },
-      { uid: 'f4', email: 'f4@x.com', customClaims: null },
-    ];
-    await resetAndSeed(buildUserRolesSeed(exported));
-    const pg = new PostgresUserDirectoryService(db);
-    const firebase = new FirebaseUserDirectoryService(fakeAuth(exported));
-
-    for (const role of ['reviewer', 'approver', 'auditor', 'admin', 'nope']) {
-      const pgUids = (await pg.getUsersByRole(role)).map((u) => u.uid).sort();
-      const fbUids = (await firebase.getUsersByRole(role)).map((u) => u.uid).sort();
-      expect(pgUids).toEqual(fbUids);
-    }
-  });
 });
-
-function fakeAuth(users: FirebaseUserExport[]): Auth {
-  return {
-    listUsers: async () => ({ users, pageToken: undefined }),
-  } as unknown as Auth;
-}

@@ -5,20 +5,19 @@ import type { ResendInviteInput, ResendInviteOutput } from '../../contract/users
 import { actorFromCaller } from '../_helpers';
 
 /**
- * Re-issue an invite for a pending workspace member.
+ * Re-send the workspace-notification email for a pending workspace member
+ * (ADR-0002 §3.1 seed-based model).
  *
  *   1. Caller must be `owner`/`admin` of `namespaceHandle` (apiKey bypass).
  *   2. Look up the target user's email via
  *      `scope.system.inviteService.getUserEmail`. Missing email → `validation`.
  *   3. Refuse if the invite isn't pending anymore — `isInvitePending` returns
- *      `false` once `mustChangePassword` is cleared AND the user has signed
- *      in. Active users keep their password; this guard prevents an admin
- *      from accidentally locking a colleague out.
- *   4. Rotate the temporary password via
- *      `scope.system.inviteService.resetInvitePassword` and (best-effort)
- *      deliver it via `scope.system.inviteNotificationService.sendInviteEmail`.
- *      Email failures don't fail the response — `emailSent` flips to `false`
- *      so the admin can hand the password over manually.
+ *      `false` once the invitee has a session or has set a password. This guard
+ *      stops an admin from re-notifying a colleague who is already active.
+ *   4. Re-send the workspace-notification email (best-effort) via
+ *      `scope.system.inviteNotificationService.sendWorkspaceNotificationEmail`.
+ *      There is no temp password to rotate in the seed-based model. Email
+ *      failures don't fail the response — `emailSent` flips to `false`.
  *   5. Append `invitation.resent` to the audit log.
  *
  * `scope.system.inviteService === null` → `PreconditionFailedError` — same
@@ -47,13 +46,18 @@ export async function resendInvite(
     );
   }
 
-  const temporaryPassword = await invite.resetInvitePassword(input.uid);
-
   let emailSent = false;
   const notify = scope.system.inviteNotificationService;
   if (notify !== null) {
     try {
-      await notify.sendInviteEmail({ toEmail: email, temporaryPassword });
+      const namespace = await scope.workspaces.getNamespace(input.namespaceHandle);
+      const workspaceName = namespace?.displayName ?? input.namespaceHandle;
+      await notify.sendWorkspaceNotificationEmail({
+        toEmail: email,
+        inviterName: workspaceName,
+        workspaceName,
+        workspaceHandle: input.namespaceHandle,
+      });
       emailSent = true;
     } catch (emailErr) {
       console.error('[resend-invite] Failed to send email:', emailErr);
@@ -77,5 +81,5 @@ export async function resendInvite(
     namespace: input.namespaceHandle,
   });
 
-  return { uid: input.uid, email, temporaryPassword, emailSent };
+  return { uid: input.uid, email, emailSent };
 }

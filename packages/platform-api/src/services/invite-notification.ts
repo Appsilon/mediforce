@@ -1,40 +1,44 @@
 /**
  * Framework-free interfaces for the invite + workspace-notification flows.
- * Adapters in `platform-services.ts` wire Firebase + Mailgun through
- * `CallerScope.system`. Named `InviteNotificationService` (not
- * `NotificationService`) to avoid collision with `platform-core`'s
- * workflow-engine task notifications.
+ * Adapters in `platform-services.ts` wire the Postgres seed-based invite
+ * (ADR-0002 §3.1) + Mailgun through `CallerScope.system`. Named
+ * `InviteNotificationService` (not `NotificationService`) to avoid collision
+ * with `platform-core`'s workflow-engine task notifications.
  */
 
 export interface InvitedUser {
   readonly uid: string;
-  /** Empty string when `isExisting` — pre-existing users keep their password. */
-  readonly temporaryPassword: string;
+  /** True when the `auth_users` row already existed (email collision). */
   readonly isExisting: boolean;
 }
 
-export interface InviteService {
-  /** Idempotent on email collision — returns existing uid with empty password. */
-  createInvitedUser(
-    email: string,
-    displayName: string | undefined,
-  ): Promise<InvitedUser>;
+export interface SeedInviteInput {
+  readonly email: string;
+  readonly displayName?: string;
+  readonly workspaceHandle: string;
+  readonly membership: 'owner' | 'admin' | 'member';
+  readonly roles?: readonly string[];
+}
 
-  /** Rotates password + re-flags `mustChangePassword`. Returns new plaintext. */
-  resetInvitePassword(uid: string): Promise<string>;
+export interface InviteService {
+  /**
+   * Pre-seed the invitee's `auth_users` row + workspace membership + global
+   * roles (ADR-0002 §3.1). No temporary password and no credentials email —
+   * the invitee signs in later via Google (verified-email auto-link) or by
+   * setting a password. Idempotent on email collision — returns the existing
+   * uid with `isExisting: true` and leaves the existing membership untouched.
+   */
+  seedInvite(input: SeedInviteInput): Promise<InvitedUser>;
 
   getUserEmail(uid: string): Promise<string | null>;
 
   /**
-   * True iff user never signed in (`lastSignInTime` empty) or still carries
-   * `mustChangePassword`. Resend-invite refuses to reset an active user.
+   * True iff the invitee still needs to establish a session: no
+   * `auth_sessions` row exists for the uid AND no password has been set
+   * (`auth_users.password_hash` is null). Resend-invite refuses to re-notify
+   * an already-active user.
    */
   isInvitePending(uid: string): Promise<boolean>;
-}
-
-export interface SendInviteEmailInput {
-  readonly toEmail: string;
-  readonly temporaryPassword: string;
 }
 
 export interface SendWorkspaceNotificationEmailInput {
@@ -45,11 +49,11 @@ export interface SendWorkspaceNotificationEmailInput {
 }
 
 /**
- * `null` in `SystemServices` when Mailgun env vars are unset — handlers
- * detect that and skip email delivery while still returning the temporary
- * password in the response.
+ * `null` in `SystemServices` when Mailgun/SMTP env vars are unset — handlers
+ * detect that and skip email delivery while still seeding the invite. There is
+ * no temporary-password email in the seed-based model (ADR-0002 §3.1); the
+ * only invite email is the workspace-notification.
  */
 export interface InviteNotificationService {
-  sendInviteEmail(input: SendInviteEmailInput): Promise<void>;
   sendWorkspaceNotificationEmail(input: SendWorkspaceNotificationEmailInput): Promise<void>;
 }

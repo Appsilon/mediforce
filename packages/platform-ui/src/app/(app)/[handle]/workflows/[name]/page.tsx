@@ -50,8 +50,8 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
   const decodedName = decodeURIComponent(name);
   const router = useRouter();
   const { definition, loading, error } = useWorkflowDefinitionApi(handle, decodedName);
-  const { firebaseUser } = useAuth();
-  const { namespaces } = useAllUserNamespaces(firebaseUser?.uid);
+  const { user } = useAuth();
+  const { namespaces } = useAllUserNamespaces(user?.id);
 
   const [copyOpen, setCopyOpen] = React.useState(false);
   const [copyTarget, setCopyTarget] = React.useState('');
@@ -203,8 +203,8 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
     return map;
   }, [activeTasks]);
 
-  const { firebaseUser, loading: authLoading } = useAuth();
-  const { namespaces } = useAllUserNamespaces(firebaseUser?.uid);
+  const { user, loading: authLoading } = useAuth();
+  const { namespaces } = useAllUserNamespaces(user?.id);
 
   const [archiving, setArchiving] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -532,7 +532,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
         {/* Secrets tab */}
         <Tabs.Content value="secrets" className="flex-1 p-6">
           <div className="max-w-2xl">
-            {firebaseUser && (
+            {user && (
               <WorkflowSecretsEditor
                 namespace={handle}
                 workflowName={decodedName}

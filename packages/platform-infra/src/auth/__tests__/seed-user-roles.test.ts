@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Auth } from 'firebase-admin/auth';
 import { buildUserRolesSeed, type FirebaseUserExport } from '../seed-user-roles';
-import { FirebaseUserDirectoryService } from '../firebase-user-directory-service';
 
 const FIXTURE: FirebaseUserExport[] = [
   {
@@ -64,23 +62,19 @@ describe('buildUserRolesSeed', () => {
     expect(buildUserRolesSeed(FIXTURE)).toEqual(buildUserRolesSeed(FIXTURE));
   });
 
-  it('mirrors FirebaseUserDirectoryService.getUsersByRole for every role', async () => {
-    const firebase = new FirebaseUserDirectoryService(fakeAuth(FIXTURE));
+  // Faithful port of the old Firebase `getUsersByRole` filter (ADR-0002 §5):
+  // roles[] takes precedence over the role scalar, so the resulting role→uid
+  // mapping must match what the Firebase directory resolved. The scalar
+  // 'admin' on u1 is ignored because u1 has a roles[] array.
+  it('produces the same role→uid mapping the Firebase directory resolved', () => {
     const seed = buildUserRolesSeed(FIXTURE);
+    const uidsForRole = (role: string) =>
+      seed.userRoles.filter((r) => r.role === role).map((r) => r.uid).sort();
 
-    for (const role of ['reviewer', 'approver', 'auditor', 'admin', 'nonexistent']) {
-      const firebaseUids = (await firebase.getUsersByRole(role)).map((u) => u.uid).sort();
-      const seedUids = seed.userRoles
-        .filter((r) => r.role === role)
-        .map((r) => r.uid)
-        .sort();
-      expect(seedUids).toEqual(firebaseUids);
-    }
+    expect(uidsForRole('reviewer')).toEqual(['u1', 'u2']);
+    expect(uidsForRole('approver')).toEqual(['u1']);
+    expect(uidsForRole('auditor')).toEqual(['u3']);
+    expect(uidsForRole('admin')).toEqual([]);
+    expect(uidsForRole('nonexistent')).toEqual([]);
   });
 });
-
-function fakeAuth(users: FirebaseUserExport[]): Auth {
-  return {
-    listUsers: async () => ({ users, pageToken: undefined }),
-  } as unknown as Auth;
-}

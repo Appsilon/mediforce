@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { getAdminAuth } from '@mediforce/platform-infra';
+import { resolveSessionUid } from '@/lib/api-auth';
 import { attachmentContentDisposition, contentTypeForFilePath } from '@/lib/file-content-type';
 
 /**
@@ -33,11 +33,7 @@ const DELIVERABLE_FILENAME: Record<DeliverableKind, (stepId: string) => string> 
 };
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const authHeader = request.headers.get('Authorization') ?? '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  try {
-    await getAdminAuth().verifyIdToken(token);
-  } catch {
+  if ((await resolveSessionUid(request)) === null) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

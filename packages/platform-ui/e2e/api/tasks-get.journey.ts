@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
-  bearerHeaders,
+  sessionCookieHeaders,
   setupMultiNamespaceCallers,
   type MultiNamespaceFixture,
 } from '../helpers/multi-namespace';
@@ -45,7 +45,7 @@ test.describe('GET /api/tasks/[taskId] — API E2E', () => {
 
   test('outsider user (different namespace) gets 404 — anti-enumeration', async ({ request }) => {
     const res = await request.get('/api/tasks/task-completed-1', {
-      headers: bearerHeaders(callers.outsider),
+      headers: sessionCookieHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
     const body = await res.json() as { error: { code: string; message: string } };
@@ -55,7 +55,7 @@ test.describe('GET /api/tasks/[taskId] — API E2E', () => {
 
   test('non-existent task id returns the same 404 (indistinguishable from cross-namespace)', async ({ request }) => {
     const res = await request.get('/api/tasks/task-does-not-exist', {
-      headers: bearerHeaders(callers.outsider),
+      headers: sessionCookieHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
     const body = await res.json() as { error: { code: string; message: string } };

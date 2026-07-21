@@ -127,8 +127,8 @@ function ImgWithFallback({ src, className, fallback }: { src: string; className:
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { firebaseUser, signOut } = useAuth();
-  const { namespaces } = useAllUserNamespaces(firebaseUser?.uid);
+  const { user, signOut } = useAuth();
+  const { namespaces } = useAllUserNamespaces(user?.id);
   const personalNamespace = namespaces.find((ns) => ns.type === 'personal') ?? null;
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
@@ -169,14 +169,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-label="Switch namespace"
             >
               {(() => {
-                const avatarSrc = activeNamespace?.avatarUrl ?? (activeNamespace?.type === 'personal' ? firebaseUser?.photoURL : undefined) ?? undefined;
+                const avatarSrc = activeNamespace?.avatarUrl ?? (activeNamespace?.type === 'personal' ? user?.image : undefined) ?? undefined;
                 const avatarFallback = (
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-semibold">
                     {activeNamespace !== null && activeNamespace.type === 'organization' ? (
                       (() => { const Icon = getWorkspaceIcon(activeNamespace.icon); return <Icon className="h-3.5 w-3.5" />; })()
                     ) : (
-                      firebaseUser?.displayName
-                        ? firebaseUser.displayName
+                      user?.name
+                        ? user.name
                             .split(' ')
                             .slice(0, 2)
                             .map((part) => part[0]?.toUpperCase() ?? '')
@@ -214,8 +214,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           handleFromPath === personalNamespace.handle ? 'text-foreground' : 'text-muted-foreground',
                         )}
                       >
-                        {firebaseUser?.photoURL ? (
-                          <ImgWithFallback src={firebaseUser.photoURL} className="h-5 w-5 shrink-0 rounded-full object-cover" fallback={<User className="h-4 w-4 shrink-0" />} />
+                        {user?.image ? (
+                          <ImgWithFallback src={user.image} className="h-5 w-5 shrink-0 rounded-full object-cover" fallback={<User className="h-4 w-4 shrink-0" />} />
                         ) : (
                           <User className="h-4 w-4 shrink-0" />
                         )}
@@ -405,10 +405,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2">
             <CommandPaletteTrigger />
             <ThemeToggle />
-            {firebaseUser && (
+            {user && (
               <>
                 <span className="text-sm text-muted-foreground hidden sm:block">
-                  {firebaseUser.displayName || firebaseUser.email}
+                  {user.name || user.email}
                 </span>
                 <button
                   onClick={signOut}

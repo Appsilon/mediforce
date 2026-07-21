@@ -21,12 +21,12 @@ export function WorkflowSecretKeysProvider({
   workflowNames: string[];
   children: React.ReactNode;
 }) {
-  const { firebaseUser } = useAuth();
+  const { user } = useAuth();
   const [secretsByWorkflow, setSecretsByWorkflow] = React.useState<Map<string, string[]>>(new Map());
   const [nsKeys, setNsKeys] = React.useState<string[]>([]);
   const [loading, setLoading] = React.useState(true);
 
-  const uid = firebaseUser?.uid;
+  const uid = user?.id;
   const namesKey = React.useMemo(() => [...workflowNames].sort().join(','), [workflowNames]);
 
   React.useEffect(() => {

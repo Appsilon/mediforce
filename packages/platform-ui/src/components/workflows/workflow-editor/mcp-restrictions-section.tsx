@@ -16,7 +16,7 @@ interface McpRestrictionsSectionProps {
 }
 
 export function McpRestrictionsSection({ agentId, restrictions, onChange }: McpRestrictionsSectionProps) {
-  const { firebaseUser, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [bindings, setBindings] = useState<AgentMcpBindingMap>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +41,7 @@ export function McpRestrictionsSection({ agentId, restrictions, onChange }: McpR
     return () => {
       cancelled = true;
     };
-  }, [agentId, authLoading, firebaseUser]);
+  }, [agentId, authLoading, user]);
 
   const updateEntry = useCallback(
     (serverName: string, patch: Partial<{ disable: boolean; denyTools: string[] }>) => {

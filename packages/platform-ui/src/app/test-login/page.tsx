@@ -5,24 +5,25 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function TestLoginPage() {
-  const { signInWithEmail, firebaseUser, loading } = useAuth();
+  const { signInWithEmail, user, loading, emailAuthEnabled } = useAuth();
   const router = useRouter();
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
 
-  const emulatorsEnabled = process.env.NEXT_PUBLIC_USE_EMULATORS === 'true';
-
   React.useEffect(() => {
-    if (!loading && firebaseUser) {
+    if (!loading && user) {
       router.replace('/workspace-selection');
     }
-  }, [loading, firebaseUser, router]);
+  }, [loading, user, router]);
 
-  if (!emulatorsEnabled) {
+  // Password auth is the dev / E2E / air-gapped path (ADR-0002 §4). This page
+  // only functions when the Credentials provider is enabled
+  // (`ENABLE_PASSWORD_AUTH=true`).
+  if (emailAuthEnabled === false) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <p className="text-sm text-muted-foreground">
-          Test login is only available when Firebase Emulators are running.
+          Test login is only available when password auth is enabled.
         </p>
       </div>
     );
@@ -37,7 +38,7 @@ export default function TestLoginPage() {
     const password = form.get('password') as string;
     try {
       await signInWithEmail(email, password);
-      // Navigation is handled by the useEffect watching firebaseUser
+      // Navigation is handled by the useEffect watching the session `user`.
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Sign in failed');
       setPending(false);
@@ -49,7 +50,7 @@ export default function TestLoginPage() {
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-2 text-center">
           <h1 className="text-2xl font-headline font-semibold tracking-tight">Mediforce</h1>
-          <p className="text-sm text-muted-foreground">Test Login (Emulator)</p>
+          <p className="text-sm text-muted-foreground">Test Login (password auth)</p>
         </div>
         {error && (
           <p className="text-sm text-destructive text-center" role="alert">{error}</p>

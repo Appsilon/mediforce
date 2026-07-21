@@ -84,7 +84,6 @@ export const InviteUserInputSchema = z.object({
 export const InviteUserOutputSchema = z.object({
   uid: z.string(),
   email: z.string(),
-  temporaryPassword: z.string(),
   emailSent: z.boolean(),
   isExisting: z.boolean(),
 });
@@ -103,7 +102,6 @@ export const ResendInviteInputSchema = z.object({
 export const ResendInviteOutputSchema = z.object({
   uid: z.string(),
   email: z.string(),
-  temporaryPassword: z.string(),
   emailSent: z.boolean(),
 });
 

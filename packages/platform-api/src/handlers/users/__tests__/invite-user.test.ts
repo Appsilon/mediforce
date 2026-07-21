@@ -7,31 +7,23 @@ import type {
   InviteNotificationService,
   InviteService,
   InvitedUser,
-  SendInviteEmailInput,
   SendWorkspaceNotificationEmailInput,
 } from '../../../services/invite-notification';
 
 function inviteServiceReturning(result: InvitedUser): InviteService {
   return {
-    createInvitedUser: vi.fn(async () => result),
-    resetInvitePassword: vi.fn(async () => 'Mf-RESET'),
+    seedInvite: vi.fn(async () => result),
     getUserEmail: vi.fn(async () => null),
     isInvitePending: vi.fn(async () => true),
   };
 }
 
 function recordingNotifier(): InviteNotificationService & {
-  sendInviteEmailCalls: SendInviteEmailInput[];
   sendWorkspaceCalls: SendWorkspaceNotificationEmailInput[];
 } {
-  const sendInviteEmailCalls: SendInviteEmailInput[] = [];
   const sendWorkspaceCalls: SendWorkspaceNotificationEmailInput[] = [];
   return {
-    sendInviteEmailCalls,
     sendWorkspaceCalls,
-    async sendInviteEmail(input) {
-      sendInviteEmailCalls.push(input);
-    },
     async sendWorkspaceNotificationEmail(input) {
       sendWorkspaceCalls.push(input);
     },
@@ -57,12 +49,8 @@ describe('inviteUser handler', () => {
     auditRepo = new InMemoryAuditRepository();
   });
 
-  it('invites a brand-new user for an apiKey caller and sends the invite email', async () => {
-    const inviteService = inviteServiceReturning({
-      uid: 'uid-new',
-      temporaryPassword: 'Mf-XYZ',
-      isExisting: false,
-    });
+  it('seeds a brand-new user for an apiKey caller and sends the workspace-notification email', async () => {
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const notifier = recordingNotifier();
     const scope = createTestScope({
       namespaceRepo,
@@ -76,26 +64,27 @@ describe('inviteUser handler', () => {
     expect(result).toEqual({
       uid: 'uid-new',
       email: 'newbie@example.test',
-      temporaryPassword: 'Mf-XYZ',
       emailSent: true,
       isExisting: false,
     });
-    expect(notifier.sendInviteEmailCalls).toEqual([
-      { toEmail: 'newbie@example.test', temporaryPassword: 'Mf-XYZ' },
+    expect(inviteService.seedInvite).toHaveBeenCalledWith({
+      email: 'newbie@example.test',
+      workspaceHandle: 'alpha',
+      membership: 'member',
+      roles: [],
+    });
+    expect(notifier.sendWorkspaceCalls).toEqual([
+      {
+        toEmail: 'newbie@example.test',
+        inviterName: 'alpha',
+        workspaceName: 'alpha',
+        workspaceHandle: 'alpha',
+      },
     ]);
-    expect(notifier.sendWorkspaceCalls).toHaveLength(0);
-    expect(namespaceRepo.members.get('alpha')).toEqual([
-      expect.objectContaining({ uid: 'uid-new', role: 'member' }),
-    ]);
-    expect(namespaceRepo.userOrganizations.get('uid-new')).toEqual(['alpha']);
   });
 
-  it('lower-cases + trims the email and forwards displayName', async () => {
-    const inviteService = inviteServiceReturning({
-      uid: 'uid-new',
-      temporaryPassword: 'Mf-XYZ',
-      isExisting: false,
-    });
+  it('lower-cases + trims the email and forwards displayName to seedInvite', async () => {
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const notifier = recordingNotifier();
     const scope = createTestScope({
       namespaceRepo,
@@ -109,22 +98,28 @@ describe('inviteUser handler', () => {
       scope,
     );
 
-    expect(inviteService.createInvitedUser).toHaveBeenCalledWith(
-      'newbie@example.test',
-      'Newbie',
-    );
-    expect(namespaceRepo.members.get('alpha')?.[0]).toMatchObject({
-      uid: 'uid-new',
+    expect(inviteService.seedInvite).toHaveBeenCalledWith({
+      email: 'newbie@example.test',
       displayName: 'Newbie',
+      workspaceHandle: 'alpha',
+      membership: 'member',
+      roles: [],
     });
   });
 
+  it('forwards an admin membership to seedInvite', async () => {
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
+    const scope = createTestScope({ namespaceRepo, auditRepo, inviteService });
+
+    await inviteUser({ ...baseInput, role: 'admin' }, scope);
+
+    expect(inviteService.seedInvite).toHaveBeenCalledWith(
+      expect.objectContaining({ membership: 'admin' }),
+    );
+  });
+
   it('proceeds for an owner caller of the namespace', async () => {
-    const inviteService = inviteServiceReturning({
-      uid: 'uid-new',
-      temporaryPassword: 'Mf-XYZ',
-      isExisting: false,
-    });
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const scope = createTestScope({
       namespaceRepo,
       auditRepo,
@@ -137,11 +132,7 @@ describe('inviteUser handler', () => {
   });
 
   it('proceeds for an admin caller of the namespace', async () => {
-    const inviteService = inviteServiceReturning({
-      uid: 'uid-new',
-      temporaryPassword: 'Mf-XYZ',
-      isExisting: false,
-    });
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const scope = createTestScope({
       namespaceRepo,
       auditRepo,
@@ -154,11 +145,7 @@ describe('inviteUser handler', () => {
   });
 
   it('throws ForbiddenError for a plain member of the namespace', async () => {
-    const inviteService = inviteServiceReturning({
-      uid: 'uid-new',
-      temporaryPassword: 'Mf-XYZ',
-      isExisting: false,
-    });
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const scope = createTestScope({
       namespaceRepo,
       auditRepo,
@@ -167,15 +154,11 @@ describe('inviteUser handler', () => {
     });
 
     await expect(inviteUser(baseInput, scope)).rejects.toBeInstanceOf(ForbiddenError);
-    expect(namespaceRepo.members.get('alpha')).toBeUndefined();
+    expect(inviteService.seedInvite).not.toHaveBeenCalled();
   });
 
   it('throws ForbiddenError for a caller not in the namespace', async () => {
-    const inviteService = inviteServiceReturning({
-      uid: 'uid-new',
-      temporaryPassword: 'Mf-XYZ',
-      isExisting: false,
-    });
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const scope = createTestScope({
       namespaceRepo,
       auditRepo,
@@ -198,18 +181,14 @@ describe('inviteUser handler', () => {
     );
   });
 
-  it('sends the workspace-notification email for an existing user', async () => {
+  it('sends the workspace-notification email with the resolved workspace name for an existing user', async () => {
     namespaceRepo.seedNamespace({
       handle: 'alpha',
       type: 'organization',
       displayName: 'Alpha Workspace',
       createdAt: '2026-01-01T00:00:00.000Z',
     });
-    const inviteService = inviteServiceReturning({
-      uid: 'uid-existing',
-      temporaryPassword: '',
-      isExisting: true,
-    });
+    const inviteService = inviteServiceReturning({ uid: 'uid-existing', isExisting: true });
     const notifier = recordingNotifier();
     const scope = createTestScope({
       namespaceRepo,
@@ -221,8 +200,6 @@ describe('inviteUser handler', () => {
     const result = await inviteUser({ ...baseInput, inviterName: 'Marek' }, scope);
 
     expect(result.isExisting).toBe(true);
-    expect(result.temporaryPassword).toBe('');
-    expect(notifier.sendInviteEmailCalls).toHaveLength(0);
     expect(notifier.sendWorkspaceCalls).toEqual([
       {
         toEmail: 'newbie@example.test',
@@ -235,11 +212,7 @@ describe('inviteUser handler', () => {
 
   it('falls back to the namespace handle when the namespace has no displayName', async () => {
     // No namespace doc seeded → fallback path.
-    const inviteService = inviteServiceReturning({
-      uid: 'uid-existing',
-      temporaryPassword: '',
-      isExisting: true,
-    });
+    const inviteService = inviteServiceReturning({ uid: 'uid-existing', isExisting: true });
     const notifier = recordingNotifier();
     const scope = createTestScope({
       namespaceRepo,
@@ -257,17 +230,10 @@ describe('inviteUser handler', () => {
   });
 
   it('treats email-send failures as non-fatal (emailSent=false, no throw)', async () => {
-    const inviteService = inviteServiceReturning({
-      uid: 'uid-new',
-      temporaryPassword: 'Mf-XYZ',
-      isExisting: false,
-    });
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const notifier: InviteNotificationService = {
-      async sendInviteEmail() {
-        throw new Error('mailgun down');
-      },
       async sendWorkspaceNotificationEmail() {
-        /* not exercised */
+        throw new Error('mailgun down');
       },
     };
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -286,11 +252,7 @@ describe('inviteUser handler', () => {
   });
 
   it('returns emailSent=false when inviteNotificationService is null', async () => {
-    const inviteService = inviteServiceReturning({
-      uid: 'uid-new',
-      temporaryPassword: 'Mf-XYZ',
-      isExisting: false,
-    });
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const scope = createTestScope({
       namespaceRepo,
       auditRepo,
@@ -302,16 +264,11 @@ describe('inviteUser handler', () => {
 
     expect(result.emailSent).toBe(false);
     expect(result.uid).toBe('uid-new');
-    // Member still recorded.
-    expect(namespaceRepo.members.get('alpha')).toHaveLength(1);
+    expect(inviteService.seedInvite).toHaveBeenCalledTimes(1);
   });
 
   it('writes an invitation.created audit event attributed to the caller', async () => {
-    const inviteService = inviteServiceReturning({
-      uid: 'uid-new',
-      temporaryPassword: 'Mf-XYZ',
-      isExisting: false,
-    });
+    const inviteService = inviteServiceReturning({ uid: 'uid-new', isExisting: false });
     const scope = createTestScope({
       namespaceRepo,
       auditRepo,

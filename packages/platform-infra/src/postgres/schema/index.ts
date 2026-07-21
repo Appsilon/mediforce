@@ -18,4 +18,7 @@ export * from './workflow-secret';
 export * from './user-profile';
 export * from './platform-settings';
 export * from './auth-user';
+export * from './auth-account';
+export * from './auth-session';
+export * from './auth-verification-token';
 export * from './user-role';

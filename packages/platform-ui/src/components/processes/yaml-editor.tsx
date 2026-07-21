@@ -16,8 +16,8 @@ interface YamlEditorProps {
 }
 
 export function YamlEditor({ initialValue = '', namespace, onNamespaceChange, onSaved }: YamlEditorProps) {
-  const { firebaseUser } = useAuth();
-  const { namespaces, loading: namespacesLoading } = useAllUserNamespaces(firebaseUser?.uid);
+  const { user } = useAuth();
+  const { namespaces, loading: namespacesLoading } = useAllUserNamespaces(user?.id);
 
   const [yaml, setYaml] = React.useState(initialValue);
   const [state, setState] = React.useState<

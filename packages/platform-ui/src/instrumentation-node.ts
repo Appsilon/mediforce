@@ -1,25 +1,24 @@
 // Node-only: contains process.exit, kept out of the Edge module graph so
 // Turbopack never parses it for the Edge runtime build. Dynamic-imported from
 // instrumentation.ts only inside the NEXT_RUNTIME === 'nodejs' branch.
-export function validateEnv(existsSync: (path: string) => boolean): void {
+export function validateEnv(): void {
   const errors: string[] = [];
-  const isEmulatorMode = process.env.NEXT_PUBLIC_USE_EMULATORS === 'true';
+  const isProduction = process.env.NODE_ENV === 'production';
 
-  // --- PLATFORM_API_KEY (production only) ---
-  // Browser requests use Firebase token auth; server-to-server calls
-  // (server actions, cron, queue workers) use X-Api-Key. In emulator mode
-  // browser auth suffices for most flows, so we skip this check.
-  if (!isEmulatorMode) {
+  // Production-only checks. In dev the app runs with relaxed requirements
+  // (e.g. no PLATFORM_API_KEY, a throwaway AUTH_SECRET).
+  if (isProduction) {
+    // --- PLATFORM_API_KEY ---
+    // Browser requests use the NextAuth session cookie (ADR-0002 §6);
+    // server-to-server calls (cron, queue workers, CLI) use X-Api-Key.
     const apiKey = process.env.PLATFORM_API_KEY;
     if (typeof apiKey !== 'string' || apiKey.length === 0) {
       errors.push(
-        'PLATFORM_API_KEY is not set. Required for API authentication (middleware X-Api-Key check).',
+        'PLATFORM_API_KEY is not set. Required for server-to-server API authentication (proxy X-Api-Key check).',
       );
     }
-  }
 
-  // --- SECRETS_ENCRYPTION_KEY (production only) ---
-  if (!isEmulatorMode) {
+    // --- SECRETS_ENCRYPTION_KEY ---
     const secretsKey = process.env.SECRETS_ENCRYPTION_KEY;
     if (typeof secretsKey !== 'string' || secretsKey.length === 0) {
       errors.push(
@@ -31,27 +30,45 @@ export function validateEnv(existsSync: (path: string) => boolean): void {
         `SECRETS_ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes). Got ${secretsKey.length} character(s).`,
       );
     }
-  }
 
-  // --- GOOGLE_APPLICATION_CREDENTIALS (production only) ---
-  if (!isEmulatorMode) {
-    const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    if (typeof credPath !== 'string' || credPath.length === 0) {
+    // --- AUTH_SECRET (NextAuth session encryption, ADR-0002) ---
+    const authSecret = process.env.AUTH_SECRET;
+    if (typeof authSecret !== 'string' || authSecret.length === 0) {
       errors.push(
-        'GOOGLE_APPLICATION_CREDENTIALS is not set. '
-        + 'Point it to your Firebase service account JSON file (e.g. /run/secrets/firebase-sa.json).',
+        'AUTH_SECRET is not set. Required by NextAuth to sign/encrypt sessions. '
+        + 'Generate one with `openssl rand -hex 32`.',
       );
-    } else if (!existsSync(credPath)) {
+    }
+
+    // --- At least one auth provider (ADR-0002 §4) ---
+    const googleEnabled = typeof process.env.GOOGLE_CLIENT_ID === 'string' && process.env.GOOGLE_CLIENT_ID !== '';
+    const passwordEnabled = process.env.ENABLE_PASSWORD_AUTH === 'true';
+    const oidcEnabled = typeof process.env.OIDC_ISSUER === 'string' && process.env.OIDC_ISSUER !== '';
+    if (!googleEnabled && !passwordEnabled && !oidcEnabled) {
       errors.push(
-        `GOOGLE_APPLICATION_CREDENTIALS points to "${credPath}" but the file does not exist.`,
+        'No auth provider is configured. Set GOOGLE_CLIENT_ID, ENABLE_PASSWORD_AUTH=true, or OIDC_ISSUER '
+        + '(ADR-0002 §4) — otherwise no one can sign in.',
       );
+    }
+
+    // --- ALLOWED_EMAIL_DOMAINS mandatory when Google is on (ADR-0002 §4a) ---
+    if (googleEnabled) {
+      const allowlist = (process.env.ALLOWED_EMAIL_DOMAINS ?? '')
+        .split(',')
+        .map((d) => d.trim())
+        .filter((d) => d !== '');
+      if (allowlist.length === 0) {
+        errors.push(
+          'GOOGLE_CLIENT_ID is set but ALLOWED_EMAIL_DOMAINS is empty. With Google enabled, any Google account '
+          + 'on earth could sign in — set ALLOWED_EMAIL_DOMAINS to your domain(s) (ADR-0002 §4a).',
+        );
+      }
     }
   }
 
-  // --- DATABASE_URL (ADR-0001: Postgres-only) ---
+  // --- DATABASE_URL (ADR-0001: Postgres-only, always required) ---
   // Firestore data layer was deleted; getPlatformServices unconditionally
-  // constructs Postgres repos. Missing DATABASE_URL crashes the app on
-  // first request — fail fast at boot instead.
+  // constructs Postgres repos, and NextAuth's database sessions need it too.
   const dbUrl = process.env.DATABASE_URL;
   if (typeof dbUrl !== 'string' || dbUrl.length === 0) {
     errors.push(

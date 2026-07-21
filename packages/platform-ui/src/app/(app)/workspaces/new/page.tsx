@@ -26,7 +26,7 @@ type FormErrors = {
 export default function NewWorkspacePage() {
   const router = useRouter();
   const qc = useQueryClient();
-  const { firebaseUser, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [handle, setHandle] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -91,7 +91,7 @@ export default function NewWorkspacePage() {
     );
   }
 
-  if (firebaseUser === null) {
+  if (user === null) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
         <p className="text-sm text-muted-foreground">Sign in to create a workspace.</p>

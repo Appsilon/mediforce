@@ -1,11 +1,19 @@
-// Auth / Firebase wiring (kept — Firebase Auth is the identity provider).
-// Firestore is fully removed (ADR-0001 final cutover, #534); only Auth and
-// Storage remain on Firebase.
-export { FirebaseUserDirectoryService } from './auth/firebase-user-directory-service';
+// Auth wiring. Firebase Auth is fully removed (ADR-0002 PR2); identity + the
+// user directory + invites + sessions run on Postgres (NextAuth database
+// sessions). The `seed-user-roles`/migration script still reads Firebase Auth
+// via `firebase-admin` as a one-time export source (ADR-0002 §4, PLAN §8.2
+// grep exception).
 export { PostgresUserDirectoryService } from './auth/postgres-user-directory-service';
 export { PostgresInviteService } from './auth/postgres-invite-service';
 export type { SeedInviteInput, SeededInvite } from './auth/postgres-invite-service';
 export { buildUserRolesSeed } from './auth/seed-user-roles';
+export {
+  resolveSessionUserId,
+  getUserRoles,
+  createDatabaseSession,
+  SESSION_TTL_MS,
+} from './auth/session-store';
+export { setUserPasswordHash } from './auth/credentials-store';
 export type {
   FirebaseUserExport,
   FirebaseCustomClaims,
@@ -13,13 +21,6 @@ export type {
   AuthUserSeedRow,
   UserRoleSeedRow,
 } from './auth/seed-user-roles';
-export { FirebaseInviteService } from './auth/firebase-invite-service';
-export { getAdminAuth } from './auth/firebase-admin-init';
-export {
-  initializeFirebase,
-  getFirebaseAuth,
-} from './config/firebase-init';
-export type { FirebaseConfig } from './config/firebase-init';
 
 // Notifications + email
 export { EmailNotificationService } from './notifications/mailgun-notification-service';
@@ -52,6 +53,13 @@ export { PostgresUserProfileRepository } from './postgres/repositories/user-prof
 export { PostgresPlatformSettingsRepository } from './postgres/repositories/platform-settings-repository';
 export { createPostgresClient, getSharedPostgresClient } from './postgres/client';
 export type { Database } from './postgres/client';
+// NextAuth (@auth/drizzle-adapter) schema tables (ADR-0002 PR2). Exported so
+// the platform-ui `auth.ts` can wire the DrizzleAdapter without reaching into
+// the schema directory directly.
+export { authUsers } from './postgres/schema/auth-user';
+export { authAccounts } from './postgres/schema/auth-account';
+export { authSessions } from './postgres/schema/auth-session';
+export { authVerificationTokens } from './postgres/schema/auth-verification-token';
 export { PostgresAgentEventLog } from './postgres/agent-event-log';
 
 // Blob storage (ADR-0003 task attachments).

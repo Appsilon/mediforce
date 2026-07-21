@@ -12,7 +12,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Changed
-- User directory + global process-roles now read Postgres (`user_roles` + a minimal `auth_users`) instead of Firebase Admin, behind the unchanged `UserDirectoryService` port; ships a seed-based `PostgresInviteService` and a gated one-time seed of `user_roles` from current Firebase `customClaims.roles` so `getUsersByRole` escalation targeting stays identical. Member-list `lastSignInTime` is `null` until NextAuth sessions land (ADR-0002 PR1).
+- Authentication moves from Firebase Auth to NextAuth / Auth.js v5 (ADR-0002):
+  - User directory + global process-roles now read Postgres (`user_roles` + a minimal `auth_users`) instead of Firebase Admin, behind the unchanged `UserDirectoryService` port; ships a seed-based `PostgresInviteService` and a gated one-time seed of `user_roles` from current Firebase `customClaims.roles` so `getUsersByRole` escalation targeting stays identical. Member-list `lastSignInTime` is `null` until NextAuth sessions land (ADR-0002 PR1).
+  - E2E auth is now a seeded NextAuth database session (`auth_users` + `auth_sessions` + an `authjs.session-token` cookie in Playwright storageState) instead of the Firebase Auth emulator sign-in; the `user`-kind API journeys authenticate via the session cookie, the E2E server runs with `ENABLE_PASSWORD_AUTH=true` + `AUTH_SECRET`, and the Playwright `globalSetup` no longer spawns the Firebase emulator. The keep-uid migration seed now stamps `auth_users.email_verified` so a first Google sign-in links by verified email (§4b). `.env.example`, dev-quickref, README, and GETTING-STARTED document the NextAuth env (`AUTH_SECRET`, `GOOGLE_CLIENT_*`, `ENABLE_PASSWORD_AUTH`, `ALLOWED_EMAIL_DOMAINS`, `OIDC_*`) in place of the Firebase Auth vars (ADR-0002 PR2).
 
 ## [2026-06-21]
 

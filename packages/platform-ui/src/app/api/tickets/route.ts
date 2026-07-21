@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getAdminAuth } from '@mediforce/platform-infra';
+import { getSharedPostgresClient, PostgresUserDirectoryService } from '@mediforce/platform-infra';
+import { resolveSessionUid } from '@/lib/api-auth';
 import { consumeRateLimit, DAILY_LIMIT } from './rate-limit';
 
 const TICKET_TYPES = ['bug', 'idea', 'question'] as const;
@@ -47,22 +48,12 @@ function buildIssueBody(params: {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const adminAuth = getAdminAuth();
-
-  const authHeader = req.headers.get('Authorization') ?? '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  if (token === '') {
+  const uid = await resolveSessionUid(req);
+  if (uid === null) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let decoded: { uid: string; name?: string; email?: string };
-  try {
-    decoded = await adminAuth.verifyIdToken(token);
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const rateLimit = consumeRateLimit(decoded.uid, Date.now());
+  const rateLimit = consumeRateLimit(uid, Date.now());
   if (!rateLimit.ok) {
     return NextResponse.json(
       { error: `Daily ticket limit of ${DAILY_LIMIT} reached. Try again tomorrow.` },
@@ -83,7 +74,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const { title, description, type, context } = parsed.data;
-  const filedBy = decoded.name ?? decoded.email ?? decoded.uid;
+  const metadata = await new PostgresUserDirectoryService(getSharedPostgresClient().db)
+    .getUserMetadata(uid)
+    .catch(() => null);
+  const filedBy = metadata?.displayName ?? metadata?.email ?? uid;
 
   const githubToken = process.env.GITHUB_TOKEN ?? '';
   const repo = process.env.GITHUB_REPO ?? 'appsilon/mediforce';

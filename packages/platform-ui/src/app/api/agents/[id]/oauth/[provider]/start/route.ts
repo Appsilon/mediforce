@@ -5,7 +5,7 @@ import { getPlatformServices } from '@/lib/platform-services';
 import { getOAuthStateSecret } from '@/lib/oauth-state-secret';
 import { buildOAuthCallbackUrl } from '@/lib/app-base-url';
 import {
-  requireFirebaseUid,
+  requireCallerUid,
   requireNamespaceFromQuery,
   requireNamespaceMembership,
 } from '../../_shared/auth';
@@ -44,7 +44,7 @@ export async function POST(
 ): Promise<NextResponse> {
   const { id: agentId, provider: providerSlug } = await params;
 
-  const uidOrResponse = await requireFirebaseUid(request);
+  const uidOrResponse = await requireCallerUid(request);
   if (uidOrResponse instanceof NextResponse) return uidOrResponse;
   const uid = uidOrResponse;
 

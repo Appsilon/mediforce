@@ -7,10 +7,8 @@ import { NextRequest } from 'next/server';
 // This file proves the adapter wires schema + services + handler, and that
 // 201 + the typed error envelope flow through.
 
-const mockCreateInvitedUser = vi.fn();
-const mockAddMember = vi.fn();
+const mockSeedInvite = vi.fn();
 const mockGetNamespace = vi.fn();
-const mockSendInviteEmail = vi.fn();
 const mockSendWorkspaceEmail = vi.fn();
 const mockAuditAppend = vi.fn();
 
@@ -18,18 +16,16 @@ vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
     namespaceRepo: {
       getNamespace: mockGetNamespace,
-      addMember: mockAddMember,
+      addMember: vi.fn(),
       getMembers: vi.fn(),
       getMembershipsForUser: vi.fn().mockResolvedValue([]),
     },
     inviteService: {
-      createInvitedUser: mockCreateInvitedUser,
-      resetInvitePassword: vi.fn(),
+      seedInvite: mockSeedInvite,
       getUserEmail: vi.fn(),
       isInvitePending: vi.fn(),
     },
     inviteNotificationService: {
-      sendInviteEmail: mockSendInviteEmail,
       sendWorkspaceNotificationEmail: mockSendWorkspaceEmail,
     },
     instanceRepo: { getById: vi.fn() },
@@ -87,14 +83,11 @@ describe('POST /api/users/invite', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockResolveCallerIdentity.mockResolvedValue(apiKeyCaller);
-    mockCreateInvitedUser.mockResolvedValue({
+    mockSeedInvite.mockResolvedValue({
       uid: 'uid-new',
-      temporaryPassword: 'Mf-XYZ',
       isExisting: false,
     });
     mockGetNamespace.mockResolvedValue(null);
-    mockAddMember.mockResolvedValue(undefined);
-    mockSendInviteEmail.mockResolvedValue(undefined);
     mockSendWorkspaceEmail.mockResolvedValue(undefined);
     mockAuditAppend.mockResolvedValue(undefined);
   });
@@ -104,7 +97,6 @@ describe('POST /api/users/invite', () => {
     const json = (await res.json()) as {
       uid: string;
       email: string;
-      temporaryPassword: string;
       emailSent: boolean;
       isExisting: boolean;
     };
@@ -113,16 +105,16 @@ describe('POST /api/users/invite', () => {
     expect(json).toEqual({
       uid: 'uid-new',
       email: 'newbie@example.test',
-      temporaryPassword: 'Mf-XYZ',
       emailSent: true,
       isExisting: false,
     });
-    expect(mockCreateInvitedUser).toHaveBeenCalledWith('newbie@example.test', undefined);
-    expect(mockAddMember).toHaveBeenCalledWith(
-      'alpha',
-      expect.objectContaining({ uid: 'uid-new', role: 'member' }),
-    );
-    expect(mockSendInviteEmail).toHaveBeenCalled();
+    expect(mockSeedInvite).toHaveBeenCalledWith({
+      email: 'newbie@example.test',
+      workspaceHandle: 'alpha',
+      membership: 'member',
+      roles: [],
+    });
+    expect(mockSendWorkspaceEmail).toHaveBeenCalled();
   });
 
   it('[AUTHZ] non-admin user gets 403', async () => {
@@ -131,7 +123,7 @@ describe('POST /api/users/invite', () => {
     const res = await POST(makePostRequest(validBody));
 
     expect(res.status).toBe(403);
-    expect(mockCreateInvitedUser).not.toHaveBeenCalled();
+    expect(mockSeedInvite).not.toHaveBeenCalled();
   });
 
   it('[AUTHZ] owner/admin caller succeeds', async () => {
@@ -159,21 +151,21 @@ describe('POST /api/users/invite', () => {
     const res = await POST(makePostRequest(validBody));
 
     expect(res.status).toBe(401);
-    expect(mockCreateInvitedUser).not.toHaveBeenCalled();
+    expect(mockSeedInvite).not.toHaveBeenCalled();
   });
 
   it('[VALIDATION] 400 for an invalid email', async () => {
     const res = await POST(makePostRequest({ ...validBody, email: 'not-an-email' }));
 
     expect(res.status).toBe(400);
-    expect(mockCreateInvitedUser).not.toHaveBeenCalled();
+    expect(mockSeedInvite).not.toHaveBeenCalled();
   });
 
   it('[VALIDATION] 400 for a namespaceHandle that violates the regex', async () => {
     const res = await POST(makePostRequest({ ...validBody, namespaceHandle: 'Alpha_Space' }));
 
     expect(res.status).toBe(400);
-    expect(mockCreateInvitedUser).not.toHaveBeenCalled();
+    expect(mockSeedInvite).not.toHaveBeenCalled();
   });
 
   it('[VALIDATION] 400 when the body is not valid JSON', async () => {
@@ -186,6 +178,6 @@ describe('POST /api/users/invite', () => {
     const res = await POST(req);
 
     expect(res.status).toBe(400);
-    expect(mockCreateInvitedUser).not.toHaveBeenCalled();
+    expect(mockSeedInvite).not.toHaveBeenCalled();
   });
 });

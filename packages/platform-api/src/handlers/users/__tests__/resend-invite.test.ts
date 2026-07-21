@@ -13,41 +13,28 @@ import {
 import type {
   InviteNotificationService,
   InviteService,
-  SendInviteEmailInput,
   SendWorkspaceNotificationEmailInput,
 } from '../../../services/invite-notification';
 
 interface InviteServiceStub {
   email: string | null;
   pending: boolean;
-  resetPassword: string;
 }
 
 function inviteServiceStub(stub: InviteServiceStub): InviteService {
   return {
-    createInvitedUser: vi.fn(async () => ({
-      uid: 'unused',
-      temporaryPassword: '',
-      isExisting: false,
-    })),
-    resetInvitePassword: vi.fn(async () => stub.resetPassword),
+    seedInvite: vi.fn(async () => ({ uid: 'unused', isExisting: false })),
     getUserEmail: vi.fn(async () => stub.email),
     isInvitePending: vi.fn(async () => stub.pending),
   };
 }
 
 function recordingNotifier(): InviteNotificationService & {
-  sendInviteEmailCalls: SendInviteEmailInput[];
   sendWorkspaceCalls: SendWorkspaceNotificationEmailInput[];
 } {
-  const sendInviteEmailCalls: SendInviteEmailInput[] = [];
   const sendWorkspaceCalls: SendWorkspaceNotificationEmailInput[] = [];
   return {
-    sendInviteEmailCalls,
     sendWorkspaceCalls,
-    async sendInviteEmail(input) {
-      sendInviteEmailCalls.push(input);
-    },
     async sendWorkspaceNotificationEmail(input) {
       sendWorkspaceCalls.push(input);
     },
@@ -69,11 +56,10 @@ describe('resendInvite handler', () => {
     auditRepo = new InMemoryAuditRepository();
   });
 
-  it('resets the password, sends the email, and audits for an apiKey caller', async () => {
+  it('re-sends the workspace-notification email and audits for an apiKey caller', async () => {
     const inviteService = inviteServiceStub({
       email: 'pending@example.test',
       pending: true,
-      resetPassword: 'Mf-RESET',
     });
     const notifier = recordingNotifier();
     const scope = createTestScope({
@@ -87,12 +73,16 @@ describe('resendInvite handler', () => {
     expect(result).toEqual({
       uid: 'uid-target',
       email: 'pending@example.test',
-      temporaryPassword: 'Mf-RESET',
       emailSent: true,
     });
-    expect(inviteService.resetInvitePassword).toHaveBeenCalledWith('uid-target');
-    expect(notifier.sendInviteEmailCalls).toEqual([
-      { toEmail: 'pending@example.test', temporaryPassword: 'Mf-RESET' },
+    expect(inviteService.isInvitePending).toHaveBeenCalledWith('uid-target');
+    expect(notifier.sendWorkspaceCalls).toEqual([
+      {
+        toEmail: 'pending@example.test',
+        inviterName: 'alpha',
+        workspaceName: 'alpha',
+        workspaceHandle: 'alpha',
+      },
     ]);
   });
 
@@ -100,7 +90,6 @@ describe('resendInvite handler', () => {
     const inviteService = inviteServiceStub({
       email: 'pending@example.test',
       pending: true,
-      resetPassword: 'Mf-RESET',
     });
     const scope = createTestScope({
       auditRepo,
@@ -116,7 +105,6 @@ describe('resendInvite handler', () => {
     const inviteService = inviteServiceStub({
       email: 'pending@example.test',
       pending: true,
-      resetPassword: 'Mf-RESET',
     });
     const scope = createTestScope({
       auditRepo,
@@ -125,7 +113,7 @@ describe('resendInvite handler', () => {
     });
 
     await expect(resendInvite(baseInput, scope)).rejects.toBeInstanceOf(ForbiddenError);
-    expect(inviteService.resetInvitePassword).not.toHaveBeenCalled();
+    expect(inviteService.isInvitePending).not.toHaveBeenCalled();
   });
 
   it('throws PreconditionFailedError when inviteService is null', async () => {
@@ -143,7 +131,6 @@ describe('resendInvite handler', () => {
     const inviteService = inviteServiceStub({
       email: null,
       pending: true,
-      resetPassword: 'Mf-RESET',
     });
     const scope = createTestScope({
       auditRepo,
@@ -153,38 +140,35 @@ describe('resendInvite handler', () => {
     const err = await resendInvite(baseInput, scope).catch((e) => e);
     expect(err).toBeInstanceOf(HandlerError);
     expect((err as HandlerError).code).toBe('validation');
-    expect(inviteService.resetInvitePassword).not.toHaveBeenCalled();
+    expect(inviteService.isInvitePending).not.toHaveBeenCalled();
   });
 
   it('throws PreconditionFailedError when the invite is no longer pending', async () => {
     const inviteService = inviteServiceStub({
       email: 'active@example.test',
       pending: false,
-      resetPassword: 'Mf-RESET',
     });
+    const notifier = recordingNotifier();
     const scope = createTestScope({
       auditRepo,
       inviteService,
+      inviteNotificationService: notifier,
     });
 
     await expect(resendInvite(baseInput, scope)).rejects.toBeInstanceOf(
       PreconditionFailedError,
     );
-    expect(inviteService.resetInvitePassword).not.toHaveBeenCalled();
+    expect(notifier.sendWorkspaceCalls).toHaveLength(0);
   });
 
   it('treats email-send failures as non-fatal (emailSent=false, no throw)', async () => {
     const inviteService = inviteServiceStub({
       email: 'pending@example.test',
       pending: true,
-      resetPassword: 'Mf-RESET',
     });
     const notifier: InviteNotificationService = {
-      async sendInviteEmail() {
-        throw new Error('mailgun down');
-      },
       async sendWorkspaceNotificationEmail() {
-        /* not exercised */
+        throw new Error('mailgun down');
       },
     };
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -197,7 +181,7 @@ describe('resendInvite handler', () => {
     const result = await resendInvite(baseInput, scope);
 
     expect(result.emailSent).toBe(false);
-    expect(result.temporaryPassword).toBe('Mf-RESET');
+    expect(result.email).toBe('pending@example.test');
     consoleError.mockRestore();
   });
 
@@ -205,7 +189,6 @@ describe('resendInvite handler', () => {
     const inviteService = inviteServiceStub({
       email: 'pending@example.test',
       pending: true,
-      resetPassword: 'Mf-RESET',
     });
     const scope = createTestScope({
       auditRepo,
@@ -216,14 +199,13 @@ describe('resendInvite handler', () => {
     const result = await resendInvite(baseInput, scope);
 
     expect(result.emailSent).toBe(false);
-    expect(result.temporaryPassword).toBe('Mf-RESET');
+    expect(result.email).toBe('pending@example.test');
   });
 
   it('writes an invitation.resent audit event attributed to the caller', async () => {
     const inviteService = inviteServiceStub({
       email: 'pending@example.test',
       pending: true,
-      resetPassword: 'Mf-RESET',
     });
     const scope = createTestScope({
       auditRepo,
@@ -247,5 +229,4 @@ describe('resendInvite handler', () => {
       emailSent: false,
     });
   });
-
 });
