@@ -59,7 +59,7 @@ The Co-Work Workflow Designer Workflow (`apps/workflow-designer/src/workflow-des
 - `callOpenRouter()` in `packages/platform-api/src/services/openrouter-client.ts` — generic chat-completions + tool-calling wrapper, not cowork-specific.
 - `ModelPicker` (`packages/platform-ui/src/components/workflows/workflow-editor/model-picker.tsx`) — drop-in model selector (registry-backed, context/pricing/tools/vision badges, custom model ID support). Satisfies spec (4) directly.
 - The `DEFAULT_MODEL = 'anthropic/claude-sonnet-4'` fallback convention from `packages/platform-api/src/handlers/cowork/chat.ts` — same default-with-override pattern for spec (4).
-- The message-list/bubble/input chat UI from `packages/platform-ui/src/components/cowork/chat-cowork-view.tsx` — reused for the pane's chat shell, **excluding** the artifact-panel, session-polling, and finalize/dry-run plumbing, which are engine-coupled.
+- The message-list/bubble/input chat pattern from `packages/platform-ui/src/components/cowork/chat-cowork-view.tsx` — used as the model for the pane's chat shell. That component is session/instance-bound (artifact panel, session polling, finalize/dry-run plumbing are all engine-coupled), so the designer pane ships a fresh, session-free chat shell of the same shape rather than importing it directly.
 
 **Adapted, not reused verbatim:**
 

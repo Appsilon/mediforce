@@ -157,7 +157,7 @@ export function StartRunButton({
     });
   }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.effectiveRemaining, handle, workflowName, adminContact.email, modelValidation.isLoading, modelValidation.unknown]);
 
-  const preflightLoading = definitionLoading || dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading || modelValidation.isLoading;
+  const preflightLoading = preflightEnabled && (definitionLoading || dockerLoading || secretKeysLoading || openRouterCredits.isLoading || adminContact.isLoading || modelValidation.isLoading);
   const hasWarnings = warnings.length > 0;
   const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
 
@@ -221,7 +221,7 @@ export function StartRunButton({
     }
 
     const versionChanged = targetVersion !== undefined && targetVersion !== effectiveVersion;
-    if (hasTriggerInput || hasWarnings || versionChanged) {
+    if (hasTriggerInput || hasWarnings || (versionChanged && !onBeforeStart)) {
       setPendingVersion(targetVersion);
       setDialogOpen(true);
     } else {
