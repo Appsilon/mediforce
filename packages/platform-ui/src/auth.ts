@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth';
 import type { NextAuthConfig } from 'next-auth';
 import type { Provider } from 'next-auth/providers';
+import type { Adapter } from 'next-auth/adapters';
 import { DrizzleAdapter } from '@auth/drizzle-adapter';
 import Google from 'next-auth/providers/google';
 import {
@@ -28,14 +29,15 @@ import { parseAllowedDomains, isEmailDomainAllowed } from '@/lib/email-allowlist
  * `resolveCallerIdentity` resolve to a uid via `resolveSessionUserId`.
  */
 
-const { db } = getSharedPostgresClient();
-
-const adapter = DrizzleAdapter(db, {
-  usersTable: authUsers,
-  accountsTable: authAccounts,
-  sessionsTable: authSessions,
-  verificationTokensTable: authVerificationTokens,
-});
+function buildAdapter(): Adapter {
+  const { db } = getSharedPostgresClient();
+  return DrizzleAdapter(db, {
+    usersTable: authUsers,
+    accountsTable: authAccounts,
+    sessionsTable: authSessions,
+    verificationTokensTable: authVerificationTokens,
+  });
+}
 
 function buildProviders(): Provider[] {
   const providers: Provider[] = [];
@@ -73,27 +75,35 @@ function buildProviders(): Provider[] {
   return providers;
 }
 
-export const authConfig: NextAuthConfig = {
-  adapter,
-  session: { strategy: 'database' },
-  trustHost: true,
-  pages: { signIn: '/login' },
-  providers: buildProviders(),
-  callbacks: {
-    async signIn({ user }) {
-      // ADR-0002 §4a: reject a sign-in whose email domain is not allowlisted.
-      // Personal-workspace bootstrap is NOT done here — it stays the lazy,
-      // idempotent `GET /api/users/me` bootstrap (get-me handler), so the
-      // handle-generation logic lives in exactly one place.
-      return isEmailDomainAllowed(user.email, parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS));
+/**
+ * Built per request, not at module load: `next build` collects page data for
+ * `/api/auth/[...nextauth]` with no database around, and opening the Postgres
+ * client eagerly fails the production build.
+ */
+export function buildAuthConfig(): NextAuthConfig {
+  const { db } = getSharedPostgresClient();
+  return {
+    adapter: buildAdapter(),
+    session: { strategy: 'database' },
+    trustHost: true,
+    pages: { signIn: '/login' },
+    providers: buildProviders(),
+    callbacks: {
+      async signIn({ user }) {
+        // ADR-0002 §4a: reject a sign-in whose email domain is not allowlisted.
+        // Personal-workspace bootstrap is NOT done here — it stays the lazy,
+        // idempotent `GET /api/users/me` bootstrap (get-me handler), so the
+        // handle-generation logic lives in exactly one place.
+        return isEmailDomainAllowed(user.email, parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS));
+      },
+      async session({ session, user }) {
+        // Explicit allowlist — NEVER spread `user`, which carries `passwordHash`.
+        session.user.id = user.id;
+        session.user.roles = await getUserRoles(db, user.id);
+        return session;
+      },
     },
-    async session({ session, user }) {
-      // Explicit allowlist — NEVER spread `user`, which carries `passwordHash`.
-      session.user.id = user.id;
-      session.user.roles = await getUserRoles(db, user.id);
-      return session;
-    },
-  },
-};
+  };
+}
 
-export const { auth, handlers, signIn, signOut } = NextAuth(authConfig);
+export const { auth, handlers, signIn, signOut } = NextAuth(() => buildAuthConfig());

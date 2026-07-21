@@ -4,7 +4,20 @@ import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth, CredentialsSignInError } from '@/contexts/auth-context';
 
+/**
+ * `useSearchParams` (below, for the `?error=` bounce-back) opts the whole
+ * subtree into client-side rendering, which fails the production build unless
+ * it sits under a Suspense boundary.
+ */
 export default function LoginPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <LoginForm />
+    </React.Suspense>
+  );
+}
+
+function LoginForm() {
   const { signInWithGoogle, signInWithEmail, user, loading, mustChangePassword, emailAuthEnabled, googleAuthEnabled } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
