@@ -3,11 +3,13 @@ import { hashSync } from 'bcryptjs';
 
 const mockFindPasswordCredentialByEmail = vi.fn();
 const mockCreateDatabaseSession = vi.fn();
+const mockRecordSignIn = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
   getSharedPostgresClient: () => ({ db: {} }),
   findPasswordCredentialByEmail: (...args: unknown[]) => mockFindPasswordCredentialByEmail(...args),
   createDatabaseSession: (...args: unknown[]) => mockCreateDatabaseSession(...args),
+  recordSignIn: (...args: unknown[]) => mockRecordSignIn(...args),
   SESSION_TTL_MS: 30 * 24 * 60 * 60 * 1000,
 }));
 
@@ -54,6 +56,8 @@ describe('/api/auth/password-login', () => {
     const cookie = res.headers.get('set-cookie') ?? '';
     expect(cookie).toContain(`authjs.session-token=${session.sessionToken}`);
     expect(cookie).toContain('HttpOnly');
+    // Feeds the member list's "last seen" column.
+    expect(mockRecordSignIn).toHaveBeenCalledWith({}, 'user-1');
   });
 
   it('uses the __Secure- cookie name over https', async () => {

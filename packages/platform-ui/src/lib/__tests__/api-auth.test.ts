@@ -93,6 +93,8 @@ describe('resolveCallerIdentity', () => {
         ['org-c', 'member'],
       ]),
       isSystemActor: false,
+      // Carried so a password change can revoke every session except this one.
+      sessionToken: 'session-token-abc',
     });
   });
 
