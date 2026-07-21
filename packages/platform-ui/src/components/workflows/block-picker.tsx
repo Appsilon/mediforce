@@ -102,7 +102,7 @@ type Props = {
 export function BlockPicker({ onAdd }: Props) {
   const [pendingType, setPendingType] = useState<'creation' | 'decision'>('creation');
 
-  const handleAdd = (payload: NewStepPayload) => {
+  const handleAdd = (payload: Omit<NewStepPayload, 'type'>) => {
     onAdd({ ...payload, type: pendingType });
   };
 

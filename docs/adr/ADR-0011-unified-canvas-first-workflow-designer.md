@@ -1,4 +1,4 @@
-# ADR-0010: Unified Canvas-First Workflow Designer
+# ADR-0011: Unified Canvas-First Workflow Designer
 
 **Status:** Proposed
 **Date:** 2026-06-30
@@ -36,7 +36,7 @@ Selecting a node surfaces its configuration in the same right sidebar. The AI As
 "Add Block" (bottom toolbar) places an unconnected node anywhere on the canvas. The "+" edge button connects a new node inline at a specific position. Neither replaces the other.
 
 **Block presets — show what is possible.**
-A thin mapping layer (`lib/block-presets.ts`) groups existing step types into user-facing categories (Agents, Conditions, Database, Script, Utilities, Human) with sensible defaults and descriptions. No new schema is introduced — it is a lookup table that makes the picker legible and communicates the platform's capabilities to new users.
+A thin mapping layer (`lib/block-presets.ts`) groups the step executors into control-mode rows (CM0–CM4) plus a creation/decision step-type toggle, each with sensible defaults and descriptions. No new schema is introduced — it is a lookup table that makes the picker legible and communicates the platform's capabilities to new users.
 
 **Does not run on the workflow engine.**
 The designer is a standalone UI feature. It does not require a running workflow engine session, a cowork workflow, or a BullMQ job to function. UI-level components (e.g. the chat shell from the cowork view) may be reused where appropriate, but there is no engine dependency at design time.
@@ -73,9 +73,9 @@ The Co-Work Workflow Designer Workflow (`apps/workflow-designer/src/workflow-des
 
 ## Consequences
 
-- The Co-Work Workflow Designer Workflow is deprecated and removed as a workflow creation path.
+- The Co-Work Workflow Designer Workflow is deprecated as a workflow creation path and will be removed once the in-canvas AI Assistant (Phase 4) lands; it still ships in this phase because the AI Assistant pane is a placeholder shell.
 - `workflow-editor-canvas.tsx` is restructured: the two-column split layout is replaced with a full-width canvas + right sidebar.
-- `step-editor.tsx` form logic is preserved entirely and rendered inside the right sidebar — no form logic is rewritten.
+- `step-editor.tsx` is rendered inside the right sidebar. Its field logic is preserved, with one deliberate control change: the autonomy-level `<select>` becomes a pill toggle (L2/L3/L4). No field semantics change.
 - `lib/block-presets.ts` is the only new abstraction introduced at this stage.
 - All existing step types (agent, script, human, cowork, action, decision) and all control modes (CM0–CM4) remain fully supported.
 - All workflow creation and editing goes through this designer exclusively.
