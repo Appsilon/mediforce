@@ -46,9 +46,11 @@ test.describe('Workflow Triggers Journey', () => {
     // The page header reflects the live schedule as running.
     await expect(page.getByText(/runs automatically/i)).toBeVisible({ timeout: 15_000 });
 
-    // Stop it — still listed, now Stopped.
+    // Stop it — still listed, now Stopped. Match the row badge exactly: the
+    // header's "Schedule stopped · …" summary also contains "Stopped", so a
+    // substring match would resolve to two elements (strict-mode violation).
     await page.getByRole('button', { name: 'Stop' }).click();
-    await expect(page.getByText('Stopped')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Stopped', { exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(triggerName)).toBeVisible();
 
     // The header must drop "Runs automatically" once the schedule is stopped.
