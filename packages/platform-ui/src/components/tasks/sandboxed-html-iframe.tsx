@@ -28,8 +28,11 @@ export function SandboxedHtmlIframe({
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
+  // Always track the content height, even while `fill` applies `100%` instead:
+  // the iframe measures itself once on load and does not re-fire on an
+  // unchanged `srcDoc`, so keeping the last measurement lets the auto-sized
+  // preview restore correctly when the user leaves fullscreen.
   React.useEffect(() => {
-    if (fill) return;
     const handler = (event: MessageEvent) => {
       if (
         isIframeResizeMessage(event.data) &&
@@ -44,7 +47,7 @@ export function SandboxedHtmlIframe({
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [fill]);
+  }, []);
 
   React.useEffect(() => {
     iframeRef.current?.contentWindow?.postMessage({ type: 'theme', dark: isDark }, '*');
