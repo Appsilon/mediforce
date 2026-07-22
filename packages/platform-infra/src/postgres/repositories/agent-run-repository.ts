@@ -85,6 +85,50 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
     return toAgentRun(row);
   }
 
+  async update(runId: string, updates: Partial<AgentRun>): Promise<void> {
+    const current = await this.getById(runId);
+    if (current === null) {
+      throw new Error(`AgentRun not found: ${runId}`);
+    }
+    const parsed = AgentRunSchema.parse({
+      ...current,
+      ...updates,
+      id: runId,
+      processInstanceId: current.processInstanceId,
+    });
+    const parent = await this.parents.getById(parsed.processInstanceId);
+    if (!parent || typeof parent.namespace !== 'string') {
+      throw new Error(
+        'PostgresAgentRunRepository.update: cannot resolve workspace — ' +
+          `parent ProcessInstance ${parsed.processInstanceId} missing or has no namespace.`,
+      );
+    }
+    const { extracted, payload } = splitEnvelope(parsed.envelope);
+    await this.db
+      .update(agentRuns)
+      .set({
+        workspace: parent.namespace,
+        processInstanceId: parsed.processInstanceId,
+        stepId: parsed.stepId,
+        pluginId: parsed.pluginId,
+        autonomyLevel: parsed.autonomyLevel,
+        status: parsed.status,
+        fallbackReason: parsed.fallbackReason,
+        confidence: extracted.confidence,
+        model: extracted.model,
+        durationMs: extracted.durationMs,
+        promptTokens: extracted.promptTokens,
+        completionTokens: extracted.completionTokens,
+        costUsd: extracted.costUsd,
+        envelopePayload: payload,
+        executorType: parsed.executorType ?? null,
+        reviewerType: parsed.reviewerType ?? null,
+        startedAt: new Date(parsed.startedAt),
+        completedAt: parsed.completedAt ? new Date(parsed.completedAt) : null,
+      })
+      .where(eq(agentRuns.id, runId));
+  }
+
   async getById(runId: string): Promise<AgentRun | null> {
     const rows = await this.db
       .select()

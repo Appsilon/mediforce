@@ -41,6 +41,8 @@ export class AuthorizedAgentRunRepository extends AuthorizedScope {
   // Intentional no-op wrappers — see header. Both user and system actors
   // hit `raw.*` directly; the `caller` field stays on the class so a future
   // gating-restore is a one-file change.
+  update = async (runId: string, updates: Partial<AgentRun>): Promise<void> =>
+    this.raw.update(runId, updates);
   getById = async (runId: string): Promise<AgentRun | null> => this.raw.getById(runId);
   getByInstanceId = async (instanceId: string): Promise<AgentRun[]> =>
     this.raw.getByInstanceId(instanceId);

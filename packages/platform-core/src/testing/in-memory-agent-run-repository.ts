@@ -30,6 +30,19 @@ export class InMemoryAgentRunRepository implements AgentRunRepository {
     this.byId.set(parsed.id, parsed);
     return parsed;
   }
+  async update(runId: string, updates: Partial<AgentRun>): Promise<void> {
+    const current = this.byId.get(runId);
+    if (current === undefined) {
+      throw new Error(`AgentRun not found: ${runId}`);
+    }
+    const parsed = AgentRunSchema.parse({
+      ...current,
+      ...updates,
+      id: runId,
+      processInstanceId: current.processInstanceId,
+    });
+    this.byId.set(runId, parsed);
+  }
   async getById(runId: string): Promise<AgentRun | null> {
     return this.byId.get(runId) ?? null;
   }

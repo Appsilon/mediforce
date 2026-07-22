@@ -33,6 +33,31 @@ export async function cancelRun(
     updatedAt: now,
   });
 
+  const stepExecutions = await scope.runs.getStepExecutions(input.runId);
+  const runningStepExecutions = stepExecutions.filter(
+    (execution) => execution.status === 'running',
+  );
+  const agentRuns = await scope.agentRuns.getByInstanceId(input.runId);
+  const runningAgentRuns = agentRuns.filter(
+    (agentRun) => agentRun.status === 'running',
+  );
+  await Promise.all([
+    ...runningStepExecutions.map((execution) =>
+      scope.runs.updateStepExecution(input.runId, execution.id, {
+        status: 'failed',
+        error: reason,
+        completedAt: now,
+      }),
+    ),
+    ...runningAgentRuns.map((agentRun) =>
+      scope.agentRuns.update(agentRun.id, {
+        status: 'error',
+        fallbackReason: reason,
+        completedAt: now,
+      }),
+    ),
+  ]);
+
   const tasks = await scope.tasks.getByInstanceId(input.runId);
   const actionableTasks = tasks.filter((task) =>
     ACTIONABLE_TASK_STATUSES.has(task.status),
@@ -48,7 +73,13 @@ export async function cancelRun(
     description: `Run cancelled by operator (was ${run.status}${run.currentStepId ? ` at step '${run.currentStepId}'` : ''})`,
     timestamp: now,
     inputSnapshot: { previousStatus: run.status, currentStepId: run.currentStepId },
-    outputSnapshot: { status: 'failed', error: reason, cancelledTasks: actionableTasks.length },
+    outputSnapshot: {
+      status: 'failed',
+      error: reason,
+      cancelledTasks: actionableTasks.length,
+      cancelledStepExecutions: runningStepExecutions.length,
+      cancelledAgentRuns: runningAgentRuns.length,
+    },
     basis: 'User-initiated cancel via UI — double-confirm pattern',
     entityType: 'processInstance',
     entityId: input.runId,

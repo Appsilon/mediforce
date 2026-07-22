@@ -20,6 +20,7 @@ export interface ListAgentRunsPage {
  */
 export interface AgentRunRepository {
   create(run: AgentRun): Promise<AgentRun>;
+  update(runId: string, updates: Partial<AgentRun>): Promise<void>;
 
   getById(runId: string): Promise<AgentRun | null>;
   getByIdInNamespaces(runId: string, allowed: readonly string[]): Promise<AgentRun | null>;
