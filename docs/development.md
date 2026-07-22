@@ -177,3 +177,25 @@ Staging and production servers are hosted on **Hetzner**.
 The staging machine also has an `sftpuser` account with SFTP enabled, used for the Data Landing Zone workflow demo.
 
 All credentials (SSH passwords, etc.) are stored in **1Password** under the **Mediforce** vault.
+
+Standing up a *new* server is driven by [`scripts/bootstrap-server.py`](../scripts/bootstrap-server.py) (or the browser wizard in [`docs/setup/index.html`](setup/index.html)), which collects every required env var — including the NextAuth ones (`AUTH_SECRET`, a provider, `ALLOWED_EMAIL_DOMAINS`) — and prints the exact Google OAuth redirect URI to register. The boot-time authority on what is mandatory is `packages/platform-ui/src/instrumentation-node.ts`; the server refuses to start if anything is missing.
+
+### Authentication setup (ADR-0002)
+
+Auth is NextAuth over Postgres — there is no Firebase project, service account, or emulator to provision. Two setup shapes:
+
+**Migrating an existing Firebase-Auth deployment (e.g. staging).** The identity data lives in Firebase Auth and must be copied into the `auth_users` table *once*, keeping each user's uid so their workspaces, tasks and audit trail stay attached. **Run the seed before deploying the NextAuth build** — it is additive and invisible to the still-running Firebase app, which removes the window where someone could sign in and mint a fresh uid:
+
+```bash
+firebase auth:export users.json --project <firebase-project-id>
+# dry-run first — prints counts, writes nothing:
+npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts users.json
+# then, once the counts look right:
+npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts users.json --apply
+```
+
+Full runbook, including the gate (never `--apply` on staging without coordinator sign-off, never on production): [`scripts/migrate-firebase-auth-to-postgres/README.md`](../scripts/migrate-firebase-auth-to-postgres/README.md).
+
+The seed sets `email_verified`, which is what lets each user's first Google sign-in link onto their existing uid by verified email. **The OAuth client is irrelevant to this** — a new standalone Google client or the reused Firebase one both match users by email, so there is nothing to "migrate" client-side; only the `auth_users` seed matters. **Passwords are not migrated** (Firebase uses scrypt, we use bcrypt): password-only Firebase users cannot sign in with their password afterwards and must use Google/OIDC or a fresh password (password recovery is [issue #1001](https://github.com/Appsilon/mediforce/issues/1001)). Verify on staging that a Google sign-in yields the *old* uid, not a new uuid, before trusting the cutover.
+
+**Greenfield install (fresh customer / on-prem, no prior Firebase).** There is nothing to export. Create the first user directly: an `auth_users` row with a bcrypt `password_hash` (see `packages/platform-ui/.env.example`, `ENABLE_PASSWORD_AUTH`), or configure OIDC against the customer's IdP and let them sign in. `user_roles` starts empty and is populated as roles are assigned.
