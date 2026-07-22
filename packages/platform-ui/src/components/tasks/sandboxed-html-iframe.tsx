@@ -8,18 +8,30 @@ interface SandboxedHtmlIframeProps {
   html: string;
   result?: Record<string, unknown> | null;
   title?: string;
+  /**
+   * Fill the parent's height and let the iframe scroll its own content,
+   * instead of auto-growing to fit. Used by the fullscreen preview so a large
+   * report renders with a single native scrollbar rather than nesting the
+   * iframe's clamped-height scrollbar inside the modal's.
+   */
+  fill?: boolean;
 }
 
 export function SandboxedHtmlIframe({
   html,
   result = null,
   title = 'HTML preview',
+  fill = false,
 }: SandboxedHtmlIframeProps) {
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = React.useState(300);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
+  // Always track the content height, even while `fill` applies `100%` instead:
+  // the iframe measures itself once on load and does not re-fire on an
+  // unchanged `srcDoc`, so keeping the last measurement lets the auto-sized
+  // preview restore correctly when the user leaves fullscreen.
   React.useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (
@@ -46,7 +58,7 @@ export function SandboxedHtmlIframe({
       ref={iframeRef}
       srcDoc={buildSrcdoc(html, result, isDark)}
       sandbox="allow-scripts"
-      style={{ width: '100%', height, border: 'none' }}
+      style={{ width: '100%', height: fill ? '100%' : height, border: 'none' }}
       title={title}
     />
   );
