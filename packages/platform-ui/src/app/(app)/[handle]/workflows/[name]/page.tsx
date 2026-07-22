@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, Eye, EyeOff, Copy } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
+import { useWorkflowTriggers } from '@/hooks/use-workflow-triggers';
 import { useProcessInstances } from '@/hooks/use-process-instances';
 import { useMyActionableTasks } from '@/hooks/use-tasks';
 import { RunsTable } from '@/components/processes/runs-table';
@@ -23,6 +24,7 @@ import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useWorkflowDefinitionApi } from '@/hooks/use-workflows-api';
 import { WorkflowSecretsEditor } from '@/components/workflows/workflow-secrets-editor';
+import { TriggersPanel } from './TriggersPanel';
 
 
 export default function ProcessDefinitionPage() {
@@ -179,7 +181,9 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const searchParams = useSearchParams();
   const decodedName = decodeURIComponent(name);
 
-  const initialTab = searchParams.get('tab') === 'secrets' ? 'secrets' : 'runs';
+  const tabParam = searchParams.get('tab');
+  const initialTab =
+    tabParam === 'secrets' || tabParam === 'triggers' ? tabParam : 'runs';
   const setupKeys = searchParams.get('setup')?.split(',').filter(Boolean) ?? [];
   const [activeTab, setActiveTab] = React.useState(initialTab);
   const [showArchivedRuns, setShowArchivedRuns] = React.useState(false);
@@ -190,6 +194,10 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   // carry. Fetch it once per workflow.
   const latestVersionNumber = versions[0]?.version ?? null;
   const { definition: latest } = useWorkflowVersion(decodedName, handle, latestVersionNumber);
+  // Live trigger rows (enabled/schedule) — the header summary reflects these,
+  // not the advisory triggers declared on the definition, so stopping a cron
+  // trigger in the Triggers tab immediately updates the header.
+  const { cronTriggers } = useWorkflowTriggers(decodedName, handle);
   const { data: runs, loading: runsLoading } = useProcessInstances('all', decodedName, showArchivedRuns, handle);
   const { data: activeTasks } = useMyActionableTasks();
 
@@ -315,13 +323,28 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 {latest?.steps.length} steps
               </span>
               <span>{runs.length} runs</span>
-              {latest?.triggers?.map((trigger: { type: string; name: string; schedule?: string }) => (
-                <span key={trigger.name} className="inline-flex items-center gap-1">
-                  {trigger.type === 'cron' ? <Clock className="h-3 w-3" /> : trigger.type === 'manual' ? <Play className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
-                  {trigger.type === 'cron' && trigger.schedule ? (
-                    <span className="bg-muted px-1.5 py-0.5 rounded" title={trigger.schedule}>Runs automatically · {formatCron(trigger.schedule)}</span>
-                  ) : (
+              {latest?.triggers
+                ?.filter((trigger: { type: string }) => trigger.type !== 'cron')
+                .map((trigger: { type: string; name: string }) => (
+                  <span key={trigger.name} className="inline-flex items-center gap-1">
+                    {trigger.type === 'manual' ? <Play className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
                     <span>{trigger.name}</span>
+                  </span>
+                ))}
+              {cronTriggers.map((trigger) => (
+                <span key={trigger.name} className="inline-flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {trigger.enabled ? (
+                    <span className="bg-muted px-1.5 py-0.5 rounded" title={trigger.config.schedule}>
+                      Runs automatically · {formatCron(trigger.config.schedule)}
+                    </span>
+                  ) : (
+                    <span
+                      className="bg-muted px-1.5 py-0.5 rounded text-muted-foreground"
+                      title={trigger.config.schedule}
+                    >
+                      Schedule stopped · {formatCron(trigger.config.schedule)}
+                    </span>
                   )}
                 </span>
               ))}
@@ -469,7 +492,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
       {/* Tabs */}
       <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex flex-1 flex-col">
         <Tabs.List className="flex border-b px-6 gap-0">
-          {['runs', 'definitions', 'secrets'].map((tab) => (
+          {['runs', 'definitions', 'triggers', 'secrets'].map((tab) => (
             <Tabs.Trigger
               key={tab}
               value={tab}
@@ -478,14 +501,16 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 'text-muted-foreground border-transparent',
                 'data-[state=active]:text-foreground data-[state=active]:border-primary',
                 'hover:text-foreground',
-                tab === 'secrets' && 'flex items-center gap-1.5',
+                (tab === 'secrets' || tab === 'triggers') && 'flex items-center gap-1.5',
               )}
             >
               {tab === 'runs'
                 ? `Runs${runs.length > 0 ? ` (${runs.length})` : ''}`
                 : tab === 'secrets'
                   ? <><KeyRound className="h-3.5 w-3.5" />Secrets</>
-                  : 'Definitions'}
+                  : tab === 'triggers'
+                    ? <><Clock className="h-3.5 w-3.5" />Triggers</>
+                    : 'Definitions'}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
@@ -526,6 +551,13 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
         <Tabs.Content value="definitions" className="flex-1 p-6">
           <div className="max-w-2xl">
             <DefinitionsList workflowName={decodedName} />
+          </div>
+        </Tabs.Content>
+
+        {/* Triggers tab */}
+        <Tabs.Content value="triggers" className="flex-1 p-6">
+          <div className="max-w-2xl">
+            <TriggersPanel handle={handle} definitionName={decodedName} />
           </div>
         </Tabs.Content>
 

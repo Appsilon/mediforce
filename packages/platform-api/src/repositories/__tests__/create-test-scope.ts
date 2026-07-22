@@ -9,7 +9,6 @@ import {
   InMemoryAgentRunRepository,
   InMemoryAuditRepository,
   InMemoryCoworkSessionRepository,
-  InMemoryCronTriggerStateRepository,
   InMemoryHandoffRepository,
   InMemoryHumanTaskRepository,
   InMemoryOAuthProviderRepository,
@@ -176,7 +175,6 @@ export interface TestScopeOverrides {
   readonly handoffRepo?: InMemoryHandoffRepository;
   readonly agentDefinitionRepo?: InMemoryAgentDefinitionRepository;
   readonly coworkSessionRepo?: InMemoryCoworkSessionRepository;
-  readonly cronTriggerStateRepo?: InMemoryCronTriggerStateRepository;
   readonly triggerRepo?: InMemoryTriggerRepository;
   readonly toolCatalogRepo?: InMemoryToolCatalogRepository;
   readonly oauthProviderRepo?: InMemoryOAuthProviderRepository;
@@ -228,7 +226,6 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     handoffRepo: overrides.handoffRepo ?? new InMemoryHandoffRepository(instanceRepo),
     agentDefinitionRepo: overrides.agentDefinitionRepo ?? new InMemoryAgentDefinitionRepository(),
     coworkSessionRepo: overrides.coworkSessionRepo ?? new InMemoryCoworkSessionRepository(instanceRepo),
-    cronTriggerStateRepo: overrides.cronTriggerStateRepo ?? new InMemoryCronTriggerStateRepository(),
     triggerRepo: overrides.triggerRepo ?? new InMemoryTriggerRepository(),
     toolCatalogRepo: overrides.toolCatalogRepo ?? new InMemoryToolCatalogRepository(),
     namespaceRepo: overrides.namespaceRepo ?? stubNamespaceRepo,

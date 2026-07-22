@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   InMemoryAuditRepository,
-  InMemoryCronTriggerStateRepository,
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
+  InMemoryTriggerRepository,
   buildProcessInstance,
   buildWorkflowDefinition,
   resetFactorySequence,
@@ -17,37 +17,53 @@ import {
 import { noopRunKicker } from '../../../runtime/run-kicker';
 
 /**
- * Handler-level tests for `heartbeat`. The cron trigger is stubbed; engine
- * mechanics (instance creation, `instance.created` emission) are covered by
- * `workflow-engine`'s cron-trigger tests. This file covers the handler-
- * resident bridge: caller gating, schedule scanning, state persistence,
- * audit emission, and run kick.
+ * Handler-level tests for `heartbeat`. Row-driven (ADR-0011): enabled cron
+ * rows in the unified `triggers` table are the source of truth for what fires,
+ * resolved against the target workflow's default→latest version. The cron
+ * trigger service is stubbed; engine mechanics are covered elsewhere. This file
+ * covers the handler bridge: caller gating, resolve-and-skip, fire-cursor
+ * advance, audit emission, run kick, and the paused/stranded sweeps.
  */
 
 describe('heartbeat handler', () => {
   let processRepo: InMemoryProcessRepository;
   let instanceRepo: InMemoryProcessInstanceRepository;
   let auditRepo: InMemoryAuditRepository;
-  let cronTriggerStateRepo: InMemoryCronTriggerStateRepository;
+  let triggerRepo: InMemoryTriggerRepository;
 
   beforeEach(() => {
     resetFactorySequence();
     processRepo = new InMemoryProcessRepository();
     instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository(instanceRepo);
-    cronTriggerStateRepo = new InMemoryCronTriggerStateRepository();
+    triggerRepo = new InMemoryTriggerRepository();
   });
 
-  it('returns empty triggered + skipped when no workflow definitions exist', async () => {
-    const scope = createTestScope({
-      processRepo,
-      instanceRepo,
-      auditRepo,
-      cronTriggerStateRepo,
+  function seedCron(opts: {
+    namespace: string;
+    workflowName: string;
+    name: string;
+    schedule: string;
+    enabled?: boolean;
+    lastTriggeredAt?: string | null;
+  }): Promise<unknown> {
+    const now = new Date().toISOString();
+    return triggerRepo.create({
+      type: 'cron',
+      namespace: opts.namespace,
+      workflowName: opts.workflowName,
+      name: opts.name,
+      enabled: opts.enabled ?? true,
+      config: { schedule: opts.schedule },
+      lastTriggeredAt: opts.lastTriggeredAt ?? null,
+      createdAt: now,
+      updatedAt: now,
     });
-    Object.assign(scope.system, {
-      cronTrigger: { fireWorkflow: vi.fn() },
-    });
+  }
+
+  it('returns empty triggered + skipped when no cron rows exist', async () => {
+    const scope = createTestScope({ processRepo, instanceRepo, auditRepo, triggerRepo });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
 
     const result = await heartbeat({}, scope);
 
@@ -59,27 +75,25 @@ describe('heartbeat handler', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      cronTriggerStateRepo,
+      triggerRepo,
       caller: userCaller('u-1', ['team-alpha']),
     });
-    Object.assign(scope.system, {
-      cronTrigger: { fireWorkflow: vi.fn() },
-    });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
 
     await expect(heartbeat({}, scope)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  it('fires a due cron trigger, persists state, emits audit, kicks the runner', async () => {
+  it('fires a due cron trigger, advances the cursor, emits audit, kicks the runner', async () => {
     await processRepo.saveWorkflowDefinition(
-      buildWorkflowDefinition({
-        name: 'nightly-report',
-        namespace: 'team-alpha',
-        version: 1,
-        triggers: [
-          { type: 'cron', name: 'nightly', schedule: '*/15 * * * *' },
-        ],
-      }),
+      buildWorkflowDefinition({ name: 'nightly-report', namespace: 'team-alpha', version: 1 }),
     );
+    await seedCron({
+      namespace: 'team-alpha',
+      workflowName: 'nightly-report',
+      name: 'nightly',
+      schedule: '*/15 * * * *',
+      lastTriggeredAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    });
     const fireWorkflow = vi.fn().mockResolvedValue({
       instanceId: 'inst-new-1',
       status: 'created' as const,
@@ -89,7 +103,7 @@ describe('heartbeat handler', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      cronTriggerStateRepo,
+      triggerRepo,
       runKicker: kicker,
     });
     Object.assign(scope.system, { cronTrigger: { fireWorkflow } });
@@ -116,14 +130,14 @@ describe('heartbeat handler', () => {
       }),
     );
 
-    // State persisted AFTER successful fire.
-    const persistedState = await cronTriggerStateRepo.get(
-      'nightly-report',
-      'nightly',
-    );
-    expect(persistedState).not.toBeNull();
-    expect(persistedState!.definitionName).toBe('nightly-report');
-    expect(persistedState!.triggerName).toBe('nightly');
+    // Fire cursor advanced AFTER successful fire.
+    const rows = await triggerRepo.listByWorkflow('team-alpha', 'nightly-report');
+    const row = rows.find((r) => r.name === 'nightly');
+    expect(row?.type === 'cron' && row.lastTriggeredAt).not.toBeNull();
+    expect(
+      row?.type === 'cron' &&
+        new Date(row.lastTriggeredAt!).getTime() > Date.now() - 5000,
+    ).toBe(true);
 
     // Audit event recorded.
     const events = await auditRepo.getByProcess('inst-new-1');
@@ -144,9 +158,74 @@ describe('heartbeat handler', () => {
     expect(event.outputSnapshot).toMatchObject({ instanceId: 'inst-new-1' });
 
     // Run kicked.
-    expect(kicker.kicks).toEqual([
-      { instanceId: 'inst-new-1', triggeredBy: 'cron-heartbeat' },
-    ]);
+    expect(kicker.kicks).toEqual([{ instanceId: 'inst-new-1', triggeredBy: 'cron-heartbeat' }]);
+  });
+
+  it('resolves against the default version when set (not latest)', async () => {
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'versioned', namespace: 'team-alpha', version: 1 }),
+    );
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'versioned', namespace: 'team-alpha', version: 2 }),
+    );
+    await processRepo.setDefaultWorkflowVersion('team-alpha', 'versioned', 1);
+    await seedCron({
+      namespace: 'team-alpha',
+      workflowName: 'versioned',
+      name: 'beat',
+      schedule: '*/15 * * * *',
+      lastTriggeredAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    });
+    const fireWorkflow = vi.fn().mockResolvedValue({ instanceId: 'i', status: 'created' as const });
+    const scope = createTestScope({ processRepo, instanceRepo, auditRepo, triggerRepo });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow } });
+
+    await heartbeat({}, scope);
+
+    expect(fireWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({ definitionName: 'versioned', definitionVersion: 1 }),
+    );
+  });
+
+  it('skips a cron row whose target workflow is soft-deleted (resolve-and-skip)', async () => {
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'gone', namespace: 'team-alpha', version: 1 }),
+    );
+    await processRepo.setWorkflowDeleted('team-alpha', 'gone', true);
+    await seedCron({
+      namespace: 'team-alpha',
+      workflowName: 'gone',
+      name: 'beat',
+      schedule: '*/15 * * * *',
+    });
+    const fireWorkflow = vi.fn();
+    const scope = createTestScope({ processRepo, instanceRepo, auditRepo, triggerRepo });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow } });
+
+    const result = await heartbeat({}, scope);
+
+    expect(fireWorkflow).not.toHaveBeenCalled();
+    expect(result.triggered).toHaveLength(0);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]).toMatchObject({ triggerName: 'beat', reason: 'Workflow deleted' });
+  });
+
+  it('skips a cron row that points at an unresolvable workflow', async () => {
+    await seedCron({
+      namespace: 'team-alpha',
+      workflowName: 'never-registered',
+      name: 'beat',
+      schedule: '*/15 * * * *',
+    });
+    const fireWorkflow = vi.fn();
+    const scope = createTestScope({ processRepo, instanceRepo, auditRepo, triggerRepo });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow } });
+
+    const result = await heartbeat({}, scope);
+
+    expect(fireWorkflow).not.toHaveBeenCalled();
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]).toMatchObject({ reason: 'No resolvable version' });
   });
 
   it('re-kicks a running instance stranded past the threshold (driver died mid-step)', async () => {
@@ -167,7 +246,7 @@ describe('heartbeat handler', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      cronTriggerStateRepo,
+      triggerRepo,
       runKicker: kicker,
     });
     Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
@@ -220,7 +299,7 @@ describe('heartbeat handler', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      cronTriggerStateRepo,
+      triggerRepo,
       runKicker: kicker,
     });
     Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
@@ -267,7 +346,7 @@ describe('heartbeat handler', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      cronTriggerStateRepo,
+      triggerRepo,
       runKicker: kicker,
     });
     Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
@@ -297,7 +376,7 @@ describe('heartbeat handler', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      cronTriggerStateRepo,
+      triggerRepo,
       runKicker: kicker,
     });
     Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
@@ -322,7 +401,7 @@ describe('heartbeat handler', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      cronTriggerStateRepo,
+      triggerRepo,
       runKicker: kicker,
     });
     Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
@@ -336,19 +415,14 @@ describe('heartbeat handler', () => {
 
   it('skips a not-due trigger — no audit, no kick, reason="Not due"', async () => {
     await processRepo.saveWorkflowDefinition(
-      buildWorkflowDefinition({
-        name: 'quarter-hourly',
-        namespace: 'team-alpha',
-        version: 1,
-        triggers: [
-          { type: 'cron', name: 'beat', schedule: '0 0 1 1 0' }, // Jan 1 midnight Sunday — rarely matches
-        ],
-      }),
+      buildWorkflowDefinition({ name: 'quarter-hourly', namespace: 'team-alpha', version: 1 }),
     );
-    // Seed state so isDue's scan path is taken with a recent lastTriggeredAt.
-    await cronTriggerStateRepo.set({
-      definitionName: 'quarter-hourly',
-      triggerName: 'beat',
+    // Seed cron row with a recent cursor so isDue's scan path finds no slot.
+    await seedCron({
+      namespace: 'team-alpha',
+      workflowName: 'quarter-hourly',
+      name: 'beat',
+      schedule: '0 0 1 1 0', // Jan 1 midnight Sunday — rarely matches
       lastTriggeredAt: new Date().toISOString(),
     });
 
@@ -358,7 +432,7 @@ describe('heartbeat handler', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      cronTriggerStateRepo,
+      triggerRepo,
       runKicker: kicker,
     });
     Object.assign(scope.system, { cronTrigger: { fireWorkflow } });

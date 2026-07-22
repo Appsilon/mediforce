@@ -9,7 +9,6 @@ export { InMemoryBlobStore } from './in-memory-blob-store';
 export { InMemoryHandoffRepository } from './in-memory-handoff-repository';
 export { NoopNotificationService } from './noop-notification-service';
 export { InMemoryCoworkSessionRepository } from './in-memory-cowork-session-repository';
-export { InMemoryCronTriggerStateRepository } from './in-memory-cron-trigger-state-repository';
 export { InMemoryTriggerRepository } from './in-memory-trigger-repository';
 export { InMemoryToolCatalogRepository } from './in-memory-tool-catalog-repository';
 export { InMemoryOAuthProviderRepository } from './in-memory-oauth-provider-repository';

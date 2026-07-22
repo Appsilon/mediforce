@@ -103,6 +103,35 @@ export async function registerWorkflow(
     namespace: input.namespace,
   });
 
+  // ADR-0011: seed a cron Trigger row for each declared cron trigger that has no
+  // live row yet. Seed-if-absent — never overwrite a user's live schedule or
+  // enabled state, so the declared schedule is advisory after first registration.
+  // The fire cursor anchors to `now` so a freshly-seeded schedule starts at its
+  // next slot rather than back-firing on the next heartbeat.
+  const existingTriggers = await scope.triggers.listByWorkflow(input.namespace, definition.name);
+  for (const trigger of definition.triggers) {
+    if (
+      trigger.type !== 'cron' ||
+      typeof trigger.schedule !== 'string' ||
+      trigger.schedule.length === 0
+    ) {
+      continue;
+    }
+    if (existingTriggers.some((t) => t.name === trigger.name)) continue;
+    const seededAt = new Date().toISOString();
+    await scope.triggers.create({
+      type: 'cron',
+      namespace: input.namespace,
+      workflowName: definition.name,
+      name: trigger.name,
+      enabled: true,
+      config: { schedule: trigger.schedule },
+      lastTriggeredAt: seededAt,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+    });
+  }
+
   const warnings: RegistrationWarning[] = [];
 
   const hasDockerSteps = definition.steps.some(

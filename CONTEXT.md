@@ -72,6 +72,10 @@ the name `Trigger` / `TriggerSchema` is still held by the legacy trigger
 *declaration* embedded in `process-definition.ts`; when the triggers-detachment
 epic makes the Definition trigger-free, `TriggerResource` renames back to
 `Trigger`.
+_Status:_ `cron` is now fully wired on the unified `triggers` table (managed from
+CLI / UI / API, heartbeat fires row-driven from `listEnabledByType('cron')`); the
+old `cron_trigger_state` overlay is retired (#929). `manual` / `webhook` still
+read from the embedded Definition declaration until later epic issues cut them over.
 _Avoid_: conflating the detached Trigger resource with the embedded Definition
 trigger declaration (legacy, being removed), or with the **Trigger Payload** on
 a Workflow Run (the data a firing hands the Run).
