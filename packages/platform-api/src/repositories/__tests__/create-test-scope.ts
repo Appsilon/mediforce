@@ -17,6 +17,7 @@ import {
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
   InMemoryToolCatalogRepository,
+  InMemoryTriggerRepository,
   InMemoryAgentOAuthTokenRepository,
   InMemoryUserProfileRepository,
   InMemoryTaskAttachmentRepository,
@@ -176,6 +177,7 @@ export interface TestScopeOverrides {
   readonly agentDefinitionRepo?: InMemoryAgentDefinitionRepository;
   readonly coworkSessionRepo?: InMemoryCoworkSessionRepository;
   readonly cronTriggerStateRepo?: InMemoryCronTriggerStateRepository;
+  readonly triggerRepo?: InMemoryTriggerRepository;
   readonly toolCatalogRepo?: InMemoryToolCatalogRepository;
   readonly oauthProviderRepo?: InMemoryOAuthProviderRepository;
   readonly agentOAuthTokenRepo?: InMemoryAgentOAuthTokenRepository;
@@ -227,6 +229,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     agentDefinitionRepo: overrides.agentDefinitionRepo ?? new InMemoryAgentDefinitionRepository(),
     coworkSessionRepo: overrides.coworkSessionRepo ?? new InMemoryCoworkSessionRepository(instanceRepo),
     cronTriggerStateRepo: overrides.cronTriggerStateRepo ?? new InMemoryCronTriggerStateRepository(),
+    triggerRepo: overrides.triggerRepo ?? new InMemoryTriggerRepository(),
     toolCatalogRepo: overrides.toolCatalogRepo ?? new InMemoryToolCatalogRepository(),
     namespaceRepo: overrides.namespaceRepo ?? stubNamespaceRepo,
     userProfileRepo: overrides.userProfileRepo ?? new InMemoryUserProfileRepository(),
