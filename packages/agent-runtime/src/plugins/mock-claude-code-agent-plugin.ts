@@ -23,6 +23,14 @@ export class MockClaudeCodeAgentPlugin implements StepExecutorPlugin {
       throw new Error('MockClaudeCodeAgentPlugin must be initialized before run().');
     }
 
+    // Optional artificial delay before emitting the result. Lets local dev hold
+    // a step `running` long enough to exercise mid-step recovery paths (e.g. the
+    // ADR-0010 §4 SIGTERM deploy interrupt) without needing a real slow agent.
+    const delayMs = Number(process.env.MOCK_AGENT_DELAY_MS);
+    if (Number.isFinite(delayMs) && delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
     await emit({
       type: 'result',
       payload: {

@@ -665,3 +665,48 @@ describe('AgentRunner.reapAsTimeout (issue #868)', () => {
     expect(inst?.pauseReason).toBe('agent_escalated');
   });
 });
+
+describe('AgentRunner.markStepRunsInterrupted (issue #907)', () => {
+  it('terminalizes only the running AgentRun(s) of the given step as interrupted', async () => {
+    const instanceRepository = new InMemoryProcessInstanceRepository();
+    const auditRepository = new InMemoryAuditRepository();
+    const eventLog = new InMemoryAgentEventLog();
+    const agentRunRepo = new InMemoryAgentRunRepository();
+    await createTestInstance(instanceRepository);
+    const runner = new AgentRunner(instanceRepository, auditRepository, eventLog, agentRunRepo);
+
+    const base = {
+      processInstanceId: 'instance-1',
+      pluginId: 'test-plugin',
+      autonomyLevel: 'L4' as const,
+      envelope: null,
+      fallbackReason: null,
+      startedAt: new Date(Date.now() - 60 * 60_000).toISOString(),
+    };
+    // Orphaned running run for the interrupted step — should be terminalized.
+    await agentRunRepo.create({ ...base, id: 'run-interrupted', stepId: 'step-1', status: 'running', completedAt: null });
+    // A completed run of the same step — must be left untouched.
+    await agentRunRepo.create({ ...base, id: 'run-done', stepId: 'step-1', status: 'completed', completedAt: new Date().toISOString() });
+    // A running run of a different step — must be left untouched.
+    await agentRunRepo.create({ ...base, id: 'run-other-step', stepId: 'step-2', status: 'running', completedAt: null });
+
+    const count = await runner.markStepRunsInterrupted('instance-1', 'step-1');
+
+    expect(count).toBe(1);
+    const interrupted = await agentRunRepo.getById('run-interrupted');
+    expect(interrupted?.status).toBe('interrupted');
+    expect(interrupted?.completedAt).not.toBeNull();
+    expect((await agentRunRepo.getById('run-done'))?.status).toBe('completed');
+    expect((await agentRunRepo.getById('run-other-step'))?.status).toBe('running');
+  });
+
+  it('is a no-op when the step has no running AgentRun (e.g. script steps)', async () => {
+    const instanceRepository = new InMemoryProcessInstanceRepository();
+    const agentRunRepo = new InMemoryAgentRunRepository();
+    await createTestInstance(instanceRepository);
+    const runner = new AgentRunner(instanceRepository, new InMemoryAuditRepository(), new InMemoryAgentEventLog(), agentRunRepo);
+
+    const count = await runner.markStepRunsInterrupted('instance-1', 'step-1');
+    expect(count).toBe(0);
+  });
+});

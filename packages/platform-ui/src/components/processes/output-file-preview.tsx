@@ -3,7 +3,7 @@
 import * as React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import Papa from 'papaparse';
-import { Download, Loader2, X } from 'lucide-react';
+import { Download, Loader2, Maximize2, Minimize2, X } from 'lucide-react';
 import type { RunOutputFileEntry } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
@@ -54,6 +54,13 @@ export function OutputFilePreview({ runId, file, open, onOpenChange }: OutputFil
 
   const [state, setState] = React.useState<LoadState>({ kind: 'idle' });
   const [downloading, setDownloading] = React.useState(false);
+  const [fullscreen, setFullscreen] = React.useState(false);
+
+  // Reopen windowed: a maximized preview from a previous file shouldn't carry
+  // over when the dialog closes.
+  React.useEffect(() => {
+    if (open === false) setFullscreen(false);
+  }, [open]);
 
   React.useEffect(() => {
     if (open === false || previewable === false) return;
@@ -99,7 +106,14 @@ export function OutputFilePreview({ runId, file, open, onOpenChange }: OutputFil
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border bg-background shadow-lg focus:outline-none">
+        <Dialog.Content
+          className={cn(
+            'fixed z-50 flex flex-col bg-background shadow-lg focus:outline-none',
+            fullscreen
+              ? 'inset-0 h-full w-full rounded-none border-0'
+              : 'left-1/2 top-1/2 max-h-[85vh] w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 rounded-lg border',
+          )}
+        >
           <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
             <div className="min-w-0">
               <Dialog.Title className="truncate text-sm font-semibold" title={file.name}>
@@ -116,6 +130,16 @@ export function OutputFilePreview({ runId, file, open, onOpenChange }: OutputFil
                 <Download className="h-3.5 w-3.5" />
                 {downloading ? 'Downloading…' : 'Download'}
               </button>
+              {previewable && (
+                <button
+                  onClick={() => setFullscreen((prev) => !prev)}
+                  className="rounded-sm p-1 text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                  title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+                >
+                  {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </button>
+              )}
               <Dialog.Close asChild>
                 <button
                   className="rounded-sm p-1 text-muted-foreground transition-colors hover:text-foreground"
@@ -128,8 +152,8 @@ export function OutputFilePreview({ runId, file, open, onOpenChange }: OutputFil
           </div>
           <Dialog.Description className="sr-only">Preview of output file {shortName}</Dialog.Description>
 
-          <div className="min-h-0 flex-1 overflow-auto p-4">
-            <PreviewBody selection={selection} state={state} fileName={shortName} />
+          <div className="flex min-h-0 flex-1 flex-col overflow-auto p-4">
+            <PreviewBody selection={selection} state={state} fileName={shortName} fill={fullscreen} />
           </div>
         </Dialog.Content>
       </Dialog.Portal>
@@ -141,10 +165,12 @@ function PreviewBody({
   selection,
   state,
   fileName,
+  fill,
 }: {
   selection: ViewerSelection;
   state: LoadState;
   fileName: string;
+  fill: boolean;
 }) {
   if (selection.viewer === 'download') {
     const message =
@@ -167,17 +193,19 @@ function PreviewBody({
     return <Notice tone="error">{state.message}</Notice>;
   }
 
-  return <RenderedFile viewer={selection.viewer} file={state.file} fileName={fileName} />;
+  return <RenderedFile viewer={selection.viewer} file={state.file} fileName={fileName} fill={fill} />;
 }
 
 function RenderedFile({
   viewer,
   file,
   fileName,
+  fill,
 }: {
   viewer: Exclude<ViewerSelection['viewer'], 'download'>;
   file: LoadedFile;
   fileName: string;
+  fill: boolean;
 }) {
   // Blob-backed viewers (image, svg-as-image, pdf) hand a same-origin blob URL
   // to the browser, which streams it natively. Kept in state so it can be
@@ -203,7 +231,7 @@ function RenderedFile({
     case 'markdown':
       return <MarkdownPresentation content={text} />;
     case 'html':
-      return <SandboxedHtmlIframe html={text} title={`Preview of ${fileName}`} />;
+      return <SandboxedHtmlIframe html={text} title={`Preview of ${fileName}`} fill={fill} />;
     case 'text':
       return (
         <pre className="whitespace-pre-wrap break-words rounded-md bg-muted p-3 text-xs leading-relaxed">

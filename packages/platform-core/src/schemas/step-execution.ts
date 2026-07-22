@@ -8,6 +8,12 @@ export const StepExecutionStatusSchema = z.enum([
   'failed',
   'escalated',
   'paused',
+  // Terminal-ish (ADR-0010 §4): the driving process was told to shut down
+  // (deploy SIGTERM) while this execution was still running. Distinct from
+  // 'running' (nothing is advancing it) and 'failed' (it was interrupted, not a
+  // genuine failure) so the auto-runner retries it as a fresh attempt instead
+  // of reaping it as a timeout.
+  'interrupted',
 ]);
 
 export const GateResultSchema = z.object({

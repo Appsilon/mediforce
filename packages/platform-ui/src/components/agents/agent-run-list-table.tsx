@@ -30,6 +30,7 @@ const STATUS_STYLES: Record<string, string> = {
   low_confidence: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
   flagged: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
   paused: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+  interrupted: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
 };
 
 function formatDuration(start: string, end: string | null): string {
