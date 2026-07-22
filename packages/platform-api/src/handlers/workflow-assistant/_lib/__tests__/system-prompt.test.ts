@@ -17,13 +17,13 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
 
   it('does not reference any engine-only concepts from the deprecated full-artifact designer', () => {
     expect(prompt).not.toMatch(/update_artifact/);
-    expect(prompt).not.toMatch(/dry.run/i);
     expect(prompt).not.toMatch(/render_workflow_diagram/);
   });
 
   it('warns against exposing internal schema codes (autonomy levels) to the user', () => {
     expect(prompt).toMatch(/L2/);
     expect(prompt).toMatch(/autonomy/i);
+    expect(prompt).toMatch(/Default to \`L3\`/);
   });
 
   it('addresses the starter-template placeholder and step-ID grounding', () => {
@@ -106,4 +106,14 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/step N's `\/output\/result\.json` becomes step N\+1's `\/output\/input\.json`/);
     expect(prompt).toMatch(/don't pretend an empty result is impossible/);
   });
+
+  it('appends the embedded capability & authoring reference (all three docs) and scopes out package-only authoring', () => {
+    expect(prompt).toMatch(/# Capability & authoring reference/);
+    expect(prompt).toMatch(/out of scope for you/);
+    expect(prompt).toMatch(/`command`-mode scripts/);
+    expect(prompt).toMatch(/Pick an authoring path/); // how-to-create-workflow.md
+    expect(prompt).toMatch(/this is where fan-out lives/); // workflow-capabilities.md
+    expect(prompt).toMatch(/Do \*\*not\*\* create new CM1\/L2/); // workflow-authoring-golden-rules.md
+  });
+
 });
