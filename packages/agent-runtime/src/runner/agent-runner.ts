@@ -62,6 +62,14 @@ export class AgentRunner {
         this.tracingOptions.captureContent === true ? result.envelope?.result : undefined,
     });
     if (this.agentRunRepository) {
+      // In-flight cancel guard: if cancelRun reaped this AgentRun to a terminal
+      // state (e.g. `error`) while the plugin was still executing, do NOT
+      // resurrect it with the real completion result. Only terminalize a row
+      // that is still `running`.
+      const existing = await this.agentRunRepository.getById(runId);
+      if (existing && existing.status !== 'running') {
+        return;
+      }
       await this.agentRunRepository.create({
         id: runId,
         processInstanceId: context.processInstanceId,

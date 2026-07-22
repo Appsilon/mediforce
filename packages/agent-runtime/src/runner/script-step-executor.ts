@@ -79,6 +79,30 @@ export class ScriptStepExecutor implements StepExecutor {
       }
     }
 
+    // In-flight cancel guard: if the run was cancelled/terminated out from under
+    // us while the script was executing, cancelRun has already reaped this step's
+    // StepExecution and flipped the instance to `failed`. Do NOT resurrect the
+    // reaped execution with a late completion write, persist output onto the
+    // cancelled instance, or advance — bail with the instance's terminal state.
+    // `running` and `paused` are the only active states here (a reap flips it to
+    // `failed` only further down), so they proceed normally.
+    const guardInstance = await instanceRepo.getById(instanceId);
+    if (
+      guardInstance &&
+      guardInstance.status !== 'running' &&
+      guardInstance.status !== 'paused'
+    ) {
+      return {
+        status: 'failed',
+        envelope,
+        appliedToWorkflow: false,
+        fallbackReason,
+        errorMessage,
+        executorType: 'script',
+        instanceState: { status: guardInstance.status, currentStepId: guardInstance.currentStepId },
+      };
+    }
+
     if (stepExecutionId) {
       const isFailed = fallbackReason !== null;
       await instanceRepo.updateStepExecution(instanceId, stepExecutionId, {

@@ -55,6 +55,30 @@ export class AgentStepExecutor implements StepExecutor {
       : await this.agentRunner.runWithWorkflowStep(plugin, context);
 
     const envelope = runResult.envelope;
+
+    // In-flight cancel guard: if the run was cancelled/terminated out from under
+    // us while the plugin was executing, cancelRun has already reaped this step's
+    // StepExecution and AgentRun to terminal state and flipped the instance to
+    // `failed`. Do NOT resurrect the reaped child rows with late completion
+    // writes, persist output/cost onto the cancelled instance, or advance — bail
+    // with the instance's terminal state. `paused` (L3 review / fallback) and
+    // `running` are the only active states here, so they proceed normally.
+    const guardInstance = await instanceRepo.getById(instanceId);
+    if (
+      guardInstance &&
+      guardInstance.status !== 'running' &&
+      guardInstance.status !== 'paused'
+    ) {
+      return {
+        status: 'failed',
+        envelope,
+        appliedToWorkflow: false,
+        fallbackReason: runResult.fallbackReason,
+        executorType: 'agent',
+        instanceState: { status: guardInstance.status, currentStepId: guardInstance.currentStepId },
+      };
+    }
+
     const costResult = envelope ? await estimateCostField(envelope, modelRegistryRepo, stepId) : {};
 
     if (stepExecutionId) {

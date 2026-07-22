@@ -301,6 +301,37 @@ describe('ScriptStepExecutor', () => {
   });
 });
 
+describe('ScriptStepExecutor in-flight cancel guard', () => {
+  let executor: ScriptStepExecutor;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    executor = new ScriptStepExecutor(mockPluginRunner as never);
+    // The run was cancelled (→ failed) while the script was still executing.
+    mockInstanceRepo.getById.mockResolvedValue({
+      status: 'failed', currentStepId: 'transform-data', definitionVersion: '1', variables: {},
+    });
+  });
+
+  it('does not resurrect the reaped step execution, persist output, or advance when cancelled mid-flight', async () => {
+    const envelope = buildStepOutputEnvelope({ result: { rows: 42 } });
+    mockPluginRunner.execute.mockResolvedValue({
+      resultPayload: envelope,
+      timedOut: false,
+      errorMessage: null,
+    });
+
+    const result = await executor.execute(mockPlugin, makeContext(), services, meta);
+
+    expect(mockInstanceRepo.updateStepExecution).not.toHaveBeenCalled();
+    expect(mockInstanceRepo.update).not.toHaveBeenCalled();
+    expect(mockEngine.advanceStep).not.toHaveBeenCalled();
+    expect(result.appliedToWorkflow).toBe(false);
+    expect(result.status).toBe('failed');
+    expect(result.instanceState?.status).toBe('failed');
+  });
+});
+
 describe('ScriptStepExecutor reap mode (issue #868)', () => {
   let executor: ScriptStepExecutor;
 
