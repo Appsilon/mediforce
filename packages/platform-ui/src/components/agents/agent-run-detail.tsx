@@ -20,6 +20,7 @@ const STATUS_STYLES: Record<string, string> = {
   error: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
   low_confidence: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
   flagged: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+  interrupted: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
 };
 
 function CollapsibleSection({

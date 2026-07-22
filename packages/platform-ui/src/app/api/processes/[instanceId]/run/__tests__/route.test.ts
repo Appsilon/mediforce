@@ -35,6 +35,7 @@ const mockFireWorkflow = vi.fn();
 const mockAdvanceStep = vi.fn();
 
 const mockActionDispatch = vi.fn();
+const mockMarkStepRunsInterrupted = vi.fn().mockResolvedValue(0);
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
@@ -72,6 +73,7 @@ vi.mock('@/lib/platform-services', () => ({
     modelRegistryRepo: { list: vi.fn().mockResolvedValue([]) },
     actionRegistry: { dispatch: mockActionDispatch },
     engine: { advanceStep: (...args: unknown[]) => mockAdvanceStep(...args) },
+    agentRunner: { markStepRunsInterrupted: (...args: unknown[]) => mockMarkStepRunsInterrupted(...args) },
   }),
 }));
 
@@ -401,6 +403,9 @@ describe('POST /api/processes/[instanceId]/run', () => {
       const [, , , , , freshExecId, reapOpts] = mockExecuteAgentStep.mock.calls[0];
       expect(freshExecId).not.toBe('exec-interrupted');
       expect(reapOpts).toBeUndefined();
+      // The orphaned AgentRun from the interrupted attempt is terminalized before
+      // the fresh dispatch, so it doesn't linger `running` in Agents history.
+      expect(mockMarkStepRunsInterrupted).toHaveBeenCalledWith('inst-1', 'gather-data');
     });
 
     it('[DATA] fails the run when a step exceeds the persisted attempt cap (issue #868)', async () => {

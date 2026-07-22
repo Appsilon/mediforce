@@ -816,6 +816,13 @@ export async function POST(
             );
             if (interruptedForStep.length > 0) {
               console.log(`[auto-runner] Step '${instance.currentStepId}' has ${interruptedForStep.length} execution(s) interrupted by a prior shutdown (deploy) — retrying with a fresh attempt`);
+              // The interrupted attempt left its AgentRun `running` (the SIGTERM
+              // hook only marked the StepExecution). Terminalize it before the
+              // retry spawns a fresh AgentRun, so the old one doesn't linger
+              // `running` in the Agents history forever (ADR-0010 §4). No-op for
+              // script steps (no AgentRun row).
+              const { agentRunner } = getPlatformServices();
+              await agentRunner.markStepRunsInterrupted(instanceId, instance.currentStepId);
             }
 
             const previousStepId = workflowDefinition.transitions.find(
