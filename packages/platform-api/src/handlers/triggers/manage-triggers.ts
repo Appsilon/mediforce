@@ -173,12 +173,25 @@ export async function setTriggerEnabled(
   await loadTriggerOr404(scope, input.namespace, input.definitionName, input.triggerName);
 
   const now = new Date().toISOString();
-  const trigger = await scope.triggers.update(
+  let trigger = await scope.triggers.update(
     input.namespace,
     input.definitionName,
     input.triggerName,
     { enabled: input.enabled, updatedAt: now },
   );
+
+  // Re-anchor the cron fire cursor to start time on re-enable so a schedule
+  // that was stopped across one of its slots never back-fires the missed run
+  // on the next heartbeat. No-op for non-cron rows.
+  if (input.enabled && trigger.type === 'cron') {
+    await scope.triggers.recordTriggered(
+      input.namespace,
+      input.definitionName,
+      input.triggerName,
+      now,
+    );
+    trigger = { ...trigger, lastTriggeredAt: now };
+  }
 
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({

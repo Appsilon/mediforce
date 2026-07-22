@@ -187,6 +187,57 @@ describe('heartbeat handler', () => {
     );
   });
 
+  it('falls back to the newest live version when the default is archived', async () => {
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'versioned', namespace: 'team-alpha', version: 1 }),
+    );
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'versioned', namespace: 'team-alpha', version: 2 }),
+    );
+    // Default points at v2, but v2 is archived — v1 is still runnable.
+    await processRepo.setDefaultWorkflowVersion('team-alpha', 'versioned', 2);
+    await processRepo.setVersionArchived('team-alpha', 'versioned', 2, true);
+    await seedCron({
+      namespace: 'team-alpha',
+      workflowName: 'versioned',
+      name: 'beat',
+      schedule: '*/15 * * * *',
+      lastTriggeredAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    });
+    const fireWorkflow = vi.fn().mockResolvedValue({ instanceId: 'i', status: 'created' as const });
+    const scope = createTestScope({ processRepo, instanceRepo, auditRepo, triggerRepo });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow } });
+
+    const result = await heartbeat({}, scope);
+
+    expect(result.skipped).toHaveLength(0);
+    expect(fireWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({ definitionName: 'versioned', definitionVersion: 1 }),
+    );
+  });
+
+  it('skips a cron row when every version of the target workflow is archived', async () => {
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'shelved', namespace: 'team-alpha', version: 1 }),
+    );
+    await processRepo.setVersionArchived('team-alpha', 'shelved', 1, true);
+    await seedCron({
+      namespace: 'team-alpha',
+      workflowName: 'shelved',
+      name: 'beat',
+      schedule: '*/15 * * * *',
+    });
+    const fireWorkflow = vi.fn();
+    const scope = createTestScope({ processRepo, instanceRepo, auditRepo, triggerRepo });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow } });
+
+    const result = await heartbeat({}, scope);
+
+    expect(fireWorkflow).not.toHaveBeenCalled();
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]).toMatchObject({ triggerName: 'beat', reason: 'No live version' });
+  });
+
   it('skips a cron row whose target workflow is soft-deleted (resolve-and-skip)', async () => {
     await processRepo.saveWorkflowDefinition(
       buildWorkflowDefinition({ name: 'gone', namespace: 'team-alpha', version: 1 }),

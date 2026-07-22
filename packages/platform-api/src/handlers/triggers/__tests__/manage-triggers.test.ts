@@ -152,6 +152,36 @@ describe('trigger handlers (cron on the unified table, ADR-0011)', () => {
     expect(actions).toContain('cron.trigger.enabled');
   });
 
+  it('re-anchors the fire cursor on re-enable so a stopped interval never back-fires', async () => {
+    const scope = buildScope();
+    await createTrigger({ ...cron, schedule: '0 3 * * *', enabled: true }, scope);
+    // Cursor left stale in the past while the schedule is stopped.
+    await triggerRepo.recordTriggered('team-alpha', 'flow', 'nightly', '2026-06-01T03:00:00.000Z');
+    await setTriggerEnabled({ ...base, enabled: false }, scope);
+
+    const before = Date.now();
+    const started = await setTriggerEnabled({ ...base, enabled: true }, scope);
+
+    const anchored = started.trigger.type === 'cron' ? started.trigger.lastTriggeredAt : null;
+    expect(anchored).not.toBe('2026-06-01T03:00:00.000Z');
+    expect(anchored).not.toBeNull();
+    expect(new Date(anchored!).getTime()).toBeGreaterThanOrEqual(before);
+    // Persisted, not only reflected in the return value.
+    const stored = await storedTrigger('nightly');
+    expect(stored?.type === 'cron' && stored.lastTriggeredAt).toBe(anchored);
+  });
+
+  it('does not touch the fire cursor when stopping a trigger', async () => {
+    const scope = buildScope();
+    await createTrigger({ ...cron, schedule: '0 3 * * *', enabled: true }, scope);
+    await triggerRepo.recordTriggered('team-alpha', 'flow', 'nightly', '2026-06-01T03:00:00.000Z');
+
+    const stopped = await setTriggerEnabled({ ...base, enabled: false }, scope);
+    expect(stopped.trigger.type === 'cron' && stopped.trigger.lastTriggeredAt).toBe(
+      '2026-06-01T03:00:00.000Z',
+    );
+  });
+
   it('deletes a trigger', async () => {
     const scope = buildScope();
     await createTrigger({ ...cron, schedule: '0 3 * * *', enabled: true }, scope);

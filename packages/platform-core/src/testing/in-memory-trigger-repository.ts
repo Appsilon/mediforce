@@ -102,4 +102,19 @@ export class InMemoryTriggerRepository implements TriggerRepository {
       }
     }
   }
+
+  async transferWorkflowNamespace(
+    sourceNamespace: string,
+    workflowName: string,
+    targetNamespace: string,
+  ): Promise<void> {
+    const matches = [...this.store.entries()].filter(
+      ([, t]) => t.namespace === sourceNamespace && t.workflowName === workflowName,
+    );
+    for (const [key, trigger] of matches) {
+      this.store.delete(key);
+      const moved = { ...trigger, namespace: targetNamespace };
+      this.store.set(this.key(targetNamespace, workflowName, trigger.name), moved);
+    }
+  }
 }

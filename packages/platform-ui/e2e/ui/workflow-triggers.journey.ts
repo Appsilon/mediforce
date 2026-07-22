@@ -14,15 +14,27 @@ test.describe('Workflow Triggers Journey', () => {
   test('add, stop, and delete a cron trigger from the Triggers tab', async ({ page }) => {
     trackPageErrors(page);
 
+    const triggerName = 'e2e-nightly';
+
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review`);
     await expect(page.getByRole('tab', { name: /runs/i })).toBeVisible({ timeout: 30_000 });
 
     // Open the Triggers tab.
     await page.getByRole('tab', { name: 'Triggers' }).click();
+
+    // Reset: a prior attempt may have left this row behind (Playwright retries
+    // reuse the shared seed data). Delete it before asserting the clean state so
+    // a retry exposes the original failure, not a stale-row setup failure.
+    await expect(
+      page.getByText(triggerName).or(page.getByText(/no triggers yet/i)),
+    ).toBeVisible({ timeout: 10_000 });
+    if (await page.getByText(triggerName).isVisible()) {
+      page.once('dialog', (dialog) => dialog.accept());
+      await page.getByRole('button', { name: 'Delete' }).click();
+    }
     await expect(page.getByText(/no triggers yet/i)).toBeVisible({ timeout: 10_000 });
 
     // Add a cron trigger to this manual-only workflow — no new version needed.
-    const triggerName = 'e2e-nightly';
     await page.getByPlaceholder('nightly-refresh').fill(triggerName);
     await page.getByPlaceholder('0 6 * * *').fill('0 3 * * *');
     await page.getByRole('button', { name: 'Add trigger' }).click();

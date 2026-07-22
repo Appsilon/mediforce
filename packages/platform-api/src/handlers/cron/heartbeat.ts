@@ -71,8 +71,12 @@ function evaluateTrigger(
 type Resolution = { ok: true; def: WorkflowDefinition } | { ok: false; reason: string };
 
 // Resolve the Workflow Definition version a Cron Trigger fires (ADR-0011):
-// the workflow's default version, falling back to latest. Skips deleted,
-// archived, or unresolvable targets so a stale row can never fire a ghost run.
+// the workflow's default version when it is itself runnable, otherwise the
+// newest live (non-archived, non-deleted) version. Both the default pointer and
+// `getLatestVersion` include archived versions, so selecting from them directly
+// would skip a workflow whose head is archived even though an earlier version
+// is still runnable. Skips deleted or fully-archived targets so a stale row can
+// never fire a ghost run.
 async function resolveTarget(
   scope: CallerScope,
   namespace: string,
@@ -81,15 +85,16 @@ async function resolveTarget(
   if (await scope.workflowDefinitions.isNameDeleted(namespace, workflowName)) {
     return { ok: false, reason: 'Workflow deleted' };
   }
-  const defaultVersion = await scope.workflowDefinitions.getDefaultVersion(namespace, workflowName);
-  const version =
-    defaultVersion ?? (await scope.workflowDefinitions.getLatestVersion(namespace, workflowName));
-  if (!version) return { ok: false, reason: 'No resolvable version' };
+  const versions = await scope.workflowDefinitions.listVersions(namespace, workflowName);
+  if (versions.length === 0) return { ok: false, reason: 'No resolvable version' };
 
-  const def = await scope.workflowDefinitions.get(namespace, workflowName, version);
-  if (def === null) return { ok: false, reason: `Version ${version} not found` };
-  if (def.deleted === true) return { ok: false, reason: 'Workflow deleted' };
-  if (def.archived === true) return { ok: false, reason: 'Workflow archived' };
+  const live = versions.filter((v) => v.archived !== true && v.deleted !== true);
+  if (live.length === 0) return { ok: false, reason: 'No live version' };
+
+  const defaultVersion = await scope.workflowDefinitions.getDefaultVersion(namespace, workflowName);
+  const def =
+    live.find((v) => v.version === defaultVersion) ??
+    live.reduce((newest, v) => (v.version > newest.version ? v : newest));
   return { ok: true, def };
 }
 

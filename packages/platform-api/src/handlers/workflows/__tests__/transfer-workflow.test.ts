@@ -3,6 +3,7 @@ import {
   InMemoryAuditRepository,
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
+  InMemoryTriggerRepository,
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
@@ -16,18 +17,21 @@ import { ForbiddenError } from '../../../errors';
 describe('transferWorkflowNamespace handler', () => {
   let processRepo: InMemoryProcessRepository;
   let auditRepo: InMemoryAuditRepository;
+  let triggerRepo: InMemoryTriggerRepository;
 
   beforeEach(() => {
     resetFactorySequence();
     processRepo = new InMemoryProcessRepository();
     const instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository(instanceRepo);
+    triggerRepo = new InMemoryTriggerRepository();
   });
 
   function buildScope(namespaces = ['team-alpha']) {
     return createTestScope({
       processRepo,
       auditRepo,
+      triggerRepo,
       caller: userCaller('user-42', namespaces),
     });
   }
@@ -57,6 +61,38 @@ describe('transferWorkflowNamespace handler', () => {
     expect(events).toHaveLength(1);
     expect(events[0].action).toBe('workflow.transferred');
     expect(events[0].actorId).toBe('user-42');
+  });
+
+  it('transferWorkflowNamespace moves the workflow’s trigger rows with the definition', async () => {
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'flow-move', version: 1, namespace: 'team-alpha' }),
+    );
+    await triggerRepo.create({
+      type: 'cron',
+      namespace: 'team-alpha',
+      workflowName: 'flow-move',
+      name: 'nightly',
+      enabled: true,
+      config: { schedule: '0 3 * * *' },
+      lastTriggeredAt: '2026-07-01T03:00:00.000Z',
+      createdAt: '2026-07-01T00:00:00.000Z',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    });
+    const scope = buildScope(['team-alpha', 'team-beta']);
+
+    await transferWorkflowNamespace(
+      { name: 'flow-move', sourceNamespace: 'team-alpha', targetNamespace: 'team-beta' },
+      scope,
+    );
+
+    expect(await triggerRepo.listByWorkflow('team-alpha', 'flow-move')).toEqual([]);
+    const moved = await triggerRepo.listByWorkflow('team-beta', 'flow-move');
+    expect(moved).toHaveLength(1);
+    expect(moved[0].namespace).toBe('team-beta');
+    expect(moved[0].name).toBe('nightly');
+    // Enabled state and fire cursor survive the move so the schedule is intact.
+    expect(moved[0].enabled).toBe(true);
+    expect(moved[0].type === 'cron' && moved[0].lastTriggeredAt).toBe('2026-07-01T03:00:00.000Z');
   });
 
   it('transferWorkflowNamespace rejects when caller lacks membership on the source namespace', async () => {
