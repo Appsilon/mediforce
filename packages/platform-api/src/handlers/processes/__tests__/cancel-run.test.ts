@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   InMemoryAuditRepository,
+  InMemoryAgentRunRepository,
   InMemoryHumanTaskRepository,
   InMemoryProcessInstanceRepository,
+  buildAgentRun,
   buildHumanTask,
   buildProcessInstance,
+  buildStepExecution,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { cancelRun } from '../cancel-run';
@@ -22,12 +25,14 @@ describe('cancelRun handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;
   let auditRepo: InMemoryAuditRepository;
   let humanTaskRepo: InMemoryHumanTaskRepository;
+  let agentRunRepo: InMemoryAgentRunRepository;
 
   beforeEach(() => {
     resetFactorySequence();
     instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository(instanceRepo);
     humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
+    agentRunRepo = new InMemoryAgentRunRepository(instanceRepo);
   });
 
   describe('happy path', () => {
@@ -299,6 +304,57 @@ describe('cancelRun handler', () => {
 
       const events = await auditRepo.getByProcess('inst-a');
       expect(events[0]!.outputSnapshot).toMatchObject({ cancelledTasks: 2 });
+    });
+  });
+
+  describe('in-flight execution cascade', () => {
+    it('marks running step executions and agent runs terminal when the run is cancelled', async () => {
+      await instanceRepo.create(
+        buildProcessInstance({
+          id: 'inst-a',
+          namespace: 'team-alpha',
+          status: 'running',
+          currentStepId: 'draft-plan',
+        }),
+      );
+      await instanceRepo.addStepExecution(
+        'inst-a',
+        buildStepExecution({
+          id: 'exec-running',
+          instanceId: 'inst-a',
+          stepId: 'draft-plan',
+          status: 'running',
+          completedAt: null,
+          error: null,
+        }),
+      );
+      await agentRunRepo.create(
+        buildAgentRun({
+          id: 'agent-running',
+          processInstanceId: 'inst-a',
+          stepId: 'draft-plan',
+          status: 'running',
+          envelope: null,
+          completedAt: null,
+        }),
+      );
+      const scope = createTestScope({
+        instanceRepo,
+        auditRepo,
+        agentRunRepo,
+        caller: userCaller('u-1', ['team-alpha']),
+      });
+
+      await cancelRun({ runId: 'inst-a' }, scope);
+
+      const [stepExecution] = await instanceRepo.getStepExecutions('inst-a');
+      expect(stepExecution!.status).toBe('failed');
+      expect(stepExecution!.completedAt).not.toBeNull();
+      expect(stepExecution!.error).toBe('Cancelled by user');
+
+      const [agentRun] = await agentRunRepo.getByInstanceId('inst-a');
+      expect(agentRun!.status).toBe('error');
+      expect(agentRun!.completedAt).toBe(stepExecution!.completedAt);
     });
   });
 });

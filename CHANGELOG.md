@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Fixed
+- Cancelling a run now reaps any in-flight step execution and agent run rows, so cancelled runs no longer leave the current step rendering as `running` forever [#912](https://github.com/Appsilon/mediforce/issues/912).
+
 ## [2026-07-19]
 
 ### Added

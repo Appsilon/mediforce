@@ -78,7 +78,9 @@ export async function getProcessSteps(
         status = hasOutput ? 'completed' : 'pending';
       }
     } else if (step.id === currentStepId) {
-      status = 'running';
+      status = instance.status === 'failed' && latestExec?.status === 'failed'
+        ? 'failed'
+        : 'running';
     } else {
       const hasCompleted =
         stepExecs.some((e) => e.status === 'completed') || stepVariables !== null;
