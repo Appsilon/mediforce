@@ -37,10 +37,21 @@ const validReviewVerdict = {
 
 describe('StepExecutionStatusSchema', () => {
   it('should accept all valid status values', () => {
-    for (const status of ['pending', 'running', 'completed', 'failed']) {
+    for (const status of ['pending', 'running', 'completed', 'failed', 'escalated', 'paused', 'interrupted']) {
       const result = StepExecutionStatusSchema.safeParse(status);
       expect(result.success).toBe(true);
     }
+  });
+
+  it('should accept the interrupted status (ADR-0010 §4 deploy fast-path)', () => {
+    const result = StepExecutionSchema.safeParse({
+      ...validStepExecution,
+      status: 'interrupted',
+      output: null,
+      completedAt: '2026-02-26T10:01:30Z',
+      error: 'Interrupted by platform-ui shutdown (deploy) — will retry',
+    });
+    expect(result.success).toBe(true);
   });
 
   it('should reject an invalid status value', () => {
