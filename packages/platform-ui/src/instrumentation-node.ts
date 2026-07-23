@@ -46,9 +46,13 @@ export function validateEnv(): void {
     const googleEnabled = typeof process.env.GOOGLE_CLIENT_ID === 'string' && process.env.GOOGLE_CLIENT_ID !== '';
     const passwordEnabled = process.env.ENABLE_PASSWORD_AUTH === 'true';
     const oidcEnabled = typeof process.env.OIDC_ISSUER === 'string' && process.env.OIDC_ISSUER !== '';
-    if (!googleEnabled && !passwordEnabled && !oidcEnabled) {
+    // A magic-link-only deployment is a valid provider set. `ENABLE_MAGIC_LINK`
+    // with email disabled/unconfigured is caught at auth-config build (auth.ts),
+    // so no duplicate check here.
+    const magicLinkEnabled = process.env.ENABLE_MAGIC_LINK === 'true';
+    if (!googleEnabled && !passwordEnabled && !oidcEnabled && !magicLinkEnabled) {
       errors.push(
-        'No auth provider is configured. Set GOOGLE_CLIENT_ID, ENABLE_PASSWORD_AUTH=true, or OIDC_ISSUER '
+        'No auth provider is configured. Set GOOGLE_CLIENT_ID, ENABLE_PASSWORD_AUTH=true, ENABLE_MAGIC_LINK=true, or OIDC_ISSUER '
         + '(ADR-0002 §4) — otherwise no one can sign in.',
       );
     }

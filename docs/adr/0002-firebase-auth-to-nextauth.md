@@ -108,9 +108,8 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
      lands; the MVP at most carries one smoke test against a local Keycloak.
      Shipped now because it *is* the on-prem SSO GTM story and costs almost
      nothing dormant.
-   - **Email magic link** — **deferred** (was a fourth provider in the
-     draft). Needs SMTP wiring + the verification-token flow, which nobody
-     needs today. Add when a deployment without Google/OIDC/password asks.
+   - **Email magic link** — deferred at cutover, **now implemented** post-cutover
+     (`ENABLE_MAGIC_LINK`). See the 2026-07-23 addendum (Gap 1) at the end of this ADR.
 
 4a. **Email-domain allowlist (decision 2026-06-16).** A deployment-level
    `ALLOWED_EMAIL_DOMAINS` env (comma-separated, e.g. `appsilon.com`) is
@@ -346,8 +345,11 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
   when a customer with >100 users asks.
 - **Federated logout / single sign-out** — supported by NextAuth for OIDC
   but needs wiring. Future ADR.
-- **Firebase Auth password hash migration** — explicitly deferred. Active
-  password users re-enroll via magic link or set a new password.
+- **Firebase Auth password hash migration** — deferred at cutover, **now
+  implemented** post-cutover as migrate-on-login (verify Firebase scrypt at
+  sign-in, rehash to bcrypt on first success). See the 2026-07-23 addendum
+  (Gap 2). Magic-link (Gap 1) remains the alternative for deployments that
+  prefer a reset over transparent migration.
 
 ## Open questions for review
 
@@ -367,8 +369,8 @@ see below.)
   anyway). See §3.
 - **Email-domain allowlist.** Added: `ALLOWED_EMAIL_DOMAINS` enforced in the
   `signIn` callback — mandatory in spirit once Google is on. See §4a.
-- **Magic-link provider.** Deferred (SMTP + verification-token flow; nobody
-  needs it today). See §4.
+- **Magic-link provider.** Deferred at cutover; implemented post-cutover as
+  Gap 1 (`ENABLE_MAGIC_LINK`). See §4 and the 2026-07-23 addendum.
 
 - **Auth carrier (browser → API).** Resolved: cookie-native, same-origin
   (decision §6). The browser uses the NextAuth httpOnly session cookie;
@@ -378,3 +380,59 @@ see below.)
   completed 2026-05-31, PR #534). Mediforce now runs on Postgres + Firebase
   Auth — exactly the stable hybrid this ADR's §8 assumed. ADR-0002 is the
   next cutover; no bundling question remains.
+
+## Addendum (2026-07-23) — password auth completion (Gap 1 & Gap 2)
+
+The staging cutover landed first-password delivery and Firebase password
+migration as deliberate follow-ups (issues #1001, #1002). Both are now built.
+This addendum records the two decisions the follow-up code references as
+"ADR-0002 Gap 1" and "ADR-0002 Gap 2".
+
+### The problem
+
+A pure password-only user (no Google, no existing session) had no way to obtain
+a FIRST password after the cutover: `set-password` needs a session, and the
+seed-based invite writes no password hash — a chicken-and-egg dead end
+(#1001 recovery, #1002 invite dead-end). Separately, existing Firebase password
+users could sign in before the cutover but not after, since their credential
+never moved.
+
+### Gap 1 — first-password delivery via magic-link (implemented)
+
+Enable the **Auth.js Email provider** (`ENABLE_MAGIC_LINK`, reusing the
+`auth_verification_tokens` table and the configured Mailgun/SMTP sender). Unlike
+Credentials, the Email provider is fully compatible with the `database` session
+strategy — it mints the same `auth_sessions` row + cookie as Google, so
+revocation (§3) is unchanged. The link is gated: it is sent **only** to an
+address that already belongs to an `auth_users` row on an allowlisted domain
+(no self-registration; a miss returns silently for anti-enumeration). After
+signing in, the user sets a first password via the existing
+`POST /api/users/set-password`. This closes #1001 and #1002 with one provider.
+
+Chosen over an invite-minted one-time set-password link (narrower, still custom
+token plumbing) and admin-initiated reset (no self-service recovery).
+
+### Gap 2 — Firebase password migration via migrate-on-login (implemented)
+
+Firebase scrypt hashes cannot be converted to bcrypt offline, but they **can**
+be verified at login and rehashed. Two columns (`auth_users.firebase_password_hash`,
+`firebase_salt`, migration 0035) carry the per-user Firebase credential; the seed
+copies them only with `--carry-legacy-passwords`. At sign-in, a user with no
+bcrypt hash but a legacy scrypt credential is verified with a native-crypto
+Firebase-scrypt verifier; on success the plaintext is bcrypt-hashed, written, and
+the legacy columns cleared in one atomic update — transparent, at most once per
+user. The project-level scrypt params (`base64_signer_key`, `salt_separator`,
+`rounds`, `mem_cost`) are **not** in the `firebase auth:export` file; they are
+pulled once from the Firebase console and supplied as `FIREBASE_SCRYPT_*` env.
+Params absent ⇒ migrate-on-login is off (a legitimate "feature off"); params
+partially set ⇒ fail loud (misconfiguration).
+
+**Scope note.** On staging this is near-moot (both real password-only accounts
+can use Google or magic-link), so magic-link alone would suffice there. It is
+kept for on-prem / customer deployments that prefer transparent migration over
+forcing every password user through a reset.
+
+Constraints preserved: no new Server Actions (the migrate-on-login write stays
+in the cookie-setting `password-login` route — the same accepted exception as
+password sign-in); `database` session strategy unchanged (revocation still used
+by `set-password`); no silent schema fallbacks.

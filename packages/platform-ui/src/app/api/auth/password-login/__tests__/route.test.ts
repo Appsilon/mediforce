@@ -4,12 +4,19 @@ import { hashSync } from 'bcryptjs';
 const mockFindPasswordCredentialByEmail = vi.fn();
 const mockCreateDatabaseSession = vi.fn();
 const mockRecordSignIn = vi.fn();
+const mockPromoteFirebaseCredentialToBcrypt = vi.fn();
+const mockVerifyFirebasePassword = vi.fn();
+const mockResolveFirebaseScryptParams = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
   getSharedPostgresClient: () => ({ db: {} }),
   findPasswordCredentialByEmail: (...args: unknown[]) => mockFindPasswordCredentialByEmail(...args),
   createDatabaseSession: (...args: unknown[]) => mockCreateDatabaseSession(...args),
   recordSignIn: (...args: unknown[]) => mockRecordSignIn(...args),
+  promoteFirebaseCredentialToBcrypt: (...args: unknown[]) =>
+    mockPromoteFirebaseCredentialToBcrypt(...args),
+  verifyFirebasePassword: (...args: unknown[]) => mockVerifyFirebasePassword(...args),
+  resolveFirebaseScryptParams: (...args: unknown[]) => mockResolveFirebaseScryptParams(...args),
   SESSION_TTL_MS: 30 * 24 * 60 * 60 * 1000,
 }));
 
@@ -37,7 +44,12 @@ describe('/api/auth/password-login', () => {
       name: 'Alice',
       image: null,
       passwordHash: PASSWORD_HASH,
+      firebasePasswordHash: null,
+      firebaseSalt: null,
     });
+    // Migrate-on-login off by default; the Firebase-legacy cases opt in.
+    mockResolveFirebaseScryptParams.mockReturnValue(null);
+    mockVerifyFirebasePassword.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -135,6 +147,61 @@ describe('/api/auth/password-login', () => {
     // an anonymous caller which domains this deployment accepts.
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: 'Incorrect email or password.' });
+    expect(mockCreateDatabaseSession).not.toHaveBeenCalled();
+  });
+
+  const FIREBASE_LEGACY_RECORD = {
+    id: 'user-1',
+    email: 'alice@example.com',
+    name: 'Alice',
+    image: null,
+    passwordHash: null,
+    firebasePasswordHash: 'lSrfV15cpx95==',
+    firebaseSalt: '42xEC+ixf3L2lw==',
+  };
+  const SCRYPT_PARAMS = { signerKey: 'k', saltSeparator: 's', rounds: 8, memCost: 14 };
+
+  it('migrates a Firebase-legacy user on a correct password: rehashes to bcrypt and opens a session', async () => {
+    mockFindPasswordCredentialByEmail.mockResolvedValue(FIREBASE_LEGACY_RECORD);
+    mockResolveFirebaseScryptParams.mockReturnValue(SCRYPT_PARAMS);
+    mockVerifyFirebasePassword.mockReturnValue(true);
+
+    const res = await POST(loginRequest({ email: 'alice@example.com', password: PASSWORD }));
+
+    expect(res.status).toBe(200);
+    expect(mockPromoteFirebaseCredentialToBcrypt).toHaveBeenCalledTimes(1);
+    const [, uid, bcryptHash] = mockPromoteFirebaseCredentialToBcrypt.mock.calls[0] as [
+      unknown,
+      string,
+      string,
+    ];
+    expect(uid).toBe('user-1');
+    expect(bcryptHash.startsWith('$2')).toBe(true);
+    expect(mockCreateDatabaseSession).toHaveBeenCalledTimes(1);
+    expect(res.headers.get('set-cookie') ?? '').toContain('authjs.session-token=');
+  });
+
+  it('rejects a Firebase-legacy user on a wrong password without migrating', async () => {
+    mockFindPasswordCredentialByEmail.mockResolvedValue(FIREBASE_LEGACY_RECORD);
+    mockResolveFirebaseScryptParams.mockReturnValue(SCRYPT_PARAMS);
+    mockVerifyFirebasePassword.mockReturnValue(false);
+
+    const res = await POST(loginRequest({ email: 'alice@example.com', password: 'wrong' }));
+
+    expect(res.status).toBe(401);
+    expect(mockPromoteFirebaseCredentialToBcrypt).not.toHaveBeenCalled();
+    expect(mockCreateDatabaseSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects a Firebase-legacy user when migrate-on-login is off (params absent), without crashing', async () => {
+    mockFindPasswordCredentialByEmail.mockResolvedValue(FIREBASE_LEGACY_RECORD);
+    mockResolveFirebaseScryptParams.mockReturnValue(null);
+
+    const res = await POST(loginRequest({ email: 'alice@example.com', password: PASSWORD }));
+
+    expect(res.status).toBe(401);
+    expect(mockVerifyFirebasePassword).not.toHaveBeenCalled();
+    expect(mockPromoteFirebaseCredentialToBcrypt).not.toHaveBeenCalled();
     expect(mockCreateDatabaseSession).not.toHaveBeenCalled();
   });
 

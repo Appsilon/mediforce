@@ -117,7 +117,7 @@ PRODUCTION_MARKERS = ("mediforce-platform", "production", "prod")
 # Firebase project ids known to be non-production. Anything not listed here
 # demands the explicit --allow-unlisted-env opt-in (a new env is a conscious
 # choice, never a default). Add a new environment's project id as it is cut over.
-KNOWN_STAGING_PROJECTS = frozenset({"mediforce-1c761"})
+KNOWN_STAGING_PROJECTS = frozenset({"mediforce-1c761", "mediforce-cdisc"})
 
 SEED_CONTAINER_IMAGE = "node:22-bookworm"
 DEFAULT_REPO_DIR = "/opt/mediforce"

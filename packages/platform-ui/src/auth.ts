@@ -12,8 +12,13 @@ import {
   authVerificationTokens,
   getUserRoles,
   recordSignIn,
+  resolveEmailSenderFromEnv,
+  findPasswordCredentialByEmail,
 } from '@mediforce/platform-infra';
+import type { Database } from '@mediforce/platform-infra';
 import { parseAllowedDomains, isEmailDomainAllowed } from '@/lib/email-allowlist';
+import { buildMagicLinkEmail } from '@/lib/magic-link-email';
+import { shouldSendMagicLink } from '@/lib/magic-link-gate';
 
 /**
  * NextAuth (Auth.js v5) — the single source of truth for authentication after
@@ -40,7 +45,7 @@ function buildAdapter(): Adapter {
   });
 }
 
-function buildProviders(): Provider[] {
+function buildProviders(db: Database): Provider[] {
   const providers: Provider[] = [];
 
   if (process.env.GOOGLE_CLIENT_ID) {
@@ -60,7 +65,50 @@ function buildProviders(): Provider[] {
   // Password sign-in lives in `/api/auth/password-login`, not here — see the
   // module docblock.
 
-  // Magic-link (Email) provider is DEFERRED for the MVP (ADR-0002 §4).
+  // Magic-link (Email) provider (ADR-0002 §4). Fully compatible with database
+  // sessions: it mints the same `auth_sessions` row + cookie as Google. After
+  // signing in the user sets a first password via `POST /api/users/set-password`.
+  if (process.env.ENABLE_MAGIC_LINK === 'true') {
+    // Reuse the shared resolver so magic-link and platform-services agree on
+    // the active provider. `null` means email is disabled — fail loud rather
+    // than silently drop the only sign-in method the deployment enabled. A
+    // misconfiguration throws from within the resolver (also loud).
+    const resolvedEmail = resolveEmailSenderFromEnv();
+    if (resolvedEmail === null) {
+      throw new Error(
+        'ENABLE_MAGIC_LINK=true requires an email provider (Mailgun/SMTP) and ' +
+        'MEDIFORCE_DISABLE_EMAIL must not be set.',
+      );
+    }
+    providers.push({
+      id: 'email',
+      type: 'email',
+      name: 'Email',
+      from: resolvedEmail.from,
+      // 15-minute link validity.
+      maxAge: 60 * 15,
+      async sendVerificationRequest(params: { identifier: string; url: string }) {
+        const { identifier, url } = params;
+        // Account-creation gate (ADR-0002 §4). The Email provider would
+        // otherwise let ANY address request a link, and the adapter would
+        // self-register a new `auth_users` row on callback. Only send when the
+        // address already belongs to a user AND its domain is allowlisted; the
+        // adapter can never create a user because no link was ever minted.
+        // On a miss we return WITHOUT sending and WITHOUT throwing, so the UI
+        // shows the same "check your email" either way (anti-enumeration).
+        const credential = await findPasswordCredentialByEmail(db, identifier);
+        const domainAllowed = isEmailDomainAllowed(
+          identifier,
+          parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS),
+        );
+        if (!shouldSendMagicLink({ userExists: credential !== null, domainAllowed })) {
+          return;
+        }
+        const { subject, text, html } = buildMagicLinkEmail(url);
+        await resolvedEmail.send({ to: [identifier], subject, text, html });
+      },
+    } as Provider);
+  }
 
   if (process.env.OIDC_ISSUER) {
     providers.push({
@@ -88,7 +136,7 @@ export function buildAuthConfig(): NextAuthConfig {
     session: { strategy: 'database' },
     trustHost: true,
     pages: { signIn: '/login' },
-    providers: buildProviders(),
+    providers: buildProviders(db),
     callbacks: {
       async signIn({ user }) {
         // ADR-0002 §4a: reject a sign-in whose email domain is not allowlisted.

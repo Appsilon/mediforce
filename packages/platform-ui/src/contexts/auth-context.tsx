@@ -18,8 +18,10 @@ interface AuthContextValue {
   mustChangePassword: boolean;
   emailAuthEnabled: boolean | null; // null = provider list not loaded yet
   googleAuthEnabled: boolean | null; // null = provider list not loaded yet
+  magicLinkEnabled: boolean | null; // null = provider list not loaded yet
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
+  signInWithMagicLink: (email: string) => Promise<void>;
   clearMustChangePassword: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -39,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status, update: refreshSession } = useSession();
   const [emailAuthEnabled, setEmailAuthEnabled] = React.useState<boolean | null>(null);
   const [googleAuthEnabled, setGoogleAuthEnabled] = React.useState<boolean | null>(null);
+  const [magicLinkEnabled, setMagicLinkEnabled] = React.useState<boolean | null>(null);
   const qc = useQueryClient();
 
   const user = session?.user ?? null;
@@ -51,10 +54,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let active = true;
     getProviders()
       .then((providers) => {
-        if (active) setGoogleAuthEnabled(providers?.google !== undefined);
+        if (active) {
+          setGoogleAuthEnabled(providers?.google !== undefined);
+          setMagicLinkEnabled(providers?.email !== undefined);
+        }
       })
       .catch(() => {
-        if (active) setGoogleAuthEnabled(false);
+        if (active) {
+          setGoogleAuthEnabled(false);
+          setMagicLinkEnabled(false);
+        }
       });
     fetch(PASSWORD_LOGIN_PATH)
       .then((res) => res.json())
@@ -118,6 +127,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [refreshSession],
   );
 
+  const signInWithMagicLink = React.useCallback(async (email: string) => {
+    // The Email provider mints the same `auth_sessions` row + cookie as Google.
+    // `redirect: true` lets Auth.js send the browser to its verify-request page;
+    // this resolves on the normal redirect, so callers must not treat it as an
+    // error path.
+    await signIn('email', { email, redirect: true, callbackUrl: '/workspace-selection' });
+  }, []);
+
   const clearMustChangePassword = React.useCallback(async () => {
     await mediforce.users.clearMustChangePassword();
     // refetchQueries (not invalidateQueries) so the `me` cache holds the fresh
@@ -139,8 +156,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         mustChangePassword,
         emailAuthEnabled,
         googleAuthEnabled,
+        magicLinkEnabled,
         signInWithGoogle,
         signInWithEmail,
+        signInWithMagicLink,
         clearMustChangePassword,
         signOut,
       }}
