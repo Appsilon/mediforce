@@ -226,12 +226,20 @@ export {
   ListModelsToolSchema,
   WORKFLOW_ASSISTANT_TOOLS,
   WORKFLOW_ASSISTANT_DEFAULT_MODEL,
+  WorkflowAssistantToolCallSchema,
   type AddStepTool,
   type UpdateStepTool,
   type RemoveStepTool,
   type ListModelsTool,
   type WorkflowAssistantToolName,
+  type WorkflowAssistantToolCall,
 } from './workflow-assistant-tools';
+
+export {
+  applyWorkflowAssistantToolCalls,
+  type ToolCallOutcome,
+  type ApplyToolCallsResult,
+} from './workflow-assistant-apply';
 
 export {
   ConversationTurnSchema,

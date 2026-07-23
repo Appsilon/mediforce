@@ -2,9 +2,7 @@ import { z } from 'zod';
 import {
   WorkflowStepSchema,
   TransitionSchema,
-  AddStepToolSchema,
-  UpdateStepToolSchema,
-  RemoveStepToolSchema,
+  WorkflowAssistantToolCallSchema,
 } from '@mediforce/platform-core';
 
 export const WorkflowAssistantMessageSchema = z.object({
@@ -22,11 +20,7 @@ export const AskWorkflowAssistantInputSchema = z.object({
 });
 export type AskWorkflowAssistantInput = z.infer<typeof AskWorkflowAssistantInputSchema>;
 
-export const WorkflowAssistantToolCallSchema = z.discriminatedUnion('tool', [
-  z.object({ tool: z.literal('add_step'), arguments: AddStepToolSchema }),
-  z.object({ tool: z.literal('update_step'), arguments: UpdateStepToolSchema }),
-  z.object({ tool: z.literal('remove_step'), arguments: RemoveStepToolSchema }),
-]);
+/** Re-exported from platform-core so `@mediforce/platform-api/contract` consumers keep a single import site. */
 export type WorkflowAssistantToolCall = z.infer<typeof WorkflowAssistantToolCallSchema>;
 
 export const AskWorkflowAssistantOutputSchema = z.object({

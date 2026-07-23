@@ -107,4 +107,12 @@ export const ListModelsToolSchema = z.object({
 });
 export type ListModelsTool = z.infer<typeof ListModelsToolSchema>;
 
+/** A single canvas-mutation tool call, discriminated on `tool`. */
+export const WorkflowAssistantToolCallSchema = z.discriminatedUnion('tool', [
+  z.object({ tool: z.literal('add_step'), arguments: AddStepToolSchema }),
+  z.object({ tool: z.literal('update_step'), arguments: UpdateStepToolSchema }),
+  z.object({ tool: z.literal('remove_step'), arguments: RemoveStepToolSchema }),
+]);
+export type WorkflowAssistantToolCall = z.infer<typeof WorkflowAssistantToolCallSchema>;
+
 export const WORKFLOW_ASSISTANT_DEFAULT_MODEL = 'anthropic/claude-sonnet-4';

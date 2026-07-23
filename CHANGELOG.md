@@ -101,6 +101,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - **Decision steps now route natively by verdict**, like review steps: the engine follows a decision step's verdict targets, and the step editor exposes verdict routing for both `review` and `decision` step types.
 - **Registering a workflow now rejects structurally-invalid definitions** — the graph (reachability, terminal step, dangling transitions/verdict targets) and step references are validated at registration, not just schema-parsed. Note: a previously-stored definition that is incomplete can no longer be re-registered until fixed.
 - The **workflow `validate` endpoint / CLI preflight now runs the same graph + reference gate** as register, so a definition can no longer pass `validate` and then fail `register`.
+- Saving a workflow (new workflow or new version) now lands on the workflow's **Runs** section instead of the just-saved definition editor; **Save & Start Run** is unchanged.
 
 ### Added
 - `ALLOWED_EMAIL_DOMAINS="*"` is an explicit, logged opt-out that lets any email domain sign in via Google/OIDC — boot WARNs loudly that the restriction is disabled, while an empty/unset allowlist still fails boot (ADR-0002 §4a).
