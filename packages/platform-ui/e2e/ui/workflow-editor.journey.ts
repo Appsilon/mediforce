@@ -33,6 +33,24 @@ function executorButton(page: import('@playwright/test').Page, executor: 'human'
   return page.getByRole('button', { name: labels[executor], exact: true });
 }
 
+/**
+ * Assert the source-code CodeMirror editor contains `text`, scrolling it down
+ * as needed. CodeMirror virtualizes: only on-screen lines are in the DOM, so a
+ * step near the bottom of a long document isn't matchable until scrolled into
+ * view. Retries scroll-then-check until the text renders.
+ */
+async function expectJsonEditorContains(page: import('@playwright/test').Page, text: string) {
+  // The editor's `.cm-scroller` is `overflow: visible`, so the surrounding modal
+  // body (an `overflow-y-auto` div wrapping `.cm-editor`) is what actually
+  // scrolls and drives CodeMirror's line virtualization.
+  const scroller = page.locator('div.overflow-y-auto').filter({ has: page.locator('.cm-editor') });
+  const content = page.locator('.cm-content');
+  await expect(async () => {
+    await scroller.evaluate((el) => { el.scrollTop += 400; });
+    await expect(content).toContainText(text, { timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 test.describe('Workflow Editor Journey', () => {
@@ -81,8 +99,10 @@ test.describe('Workflow Editor Journey', () => {
     await expect(header.getByText(/you are editing workflow version/i)).toBeVisible();
     await expect(header.getByText(/v1/)).toBeVisible();
 
-    // Save button is always enabled — clicking it opens the version-name dialog
-    const saveButton = page.getByRole('button', { name: /save new version/i });
+    // Save button is always enabled — clicking it opens the version-name dialog.
+    // (The header exposes a plain "Save"; "Save new version" is the dialog's
+    // confirm label.)
+    const saveButton = page.getByRole('button', { name: 'Save', exact: true });
     await expect(saveButton).toBeVisible();
     await expect(saveButton).toBeEnabled();
 
@@ -225,7 +245,7 @@ test.describe('Workflow Editor Journey', () => {
 
   // ── Source code modal ─────────────────────────────────────────────────────
 
-  test('workflow source code modal shows live yaml preview', async ({ page }) => {
+  test('workflow source code modal shows live json preview', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
@@ -236,14 +256,14 @@ test.describe('Workflow Editor Journey', () => {
     // Modal shows the CodeMirror editor
     await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
 
-    // YAML content contains the entry step id. (CodeMirror virtualizes: only
+    // JSON content contains the entry step id. (CodeMirror virtualizes: only
     // on-screen lines are in the DOM, so assert the top-of-document step, not
     // one further down like human-review.)
-    const yamlContent = page.locator('.cm-content');
-    await expect(yamlContent).toContainText('vendor-assessment', { timeout: 5_000 });
+    const jsonContent = page.locator('.cm-content');
+    await expect(jsonContent).toContainText('vendor-assessment', { timeout: 5_000 });
 
     // Apply button is available inside the modal
-    await expect(page.getByRole('button', { name: /apply yaml/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /apply json/i })).toBeVisible();
   });
 
   // ── Source editor is modal-gated (not an always-open panel) ───────────────
@@ -259,7 +279,7 @@ test.describe('Workflow Editor Journey', () => {
     // It appears only after opening the source-code modal
     await page.getByRole('button', { name: /workflow source code/i }).click();
     await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('button', { name: /apply yaml/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /apply json/i })).toBeVisible();
   });
 
   // ── Create new workflow ───────────────────────────────────────────────────
@@ -271,8 +291,9 @@ test.describe('Workflow Editor Journey', () => {
     // Template canvas already has three steps: draft, ai-review, done
     await expect(page.locator('.react-flow__node')).toHaveCount(3, { timeout: 8_000 });
 
-    // Save button starts disabled (all required fields empty)
-    const saveButton = page.getByRole('button', { name: /publish workflow/i });
+    // Save button starts disabled (all required fields empty). The header shows
+    // a plain "Save"; "Publish workflow" is the dialog's confirm label.
+    const saveButton = page.getByRole('button', { name: 'Save', exact: true });
     await expect(saveButton).toBeDisabled();
 
     // Fill Workflow name
@@ -295,10 +316,9 @@ test.describe('Workflow Editor Journey', () => {
     await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('v1 — initial');
     await expect(page.getByText(/will be saved as/i)).toBeVisible();
 
-    // Confirm in dialog → redirect to the new definition page
-    // Use .last() because the dialog confirm button is the second "Publish workflow"
-    // button in the DOM (the first is the disabled header button behind the overlay).
-    await page.getByRole('button', { name: /publish workflow/i }).last().click();
+    // Confirm in dialog → redirect to the new definition page. "Publish workflow"
+    // is the dialog's confirm label (the header button is "Save").
+    await page.getByRole('button', { name: /publish workflow/i }).click();
     await page.waitForURL(/\/workflows\/e2e-test-workflow\/definitions\/\d+/, { timeout: 20_000 });
 
     // On the definition page the workflow name is shown as a heading
@@ -316,7 +336,7 @@ test.describe('Workflow Editor Journey', () => {
 
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
 
-    const saveButton = page.getByRole('button', { name: /publish workflow/i });
+    const saveButton = page.getByRole('button', { name: 'Save', exact: true });
 
     // Workflow name that slugifies to empty (only special chars → '')
     await page.getByPlaceholder('Add a Workflow Name…').fill('---');
@@ -345,9 +365,9 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.locator('[data-testid="step-editor"]')).not.toBeVisible({ timeout: 5_000 });
   });
 
-  // ── Executor switching clears stale YAML fields ───────────────────────────
+  // ── Executor switching clears stale JSON fields ───────────────────────────
 
-  test('executor chosen at creation is locked in the editor and reflected in YAML', async ({ page }) => {
+  test('executor chosen at creation is locked in the editor and reflected in wd.json', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
 
@@ -374,13 +394,15 @@ test.describe('Workflow Editor Journey', () => {
       stepEditor.getByTitle(/executor is set at creation/i).getByText('Agent', { exact: true }),
     ).toBeVisible();
 
-    // Deselect, then open the source modal to verify YAML reflects the agent executor
+    // Deselect, then open the source modal to verify wd.json reflects the agent executor
     await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
     await page.getByRole('button', { name: /workflow source code/i }).click();
-    const yamlContent = page.locator('.cm-content');
-    await expect(yamlContent).toBeVisible({ timeout: 10_000 });
-    await expect(yamlContent).toContainText('executor: agent');
-    await expect(yamlContent).toContainText('opencode-agent');
+    const jsonContent = page.locator('.cm-content');
+    await expect(jsonContent).toBeVisible({ timeout: 10_000 });
+    // The new agent step is further down the document than the on-screen lines;
+    // scroll the editor until its executor/plugin render.
+    await expectJsonEditorContains(page, '"executor": "agent"');
+    await expectJsonEditorContains(page, 'opencode-agent');
   });
 
   // ── Cowork step ───────────────────────────────────────────────────────────
@@ -420,9 +442,11 @@ test.describe('Workflow Editor Journey', () => {
     // Deselect, then open the source modal to verify the cowork executor
     await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
     await page.getByRole('button', { name: /workflow source code/i }).click();
-    const yamlContent = page.locator('.cm-content');
-    await expect(yamlContent).toBeVisible({ timeout: 10_000 });
-    await expect(yamlContent).toContainText('executor: cowork', { timeout: 5_000 });
+    const jsonContent = page.locator('.cm-content');
+    await expect(jsonContent).toBeVisible({ timeout: 10_000 });
+    // Scroll the editor until the new cowork step's executor renders (CodeMirror
+    // virtualizes off-screen lines).
+    await expectJsonEditorContains(page, '"executor": "cowork"');
   });
 
   test('cowork step MCP server editor supports add, fill, transport toggle, and remove', async ({ page }) => {
@@ -476,5 +500,30 @@ test.describe('Workflow Editor Journey', () => {
     // Remove — empty state returns.
     await sidePanel.locator('button').filter({ has: page.locator('svg.lucide-trash-2') }).click();
     await expect(sidePanel.getByText(/No MCP servers configured/i)).toBeVisible();
+  });
+
+  // ── Save & Start Run resolver flow ─────────────────────────────────────────
+
+  test('Save & Start Run opens the version dialog and cancel aborts without starting', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    // The header exposes both a plain "Save" and a "Save & Start Run" button.
+    const saveAndStart = page.getByRole('button', { name: /save & start run/i });
+    await expect(saveAndStart).toBeEnabled({ timeout: 10_000 });
+
+    // Clicking it runs onBeforeStart, which parks a resolver and opens the
+    // version-name dialog (the resolver-ref coordination this branch adds).
+    await saveAndStart.click();
+    await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 5_000 });
+
+    // Cancelling resolves the parked start with `undefined`: the dialog closes,
+    // no run is started, we stay on the definition page, and the button is idle
+    // again (not stuck in the "Saving…" pending state).
+    await page.getByRole('button', { name: /^cancel$/i }).click();
+    await expect(page.getByRole('heading', { name: /name this version/i })).not.toBeVisible();
+    await expect(page).toHaveURL(/\/definitions\/1$/);
+    await expect(page.getByRole('button', { name: /save & start run/i })).toBeEnabled();
   });
 });

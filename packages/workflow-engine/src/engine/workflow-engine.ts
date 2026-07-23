@@ -19,7 +19,7 @@ import type {
   ProcessNotificationConfig,
 } from '@mediforce/platform-core';
 import type { Selection, TaskVerdict } from '@mediforce/platform-core';
-import { RbacService, RbacError, normalizeSelection, buildTaskVerdicts, interpolate } from '@mediforce/platform-core';
+import { RbacService, RbacError, normalizeSelection, buildTaskVerdicts, interpolate, toProcessDefinition } from '@mediforce/platform-core';
 import { validateStepGraph } from '../graph/graph-validator';
 import { StepExecutor, type StepActor } from './step-executor';
 import { RoutingError, InvalidTransitionError, ParentInstanceNotFoundError } from './errors';
@@ -241,7 +241,7 @@ export class WorkflowEngine {
       actor,
       // WorkflowDefinition steps are structurally compatible with ProcessDefinition
       // for routing purposes (same id/type/verdicts/transitions shape)
-      this.workflowDefinitionToProcessDefinition(definition),
+      toProcessDefinition(definition),
     );
 
     // HumanTask creation: create task when next step's executor is 'human'
@@ -425,7 +425,7 @@ export class WorkflowEngine {
     }
 
     const workflowDef = await this.loadDefinitionUnified(instance);
-    const definition = this.workflowDefinitionToProcessDefinition(workflowDef);
+    const definition = toProcessDefinition(workflowDef);
     const workflowStep = workflowDef.steps.find((s) => s.id === stepId);
     const maxIterations = workflowStep?.review?.maxIterations;
 
@@ -966,31 +966,4 @@ export class WorkflowEngine {
     );
   }
 
-  /**
-   * Adapts a WorkflowDefinition to the ProcessDefinition shape used by StepExecutor.
-   * Only routing-relevant fields (id, type, verdicts, transitions, version) are used by StepExecutor.
-   */
-  private workflowDefinitionToProcessDefinition(
-    definition: WorkflowDefinition,
-  ): import('@mediforce/platform-core').ProcessDefinition {
-    return {
-      name: definition.name,
-      version: String(definition.version),
-      steps: definition.steps.map((step) => ({
-        id: step.id,
-        name: step.name,
-        type: step.type,
-        ...(step.verdicts ? { verdicts: step.verdicts } : {}),
-        ...(step.selection !== undefined ? { selection: step.selection } : {}),
-        ...(step.ui ? { ui: step.ui } : {}),
-        ...(step.params ? { params: step.params } : {}),
-        ...(step.description ? { description: step.description } : {}),
-        ...(step.metadata ? { metadata: step.metadata } : {}),
-      })),
-      transitions: definition.transitions,
-      triggers: definition.triggers,
-      ...(definition.description ? { description: definition.description } : {}),
-      ...(definition.metadata ? { metadata: definition.metadata } : {}),
-    };
-  }
 }

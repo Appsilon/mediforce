@@ -4,21 +4,10 @@ import React from 'react';
 import { Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// ---------------------------------------------------------------------------
-// Shared input style tokens — import these instead of defining locally
-// ---------------------------------------------------------------------------
-
 export const inputBase = 'w-full bg-muted/60 text-sm rounded-xl border-0 focus:ring-2 focus:ring-primary/30 focus:outline-none px-3 py-2 transition-colors';
 export const inputBaseMono = `${inputBase} font-mono`;
 export const selectBase = `${inputBase} cursor-pointer appearance-none pr-9 bg-no-repeat bg-[length:1rem] bg-[right_0.65rem_center] bg-[url('data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23737373%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%2F%3E%3C%2Fsvg%3E')]`;
 export const textareaBase = `${inputBase} resize-y leading-relaxed`;
-
-// ---------------------------------------------------------------------------
-// humanizeToken — turns a raw dev-facing key or enum value (dot-path,
-// camelCase, kebab-case, snake_case) into a proper-cased display label with
-// no separators. Only affects what's rendered; the underlying value/prop the
-// caller passes elsewhere (e.g. an <option value=...>) is untouched.
-// ---------------------------------------------------------------------------
 
 const HUMANIZE_ACRONYMS = new Set(['http', 'https', 'mcp', 'url', 'id', 'llm', 'json', 'yaml', 'api', 'sdk']);
 
@@ -35,8 +24,6 @@ export function humanizeToken(raw: string): string {
     ))
     .join(' ');
 }
-
-// ---------------------------------------------------------------------------
 
 function FieldTooltip({ text }: { text: string }) {
   return (

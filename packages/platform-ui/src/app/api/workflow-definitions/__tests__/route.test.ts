@@ -44,8 +44,11 @@ function makeRequest(namespace: string | null, body: unknown): NextRequest {
 const validBody = {
   name: 'wf-new',
   visibility: 'private',
-  steps: [{ id: 's1', name: 'Step 1', executor: 'human', assignedRole: 'reviewer' }],
-  transitions: [{ from: 's1', to: '__end__' }],
+  steps: [
+    { id: 's1', name: 'Step 1', type: 'creation', executor: 'human', assignedRole: 'reviewer' },
+    { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+  ],
+  transitions: [{ from: 's1', to: 'done' }],
   triggers: [{ type: 'manual', name: 'manual' }],
 };
 

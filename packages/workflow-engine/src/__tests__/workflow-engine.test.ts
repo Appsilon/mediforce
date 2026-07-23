@@ -86,6 +86,36 @@ const reviewDef: WorkflowDefinition = {
   triggers: [{ type: 'manual', name: 'Start Review' }],
 };
 
+const decisionDef: WorkflowDefinition = {
+  name: 'decision-process',
+  version: 1,
+  namespace: 'test',
+  visibility: 'private',
+  steps: [
+    { id: 'draft', name: 'Draft', type: 'creation', executor: 'agent' },
+    {
+      id: 'decide',
+      name: 'Decide',
+      type: 'decision',
+      executor: 'human',
+      verdicts: {
+        approve: { target: 'approved' },
+        revise: { target: 'draft' },
+        reject: { target: 'rejected' },
+      },
+    },
+    { id: 'approved', name: 'Approved', type: 'terminal', executor: 'human' },
+    { id: 'rejected', name: 'Rejected', type: 'terminal', executor: 'human' },
+  ],
+  transitions: [
+    { from: 'draft', to: 'decide' },
+    { from: 'decide', to: 'approved' },
+    { from: 'decide', to: 'draft' },
+    { from: 'decide', to: 'rejected' },
+  ],
+  triggers: [{ type: 'manual', name: 'Start Decision' }],
+};
+
 const actor: StepActor = { id: 'user-1', role: 'operator' };
 
 function makeReviewVerdict(
@@ -120,6 +150,7 @@ describe('WorkflowEngine', () => {
     await processRepo.saveWorkflowDefinition(linearDef);
     await processRepo.saveWorkflowDefinition(branchingDef);
     await processRepo.saveWorkflowDefinition(reviewDef);
+    await processRepo.saveWorkflowDefinition(decisionDef);
   });
 
   // --- createInstance ---
@@ -240,6 +271,34 @@ describe('WorkflowEngine', () => {
       .getAll()
       .find((e) => e.action === 'instance.completed');
     expect(completedEvent).toBeDefined();
+    const terminalStepId =
+      (completedEvent!.inputSnapshot as { terminalStepId?: string } | undefined)?.terminalStepId;
+    expect(terminalStepId).toBe('rejected');
+  });
+
+  it('submitReviewVerdict routes a decision-type step natively too, not just review', async () => {
+    const instance = await engine.createInstance('test',
+      'decision-process',
+      1,
+      'user-1',
+      'manual',
+      {},
+    );
+    await engine.startInstance(instance.id);
+    await engine.advanceStep(instance.id, {}, actor);
+
+    const verdict = makeReviewVerdict('reject');
+    const result = await engine.submitReviewVerdict(
+      instance.id,
+      'decide',
+      verdict,
+      actor,
+    );
+
+    expect(result.status).toBe('completed');
+    const completedEvent = auditRepo
+      .getAll()
+      .find((e) => e.action === 'instance.completed');
     const terminalStepId =
       (completedEvent!.inputSnapshot as { terminalStepId?: string } | undefined)?.terminalStepId;
     expect(terminalStepId).toBe('rejected');

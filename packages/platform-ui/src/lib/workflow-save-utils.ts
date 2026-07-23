@@ -1,15 +1,20 @@
 import type { WorkflowStep } from '@mediforce/platform-core';
 import type { RegistrationWarning } from '@mediforce/platform-api/contract';
 import type { ToastOpts } from '@/components/command-palette/types';
+import { ApiError } from '@/lib/mediforce';
+import { formatStepName } from '@/lib/format';
 
 export type ValidationIssue = { path: (string | number)[]; message: string };
 
-type Transitions = { from: string; to: string; when?: string }[];
+export const DISPLAY_NAME_KEY = 'displayName';
 
-/**
- * Maps server-side validation issues back to per-step field errors.
- * Keyed by stepId → fieldName → message.
- */
+export function workflowDisplayName(
+  def: { name: string; metadata?: Record<string, unknown> | null },
+): string {
+  const dn = def.metadata?.[DISPLAY_NAME_KEY];
+  return typeof dn === 'string' && dn.trim().length > 0 ? dn : formatStepName(def.name);
+}
+
 export function parseStepErrors(
   issues: ValidationIssue[],
   steps: WorkflowStep[],
@@ -26,16 +31,21 @@ export function parseStepErrors(
   return result;
 }
 
-/**
- * Validates steps for known structural errors before saving.
- * Returns an error message string on failure, or null when valid.
- */
 export function validateSteps(steps: WorkflowStep[]): string | null {
   const missingPlugin = steps.filter(
     (s) => s.type !== 'terminal' && (s.executor === 'agent' || s.executor === 'script') && !s.plugin,
   );
   if (missingPlugin.length > 0) {
     return `Plugin required for agent/script steps: ${missingPlugin.map((s) => `"${s.name}"`).join(', ')}`;
+  }
+
+  const missingAction = steps.filter((s) => s.executor === 'action' && !s.action);
+  if (missingAction.length > 0) {
+    return `Action config required: ${missingAction.map((s) => `"${s.name}"`).join(', ')}`;
+  }
+  const missingScript = steps.filter((s) => s.executor === 'script' && !s.script && !s.databricks);
+  if (missingScript.length > 0) {
+    return `Script config required: ${missingScript.map((s) => `"${s.name}"`).join(', ')}`;
   }
 
   const emptyIds = steps.filter((s) => !s.id);
@@ -53,25 +63,6 @@ export function validateSteps(steps: WorkflowStep[]): string | null {
   return null;
 }
 
-/**
- * Adds implicit transitions derived from review-step verdicts so the saved
- * definition graph is complete even when the canvas only shows one outgoing
- * edge per review step.
- */
-export function mergeVerdictTransitions(steps: WorkflowStep[], transitions: Transitions): Transitions {
-  const merged = [...transitions];
-  for (const step of steps) {
-    if (step.type === 'review' && step.verdicts) {
-      for (const verdict of Object.values(step.verdicts)) {
-        if (verdict.target && !merged.some((t) => t.from === step.id && t.to === verdict.target)) {
-          merged.push({ from: step.id, to: verdict.target });
-        }
-      }
-    }
-  }
-  return merged;
-}
-
 export function toastRegistrationWarnings(
   warnings: RegistrationWarning[] | undefined,
   toast: (opts: ToastOpts) => void,
@@ -82,4 +73,22 @@ export function toastRegistrationWarnings(
     description: warnings.map((w) => w.message).join('\n'),
     variant: 'warning',
   });
+}
+
+export function reportSaveError(
+  err: unknown,
+  steps: WorkflowStep[],
+  toast: (opts: ToastOpts) => void,
+): { displayMessage: string; stepErrors: Record<string, Record<string, string>> } {
+  const issues = err instanceof ApiError && Array.isArray(err.details)
+    ? (err.details as ValidationIssue[])
+    : [];
+  const stepErrors = parseStepErrors(issues, steps);
+  const message = err instanceof ApiError ? err.message
+    : err instanceof Error ? err.message : 'Unknown error';
+  const displayMessage = Object.keys(stepErrors).length > 0
+    ? 'Some steps have errors — check the highlighted steps in the diagram.'
+    : message;
+  toast({ title: 'Save failed', description: displayMessage, variant: 'error' });
+  return { displayMessage, stepErrors };
 }

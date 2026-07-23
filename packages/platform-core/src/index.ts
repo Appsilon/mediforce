@@ -126,6 +126,11 @@ export {
   AssignmentItemSchema,
   TableEditorRowSchema,
   CompleteHumanTaskPayloadSchema,
+  toProcessDefinition,
+  mergeVerdictTransitions,
+  ensureEntryStepFirst,
+  validateStepReferences,
+  type ReferenceIssue,
 } from './schemas/index';
 
 export type { Handle } from './schemas/handle';
@@ -425,6 +430,7 @@ export { calculateEstimatedCost } from './utils/cost';
 export { formatBytes } from './utils/format';
 export { compact, parseRow } from './utils/compact';
 export { normaliseModelId } from './utils/normalise-model-id';
+export { toSlug } from './utils/slug';
 
 // Workflow examples — shared loader for MCP tool, tests, and build scripts.
 // Uses Node.js fs/path so NOT exported from this barrel (breaks browser bundles).
