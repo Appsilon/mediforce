@@ -30,10 +30,7 @@ export const workspaceMembers = pgTable(
       .notNull()
       .references(() => workspaces.handle, { onDelete: 'cascade' }),
     uid: text('uid').notNull(),
-    // Workspace governance level: 'owner' | 'admin' | 'member'. Renamed from
-    // 'role' (ADR-0002 §5, migration 0030) to remove the collision with
-    // process-domain roles, which live in the global `user_roles` table.
-    membership: text('membership').notNull(),
+    role: text('role').notNull(),
     displayName: text('display_name'),
     avatarUrl: text('avatar_url'),
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),

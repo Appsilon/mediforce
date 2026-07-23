@@ -165,9 +165,12 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
      would silently change notification targeting, a **regression** dressed as
      a migration. Per-workspace functional roles can return later as a real
      product decision if asked.)_
-   - Workspace governance (`owner | admin | member`) lives on
-     `workspace_members.membership` (renamed from today's `members.role`
-     to remove the naming collision with process-domain roles).
+   - Workspace governance (`owner | admin | member`) lives in the
+     `workspace_members.role` column. The dedicated `membership` column
+     name (to remove the naming collision with process-domain roles) is
+     **deferred** — this cutover keeps migrations additive and does not
+     rename the live column. The membership-vs-roles distinction remains
+     a domain concept until the domain layer adopts the new column name.
 
 6. **Auth boundary — cookie for the browser, key/token for machines.**
    The carrier splits cleanly by client kind, which is the industry-standard
@@ -212,8 +215,10 @@ introduced in ADR-0001 via `@auth/drizzle-adapter`. Specifics:
    stays valid with zero data rewrite**:
 
    - **Structural changes ship as Drizzle migrations** (create `auth_*`;
-     `workspace_members` rename `role` → `membership`; create the global
-     `user_roles` table). The uid columns are **not** touched, and the planned
+     create the global `user_roles` table). Migrations stay **purely
+     additive** — the `workspace_members` `role` → `membership` rename is
+     **deferred**, not part of this cutover. The uid columns are **not**
+     touched, and the planned
      `user_profiles` reshape was dropped (§2, §8).
    - **Migration = a tiny one-time seed**, not a remap: a script reads the
      Firebase Auth user list and inserts one `auth_users` row per existing user

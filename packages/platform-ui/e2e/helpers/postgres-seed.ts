@@ -109,7 +109,7 @@ export async function seedPostgresNamespace(
     // ── 2. workspace_members ────────────────────────────────────────────────
     for (const member of Object.values(data.namespaceMembers)) {
       await sql`
-        INSERT INTO workspace_members (workspace, uid, membership, joined_at)
+        INSERT INTO workspace_members (workspace, uid, role, joined_at)
         VALUES (
           ${TEST_ORG_HANDLE},
           ${member.uid as string},
@@ -117,7 +117,7 @@ export async function seedPostgresNamespace(
           ${member.joinedAt as string}
         )
         ON CONFLICT (workspace, uid) DO UPDATE SET
-          membership = EXCLUDED.membership,
+          role = EXCLUDED.role,
           joined_at = EXCLUDED.joined_at
       `;
     }
@@ -545,7 +545,7 @@ export async function seedPostgresPersonalNamespace(
       ON CONFLICT (handle) DO NOTHING
     `;
     await sql`
-      INSERT INTO workspace_members (workspace, uid, membership, joined_at)
+      INSERT INTO workspace_members (workspace, uid, role, joined_at)
       VALUES (${handle}, ${uid}, 'owner', now())
       ON CONFLICT (workspace, uid) DO NOTHING
     `;
@@ -584,7 +584,7 @@ export async function seedPostgresOrganizationNamespace(
       ON CONFLICT (handle) DO NOTHING
     `;
     await sql`
-      INSERT INTO workspace_members (workspace, uid, membership, joined_at)
+      INSERT INTO workspace_members (workspace, uid, role, joined_at)
       VALUES (${handle}, ${ownerUid}, 'owner', now())
       ON CONFLICT (workspace, uid) DO NOTHING
     `;

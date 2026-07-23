@@ -66,12 +66,12 @@ export class PostgresInviteService {
         .values({
           workspace: input.workspaceHandle,
           uid,
-          membership: input.membership,
+          role: input.membership,
           ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
         })
         .onConflictDoUpdate({
           target: [workspaceMembers.workspace, workspaceMembers.uid],
-          set: { membership: input.membership },
+          set: { role: input.membership },
         });
 
       for (const role of input.roles ?? []) {

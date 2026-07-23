@@ -244,7 +244,9 @@ _Avoid_: "JWT" (we explicitly chose database sessions, not JWT).
 
 **Membership** *(workspace governance level)*:
 The kind of seat a User holds inside one Workspace: `owner | admin | member`.
-Stored on `workspace_members.membership`. Owners can delete the Workspace and
+Stored in the `workspace_members.role` column (the dedicated `membership`
+column name is deferred until the domain layer adopts it — see ADR-0002).
+Owners can delete the Workspace and
 manage other owners; admins can manage members and workspace settings; members
 can use the Workspace.
 _Avoid_: "Role" alone — that's overloaded with process-domain roles below.

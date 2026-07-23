@@ -73,7 +73,7 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
 
     const members = await db.select().from(workspaceMembers).where(eq(workspaceMembers.uid, uid));
     expect(members).toHaveLength(1);
-    expect(members[0]).toMatchObject({ workspace: 'acme', uid, membership: 'admin', displayName: 'New Person' });
+    expect(members[0]).toMatchObject({ workspace: 'acme', uid, role: 'admin', displayName: 'New Person' });
 
     const roles = (await db.select().from(userRoles).where(eq(userRoles.uid, uid)))
       .map((r) => r.role)
@@ -152,7 +152,7 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
       .from(workspaceMembers)
       .where(eq(workspaceMembers.uid, first.uid));
     expect(members).toHaveLength(1);
-    expect(members[0]).toMatchObject({ workspace: 'acme', membership: 'admin' });
+    expect(members[0]).toMatchObject({ workspace: 'acme', role: 'admin' });
   });
 
   it('getUserEmail returns the seeded email and null for unknown uids', async () => {

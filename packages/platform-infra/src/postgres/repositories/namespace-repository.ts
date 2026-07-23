@@ -72,7 +72,7 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       await tx.insert(workspaceMembers).values({
         workspace: parsedNs.handle,
         uid: parsedMember.uid,
-        membership: parsedMember.role,
+        role: parsedMember.role,
         displayName: parsedMember.displayName ?? null,
         avatarUrl: parsedMember.avatarUrl ?? null,
         joinedAt: new Date(parsedMember.joinedAt),
@@ -118,7 +118,7 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
     const values = {
       workspace: handle,
       uid: parsed.uid,
-      membership: parsed.role,
+      role: parsed.role,
       displayName: parsed.displayName ?? null,
       avatarUrl: parsed.avatarUrl ?? null,
       joinedAt: new Date(parsed.joinedAt),
@@ -129,7 +129,7 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       .onConflictDoUpdate({
         target: [workspaceMembers.workspace, workspaceMembers.uid],
         set: {
-          membership: values.membership,
+          role: values.role,
           displayName: values.displayName,
           avatarUrl: values.avatarUrl,
           joinedAt: values.joinedAt,
@@ -169,7 +169,7 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
   ): Promise<void> {
     await this.db
       .update(workspaceMembers)
-      .set({ membership: role })
+      .set({ role })
       .where(
         and(
           eq(workspaceMembers.workspace, handle),
@@ -227,7 +227,7 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
   async getMembershipsForUser(uid: string): Promise<readonly NamespaceMembership[]> {
     // Explicit org memberships from workspace_members.
     const orgRows = await this.db
-      .select({ handle: workspaceMembers.workspace, role: workspaceMembers.membership })
+      .select({ handle: workspaceMembers.workspace, role: workspaceMembers.role })
       .from(workspaceMembers)
       .where(eq(workspaceMembers.uid, uid));
     // Implicit personal-workspace owner via workspaces.linkedUserId.
@@ -267,7 +267,7 @@ function toNamespace(row: typeof workspaces.$inferSelect): Namespace {
 function toMember(row: typeof workspaceMembers.$inferSelect): NamespaceMember {
   return parseRow(NamespaceMemberSchema, {
     uid: row.uid,
-    role: row.membership,
+    role: row.role,
     joinedAt: row.joinedAt.toISOString(),
     displayName: row.displayName ?? undefined,
     avatarUrl: row.avatarUrl ?? undefined,
