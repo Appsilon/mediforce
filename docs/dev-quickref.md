@@ -21,8 +21,28 @@ Notes:
 - `DATABASE_URL` is hardcoded in the `dev` / `dev:queue` scripts; `dev:no-docker` defaults to
   the same `localhost:5432` URL but does **not** start Postgres — run `pnpm dev` once first
   (or bring your own DB on :5432).
-- `dev:mock` is the only mode that runs without `DATABASE_URL`.
+- `dev:mock` still needs `DATABASE_URL` (Postgres is required unconditionally — see
+  `instrumentation-node.ts`); only the agent/auth/email layers are mocked.
 - Port override: `PORT=9999 pnpm dev`.
+
+### `dev:mock` env overrides
+
+`dev-mock.py` bakes in defaults (`DEMO_ENV`) for things like `MOCK_AGENT`,
+`MEDIFORCE_DISABLE_EMAIL`, and the fake Firebase/OpenRouter keys — but any of
+those, plus anything not baked in at all (`DATABASE_URL`, `MEDIFORCE_API_KEY`,
+`MEDIFORCE_BASE_URL`), can be overridden by exporting it before the command; an
+already-exported value always wins over the built-in default. Example — point
+at a real Postgres, use a real API key so the `mediforce` CLI can hit the
+running mock server, and run real (non-mocked) agent containers:
+
+```sh
+DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce \
+MEDIFORCE_API_KEY="test" \
+MEDIFORCE_BASE_URL="http://127.0.0.1:9007" \
+MEDIFORCE_DISABLE_EMAIL=false \
+MOCK_AGENT=false \
+pnpm dev:mock
+```
 
 ## Test levels
 

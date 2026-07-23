@@ -126,6 +126,15 @@ export {
 } from './workflows';
 
 export {
+  WorkflowAssistantMessageSchema,
+  AskWorkflowAssistantInputSchema,
+  AskWorkflowAssistantOutputSchema,
+  type AskWorkflowAssistantInput,
+  type WorkflowAssistantToolCall,
+  type AskWorkflowAssistantOutput,
+} from './workflow-assistant';
+
+export {
   DockerImageInfoSchema,
   DockerDiskInfoSchema,
   DockerInfoResponseSchema,

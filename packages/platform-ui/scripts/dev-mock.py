@@ -171,7 +171,10 @@ def run_next(env: dict[str, str]) -> int:
 
 
 def main() -> int:
-    env = with_local_java({**os.environ, **DEMO_ENV})
+    # DEMO_ENV entries are defaults, not overrides — a value already exported
+    # (e.g. `MOCK_AGENT=false OPENROUTER_API_KEY=sk-... pnpm dev:mock`) wins.
+    demo_defaults = {key: value for key, value in DEMO_ENV.items() if key not in os.environ}
+    env = with_local_java({**os.environ, **demo_defaults})
     emulator_proc: subprocess.Popen[bytes] | None = None
     try:
         if port_open(NEXT_PORT):

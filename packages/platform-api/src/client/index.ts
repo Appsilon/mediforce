@@ -5,6 +5,10 @@ import {
   GetTaskOutputSchema,
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
+  AskWorkflowAssistantInputSchema,
+  AskWorkflowAssistantOutputSchema,
+  type AskWorkflowAssistantInput,
+  type AskWorkflowAssistantOutput,
   ValidateWorkflowOutputSchema,
   GetWorkflowSchemaOutputSchema,
   ListWorkflowsInputSchema,
@@ -536,6 +540,13 @@ export class Mediforce {
     list: () => Promise<ListPluginsOutput>;
   };
 
+  readonly assistant: {
+    ask: (
+      input: AskWorkflowAssistantInput,
+      options: { namespace: string },
+    ) => Promise<AskWorkflowAssistantOutput>;
+  };
+
   readonly workflows: {
     register: (
       input: RegisterWorkflowBody,
@@ -927,6 +938,26 @@ export class Mediforce {
         const res = await this.request('/api/plugins');
         const body = await parseJsonOrThrow(res, 'mediforce.plugins.list');
         return ListPluginsOutputSchema.parse(body);
+      },
+    };
+
+    this.assistant = {
+      ask: async (input, options) => {
+        const validatedInput = AskWorkflowAssistantInputSchema.parse(input);
+        const namespace = options.namespace;
+        if (typeof namespace !== 'string' || namespace.length === 0) {
+          throw new Error(
+            'mediforce.assistant.ask: `namespace` is required (passed as an HTTP query parameter).',
+          );
+        }
+        const qs = toSearchParams({ namespace });
+        return this.sendJson(
+          'POST',
+          `/api/workflow-assistant${qs}`,
+          { ...validatedInput } as Record<string, unknown>,
+          AskWorkflowAssistantOutputSchema,
+          'mediforce.assistant.ask',
+        );
       },
     };
 

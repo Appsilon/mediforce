@@ -316,16 +316,16 @@ test.describe('Workflow Editor Journey', () => {
     await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('v1 — initial');
     await expect(page.getByText(/will be saved as/i)).toBeVisible();
 
-    // Confirm in dialog → redirect to the new definition page. "Publish workflow"
-    // is the dialog's confirm label (the header button is "Save").
+    // Confirm in dialog → redirect to the workflow's Runs section (the workflow
+    // detail page). "Publish workflow" is the dialog's confirm label (the header
+    // button is "Save").
     await page.getByRole('button', { name: /publish workflow/i }).click();
-    await page.waitForURL(/\/workflows\/e2e-test-workflow\/definitions\/\d+/, { timeout: 20_000 });
+    await page.waitForURL(/\/workflows\/e2e-test-workflow\/?$/, { timeout: 20_000 });
 
-    // On the definition page the workflow name is shown as a heading
-    const header = pageHeader(page);
-    const workflowHeading = header.locator('h1');
-    await expect(workflowHeading).toBeVisible({ timeout: 10_000 });
-    await expect(workflowHeading).toHaveText('e2e-test-workflow');
+    // Lands on the workflow detail page with the Runs tab active.
+    const runsTab = page.getByRole('tab', { name: /runs/i });
+    await expect(runsTab).toBeVisible({ timeout: 10_000 });
+    await expect(runsTab).toHaveAttribute('data-state', 'active');
   });
 
   // ── Validation gates ─────────────────────────────────────────────────────

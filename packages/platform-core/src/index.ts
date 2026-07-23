@@ -246,6 +246,24 @@ export {
   TaskAttachmentSchema,
   NewTaskAttachmentSchema,
 } from './schemas/index';
+export {
+  AddStepToolSchema,
+  UpdateStepToolSchema,
+  RemoveStepToolSchema,
+  ListModelsToolSchema,
+  WORKFLOW_ASSISTANT_TOOLS,
+  WORKFLOW_ASSISTANT_DEFAULT_MODEL,
+  WorkflowAssistantToolCallSchema,
+  applyWorkflowAssistantToolCalls,
+  type AddStepTool,
+  type UpdateStepTool,
+  type RemoveStepTool,
+  type ListModelsTool,
+  type WorkflowAssistantToolName,
+  type WorkflowAssistantToolCall,
+  type ToolCallOutcome,
+  type ApplyToolCallsResult,
+} from './schemas/index';
 
 // Interfaces (repository and service contracts)
 export type {
