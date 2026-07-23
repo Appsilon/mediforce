@@ -165,26 +165,26 @@ export default function NewWorkflowPage() {
   const canPublish = saveState.status !== 'saving' && !!toWorkflowId(workflowName) && !!description.trim();
 
   return (
-    <div className="flex h-full flex-col relative">
+    <div className="flex h-full flex-col relative bg-white dark:bg-background">
       {/* Header */}
-      <div className="border-b px-6 py-5 sticky top-0 z-30 bg-background">
+      <div className="border-b px-6 py-3 sticky top-0 z-30 bg-white dark:bg-background">
         <div className="flex items-start justify-between gap-6">
           {/* Left: workflow identity */}
           <div className="flex-1 min-w-0">
             <input
               value={workflowName}
               onChange={(e) => setWorkflowName(e.target.value)}
-              placeholder="Workflow name…"
-              className="w-full bg-transparent text-2xl font-bold tracking-tight text-foreground placeholder:text-muted-foreground/30 border-0 outline-none px-0 py-0"
+              placeholder="Add a Workflow Name…"
+              className="w-full bg-transparent text-xl font-bold tracking-tight text-foreground placeholder:text-muted-foreground/30 border-0 outline-none px-0 py-0"
             />
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add a description…"
-              className="mt-1 w-full bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
+              placeholder="Add a workflow description…"
+              className="w-full bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
             />
             {/* Secondary metadata row */}
-            <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground/60 flex-wrap">
+            <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground/60 flex-wrap">
               <span className="shrink-0">Namespace:</span>
               <select
                 value={effectiveNamespace}
@@ -223,22 +223,25 @@ export default function NewWorkflowPage() {
                 {saveState.message}
               </span>
             )}
-            <button
-              onClick={() => setDialogOpen(true)}
-              disabled={!canPublish}
+            <span
               title={
                 !toWorkflowId(workflowName) ? 'Enter a workflow name to publish' :
                 !description.trim() ? 'Add a description to publish' :
                 undefined
               }
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-                !canPublish && 'opacity-50 cursor-not-allowed',
-              )}
             >
-              <Save className="h-3.5 w-3.5" />
-              {saveState.status === 'saving' ? 'Publishing…' : 'Publish workflow'}
-            </button>
+              <button
+                onClick={() => setDialogOpen(true)}
+                disabled={!canPublish}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
+                  !canPublish && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                <Save className="h-3.5 w-3.5" />
+                {saveState.status === 'saving' ? 'Publishing…' : 'Publish workflow'}
+              </button>
+            </span>
           </div>
         </div>
       </div>

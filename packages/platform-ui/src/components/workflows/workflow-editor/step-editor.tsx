@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle } from 'lucide-react';
+import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
 import { useAuth } from '@/contexts/auth-context';
@@ -12,13 +12,12 @@ import type { WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import {
-  AGENT_CONTROL_MODES,
   STEP_TYPE_LABELS,
   FALLBACK_OPTIONS,
   RUNTIME_OPTIONS,
 } from './constants';
 import { CoworkSection } from './cowork-section';
-import { FieldRow, FieldGroup, Section, inputBase, inputBaseMono, selectBase, textareaBase } from './step-editor-fields';
+import { FieldRow, FieldGroup, Section, PillToggle, inputBase, inputBaseMono, selectBase, textareaBase, humanizeToken } from './step-editor-fields';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
 
 // ---------------------------------------------------------------------------
@@ -354,7 +353,7 @@ export function StepEditor({
         <FieldRow label="executor" tooltip={TIP.executor}>
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5" title="executor is set at creation. To change, remove this step and add a new one.">
             <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-            <span>{execStyle.label.toLowerCase()}</span>
+            <span>{execStyle.label}</span>
           </span>
         </FieldRow>
       </FieldGroup>
@@ -363,15 +362,15 @@ export function StepEditor({
       {isAgent && (<>
         <FieldGroup>
           <FieldRow label="autonomy level" tooltip="Assist: agent draft, human approves. Human review: explicit approval required. Autonomous agent: executes without review.">
-            <select
+            <PillToggle
               value={step.autonomyLevel ?? 'L2'}
-              onChange={(e) => onChange({ autonomyLevel: (e.target.value || undefined) as WorkflowStep['autonomyLevel'] })}
-              className={rs}
-            >
-              {AGENT_CONTROL_MODES.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
+              onChange={(v) => onChange({ autonomyLevel: v as WorkflowStep['autonomyLevel'] })}
+              options={[
+                { value: 'L2', label: 'Assist', icon: Bot, activeClassName: 'border-lime-400 bg-lime-50 text-lime-700 dark:bg-lime-950/30 dark:text-lime-400' },
+                { value: 'L3', label: 'Human Review', icon: Users, activeClassName: 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-400' },
+                { value: 'L4', label: 'Autonomous', icon: Bot, activeClassName: 'border-violet-400 bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-400' },
+              ]}
+            />
           </FieldRow>
 
           <FieldRow label="plugin" tooltip={TIP.plugin}>
@@ -381,9 +380,9 @@ export function StepEditor({
               className={rs}
             >
               <option value="">None</option>
-              {plugins.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
+              {plugins.map((p) => <option key={p.name} value={p.name}>{humanizeToken(p.name)}</option>)}
               {step.plugin && !plugins.some((p) => p.name === step.plugin) && (
-                <option value={step.plugin}>{step.plugin}</option>
+                <option value={step.plugin}>{humanizeToken(step.plugin)}</option>
               )}
             </select>
           </FieldRow>
@@ -626,11 +625,11 @@ export function StepEditor({
           {(['notebookParams', 'jobParameters'] as const).map((field) => (
             <div key={field} className="px-3 py-1.5 border-b border-border/30 last:border-0">
               <div
-                className="text-[11px] text-muted-foreground mb-1"
+                className="text-xs font-medium text-muted-foreground mb-1"
                 title={field === 'notebookParams' ? TIP.databricksNotebookParams : TIP.databricksJobParameters}
-              >databricks.{field}</div>
+              >{humanizeToken(`databricks.${field}`)}</div>
               {Object.entries(step.databricks?.[field] ?? {}).map(([key, val], idx) => (
-                <div key={idx} className="grid grid-cols-[184px_1fr_auto] gap-x-3 py-1 items-center">
+                <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-x-2 py-1 items-center">
                   <input
                     value={key}
                     onChange={(e) => updateDatabricksParams(field, (params) => {
@@ -766,9 +765,9 @@ export function StepEditor({
               className={rs}
             >
               <option value="">Default</option>
-              <option value="human">human</option>
-              <option value="agent">agent</option>
-              <option value="none">none</option>
+              <option value="human">Human</option>
+              <option value="agent">Agent</option>
+              <option value="none">None</option>
             </select>
           </FieldRow>
 
@@ -827,7 +826,7 @@ export function StepEditor({
             <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5"
               title="Action kind is set at creation.">
               <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-              {step.action?.kind ?? '—'}
+              {step.action?.kind ? humanizeToken(step.action.kind) : '—'}
             </span>
           </FieldRow>
 
@@ -871,7 +870,7 @@ export function StepEditor({
               {/* action.headers key-value rows */}
               <div className="border-t border-border/30">
                 {Object.entries(httpAction.config.headers ?? {}).map(([hKey, hVal], idx) => (
-                  <div key={idx} className="grid grid-cols-[184px_1fr] gap-x-3 px-3 py-1.5 border-b border-border/30 last:border-0 items-center">
+                  <div key={idx} className="grid grid-cols-[1fr_1fr] gap-x-2 px-3 py-1.5 border-b border-border/30 last:border-0 items-center">
                     <input
                       value={hKey}
                       onChange={(e) => {
@@ -1066,28 +1065,33 @@ export function StepEditor({
       {/* ── Parameters ───────────────────────────────────────────── */}
       {!isTerminal && (
         <Section title="Parameters">
-          <div className="space-y-2">
+          <div className="space-y-3">
             {(step.params ?? []).map((param, idx) => (
-              <FieldGroup key={idx}>
+              <div key={idx} className="rounded-xl border border-border/60 p-3 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground">Parameter {idx + 1}</span>
+                  <button
+                    onClick={() => {
+                      const next = (step.params ?? []).filter((_, i) => i !== idx);
+                      onChange({ params: next.length > 0 ? next : undefined });
+                    }}
+                    className="rounded-md p-0.5 text-muted-foreground/50 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                    aria-label="Remove parameter"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <FieldGroup>
                 <FieldRow label="name" tooltip={TIP.paramName}>
-                  <div className="flex items-center gap-2">
-                    <input
-                      value={param.name}
-                      onChange={(e) => {
-                        const next = [...(step.params ?? [])];
-                        next[idx] = { ...next[idx], name: e.target.value };
-                        onChange({ params: next });
-                      }}
-                      className={cn(riMono, 'flex-1')}
-                    />
-                    <button
-                      onClick={() => {
-                        const next = (step.params ?? []).filter((_, i) => i !== idx);
-                        onChange({ params: next.length > 0 ? next : undefined });
-                      }}
-                      className="text-[10px] text-muted-foreground/30 hover:text-red-500 transition-colors shrink-0"
-                    >×</button>
-                  </div>
+                  <input
+                    value={param.name}
+                    onChange={(e) => {
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], name: e.target.value };
+                      onChange({ params: next });
+                    }}
+                    className={riMono}
+                  />
                 </FieldRow>
                 <FieldRow label="type" tooltip={TIP.paramType}>
                   <select
@@ -1100,7 +1104,7 @@ export function StepEditor({
                     className={rs}
                   >
                     {(['string', 'number', 'boolean', 'date'] as const).map((t) => (
-                      <option key={t} value={t}>{t}</option>
+                      <option key={t} value={t}>{humanizeToken(t)}</option>
                     ))}
                   </select>
                 </FieldRow>
@@ -1150,7 +1154,8 @@ export function StepEditor({
                     className={ri}
                   />
                 </FieldRow>
-              </FieldGroup>
+                </FieldGroup>
+              </div>
             ))}
           </div>
           <button
@@ -1174,7 +1179,7 @@ export function StepEditor({
         <Section title="Environment">
           <FieldGroup>
             {Object.entries(step.env ?? {}).map(([key, val], idx) => (
-              <div key={idx} className="grid grid-cols-[184px_1fr] gap-x-3 px-3 py-1.5 border-b border-border/30 last:border-0 items-center">
+              <div key={idx} className="grid grid-cols-[1fr_1fr] gap-x-2 px-3 py-1.5 border-b border-border/30 last:border-0 items-center">
                 <input
                   value={key}
                   onChange={(e) => {

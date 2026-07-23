@@ -151,23 +151,23 @@ export default function WorkflowDefinitionVersionPage() {
   if (definition === null) return null;
 
   return (
-    <div className="flex h-full flex-col relative">
+    <div className="flex h-full flex-col relative bg-white dark:bg-background">
       {/* Header */}
-      <div className="border-b px-6 py-5 sticky top-0 z-30 bg-background">
+      <div className="border-b px-6 py-3 sticky top-0 z-30 bg-white dark:bg-background">
         <div className="flex items-start justify-between gap-6">
           {/* Left: workflow identity */}
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground truncate">
+            <h1 className="text-xl font-bold tracking-tight text-foreground truncate">
               {decodedName}
             </h1>
             <input
               value={editedDescription}
               onChange={(e) => setEditedDescription(e.target.value)}
               placeholder="Add a description…"
-              className="mt-1 w-full bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
+              className="w-full bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
             />
             {/* Secondary metadata row */}
-            <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground/60 flex-wrap">
+            <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground/60 flex-wrap">
               {definition.namespace && (
                 <>
                   <span className="shrink-0">Namespace:</span>

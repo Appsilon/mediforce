@@ -19,6 +19,9 @@ interface RegisterScopedInput extends RegisterWorkflowInput {
   namespace: string;
 }
 
+/** Default Docker image for agent steps that specify neither `image` nor `repo`+`commit`. */
+const DEFAULT_AGENT_IMAGE = 'mediforce-golden-image';
+
 export async function registerWorkflow(
   input: RegisterScopedInput,
   scope: CallerScope,
@@ -49,20 +52,14 @@ export async function registerWorkflow(
   }
 
   if (!isLocalAgentMode()) {
-    const missingImage = parsed.data.steps
-      .filter((s) => s.executor === 'agent')
-      .filter((s) => {
-        const cfg = s.agent;
-        if (typeof cfg?.image === 'string' && cfg.image.length > 0) return false;
-        if (typeof cfg?.repo === 'string' && cfg.repo.length > 0
-          && typeof cfg?.commit === 'string' && cfg.commit.length > 0) return false;
-        return true;
-      });
-    if (missingImage.length > 0) {
-      const names = missingImage.map((s) => `'${s.name}'`).join(', ');
-      throw new ValidationError(
-        `Agent step(s) ${names} missing Docker image. Set agent.image or configure agent.repo + agent.commit for auto-build.`,
-      );
+    for (const step of parsed.data.steps) {
+      if (step.executor !== 'agent') continue;
+      const cfg = step.agent;
+      const hasImage = typeof cfg?.image === 'string' && cfg.image.length > 0;
+      const hasBuildSource = typeof cfg?.repo === 'string' && cfg.repo.length > 0
+        && typeof cfg?.commit === 'string' && cfg.commit.length > 0;
+      if (hasImage || hasBuildSource) continue;
+      step.agent = { ...cfg, image: DEFAULT_AGENT_IMAGE };
     }
   }
 

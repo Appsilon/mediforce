@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Layers, ArrowDownToLine, ArrowUpFromLine, Wrench, Eye, TrendingUp } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
+import { cn } from '@/lib/utils';
 import type { ModelRegistryEntry } from '@mediforce/platform-core';
 
 interface ModelPickerProps {
@@ -28,23 +29,38 @@ const TOP_PICKS_COUNT = 20;
 
 export function ModelPicker({ value, onChange, defaultModel, className }: ModelPickerProps) {
   const [models, setModels] = useState<ModelRegistryEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [customInput, setCustomInput] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
     apiFetch('/api/model-registry')
-      .then((res) => res.json())
-      .then((data: { models: ModelRegistryEntry[] }) => setModels(data.models))
-      .catch(() => {});
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to load models (${String(res.status)})`);
+        return res.json();
+      })
+      .then((data: { models: ModelRegistryEntry[] }) => {
+        setModels(data.models);
+        setLoadError(null);
+      })
+      .catch((err: unknown) => {
+        setLoadError(err instanceof Error ? err.message : 'Failed to load models');
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const topPicks = useMemo(() =>
-    models
+  // Prefer models with usage history, but fall back to the full (non-retired)
+  // registry when no usage stats exist yet (e.g. a freshly-synced registry) —
+  // otherwise the picker looks empty/broken even though models are available.
+  const topPicks = useMemo(() => {
+    const withUsage = models
       .filter((m) => m.retiredAt === null)
       .filter((m) => m.requestCount !== null && m.requestCount > 0)
-      .sort((a, b) => (b.requestCount ?? 0) - (a.requestCount ?? 0))
-      .slice(0, TOP_PICKS_COUNT),
-    [models],
-  );
+      .sort((a, b) => (b.requestCount ?? 0) - (a.requestCount ?? 0));
+    if (withUsage.length > 0) return withUsage.slice(0, TOP_PICKS_COUNT);
+    return models.filter((m) => m.retiredAt === null).slice(0, TOP_PICKS_COUNT);
+  }, [models]);
 
   const selectedModel = useMemo(() => {
     if (!value) return null;
@@ -67,11 +83,12 @@ export function ModelPicker({ value, onChange, defaultModel, className }: ModelP
             value={value ?? ''}
             onChange={(e) => onChange(e.target.value || undefined)}
             placeholder="e.g. tencent/hy3-preview:free"
-            className={className}
+            className={cn(className, 'flex-1 min-w-0')}
             list="model-registry-list"
           />
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => setCustomInput(false)}
             className="shrink-0 rounded-md border px-2 py-1 text-xs hover:bg-accent transition-colors"
           >
@@ -92,6 +109,7 @@ export function ModelPicker({ value, onChange, defaultModel, className }: ModelP
       <div className="flex gap-2">
         <select
           value={value ?? ''}
+          disabled={loading}
           onChange={(e) => {
             if (e.target.value === '__custom__') {
               setCustomInput(true);
@@ -101,18 +119,26 @@ export function ModelPicker({ value, onChange, defaultModel, className }: ModelP
           }}
           className={className}
         >
-          <option value="">Default ({displayDefault})</option>
-          <optgroup label="Top picks">
-            {topPicks.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name} — {formatContext(m.contextLength)}, in:{formatPrice(m.pricing.input)}
-              </option>
-            ))}
-          </optgroup>
+          <option value="">{loading ? 'Loading models…' : `Default (${displayDefault})`}</option>
+          {topPicks.length > 0 && (
+            <optgroup label="Top picks">
+              {topPicks.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name} — {formatContext(m.contextLength)}, in:{formatPrice(m.pricing.input)}
+                </option>
+              ))}
+            </optgroup>
+          )}
           <option value="__custom__">Custom model ID...</option>
           {isCustom && <option value={value}>{value}</option>}
         </select>
       </div>
+      {loadError && (
+        <p className="text-xs text-red-500">Couldn&apos;t load the model registry: {loadError}</p>
+      )}
+      {!loading && !loadError && models.length === 0 && (
+        <p className="text-xs text-muted-foreground">No models in the registry yet. Enter a custom model ID instead.</p>
+      )}
       {(selectedModel ?? (value === '' || value === undefined ? defaultModelMeta(models, defaultModel) : null)) && (
         <ModelMeta model={(selectedModel ?? defaultModelMeta(models, defaultModel))!} />
       )}
@@ -128,14 +154,17 @@ function defaultModelMeta(models: ModelRegistryEntry[], defaultModel?: string): 
 
 function ModelMeta({ model }: { model: ModelRegistryEntry }) {
   return (
-    <div className="flex gap-3 text-xs text-muted-foreground">
-      <span>{formatContext(model.contextLength)} context</span>
-      <span>in:{formatPrice(model.pricing.input)}</span>
-      <span>out:{formatPrice(model.pricing.output)}</span>
-      {model.supportsTools && <span>tools ✓</span>}
-      {model.supportsVision && <span>vision ✓</span>}
+    <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+      <span className="inline-flex items-center gap-1"><Layers className="h-3.5 w-3.5 shrink-0" />{formatContext(model.contextLength)} context</span>
+      <span className="inline-flex items-center gap-1"><ArrowDownToLine className="h-3.5 w-3.5 shrink-0" />{formatPrice(model.pricing.input)}</span>
+      <span className="inline-flex items-center gap-1"><ArrowUpFromLine className="h-3.5 w-3.5 shrink-0" />{formatPrice(model.pricing.output)}</span>
+      {model.supportsTools && <span className="inline-flex items-center gap-1"><Wrench className="h-3.5 w-3.5 shrink-0" />Tools</span>}
+      {model.supportsVision && <span className="inline-flex items-center gap-1"><Eye className="h-3.5 w-3.5 shrink-0" />Vision</span>}
       {model.requestCount !== null && model.requestCount > 0 && (
-        <span>{model.requestCount >= 1_000_000 ? `${(model.requestCount / 1_000_000).toFixed(1)}M` : `${Math.round(model.requestCount / 1000)}K`} requests</span>
+        <span className="inline-flex items-center gap-1">
+          <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+          {model.requestCount >= 1_000_000 ? `${(model.requestCount / 1_000_000).toFixed(1)}M` : `${Math.round(model.requestCount / 1000)}K`} requests
+        </span>
       )}
     </div>
   );

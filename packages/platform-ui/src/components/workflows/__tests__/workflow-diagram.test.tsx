@@ -6,6 +6,7 @@ import React from 'react';
 vi.mock('@xyflow/react', () => {
   const Position = { Top: 'top', Bottom: 'bottom', Left: 'left', Right: 'right' };
   const MarkerType = { ArrowClosed: 'arrowclosed' };
+  const BackgroundVariant = { Dots: 'dots', Lines: 'lines', Cross: 'cross' };
   return {
     ReactFlow: ({ nodes, nodeTypes }: { nodes: Array<{ id: string; type: string; data: Record<string, unknown>; selected?: boolean }>; nodeTypes: Record<string, React.ComponentType<unknown>> }) => (
       <div data-testid="reactflow">
@@ -21,6 +22,11 @@ vi.mock('@xyflow/react', () => {
     EdgeLabelRenderer: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     getSmoothStepPath: () => ['', 0, 0],
     Handle: () => null,
+    Background: () => null,
+    BackgroundVariant,
+    useReactFlow: () => ({ fitView: () => undefined, zoomIn: () => undefined, zoomOut: () => undefined }),
+    useStore: (selector: (state: { transform: [number, number, number] }) => unknown) => selector({ transform: [0, 0, 1] }),
+    applyNodeChanges: <T,>(_changes: unknown, nodes: T): T => nodes,
     Position,
     MarkerType,
   };
