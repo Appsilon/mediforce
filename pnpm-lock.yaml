@@ -6,7 +6,7 @@ settings:
 
 overrides:
   axios: '>=1.15.0'
-  protobufjs: 8.6.6
+  protobufjs: 8.7.1
   hono: 4.12.30
   '@hono/node-server': 2.0.10
   fast-xml-parser: 5.10.1
