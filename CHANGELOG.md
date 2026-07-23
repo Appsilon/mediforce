@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Fixed
+- `sync-model-rankings.py` follows OpenRouter's rankings endpoint move to the versioned `/api/frontend/v1/rankings/performance` path (old path now 404s), so the model-registry ranking sync works again.
 - Cancelling a run now reaps any in-flight step execution and agent run rows, so cancelled runs no longer leave the current step rendering as `running` forever. The reap is also guarded against a late worker write: a still-executing agent/script whose plugin finishes *after* the cancel no longer resurrects the reaped `StepExecution`/`AgentRun` to `completed` or persists its output/cost onto the cancelled instance — the runtime bails once it sees the parent is no longer active, and terminal `AgentRun` writes only apply to a row still `running` [#912](https://github.com/Appsilon/mediforce/issues/912).
 ### Added
 - Output File preview modal gains a **fullscreen toggle**: large HTML reports rendered in the sandboxed iframe previously nested scrollbars inside the centered `max-w-4xl`/`max-h-[85vh]` box. The new maximize button (shown for any previewable file) expands the modal to fill the viewport, and in fullscreen the HTML iframe fills the available height and scrolls its own content — a single native scrollbar instead of the iframe's clamped-height scrollbar nested inside the modal's.

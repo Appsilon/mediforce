@@ -15,7 +15,7 @@ import urllib.request
 
 DEFAULT_BASE_URL = "http://localhost:9003"
 MOCK_DEV_BASE_URL = "http://localhost:9007"
-OPENROUTER_RANKINGS_URL = "https://openrouter.ai/api/frontend/rankings/performance"
+OPENROUTER_RANKINGS_URL = "https://openrouter.ai/api/frontend/v1/rankings/performance"
 
 
 def sync_models(base_url: str, api_key: str) -> dict:
