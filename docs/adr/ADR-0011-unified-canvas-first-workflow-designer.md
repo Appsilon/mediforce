@@ -54,8 +54,7 @@ The Co-Work Workflow Designer Workflow (`apps/workflow-designer/src/workflow-des
 
 **Reused as-is (no engine dependency):**
 
-- `getWorkflowAuthorableJsonSchema()` in `packages/platform-core/src/schemas/workflow-definition.ts` — produces a JSON Schema matching `WorkflowStep`/`Transition` shape. Used to constrain the assistant's generation output.
-- `docs/workflow-examples/` (10 examples + `anti-patterns/*.json` with `why`/`fix` fields), loaded via `loadWorkflowExamples()` in `packages/platform-core/src/workflow-examples.ts` — few-shot material for generation quality.
+- The authoring docs (`docs/how-to-create-workflow.md`, `docs/workflow-capabilities.md`, `docs/workflow-authoring-golden-rules.md`) — embedded verbatim into the system prompt as the capability & authoring reference (see PLAN-0011 for the build-time bake mechanism), rather than the assistant re-deriving the schema. (Supersedes the earlier plan to ground on `getWorkflowAuthorableJsonSchema()` + `loadWorkflowExamples()`.)
 - `callOpenRouter()` in `packages/platform-api/src/services/openrouter-client.ts` — generic chat-completions + tool-calling wrapper, not cowork-specific.
 - `ModelPicker` (`packages/platform-ui/src/components/workflows/workflow-editor/model-picker.tsx`) — drop-in model selector (registry-backed, context/pricing/tools/vision badges, custom model ID support). Satisfies spec (4) directly.
 - The `DEFAULT_MODEL = 'anthropic/claude-sonnet-4'` fallback convention from `packages/platform-api/src/handlers/cowork/chat.ts` — same default-with-override pattern for spec (4).

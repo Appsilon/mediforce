@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import type { WorkflowStep, WorkflowDefinition } from '@mediforce/platform-core';
+import type { WorkflowStep, WorkflowDefinition } from '../workflow-definition';
 import { applyWorkflowAssistantToolCalls } from '../workflow-assistant-apply';
-import type { WorkflowAssistantToolCall } from '../workflow-assistant';
+import type { WorkflowAssistantToolCall } from '../workflow-assistant-tools';
 
 type Transitions = WorkflowDefinition['transitions'];
 

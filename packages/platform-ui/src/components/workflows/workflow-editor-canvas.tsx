@@ -30,8 +30,7 @@ import { computeMoveEligibility, ensureTerminalConnected } from './workflow-edit
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
-import { applyWorkflowAssistantToolCalls } from '@mediforce/platform-api/contract';
-import type { WorkflowAssistantToolCall } from '@mediforce/platform-api/contract';
+import { applyWorkflowAssistantToolCalls, type WorkflowAssistantToolCall } from '@mediforce/platform-core';
 
 interface AssistantMessage {
   role: 'user' | 'assistant';

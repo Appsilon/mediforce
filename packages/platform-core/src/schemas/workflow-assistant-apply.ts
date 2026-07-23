@@ -1,6 +1,6 @@
-import { toSlug } from '@mediforce/platform-core';
-import type { WorkflowStep, WorkflowDefinition } from '@mediforce/platform-core';
-import type { WorkflowAssistantToolCall } from './workflow-assistant';
+import { toSlug } from '../utils/slug';
+import type { WorkflowStep, WorkflowDefinition } from './workflow-definition';
+import type { WorkflowAssistantToolCall } from './workflow-assistant-tools';
 
 type Transitions = WorkflowDefinition['transitions'];
 

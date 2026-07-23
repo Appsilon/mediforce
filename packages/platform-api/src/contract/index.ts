@@ -128,18 +128,11 @@ export {
 export {
   WorkflowAssistantMessageSchema,
   AskWorkflowAssistantInputSchema,
-  WorkflowAssistantToolCallSchema,
   AskWorkflowAssistantOutputSchema,
   type AskWorkflowAssistantInput,
   type WorkflowAssistantToolCall,
   type AskWorkflowAssistantOutput,
 } from './workflow-assistant';
-
-export {
-  applyWorkflowAssistantToolCalls,
-  type ToolCallOutcome,
-  type ApplyToolCallsResult,
-} from './workflow-assistant-apply';
 
 export {
   DockerImageInfoSchema,

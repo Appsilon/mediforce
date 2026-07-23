@@ -10,6 +10,7 @@ import {
   mergeVerdictTransitions,
   ensureEntryStepFirst,
   validateStepReferences,
+  applyWorkflowAssistantToolCalls,
   type WorkflowAssistantToolName,
   type WorkflowStep,
   type WorkflowDefinition,
@@ -20,7 +21,6 @@ import type {
   AskWorkflowAssistantOutput,
   WorkflowAssistantToolCall,
 } from '../../contract/workflow-assistant';
-import { applyWorkflowAssistantToolCalls } from '../../contract/workflow-assistant-apply';
 import type { CallerScope } from '../../repositories/index';
 import { actorFromCaller } from '../_helpers';
 import { HandlerError, ValidationError } from '../../errors';
@@ -37,7 +37,7 @@ const MAX_TOOL_LOOP_ITERATIONS = 5;
 
 function buildToolDefinitions(): OpenRouterToolDefinition[] {
   const mutationTools = (
-    Object.entries(WORKFLOW_ASSISTANT_TOOLS) as [WorkflowAssistantToolName, typeof AddStepToolSchema][]
+    Object.entries(WORKFLOW_ASSISTANT_TOOLS) as [WorkflowAssistantToolName, z.ZodType][]
   ).map(([name, schema]) => ({
     type: 'function',
     function: { name, parameters: z.toJSONSchema(schema, { io: 'input' }) },

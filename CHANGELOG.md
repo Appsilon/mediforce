@@ -18,6 +18,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Registering a workflow whose agent step omits a Docker image now **defaults to the golden image** (`mediforce-golden-image`) instead of rejecting the registration with a `ValidationError`; a step that names its own image is unaffected.
 - **Decision steps now route natively by verdict**, like review steps: the engine follows a decision step's verdict targets, and the step editor exposes verdict routing for both `review` and `decision` step types.
 - **Registering a workflow now rejects structurally-invalid definitions** — the graph (reachability, terminal step, dangling transitions/verdict targets) and step references are validated at registration, not just schema-parsed. Note: a previously-stored definition that is incomplete can no longer be re-registered until fixed.
+- Saving a workflow (new workflow or new version) now lands on the workflow's **Runs** section instead of the just-saved definition editor; **Save & Start Run** is unchanged.
 
 ### Added
 - Output File preview modal gains a **fullscreen toggle**: large HTML reports rendered in the sandboxed iframe previously nested scrollbars inside the centered `max-w-4xl`/`max-h-[85vh]` box. The new maximize button (shown for any previewable file) expands the modal to fill the viewport, and in fullscreen the HTML iframe fills the available height and scrolls its own content — a single native scrollbar instead of the iframe's clamped-height scrollbar nested inside the modal's.
