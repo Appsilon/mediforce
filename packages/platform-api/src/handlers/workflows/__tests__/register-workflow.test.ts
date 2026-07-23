@@ -4,6 +4,7 @@ import {
   InMemoryModelRegistryRepository,
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
+  InMemoryTriggerRepository,
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
@@ -28,18 +29,21 @@ vi.mock('../../system/_docker', async (importOriginal) => {
 describe('registerWorkflow handler', () => {
   let processRepo: InMemoryProcessRepository;
   let auditRepo: InMemoryAuditRepository;
+  let triggerRepo: InMemoryTriggerRepository;
 
   beforeEach(() => {
     resetFactorySequence();
     processRepo = new InMemoryProcessRepository();
     const instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository(instanceRepo);
+    triggerRepo = new InMemoryTriggerRepository();
   });
 
   function buildScope(namespaces = ['team-alpha']) {
     return createTestScope({
       processRepo,
       auditRepo,
+      triggerRepo,
       caller: userCaller('user-42', namespaces),
     });
   }
@@ -65,6 +69,45 @@ describe('registerWorkflow handler', () => {
     expect(events).toHaveLength(1);
     expect(events[0].action).toBe('workflow.created');
     expect(events[0].actorId).toBe('user-42');
+  });
+
+  it('seeds an enabled manual trigger row so a new workflow is hand-startable', async () => {
+    const scope = buildScope();
+    const body = buildWorkflowDefinition({ name: 'flow-manual', namespace: 'team-alpha' });
+    body.steps[1].agent = { image: 'test-image' };
+    const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
+
+    await registerWorkflow({ ...input, namespace: 'team-alpha' }, scope);
+
+    const rows = await triggerRepo.listByWorkflow('team-alpha', 'flow-manual');
+    const manual = rows.find((t) => t.type === 'manual');
+    // Def-independent singleton, canonically named 'manual' (Issue #930).
+    expect(manual).toMatchObject({ type: 'manual', name: 'manual', enabled: true, config: {} });
+    expect(rows.filter((t) => t.type === 'manual')).toHaveLength(1);
+    expect(manual?.type === 'manual' && manual.lastTriggeredAt).toBeNull();
+  });
+
+  it('does not duplicate the manual trigger row when a second version registers', async () => {
+    const scope = buildScope();
+    const body = buildWorkflowDefinition({ name: 'flow-twice', namespace: 'team-alpha' });
+    body.steps[1].agent = { image: 'test-image' };
+    const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
+
+    await registerWorkflow({ ...input, namespace: 'team-alpha' }, scope);
+    const seeded = (await triggerRepo.listByWorkflow('team-alpha', 'flow-twice')).find(
+      (t) => t.type === 'manual',
+    );
+    expect(seeded).toBeDefined();
+    // A user stops the seeded manual trigger; re-registering must not resurrect it.
+    await triggerRepo.update('team-alpha', 'flow-twice', seeded!.name, {
+      enabled: false,
+      updatedAt: new Date().toISOString(),
+    });
+    await registerWorkflow({ ...input, namespace: 'team-alpha' }, scope);
+
+    const rows = await triggerRepo.listByWorkflow('team-alpha', 'flow-twice');
+    expect(rows.filter((t) => t.name === seeded!.name)).toHaveLength(1);
+    expect(rows.find((t) => t.name === seeded!.name)?.enabled).toBe(false);
   });
 
   it('rejects workflow with retired model in agent step', async () => {

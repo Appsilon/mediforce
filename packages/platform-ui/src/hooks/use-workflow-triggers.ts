@@ -8,6 +8,7 @@ import { stopRetryOn4xx } from '@/lib/retry';
 
 type Trigger = Awaited<ReturnType<typeof mediforce.triggers.list>>['triggers'][number];
 export type CronTrigger = Extract<Trigger, { type: 'cron' }>;
+export type ManualTrigger = Extract<Trigger, { type: 'manual' }>;
 
 /**
  * Live trigger rows for a workflow, react-query backed. Single source of truth
@@ -24,6 +25,7 @@ export function useWorkflowTriggers(
 ): {
   triggers: Trigger[];
   cronTriggers: CronTrigger[];
+  manualTriggers: ManualTrigger[];
   loading: boolean;
   error: Error | null;
   invalidate: () => Promise<void>;
@@ -46,6 +48,7 @@ export function useWorkflowTriggers(
 
   const triggers = query.data ?? [];
   const cronTriggers = triggers.filter((t): t is CronTrigger => t.type === 'cron');
+  const manualTriggers = triggers.filter((t): t is ManualTrigger => t.type === 'manual');
 
   const invalidate = useCallback(async () => {
     if (!enabled) return;
@@ -57,6 +60,7 @@ export function useWorkflowTriggers(
   return {
     triggers,
     cronTriggers,
+    manualTriggers,
     loading: enabled && query.isPending,
     error: (query.error as Error | null) ?? null,
     invalidate,

@@ -49,6 +49,12 @@ describe('trigger handlers (cron on the unified table, ADR-0011)', () => {
 
   const base = { namespace: 'team-alpha', definitionName: 'flow', triggerName: 'nightly' };
   const cron = { ...base, type: 'cron' as const };
+  const manual = {
+    namespace: 'team-alpha',
+    definitionName: 'flow',
+    triggerName: 'manual',
+    type: 'manual' as const,
+  };
 
   it('creates a cron trigger, persists it, and audits', async () => {
     const scope = buildScope();
@@ -79,14 +85,78 @@ describe('trigger handlers (cron on the unified table, ADR-0011)', () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it('rejects a non-cron type (not yet supported)', async () => {
+  it('creates a manual trigger (empty config, no fire cursor) and audits', async () => {
     const scope = buildScope();
+    const result = await createTrigger({ ...manual, enabled: true }, scope);
+
+    expect(result.trigger).toMatchObject({
+      type: 'manual',
+      namespace: 'team-alpha',
+      workflowName: 'flow',
+      name: 'manual',
+      enabled: true,
+      config: {},
+    });
+    expect(result.trigger.type === 'manual' && result.trigger.lastTriggeredAt).toBeNull();
+    const events = auditRepo.getAll();
+    expect(events[0].action).toBe('manual.trigger.created');
+  });
+
+  it('creates a disabled manual trigger when enabled is false', async () => {
+    const scope = buildScope();
+    const result = await createTrigger({ ...manual, enabled: false }, scope);
+    expect(result.trigger.enabled).toBe(false);
+  });
+
+  it('rejects a second manual trigger — the manual trigger is a singleton', async () => {
+    const scope = buildScope();
+    await createTrigger({ ...manual, enabled: true }, scope);
     await expect(
       createTrigger(
-        { ...base, type: 'manual', schedule: '0 3 * * *', enabled: true },
+        { ...manual, triggerName: 'manual-2', enabled: true },
         scope,
       ),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it('refuses to delete a manual trigger (stop it instead)', async () => {
+    const scope = buildScope();
+    await createTrigger({ ...manual, enabled: true }, scope);
+    await expect(deleteTrigger({ ...base, triggerName: 'manual' }, scope)).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    expect(await storedTrigger('manual')).not.toBeNull();
+  });
+
+  it('rejects a manual trigger carrying a schedule', async () => {
+    const scope = buildScope();
+    await expect(
+      createTrigger({ ...manual, schedule: '0 3 * * *', enabled: true }, scope),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('rejects a cron trigger with no schedule', async () => {
+    const scope = buildScope();
+    await expect(
+      createTrigger({ ...cron, enabled: true }, scope),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('rejects a webhook type (not yet supported)', async () => {
+    const scope = buildScope();
+    await expect(
+      createTrigger({ ...base, type: 'webhook', enabled: true }, scope),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('stops and starts a manual trigger with manual-typed audit actions', async () => {
+    const scope = buildScope();
+    await createTrigger({ ...manual, enabled: true }, scope);
+    await setTriggerEnabled({ ...manual, enabled: false }, scope);
+    await setTriggerEnabled({ ...manual, enabled: true }, scope);
+    const actions = auditRepo.getAll().map((e) => e.action);
+    expect(actions).toContain('manual.trigger.disabled');
+    expect(actions).toContain('manual.trigger.enabled');
   });
 
   it('rejects creating a trigger on a non-existent workflow', async () => {

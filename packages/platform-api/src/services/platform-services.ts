@@ -432,7 +432,7 @@ export function getPlatformServices(): PlatformServices {
   const scriptStepExecutor = new ScriptStepExecutor(pluginRunner);
   const agentStepExecutor = new AgentStepExecutor(agentRunner);
 
-  const manualTrigger = new ManualTrigger(engine, processRepo);
+  const manualTrigger = new ManualTrigger(engine, processRepo, triggerRepo);
 
   const actionRegistry = new ActionRegistry();
   actionRegistry.register('http', httpActionHandler);

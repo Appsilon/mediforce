@@ -1,14 +1,21 @@
 'use client';
 
 import * as React from 'react';
-import { Clock, Play, Square, Trash2, Pencil, Plus, Check, X } from 'lucide-react';
+import { Clock, Play, Square, Trash2, Pencil, Plus, Check, X, MousePointerClick } from 'lucide-react';
 import { mediforce, ApiError } from '@/lib/mediforce';
-import { useWorkflowTriggers, type CronTrigger } from '@/hooks/use-workflow-triggers';
+import {
+  useWorkflowTriggers,
+  type CronTrigger,
+  type ManualTrigger,
+} from '@/hooks/use-workflow-triggers';
 import { formatCron } from '@/lib/format-cron';
 import { cn } from '@/lib/utils';
 
 const SCHEDULE_HELPER_TEXT =
   '5-field cron, UTC. Minutes must be :00, :15, :30 or :45 (aligned to the 15-minute heartbeat).';
+
+/** Canonical name of the per-workflow manual trigger singleton (Issue #930). */
+const MANUAL_TRIGGER_NAME = 'manual';
 
 function errorMessage(err: unknown): string {
   if (err instanceof ApiError) return err.message;
@@ -23,7 +30,7 @@ export function TriggersPanel({
   handle: string;
   definitionName: string;
 }) {
-  const { cronTriggers: triggers, loading, error, invalidate } = useWorkflowTriggers(
+  const { cronTriggers, manualTriggers, loading, error, invalidate } = useWorkflowTriggers(
     definitionName,
     handle,
   );
@@ -39,33 +46,203 @@ export function TriggersPanel({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {loadError && <p className="text-sm text-destructive">{loadError}</p>}
 
-      {triggers.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No triggers yet. Add one below to run this workflow on a schedule.
-        </p>
-      ) : (
-        <ul className="space-y-3">
-          {triggers.map((trigger) => (
-            <TriggerRow
-              key={trigger.name}
-              handle={handle}
-              definitionName={definitionName}
-              trigger={trigger}
-              onChanged={invalidate}
-            />
-          ))}
-        </ul>
-      )}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold">Manual</h2>
+          <p className="text-xs text-muted-foreground">
+            The manual trigger makes this workflow hand-startable. It is always
+            present — start or stop it to allow or block the Start Run button and
+            API starts; it can&rsquo;t be removed.
+          </p>
+        </div>
+        <ManualTriggerRow
+          handle={handle}
+          definitionName={definitionName}
+          trigger={manualTriggers[0] ?? null}
+          onChanged={invalidate}
+        />
+      </section>
 
-      <AddTriggerForm handle={handle} definitionName={definitionName} onCreated={invalidate} />
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold">Scheduled (cron)</h2>
+          <p className="text-xs text-muted-foreground">
+            Fire this workflow automatically on a schedule.
+          </p>
+        </div>
+        {cronTriggers.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No cron triggers yet. Add one below to run this workflow on a schedule.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {cronTriggers.map((trigger) => (
+              <CronTriggerRow
+                key={trigger.name}
+                handle={handle}
+                definitionName={definitionName}
+                trigger={trigger}
+                onChanged={invalidate}
+              />
+            ))}
+          </ul>
+        )}
+        <AddCronTriggerForm handle={handle} definitionName={definitionName} onCreated={invalidate} />
+      </section>
     </div>
   );
 }
 
-function TriggerRow({
+/** Start/stop + delete controls shared by manual and cron rows. */
+function RowActions({
+  isEnabled,
+  busy,
+  onToggle,
+  onDelete,
+  children,
+}: {
+  isEnabled: boolean;
+  busy: boolean;
+  onToggle: () => void;
+  onDelete: () => void;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      {children}
+      <button
+        onClick={onToggle}
+        disabled={busy}
+        title={isEnabled ? 'Stop' : 'Start'}
+        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
+      >
+        {isEnabled ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+      </button>
+      <button
+        onClick={onDelete}
+        disabled={busy}
+        title="Delete"
+        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50 disabled:pointer-events-none"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+function StatusBadge({ isEnabled }: { isEnabled: boolean }) {
+  return (
+    <span
+      className={cn(
+        'rounded-full px-1.5 py-0.5 text-[11px] font-medium',
+        isEnabled ? 'bg-green-500/10 text-green-600' : 'bg-muted text-muted-foreground',
+      )}
+    >
+      {isEnabled ? 'Running' : 'Stopped'}
+    </span>
+  );
+}
+
+/**
+ * The manual trigger is a per-workflow singleton (Issue #930): always shown as
+ * "Manual", start/stop only, never removable. When the row doesn't exist yet
+ * (legacy workflow), Start creates the canonical `manual` row enabled.
+ */
+function ManualTriggerRow({
+  handle,
+  definitionName,
+  trigger,
+  onChanged,
+}: {
+  handle: string;
+  definitionName: string;
+  trigger: ManualTrigger | null;
+  onChanged: () => Promise<void>;
+}) {
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string>('');
+  const isEnabled = trigger?.enabled === true;
+
+  async function run(action: () => Promise<unknown>) {
+    setBusy(true);
+    setError('');
+    try {
+      await action();
+      await onChanged();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function toggle() {
+    if (trigger === null) {
+      // No row yet — Start creates the canonical singleton, enabled.
+      void run(() =>
+        mediforce.triggers.create({
+          definitionName,
+          namespace: handle,
+          triggerName: MANUAL_TRIGGER_NAME,
+          type: 'manual',
+          enabled: true,
+        }),
+      );
+      return;
+    }
+    void run(() =>
+      mediforce.triggers.setEnabled({
+        definitionName,
+        namespace: handle,
+        triggerName: trigger.name,
+        enabled: !isEnabled,
+      }),
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        'rounded-md border p-4',
+        isEnabled ? 'bg-background' : 'bg-muted/40 border-dashed',
+      )}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <MousePointerClick
+              className={cn(
+                'h-4 w-4 shrink-0',
+                isEnabled ? 'text-foreground' : 'text-muted-foreground',
+              )}
+            />
+            <span className="font-medium truncate">Manual</span>
+            <StatusBadge isEnabled={isEnabled} />
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">Hand-started by a person or the API.</p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            onClick={toggle}
+            disabled={busy}
+            title={isEnabled ? 'Stop' : 'Start'}
+            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
+          >
+            {isEnabled ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+function CronTriggerRow({
   handle,
   definitionName,
   trigger,
@@ -113,16 +290,7 @@ function TriggerRow({
               )}
             />
             <span className="font-medium truncate">{trigger.name}</span>
-            <span
-              className={cn(
-                'rounded-full px-1.5 py-0.5 text-[11px] font-medium',
-                isEnabled
-                  ? 'bg-green-500/10 text-green-600'
-                  : 'bg-muted text-muted-foreground',
-              )}
-            >
-              {isEnabled ? 'Running' : 'Stopped'}
-            </span>
+            <StatusBadge isEnabled={isEnabled} />
           </div>
 
           {editing ? (
@@ -150,98 +318,81 @@ function TriggerRow({
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
-          {editing ? (
-            <>
-              <button
-                onClick={() =>
-                  run(() =>
-                    mediforce.triggers
-                      .update({
-                        definitionName,
-                        namespace: handle,
-                        triggerName: trigger.name,
-                        schedule: scheduleDraft.trim(),
-                      })
-                      .then(() => setEditing(false)),
-                  )
-                }
-                disabled={busy || scheduleDraft.trim().length === 0}
-                title="Save schedule"
-                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
-              >
-                <Check className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => {
-                  setScheduleDraft(trigger.config.schedule);
-                  setError('');
-                  setEditing(false);
-                }}
-                disabled={busy}
-                title="Cancel"
-                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() =>
-                  run(() =>
-                    mediforce.triggers.setEnabled({
+        {editing ? (
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={() =>
+                run(() =>
+                  mediforce.triggers
+                    .update({
                       definitionName,
                       namespace: handle,
                       triggerName: trigger.name,
-                      enabled: !isEnabled,
-                    }),
-                  )
-                }
-                disabled={busy}
-                title={isEnabled ? 'Stop' : 'Start'}
-                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
-              >
-                {isEnabled ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              </button>
-              <button
-                onClick={() => {
-                  setScheduleDraft(trigger.config.schedule);
-                  setError('');
-                  setEditing(true);
-                }}
-                disabled={busy}
-                title="Edit schedule"
-                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => {
-                  if (
-                    !window.confirm(
-                      `Delete trigger "${trigger.name}"? This cannot be undone.`,
-                    )
-                  ) {
-                    return;
-                  }
-                  void run(() =>
-                    mediforce.triggers.delete({
-                      definitionName,
-                      namespace: handle,
-                      triggerName: trigger.name,
-                    }),
-                  );
-                }}
-                disabled={busy}
-                title="Delete"
-                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50 disabled:pointer-events-none"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </>
-          )}
-        </div>
+                      schedule: scheduleDraft.trim(),
+                    })
+                    .then(() => setEditing(false)),
+                )
+              }
+              disabled={busy || scheduleDraft.trim().length === 0}
+              title="Save schedule"
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <Check className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => {
+                setScheduleDraft(trigger.config.schedule);
+                setError('');
+                setEditing(false);
+              }}
+              disabled={busy}
+              title="Cancel"
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <RowActions
+            isEnabled={isEnabled}
+            busy={busy}
+            onToggle={() =>
+              run(() =>
+                mediforce.triggers.setEnabled({
+                  definitionName,
+                  namespace: handle,
+                  triggerName: trigger.name,
+                  enabled: !isEnabled,
+                }),
+              )
+            }
+            onDelete={() => {
+              if (!window.confirm(`Delete trigger "${trigger.name}"? This cannot be undone.`)) {
+                return;
+              }
+              void run(() =>
+                mediforce.triggers.delete({
+                  definitionName,
+                  namespace: handle,
+                  triggerName: trigger.name,
+                }),
+              );
+            }}
+          >
+            <button
+              onClick={() => {
+                setScheduleDraft(trigger.config.schedule);
+                setError('');
+                setEditing(true);
+              }}
+              disabled={busy}
+              title="Edit schedule"
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          </RowActions>
+        )}
       </div>
 
       {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
@@ -249,7 +400,7 @@ function TriggerRow({
   );
 }
 
-function AddTriggerForm({
+function AddCronTriggerForm({
   handle,
   definitionName,
   onCreated,
@@ -341,7 +492,7 @@ function AddTriggerForm({
             'disabled:opacity-50 disabled:cursor-not-allowed',
           )}
         >
-          {busy ? 'Adding...' : 'Add trigger'}
+          {busy ? 'Adding...' : 'Add cron trigger'}
         </button>
       </div>
     </div>

@@ -61,6 +61,7 @@ import {
   InMemoryHumanTaskRepository,
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
+  InMemoryTriggerRepository,
   parseWorkflowTemplate,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
@@ -122,7 +123,8 @@ const services = (() => {
   actionRegistry.register('http', httpActionHandler);
   actionRegistry.register('reshape', reshapeActionHandler);
   const webhookRouter = new WebhookRouter(engine, processRepo);
-  const manualTrigger = new ManualTrigger(engine);
+  const triggerRepo = new InMemoryTriggerRepository();
+  const manualTrigger = new ManualTrigger(engine, processRepo, triggerRepo);
   return {
     engine,
     processRepo,
@@ -133,6 +135,7 @@ const services = (() => {
     actionRegistry,
     webhookRouter,
     manualTrigger,
+    triggerRepo,
   };
 })();
 
@@ -236,6 +239,20 @@ beforeEach(async () => {
     version: 1,
   };
   await services.processRepo.saveWorkflowDefinition(definition);
+  // The manual guard now gates on an enabled manual trigger row (ADR-0011),
+  // not the definition's advisory `triggers[]`.
+  const seededAt = new Date().toISOString();
+  await services.triggerRepo.create({
+    type: 'manual',
+    namespace: 'examples',
+    workflowName: definition.name,
+    name: 'test',
+    enabled: true,
+    config: {},
+    lastTriggeredAt: null,
+    createdAt: seededAt,
+    updatedAt: seededAt,
+  });
 });
 
 afterEach(() => {

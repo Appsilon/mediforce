@@ -13,6 +13,7 @@ import {
 } from '../../errors';
 import { actorFromCaller } from '../_helpers';
 import { checkRetiredModels } from './retired-model-check';
+import { seedTriggersFromDefinition } from './_seed-triggers';
 import { isLocalAgentMode, fetchFromContainerWorker, fetchFromLocalDocker } from '../system/_docker';
 
 interface RegisterScopedInput extends RegisterWorkflowInput {
@@ -103,34 +104,10 @@ export async function registerWorkflow(
     namespace: input.namespace,
   });
 
-  // ADR-0011: seed a cron Trigger row for each declared cron trigger that has no
-  // live row yet. Seed-if-absent — never overwrite a user's live schedule or
-  // enabled state, so the declared schedule is advisory after first registration.
-  // The fire cursor anchors to `now` so a freshly-seeded schedule starts at its
-  // next slot rather than back-firing on the next heartbeat.
-  const existingTriggers = await scope.triggers.listByWorkflow(input.namespace, definition.name);
-  for (const trigger of definition.triggers) {
-    if (
-      trigger.type !== 'cron' ||
-      typeof trigger.schedule !== 'string' ||
-      trigger.schedule.length === 0
-    ) {
-      continue;
-    }
-    if (existingTriggers.some((t) => t.name === trigger.name)) continue;
-    const seededAt = new Date().toISOString();
-    await scope.triggers.create({
-      type: 'cron',
-      namespace: input.namespace,
-      workflowName: definition.name,
-      name: trigger.name,
-      enabled: true,
-      config: { schedule: trigger.schedule },
-      lastTriggeredAt: seededAt,
-      createdAt: seededAt,
-      updatedAt: seededAt,
-    });
-  }
+  // ADR-0011: seed detached cron/manual Trigger rows for this definition — a
+  // declared `manual` trigger makes the workflow hand-startable by default
+  // (Issue #930), a declared `cron` trigger starts firing. Seed-if-absent.
+  await seedTriggersFromDefinition(scope, input.namespace, definition);
 
   const warnings: RegistrationWarning[] = [];
 

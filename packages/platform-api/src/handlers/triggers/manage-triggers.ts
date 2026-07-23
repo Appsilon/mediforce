@@ -1,4 +1,8 @@
-import type { CronTriggerResource, TriggerResource } from '@mediforce/platform-core';
+import type {
+  CronTriggerResource,
+  ManualTriggerResource,
+  TriggerResource,
+} from '@mediforce/platform-core';
 import { validateCronSchedule } from '@mediforce/workflow-engine';
 import type {
   CreateTriggerInput,
@@ -15,6 +19,12 @@ import type {
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
+
+function labelFor(type: TriggerResource['type']): string {
+  if (type === 'cron') return 'Cron';
+  if (type === 'manual') return 'Manual';
+  return 'Webhook';
+}
 
 function assertValidSchedule(schedule: string): void {
   const validation = validateCronSchedule(schedule);
@@ -71,52 +81,83 @@ export async function createTrigger(
   input: CreateTriggerInput,
   scope: CallerScope,
 ): Promise<CreateTriggerOutput> {
-  if (input.type !== 'cron') {
+  if (input.type !== 'cron' && input.type !== 'manual') {
     throw new ValidationError(`Trigger type '${input.type}' is not yet supported`);
   }
-  assertValidSchedule(input.schedule);
   await assertWorkflowExists(scope, input.namespace, input.definitionName);
 
-  const existing = await loadTrigger(
-    scope,
+  const workflowTriggers = await scope.triggers.listByWorkflow(
     input.namespace,
     input.definitionName,
-    input.triggerName,
   );
+  const existing = workflowTriggers.find((t) => t.name === input.triggerName) ?? null;
   if (existing !== null) {
     throw new ConflictError(
       `Trigger '${input.triggerName}' already exists for '${input.definitionName}'`,
     );
   }
+  // A workflow has at most one manual trigger — it is the singleton switch that
+  // makes the workflow hand-startable (Issue #930). Reject a second.
+  if (input.type === 'manual' && workflowTriggers.some((t) => t.type === 'manual')) {
+    throw new ConflictError(
+      `'${input.definitionName}' already has a manual trigger`,
+    );
+  }
 
   const now = new Date().toISOString();
-  const trigger: CronTriggerResource = {
-    type: 'cron',
-    namespace: input.namespace,
-    workflowName: input.definitionName,
-    name: input.triggerName,
-    enabled: input.enabled,
-    config: { schedule: input.schedule },
-    // Anchor the fire cursor to creation time so the schedule starts at its next
-    // slot rather than back-firing history from the workflow's createdAt on the
-    // next heartbeat.
-    lastTriggeredAt: now,
-    createdAt: now,
-    updatedAt: now,
-  };
+  let trigger: TriggerResource;
+  if (input.type === 'cron') {
+    if (typeof input.schedule !== 'string' || input.schedule.length === 0) {
+      throw new ValidationError('A cron trigger requires a schedule');
+    }
+    assertValidSchedule(input.schedule);
+    const cron: CronTriggerResource = {
+      type: 'cron',
+      namespace: input.namespace,
+      workflowName: input.definitionName,
+      name: input.triggerName,
+      enabled: input.enabled,
+      config: { schedule: input.schedule },
+      // Anchor the fire cursor to creation time so the schedule starts at its next
+      // slot rather than back-firing history from the workflow's createdAt on the
+      // next heartbeat.
+      lastTriggeredAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    trigger = cron;
+  } else {
+    if (typeof input.schedule === 'string' && input.schedule.length > 0) {
+      throw new ValidationError('A manual trigger does not take a schedule');
+    }
+    const manual: ManualTriggerResource = {
+      type: 'manual',
+      namespace: input.namespace,
+      workflowName: input.definitionName,
+      name: input.triggerName,
+      enabled: input.enabled,
+      config: {},
+      lastTriggeredAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    trigger = manual;
+  }
   const created = await scope.triggers.create(trigger);
 
+  const scheduleSuffix = trigger.type === 'cron' ? ` (${trigger.config.schedule})` : '';
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
     ...actor,
-    action: 'cron.trigger.created',
-    description: `Cron trigger '${input.triggerName}' created for '${input.definitionName}' (${input.schedule})`,
+    action: `${input.type}.trigger.created`,
+    description: `${labelFor(input.type)} trigger '${input.triggerName}' created for '${input.definitionName}'${scheduleSuffix}`,
     timestamp: now,
     inputSnapshot: {
       namespace: input.namespace,
       definitionName: input.definitionName,
       triggerName: input.triggerName,
-      schedule: input.schedule,
+      type: input.type,
+      ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
       enabled: input.enabled,
     },
     outputSnapshot: { enabled: input.enabled },
@@ -170,7 +211,12 @@ export async function setTriggerEnabled(
   input: SetTriggerEnabledInput,
   scope: CallerScope,
 ): Promise<SetTriggerEnabledOutput> {
-  await loadTriggerOr404(scope, input.namespace, input.definitionName, input.triggerName);
+  const current = await loadTriggerOr404(
+    scope,
+    input.namespace,
+    input.definitionName,
+    input.triggerName,
+  );
 
   const now = new Date().toISOString();
   let trigger = await scope.triggers.update(
@@ -196,8 +242,8 @@ export async function setTriggerEnabled(
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
     ...actor,
-    action: input.enabled ? 'cron.trigger.enabled' : 'cron.trigger.disabled',
-    description: `Cron trigger '${input.triggerName}' ${input.enabled ? 'started' : 'stopped'} for '${input.definitionName}'`,
+    action: `${current.type}.trigger.${input.enabled ? 'enabled' : 'disabled'}`,
+    description: `${labelFor(current.type)} trigger '${input.triggerName}' ${input.enabled ? 'started' : 'stopped'} for '${input.definitionName}'`,
     timestamp: now,
     inputSnapshot: {
       namespace: input.namespace,
@@ -219,15 +265,28 @@ export async function deleteTrigger(
   input: DeleteTriggerInput,
   scope: CallerScope,
 ): Promise<DeleteTriggerOutput> {
-  await loadTriggerOr404(scope, input.namespace, input.definitionName, input.triggerName);
+  const current = await loadTriggerOr404(
+    scope,
+    input.namespace,
+    input.definitionName,
+    input.triggerName,
+  );
+  // The manual trigger is the singleton hand-start switch — it can be stopped
+  // but never removed, so the workflow always has one (Issue #930). Workflow
+  // deletion still reaps it via the cascade (`deleteByWorkflow`).
+  if (current.type === 'manual') {
+    throw new ValidationError(
+      'The manual trigger cannot be removed — stop it instead',
+    );
+  }
 
   await scope.triggers.delete(input.namespace, input.definitionName, input.triggerName);
 
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
     ...actor,
-    action: 'cron.trigger.deleted',
-    description: `Cron trigger '${input.triggerName}' deleted for '${input.definitionName}'`,
+    action: `${current.type}.trigger.deleted`,
+    description: `${labelFor(current.type)} trigger '${input.triggerName}' deleted for '${input.definitionName}'`,
     timestamp: new Date().toISOString(),
     inputSnapshot: {
       namespace: input.namespace,

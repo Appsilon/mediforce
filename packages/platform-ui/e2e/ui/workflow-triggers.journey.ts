@@ -4,14 +4,15 @@ import { trackPageErrors } from '../helpers/page-errors';
 
 /**
  * Trigger management UI (ADR-0011). Exercises the "Triggers" tab on a workflow
- * detail page: add a cron trigger to an existing (manual-only) workflow, see it
- * listed as Running, stop it (still listed, Stopped), then delete it. Triggers
- * live in their own table, so this mutating flow does not touch data any other
- * journey reads.
+ * detail page. The workflow declares a manual trigger, so the Manual section
+ * shows a Running row (seeded on register, Issue #930) and the Start Run button
+ * is enabled. The cron flow adds a cron trigger, sees it Running, stops it, then
+ * deletes it. Triggers live in their own table, so this mutating flow only
+ * touches the cron row it creates — the shared manual trigger is left untouched.
  */
 
 test.describe('Workflow Triggers Journey', () => {
-  test('add, stop, and delete a cron trigger from the Triggers tab', async ({ page }) => {
+  test('manual section is present; add, stop, and delete a cron trigger', async ({ page }) => {
     trackPageErrors(page);
 
     const triggerName = 'e2e-nightly';
@@ -19,39 +20,44 @@ test.describe('Workflow Triggers Journey', () => {
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review`);
     await expect(page.getByRole('tab', { name: /runs/i })).toBeVisible({ timeout: 30_000 });
 
+    // The workflow is hand-startable: the Start Run button reads the manual
+    // trigger row (same source of truth as the server guard) and is enabled.
+    const startRunButton = page.getByRole('button', { name: /start run/i });
+    await expect(startRunButton).toBeEnabled({ timeout: 15_000 });
+
     // Open the Triggers tab.
     await page.getByRole('tab', { name: 'Triggers' }).click();
 
-    // Reset: a prior attempt may have left this row behind (Playwright retries
-    // reuse the shared seed data). Delete it before asserting the clean state so
-    // a retry exposes the original failure, not a stale-row setup failure.
-    await expect(
-      page.getByText(triggerName).or(page.getByText(/no triggers yet/i)),
-    ).toBeVisible({ timeout: 10_000 });
-    if (await page.getByText(triggerName).isVisible()) {
-      page.once('dialog', (dialog) => dialog.accept());
-      await page.getByRole('button', { name: 'Delete' }).click();
-    }
-    await expect(page.getByText(/no triggers yet/i)).toBeVisible({ timeout: 10_000 });
+    // The Manual section shows the seeded, enabled manual trigger.
+    await expect(page.getByRole('heading', { name: 'Manual' })).toBeVisible({ timeout: 10_000 });
 
-    // Add a cron trigger to this manual-only workflow — no new version needed.
+    // Scope every cron operation to the cron row / cron form so the manual row's
+    // identical Stop/Delete/Running controls never satisfy a selector.
+    const cronRow = page.locator('li', { hasText: triggerName });
+
+    // Reset: a prior attempt may have left this row behind (Playwright retries
+    // reuse the shared seed data). Delete it before asserting the clean state.
+    if ((await cronRow.count()) > 0) {
+      page.once('dialog', (dialog) => dialog.accept());
+      await cronRow.getByRole('button', { name: 'Delete' }).click();
+    }
+    await expect(page.getByText(/no cron triggers yet/i)).toBeVisible({ timeout: 10_000 });
+
+    // Add a cron trigger to this workflow — no new version needed.
     await page.getByPlaceholder('nightly-refresh').fill(triggerName);
     await page.getByPlaceholder('0 6 * * *').fill('0 3 * * *');
-    await page.getByRole('button', { name: 'Add trigger' }).click();
+    await page.getByRole('button', { name: 'Add cron trigger' }).click();
 
     // It appears in the list, enabled.
-    await expect(page.getByText(triggerName)).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('Running')).toBeVisible();
+    await expect(cronRow).toBeVisible({ timeout: 15_000 });
+    await expect(cronRow.getByText('Running')).toBeVisible();
 
     // The page header reflects the live schedule as running.
     await expect(page.getByText(/runs automatically/i)).toBeVisible({ timeout: 15_000 });
 
-    // Stop it — still listed, now Stopped. Match the row badge exactly: the
-    // header's "Schedule stopped · …" summary also contains "Stopped", so a
-    // substring match would resolve to two elements (strict-mode violation).
-    await page.getByRole('button', { name: 'Stop' }).click();
-    await expect(page.getByText('Stopped', { exact: true })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(triggerName)).toBeVisible();
+    // Stop it — still listed, now Stopped.
+    await cronRow.getByRole('button', { name: 'Stop' }).click();
+    await expect(cronRow.getByText('Stopped', { exact: true })).toBeVisible({ timeout: 15_000 });
 
     // The header must drop "Runs automatically" once the schedule is stopped.
     await expect(page.getByText(/runs automatically/i)).toHaveCount(0);
@@ -59,8 +65,8 @@ test.describe('Workflow Triggers Journey', () => {
 
     // Delete it (confirm dialog) — it disappears from the list.
     page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Delete' }).click();
-    await expect(page.getByText(/no triggers yet/i)).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(triggerName)).toHaveCount(0);
+    await cronRow.getByRole('button', { name: 'Delete' }).click();
+    await expect(page.getByText(/no cron triggers yet/i)).toBeVisible({ timeout: 15_000 });
+    await expect(cronRow).toHaveCount(0);
   });
 });

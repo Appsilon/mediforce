@@ -4,10 +4,12 @@ import { TriggerResourceSchema, TriggerTypeSchema } from '@mediforce/platform-co
 /**
  * Contract for Trigger management on the unified `triggers` table (ADR-0011).
  *
- * Functionally cron-only for now (Issues 3/4 wire `manual` / `webhook`): create
- * carries a `type` that defaults to `'cron'` and the handler rejects the rest.
- * Cron schedule syntax is validated in the handlers via `validateCronSchedule`
- * (UTC, 15-minute alignment) so CLI and UI reject identically at one boundary.
+ * Supports `cron` and `manual` for now (Issue 4 wires `webhook`): create carries
+ * a `type` that defaults to `'cron'` and the handler rejects the rest. `schedule`
+ * is only meaningful for cron — it is optional on the wire and the handler
+ * requires it for cron / forbids it for manual. Cron schedule syntax is
+ * validated in the handlers via `validateCronSchedule` (UTC, 15-minute
+ * alignment) so CLI and UI reject identically at one boundary.
  */
 
 const key = {
@@ -27,7 +29,8 @@ export const ListTriggersOutputSchema = z.object({
 export const CreateTriggerInputSchema = z.object({
   ...key,
   type: TriggerTypeSchema.default('cron'),
-  schedule: z.string().min(1),
+  // Cron-only: required for `cron`, forbidden for `manual`. Enforced in the handler.
+  schedule: z.string().min(1).optional(),
   enabled: z.boolean().default(true),
 });
 export const CreateTriggerOutputSchema = z.object({

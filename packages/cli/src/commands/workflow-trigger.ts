@@ -12,12 +12,17 @@ const typeArg = {
   type: 'string',
   required: false,
   default: 'cron',
-  description: 'Trigger type (cron only for now)',
+  description: "Trigger type: 'cron' or 'manual'",
 } as const;
 const scheduleArg = {
   type: 'string',
   required: true,
   description: '5-field cron schedule (UTC; minutes must be :00/:15/:30/:45)',
+} as const;
+const scheduleOptArg = {
+  type: 'string',
+  required: false,
+  description: '5-field cron schedule (UTC; :00/:15/:30/:45). Required for --type cron, omit for --type manual',
 } as const;
 
 function scheduleOf(trigger: { type: string; config: unknown }): string {
@@ -56,24 +61,27 @@ export const workflowTriggerAddCommand = defineCommand({
   args: {
     name: nameArg,
     trigger: triggerArg,
-    schedule: scheduleArg,
+    schedule: scheduleOptArg,
     namespace: namespaceArg,
     type: typeArg,
   },
   async run({ args, output, mediforce, jsonMode }) {
+    const type = (args.type ?? 'cron') as 'cron' | 'manual';
     const result = await mediforce.triggers.create({
       definitionName: args.name,
       triggerName: args.trigger!,
-      type: (args.type ?? 'cron') as 'cron',
-      schedule: args.schedule!,
+      type,
+      ...(args.schedule ? { schedule: args.schedule } : {}),
       namespace: args.namespace!,
       enabled: true,
     });
     if (jsonMode) {
       printJson(output, result);
     } else {
+      const schedule = scheduleOf(result.trigger);
+      const suffix = schedule.length > 0 ? ` (${schedule})` : '';
       output.stdout(
-        `Added ${result.trigger.type} trigger '${result.trigger.name}' (${scheduleOf(result.trigger)}) to '${args.name}'`,
+        `Added ${result.trigger.type} trigger '${result.trigger.name}'${suffix} to '${args.name}'`,
       );
     }
     return 0;

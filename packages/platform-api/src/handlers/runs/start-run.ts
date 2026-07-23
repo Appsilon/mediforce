@@ -1,7 +1,8 @@
 import { validatePayload } from '@mediforce/platform-core';
+import { ManualTriggerNotDeclaredError } from '@mediforce/workflow-engine';
 import type { StartRunInput, StartRunOutput } from '../../contract/runs';
 import type { CallerScope } from '../../repositories/index';
-import { ForbiddenError, NotFoundError, HandlerError } from '../../errors';
+import { ConflictError, ForbiddenError, NotFoundError, HandlerError } from '../../errors';
 
 // Engine's createInstance + startInstance emit instance.created /
 // instance.started; handler does NOT double-emit.
@@ -50,15 +51,26 @@ export async function startRun(
     }
   }
 
-  const result = await scope.system.manualTrigger.fireWorkflow({
-    namespace: definition.namespace,
-    definitionName: input.definitionName,
-    definitionVersion: version,
-    triggerName: input.triggerName,
-    triggeredBy: input.triggeredBy,
-    payload,
-    ...(input.dryRun ? { dryRun: true } : {}),
-  });
+  let result;
+  try {
+    result = await scope.system.manualTrigger.fireWorkflow({
+      namespace: definition.namespace,
+      definitionName: input.definitionName,
+      definitionVersion: version,
+      triggerName: input.triggerName,
+      triggeredBy: input.triggeredBy,
+      payload,
+      ...(input.dryRun ? { dryRun: true } : {}),
+    });
+  } catch (err) {
+    // The workflow has no enabled `manual` trigger row (ADR-0011). This is an
+    // expected client-facing rejection, not a server fault — surface it as 409
+    // rather than letting the plain Error fall through to a 500.
+    if (err instanceof ManualTriggerNotDeclaredError) {
+      throw new ConflictError(err.message);
+    }
+    throw err;
+  }
 
   await scope.system.runKicker.kick(result.instanceId, {
     triggeredBy: input.triggeredBy,

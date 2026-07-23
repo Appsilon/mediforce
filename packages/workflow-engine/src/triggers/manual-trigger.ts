@@ -1,4 +1,4 @@
-import type { ProcessRepository } from '@mediforce/platform-core';
+import type { ProcessRepository, TriggerRepository } from '@mediforce/platform-core';
 import type { WorkflowEngine } from '../engine/workflow-engine';
 import type { TriggerResult, WorkflowTriggerContext } from './trigger-types';
 import { ManualTriggerNotDeclaredError } from './trigger-errors';
@@ -9,24 +9,26 @@ import { ManualTriggerNotDeclaredError } from './trigger-errors';
  * Used for user-initiated flows where a human explicitly triggers
  * a new process execution.
  *
- * Validates that the target WorkflowDefinition declares a `manual` trigger
- * before creating the instance. This is the server-side counterpart to the
- * disabled state of the StartRunButton — it ensures that workflows without
- * a manual trigger cannot be started by callers that bypass the UI gate.
+ * Gates on an **enabled `manual` trigger row** in the unified triggers table
+ * (ADR-0011) keyed by `(namespace, workflowName)` — not on the definition's
+ * advisory `triggers[]`. This is the server-side counterpart to the disabled
+ * state of the StartRunButton: workflows without an enabled manual trigger
+ * cannot be started by callers that bypass the UI gate.
  */
 export class ManualTrigger {
   constructor(
     private readonly engine: WorkflowEngine,
     private readonly processRepository: ProcessRepository,
+    private readonly triggerRepository: TriggerRepository,
   ) {}
 
   /**
    * Creates and starts a workflow instance from a unified WorkflowDefinition.
    * No separate ProcessConfig required — all config is embedded in the definition.
    *
-   * Throws {@link ManualTriggerNotDeclaredError} when the WD does not declare
-   * a `manual` trigger. The engine error for "definition not found" propagates
-   * unchanged.
+   * Throws {@link ManualTriggerNotDeclaredError} when the workflow has no
+   * enabled `manual` trigger row. The engine error for "definition not found"
+   * propagates unchanged.
    */
   async fireWorkflow(context: WorkflowTriggerContext): Promise<TriggerResult> {
     const definition = await this.processRepository.getWorkflowDefinition(
@@ -39,10 +41,14 @@ export class ManualTrigger {
         `Workflow definition '${context.definitionName}' version '${context.definitionVersion}' not found`,
       );
     }
-    const hasManualTrigger = definition.triggers.some(
-      (trigger) => trigger.type === 'manual',
+    const triggers = await this.triggerRepository.listByWorkflow(
+      context.namespace,
+      context.definitionName,
     );
-    if (!hasManualTrigger) {
+    const hasEnabledManualTrigger = triggers.some(
+      (trigger) => trigger.type === 'manual' && trigger.enabled,
+    );
+    if (!hasEnabledManualTrigger) {
       throw new ManualTriggerNotDeclaredError(
         context.definitionName,
         context.definitionVersion,

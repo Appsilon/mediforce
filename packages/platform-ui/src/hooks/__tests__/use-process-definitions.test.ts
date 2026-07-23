@@ -35,7 +35,7 @@ describe('useProcessDefinitions', () => {
     const runSummary = { total: 5, active: 2, latest: [] };
     listMock.mockResolvedValue({
       definitions: [
-        { namespace: 'ns1', name: 'wf-a', latestVersion: 3, defaultVersion: 3, definition: def, runSummary },
+        { namespace: 'ns1', name: 'wf-a', latestVersion: 3, defaultVersion: 3, definition: def, runSummary, manualStartEnabled: true },
       ],
     });
 
@@ -67,13 +67,15 @@ describe('useProcessDefinitions', () => {
     expect(steps).toEqual(['intake', 'review']);
   });
 
-  it('derives hasManualTrigger=false when no trigger has type manual', async () => {
+  it('reflects hasManualTrigger=false from the triggers table (not def.triggers)', async () => {
+    // Even though the definition declares a manual trigger, the gate reads the
+    // table's `manualStartEnabled` (Issue #930) — here it is stopped.
     const def = buildWorkflowDefinition({
-      triggers: [{ type: 'webhook', name: 'Hook', config: { method: 'POST', path: '/x' } }],
+      triggers: [{ type: 'manual', name: 'Start' }],
     });
     listMock.mockResolvedValue({
       definitions: [
-        { namespace: 'ns1', name: 'wf-a', latestVersion: 1, defaultVersion: 1, definition: def, runSummary: { total: 0, active: 0, latest: [] } },
+        { namespace: 'ns1', name: 'wf-a', latestVersion: 1, defaultVersion: 1, definition: def, runSummary: { total: 0, active: 0, latest: [] }, manualStartEnabled: false },
       ],
     });
 

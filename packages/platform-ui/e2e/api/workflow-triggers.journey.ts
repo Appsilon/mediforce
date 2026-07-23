@@ -130,8 +130,73 @@ test.describe('Trigger management — API E2E', () => {
       const afterList = await request.get(`${triggersUrl}?namespace=${TEST_ORG_HANDLE}`, {
         headers: AUTH_HEADERS,
       });
-      const after = (await afterList.json()) as { triggers: Array<unknown> };
-      expect(after.triggers).toHaveLength(0);
+      const after = (await afterList.json()) as { triggers: Array<{ name: string }> };
+      // The cron 'nightly' is gone; the seed-on-register 'manual' row remains
+      // (Issue #930 — new workflows are hand-startable by default).
+      expect(after.triggers.map((t) => t.name)).toEqual(['manual']);
+    } finally {
+      await deleteWorkflowDefinition(request, wdName);
+    }
+  });
+
+  test('manual trigger gates hand-start (enabled → 201, disabled/deleted → 409)', async ({
+    request,
+  }) => {
+    const wdName = `e2e-manualgate-${Date.now()}`;
+    const manualEnabledUrl = `${base}/${encodeURIComponent(wdName)}/triggers/manual/enabled`;
+    const manualUrl = `${base}/${encodeURIComponent(wdName)}/triggers/manual`;
+
+    const createWdRes = await request.post(`${base}?namespace=${TEST_ORG_HANDLE}`, {
+      headers: AUTH_HEADERS,
+      data: manualOnlyWd(wdName),
+    });
+    expect(createWdRes.status(), await createWdRes.text()).toBe(201);
+
+    const startData = {
+      namespace: TEST_ORG_HANDLE,
+      definitionName: wdName,
+      triggeredBy: 'e2e-test',
+      triggerName: 'manual',
+    };
+
+    try {
+      // Registration seeded an enabled manual trigger → hand-start succeeds.
+      const okStart = await request.post('/api/processes', {
+        headers: AUTH_HEADERS,
+        data: startData,
+      });
+      expect(okStart.status(), await okStart.text()).toBe(201);
+
+      // Stop the manual trigger → hand-start is now rejected (409, not 500).
+      const stopRes = await request.post(manualEnabledUrl, {
+        headers: AUTH_HEADERS,
+        data: { namespace: TEST_ORG_HANDLE, enabled: false },
+      });
+      expect(stopRes.ok(), await stopRes.text()).toBe(true);
+      const blockedStart = await request.post('/api/processes', {
+        headers: AUTH_HEADERS,
+        data: startData,
+      });
+      expect(blockedStart.status()).toBe(409);
+
+      // Re-enable → start works again.
+      const startRes = await request.post(manualEnabledUrl, {
+        headers: AUTH_HEADERS,
+        data: { namespace: TEST_ORG_HANDLE, enabled: true },
+      });
+      expect(startRes.ok()).toBe(true);
+      const reStart = await request.post('/api/processes', {
+        headers: AUTH_HEADERS,
+        data: startData,
+      });
+      expect(reStart.status()).toBe(201);
+
+      // The manual trigger is a singleton switch — it can be stopped but never
+      // removed, so a delete is rejected.
+      const delRes = await request.delete(`${manualUrl}?namespace=${TEST_ORG_HANDLE}`, {
+        headers: AUTH_HEADERS,
+      });
+      expect(delRes.ok()).toBe(false);
     } finally {
       await deleteWorkflowDefinition(request, wdName);
     }

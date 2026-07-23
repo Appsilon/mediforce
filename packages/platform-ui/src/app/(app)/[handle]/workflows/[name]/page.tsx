@@ -197,7 +197,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   // Live trigger rows (enabled/schedule) — the header summary reflects these,
   // not the advisory triggers declared on the definition, so stopping a cron
   // trigger in the Triggers tab immediately updates the header.
-  const { cronTriggers } = useWorkflowTriggers(decodedName, handle);
+  const { cronTriggers, triggers, loading: triggersLoading } = useWorkflowTriggers(decodedName, handle);
   const { data: runs, loading: runsLoading } = useProcessInstances('all', decodedName, showArchivedRuns, handle);
   const { data: activeTasks } = useMyActionableTasks();
 
@@ -243,9 +243,13 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
 
   const currentVisibility = visibilityOverride ?? latest?.visibility ?? 'private';
   const isPrivate = currentVisibility === 'private';
-  const hasManualTrigger = latest?.triggers?.some(
-    (trigger: { type: string }) => trigger.type === 'manual',
-  ) ?? false;
+  // Hand-startable iff an enabled `manual` trigger row exists (ADR-0011 / Issue
+  // #930) — same source of truth as the server guard, not the definition's
+  // advisory triggers[]. Stay optimistic while the rows load so the button
+  // doesn't flash disabled; the server guard is the real gate.
+  const hasManualTrigger = triggersLoading
+    ? true
+    : triggers.some((trigger) => trigger.type === 'manual' && trigger.enabled);
 
   if (versionsLoading || authLoading) {
     return (
@@ -323,12 +327,18 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 {latest?.steps.length} steps
               </span>
               <span>{runs.length} runs</span>
-              {latest?.triggers
-                ?.filter((trigger: { type: string }) => trigger.type !== 'cron')
-                .map((trigger: { type: string; name: string }) => (
-                  <span key={trigger.name} className="inline-flex items-center gap-1">
+              {triggers
+                .filter((trigger) => trigger.type !== 'cron')
+                .map((trigger) => (
+                  <span
+                    key={trigger.name}
+                    className={cn(
+                      'inline-flex items-center gap-1',
+                      trigger.enabled ? '' : 'text-muted-foreground line-through',
+                    )}
+                  >
                     {trigger.type === 'manual' ? <Play className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
-                    <span>{trigger.name}</span>
+                    <span>{trigger.type === 'manual' ? 'Manual' : trigger.name}</span>
                   </span>
                 ))}
               {cronTriggers.map((trigger) => (

@@ -225,6 +225,13 @@
       "when": 1784720152303,
       "tag": "0031_retire_cron_trigger_state",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1784720152304,
+      "tag": "0032_backfill_manual_triggers",
+      "breakpoints": true
     }
   ]
 }

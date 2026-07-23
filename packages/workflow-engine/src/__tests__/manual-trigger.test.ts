@@ -3,8 +3,9 @@ import {
   InMemoryProcessRepository,
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
+  InMemoryTriggerRepository,
 } from '@mediforce/platform-core';
-import type { WorkflowDefinition } from '@mediforce/platform-core';
+import type { ManualTriggerResource, WorkflowDefinition } from '@mediforce/platform-core';
 import {
   WorkflowEngine,
   ManualTrigger,
@@ -42,10 +43,31 @@ const cronOnlyDef: WorkflowDefinition = {
   triggers: [{ type: 'cron', name: 'Nightly', schedule: '0 0 * * *' }],
 };
 
+function manualRow(
+  namespace: string,
+  workflowName: string,
+  name: string,
+  enabled: boolean,
+): ManualTriggerResource {
+  const now = new Date().toISOString();
+  return {
+    type: 'manual',
+    namespace,
+    workflowName,
+    name,
+    enabled,
+    config: {},
+    lastTriggeredAt: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 describe('ManualTrigger', () => {
   let processRepo: InMemoryProcessRepository;
   let instanceRepo: InMemoryProcessInstanceRepository;
   let auditRepo: InMemoryAuditRepository;
+  let triggerRepo: InMemoryTriggerRepository;
   let engine: WorkflowEngine;
   let trigger: ManualTrigger;
 
@@ -53,15 +75,20 @@ describe('ManualTrigger', () => {
     processRepo = new InMemoryProcessRepository();
     instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository();
+    triggerRepo = new InMemoryTriggerRepository();
     engine = new WorkflowEngine(
       processRepo,
       instanceRepo,
       auditRepo,
     );
-    trigger = new ManualTrigger(engine, processRepo);
+    trigger = new ManualTrigger(engine, processRepo, triggerRepo);
 
     await processRepo.saveWorkflowDefinition(linearDef);
     await processRepo.saveWorkflowDefinition(cronOnlyDef);
+    // The guard reads the unified triggers table (ADR-0011), not the definition's
+    // advisory `triggers[]`. `linear-process` gets an enabled manual row;
+    // `cron-only-process` gets none.
+    await triggerRepo.create(manualRow('test', 'linear-process', 'Start Process', true));
   });
 
   function makeContext(
@@ -109,13 +136,36 @@ describe('ManualTrigger', () => {
     expect(result.instanceId).toMatch(uuidRegex);
   });
 
-  describe('manual trigger declaration enforcement', () => {
-    it('rejects workflows that do not declare a manual trigger', async () => {
+  describe('manual trigger gating (unified triggers table)', () => {
+    it('rejects workflows with no enabled manual trigger row', async () => {
       await expect(
         trigger.fireWorkflow(
           makeContext({ definitionName: 'cron-only-process' }),
         ),
       ).rejects.toThrow(ManualTriggerNotDeclaredError);
+    });
+
+    it('rejects when the manual trigger row exists but is disabled', async () => {
+      await triggerRepo.update('test', 'linear-process', 'Start Process', {
+        enabled: false,
+        updatedAt: new Date().toISOString(),
+      });
+      await expect(trigger.fireWorkflow(makeContext())).rejects.toThrow(
+        ManualTriggerNotDeclaredError,
+      );
+    });
+
+    it('allows starting once a disabled manual row is re-enabled', async () => {
+      await triggerRepo.update('test', 'linear-process', 'Start Process', {
+        enabled: false,
+        updatedAt: new Date().toISOString(),
+      });
+      await triggerRepo.update('test', 'linear-process', 'Start Process', {
+        enabled: true,
+        updatedAt: new Date().toISOString(),
+      });
+      const result = await trigger.fireWorkflow(makeContext());
+      expect(result.status).toBe('created');
     });
 
     it('does not create an instance when manual trigger is missing', async () => {
