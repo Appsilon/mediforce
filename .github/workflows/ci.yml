@@ -68,7 +68,7 @@ jobs:
     timeout-minutes: 10
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: mediforce
           POSTGRES_PASSWORD: mediforce
@@ -108,7 +108,7 @@ jobs:
     timeout-minutes: 25
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: mediforce
           POSTGRES_PASSWORD: mediforce
