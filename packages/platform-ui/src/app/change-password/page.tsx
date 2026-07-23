@@ -2,14 +2,20 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { updatePassword, signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { mediforce } from '@/lib/mediforce';
 import { useAuth } from '@/contexts/auth-context';
+import { useUserMe } from '@/hooks/use-user-me';
 
 export default function ChangePasswordPage() {
-  const { firebaseUser, loading, mustChangePassword, clearMustChangePassword } = useAuth();
+  const { user, loading, mustChangePassword, clearMustChangePassword } = useAuth();
   const router = useRouter();
+  // `hasPassword` decides whether this is a replacement (re-authentication
+  // required) or a first-time set. Fail closed: until `me` resolves we assume
+  // a password exists, so the field is asked for rather than silently skipped.
+  const userMe = useUserMe({ enabled: user !== null });
+  const hasPassword = userMe.data?.user.hasPassword !== false;
 
+  const [currentPassword, setCurrentPassword] = React.useState('');
   const [newPassword, setNewPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
@@ -17,7 +23,7 @@ export default function ChangePasswordPage() {
 
   React.useEffect(() => {
     if (loading) return;
-    if (!firebaseUser) {
+    if (!user) {
       router.replace('/login');
       return;
     }
@@ -25,7 +31,7 @@ export default function ChangePasswordPage() {
     if (!mustChangePassword) {
       router.replace('/workspace-selection');
     }
-  }, [loading, firebaseUser, mustChangePassword, router]);
+  }, [loading, user, mustChangePassword, router]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,40 +46,30 @@ export default function ChangePasswordPage() {
       return;
     }
 
+    if (hasPassword && currentPassword === '') {
+      setError('Enter your current password.');
+      return;
+    }
+
     setPending(true);
     try {
-      const currentUser = auth.currentUser;
-      if (currentUser === null) throw new Error('Not signed in.');
-      const email = currentUser.email;
-      if (email === null) throw new Error('Account has no email address.');
-      await updatePassword(currentUser, newPassword);
-      // updatePassword revokes every existing ID token for the user (their
-      // `validSince` moves to now), so the cached session token the client
-      // keeps serving is rejected and the next authenticated call 401s.
-      // Re-authenticate with the new password to establish a fresh session
-      // whose token clearMustChangePassword and the landing page reuse.
-      await signInWithEmailAndPassword(auth, email, newPassword);
+      // Set the bcrypt password hash server-side (ADR-0002 §4), then clear the
+      // forced-change flag. The NextAuth session cookie rides both calls — the
+      // handler revokes the user's OTHER sessions only, so this one survives.
+      await mediforce.users.setPassword({
+        newPassword,
+        ...(hasPassword ? { currentPassword } : {}),
+      });
       await clearMustChangePassword();
       router.replace('/workspace-selection');
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        const code = (err as { code?: string }).code ?? '';
-        if (code === 'auth/requires-recent-login') {
-          setError('Session expired. Please sign out and sign in again to change your password.');
-        } else if (code === 'auth/weak-password') {
-          setError('Password is too weak. Please choose a longer or more complex password.');
-        } else {
-          setError(err.message);
-        }
-      } else {
-        setError('Failed to update password.');
-      }
+      setError(err instanceof Error ? err.message : 'Failed to update password.');
     } finally {
       setPending(false);
     }
   }
 
-  if (loading || !firebaseUser || !mustChangePassword) {
+  if (loading || !user || !mustChangePassword) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-sm text-muted-foreground animate-pulse">Loading…</div>
@@ -87,7 +83,7 @@ export default function ChangePasswordPage() {
         <div className="space-y-2 text-center">
           <h1 className="text-2xl font-headline font-semibold tracking-tight">Set your password</h1>
           <p className="text-sm text-muted-foreground">
-            You signed in with a temporary password. Choose a permanent password to continue.
+            Choose a password to continue.
           </p>
         </div>
 
@@ -96,6 +92,22 @@ export default function ChangePasswordPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {hasPassword && (
+            <div className="space-y-1.5">
+              <label htmlFor="currentPassword" className="text-sm font-medium">Current password</label>
+              <input
+                id="currentPassword"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Your current password"
+                autoComplete="current-password"
+                required
+                disabled={pending}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+              />
+            </div>
+          )}
           <div className="space-y-1.5">
             <label htmlFor="newPassword" className="text-sm font-medium">New password</label>
             <input

@@ -1,14 +1,31 @@
-// Auth / Firebase wiring (kept — Firebase Auth is the identity provider).
-// Firestore is fully removed (ADR-0001 final cutover, #534); only Auth and
-// Storage remain on Firebase.
-export { FirebaseUserDirectoryService } from './auth/firebase-user-directory-service';
-export { FirebaseInviteService } from './auth/firebase-invite-service';
-export { getAdminAuth } from './auth/firebase-admin-init';
+// Auth wiring. Firebase Auth is fully removed (ADR-0002 PR2); identity + the
+// user directory + invites + sessions run on Postgres (NextAuth database
+// sessions). The one-time `seed-user-roles` migration script reads a
+// `firebase auth:export` JSON file, not the Admin SDK (ADR-0002 §7, PLAN-0002 §4).
+export { PostgresUserDirectoryService } from './auth/postgres-user-directory-service';
+export { PostgresInviteService } from './auth/postgres-invite-service';
+export type { SeedInviteInput, SeededInvite } from './auth/postgres-invite-service';
+export { buildUserRolesSeed } from './auth/seed-user-roles';
 export {
-  initializeFirebase,
-  getFirebaseAuth,
-} from './config/firebase-init';
-export type { FirebaseConfig } from './config/firebase-init';
+  resolveSessionUserId,
+  getUserRoles,
+  createDatabaseSession,
+  recordSignIn,
+  deleteUserSessions,
+  SESSION_TTL_MS,
+} from './auth/session-store';
+export {
+  setUserPasswordHash,
+  getUserPasswordHash,
+  findPasswordCredentialByEmail,
+} from './auth/credentials-store';
+export type {
+  FirebaseUserExport,
+  FirebaseCustomClaims,
+  UserRolesSeed,
+  AuthUserSeedRow,
+  UserRoleSeedRow,
+} from './auth/seed-user-roles';
 
 // Notifications + email
 export { EmailNotificationService } from './notifications/mailgun-notification-service';
@@ -39,9 +56,17 @@ export { PostgresModelRegistryRepository } from './postgres/repositories/model-r
 export { PostgresNamespaceSecretsRepository } from './postgres/repositories/namespace-secrets-repository';
 export { PostgresWorkflowSecretsRepository } from './postgres/repositories/workflow-secrets-repository';
 export { PostgresUserProfileRepository } from './postgres/repositories/user-profile-repository';
+export { PostgresCredentialsRepository } from './postgres/repositories/credentials-repository';
 export { PostgresPlatformSettingsRepository } from './postgres/repositories/platform-settings-repository';
 export { createPostgresClient, getSharedPostgresClient } from './postgres/client';
 export type { Database } from './postgres/client';
+// NextAuth (@auth/drizzle-adapter) schema tables (ADR-0002 PR2). Exported so
+// the platform-ui `auth.ts` can wire the DrizzleAdapter without reaching into
+// the schema directory directly.
+export { authUsers } from './postgres/schema/auth-user';
+export { authAccounts } from './postgres/schema/auth-account';
+export { authSessions } from './postgres/schema/auth-session';
+export { authVerificationTokens } from './postgres/schema/auth-verification-token';
 export { PostgresAgentEventLog } from './postgres/agent-event-log';
 
 // Blob storage (ADR-0003 task attachments).

@@ -1,19 +1,19 @@
 // packages/platform-ui/src/lib/mediforce.ts
 //
-// Browser-side Mediforce client. Auth: Firebase ID token via `bearerToken`.
-// `platform-api/client` stays free of Firebase — the knowledge lives in this
-// wrapper, and it is funneled through a single helper (`getFirebaseIdToken`)
-// that `apiFetch` also uses. One source of truth for the browser Bearer.
+// Browser-side Mediforce client. After the Firebase Auth exit (ADR-0002 §6)
+// the browser authenticates with the NextAuth httpOnly session cookie, which
+// rides same-origin `/api/*` requests automatically — no `Authorization`
+// header. The client is constructed with a `bearerToken` callback that always
+// resolves `null` so no header is attached; the cookie is the sole carrier.
 //
-// For Node consumers (agent / CLI / MCP server), build your own instance
-// with `new Mediforce({ baseUrl, apiKey })` — same contract, same type
-// safety, different runtime.
+// For Node consumers (agent / CLI / MCP server), build your own instance with
+// `new Mediforce({ baseUrl, apiKey })` — same contract, same type safety,
+// different runtime.
 
 import { Mediforce, ApiError } from '@mediforce/platform-api/client';
-import { getFirebaseIdToken } from './firebase-id-token';
 
 export const mediforce = new Mediforce({
-  bearerToken: getFirebaseIdToken,
+  bearerToken: async () => null,
 });
 
 export { ApiError };

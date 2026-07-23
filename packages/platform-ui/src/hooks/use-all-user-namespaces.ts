@@ -14,7 +14,7 @@ export interface UseAllUserNamespacesResult {
  * Pure selector over `useUserMe()`. Returns the full list of namespaces the
  * caller belongs to (personal + organisation). The `_uid` parameter is
  * accepted for source-compat with the pre-Phase-4 signature — the value is
- * ignored because the bundle is keyed off the verified bearer token, not a
+ * ignored because the bundle is keyed off the verified session, not a
  * client-supplied uid.
  *
  * `isError` / `error` are surfaced so callers can fail loud on a failed

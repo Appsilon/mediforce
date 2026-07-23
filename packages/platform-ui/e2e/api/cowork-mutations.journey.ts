@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
-  bearerHeaders,
+  sessionCookieHeaders,
   setupMultiNamespaceCallers,
   type MultiNamespaceFixture,
 } from '../helpers/multi-namespace';
@@ -42,7 +42,7 @@ test.describe('POST /api/cowork/* — mutation E2E', () => {
 
   test('chat: outsider user → 404 (anti-enum)', async ({ request }) => {
     const res = await request.post(`/api/cowork/${SESSION_ID}/chat`, {
-      headers: { ...bearerHeaders(callers.outsider), 'Content-Type': 'application/json' },
+      headers: { ...sessionCookieHeaders(callers.outsider), 'Content-Type': 'application/json' },
       data: { message: 'hi' },
     });
     expect(res.status()).toBe(404);
@@ -73,7 +73,7 @@ test.describe('POST /api/cowork/* — mutation E2E', () => {
 
   test('finalize: outsider user → 404 (anti-enum)', async ({ request }) => {
     const res = await request.post(`/api/cowork/${SESSION_ID}/finalize`, {
-      headers: { ...bearerHeaders(callers.outsider), 'Content-Type': 'application/json' },
+      headers: { ...sessionCookieHeaders(callers.outsider), 'Content-Type': 'application/json' },
       data: { artifact: { x: 1 } },
     });
     expect(res.status()).toBe(404);
@@ -98,7 +98,7 @@ test.describe('POST /api/cowork/* — mutation E2E', () => {
 
   test('voice/ephemeral-key: outsider user → 404', async ({ request }) => {
     const res = await request.post(`/api/cowork/${SESSION_ID}/voice/ephemeral-key`, {
-      headers: bearerHeaders(callers.outsider),
+      headers: sessionCookieHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
   });
@@ -113,7 +113,7 @@ test.describe('POST /api/cowork/* — mutation E2E', () => {
 
   test('voice/synthesize: outsider user → 404', async ({ request }) => {
     const res = await request.post(`/api/cowork/${SESSION_ID}/voice/synthesize`, {
-      headers: { ...bearerHeaders(callers.outsider), 'Content-Type': 'application/json' },
+      headers: { ...sessionCookieHeaders(callers.outsider), 'Content-Type': 'application/json' },
       data: { transcript: 'User: hi' },
     });
     expect(res.status()).toBe(404);

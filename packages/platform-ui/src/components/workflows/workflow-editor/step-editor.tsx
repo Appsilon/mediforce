@@ -228,11 +228,11 @@ export function StepEditor({
   const isNewStep = step.id.startsWith('new-step-');
   const { plugins } = usePlugins();
   const selectedPluginDefaultModel = plugins.find((p) => p.name === step.plugin)?.metadata?.foundationModel;
-  const { firebaseUser } = useAuth();
+  const { user } = useAuth();
   const { handle } = useParams<{ handle: string }>();
   const [secretKeys, setSecretKeys] = useState<string[]>([]);
 
-  const uid = firebaseUser?.uid;
+  const uid = user?.id;
   useEffect(() => {
     if (handle && workflowName && uid) {
       mediforce.secrets

@@ -2,7 +2,7 @@ import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import {
   apiKeyHeaders,
-  bearerHeaders,
+  sessionCookieHeaders,
   setupMultiNamespaceCallers,
   type MultiNamespaceFixture,
 } from '../helpers/multi-namespace';
@@ -40,7 +40,7 @@ test.describe('GET /api/workflow-definitions/[name] — visibility 404', () => {
   test('outsider user → 404 on a private WD they have no membership for', async ({ request }) => {
     const res = await request.get(
       `/api/workflow-definitions/${encodeURIComponent(SEEDED_PRIVATE_WD)}?namespace=${TEST_ORG_HANDLE}`,
-      { headers: bearerHeaders(callers.outsider) },
+      { headers: sessionCookieHeaders(callers.outsider) },
     );
     expect(res.status()).toBe(404);
     const body = await res.json() as { error: { code: string; message: string } };
@@ -51,7 +51,7 @@ test.describe('GET /api/workflow-definitions/[name] — visibility 404', () => {
   test('nonexistent WD name → 404 (same shape as visibility denial)', async ({ request }) => {
     const res = await request.get(
       `/api/workflow-definitions/${encodeURIComponent('Does-Not-Exist-zzz')}?namespace=${TEST_ORG_HANDLE}`,
-      { headers: bearerHeaders(callers.outsider) },
+      { headers: sessionCookieHeaders(callers.outsider) },
     );
     expect(res.status()).toBe(404);
   });

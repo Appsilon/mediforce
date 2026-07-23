@@ -26,4 +26,5 @@ export type { ToolCatalogRepository } from './tool-catalog-repository';
 export type { NamespaceRepository, NamespaceUpdates } from './namespace-repository';
 export type { NamespaceSecretsRepository } from './namespace-secrets-repository';
 export type { UserProfile, UserProfileRepository } from './user-profile-repository';
+export type { CredentialsRepository } from './credentials-repository';
 export type { WorkflowSecretsRepository } from './workflow-secrets-repository';

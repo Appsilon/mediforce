@@ -10,7 +10,6 @@
     "dev:mock": "pnpm install --prefer-offline --silent && pnpm --filter @mediforce/platform-ui dev:mock",
     "dev:no-docker": "pnpm install --prefer-offline --silent && DATABASE_URL=\"${DATABASE_URL:-postgresql://mediforce:mediforce@localhost:5432/mediforce}\" ALLOW_LOCAL_AGENTS=true pnpm --filter @mediforce/platform-ui dev",
     "dev:queue": "pnpm install --prefer-offline --silent && python3 scripts/dev-infra.py --redis && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce pnpm db:migrate && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce REDIS_URL=redis://localhost:6379 pnpm --filter @mediforce/platform-ui dev",
-    "emulators": "pnpm --filter @mediforce/platform-ui emulators",
     "test": "pnpm test:unit && pnpm test:e2e",
     "test:unit": "vitest run",
     "test:e2e": "pnpm --filter @mediforce/platform-ui test:e2e",
@@ -31,8 +30,7 @@
       "esbuild",
       "sharp",
       "protobufjs",
-      "msgpackr-extract",
-      "@firebase/util"
+      "msgpackr-extract"
     ],
     "overrides": {
       "axios": ">=1.15.0",
@@ -62,6 +60,7 @@
     "tsx": "latest",
     "typescript": "~6.0.0",
     "vite": "8.1.5",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "zod": "^4.0.0"
   }
 }

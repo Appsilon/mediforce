@@ -12,8 +12,10 @@ const PERSONAL_HANDLE_FALLBACK = 'user';
  *
  * Lazy bootstrap: when the caller has no personal namespace, the handler
  * creates one inline (idempotent) before returning, emitting
- * `user.personal_namespace_created` exactly once. Bootstrap moves to
- * `events.createUser` when ADR-0002 (NextAuth) lands.
+ * `user.personal_namespace_created` exactly once. This stayed the single
+ * bootstrap site through the NextAuth cutover — the `signIn` callback only
+ * gates the email domain, so handle generation lives here alone (ADR-0002
+ * §4a).
  *
  * apiKey callers are rejected — there's no uid to attribute the response to.
  */
@@ -21,13 +23,15 @@ export async function getMe(input: GetMeInput, scope: CallerScope): Promise<GetM
   const uid = resolveUid(input, scope);
 
   const directory = scope.system.userDirectory;
-  const [metadata, profile] = await Promise.all([
+  const [metadata, profile, passwordHash] = await Promise.all([
     directory === null ? Promise.resolve(null) : directory.getUserMetadata(uid).catch(() => null),
     scope.userProfiles.getProfile(uid),
+    scope.credentials.getPasswordHash(uid),
   ]);
   const email = metadata?.email ?? null;
   const displayName = metadata?.displayName ?? null;
   const mustChangePassword = profile?.mustChangePassword ?? false;
+  const hasPassword = passwordHash !== null;
 
   let namespaces = await scope.workspaces.getNamespacesByUser(uid);
   let personal = namespaces.find((n) => n.type === 'personal' && n.linkedUserId === uid);
@@ -50,7 +54,7 @@ export async function getMe(input: GetMeInput, scope: CallerScope): Promise<GetM
   }));
 
   return {
-    user: { uid, email, displayName, mustChangePassword },
+    user: { uid, email, displayName, mustChangePassword, hasPassword },
     namespaces: responseNamespaces,
   };
 }
@@ -62,8 +66,8 @@ async function ensurePersonalNamespace(
   const baseHandle = generateHandle(user.email ?? user.uid);
   let handle = baseHandle;
   let attempt = 1;
-  // Bounded retry — Firestore handle collisions are rare and resolved by
-  // suffixing; an unbounded loop here would hide a deeper outage.
+  // Bounded retry — handle collisions are rare and resolved by suffixing;
+  // an unbounded loop here would hide a deeper outage.
   for (let i = 0; i < 16; i += 1) {
     const existing = await scope.workspaces.getNamespace(handle);
     if (existing === null) break;

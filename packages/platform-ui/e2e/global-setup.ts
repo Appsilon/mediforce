@@ -1,14 +1,13 @@
 import * as fs from 'node:fs';
-import * as net from 'node:net';
 import * as path from 'node:path';
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import type { FullConfig } from '@playwright/test';
 import { startMockOAuthServer, type MockOAuthServerHandle } from './helpers/mock-oauth-server';
 
-/** PATH for spawned tooling (firebase, java wrappers, pnpm). Homebrew installs
- *  these under /opt/homebrew/bin on Apple Silicon macOS, but that directory is
- *  absent on Linux CI, where pnpm already puts the binaries on PATH — so the
- *  prefix is macOS-only. */
+/** PATH for spawned tooling (drizzle-kit, pnpm). Homebrew installs these under
+ *  /opt/homebrew/bin on Apple Silicon macOS, but that directory is absent on
+ *  Linux CI, where pnpm already puts the binaries on PATH — so the prefix is
+ *  macOS-only. */
 function spawnPath(): string {
   const base = process.env.PATH ?? '';
   return process.platform === 'darwin' ? `/opt/homebrew/bin:${base}` : base;
@@ -36,68 +35,10 @@ const OAUTH_URL_FILE = path.join(__dirname, '.mock-oauth-url');
 declare global {
   // eslint-disable-next-line no-var
   var __mockOAuthHandle: MockOAuthServerHandle | undefined;
-  // eslint-disable-next-line no-var
-  var __firebaseEmulatorProcess: ChildProcess | undefined;
-}
-
-function isPortListening(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    socket.setTimeout(500);
-    socket.on('connect', () => { socket.destroy(); resolve(true); });
-    socket.on('error', () => { socket.destroy(); resolve(false); });
-    socket.on('timeout', () => { socket.destroy(); resolve(false); });
-    socket.connect(port, '127.0.0.1');
-  });
-}
-
-async function waitForPort(port: number, timeoutMs = 60_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await isPortListening(port)) return;
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  throw new Error(`Firebase emulator port ${port} did not become available within ${timeoutMs}ms`);
-}
-
-async function ensureFirebaseEmulator(): Promise<void> {
-  if (await isPortListening(9099)) {
-    // eslint-disable-next-line no-console
-    console.log('[global-setup] Firebase Auth emulator already running on :9099');
-    return;
-  }
-
-  const uiDir = path.resolve(__dirname, '..');
-  const dataDir = path.join(uiDir, '.emulator-data');
-  const args = [
-    'emulators:start',
-    '--project', 'demo-mediforce',
-    '--only', 'auth',
-    '--export-on-exit', dataDir,
-  ];
-  if (fs.existsSync(dataDir)) args.push('--import', dataDir);
-
-  const proc = spawn('firebase', args, {
-    cwd: uiDir,
-    env: { ...process.env, PATH: spawnPath() },
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: true,
-  });
-
-  proc.on('error', (err) => {
-    // eslint-disable-next-line no-console
-    console.error(`[global-setup] Firebase emulator spawn error: ${err.message}`);
-  });
-
-  globalThis.__firebaseEmulatorProcess = proc;
-  await waitForPort(9099);
-  // eslint-disable-next-line no-console
-  console.log('[global-setup] Firebase Auth emulator started on :9099');
 }
 
 async function globalSetup(_config: FullConfig): Promise<void> {
   runMigrations();
-  await ensureFirebaseEmulator();
   const handle = await startMockOAuthServer();
   globalThis.__mockOAuthHandle = handle;
   fs.writeFileSync(OAUTH_URL_FILE, handle.baseUrl, 'utf8');

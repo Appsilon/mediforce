@@ -4,7 +4,7 @@ import type { AgentOAuthToken, OAuthProviderConfig } from '@mediforce/platform-c
 
 // ---- Mocks ----
 
-const mockVerifyIdToken = vi.fn();
+const mockResolveSessionUserId = vi.fn();
 const mockTokenGet = vi.fn();
 const mockTokenDelete = vi.fn();
 const mockProviderGet = vi.fn();
@@ -12,7 +12,8 @@ const mockGetMember = vi.fn();
 const mockGetMembershipsForUser = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
-  getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
+  getSharedPostgresClient: () => ({ db: {} }),
+  resolveSessionUserId: (...args: unknown[]) => mockResolveSessionUserId(...args),
 }));
 
 const mockAuditAppend = vi.fn();
@@ -48,7 +49,7 @@ function makeDeleteRequest(options: {
   namespace: string | null;
   serverName: string | null;
   revokeAtProvider?: boolean;
-  authHeader?: string | null;
+  sessionCookie?: string | null;
 }): NextRequest {
   const url = new URL(
     `http://localhost/api/agents/${options.agentId}/oauth/${options.providerSlug}`,
@@ -57,8 +58,9 @@ function makeDeleteRequest(options: {
   if (options.serverName !== null) url.searchParams.set('serverName', options.serverName);
   if (options.revokeAtProvider === true) url.searchParams.set('revokeAtProvider', 'true');
   const headers: Record<string, string> = {};
-  const authHeader = options.authHeader === undefined ? 'Bearer valid-token' : options.authHeader;
-  if (authHeader !== null) headers.Authorization = authHeader;
+  const sessionCookie =
+    options.sessionCookie === undefined ? 'authjs.session-token=tok-123' : options.sessionCookie;
+  if (sessionCookie !== null) headers.cookie = sessionCookie;
   return new NextRequest(url.toString(), {
     method: 'DELETE',
     headers,
@@ -106,7 +108,7 @@ describe('DELETE /api/agents/:id/oauth/:provider', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockVerifyIdToken.mockResolvedValue({ uid: 'uid-1' });
+    mockResolveSessionUserId.mockResolvedValue('uid-1');
     mockGetMember.mockResolvedValue(memberAppsilon);
     mockGetMembershipsForUser.mockResolvedValue([{ handle: 'appsilon', role: 'member' as const }]);
     originalFetch = globalThis.fetch;
@@ -248,14 +250,14 @@ describe('DELETE /api/agents/:id/oauth/:provider', () => {
     expect(mockTokenDelete).toHaveBeenCalledWith('appsilon', 'agent-1', 'gh');
   });
 
-  it('[ERROR] 401 when auth header missing', async () => {
+  it('[ERROR] 401 when session cookie missing', async () => {
     const res = await DELETE(
       makeDeleteRequest({
         agentId: 'agent-1',
         providerSlug: 'github',
         namespace: 'appsilon',
         serverName: 'gh',
-        authHeader: null,
+        sessionCookie: null,
       }),
       { params: makeParams('agent-1', 'github') },
     );
@@ -263,8 +265,8 @@ describe('DELETE /api/agents/:id/oauth/:provider', () => {
     expect(mockTokenDelete).not.toHaveBeenCalled();
   });
 
-  it('[ERROR] 401 when token verification fails', async () => {
-    mockVerifyIdToken.mockRejectedValue(new Error('bad token'));
+  it('[ERROR] 401 when session cannot be resolved', async () => {
+    mockResolveSessionUserId.mockResolvedValue(null);
 
     const res = await DELETE(
       makeDeleteRequest({

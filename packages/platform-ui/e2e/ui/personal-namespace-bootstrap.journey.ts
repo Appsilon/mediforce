@@ -8,7 +8,7 @@ const BOOTSTRAP_PASSWORD = 'Journey123!';
 /**
  * Phase 4 PR4 — `GET /api/users/me` lazy bootstrap.
  *
- * A user that exists in Firebase Auth but has no Firestore doc, no namespace,
+ * A user that exists in `auth_users` but has no profile row, no namespace,
  * and no member entry signs in for the first time. The headless `/api/users/me`
  * handler must create their personal namespace on the first call (idempotent)
  * and the picker must show it. Pre-PR4 the same bootstrap ran inline in
@@ -19,9 +19,8 @@ test.describe('Personal namespace lazy bootstrap journey', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeAll(async () => {
-    // No Firestore seeding — the only state for this user is the Firebase Auth
-    // account. The first GET /api/users/me must bootstrap the personal
-    // namespace.
+    // No workspace seeding — the only state for this user is the `auth_users`
+    // row. The first GET /api/users/me must bootstrap the personal namespace.
     await createTestUser(BOOTSTRAP_EMAIL, BOOTSTRAP_PASSWORD, 'Bootstrap User');
   });
 

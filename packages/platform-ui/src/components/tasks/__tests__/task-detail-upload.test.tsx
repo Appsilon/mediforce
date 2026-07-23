@@ -10,11 +10,6 @@ function render(ui: React.ReactElement) {
   return rtlRender(ui, { wrapper });
 }
 
-// Firebase Storage is gone (ADR-0003); only Auth init survives in @/lib/firebase.
-vi.mock('@/lib/firebase', () => ({
-  auth: {},
-}));
-
 // Mock next/link
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => (
@@ -22,8 +17,13 @@ vi.mock('next/link', () => ({
   ),
 }));
 
+// The browser carries the NextAuth session cookie via apiFetch/mediforce, so no
+// token is needed — the context only exposes the resolved user (ADR-0002).
 vi.mock('@/contexts/auth-context', () => ({
-  useAuth: () => ({ firebaseUser: { getIdToken: vi.fn().mockResolvedValue('mock-id-token') } }),
+  useAuth: () => ({
+    user: { id: 'test-uid', name: 'Test', email: 't@x.com', image: null, roles: [] },
+    loading: false,
+  }),
 }));
 
 // Authenticated blob download — fired on click, stubbed so no real fetch runs.

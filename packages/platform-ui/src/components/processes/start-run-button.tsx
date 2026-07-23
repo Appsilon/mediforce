@@ -38,7 +38,7 @@ export function StartRunButton({
 }: StartRunButtonProps) {
   const router = useRouter();
   const handle = useHandleFromPath();
-  const { firebaseUser } = useAuth();
+  const { user } = useAuth();
   const { versions: definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowVersions(workflowName, handle);
   const { images: dockerImages, isAvailable: dockerAvailable, isLoading: dockerLoading } = useDockerImages();
   const openRouterCredits = useOpenRouterCredits();
@@ -63,7 +63,7 @@ export function StartRunButton({
   const modelValidation = useModelValidation(effectiveDefinition);
 
   const hasContext = secretKeysCtx !== null;
-  const uid = firebaseUser?.uid;
+  const uid = user?.id;
 
   const triggerInput: TriggerInputField[] = effectiveDefinition?.triggerInput ?? [];
   const hasTriggerInput = triggerInput.length > 0;
@@ -143,7 +143,7 @@ export function StartRunButton({
 
   async function executeStart(v?: number, dryRun?: boolean) {
     const targetVersion = v ?? effectiveVersion;
-    if (!firebaseUser || targetVersion === null || targetVersion === 0) return;
+    if (!user || targetVersion === null || targetVersion === 0) return;
 
     setStarting(true);
     setError(null);
@@ -158,7 +158,7 @@ export function StartRunButton({
         definitionName: workflowName,
         definitionVersion: targetVersion,
         triggerName: 'manual',
-        triggeredBy: firebaseUser.uid,
+        triggeredBy: user.id,
         payload,
         ...(dryRun ? { dryRun: true } : {}),
       });

@@ -7,29 +7,27 @@ import { NextRequest } from 'next/server';
 // This file proves the adapter wires schema + services + handler, and that
 // 200 + the typed error envelope flow through.
 
-const mockResetInvitePassword = vi.fn();
 const mockGetUserEmail = vi.fn();
 const mockIsInvitePending = vi.fn();
-const mockSendInviteEmail = vi.fn();
+const mockGetNamespace = vi.fn();
+const mockSendWorkspaceEmail = vi.fn();
 const mockAuditAppend = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
     namespaceRepo: {
-      getNamespace: vi.fn(),
+      getNamespace: mockGetNamespace,
       addMember: vi.fn(),
       getMembers: vi.fn(),
       getMembershipsForUser: vi.fn().mockResolvedValue([]),
     },
     inviteService: {
-      createInvitedUser: vi.fn(),
-      resetInvitePassword: mockResetInvitePassword,
+      seedInvite: vi.fn(),
       getUserEmail: mockGetUserEmail,
       isInvitePending: mockIsInvitePending,
     },
     inviteNotificationService: {
-      sendInviteEmail: mockSendInviteEmail,
-      sendWorkspaceNotificationEmail: vi.fn(),
+      sendWorkspaceNotificationEmail: mockSendWorkspaceEmail,
     },
     instanceRepo: { getById: vi.fn() },
     auditRepo: { append: mockAuditAppend },
@@ -88,8 +86,8 @@ describe('POST /api/users/resend-invite', () => {
     mockResolveCallerIdentity.mockResolvedValue(apiKeyCaller);
     mockGetUserEmail.mockResolvedValue('pending@example.test');
     mockIsInvitePending.mockResolvedValue(true);
-    mockResetInvitePassword.mockResolvedValue('Mf-RESET');
-    mockSendInviteEmail.mockResolvedValue(undefined);
+    mockGetNamespace.mockResolvedValue(null);
+    mockSendWorkspaceEmail.mockResolvedValue(undefined);
     mockAuditAppend.mockResolvedValue(undefined);
   });
 
@@ -98,7 +96,6 @@ describe('POST /api/users/resend-invite', () => {
     const json = (await res.json()) as {
       uid: string;
       email: string;
-      temporaryPassword: string;
       emailSent: boolean;
     };
 
@@ -106,13 +103,14 @@ describe('POST /api/users/resend-invite', () => {
     expect(json).toEqual({
       uid: 'uid-target',
       email: 'pending@example.test',
-      temporaryPassword: 'Mf-RESET',
       emailSent: true,
     });
-    expect(mockResetInvitePassword).toHaveBeenCalledWith('uid-target');
-    expect(mockSendInviteEmail).toHaveBeenCalledWith({
+    expect(mockIsInvitePending).toHaveBeenCalledWith('uid-target');
+    expect(mockSendWorkspaceEmail).toHaveBeenCalledWith({
       toEmail: 'pending@example.test',
-      temporaryPassword: 'Mf-RESET',
+      inviterName: 'alpha',
+      workspaceName: 'alpha',
+      workspaceHandle: 'alpha',
     });
   });
 
@@ -125,7 +123,7 @@ describe('POST /api/users/resend-invite', () => {
     const res = await POST(makePostRequest(validBody));
 
     expect(res.status).toBe(401);
-    expect(mockResetInvitePassword).not.toHaveBeenCalled();
+    expect(mockIsInvitePending).not.toHaveBeenCalled();
   });
 
   it('[AUTHZ] non-admin user gets 403', async () => {
@@ -134,14 +132,14 @@ describe('POST /api/users/resend-invite', () => {
     const res = await POST(makePostRequest(validBody));
 
     expect(res.status).toBe(403);
-    expect(mockResetInvitePassword).not.toHaveBeenCalled();
+    expect(mockIsInvitePending).not.toHaveBeenCalled();
   });
 
   it('[VALIDATION] 400 for an empty uid', async () => {
     const res = await POST(makePostRequest({ ...validBody, uid: '' }));
 
     expect(res.status).toBe(400);
-    expect(mockResetInvitePassword).not.toHaveBeenCalled();
+    expect(mockIsInvitePending).not.toHaveBeenCalled();
   });
 
   it('[PRECONDITION] 409 when the invite is no longer pending', async () => {
@@ -150,6 +148,6 @@ describe('POST /api/users/resend-invite', () => {
     const res = await POST(makePostRequest(validBody));
 
     expect(res.status).toBe(409);
-    expect(mockResetInvitePassword).not.toHaveBeenCalled();
+    expect(mockSendWorkspaceEmail).not.toHaveBeenCalled();
   });
 });

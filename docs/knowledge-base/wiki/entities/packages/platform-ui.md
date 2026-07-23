@@ -23,7 +23,7 @@ User-facing entry. Workspace-scoped pages (agents, tasks, processes, workflows, 
 - **Auth pages**: `/login`, `/change-password`, `/test-login`, `/workspace-selection`.
 - **API**: `src/app/api/{processes,definitions,tasks,users,configs,cowork,workflow-definitions,agents,tickets,cron,migrations}`.
 - **Service singleton**: `src/lib/platform-services.ts` — `getPlatformServices()` lazy-wires everything. Registers built-in plugins (`claude-code-agent`, `opencode-agent`, `script-container`) + supply-intelligence plugins. See [service-singleton](../../concepts/service-singleton.md).
-- **Middleware**: `src/middleware.ts` — JWT/API-key auth, CORS, Firebase token verify (emulator-aware via `NEXT_PUBLIC_USE_EMULATORS`).
+- **Proxy**: `src/proxy.ts` — NextAuth session / API-key auth and CORS (ADR-0002).
 
 ## Key internal modules
 
@@ -37,7 +37,7 @@ User-facing entry. Workspace-scoped pages (agents, tasks, processes, workflows, 
 
 - **Service singleton** → [service-singleton](../../concepts/service-singleton.md).
 - **`@mediforce/source` TS condition** — dev = source `.ts`, prod = `dist/`. See [mediforce-source-custom-condition gotcha](../../gotchas/mediforce-source-custom-condition.md).
-- **Firebase emulator toggle** — `NEXT_PUBLIC_USE_EMULATORS=true` → JWT verify switches `jwtVerify` (prod JWKS) to `decodeJwt` (emulator unsigned).
+- **E2E suite toggle** — `E2E_FULL_SUITE=true` selects the full Playwright suite (setup + api + ui) on port 9007; unset runs only the smoke spec against `pnpm dev`.
 - **App Router RSC** — async server components throughout.
 
 ## Testing surface

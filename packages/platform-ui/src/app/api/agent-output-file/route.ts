@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { getAdminAuth } from '@mediforce/platform-infra';
+import { resolveSessionUid } from '@/lib/api-auth';
 import { attachmentContentDisposition, contentTypeForFilePath } from '@/lib/file-content-type';
 
 /**
  * Serves agent output files from allowed directories.
  *
- * Two query modes are supported, both authenticated via Firebase ID token:
+ * Two query modes are supported, both authenticated via the NextAuth
+ * session cookie:
  *
  *   1. Explicit path:   `?path=<absolute>&instanceId=<id>`
  *      The path must start with one of the instance-specific allowed
@@ -33,11 +34,7 @@ const DELIVERABLE_FILENAME: Record<DeliverableKind, (stepId: string) => string> 
 };
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const authHeader = request.headers.get('Authorization') ?? '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  try {
-    await getAdminAuth().verifyIdToken(token);
-  } catch {
+  if ((await resolveSessionUid(request)) === null) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

@@ -276,6 +276,7 @@ export type {
   NamespaceSecretsRepository,
   UserProfile,
   UserProfileRepository,
+  CredentialsRepository,
   WorkflowSecretsRepository,
   SendEmailParams,
   SendEmailResult,

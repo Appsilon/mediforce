@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
-  bearerHeaders,
+  sessionCookieHeaders,
   setupMultiNamespaceCallers,
   type MultiNamespaceFixture,
 } from '../helpers/multi-namespace';
@@ -25,7 +25,7 @@ test.describe('POST /api/tasks/[taskId]/claim — API E2E', () => {
 
   test('outsider user gets 404 (anti-enumeration) for a task in another workspace', async ({ request }) => {
     const res = await request.post('/api/tasks/task-pending-1/claim', {
-      headers: bearerHeaders(callers.outsider),
+      headers: sessionCookieHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
     const body = await res.json() as { error: { code: string; message: string } };
@@ -34,7 +34,7 @@ test.describe('POST /api/tasks/[taskId]/claim — API E2E', () => {
 
   test('non-existent task id returns the same 404 (indistinguishable from cross-namespace)', async ({ request }) => {
     const res = await request.post('/api/tasks/task-does-not-exist/claim', {
-      headers: bearerHeaders(callers.outsider),
+      headers: sessionCookieHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
     const body = await res.json() as { error: { code: string; message: string } };
@@ -43,7 +43,7 @@ test.describe('POST /api/tasks/[taskId]/claim — API E2E', () => {
 
   test('member claiming a completed task gets a typed 409 precondition_failed', async ({ request }) => {
     const res = await request.post('/api/tasks/task-completed-1/claim', {
-      headers: bearerHeaders(callers.member),
+      headers: sessionCookieHeaders(callers.member),
     });
     expect(res.status()).toBe(409);
     const body = await res.json() as {
@@ -60,7 +60,7 @@ test.describe('POST /api/tasks/[taskId]/claim — API E2E', () => {
   // is not consumed by any other journey (verified via grep at PR1 time).
   test('member claims a pending task → 200 with entity echo in `claimed` state', async ({ request }) => {
     const res = await request.post('/api/tasks/task-pending-1/claim', {
-      headers: bearerHeaders(callers.member),
+      headers: sessionCookieHeaders(callers.member),
     });
     expect(res.status(), await res.text()).toBe(200);
     const body = await res.json() as { task: { id: string; status: string; assignedUserId: string } };

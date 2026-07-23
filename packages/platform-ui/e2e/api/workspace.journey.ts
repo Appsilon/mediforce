@@ -9,7 +9,7 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
  * we want to verify platform behaviour that does not need a UI.
  */
 test.describe('WD.workspace API journey', () => {
-  // Locally bootstrap_e2e.py writes `test-api-key`; CI overrides via env.
+  // Locally `test-api-key` comes from .env.local; CI overrides via env.
   const apiKey = process.env.PLATFORM_API_KEY ?? 'test-api-key';
   const authHeaders = { 'X-Api-Key': apiKey };
 

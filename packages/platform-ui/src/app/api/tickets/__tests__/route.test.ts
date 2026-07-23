@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-const mockVerifyIdToken = vi.fn();
+const mockResolveSessionUserId = vi.fn();
+const mockGetUserMetadata = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
-  getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
+  getSharedPostgresClient: () => ({ db: {} }),
+  resolveSessionUserId: (...args: unknown[]) => mockResolveSessionUserId(...args),
+  PostgresUserDirectoryService: class {
+    getUserMetadata = (...args: unknown[]) => mockGetUserMetadata(...args);
+  },
 }));
 
 const mockFetch = vi.fn();
@@ -18,7 +23,7 @@ function makePostRequest(body: unknown, headers: Record<string, string> = {}): N
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: 'Bearer valid-token',
+      cookie: 'authjs.session-token=tok-123',
       ...headers,
     },
     body: JSON.stringify(body),
@@ -38,12 +43,13 @@ describe('POST /api/tickets', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     __resetRateLimitsForTests();
-    mockVerifyIdToken.mockResolvedValue({ uid: 'user-1', name: 'Test User', email: 'test@example.com' });
+    mockResolveSessionUserId.mockResolvedValue('user-1');
+    mockGetUserMetadata.mockResolvedValue({ email: 'test@example.com', displayName: 'Test User' });
     process.env.GITHUB_TOKEN = 'fake-token';
     process.env.GITHUB_REPO = 'appsilon/mediforce';
   });
 
-  it('returns 401 when authorization header is missing', async () => {
+  it('returns 401 when the session cookie is missing', async () => {
     const req = new Request('http://localhost/api/tickets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -54,8 +60,8 @@ describe('POST /api/tickets', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 401 when token verification fails', async () => {
-    mockVerifyIdToken.mockRejectedValue(new Error('Invalid token'));
+  it('returns 401 when the session cannot be resolved', async () => {
+    mockResolveSessionUserId.mockResolvedValue(null);
     const res = await POST(makePostRequest(validBody));
     expect(res.status).toBe(401);
   });
@@ -116,8 +122,9 @@ describe('POST /api/tickets', () => {
     expect(payload.body).not.toContain('CEO');
   });
 
-  it('falls back to email then uid when token has no name', async () => {
-    mockVerifyIdToken.mockResolvedValue({ uid: 'user-2', email: 'only-email@example.com' });
+  it('falls back to email then uid when the directory has no display name', async () => {
+    mockResolveSessionUserId.mockResolvedValue('user-2');
+    mockGetUserMetadata.mockResolvedValue({ email: 'only-email@example.com' });
     mockFetch.mockResolvedValue(
       new Response(JSON.stringify({ number: 1, html_url: 'https://example.com' }), { status: 201 }),
     );
@@ -167,7 +174,7 @@ describe('POST /api/tickets', () => {
     });
 
     it('allows up to 50 tickets per day for a single user', async () => {
-      mockVerifyIdToken.mockResolvedValue({ uid: 'burst-user', name: 'Burst' });
+      mockResolveSessionUserId.mockResolvedValue('burst-user');
 
       for (let count = 0; count < 50; count += 1) {
         const res = await POST(makePostRequest(validBody));
@@ -176,7 +183,7 @@ describe('POST /api/tickets', () => {
     });
 
     it('returns 429 with Retry-After on the 51st ticket', async () => {
-      mockVerifyIdToken.mockResolvedValue({ uid: 'over-user', name: 'Over' });
+      mockResolveSessionUserId.mockResolvedValue('over-user');
 
       for (let count = 0; count < 50; count += 1) {
         await POST(makePostRequest(validBody));
@@ -192,20 +199,20 @@ describe('POST /api/tickets', () => {
     });
 
     it('tracks rate limits independently per user', async () => {
-      mockVerifyIdToken.mockResolvedValue({ uid: 'user-a', name: 'A' });
+      mockResolveSessionUserId.mockResolvedValue('user-a');
       for (let count = 0; count < 50; count += 1) {
         await POST(makePostRequest(validBody));
       }
       const overA = await POST(makePostRequest(validBody));
       expect(overA.status).toBe(429);
 
-      mockVerifyIdToken.mockResolvedValue({ uid: 'user-b', name: 'B' });
+      mockResolveSessionUserId.mockResolvedValue('user-b');
       const freshB = await POST(makePostRequest(validBody));
       expect(freshB.status).toBe(201);
     });
 
     it('resets the window after 24 hours', async () => {
-      mockVerifyIdToken.mockResolvedValue({ uid: 'reset-user', name: 'R' });
+      mockResolveSessionUserId.mockResolvedValue('reset-user');
       const realNow = Date.now;
       const baseTime = 1_700_000_000_000;
       let fakeNow = baseTime;

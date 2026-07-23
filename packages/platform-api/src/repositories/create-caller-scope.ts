@@ -7,6 +7,7 @@ import type {
   AuditRepository,
   BlobStore,
   CoworkSessionRepository,
+  CredentialsRepository,
   CronTriggerStateRepository,
   EmailProviderInfo,
   HandoffRepository,
@@ -75,6 +76,7 @@ export interface CallerScopeServices {
   readonly toolCatalogRepo: ToolCatalogRepository;
   readonly namespaceRepo: NamespaceRepository;
   readonly userProfileRepo: UserProfileRepository;
+  readonly credentialsRepo: CredentialsRepository;
   readonly oauthProviderRepo: OAuthProviderRepository;
   readonly agentOAuthTokenRepo: AgentOAuthTokenRepository;
   readonly modelRegistryRepo: ModelRegistryRepository;
@@ -147,6 +149,7 @@ export function createCallerScope(
     plugins: services.pluginRegistry,
     workspaces: services.namespaceRepo,
     userProfiles: services.userProfileRepo,
+    credentials: services.credentialsRepo,
     cron: services.cronTriggerStateRepo,
 
     system: {

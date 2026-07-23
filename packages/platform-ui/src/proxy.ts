@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { jwtVerify, createRemoteJWKSet, decodeJwt, type JWTPayload } from 'jose';
+import { getSharedPostgresClient, resolveSessionUserId } from '@mediforce/platform-infra';
+import { getSessionCookie } from '@/lib/session-cookie';
 
 const LOCALHOST_RE = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
-const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? '';
-const HOSTED_APP_RE = PROJECT_ID
-  ? new RegExp(`^https://[\\w-]+--${PROJECT_ID}\\.[\\w.-]+\\.hosted\\.app$`)
-  : null;
 const PRODUCTION_ORIGINS = (process.env.ALLOWED_ORIGINS ?? '')
   .split(',')
   .map((s) => s.trim())
@@ -13,6 +10,9 @@ const PRODUCTION_ORIGINS = (process.env.ALLOWED_ORIGINS ?? '')
 
 const PUBLIC_ROUTES = new Set<string>(['/api/health']);
 const PUBLIC_ROUTE_PATTERNS: RegExp[] = [
+  // NextAuth's own endpoints (sign-in, callback, session, csrf, sign-out) —
+  // you cannot present a session while obtaining one (PLAN-0002 §2.2).
+  /^\/api\/auth\//,
   // Per-provider OAuth callback — no user session at this point; the signed
   // state HMAC inside the callback handler is the sole integrity check.
   /^\/api\/oauth\/[^/]+\/callback$/,
@@ -23,19 +23,8 @@ function isPublicRoute(pathname: string): boolean {
   return PUBLIC_ROUTE_PATTERNS.some((pattern) => pattern.test(pathname));
 }
 
-const FIREBASE_JWKS_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
-let cachedJwks: ReturnType<typeof createRemoteJWKSet> | null = null;
-function getJwks(): ReturnType<typeof createRemoteJWKSet> {
-  if (cachedJwks === null) {
-    cachedJwks = createRemoteJWKSet(new URL(FIREBASE_JWKS_URL));
-  }
-  return cachedJwks;
-}
-
 function isOriginAllowed(origin: string): boolean {
-  return LOCALHOST_RE.test(origin)
-    || PRODUCTION_ORIGINS.includes(origin)
-    || (HOSTED_APP_RE !== null && HOSTED_APP_RE.test(origin));
+  return LOCALHOST_RE.test(origin) || PRODUCTION_ORIGINS.includes(origin);
 }
 
 function hasValidApiKey(req: NextRequest): boolean {
@@ -44,42 +33,20 @@ function hasValidApiKey(req: NextRequest): boolean {
   return Boolean(provided) && Boolean(expected) && provided === expected;
 }
 
-function extractBearer(req: NextRequest): string | null {
-  const header = req.headers.get('authorization') ?? req.headers.get('Authorization');
-  if (header === null) return null;
-  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
-  return match !== null ? (match[1] ?? null) : null;
-}
-
-function checkEmulatorClaims(payload: JWTPayload, projectId: string): boolean {
-  const now = Math.floor(Date.now() / 1000);
-  if (typeof payload.exp !== 'number' || payload.exp < now) return false;
-  if (payload.aud !== projectId) return false;
-  const expectedIss = `https://securetoken.google.com/${projectId}`;
-  if (payload.iss !== expectedIss) return false;
-  if (typeof payload.sub !== 'string' || payload.sub.length === 0) return false;
-  return true;
-}
-
-async function hasValidFirebaseToken(req: NextRequest): Promise<boolean> {
-  const token = extractBearer(req);
+/**
+ * NextAuth session check (ADR-0002 §6). Replaces the Firebase Bearer
+ * verification: the browser carries the httpOnly session cookie, resolved to a
+ * uid via a single indexed `auth_sessions` lookup. An expired or revoked
+ * session fails here exactly as an invalid token used to. Runs on the Node
+ * runtime — Next always runs the proxy there — so the Postgres driver is
+ * available.
+ */
+async function hasValidSession(req: NextRequest): Promise<boolean> {
+  const token = getSessionCookie(req.cookies);
   if (token === null) return false;
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  if (typeof projectId !== 'string' || projectId.length === 0) return false;
-
-  try {
-    if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
-      const payload = decodeJwt(token);
-      return checkEmulatorClaims(payload, projectId);
-    }
-    await jwtVerify(token, getJwks(), {
-      audience: projectId,
-      issuer: `https://securetoken.google.com/${projectId}`,
-    });
-    return true;
-  } catch {
-    return false;
-  }
+  const { db } = getSharedPostgresClient();
+  const uid = await resolveSessionUserId(db, token);
+  return uid !== null;
 }
 
 function unauthorizedResponse(): NextResponse {
@@ -90,7 +57,8 @@ function applyCorsHeaders(res: NextResponse, origin: string, isAllowed: boolean)
   if (isAllowed) {
     res.headers.set('Access-Control-Allow-Origin', origin);
     res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.headers.set('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, Authorization');
+    res.headers.set('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key');
+    res.headers.set('Access-Control-Allow-Credentials', 'true');
   }
 }
 
@@ -104,22 +72,23 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
     if (isAllowed) {
       res.headers.set('Access-Control-Allow-Origin', origin);
       res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-      res.headers.set('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, Authorization');
+      res.headers.set('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key');
+      res.headers.set('Access-Control-Allow-Credentials', 'true');
       res.headers.set('Access-Control-Max-Age', '86400');
     }
     return res;
   }
 
   // Auth guard: applies to all non-OPTIONS /api/* requests unless public.
-  // Either X-Api-Key (server-to-server) or Authorization: Bearer <Firebase ID
-  // token> (signed-in user) is sufficient. Per-endpoint admin gating lives
-  // in the handler layer via `assertCallerIsNamespaceAdmin` — this layer only
-  // proves the caller is authenticated, not what they may touch.
+  // Either X-Api-Key (server-to-server) or a NextAuth session cookie (signed-in
+  // user) is sufficient. Per-endpoint admin gating lives in the handler layer
+  // via `assertNamespaceAccess` — this layer only proves the caller is
+  // authenticated, not what they may touch.
   const pathname = req.nextUrl.pathname;
   if (!isPublicRoute(pathname)) {
     const apiKeyOk = hasValidApiKey(req);
-    const bearerOk = apiKeyOk ? true : await hasValidFirebaseToken(req);
-    if (!apiKeyOk && !bearerOk) {
+    const sessionOk = apiKeyOk ? true : await hasValidSession(req);
+    if (!apiKeyOk && !sessionOk) {
       const res = unauthorizedResponse();
       applyCorsHeaders(res, origin, isAllowed);
       return res;

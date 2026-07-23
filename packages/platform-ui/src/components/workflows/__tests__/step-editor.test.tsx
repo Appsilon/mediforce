@@ -10,7 +10,7 @@ vi.mock('@/hooks/use-plugins', () => ({
 }));
 
 vi.mock('@/contexts/auth-context', () => ({
-  useAuth: () => ({ firebaseUser: null }),
+  useAuth: () => ({ user: null }),
 }));
 
 vi.mock('next/navigation', () => ({

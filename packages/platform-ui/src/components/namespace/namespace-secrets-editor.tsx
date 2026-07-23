@@ -37,7 +37,7 @@ interface Row {
 interface NamespaceSecretsEditorProps {
   namespace: string;
   // Kept for prop compatibility with the call site; auth flows via the
-  // bearer-token bridge now, not an explicit uid argument.
+  // NextAuth session cookie now, not an explicit uid argument.
   userId: string;
 }
 

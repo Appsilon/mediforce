@@ -163,6 +163,8 @@ import {
   GetMeOutputSchema,
   ClearMustChangePasswordInputSchema,
   ClearMustChangePasswordOutputSchema,
+  SetPasswordInputSchema,
+  SetPasswordOutputSchema,
   GetNamespaceInputSchema,
   GetNamespaceOutputSchema,
   CreateNamespaceInputSchema,
@@ -189,6 +191,8 @@ import {
   type GetMeOutput,
   type ClearMustChangePasswordInput,
   type ClearMustChangePasswordOutput,
+  type SetPasswordInput,
+  type SetPasswordOutput,
   type GetNamespaceInput,
   type GetNamespaceOutput,
   type CreateNamespaceInput,
@@ -423,8 +427,9 @@ export type { ApiErrorCode };
  *                     (test loopback where middleware is bypassed). `baseUrl`
  *                     is optional — the injected fetch owns URL resolution.
  *
- * Firebase is never imported by this class — a browser wrapper that reads
- * Firebase ID tokens lives in `packages/platform-ui/src/lib/mediforce.ts`.
+ * This class carries no browser auth of its own — same-origin browser calls
+ * ride the NextAuth session cookie via the wrapper in
+ * `packages/platform-ui/src/lib/mediforce.ts`.
  */
 
 interface BaseClientConfig {
@@ -660,6 +665,7 @@ export class Mediforce {
     resendInvite: (input: ResendInviteInput) => Promise<ResendInviteOutput>;
     me: (input?: GetMeInput) => Promise<GetMeOutput>;
     clearMustChangePassword: (input?: ClearMustChangePasswordInput) => Promise<ClearMustChangePasswordOutput>;
+    setPassword: (input: SetPasswordInput) => Promise<SetPasswordOutput>;
   };
 
   readonly namespaces: {
@@ -1724,6 +1730,16 @@ export class Mediforce {
           validated,
           ClearMustChangePasswordOutputSchema,
           'mediforce.users.clearMustChangePassword',
+        );
+      },
+      setPassword: async (input) => {
+        const validated = SetPasswordInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          '/api/users/set-password',
+          validated,
+          SetPasswordOutputSchema,
+          'mediforce.users.setPassword',
         );
       },
     };

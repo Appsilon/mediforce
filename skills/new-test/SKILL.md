@@ -84,7 +84,7 @@ test('creates and lists resource', async ({ request }) => {
 });
 ```
 
-Bootstrap once per machine: `python3 packages/platform-ui/scripts/bootstrap_e2e.py`. Real Next server, Firebase emulators, `MOCK_AGENT=true`. Runs serial (single `MEDIFORCE_DATA_DIR`).
+Needs Postgres on `DATABASE_URL` and a `.env.local` (copy `packages/platform-ui/.env.example`). Real Next server, `MOCK_AGENT=true`; Playwright's `globalSetup` applies migrations and `auth-setup` seeds the NextAuth user. Runs serial (single `MEDIFORCE_DATA_DIR`).
 
 ### L4 — UI E2E
 

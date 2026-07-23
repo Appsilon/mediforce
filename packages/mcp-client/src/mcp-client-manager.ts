@@ -11,7 +11,7 @@ const MCP_DEBUG = process.env.MCP_DEBUG === 'true';
 
 /**
  * Env vars inherited by stdio MCP subprocesses. Deliberately narrow to avoid
- * leaking platform secrets (Firebase, OpenRouter, DB creds, etc.) to third-party
+ * leaking platform secrets (OpenRouter, DB creds, AUTH_SECRET, etc.) to third-party
  * MCP servers. Add keys here only if they are operationally required and non-sensitive.
  * Any secret the server needs must be passed explicitly via McpServerConfig.env.
  */
