@@ -37,7 +37,7 @@ export class PostgresUserDirectoryService implements UserDirectoryService {
   }
 
   async resolveUser(identifier: string): Promise<DirectoryUser | null> {
-    // Emails are stored lower-cased (migration 0033); uids are opaque and
+    // Emails are stored lower-cased (migration 0034); uids are opaque and
     // case-sensitive, so only the email branch normalises.
     const isEmail = identifier.includes('@');
     const column = isEmail ? authUsers.email : authUsers.id;

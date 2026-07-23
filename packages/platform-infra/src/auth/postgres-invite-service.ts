@@ -39,7 +39,7 @@ export class PostgresInviteService {
   constructor(private readonly db: Database) {}
 
   async seedInvite(input: SeedInviteInput): Promise<SeededInvite> {
-    // Case-insensitive identity (migration 0033): inviting `Alice@corp.com`
+    // Case-insensitive identity (migration 0034): inviting `Alice@corp.com`
     // must reach the same account her Google sign-in creates as
     // `alice@corp.com`, or the invite silently orphans.
     const normalisedEmail = input.email.toLowerCase();

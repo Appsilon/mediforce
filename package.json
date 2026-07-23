@@ -62,12 +62,5 @@
     "vite": "8.1.5",
     "vitest": "^4.1.4",
     "zod": "^4.0.0"
-    "vite": "8.1.4",
-    "vitest": "^4.1.4"
-=======
-    "vite": "8.1.4",
-    "vitest": "^4.1.4",
-    "zod": "^4.0.0"
->>>>>>> 051da400 (refactor(auth): finish ADR-0002 cutover — handler, dev:mock, dead Firebase machinery)
   }
 }

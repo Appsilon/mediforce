@@ -11,7 +11,7 @@ import { pgTable, text, timestamp } from 'drizzle-orm/pg-core';
  *
  * `image` keeps the directory's `getUserMetadata` member-list avatar fallback.
  *
- * The NextAuth cutover added (migration 0030) the two remaining
+ * The NextAuth cutover added (migration 0032) the two remaining
  * `@auth/drizzle-adapter` columns:
  *   - `email_verified` — the adapter's `emailVerified` timestamp.
  *   - `password_hash`  — bcrypt hash, written only for users who set a
@@ -31,7 +31,7 @@ export const authUsers = pgTable('auth_users', {
   emailVerified: timestamp('email_verified', { withTimezone: true, mode: 'date' }),
   image: text('image'),
   passwordHash: text('password_hash'),
-  // Stamped by `recordSignIn` on every successful sign-in (migration 0032) so
+  // Stamped by `recordSignIn` on every successful sign-in (migration 0033) so
   // the member list can show when someone was last here. Sessions cannot carry
   // this: signing out deletes the row.
   lastSignInAt: timestamp('last_sign_in_at', { withTimezone: true, mode: 'date' }),

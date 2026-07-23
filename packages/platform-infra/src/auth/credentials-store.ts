@@ -52,7 +52,7 @@ export type PasswordCredentialRecord = {
  * `null` when no user has that email; the caller compares the bcrypt hash.
  *
  * The email is lower-cased to match the case-insensitive uniqueness index
- * (migration 0033) — addresses differing only in case are one account.
+ * (migration 0034) — addresses differing only in case are one account.
  */
 export async function findPasswordCredentialByEmail(
   db: Database,
