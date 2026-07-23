@@ -1,13 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { compare } from 'bcryptjs';
+import { compare, hash } from 'bcryptjs';
 import {
   getSharedPostgresClient,
   findPasswordCredentialByEmail,
   createDatabaseSession,
   recordSignIn,
+  promoteFirebaseCredentialToBcrypt,
+  verifyFirebasePassword,
+  resolveFirebaseScryptParams,
   SESSION_TTL_MS,
+  type Database,
 } from '@mediforce/platform-infra';
 import { parseAllowedDomains, isEmailDomainAllowed } from '@/lib/email-allowlist';
 import { sessionCookieName, isSecureRequest } from '@/lib/session-cookie';
@@ -86,14 +90,56 @@ export async function POST(request: Request): Promise<NextResponse> {
     parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS),
   );
   const passwordMatches = await compare(password, user?.passwordHash ?? DUMMY_HASH);
-  if (!allowed || user === null || user.passwordHash === null || !passwordMatches) {
-    return NextResponse.json(INVALID_CREDENTIALS, { status: 401 });
+  const bcryptSucceeded =
+    allowed && user !== null && user.passwordHash !== null && passwordMatches;
+  if (bcryptSucceeded) {
+    return establishSession(db, request, user.id);
   }
 
+  // Migrate-on-login (ADR-0002 Gap 2): a migrated Firebase user has no bcrypt
+  // hash yet but carries the legacy scrypt credential. Firebase scrypt cannot
+  // convert to bcrypt offline, but it CAN be verified here; on success we rehash
+  // the plaintext to bcrypt and clear the legacy columns atomically, then open
+  // the session exactly like a bcrypt sign-in — transparent to the user, and it
+  // runs at most once per migrated account.
+  if (
+    allowed &&
+    user !== null &&
+    user.passwordHash === null &&
+    user.firebasePasswordHash !== null &&
+    user.firebaseSalt !== null
+  ) {
+    // Params absent => migrate-on-login is switched off for this deployment (a
+    // documented "feature off", not a silent corruption fallback). Partial
+    // config THROWS on purpose: a half-configured deployment is a
+    // misconfiguration and a 500 is the correct, loud answer — do not swallow.
+    const params = resolveFirebaseScryptParams();
+    if (
+      params !== null &&
+      verifyFirebasePassword(password, user.firebasePasswordHash, user.firebaseSalt, params)
+    ) {
+      const bcryptHash = await hash(password, 12);
+      await promoteFirebaseCredentialToBcrypt(db, user.id, bcryptHash);
+      return establishSession(db, request, user.id);
+    }
+  }
+
+  return NextResponse.json(INVALID_CREDENTIALS, { status: 401 });
+}
+
+/**
+ * Open the `auth_sessions` row and set the session cookie for a verified user —
+ * the shared success tail of the bcrypt and migrate-on-login paths.
+ */
+async function establishSession(
+  db: Database,
+  request: Request,
+  userId: string,
+): Promise<NextResponse> {
   const sessionToken = `${randomUUID()}${randomUUID()}`.replace(/-/g, '');
   const expires = new Date(Date.now() + SESSION_TTL_MS);
-  await createDatabaseSession(db, { sessionToken, userId: user.id, expires });
-  await recordSignIn(db, user.id);
+  await createDatabaseSession(db, { sessionToken, userId, expires });
+  await recordSignIn(db, userId);
 
   const secure = isSecureRequest(request);
   const response = NextResponse.json({ ok: true });

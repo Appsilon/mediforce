@@ -18,7 +18,7 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
-  const { signInWithGoogle, signInWithEmail, user, loading, mustChangePassword, emailAuthEnabled, googleAuthEnabled } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signInWithMagicLink, user, loading, mustChangePassword, emailAuthEnabled, googleAuthEnabled, magicLinkEnabled } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -26,6 +26,9 @@ function LoginForm() {
   const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
+  const [magicLinkOpen, setMagicLinkOpen] = React.useState(false);
+  const [magicLinkEmail, setMagicLinkEmail] = React.useState('');
+  const [magicLinkSent, setMagicLinkSent] = React.useState(false);
 
   // Surface a NextAuth OAuth error bounced back as `?error=` (e.g. the sign-in
   // callback rejected an out-of-allowlist email — ADR-0002 §4a).
@@ -74,6 +77,24 @@ function LoginForm() {
       await signInWithEmail(email.trim(), password);
     } catch (err: unknown) {
       setError(err instanceof CredentialsSignInError ? 'Incorrect email or password.' : 'Sign in failed.');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleMagicLinkSignIn(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setPending(true);
+    try {
+      await signInWithMagicLink(magicLinkEmail.trim());
+      // Auth.js normally redirects to its verify-request page; if it resolves
+      // in place we still confirm so the user knows to check their inbox. The
+      // message is identical whether or not an email was actually sent
+      // (anti-enumeration — the sender gates on account existence).
+      setMagicLinkSent(true);
+    } catch {
+      setError('Sign in failed. Please try again.');
     } finally {
       setPending(false);
     }
@@ -152,6 +173,47 @@ function LoginForm() {
                 {pending ? 'Signing in…' : 'Sign in'}
               </button>
             </form>
+          )}
+
+          {magicLinkEnabled === true && (
+            <div className="space-y-3">
+              {magicLinkSent ? (
+                <p className="text-sm text-muted-foreground text-center" role="status">
+                  Check your email for a sign-in link.
+                </p>
+              ) : magicLinkOpen ? (
+                <form onSubmit={handleMagicLinkSignIn} className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label htmlFor="magic-link-email" className="text-sm font-medium">Email</label>
+                    <input
+                      id="magic-link-email"
+                      type="email"
+                      value={magicLinkEmail}
+                      onChange={(e) => setMagicLinkEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      required
+                      disabled={pending}
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={pending}
+                    className="w-full rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground disabled:opacity-50 transition-colors"
+                  >
+                    {pending ? 'Sending…' : 'Send sign-in link'}
+                  </button>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setMagicLinkOpen(true)}
+                  className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Email me a sign-in link
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>

@@ -31,6 +31,12 @@ export const authUsers = pgTable('auth_users', {
   emailVerified: timestamp('email_verified', { withTimezone: true, mode: 'date' }),
   image: text('image'),
   passwordHash: text('password_hash'),
+  // ADR-0002 Gap 2: the migrated Firebase scrypt credential, kept only until
+  // the user's first successful sign-in rehashes their plaintext into
+  // `password_hash` (migrate-on-login). Both are cleared at that point. Null
+  // for every user who never had a Firebase password or has already migrated.
+  firebasePasswordHash: text('firebase_password_hash'),
+  firebaseSalt: text('firebase_salt'),
   // Stamped by `recordSignIn` on every successful sign-in (migration 0033) so
   // the member list can show when someone was last here. Sessions cannot carry
   // this: signing out deletes the row.

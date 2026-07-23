@@ -26,8 +26,7 @@ import {
   getSharedPostgresClient,
   PostgresInviteService,
   validateSecretsKey,
-  createMailgunSender,
-  createSmtpSender,
+  resolveEmailSenderFromEnv,
   EmailNotificationService,
   PostgresUserDirectoryService,
 } from '@mediforce/platform-infra';
@@ -249,86 +248,19 @@ export function getPlatformServices(): PlatformServices {
     otelTracingOptions,
   );
 
-  const emailDisabled = process.env.MEDIFORCE_DISABLE_EMAIL === 'true';
-  const mailgunApiKey = process.env.MAILGUN_API_KEY ?? '';
-  const mailgunDomain = process.env.MAILGUN_DOMAIN ?? '';
-  const mailgunFrom = process.env.MAILGUN_FROM_EMAIL ?? '';
-  const mailgunSenderName = process.env.MAILGUN_SENDER_NAME ?? 'Mediforce';
-  const mailgunConfigured = mailgunApiKey !== '' && mailgunDomain !== '' && mailgunFrom !== '';
-
-  const smtpHost = process.env.SMTP_HOST ?? '';
-  const smtpPort = process.env.SMTP_PORT ?? '';
-  const smtpUser = process.env.SMTP_USER ?? '';
-  const smtpPass = process.env.SMTP_PASS ?? '';
-  const smtpSecure = process.env.SMTP_SECURE !== 'false';
-  const smtpFrom = process.env.SMTP_FROM_EMAIL ?? '';
-  const smtpSenderName = process.env.SMTP_SENDER_NAME ?? 'Mediforce';
-  const smtpConfigured = smtpHost !== '' && smtpFrom !== '';
-
-  const rawEmailProvider = process.env.EMAIL_PROVIDER || undefined;
-  if (rawEmailProvider !== undefined && rawEmailProvider !== 'mailgun' && rawEmailProvider !== 'smtp') {
-    throw new Error(
-      `EMAIL_PROVIDER="${rawEmailProvider}" is not valid. Use "mailgun" or "smtp".`,
-    );
-  }
-  const explicitProvider = rawEmailProvider as 'mailgun' | 'smtp' | undefined;
-  const resolvedProvider = resolveEmailProvider(explicitProvider, mailgunConfigured, smtpConfigured);
-
-  if (emailDisabled) {
+  // Resolve the email provider once (shared with the NextAuth magic-link
+  // provider). `null` means email is disabled; a misconfiguration throws.
+  const resolvedEmail = resolveEmailSenderFromEnv();
+  if (resolvedEmail === null) {
     console.log('[platform-services] MEDIFORCE_DISABLE_EMAIL=true — email handler and notifications disabled');
+  } else {
+    console.log(`[platform-services] Email provider: ${resolvedEmail.provider === 'mailgun' ? 'Mailgun' : 'SMTP'}`);
   }
 
-  let emailSender: SendEmailFn | undefined;
-  let emailProviderInfo: EmailProviderInfo | null = null;
-
-  if (!emailDisabled && resolvedProvider === 'mailgun') {
-    if (!mailgunConfigured) {
-      const missing = [
-        !mailgunApiKey && 'MAILGUN_API_KEY',
-        !mailgunDomain && 'MAILGUN_DOMAIN',
-        !mailgunFrom && 'MAILGUN_FROM_EMAIL',
-      ].filter(Boolean).join(', ');
-      throw new Error(
-        `EMAIL_PROVIDER=mailgun but config incomplete (missing: ${missing}). ` +
-        `Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.`,
-      );
-    }
-    emailSender = createMailgunSender({
-      apiKey: mailgunApiKey,
-      domain: mailgunDomain,
-      defaultFrom: mailgunFrom,
-      defaultSenderName: mailgunSenderName,
-    });
-    emailProviderInfo = { provider: 'mailgun', configured: true, from: mailgunFrom };
-    console.log('[platform-services] Email provider: Mailgun');
-  } else if (!emailDisabled && resolvedProvider === 'smtp') {
-    if (!smtpConfigured) {
-      const missing = [
-        !smtpHost && 'SMTP_HOST',
-        !smtpFrom && 'SMTP_FROM_EMAIL',
-      ].filter(Boolean).join(', ');
-      throw new Error(
-        `EMAIL_PROVIDER=smtp but config incomplete (missing: ${missing}). ` +
-        `Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.`,
-      );
-    }
-    emailSender = createSmtpSender({
-      host: smtpHost,
-      port: smtpPort !== '' ? Number(smtpPort) : 587,
-      secure: smtpSecure,
-      user: smtpUser,
-      pass: smtpPass,
-      defaultFrom: smtpFrom,
-      defaultSenderName: smtpSenderName,
-    });
-    emailProviderInfo = { provider: 'smtp', configured: true, from: smtpFrom };
-    console.log('[platform-services] Email provider: SMTP');
-  } else if (!emailDisabled && resolvedProvider === null) {
-    throw new Error(
-      'Email is enabled but no email provider is configured. ' +
-      'Set MAILGUN_* or SMTP_* env vars, or set MEDIFORCE_DISABLE_EMAIL=true to start without email.',
-    );
-  }
+  const emailSender: SendEmailFn | undefined = resolvedEmail?.send;
+  const emailProviderInfo: EmailProviderInfo | null = resolvedEmail
+    ? { provider: resolvedEmail.provider, configured: true, from: resolvedEmail.from }
+    : null;
 
   const notificationService = emailSender
     ? new EmailNotificationService(emailSender)
@@ -392,7 +324,7 @@ export function getPlatformServices(): PlatformServices {
   // NEXT_PUBLIC_PLATFORM_URL still renders sensible links.
   const inviteAppUrl =
     process.env.NEXT_PUBLIC_PLATFORM_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
-  const senderName = resolvedProvider === 'mailgun' ? mailgunSenderName : smtpSenderName;
+  const senderName = resolvedEmail?.senderName ?? 'Mediforce';
   const inviteNotificationService = emailSender
     ? new EmailInviteNotificationService(emailSender, inviteAppUrl, senderName)
     : null;
@@ -459,20 +391,4 @@ export function getPlatformServices(): PlatformServices {
   }
 
   return services;
-}
-
-function resolveEmailProvider(
-  explicit: 'mailgun' | 'smtp' | undefined,
-  mailgunConfigured: boolean,
-  smtpConfigured: boolean,
-): 'mailgun' | 'smtp' | null {
-  if (explicit !== undefined) return explicit;
-  if (mailgunConfigured && smtpConfigured) {
-    throw new Error(
-      'Both Mailgun and SMTP env vars are set. Set EMAIL_PROVIDER=mailgun or EMAIL_PROVIDER=smtp to disambiguate.',
-    );
-  }
-  if (mailgunConfigured) return 'mailgun';
-  if (smtpConfigured) return 'smtp';
-  return null;
 }

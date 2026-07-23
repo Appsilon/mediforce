@@ -45,6 +45,11 @@ export type PasswordCredentialRecord = {
   name: string | null;
   image: string | null;
   passwordHash: string | null;
+  // Legacy Firebase scrypt credential for migrate-on-login (ADR-0002 Gap 2).
+  // Selected in the same lookup so the login route needs no second query. Both
+  // are null for users who never had a Firebase password or already migrated.
+  firebasePasswordHash: string | null;
+  firebaseSalt: string | null;
 };
 
 /**
@@ -65,9 +70,33 @@ export async function findPasswordCredentialByEmail(
       name: authUsers.name,
       image: authUsers.image,
       passwordHash: authUsers.passwordHash,
+      firebasePasswordHash: authUsers.firebasePasswordHash,
+      firebaseSalt: authUsers.firebaseSalt,
     })
     .from(authUsers)
     .where(eq(authUsers.email, email.toLowerCase()))
     .limit(1);
   return user ?? null;
+}
+
+/**
+ * The atomic migrate-on-login step (ADR-0002 Gap 2): after verifying the legacy
+ * Firebase password, rehash the plaintext to bcrypt and store it while clearing
+ * the legacy columns in ONE update, so the scrypt credential is never left
+ * alongside the bcrypt one.
+ */
+export async function promoteFirebaseCredentialToBcrypt(
+  db: Database,
+  uid: string,
+  bcryptHash: string,
+): Promise<void> {
+  await db
+    .update(authUsers)
+    .set({
+      passwordHash: bcryptHash,
+      firebasePasswordHash: null,
+      firebaseSalt: null,
+      updatedAt: sql`now()`,
+    })
+    .where(eq(authUsers.id, uid));
 }

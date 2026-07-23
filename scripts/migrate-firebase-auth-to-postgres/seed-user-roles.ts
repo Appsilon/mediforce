@@ -25,8 +25,12 @@
  * Those columns were deliberately never added — nothing reads them. If a future
  * change introduces them, the raw `customClaims.role` is available on each
  * `FirebaseUserExport` to derive `deployment_admin = role === 'admin'`.
- * `password_hash` stays null (Firebase scrypt is proprietary; passwords are
- * test-only) — email/password users reset if they want one.
+ * `password_hash` stays null here: Firebase scrypt cannot convert to bcrypt
+ * offline. With `--carry-legacy-passwords` the raw scrypt hash + salt are copied
+ * into `firebase_password_hash` / `firebase_salt` instead, and the login route
+ * verifies + rehashes them to bcrypt on the user's first sign-in
+ * (migrate-on-login, ADR-0002 Gap 2). Without the flag the legacy columns stay
+ * null and email/password users reset if they want a password.
  *
  * GATED: dry-run by default. It prints what it WOULD write and exits. Pass
  * `--apply` to actually upsert. Do NOT run `--apply` on staging without the
@@ -39,10 +43,12 @@
  * Usage:
  *   npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts users.json
  *   npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts users.json --apply
+ *   npx tsx scripts/migrate-firebase-auth-to-postgres/seed-user-roles.ts users.json --apply --carry-legacy-passwords
  *
  * Requires: DATABASE_URL (only for `--apply`) + the export file.
  */
 import { readFileSync } from 'node:fs';
+import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { buildUserRolesSeed } from '../../packages/platform-infra/src/auth/seed-user-roles';
 import type { FirebaseUserExport } from '../../packages/platform-infra/src/auth/seed-user-roles';
@@ -61,6 +67,10 @@ const exportedUserSchema = z.object({
   displayName: z.string().optional(),
   photoUrl: z.string().optional(),
   customAttributes: z.string().optional(),
+  // Firebase scrypt credential, carried only with --carry-legacy-passwords for
+  // migrate-on-login (ADR-0002 Gap 2).
+  passwordHash: z.string().optional(),
+  salt: z.string().optional(),
 });
 
 const exportFileSchema = z.object({
@@ -116,12 +126,15 @@ function readFirebaseExport(path: string): FirebaseUserExport[] {
     displayName: user.displayName ?? null,
     photoURL: user.photoUrl ?? null,
     customClaims: parseCustomClaims(user.customAttributes),
+    passwordHash: user.passwordHash ?? null,
+    salt: user.salt ?? null,
   }));
 }
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const apply = args.includes('--apply');
+  const carryLegacyPasswords = args.includes('--carry-legacy-passwords');
   const exportPath = args.find((arg) => arg.startsWith('--') === false);
   if (exportPath === undefined) {
     throw new Error(
@@ -132,11 +145,15 @@ async function main(): Promise<void> {
   }
 
   const exported = readFirebaseExport(exportPath);
-  const seed = buildUserRolesSeed(exported);
+  const seed = buildUserRolesSeed(exported, { carryLegacyPasswords });
+  const carryingLegacyPassword = seed.authUsers.filter(
+    (user) => user.firebasePasswordHash !== null,
+  ).length;
 
   console.log(`Firebase users read:        ${exported.length}`);
   console.log(`auth_users rows to seed:    ${seed.authUsers.length}`);
   console.log(`user_roles rows to seed:    ${seed.userRoles.length}`);
+  console.log(`carrying legacy password:   ${carryingLegacyPassword}`);
   console.log(`skipped (no email):         ${seed.skippedNoEmail.length}`);
   if (seed.skippedNoEmail.length > 0) {
     console.log(`  skipped uids: ${seed.skippedNoEmail.join(', ')}`);
@@ -151,10 +168,20 @@ async function main(): Promise<void> {
   if (seed.authUsers.length > 0) {
     const now = new Date();
     const rows = seed.authUsers.map((user) => ({ ...user, emailVerified: now }));
+    // Default run touches only email_verified, exactly as before. With
+    // --carry-legacy-passwords we also (re)carry the legacy Firebase credential
+    // so a re-run populates rows that PR1 seeded without it.
+    const conflictSet = carryLegacyPasswords
+      ? {
+          emailVerified: now,
+          firebasePasswordHash: sql`excluded.firebase_password_hash`,
+          firebaseSalt: sql`excluded.firebase_salt`,
+        }
+      : { emailVerified: now };
     await db
       .insert(authUsers)
       .values(rows)
-      .onConflictDoUpdate({ target: authUsers.id, set: { emailVerified: now } });
+      .onConflictDoUpdate({ target: authUsers.id, set: conflictSet });
   }
   if (seed.userRoles.length > 0) {
     await db

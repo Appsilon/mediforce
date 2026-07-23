@@ -18,7 +18,10 @@ export {
   setUserPasswordHash,
   getUserPasswordHash,
   findPasswordCredentialByEmail,
+  promoteFirebaseCredentialToBcrypt,
 } from './auth/credentials-store';
+export { verifyFirebasePassword, resolveFirebaseScryptParams } from './auth/firebase-scrypt';
+export type { FirebaseScryptParams } from './auth/firebase-scrypt';
 export type {
   FirebaseUserExport,
   FirebaseCustomClaims,
@@ -34,6 +37,8 @@ export { createMailgunSender } from './email/mailgun-client';
 export type { MailgunConfig } from './email/mailgun-client';
 export { createSmtpSender } from './email/smtp-client';
 export type { SmtpConfig } from './email/smtp-client';
+export { resolveEmailSenderFromEnv } from './email/resolve-sender';
+export type { ResolvedEmailSender } from './email/resolve-sender';
 
 // Postgres repositories — the only data backend (ADR-0001).
 export { PostgresToolCatalogRepository } from './postgres/repositories/tool-catalog-repository';

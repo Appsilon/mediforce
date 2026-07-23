@@ -30,6 +30,10 @@ export interface FirebaseUserExport {
   readonly displayName?: string | null;
   readonly photoURL?: string | null;
   readonly customClaims?: FirebaseCustomClaims | null;
+  /** base64 Firebase scrypt password hash, for migrate-on-login (ADR-0002 Gap 2). */
+  readonly passwordHash?: string | null;
+  /** base64 per-user Firebase salt, paired with `passwordHash`. */
+  readonly salt?: string | null;
 }
 
 export interface AuthUserSeedRow {
@@ -37,6 +41,8 @@ export interface AuthUserSeedRow {
   readonly email: string;
   readonly name: string | null;
   readonly image: string | null;
+  readonly firebasePasswordHash: string | null;
+  readonly firebaseSalt: string | null;
 }
 
 export interface UserRoleSeedRow {
@@ -65,21 +71,42 @@ function rolesFromClaims(claims: FirebaseCustomClaims | null | undefined): strin
   return [];
 }
 
-export function buildUserRolesSeed(users: readonly FirebaseUserExport[]): UserRolesSeed {
+export interface BuildUserRolesSeedOptions {
+  /**
+   * Carry the legacy Firebase scrypt hash + salt onto each `auth_users` row so
+   * migrate-on-login can verify them later (ADR-0002 Gap 2). Off by default: the
+   * columns stay null, preserving the pre-migrate behaviour exactly.
+   */
+  readonly carryLegacyPasswords?: boolean;
+}
+
+export function buildUserRolesSeed(
+  users: readonly FirebaseUserExport[],
+  options: BuildUserRolesSeedOptions = {},
+): UserRolesSeed {
   const authUsersRows: AuthUserSeedRow[] = [];
   const userRolesRows: UserRoleSeedRow[] = [];
   const skippedNoEmail: string[] = [];
+  const carryLegacyPasswords = options.carryLegacyPasswords === true;
 
   for (const user of users) {
     if (user.email === null || user.email === '') {
       skippedNoEmail.push(user.uid);
       continue;
     }
+    const hasLegacyCredential =
+      typeof user.passwordHash === 'string' &&
+      user.passwordHash !== '' &&
+      typeof user.salt === 'string' &&
+      user.salt !== '';
+    const carriesLegacyCredential = carryLegacyPasswords && hasLegacyCredential;
     authUsersRows.push({
       id: user.uid,
       email: user.email,
       name: user.displayName ?? null,
       image: user.photoURL ?? null,
+      firebasePasswordHash: carriesLegacyCredential ? user.passwordHash ?? null : null,
+      firebaseSalt: carriesLegacyCredential ? user.salt ?? null : null,
     });
     for (const role of rolesFromClaims(user.customClaims)) {
       userRolesRows.push({ uid: user.uid, role });

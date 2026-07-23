@@ -18,7 +18,14 @@ describe('buildUserRolesSeed', () => {
   it('emits one auth_users row per user with email, mapping displayName/photoURL', () => {
     const seed = buildUserRolesSeed([FIXTURE[0]!]);
     expect(seed.authUsers).toEqual([
-      { id: 'u1', email: 'alice@x.com', name: 'Alice', image: 'https://img/a' },
+      {
+        id: 'u1',
+        email: 'alice@x.com',
+        name: 'Alice',
+        image: 'https://img/a',
+        firebasePasswordHash: null,
+        firebaseSalt: null,
+      },
     ]);
   });
 
@@ -38,7 +45,16 @@ describe('buildUserRolesSeed', () => {
   it('emits no roles for a user without claims but still seeds the auth_users row', () => {
     const seed = buildUserRolesSeed([FIXTURE[3]!]);
     expect(seed.userRoles).toEqual([]);
-    expect(seed.authUsers).toEqual([{ id: 'u4', email: 'dan@x.com', name: null, image: null }]);
+    expect(seed.authUsers).toEqual([
+      {
+        id: 'u4',
+        email: 'dan@x.com',
+        name: null,
+        image: null,
+        firebasePasswordHash: null,
+        firebaseSalt: null,
+      },
+    ]);
   });
 
   it('de-duplicates repeated roles within a user', () => {
@@ -60,6 +76,40 @@ describe('buildUserRolesSeed', () => {
 
   it('is idempotent — same input yields deep-equal output', () => {
     expect(buildUserRolesSeed(FIXTURE)).toEqual(buildUserRolesSeed(FIXTURE));
+  });
+
+  it('carries the legacy Firebase hash + salt only when the option is set', () => {
+    const withCredential: FirebaseUserExport = {
+      uid: 'u5',
+      email: 'eve@x.com',
+      passwordHash: 'lSrfV15cpx95==',
+      salt: '42xEC+ixf3L2lw==',
+    };
+
+    const carried = buildUserRolesSeed([withCredential], { carryLegacyPasswords: true });
+    expect(carried.authUsers).toEqual([
+      {
+        id: 'u5',
+        email: 'eve@x.com',
+        name: null,
+        image: null,
+        firebasePasswordHash: 'lSrfV15cpx95==',
+        firebaseSalt: '42xEC+ixf3L2lw==',
+      },
+    ]);
+
+    const notCarried = buildUserRolesSeed([withCredential]);
+    expect(notCarried.authUsers[0]!.firebasePasswordHash).toBeNull();
+    expect(notCarried.authUsers[0]!.firebaseSalt).toBeNull();
+  });
+
+  it('leaves legacy columns null when the export lacks a hash or salt', () => {
+    const seed = buildUserRolesSeed(
+      [{ uid: 'u6', email: 'f@x.com', passwordHash: 'onlyhash' }],
+      { carryLegacyPasswords: true },
+    );
+    expect(seed.authUsers[0]!.firebasePasswordHash).toBeNull();
+    expect(seed.authUsers[0]!.firebaseSalt).toBeNull();
   });
 
   // Faithful port of the old Firebase `getUsersByRole` filter (ADR-0002 §5):
