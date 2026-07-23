@@ -147,7 +147,10 @@ describe('platform-api boundary conventions', () => {
         const stat = statSync(full);
         if (stat.isDirectory()) {
           if (entry !== '__tests__') walk(full);
-        } else if (entry.endsWith('.ts') && entry !== 'index.ts') {
+        } else if (entry.endsWith('.ts') && entry !== 'index.ts' && !entry.endsWith('.generated.ts')) {
+          // Codegen'd data modules (e.g. embedded-workflow-docs.generated.ts) are
+          // not handlers; they're kept honest by their own drift test, not a
+          // behavioural sibling test.
           handlers.push(full);
         }
       }
