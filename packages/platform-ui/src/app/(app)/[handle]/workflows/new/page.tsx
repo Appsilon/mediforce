@@ -12,6 +12,7 @@ import { mediforce } from '@/lib/mediforce';
 import { validateSteps, toastRegistrationWarnings, reportSaveError, DISPLAY_NAME_KEY } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
+import { routes } from '@/lib/routes';
 import { mergeVerdictTransitions, ensureEntryStepFirst } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
@@ -156,7 +157,7 @@ export default function NewWorkflowPage() {
         startResolver(result.version);
       } else {
         redirectTimerRef.current = setTimeout(() => {
-          router.push(`/${handle}/workflows/${encodeURIComponent(result.name)}/definitions/${result.version}`);
+          router.push(routes.workflow(handle, result.name));
         }, 500);
       }
     } catch {

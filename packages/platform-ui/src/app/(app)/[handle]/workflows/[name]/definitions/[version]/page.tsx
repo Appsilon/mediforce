@@ -128,7 +128,7 @@ export default function WorkflowDefinitionVersionPage() {
         startResolver(result.version);
       } else {
         redirectTimerRef.current = setTimeout(() => {
-          router.push(`/${handle}/workflows/${name}/definitions/${result.version}`);
+          router.push(routes.workflow(handle, decodedName));
         }, 500);
       }
     } catch {
