@@ -22,6 +22,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Authentication moved from Firebase Auth to NextAuth / Auth.js v5 — Google OAuth, a password sign-in route, and revocable database sessions in Postgres (ADR-0002).
   - Firebase Auth, the Firebase Admin SDK and the auth emulator are gone; the user directory, global process-roles and invites read Postgres, and a one-time seed keeps every existing uid so users re-login without losing data.
   - `pnpm dev:mock` starts the dev Postgres container instead of the Firebase emulator; the E2E suite seeds a database session cookie directly.
+  - Operational staging cutover runbook (`docs/adr/RUNBOOK-0002-staging-cutover.md`) plus a guarded per-environment seed wrapper (`scripts/migrate-firebase-auth-to-postgres/migrate-to-nextauth.py`); cdisc is paused from auto-deploy until its own cutover ([#1014](https://github.com/Appsilon/mediforce/issues/1014)).
 
 ## [2026-07-19]
 
