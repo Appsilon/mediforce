@@ -55,6 +55,14 @@ describe('trigger handlers (cron on the unified table, ADR-0011)', () => {
     triggerName: 'manual',
     type: 'manual' as const,
   };
+  const webhook = {
+    namespace: 'team-alpha',
+    definitionName: 'flow',
+    triggerName: 'hook',
+    type: 'webhook' as const,
+    method: 'POST' as const,
+    path: '/orders',
+  };
 
   it('creates a cron trigger, persists it, and audits', async () => {
     const scope = buildScope();
@@ -142,11 +150,73 @@ describe('trigger handlers (cron on the unified table, ADR-0011)', () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it('rejects a webhook type (not yet supported)', async () => {
+  it('creates a webhook trigger, returns the derived URL, persists, and audits', async () => {
+    const scope = buildScope();
+    const result = await createTrigger({ ...webhook, enabled: true }, scope);
+
+    expect(result.trigger).toMatchObject({
+      type: 'webhook',
+      namespace: 'team-alpha',
+      workflowName: 'flow',
+      name: 'hook',
+      enabled: true,
+      config: { method: 'POST', path: '/orders' },
+    });
+    expect(result.trigger.type === 'webhook' && result.trigger.lastTriggeredAt).toBeNull();
+    expect(result.webhookUrl).toBe('/api/triggers/webhook/team-alpha/flow/orders');
+    const stored = await storedTrigger('hook');
+    expect(stored?.type === 'webhook' && stored.config.path).toBe('/orders');
+    const events = auditRepo.getAll();
+    expect(events[0].action).toBe('webhook.trigger.created');
+  });
+
+  it('reports webhookUrl as null for a non-webhook trigger', async () => {
+    const scope = buildScope();
+    const result = await createTrigger({ ...cron, schedule: '0 3 * * *', enabled: true }, scope);
+    expect(result.webhookUrl).toBeNull();
+  });
+
+  it('rejects a webhook trigger missing method or path', async () => {
     const scope = buildScope();
     await expect(
-      createTrigger({ ...base, type: 'webhook', enabled: true }, scope),
+      createTrigger({ ...base, type: 'webhook', path: '/orders', enabled: true }, scope),
     ).rejects.toBeInstanceOf(ValidationError);
+    await expect(
+      createTrigger({ ...base, type: 'webhook', method: 'POST', enabled: true }, scope),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('rejects a webhook trigger with a malformed path', async () => {
+    const scope = buildScope();
+    await expect(
+      createTrigger({ ...webhook, path: 'no-leading-slash', enabled: true }, scope),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('rejects a webhook trigger carrying a schedule', async () => {
+    const scope = buildScope();
+    await expect(
+      createTrigger({ ...webhook, schedule: '0 3 * * *', enabled: true }, scope),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('rejects a second webhook trigger — one webhook per workflow', async () => {
+    const scope = buildScope();
+    await createTrigger({ ...webhook, enabled: true }, scope);
+    await expect(
+      createTrigger(
+        { ...webhook, triggerName: 'hook-2', path: '/other', enabled: true },
+        scope,
+      ),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it('deletes a webhook trigger (unlike the manual singleton)', async () => {
+    const scope = buildScope();
+    await createTrigger({ ...webhook, enabled: true }, scope);
+    const result = await deleteTrigger({ ...base, triggerName: 'hook' }, scope);
+    expect(result).toEqual({ success: true });
+    expect(await storedTrigger('hook')).toBeNull();
   });
 
   it('stops and starts a manual trigger with manual-typed audit actions', async () => {

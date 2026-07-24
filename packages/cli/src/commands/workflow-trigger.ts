@@ -12,7 +12,7 @@ const typeArg = {
   type: 'string',
   required: false,
   default: 'cron',
-  description: "Trigger type: 'cron' or 'manual'",
+  description: "Trigger type: 'cron', 'manual', or 'webhook'",
 } as const;
 const scheduleArg = {
   type: 'string',
@@ -22,12 +22,26 @@ const scheduleArg = {
 const scheduleOptArg = {
   type: 'string',
   required: false,
-  description: '5-field cron schedule (UTC; :00/:15/:30/:45). Required for --type cron, omit for --type manual',
+  description: '5-field cron schedule (UTC; :00/:15/:30/:45). Required for --type cron, omit otherwise',
+} as const;
+const methodArg = {
+  type: 'string',
+  required: false,
+  description: 'HTTP method (GET/POST/PUT/DELETE/PATCH). Required for --type webhook',
+} as const;
+const pathArg = {
+  type: 'string',
+  required: false,
+  description: 'URL path, leading slash (e.g. /orders). Required for --type webhook',
 } as const;
 
 function scheduleOf(trigger: { type: string; config: unknown }): string {
   if (trigger.type === 'cron') {
     return (trigger.config as { schedule: string }).schedule;
+  }
+  if (trigger.type === 'webhook') {
+    const config = trigger.config as { method: string; path: string };
+    return `${config.method} ${config.path}`;
   }
   return '';
 }
@@ -62,27 +76,34 @@ export const workflowTriggerAddCommand = defineCommand({
     name: nameArg,
     trigger: triggerArg,
     schedule: scheduleOptArg,
+    method: methodArg,
+    path: pathArg,
     namespace: namespaceArg,
     type: typeArg,
   },
   async run({ args, output, mediforce, jsonMode }) {
-    const type = (args.type ?? 'cron') as 'cron' | 'manual';
+    const type = (args.type ?? 'cron') as 'cron' | 'manual' | 'webhook';
     const result = await mediforce.triggers.create({
       definitionName: args.name,
       triggerName: args.trigger!,
       type,
       ...(args.schedule ? { schedule: args.schedule } : {}),
+      ...(args.method ? { method: args.method as 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' } : {}),
+      ...(args.path ? { path: args.path } : {}),
       namespace: args.namespace!,
       enabled: true,
     });
     if (jsonMode) {
       printJson(output, result);
     } else {
-      const schedule = scheduleOf(result.trigger);
-      const suffix = schedule.length > 0 ? ` (${schedule})` : '';
+      const detail = scheduleOf(result.trigger);
+      const suffix = detail.length > 0 ? ` (${detail})` : '';
       output.stdout(
         `Added ${result.trigger.type} trigger '${result.trigger.name}'${suffix} to '${args.name}'`,
       );
+      if (result.webhookUrl !== null) {
+        output.stdout(`  URL: ${result.webhookUrl}`);
+      }
     }
     return 0;
   },

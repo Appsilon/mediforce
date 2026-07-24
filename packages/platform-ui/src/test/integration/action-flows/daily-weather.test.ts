@@ -47,6 +47,7 @@ vi.mock('next/server', async (importOriginal) => {
 });
 import {
   ActionRegistry,
+  createEmailActionHandler,
   httpActionHandler,
   reshapeActionHandler,
 } from '@mediforce/core-actions';
@@ -122,8 +123,14 @@ const services = (() => {
   const actionRegistry = new ActionRegistry();
   actionRegistry.register('http', httpActionHandler);
   actionRegistry.register('reshape', reshapeActionHandler);
-  const webhookRouter = new WebhookRouter(engine, processRepo);
+  // The workflow has a `send-email` step; stub the transport so the step
+  // completes without Mailgun. (Push steps are http, covered by the fetch shim.)
+  actionRegistry.register(
+    'email',
+    createEmailActionHandler(async () => ({ messageId: 'test-message-id' })),
+  );
   const triggerRepo = new InMemoryTriggerRepository();
+  const webhookRouter = new WebhookRouter(engine, processRepo, triggerRepo);
   const manualTrigger = new ManualTrigger(engine, processRepo, triggerRepo);
   return {
     engine,
@@ -136,6 +143,10 @@ const services = (() => {
     webhookRouter,
     manualTrigger,
     triggerRepo,
+    // The auto-runner validates plugin env + models for every run; action-only
+    // workflows have neither, so empty registries let validation pass.
+    pluginRegistry: { list: () => [] },
+    modelRegistryRepo: { list: async () => [] },
   };
 })();
 
@@ -151,6 +162,10 @@ vi.mock('@/app/actions/workflow-secrets', () => ({
     PUSHOVER_USER: 'test-pushover-user',
     NTFY_TOPIC: 'examples-test',
   }),
+}));
+
+vi.mock('@/app/actions/namespace-secrets', () => ({
+  getNamespaceSecretsForRuntime: async () => ({}),
 }));
 
 const { POST: runPost } = await import('@/app/api/processes/[instanceId]/run/route');
@@ -214,12 +229,22 @@ function restoreFetch(): void {
 
 // ---- Lifecycle -------------------------------------------------------------
 
+let originalApiKey: string | undefined;
+
 beforeAll(() => {
   // No external server to start — fetch shim covers all third-party calls.
+  // The run + poll routes authenticate the caller (X-Api-Key → system actor),
+  // so set the key the requests below send.
+  originalApiKey = process.env.PLATFORM_API_KEY;
+  process.env.PLATFORM_API_KEY = 'test-api-key';
 });
 
 afterAll(() => {
-  // Nothing to tear down.
+  if (originalApiKey === undefined) {
+    delete process.env.PLATFORM_API_KEY;
+  } else {
+    process.env.PLATFORM_API_KEY = originalApiKey;
+  }
 });
 
 beforeEach(async () => {
@@ -283,7 +308,7 @@ describe('daily-weather: fetch → reshape → push×2 → terminal', () => {
       `http://localhost/api/processes/${runId}/run`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': 'test-api-key' },
         body: JSON.stringify({ triggeredBy: 'daily-weather-test' }),
       },
     );
@@ -300,7 +325,7 @@ describe('daily-weather: fetch → reshape → push×2 → terminal', () => {
     while (Date.now() < deadline) {
       const pollReq = new NextRequest(
         `http://localhost/api/runs/${runId}`,
-        { method: 'GET' },
+        { method: 'GET', headers: { 'X-Api-Key': 'test-api-key' } },
       );
       const pollRes = await runsGet(pollReq, { params: Promise.resolve({ runId }) });
       const pollJson = (await pollRes.json()) as { status: string; finalOutput: unknown };

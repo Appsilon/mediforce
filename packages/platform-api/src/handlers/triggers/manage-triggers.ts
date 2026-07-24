@@ -2,7 +2,9 @@ import type {
   CronTriggerResource,
   ManualTriggerResource,
   TriggerResource,
+  WebhookTriggerResource,
 } from '@mediforce/platform-core';
+import { WebhookTriggerConfigSchema } from '@mediforce/platform-core';
 import { validateCronSchedule } from '@mediforce/workflow-engine';
 import type {
   CreateTriggerInput,
@@ -31,6 +33,13 @@ function assertValidSchedule(schedule: string): void {
   if (!validation.valid) {
     throw new ValidationError(`Invalid cron schedule: ${validation.error}`);
   }
+}
+
+/** The relative endpoint a webhook trigger listens on. Matches the catch-all
+ *  route `/api/triggers/webhook/<namespace>/<workflow>/<suffix>` — `path`
+ *  already starts with `/`, so it is the suffix verbatim. */
+function webhookUrlFor(trigger: WebhookTriggerResource): string {
+  return `/api/triggers/webhook/${trigger.namespace}/${trigger.workflowName}${trigger.config.path}`;
 }
 
 // A Trigger can only attach to an existing, visible, non-deleted workflow.
@@ -81,9 +90,6 @@ export async function createTrigger(
   input: CreateTriggerInput,
   scope: CallerScope,
 ): Promise<CreateTriggerOutput> {
-  if (input.type !== 'cron' && input.type !== 'manual') {
-    throw new ValidationError(`Trigger type '${input.type}' is not yet supported`);
-  }
   await assertWorkflowExists(scope, input.namespace, input.definitionName);
 
   const workflowTriggers = await scope.triggers.listByWorkflow(
@@ -103,21 +109,34 @@ export async function createTrigger(
       `'${input.definitionName}' already has a manual trigger`,
     );
   }
+  // A workflow has at most one webhook trigger — enforced here, not just in the
+  // UI (Issue #931). The underlying table stays many-capable for the future.
+  if (input.type === 'webhook' && workflowTriggers.some((t) => t.type === 'webhook')) {
+    throw new ConflictError(
+      `'${input.definitionName}' already has a webhook trigger`,
+    );
+  }
+
+  const hasSchedule = typeof input.schedule === 'string' && input.schedule.length > 0;
+  const hasWebhookConfig = input.method !== undefined || input.path !== undefined;
 
   const now = new Date().toISOString();
   let trigger: TriggerResource;
   if (input.type === 'cron') {
-    if (typeof input.schedule !== 'string' || input.schedule.length === 0) {
+    if (!hasSchedule) {
       throw new ValidationError('A cron trigger requires a schedule');
     }
-    assertValidSchedule(input.schedule);
+    if (hasWebhookConfig) {
+      throw new ValidationError('A cron trigger does not take a method or path');
+    }
+    assertValidSchedule(input.schedule as string);
     const cron: CronTriggerResource = {
       type: 'cron',
       namespace: input.namespace,
       workflowName: input.definitionName,
       name: input.triggerName,
       enabled: input.enabled,
-      config: { schedule: input.schedule },
+      config: { schedule: input.schedule as string },
       // Anchor the fire cursor to creation time so the schedule starts at its next
       // slot rather than back-firing history from the workflow's createdAt on the
       // next heartbeat.
@@ -126,9 +145,40 @@ export async function createTrigger(
       updatedAt: now,
     };
     trigger = cron;
+  } else if (input.type === 'webhook') {
+    if (hasSchedule) {
+      throw new ValidationError('A webhook trigger does not take a schedule');
+    }
+    // Method + path are the webhook's identity; the path format (leading slash,
+    // url-safe chars) is validated by the shared config schema so CLI and UI
+    // reject identically.
+    const config = WebhookTriggerConfigSchema.safeParse({
+      method: input.method,
+      path: input.path,
+    });
+    if (!config.success) {
+      throw new ValidationError(
+        `Invalid webhook config: ${config.error.issues.map((i) => i.message).join('; ')}`,
+      );
+    }
+    const webhook: WebhookTriggerResource = {
+      type: 'webhook',
+      namespace: input.namespace,
+      workflowName: input.definitionName,
+      name: input.triggerName,
+      enabled: input.enabled,
+      config: config.data,
+      lastTriggeredAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    trigger = webhook;
   } else {
-    if (typeof input.schedule === 'string' && input.schedule.length > 0) {
+    if (hasSchedule) {
       throw new ValidationError('A manual trigger does not take a schedule');
+    }
+    if (hasWebhookConfig) {
+      throw new ValidationError('A manual trigger does not take a method or path');
     }
     const manual: ManualTriggerResource = {
       type: 'manual',
@@ -145,12 +195,16 @@ export async function createTrigger(
   }
   const created = await scope.triggers.create(trigger);
 
-  const scheduleSuffix = trigger.type === 'cron' ? ` (${trigger.config.schedule})` : '';
+  let configSuffix = '';
+  if (trigger.type === 'cron') configSuffix = ` (${trigger.config.schedule})`;
+  else if (trigger.type === 'webhook') {
+    configSuffix = ` (${trigger.config.method} ${trigger.config.path})`;
+  }
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
     ...actor,
     action: `${input.type}.trigger.created`,
-    description: `${labelFor(input.type)} trigger '${input.triggerName}' created for '${input.definitionName}'${scheduleSuffix}`,
+    description: `${labelFor(input.type)} trigger '${input.triggerName}' created for '${input.definitionName}'${configSuffix}`,
     timestamp: now,
     inputSnapshot: {
       namespace: input.namespace,
@@ -158,6 +212,8 @@ export async function createTrigger(
       triggerName: input.triggerName,
       type: input.type,
       ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+      ...(input.method === undefined ? {} : { method: input.method }),
+      ...(input.path === undefined ? {} : { path: input.path }),
       enabled: input.enabled,
     },
     outputSnapshot: { enabled: input.enabled },
@@ -167,7 +223,8 @@ export async function createTrigger(
     namespace: input.namespace,
   });
 
-  return { trigger: created };
+  const webhookUrl = created.type === 'webhook' ? webhookUrlFor(created) : null;
+  return { trigger: created, webhookUrl };
 }
 
 export async function updateTrigger(

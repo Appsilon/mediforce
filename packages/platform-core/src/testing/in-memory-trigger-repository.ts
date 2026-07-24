@@ -15,6 +15,11 @@ import type { TriggerRepository, TriggerUpdate } from '../interfaces/trigger-rep
 export class InMemoryTriggerRepository implements TriggerRepository {
   private readonly store = new Map<string, TriggerResource>();
 
+  /** Test helper: drop all stored triggers (mirrors InMemoryProcessRepository.clear). */
+  clear(): void {
+    this.store.clear();
+  }
+
   private key(namespace: string, workflowName: string, name: string): string {
     return JSON.stringify([namespace, workflowName, name]);
   }

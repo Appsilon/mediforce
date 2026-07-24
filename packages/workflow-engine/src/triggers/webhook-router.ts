@@ -1,9 +1,8 @@
 import type {
   ProcessRepository,
-  WorkflowDefinition,
-  WebhookTriggerConfig,
+  TriggerRepository,
+  WebhookTriggerResource,
 } from '@mediforce/platform-core';
-import { WebhookTriggerConfigSchema } from '@mediforce/platform-core';
 import type { WorkflowEngine } from '../engine/workflow-engine';
 
 /** Caller-supplied request shape — normalized to the runtime's vocabulary
@@ -36,9 +35,14 @@ export type WebhookRouteResult =
  * Resolution order for `/api/triggers/webhook/<namespace>/<workflowName>/<suffix>`:
  *   1. Look up the latest WorkflowDefinition version belonging to the
  *      requested namespace (returns 0 if no version exists for that tenant).
- *   2. Find a webhook trigger whose typed config (method+path) matches the
- *      caller's method and suffix. Path comparison is exact (no globbing).
+ *   2. Find an **enabled** `webhook` trigger row in the unified `triggers`
+ *      table (ADR-0011) whose config path matches the caller's suffix. Path
+ *      comparison is exact (no globbing); a stopped webhook resolves to 404.
  *   3. Create the instance, start it, and return `{runId, statusUrl}`.
+ *
+ * Webhook triggers are detached table resources (Issue #931), NOT the advisory
+ * `triggers[]` on the versioned definition — attaching/stopping/removing a
+ * webhook takes effect immediately without cutting a new definition version.
  *
  * Namespace scoping at the version-lookup level prevents tenant A from
  * accidentally surfacing tenant B's workflow when both registered the same
@@ -52,6 +56,7 @@ export class WebhookRouter {
   constructor(
     private readonly engine: WorkflowEngine,
     private readonly processRepository: ProcessRepository,
+    private readonly triggerRepository: TriggerRepository,
   ) {}
 
   async route(input: WebhookRouteInput): Promise<WebhookRouteResult> {
@@ -85,7 +90,11 @@ export class WebhookRouter {
     const normalizedSuffix = normalizeSuffix(input.suffix);
     const upperMethod = input.method.toUpperCase();
 
-    const trigger = findMatchingWebhookTrigger(definition, normalizedSuffix);
+    const trigger = await this.findMatchingWebhookTrigger(
+      input.namespace,
+      input.workflowName,
+      normalizedSuffix,
+    );
     if (!trigger) {
       return {
         status: 404,
@@ -125,29 +134,24 @@ export class WebhookRouter {
       statusUrl: `/api/runs/${instance.id}`,
     };
   }
+
+  /** Resolve an enabled `webhook` trigger row whose path matches the suffix.
+   *  A stopped (disabled) row is invisible, so its endpoint stops resolving. */
+  private async findMatchingWebhookTrigger(
+    namespace: string,
+    workflowName: string,
+    normalizedSuffix: string,
+  ): Promise<WebhookTriggerResource | null> {
+    const rows = await this.triggerRepository.listByWorkflow(namespace, workflowName);
+    const match = rows.find(
+      (row): row is WebhookTriggerResource =>
+        row.type === 'webhook' && row.enabled && row.config.path === normalizedSuffix,
+    );
+    return match ?? null;
+  }
 }
 
 function normalizeSuffix(rawSuffix: string): string {
   if (rawSuffix.length === 0) return '/';
   return rawSuffix.startsWith('/') ? rawSuffix : `/${rawSuffix}`;
-}
-
-interface MatchedTrigger {
-  name: string;
-  config: WebhookTriggerConfig;
-}
-
-function findMatchingWebhookTrigger(
-  definition: WorkflowDefinition,
-  normalizedSuffix: string,
-): MatchedTrigger | null {
-  for (const trigger of definition.triggers) {
-    if (trigger.type !== 'webhook') continue;
-    const parsed = WebhookTriggerConfigSchema.safeParse(trigger.config);
-    if (!parsed.success) continue;
-    if (parsed.data.path === normalizedSuffix) {
-      return { name: trigger.name, config: parsed.data };
-    }
-  }
-  return null;
 }

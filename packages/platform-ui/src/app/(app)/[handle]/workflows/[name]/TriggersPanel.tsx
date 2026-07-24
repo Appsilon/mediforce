@@ -1,12 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { Clock, Play, Square, Trash2, Pencil, Plus, Check, X, MousePointerClick } from 'lucide-react';
+import { Clock, Play, Square, Trash2, Pencil, Plus, Check, X, MousePointerClick, Webhook } from 'lucide-react';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import {
   useWorkflowTriggers,
   type CronTrigger,
   type ManualTrigger,
+  type WebhookTrigger,
 } from '@/hooks/use-workflow-triggers';
 import { formatCron } from '@/lib/format-cron';
 import { cn } from '@/lib/utils';
@@ -14,8 +15,69 @@ import { cn } from '@/lib/utils';
 const SCHEDULE_HELPER_TEXT =
   '5-field cron, UTC. Minutes must be :00, :15, :30 or :45 (aligned to the 15-minute heartbeat).';
 
+const WEBHOOK_PATH_HELPER_TEXT =
+  'Leading slash, url-safe chars only (e.g. /orders). The full URL is built from your handle and workflow name — you only choose the path.';
+
 /** Canonical name of the per-workflow manual trigger singleton (Issue #930). */
 const MANUAL_TRIGGER_NAME = 'manual';
+
+/** Canonical name of the per-workflow webhook trigger singleton (Issue #931).
+ *  One webhook per workflow is enforced in the handler; the UI names the one it
+ *  creates canonically. Seeded webhooks keep their declared name. */
+const WEBHOOK_TRIGGER_NAME = 'webhook';
+
+/** Webhooks are reachable only as POST — the catch-all route exports just
+ *  `POST`, so a webhook created with any other verb would 405 before routing.
+ *  New webhooks are always created as POST; there is no method to choose. */
+const WEBHOOK_METHOD = 'POST';
+
+/** The fixed prefix every webhook URL for this workflow starts with — the caller
+ *  only appends their chosen `path`. Mirrors the handler's `webhookUrlFor`. */
+function webhookPrefixOf(handle: string, definitionName: string): string {
+  return `/api/triggers/webhook/${handle}/${definitionName}`;
+}
+
+/** The relative endpoint a webhook trigger listens on — mirrors the handler's
+ *  `webhookUrlFor`. `path` already carries its leading slash. */
+function webhookUrlOf(handle: string, definitionName: string, path: string): string {
+  return `${webhookPrefixOf(handle, definitionName)}${path}`;
+}
+
+/** Absolute origin for copy-pasteable usage examples; empty during SSR. */
+function useOrigin(): string {
+  const [origin, setOrigin] = React.useState('');
+  React.useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+  return origin;
+}
+
+/** A ready-to-run curl example so callers know exactly how to fire the webhook —
+ *  includes the auth header the endpoint requires and a JSON body, so it works
+ *  as-is once the API key is filled in. */
+function WebhookUsageExample({ url }: { url: string }) {
+  const origin = useOrigin();
+  const command = [
+    `curl -X ${WEBHOOK_METHOD} ${origin}${url} \\`,
+    `  -H 'Content-Type: application/json' \\`,
+    `  -H 'X-Api-Key: <your-api-key>' \\`,
+    `  -d '{"order": 42}'`,
+  ].join('\n');
+  return (
+    <div className="mt-3">
+      <p className="mb-1 text-xs font-medium text-muted-foreground">Example usage</p>
+      <pre className="overflow-x-auto whitespace-pre rounded bg-muted px-3 py-2 font-mono text-xs">
+        {command}
+      </pre>
+      <p className="mt-1 text-xs text-muted-foreground">
+        The JSON body is passed to the workflow as{' '}
+        <code className="font-mono">triggerPayload.body</code> — its shape is up to
+        this workflow; check what its steps read from{' '}
+        <code className="font-mono">triggerPayload.body</code>.
+      </p>
+    </div>
+  );
+}
 
 function errorMessage(err: unknown): string {
   if (err instanceof ApiError) return err.message;
@@ -30,10 +92,8 @@ export function TriggersPanel({
   handle: string;
   definitionName: string;
 }) {
-  const { cronTriggers, manualTriggers, loading, error, invalidate } = useWorkflowTriggers(
-    definitionName,
-    handle,
-  );
+  const { cronTriggers, manualTriggers, webhookTriggers, loading, error, invalidate } =
+    useWorkflowTriggers(definitionName, handle);
   const loadError = error !== null ? errorMessage(error) : '';
 
   if (loading) {
@@ -91,6 +151,30 @@ export function TriggersPanel({
           </ul>
         )}
         <AddCronTriggerForm handle={handle} definitionName={definitionName} onCreated={invalidate} />
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold">Webhook</h2>
+          <p className="text-xs text-muted-foreground">
+            Expose an HTTP endpoint that starts this workflow. One webhook per
+            workflow — remove it to take the endpoint offline.
+          </p>
+        </div>
+        {webhookTriggers[0] ? (
+          <WebhookTriggerRow
+            handle={handle}
+            definitionName={definitionName}
+            trigger={webhookTriggers[0]}
+            onChanged={invalidate}
+          />
+        ) : (
+          <AddWebhookTriggerForm
+            handle={handle}
+            definitionName={definitionName}
+            onCreated={invalidate}
+          />
+        )}
       </section>
     </div>
   );
@@ -238,6 +322,189 @@ function ManualTriggerRow({
       </div>
 
       {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * The webhook trigger is a per-workflow singleton (Issue #931): shows the live
+ * endpoint URL, start/stop, and remove. Resolution is table-backed, so stopping
+ * takes the endpoint offline immediately without cutting a new definition.
+ */
+function WebhookTriggerRow({
+  handle,
+  definitionName,
+  trigger,
+  onChanged,
+}: {
+  handle: string;
+  definitionName: string;
+  trigger: WebhookTrigger;
+  onChanged: () => Promise<void>;
+}) {
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string>('');
+  const isEnabled = trigger.enabled === true;
+  const url = webhookUrlOf(handle, definitionName, trigger.config.path);
+
+  async function run(action: () => Promise<unknown>) {
+    setBusy(true);
+    setError('');
+    try {
+      await action();
+      await onChanged();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className={cn(
+        'rounded-md border p-4',
+        isEnabled ? 'bg-background' : 'bg-muted/40 border-dashed',
+      )}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Webhook
+              className={cn(
+                'h-4 w-4 shrink-0',
+                isEnabled ? 'text-foreground' : 'text-muted-foreground',
+              )}
+            />
+            <span className="font-medium truncate">{trigger.name}</span>
+            <StatusBadge isEnabled={isEnabled} />
+          </div>
+          <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+              {trigger.config.method}
+            </span>
+            <span className="truncate font-mono text-xs">{url}</span>
+          </div>
+        </div>
+
+        <RowActions
+          isEnabled={isEnabled}
+          busy={busy}
+          onToggle={() =>
+            run(() =>
+              mediforce.triggers.setEnabled({
+                definitionName,
+                namespace: handle,
+                triggerName: trigger.name,
+                enabled: !isEnabled,
+              }),
+            )
+          }
+          onDelete={() => {
+            if (!window.confirm(`Remove the webhook trigger "${trigger.name}"? Its URL will stop working.`)) {
+              return;
+            }
+            void run(() =>
+              mediforce.triggers.delete({
+                definitionName,
+                namespace: handle,
+                triggerName: trigger.name,
+              }),
+            );
+          }}
+        />
+      </div>
+
+      <WebhookUsageExample url={url} />
+
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+function AddWebhookTriggerForm({
+  handle,
+  definitionName,
+  onCreated,
+}: {
+  handle: string;
+  definitionName: string;
+  onCreated: () => Promise<void>;
+}) {
+  const [path, setPath] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string>('');
+
+  const previewUrl = webhookUrlOf(handle, definitionName, path.trim() || '/path');
+  const canSubmit = path.trim().length > 0 && !busy;
+
+  async function submit() {
+    if (!canSubmit) return;
+    setBusy(true);
+    setError('');
+    try {
+      await mediforce.triggers.create({
+        definitionName,
+        namespace: handle,
+        triggerName: WEBHOOK_TRIGGER_NAME,
+        type: 'webhook',
+        method: WEBHOOK_METHOD,
+        path: path.trim(),
+        enabled: true,
+      });
+      setPath('');
+      await onCreated();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setError('this workflow already has a webhook trigger');
+      } else {
+        setError(errorMessage(err));
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-md border p-4">
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+        <Plus className="h-4 w-4" />
+        Create webhook trigger
+      </h3>
+      <div className="mt-3">
+        <label className="mb-1 block text-sm font-medium">Path</label>
+        <input
+          type="text"
+          value={path}
+          onChange={(e) => setPath(e.target.value)}
+          disabled={busy}
+          placeholder="/orders"
+          className={cn(
+            'w-full rounded-md border bg-background px-3 py-1.5 font-mono text-sm outline-none',
+            'focus:ring-1 focus:ring-ring focus:border-ring',
+            error && 'border-destructive',
+          )}
+        />
+        <p className="mt-1 break-all font-mono text-xs text-muted-foreground">
+          Full URL: <span className="text-foreground">{previewUrl}</span>
+        </p>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">{WEBHOOK_PATH_HELPER_TEXT}</p>
+      <WebhookUsageExample url={previewUrl} />
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+      <div className="mt-3 flex justify-end">
+        <button
+          onClick={submit}
+          disabled={!canSubmit}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+            'bg-primary text-primary-foreground hover:bg-primary/90',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+          )}
+        >
+          {busy ? 'Creating...' : 'Create webhook trigger'}
+        </button>
+      </div>
     </div>
   );
 }

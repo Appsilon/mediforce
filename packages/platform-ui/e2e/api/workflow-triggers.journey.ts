@@ -2,11 +2,13 @@ import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 
 /**
- * Trigger management API (ADR-0011; cron on the unified `triggers` table).
- * Proves the full HTTP + storage + auth path for adding a cron trigger to an
- * EXISTING workflow, starting/stopping it, modifying its schedule, and deleting
- * it — none of which requires registering a new workflow version. Also verifies
- * a stopped trigger does not fire on the heartbeat, and delete removes the row.
+ * Trigger management API (ADR-0011; cron, manual, and webhook on the unified
+ * `triggers` table). Proves the full HTTP + storage + auth path for attaching
+ * triggers to an EXISTING workflow, starting/stopping, modifying, and deleting
+ * them — none of which requires registering a new workflow version. Also
+ * verifies a stopped cron trigger does not fire on the heartbeat, the manual
+ * singleton gates hand-start, and a webhook's derived URL starts a run while it
+ * is attached and 404s once removed.
  */
 
 const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
@@ -134,6 +136,72 @@ test.describe('Trigger management — API E2E', () => {
       // The cron 'nightly' is gone; the seed-on-register 'manual' row remains
       // (Issue #930 — new workflows are hand-startable by default).
       expect(after.triggers.map((t) => t.name)).toEqual(['manual']);
+    } finally {
+      await deleteWorkflowDefinition(request, wdName);
+    }
+  });
+
+  test('webhook trigger: attach → POST derived URL starts a run → remove → 404 (Issue #931)', async ({
+    request,
+  }) => {
+    const wdName = `e2e-webhook-${Date.now()}`;
+    const triggersUrl = `${base}/${encodeURIComponent(wdName)}/triggers`;
+    const webhookTriggerUrl = `${triggersUrl}/webhook`;
+
+    const createWdRes = await request.post(`${base}?namespace=${TEST_ORG_HANDLE}`, {
+      headers: AUTH_HEADERS,
+      data: manualOnlyWd(wdName),
+    });
+    expect(createWdRes.status(), await createWdRes.text()).toBe(201);
+
+    try {
+      // Attach a webhook to the existing (manual-only) workflow — no new version.
+      const createRes = await request.post(triggersUrl, {
+        headers: AUTH_HEADERS,
+        data: {
+          namespace: TEST_ORG_HANDLE,
+          triggerName: 'webhook',
+          type: 'webhook',
+          method: 'POST',
+          path: '/orders',
+        },
+      });
+      expect(createRes.ok(), await createRes.text()).toBe(true);
+      const created = (await createRes.json()) as { webhookUrl: string };
+      expect(created.webhookUrl).toBe(`/api/triggers/webhook/${TEST_ORG_HANDLE}/${wdName}/orders`);
+
+      // A second webhook is rejected — one webhook per workflow.
+      const dupRes = await request.post(triggersUrl, {
+        headers: AUTH_HEADERS,
+        data: {
+          namespace: TEST_ORG_HANDLE,
+          triggerName: 'webhook-2',
+          type: 'webhook',
+          method: 'POST',
+          path: '/other',
+        },
+      });
+      expect(dupRes.status()).toBe(409);
+
+      // POST the derived URL → a run starts (202 + runId).
+      const fireRes = await request.post(created.webhookUrl, {
+        headers: AUTH_HEADERS,
+        data: { order: 42 },
+      });
+      expect(fireRes.status(), await fireRes.text()).toBe(202);
+      const fired = (await fireRes.json()) as { runId: string };
+      expect(fired.runId.length).toBeGreaterThan(0);
+
+      // Remove the webhook → the endpoint stops resolving (404).
+      const delRes = await request.delete(`${webhookTriggerUrl}?namespace=${TEST_ORG_HANDLE}`, {
+        headers: AUTH_HEADERS,
+      });
+      expect(delRes.ok(), await delRes.text()).toBe(true);
+      const goneRes = await request.post(created.webhookUrl, {
+        headers: AUTH_HEADERS,
+        data: { order: 43 },
+      });
+      expect(goneRes.status()).toBe(404);
     } finally {
       await deleteWorkflowDefinition(request, wdName);
     }

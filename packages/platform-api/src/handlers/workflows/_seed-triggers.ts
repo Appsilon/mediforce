@@ -1,4 +1,5 @@
 import type { WorkflowDefinition } from '@mediforce/platform-core';
+import { WebhookTriggerConfigSchema } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index';
 
 /** Canonical name of the per-workflow manual trigger singleton. */
@@ -16,6 +17,9 @@ export const MANUAL_TRIGGER_NAME = 'manual';
  * - **Cron** rows are seeded per declared cron trigger, if absent. The fire
  *   cursor anchors to `now` so a fresh schedule starts at its next slot rather
  *   than back-firing; the declared schedule is advisory after first creation.
+ * - **Webhook** rows are seeded per declared webhook trigger, if absent
+ *   (Issue #931). Opt-in: only declared webhooks are backfilled, never
+ *   auto-seeded. The declared method+path is advisory after first creation.
  */
 export async function seedTriggersFromDefinition(
   scope: CallerScope,
@@ -59,6 +63,27 @@ export async function seedTriggersFromDefinition(
       enabled: true,
       config: { schedule: trigger.schedule },
       lastTriggeredAt: seededAt,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+    });
+  }
+
+  // Webhook — one row per declared webhook trigger, seed-if-absent. The
+  // endpoint resolves against these rows, not the definition (Issue #931).
+  for (const trigger of definition.triggers) {
+    if (trigger.type !== 'webhook') continue;
+    const config = WebhookTriggerConfigSchema.safeParse(trigger.config);
+    if (!config.success) continue;
+    if (existing.some((t) => t.name === trigger.name)) continue;
+    const seededAt = new Date().toISOString();
+    await scope.triggers.create({
+      type: 'webhook',
+      namespace,
+      workflowName: definition.name,
+      name: trigger.name,
+      enabled: true,
+      config: config.data,
+      lastTriggeredAt: null,
       createdAt: seededAt,
       updatedAt: seededAt,
     });

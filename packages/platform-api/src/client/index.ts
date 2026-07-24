@@ -1155,6 +1155,8 @@ export class Mediforce {
             triggerName: v.triggerName,
             type: v.type,
             schedule: v.schedule,
+            method: v.method,
+            path: v.path,
             enabled: v.enabled,
           },
           CreateTriggerOutputSchema,

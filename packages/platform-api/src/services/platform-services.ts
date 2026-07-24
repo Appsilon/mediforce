@@ -447,7 +447,7 @@ export function getPlatformServices(): PlatformServices {
     actionRegistry.register('email', createEmailActionHandler(emailSender));
   }
 
-  const webhookRouter = new WebhookRouter(engine, processRepo);
+  const webhookRouter = new WebhookRouter(engine, processRepo, triggerRepo);
 
   // FirebaseInviteService writes to the Firebase Auth user store (identity
   // stays on Firebase Auth) and records the must-change-password flag via the

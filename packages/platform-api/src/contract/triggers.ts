@@ -1,15 +1,17 @@
 import { z } from 'zod';
-import { TriggerResourceSchema, TriggerTypeSchema } from '@mediforce/platform-core';
+import { HttpMethodSchema, TriggerResourceSchema, TriggerTypeSchema } from '@mediforce/platform-core';
 
 /**
  * Contract for Trigger management on the unified `triggers` table (ADR-0011).
  *
- * Supports `cron` and `manual` for now (Issue 4 wires `webhook`): create carries
- * a `type` that defaults to `'cron'` and the handler rejects the rest. `schedule`
- * is only meaningful for cron — it is optional on the wire and the handler
- * requires it for cron / forbids it for manual. Cron schedule syntax is
- * validated in the handlers via `validateCronSchedule` (UTC, 15-minute
- * alignment) so CLI and UI reject identically at one boundary.
+ * Supports `cron`, `manual`, and `webhook`: create carries a `type` that
+ * defaults to `'cron'`. `schedule` is only meaningful for cron — it is optional
+ * on the wire and the handler requires it for cron / forbids it elsewhere.
+ * `method` + `path` are only meaningful for webhook — optional on the wire, the
+ * handler requires them for webhook / forbids them elsewhere. Cron schedule
+ * syntax is validated in the handlers via `validateCronSchedule` (UTC, 15-minute
+ * alignment) and webhook path format via `WebhookTriggerConfigSchema`, so CLI
+ * and UI reject identically at one boundary.
  */
 
 const key = {
@@ -29,12 +31,20 @@ export const ListTriggersOutputSchema = z.object({
 export const CreateTriggerInputSchema = z.object({
   ...key,
   type: TriggerTypeSchema.default('cron'),
-  // Cron-only: required for `cron`, forbidden for `manual`. Enforced in the handler.
+  // Cron-only: required for `cron`, forbidden otherwise. Enforced in the handler.
   schedule: z.string().min(1).optional(),
+  // Webhook-only: required for `webhook`, forbidden otherwise. Path format is
+  // validated in the handler via `WebhookTriggerConfigSchema`.
+  method: HttpMethodSchema.optional(),
+  path: z.string().min(1).optional(),
   enabled: z.boolean().default(true),
 });
 export const CreateTriggerOutputSchema = z.object({
   trigger: TriggerResourceSchema,
+  // The relative endpoint a webhook trigger listens on
+  // (`/api/triggers/webhook/<namespace>/<workflow><path>`); null for non-webhook
+  // triggers so every client learns the URL at creation without re-deriving it.
+  webhookUrl: z.string().nullable(),
 });
 
 export const UpdateTriggerInputSchema = z.object({

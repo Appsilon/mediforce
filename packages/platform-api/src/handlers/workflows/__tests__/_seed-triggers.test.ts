@@ -109,4 +109,67 @@ describe('seedTriggersFromDefinition (ADR-0011 / Issue #930)', () => {
     expect(nightly?.enabled).toBe(false);
     expect(nightly?.type === 'cron' && nightly.config.schedule).toBe('0 9 * * *');
   });
+
+  it('seeds a webhook row per declared webhook trigger, seed-if-absent (Issue #931)', async () => {
+    await seedTriggersFromDefinition(
+      scope(),
+      'team-alpha',
+      def([
+        { type: 'manual', name: 'manual' },
+        { type: 'webhook', name: 'orders-hook', config: { method: 'POST', path: '/orders' } },
+      ]),
+    );
+
+    const webhook = (await triggerRepo.listByWorkflow('team-alpha', 'flow')).filter(
+      (t) => t.type === 'webhook',
+    );
+    expect(webhook).toHaveLength(1);
+    expect(webhook[0]).toMatchObject({
+      name: 'orders-hook',
+      enabled: true,
+      config: { method: 'POST', path: '/orders' },
+    });
+    expect(webhook[0].type === 'webhook' && webhook[0].lastTriggeredAt).toBeNull();
+  });
+
+  it('skips a webhook trigger whose config is malformed', async () => {
+    await seedTriggersFromDefinition(
+      scope(),
+      'team-alpha',
+      def([{ type: 'webhook', name: 'broken', config: { method: 'POST' } }]),
+    );
+
+    const webhook = (await triggerRepo.listByWorkflow('team-alpha', 'flow')).filter(
+      (t) => t.type === 'webhook',
+    );
+    expect(webhook).toHaveLength(0);
+  });
+
+  it('does not re-seed a webhook row that already exists by name', async () => {
+    const now = new Date().toISOString();
+    await triggerRepo.create({
+      type: 'webhook',
+      namespace: 'team-alpha',
+      workflowName: 'flow',
+      name: 'orders-hook',
+      enabled: false,
+      config: { method: 'GET', path: '/old' },
+      lastTriggeredAt: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await seedTriggersFromDefinition(
+      scope(),
+      'team-alpha',
+      def([{ type: 'webhook', name: 'orders-hook', config: { method: 'POST', path: '/orders' } }]),
+    );
+
+    const hook = (await triggerRepo.listByWorkflow('team-alpha', 'flow')).find(
+      (t) => t.name === 'orders-hook',
+    );
+    // Untouched: still disabled with the original method+path.
+    expect(hook?.enabled).toBe(false);
+    expect(hook?.type === 'webhook' && hook.config.path).toBe('/old');
+  });
 });
