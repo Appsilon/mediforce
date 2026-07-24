@@ -17,6 +17,7 @@ import { mediforce, ApiError } from '@/lib/mediforce';
 import { apiFetch } from '@/lib/api-fetch';
 import { pickRunnableVersion, type WorkflowDefinition } from '@mediforce/platform-core';
 import { VersionLabel } from '@/components/ui/version-label';
+import { workflowDisplayName } from '@/lib/workflow-save-utils';
 import { DeleteWorkflowDialog } from '@/components/workflows/delete-workflow-dialog';
 import { formatCron } from '@/lib/format-cron';
 import { cn } from '@/lib/utils';
@@ -377,6 +378,9 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold truncate">
+                {workflowDisplayName(latest ?? { name: decodedName })}
+              </h1>
               {isPrivate ? (
                 <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-600">
                   Private
