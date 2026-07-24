@@ -1,22 +1,24 @@
 # Running the workspace demo locally
 
-End-to-end flow for clicking through the run-scoped git workspace in the UI, with Firebase emulators and real Docker execution. Useful for dogfooding the feature before it hits staging.
+End-to-end flow for clicking through the run-scoped git workspace in the UI, with real Docker execution. Useful for dogfooding the feature before it hits staging.
 
 ## Prerequisites
 
-- Docker daemon running
-- Firebase CLI (`npm i -g firebase-tools`)
+- Docker daemon running (Postgres + agent containers)
 - Node 24 + pnpm 10
 
 ## Steps
 
-### 1. Bootstrap emulators
+### 1. Configure env + bring up Postgres
 
 ```bash
-python3 packages/platform-ui/scripts/bootstrap_e2e.py
+cp packages/platform-ui/.env.example packages/platform-ui/.env.local
+# set AUTH_SECRET (openssl rand -hex 32) and keep ENABLE_PASSWORD_AUTH=true
+pnpm dev   # starts Postgres, runs migrations — Ctrl-C once it is up
 ```
 
-Starts Firebase Auth (9099), writes `.env.local` with demo creds, installs Playwright chromium if missing. Idempotent — safe to re-run.
+Auth is NextAuth / Auth.js v5 with database sessions in Postgres (ADR-0002) —
+there is no Firebase emulator to start.
 
 ### 2. Seed demo data
 
@@ -24,7 +26,10 @@ Starts Firebase Auth (9099), writes `.env.local` with demo creds, installs Playw
 pnpm seed
 ```
 
-Seeds the test user into Firebase Auth emulator and workflow definitions into Postgres. Includes the **Sales CSV Report** workflow — a two-step pipeline that exercises the workspace (generates `data/sales.csv`, summarises to `report/summary.md`).
+Seeds the test user (an `auth_users` row with a bcrypt `password_hash`, so the
+Credentials provider accepts it) and the workflow definitions into Postgres.
+Includes the **Sales CSV Report** workflow — a two-step pipeline that exercises
+the workspace (generates `data/sales.csv`, summarises to `report/summary.md`).
 
 Credentials: `test@mediforce.dev` / `test123456`
 
@@ -35,7 +40,6 @@ pnpm dev:mock
 ```
 
 Runs Next on port **9007** with:
-- `NEXT_PUBLIC_USE_EMULATORS=true` — Firebase SDK points at emulators
 - `MOCK_AGENT=true` — LLM agent plugins run the mock bash command instead of Claude/OpenCode. Script-container is unaffected — runs real inline scripts.
 - `MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data` — workspace bare repos + worktrees land here instead of `~/.mediforce`
 - `NEXT_PUBLIC_APP_URL=http://localhost:9007` — auto-runner self-calls hit the right port
@@ -62,10 +66,10 @@ The bare repo holds one `run/<runId>` branch per trigger, each with three commit
 
 ## Reset between runs
 
-Emulator data + workspace state are independent.
+Database state + workspace state are independent.
 
 ```bash
-# Reset Auth emulator + re-seed
+# Re-seed the test user + fixtures into Postgres
 cd packages/platform-ui && pnpm seed:dev
 
 # Wipe workspace state
@@ -74,7 +78,7 @@ rm -rf /tmp/mediforce-e2e-data
 
 ## Troubleshooting
 
-- **"Cannot connect to Firebase emulator"** — emulators died, re-run bootstrap.
+- **Redirected back to `/login` in a loop** — `AUTH_SECRET` is unset or changed between server restarts, which invalidates the session cookie. Set it in `.env.local` and re-seed.
 - **Trigger returns 201 but run stays in `created`** — `NEXT_PUBLIC_APP_URL` / `NO_PROXY` unset; auto-runner self-call can't reach port 9007.
 - **Docker step fails** — check `docker ps -a` for the container. Test with `docker run --rm debian:bookworm-slim echo ok`.
 - **Worktree exists but no commits** — the step's bash command didn't write to `/workspace`. Check `scripts/examples/sales-csv-report.wd.json`.

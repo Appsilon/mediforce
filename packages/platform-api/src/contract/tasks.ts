@@ -89,7 +89,7 @@ export type GetTaskOutput = z.infer<typeof GetTaskOutputSchema>;
  * Contract for `POST /api/tasks/:taskId/claim`.
  *
  * Input is just the path-derived `taskId` — the claimer's identity comes from
- * the auth carrier (Firebase ID token for browser, `X-Api-Key` for S2S), not
+ * the auth carrier (NextAuth session cookie for browser, `X-Api-Key` for S2S), not
  * the request body. Per ADR-0005 §5 the response echoes the post-mutation
  * entity (status `claimed`, `assignedUserId` set).
  */

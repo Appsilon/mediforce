@@ -20,7 +20,7 @@ const SECTION_LABEL: Record<string, string> = {
 export function CommandPalette() {
   const { state, close, open, openCommand, commands } = useCommandPalette();
   const pathname = usePathname();
-  const { firebaseUser } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const isOpen = state.kind !== 'closed';
@@ -31,15 +31,14 @@ export function CommandPalette() {
     () => ({
       pathname: pathname ?? '/',
       user: {
-        uid: firebaseUser?.uid ?? '',
-        displayName: firebaseUser?.displayName ?? null,
-        email: firebaseUser?.email ?? null,
+        uid: user?.id ?? '',
+        displayName: user?.name ?? null,
+        email: user?.email ?? null,
       },
       close,
       toast,
-      getIdToken: async () => (firebaseUser !== null ? firebaseUser.getIdToken() : null),
     }),
-    [pathname, firebaseUser, close, toast],
+    [pathname, user, close, toast],
   );
 
   return (

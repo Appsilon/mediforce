@@ -1,21 +1,16 @@
 import { NextResponse } from 'next/server';
-import { getAdminAuth } from '@mediforce/platform-infra';
 import type { NamespaceRepository } from '@mediforce/platform-core';
+import { resolveSessionUid } from '@/lib/api-auth';
 
-/** Extract Firebase uid from the Authorization header. Returns either the uid
- *  string (on success) or a NextResponse the caller should return (401). */
-export async function requireFirebaseUid(request: Request): Promise<string | NextResponse> {
-  const authHeader = request.headers.get('Authorization') ?? '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  if (token === '') {
-    return NextResponse.json({ error: 'Unauthorized — missing Bearer token' }, { status: 401 });
+/** Resolve the caller uid from the NextAuth session cookie (ADR-0002 §6).
+ *  Returns either the uid string (on success) or a NextResponse the caller
+ *  should return (401). */
+export async function requireCallerUid(request: Request): Promise<string | NextResponse> {
+  const uid = await resolveSessionUid(request);
+  if (uid === null) {
+    return NextResponse.json({ error: 'Unauthorized — no valid session' }, { status: 401 });
   }
-  try {
-    const decoded = await getAdminAuth().verifyIdToken(token);
-    return decoded.uid;
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized — invalid token' }, { status: 401 });
-  }
+  return uid;
 }
 
 /** Resolve the namespace handle from the `?namespace=<handle>` query param.

@@ -144,6 +144,39 @@ describe('getProcessSteps handler', () => {
     expect(result.steps.find((s) => s.stepId === 's2')?.status).toBe('running');
   });
 
+  it('marks the current step failed when the terminal run has a failed latest execution', async () => {
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-failed',
+        definitionName: 'demo',
+        definitionVersion: '1',
+        namespace: 'team-alpha',
+        status: 'failed',
+        currentStepId: 's2',
+        error: 'Cancelled by user',
+      }),
+    );
+    await instanceRepo.addStepExecution(
+      'inst-failed',
+      buildStepExecution({
+        instanceId: 'inst-failed',
+        stepId: 's2',
+        status: 'failed',
+        output: null,
+        completedAt: '2026-01-01T12:30:00.000Z',
+        error: 'Cancelled by user',
+      }),
+    );
+
+    const scope = createTestScope({ instanceRepo, processRepo });
+    const result = await getProcessSteps(
+      { instanceId: 'inst-failed' },
+      scope,
+    );
+
+    expect(result.steps.find((s) => s.stepId === 's2')?.status).toBe('failed');
+  });
+
   it('returns header metadata copied from the instance', async () => {
     await instanceRepo.create(
       buildProcessInstance({

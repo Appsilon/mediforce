@@ -7,6 +7,7 @@ import type {
   AuditRepository,
   BlobStore,
   CoworkSessionRepository,
+  CredentialsRepository,
   CronTriggerStateRepository,
   EmailProviderInfo,
   HandoffRepository,
@@ -20,6 +21,7 @@ import type {
   ProcessInstanceRepository,
   ProcessRepository,
   ToolCatalogRepository,
+  TriggerRepository,
   UserDirectoryService,
   UserProfileRepository,
   WorkflowSecretsRepository,
@@ -46,6 +48,7 @@ import { AuthorizedHumanTaskRepository } from './authorized-human-task-repositor
 import { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
 import { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';
 import { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
+import { AuthorizedTriggerRepository } from './authorized-trigger-repository';
 import { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository';
 import { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository';
 import { AuthorizedWorkflowSecretRepository } from './authorized-workflow-secret-repository';
@@ -69,9 +72,11 @@ export interface CallerScopeServices {
   readonly agentDefinitionRepo: AgentDefinitionRepository;
   readonly coworkSessionRepo: CoworkSessionRepository;
   readonly cronTriggerStateRepo: CronTriggerStateRepository;
+  readonly triggerRepo: TriggerRepository;
   readonly toolCatalogRepo: ToolCatalogRepository;
   readonly namespaceRepo: NamespaceRepository;
   readonly userProfileRepo: UserProfileRepository;
+  readonly credentialsRepo: CredentialsRepository;
   readonly oauthProviderRepo: OAuthProviderRepository;
   readonly agentOAuthTokenRepo: AgentOAuthTokenRepository;
   readonly modelRegistryRepo: ModelRegistryRepository;
@@ -138,17 +143,20 @@ export function createCallerScope(
       services.secretsRepo,
     ),
     workflowSecrets: new AuthorizedWorkflowSecretRepository(caller, services.secretsRepo),
+    triggers: new AuthorizedTriggerRepository(caller, services.triggerRepo),
 
     models: services.modelRegistryRepo,
     plugins: services.pluginRegistry,
     workspaces: services.namespaceRepo,
     userProfiles: services.userProfileRepo,
+    credentials: services.credentialsRepo,
     cron: services.cronTriggerStateRepo,
 
     system: {
       engine: services.engine,
       manualTrigger: services.manualTrigger,
       cronTrigger: services.cronTrigger,
+      triggers: services.triggerRepo,
       webhookRouter: services.webhookRouter,
       agentRunner: services.agentRunner,
       blobStore: services.blobStore,

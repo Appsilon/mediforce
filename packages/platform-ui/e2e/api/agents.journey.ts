@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
-  bearerHeaders,
+  sessionCookieHeaders,
   setupMultiNamespaceCallers,
   type MultiNamespaceFixture,
 } from '../helpers/multi-namespace';
@@ -43,7 +43,7 @@ test.describe('GET /api/agents — API E2E', () => {
 
   test('list: outsider user sees only public agents (not the `test`-private ones)', async ({ request }) => {
     const res = await request.get('/api/agents', {
-      headers: bearerHeaders(callers.outsider),
+      headers: sessionCookieHeaders(callers.outsider),
     });
     expect(res.status(), await res.text()).toBe(200);
     const body = await res.json() as { agents: Array<{ id: string; visibility?: string }> };
@@ -57,14 +57,14 @@ test.describe('GET /api/agents — API E2E', () => {
 
   test('single: outsider user → 404 on a private agent (anti-enum)', async ({ request }) => {
     const res = await request.get('/api/agents/mcp-test-agent', {
-      headers: bearerHeaders(callers.outsider),
+      headers: sessionCookieHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
   });
 
   test('single: outsider user → 200 on a public agent', async ({ request }) => {
     const res = await request.get('/api/agents/claude-code-agent', {
-      headers: bearerHeaders(callers.outsider),
+      headers: sessionCookieHeaders(callers.outsider),
     });
     expect(res.status(), await res.text()).toBe(200);
     const body = await res.json() as { agent: { id: string; visibility?: string } };

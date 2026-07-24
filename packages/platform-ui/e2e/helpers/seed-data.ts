@@ -6,6 +6,7 @@ export const RUN_COMPLETED_1_ID = '00000000-0000-4000-8000-000000000001';
 export const RUN_ESCALATED_1_ID = '00000000-0000-4000-8000-000000000002';
 export const RUN_RUNNING_1_ID = '00000000-0000-4000-8000-000000000003';
 export const RUN_L4_AUTOPILOT_ID = '00000000-0000-4000-8000-000000000004';
+export const RUN_CANCEL_CASCADE_API_ID = '00000000-0000-4000-8000-000000000005';
 
 const now = new Date().toISOString();
 const oneHourAgo = new Date(Date.now() - 3600_000).toISOString();
@@ -200,6 +201,27 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     // Dedicated instance for cancel-run test — isolated so cancelling doesn't affect other tests
     'proc-cancel-target': {
       id: 'proc-cancel-target',
+      namespace: 'test',
+      definitionName: 'Supply Chain Review',
+      definitionVersion: '1.0.0',
+      configName: 'all-human',
+      configVersion: '1',
+      status: 'running',
+      currentStepId: 'narrative-summary',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: ['reviewer'],
+    },
+    // Dedicated API E2E target for issue #912 — cancel must reap the in-flight
+    // step_execution and agent_run rows owned by this instance.
+    'proc-cancel-cascade-api': {
+      id: 'proc-cancel-cascade-api',
       namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
@@ -613,6 +635,20 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       completedAt: null,
       executorType: 'agent',
     },
+    [RUN_CANCEL_CASCADE_API_ID]: {
+      id: RUN_CANCEL_CASCADE_API_ID,
+      processInstanceId: 'proc-cancel-cascade-api',
+      stepId: 'narrative-summary',
+      pluginId: 'narrative-summary',
+      autonomyLevel: 'L2',
+      status: 'running',
+      envelope: null,
+      fallbackReason: null,
+      startedAt: now,
+      completedAt: null,
+      executorType: 'agent',
+      reviewerType: 'none',
+    },
     [RUN_L4_AUTOPILOT_ID]: {
       id: RUN_L4_AUTOPILOT_ID,
       processInstanceId: 'proc-completed-2',
@@ -713,6 +749,21 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       output: null,
       verdict: null,
       executedBy: 'agent:intake-review',
+      startedAt: now,
+      completedAt: null,
+      iterationNumber: 0,
+      gateResult: null,
+      error: null,
+    },
+    'exec-cancel-cascade-api': {
+      id: 'exec-cancel-cascade-api',
+      instanceId: 'proc-cancel-cascade-api',
+      stepId: 'narrative-summary',
+      status: 'running',
+      input: { participantIds: ['p-912'] },
+      output: null,
+      verdict: null,
+      executedBy: 'agent:narrative-summary',
       startedAt: now,
       completedAt: null,
       iterationNumber: 0,

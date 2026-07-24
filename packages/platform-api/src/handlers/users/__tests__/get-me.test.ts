@@ -62,7 +62,13 @@ describe('getMe handler', () => {
 
     const result = await getMe({}, scope);
 
-    expect(result.user).toEqual({ uid: 'uid-1', email: 'alice@example.test', displayName: 'Alice', mustChangePassword: false });
+    expect(result.user).toEqual({
+      uid: 'uid-1',
+      email: 'alice@example.test',
+      displayName: 'Alice',
+      mustChangePassword: false,
+      hasPassword: false,
+    });
     expect(result.namespaces).toHaveLength(1);
     expect(result.namespaces[0]).toMatchObject({
       handle: 'alice',
@@ -243,5 +249,37 @@ describe('getMe handler', () => {
     const result = await getMe({}, scope);
 
     expect(result.user.mustChangePassword).toBe(true);
+  });
+
+  it('projects hasPassword from the credentials port', async () => {
+    const { InMemoryCredentialsRepository } = await import('@mediforce/platform-core/testing');
+    const directory = directoryWith('uid-marek', { email: 'marek@example.test', displayName: 'Marek' });
+
+    const withoutPassword = new InMemoryCredentialsRepository();
+    const noneResult = await getMe(
+      {},
+      createTestScope({
+        namespaceRepo,
+        auditRepo,
+        userDirectory: directory,
+        credentialsRepo: withoutPassword,
+        caller: userCaller('uid-marek', []),
+      }),
+    );
+    expect(noneResult.user.hasPassword).toBe(false);
+
+    const withPassword = new InMemoryCredentialsRepository();
+    await withPassword.setPasswordHash('uid-marek', '$2b$04$notarealhashbutstoredallthesame');
+    const setResult = await getMe(
+      {},
+      createTestScope({
+        namespaceRepo,
+        auditRepo,
+        userDirectory: directory,
+        credentialsRepo: withPassword,
+        caller: userCaller('uid-marek', []),
+      }),
+    );
+    expect(setResult.user.hasPassword).toBe(true);
   });
 });

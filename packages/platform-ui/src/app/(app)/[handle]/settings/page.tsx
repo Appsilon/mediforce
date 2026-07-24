@@ -46,14 +46,12 @@ interface MemberWithLastSignIn extends NamespaceMemberWithId {
 
 interface InviteResult {
   email: string;
-  temporaryPassword: string;
   emailSent: boolean;
   isExisting: boolean;
 }
 
 interface ResendResult {
   email: string;
-  temporaryPassword: string;
   emailSent: boolean;
 }
 
@@ -192,7 +190,7 @@ export default function WorkspaceConfigPage() {
   const router = useRouter();
   const qc = useQueryClient();
 
-  const { firebaseUser } = useAuth();
+  const { user } = useAuth();
   const { namespace, personalHandles, loading: namespaceLoading } = useNamespace(handle);
 
   // Polled members list via the headless contract — replaces the previous
@@ -221,14 +219,14 @@ export default function WorkspaceConfigPage() {
   // API fetch for lastSignInTime + email + auth-enriched displayName.
   // Owner member docs created before the createNamespace handler started
   // persisting displayName lack it locally; the listMembers handler falls
-  // back to the Firebase Auth profile name, and we merge that override
+  // back to the `auth_users` profile name, and we merge that override
   // here so legacy workspaces show a human name instead of the uid.
   const [lastSignInMap, setLastSignInMap] = useState<Map<string, string | null>>(new Map());
   const [emailMap, setEmailMap] = useState<Map<string, string | null>>(new Map());
   const [displayNameMap, setDisplayNameMap] = useState<Map<string, string | null>>(new Map());
 
   const fetchLastSignIn = useCallback(async () => {
-    if (handle === '' || firebaseUser === null) return;
+    if (handle === '' || user === null) return;
     try {
       const { members } = await mediforce.users.listMembers({ namespace: handle });
       const map = new Map<string, string | null>();
@@ -245,7 +243,7 @@ export default function WorkspaceConfigPage() {
     } catch {
       // non-fatal — lastSignIn just won't show
     }
-  }, [handle, firebaseUser]);
+  }, [handle, user]);
 
   useEffect(() => {
     void fetchLastSignIn();
@@ -273,10 +271,10 @@ export default function WorkspaceConfigPage() {
 
   const currentUserMember = useMemo(
     () =>
-      firebaseUser !== null
-        ? members.find((member) => member.uid === firebaseUser.uid)
+      user !== null
+        ? members.find((member) => member.uid === user.id)
         : undefined,
-    [members, firebaseUser],
+    [members, user],
   );
 
   const isOwner = currentUserMember?.role === 'owner';
@@ -288,7 +286,7 @@ export default function WorkspaceConfigPage() {
   const isPersonalOwner =
     namespace !== null &&
     namespace.type === 'personal' &&
-    namespace.linkedUserId === firebaseUser?.uid;
+    namespace.linkedUserId === user?.id;
 
   const canEditProfile = canManageMembers || isPersonalOwner;
 
@@ -434,12 +432,11 @@ export default function WorkspaceConfigPage() {
         displayName: inviteName.trim() !== '' ? inviteName.trim() : undefined,
         namespaceHandle: handle,
         role: inviteRole,
-        inviterName: firebaseUser?.displayName ?? firebaseUser?.email ?? undefined,
+        inviterName: user?.name ?? user?.email ?? undefined,
       });
 
       setInviteResult({
         email: data.email,
-        temporaryPassword: data.temporaryPassword,
         emailSent: data.emailSent,
         isExisting: data.isExisting,
       });
@@ -469,7 +466,6 @@ export default function WorkspaceConfigPage() {
       });
       setResendResult({
         email: data.email,
-        temporaryPassword: data.temporaryPassword,
         emailSent: data.emailSent,
       });
       void fetchLastSignIn();
@@ -530,7 +526,7 @@ export default function WorkspaceConfigPage() {
   }
 
   async function handleLeaveWorkspace() {
-    if (firebaseUser === null) return;
+    if (user === null) return;
     setDangerError(null);
     try {
       await leaveNamespace.mutateAsync({ handle });
@@ -831,19 +827,13 @@ export default function WorkspaceConfigPage() {
                   <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
                     Invite resent to {resendResult.email}
                   </p>
-                  <div className="text-sm text-blue-700 dark:text-blue-300 space-y-0.5">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p>
-                        New temporary password:{' '}
-                        <span className="font-mono font-semibold">{resendResult.temporaryPassword}</span>
-                      </p>
-                      <CopyButton text={resendResult.temporaryPassword} />
-                    </div>
-                  </div>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    They can sign in with Google or set a password.
+                  </p>
                   <p className="text-xs text-blue-600 dark:text-blue-400">
                     {resendResult.emailSent
                       ? 'Email sent ✓'
-                      : 'Email not sent — share credentials manually'}
+                      : 'Email not sent — let them know to sign in'}
                   </p>
                 </div>
                 <button
@@ -867,26 +857,19 @@ export default function WorkspaceConfigPage() {
                   <p className="text-sm font-medium text-green-800 dark:text-green-200">
                     {inviteResult.isExisting
                       ? `${inviteResult.email} added to workspace`
-                      : `Invite sent to ${inviteResult.email}`}
+                      : `Invited ${inviteResult.email}`}
                   </p>
                   {!inviteResult.isExisting && (
-                    <div className="text-sm text-green-700 dark:text-green-300 space-y-0.5">
-                      <p>Login: <span className="font-mono">{inviteResult.email}</span></p>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p>
-                          Temporary password:{' '}
-                          <span className="font-mono font-semibold">{inviteResult.temporaryPassword}</span>
-                        </p>
-                        <CopyButton text={inviteResult.temporaryPassword} />
-                      </div>
-                    </div>
+                    <p className="text-sm text-green-700 dark:text-green-300">
+                      They can sign in with Google or set a password.
+                    </p>
                   )}
                   <p className="text-xs text-green-600 dark:text-green-400">
                     {inviteResult.emailSent
                       ? 'Email sent ✓'
                       : inviteResult.isExisting
                         ? 'Email not sent'
-                        : 'Email not sent — share credentials manually'}
+                        : 'Email not sent — let them know to sign in'}
                   </p>
                 </div>
               </div>
@@ -996,7 +979,7 @@ export default function WorkspaceConfigPage() {
                         {/* Actions */}
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1">
-                            {canManageMembers && member.role !== 'owner' && member.uid !== firebaseUser?.uid ? (
+                            {canManageMembers && member.role !== 'owner' && member.uid !== user?.id ? (
                               <>
                                 <button
                                   type="button"
@@ -1108,11 +1091,11 @@ export default function WorkspaceConfigPage() {
         </div>
 
         {/* ── Section 4: Workspace Secrets ──────────────────────────────── */}
-        {canEditProfile && firebaseUser?.uid && (
+        {canEditProfile && user?.id && (
           <div className="mb-10 space-y-4">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Workspace Secrets</h2>
             <div className="rounded-lg border bg-card px-4 py-5">
-              <NamespaceSecretsEditor namespace={handle} userId={firebaseUser.uid} />
+              <NamespaceSecretsEditor namespace={handle} userId={user.id} />
             </div>
           </div>
         )}

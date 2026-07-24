@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { useAuth } from '@/contexts/auth-context';
 import Image from 'next/image';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -36,6 +35,7 @@ import {
 } from '@/lib/format';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
 import { saveBlobToDevice } from '@/lib/save-blob';
+import { apiFetch } from '@/lib/api-fetch';
 
 type DetailLevel = 'brief' | 'full';
 
@@ -429,8 +429,6 @@ function DeliverablesSection({
   finalOutput: ReturnType<typeof findFinalAgentOutput>;
   instanceId: string;
 }) {
-  const { firebaseUser } = useAuth();
-
   if (!finalOutput) return null;
 
   const { stepId, output, result } = finalOutput;
@@ -441,10 +439,9 @@ function DeliverablesSection({
 
   async function handleDownload() {
     if (!effectiveDeliverableFile) return;
-    const authToken = firebaseUser ? await firebaseUser.getIdToken() : '';
-    const response = await fetch(
+    // The NextAuth session cookie rides `apiFetch` same-origin (ADR-0002 §6).
+    const response = await apiFetch(
       `/api/agent-output-file?path=${encodeURIComponent(effectiveDeliverableFile)}&instanceId=${encodeURIComponent(instanceId)}`,
-      { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} },
     );
     if (!response.ok) return;
     saveBlobToDevice(

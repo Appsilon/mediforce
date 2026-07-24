@@ -144,7 +144,7 @@ describe('Mediforce client ↔ route-adapter ↔ listTasks (in-process)', () => 
       },
       listTasks,
       // Stub caller resolution + scope build so the test doesn't pull in
-      // Firebase Admin / env-gated services. The wrapper layer is exercised
+      // env-gated services. The wrapper layer is exercised
       // through `createTestScope` with the in-memory repos under test.
       {
         resolveCaller: async () => apiKeyCaller,

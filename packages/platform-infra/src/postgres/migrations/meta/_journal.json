@@ -216,7 +216,42 @@
       "idx": 30,
       "version": "7",
       "when": 1782391535834,
-      "tag": "0030_workspace_branding",
+      "tag": "0030_triggers",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1782391535835,
+      "tag": "0031_user_roles_and_auth_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1782391535836,
+      "tag": "0032_nextauth_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1782391535837,
+      "tag": "0033_auth_users_last_sign_in",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1782391535838,
+      "tag": "0034_auth_users_email_ci",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1782391535839,
+      "tag": "0035_workspace_branding",
       "breakpoints": true
     }
   ]

@@ -123,8 +123,8 @@ function WorkspaceLoadError({ error }: { error: Error | null }) {
 
 export default function WorkspaceSelectionPage() {
   const router = useRouter();
-  const { firebaseUser, loading: authLoading } = useAuth();
-  const { namespaces, loading: nsLoading, isError, error } = useAllUserNamespaces(firebaseUser?.uid);
+  const { user, loading: authLoading } = useAuth();
+  const { namespaces, loading: nsLoading, isError, error } = useAllUserNamespaces(user?.id);
   const [alwaysHandle, setAlwaysHandle] = React.useState<string | null>(null);
   const [ready, setReady] = React.useState(false);
 
@@ -139,7 +139,7 @@ export default function WorkspaceSelectionPage() {
   React.useEffect(() => {
     if (loading) return;
 
-    if (!firebaseUser) {
+    if (!user) {
       router.replace('/login');
       return;
     }
@@ -163,7 +163,7 @@ export default function WorkspaceSelectionPage() {
     if (preferred !== null && preferred !== '' && namespaces.some((ns) => ns.handle === preferred)) {
       router.replace(`/${preferred}`);
     }
-  }, [loading, firebaseUser, isError, namespaces, router]);
+  }, [loading, user, isError, namespaces, router]);
 
   function handleSelect(handle: string) {
     router.replace(`/${handle}`);
@@ -179,7 +179,7 @@ export default function WorkspaceSelectionPage() {
     }
   }
 
-  if (loading || !firebaseUser) {
+  if (loading || !user) {
     return <LoadingScreen />;
   }
 
@@ -195,7 +195,7 @@ export default function WorkspaceSelectionPage() {
     return <LoadingScreen />;
   }
 
-  const displayName = firebaseUser.displayName ?? firebaseUser.email ?? null;
+  const displayName = user.name ?? user.email ?? null;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-6 py-12">

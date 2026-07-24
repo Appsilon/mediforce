@@ -3,13 +3,26 @@ import { NextRequest } from 'next/server';
 
 const mockInstanceGetById = vi.fn();
 const mockInstanceUpdate = vi.fn();
+const mockInstanceGetStepExecutions = vi.fn();
+const mockInstanceUpdateStepExecution = vi.fn();
+const mockAgentRunGetByInstanceId = vi.fn();
+const mockAgentRunUpdate = vi.fn();
 const mockAuditAppend = vi.fn();
 const mockTaskGetByInstanceId = vi.fn();
 const mockTaskCancel = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
-    instanceRepo: { getById: mockInstanceGetById, update: mockInstanceUpdate },
+    instanceRepo: {
+      getById: mockInstanceGetById,
+      update: mockInstanceUpdate,
+      getStepExecutions: mockInstanceGetStepExecutions,
+      updateStepExecution: mockInstanceUpdateStepExecution,
+    },
+    agentRunRepo: {
+      getByInstanceId: mockAgentRunGetByInstanceId,
+      update: mockAgentRunUpdate,
+    },
     auditRepo: { append: mockAuditAppend },
     humanTaskRepo: { getByInstanceId: mockTaskGetByInstanceId, cancel: mockTaskCancel },
     namespaceRepo: {},
@@ -54,6 +67,10 @@ describe('POST /api/processes/bulk/cancel', () => {
     vi.clearAllMocks();
     mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
     mockInstanceUpdate.mockResolvedValue(undefined);
+    mockInstanceGetStepExecutions.mockResolvedValue([]);
+    mockInstanceUpdateStepExecution.mockResolvedValue(undefined);
+    mockAgentRunGetByInstanceId.mockResolvedValue([]);
+    mockAgentRunUpdate.mockResolvedValue(undefined);
     mockTaskGetByInstanceId.mockResolvedValue([]);
     mockTaskCancel.mockResolvedValue(undefined);
   });

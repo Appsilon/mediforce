@@ -1,18 +1,24 @@
 export async function register(): Promise<void> {
   // Only validate on the server runtime (not edge, not build-time).
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    // import() + webpackIgnore keeps node:fs out of webpack's dependency graph.
-    // webpackIgnore works on import() in webpack 5; it does NOT work on require().
-    const { existsSync } = await import(/* webpackIgnore: true */ 'node:fs');
     // validateEnv lives in a node-only module (it calls process.exit) so the
     // Edge runtime build never parses it. See instrumentation-node.ts.
     const { validateEnv } = await import('./instrumentation-node');
-    validateEnv(existsSync);
+    validateEnv();
 
     // OTel trace export (ADR-0007) — no-op unless OTEL_EXPORTER_OTLP_ENDPOINT
     // is set. See instrumentation-otel.ts.
     const { initOpenTelemetry } = await import('./instrumentation-otel');
     await initOpenTelemetry();
+
+    // Deploy fast-path (ADR-0010 §4): mark in-flight step executions
+    // `interrupted` on SIGTERM, and immediately re-kick any run left
+    // interrupted by the previous process so it retries in seconds instead of
+    // waiting out the timeout. The boot sweep is scheduled (not awaited) so it
+    // fires once the HTTP server is listening. See graceful-shutdown.ts.
+    const { registerGracefulShutdown, scheduleBootRekickSweep } = await import('./lib/graceful-shutdown');
+    registerGracefulShutdown();
+    scheduleBootRekickSweep();
   }
 }
 

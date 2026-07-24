@@ -18,8 +18,13 @@ jobs:
         include:
           - target: staging # staging.mediforce.ai
             ip_secret: STAGING_SERVER_IP
-          - target: cdisc # cdisc.mediforce.ai
-            ip_secret: CDISC_SERVER_IP
+          # cdisc temporarily detached from auto-deploy until its own NextAuth
+          # cutover is done (per-env Google OAuth client + ALLOWED_EMAIL_DOMAINS
+          # + auth_users seed). Deploying the NextAuth code to cdisc before its
+          # users are seeded would mint fresh uuids and orphan their data.
+          # Tracking: #1014. Re-add this entry after the cdisc cutover:
+          #   - target: cdisc # cdisc.mediforce.ai
+          #     ip_secret: CDISC_SERVER_IP
     concurrency:
       group: deploy-${{ matrix.target }}
       cancel-in-progress: true

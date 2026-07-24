@@ -287,6 +287,62 @@ describe('AgentStepExecutor', () => {
   });
 });
 
+describe('AgentStepExecutor in-flight cancel guard', () => {
+  let executor: AgentStepExecutor;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    executor = new AgentStepExecutor(mockAgentRunner as never);
+    // The run was cancelled (→ failed) while the plugin was still executing:
+    // cancelRun already reaped this step's StepExecution/AgentRun and flipped the
+    // instance to `failed`.
+    mockInstanceRepo.getById.mockResolvedValue({
+      status: 'failed',
+      currentStepId: 'analyze-data',
+      definitionVersion: '1',
+      variables: {},
+    });
+    mockEngine.advanceStep.mockResolvedValue({ status: 'running', currentStepId: 'done' });
+  });
+
+  it('does not resurrect the reaped step execution, persist output/cost, or advance when cancelled mid-flight', async () => {
+    mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+      status: 'completed',
+      envelope: defaultEnvelope,
+      appliedToWorkflow: false,
+      fallbackReason: null,
+    });
+
+    const result = await executor.execute(mockPlugin, makeContext(), services, meta);
+
+    expect(mockInstanceRepo.updateStepExecution).not.toHaveBeenCalled();
+    expect(mockInstanceRepo.update).not.toHaveBeenCalled();
+    expect(mockEngine.advanceStep).not.toHaveBeenCalled();
+    expect(result.appliedToWorkflow).toBe(false);
+    expect(result.status).toBe('failed');
+    expect(result.instanceState?.status).toBe('failed');
+  });
+
+  it('proceeds normally when the instance is still active (paused) — no false positive', async () => {
+    mockInstanceRepo.getById.mockResolvedValue({
+      status: 'paused',
+      currentStepId: 'analyze-data',
+      definitionVersion: '1',
+      variables: {},
+    });
+    mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+      status: 'completed',
+      envelope: defaultEnvelope,
+      appliedToWorkflow: false,
+      fallbackReason: null,
+    });
+
+    await executor.execute(mockPlugin, makeContext(), services, meta);
+
+    expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalled();
+  });
+});
+
 describe('AgentStepExecutor reap mode (issue #868)', () => {
   let executor: AgentStepExecutor;
 

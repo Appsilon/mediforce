@@ -75,7 +75,7 @@ let preparedDeployKeyPath: string | null = null;
  *
  * NOTE: Keep in sync with the duplicated copy in
  * `packages/container-worker/src/docker-image-builder.ts` — container-worker cannot
- * import from agent-runtime without dragging in Firebase deps.
+ * import from agent-runtime without dragging in its whole dependency tree.
  */
 export function prepareDeployKeyPath(): string {
   const source = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');

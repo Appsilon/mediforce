@@ -10,7 +10,6 @@
     "dev:mock": "pnpm install --prefer-offline --silent && pnpm --filter @mediforce/platform-ui dev:mock",
     "dev:no-docker": "pnpm install --prefer-offline --silent && DATABASE_URL=\"${DATABASE_URL:-postgresql://mediforce:mediforce@localhost:5432/mediforce}\" ALLOW_LOCAL_AGENTS=true pnpm --filter @mediforce/platform-ui dev",
     "dev:queue": "pnpm install --prefer-offline --silent && python3 scripts/dev-infra.py --redis && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce pnpm db:migrate && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce REDIS_URL=redis://localhost:6379 pnpm --filter @mediforce/platform-ui dev",
-    "emulators": "pnpm --filter @mediforce/platform-ui emulators",
     "test": "pnpm test:unit && pnpm test:e2e",
     "test:unit": "vitest run",
     "test:e2e": "pnpm --filter @mediforce/platform-ui test:e2e",
@@ -31,21 +30,20 @@
       "esbuild",
       "sharp",
       "protobufjs",
-      "msgpackr-extract",
-      "@firebase/util"
+      "msgpackr-extract"
     ],
     "overrides": {
       "axios": ">=1.15.0",
       "protobufjs": "8.6.6",
-      "hono": "4.12.29",
-      "@hono/node-server": "2.0.8",
-      "fast-xml-parser": "5.10.0",
+      "hono": "4.12.30",
+      "@hono/node-server": "2.0.10",
+      "fast-xml-parser": "5.10.1",
       "node-forge": "1.4.0",
       "follow-redirects": "1.16.0",
       "brace-expansion": "5.0.7",
       "@tootallnate/once": "3.0.1",
       "next": "16.2.10",
-      "vite": "8.1.4"
+      "vite": "8.1.5"
     },
     "minimumReleaseAgeExclude": [
       "axios",
@@ -61,7 +59,8 @@
     "ts-morph": "^28.0.0",
     "tsx": "latest",
     "typescript": "~6.0.0",
-    "vite": "8.1.4",
-    "vitest": "^4.1.4"
+    "vite": "8.1.5",
+    "vitest": "^4.1.4",
+    "zod": "^4.0.0"
   }
 }

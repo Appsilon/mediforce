@@ -90,7 +90,7 @@ export type ListAgentEventsOutput = z.infer<typeof ListAgentEventsOutputSchema>;
 // Human steps don't produce executions, so their input/output is
 // reconstructed from the definition + variables.
 
-export const StepEntryStatusSchema = z.enum(['completed', 'running', 'pending']);
+export const StepEntryStatusSchema = z.enum(['completed', 'running', 'pending', 'failed']);
 
 export const StepEntrySchema = z.object({
   stepId: z.string(),

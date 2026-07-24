@@ -10,6 +10,10 @@ export const AgentRunStatusSchema = z.enum([
   'escalated',
   'flagged',
   'paused',
+  // Terminal (ADR-0010 §4): the driving process was shut down (deploy SIGTERM)
+  // mid-run and the step is being retried with a fresh AgentRun. This one is
+  // terminalized so it doesn't linger `running` in the Agents history forever.
+  'interrupted',
 ]);
 
 export const AgentRunSchema = z.object({

@@ -5,13 +5,14 @@ import type { AgentDefinition, OAuthProviderConfig } from '@mediforce/platform-c
 
 // ---- Mocks ----
 
-const mockVerifyIdToken = vi.fn();
+const mockResolveSessionUserId = vi.fn();
 const mockAgentGetById = vi.fn();
 const mockProviderGet = vi.fn();
 const mockGetMember = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
-  getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
+  getSharedPostgresClient: () => ({ db: {} }),
+  resolveSessionUserId: (...args: unknown[]) => mockResolveSessionUserId(...args),
 }));
 
 vi.mock('@/lib/platform-services', () => ({
@@ -37,14 +38,14 @@ function makePostRequest(
   providerSlug: string,
   namespace: string | null,
   body: unknown,
-  authHeader: string | null = 'Bearer valid-token',
+  sessionCookie: string | null = 'authjs.session-token=tok-123',
 ): NextRequest {
   const url = new URL(
     `http://localhost/api/agents/${agentId}/oauth/${providerSlug}/start`,
   );
   if (namespace !== null) url.searchParams.set('namespace', namespace);
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (authHeader !== null) headers.Authorization = authHeader;
+  if (sessionCookie !== null) headers.cookie = sessionCookie;
   return new NextRequest(url.toString(), {
     method: 'POST',
     headers,
@@ -107,7 +108,7 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockVerifyIdToken.mockResolvedValue({ uid: 'user-firebase-uid' });
+    mockResolveSessionUserId.mockResolvedValue('user-firebase-uid');
     mockGetMember.mockResolvedValue(memberAppsilon);
     process.env.PLATFORM_API_KEY = 'test-platform-secret';
   });
@@ -161,7 +162,7 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
     expect(payload?.connectedBy).toBe('user-firebase-uid');
   });
 
-  it('[ERROR] 401 when auth header missing', async () => {
+  it('[ERROR] 401 when session cookie missing', async () => {
     const res = await POST(
       makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }, null),
       { params: makeParams('agent-1', 'github') },
@@ -170,8 +171,8 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
     expect(mockAgentGetById).not.toHaveBeenCalled();
   });
 
-  it('[ERROR] 401 when token verification fails', async () => {
-    mockVerifyIdToken.mockRejectedValue(new Error('bad token'));
+  it('[ERROR] 401 when session cannot be resolved', async () => {
+    mockResolveSessionUserId.mockResolvedValue(null);
     const res = await POST(
       makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }),
       { params: makeParams('agent-1', 'github') },
@@ -205,7 +206,7 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
     );
     const req = new NextRequest(url.toString(), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer x' },
+      headers: { 'Content-Type': 'application/json', cookie: 'authjs.session-token=tok-123' },
       body: 'not-json',
     });
 

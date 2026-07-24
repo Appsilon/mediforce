@@ -16,7 +16,7 @@ import type { GetMeOutput } from '@mediforce/platform-api/contract';
  * stays off; focus-refetch is also off. Cache is invalidated by membership
  * mutations (invite accept, namespace create) and on sign-out.
  *
- * `enabled` lets `AuthProvider` gate the fetch on Firebase Auth resolving.
+ * `enabled` lets `AuthProvider` gate the fetch on the session resolving.
  * Default `true` — most consumers mount inside an authenticated layout where
  * `mediforce.users.me()` will succeed.
  */

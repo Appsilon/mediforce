@@ -17,7 +17,9 @@ import {
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
   InMemoryToolCatalogRepository,
+  InMemoryTriggerRepository,
   InMemoryAgentOAuthTokenRepository,
+  InMemoryCredentialsRepository,
   InMemoryUserProfileRepository,
   InMemoryTaskAttachmentRepository,
   InMemoryBlobStore,
@@ -35,6 +37,7 @@ import type {
   TaskAttachmentRepository,
   UserDirectoryService,
   UserProfileRepository,
+  CredentialsRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../../auth';
@@ -176,6 +179,7 @@ export interface TestScopeOverrides {
   readonly agentDefinitionRepo?: InMemoryAgentDefinitionRepository;
   readonly coworkSessionRepo?: InMemoryCoworkSessionRepository;
   readonly cronTriggerStateRepo?: InMemoryCronTriggerStateRepository;
+  readonly triggerRepo?: InMemoryTriggerRepository;
   readonly toolCatalogRepo?: InMemoryToolCatalogRepository;
   readonly oauthProviderRepo?: InMemoryOAuthProviderRepository;
   readonly agentOAuthTokenRepo?: InMemoryAgentOAuthTokenRepository;
@@ -189,6 +193,7 @@ export interface TestScopeOverrides {
   readonly dockerImages?: DockerImagesService | null;
   readonly namespaceRepo?: NamespaceRepository;
   readonly userProfileRepo?: UserProfileRepository;
+  readonly credentialsRepo?: CredentialsRepository;
   readonly userDirectory?: UserDirectoryService | null;
   readonly platformSettingsRepo?: PlatformSettingsRepository;
   readonly emailProviderInfo?: EmailProviderInfo | null;
@@ -227,9 +232,11 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     agentDefinitionRepo: overrides.agentDefinitionRepo ?? new InMemoryAgentDefinitionRepository(),
     coworkSessionRepo: overrides.coworkSessionRepo ?? new InMemoryCoworkSessionRepository(instanceRepo),
     cronTriggerStateRepo: overrides.cronTriggerStateRepo ?? new InMemoryCronTriggerStateRepository(),
+    triggerRepo: overrides.triggerRepo ?? new InMemoryTriggerRepository(),
     toolCatalogRepo: overrides.toolCatalogRepo ?? new InMemoryToolCatalogRepository(),
     namespaceRepo: overrides.namespaceRepo ?? stubNamespaceRepo,
     userProfileRepo: overrides.userProfileRepo ?? new InMemoryUserProfileRepository(),
+    credentialsRepo: overrides.credentialsRepo ?? new InMemoryCredentialsRepository(),
     oauthProviderRepo: overrides.oauthProviderRepo ?? new InMemoryOAuthProviderRepository(),
     agentOAuthTokenRepo: overrides.agentOAuthTokenRepo ?? new InMemoryAgentOAuthTokenRepository(),
     modelRegistryRepo: overrides.modelRegistryRepo ?? stubModelRegistry,

@@ -75,7 +75,7 @@ function DisplayPopover({
 }
 
 export default function TasksPage() {
-  const { firebaseUser } = useAuth();
+  const { user } = useAuth();
   const [groupByFields, setGroupByFields] = React.useState<Set<GroupByField>>(
     () => new Set<GroupByField>(),
   );
@@ -98,7 +98,7 @@ export default function TasksPage() {
   const completedLoading = role ? roleCompleted.loading : callerCompleted.loading;
   const { data: activeCoworkSessions, loading: coworkLoading } = useMyCoworkSessions(role);
   const { data: finalizedCoworkSessions, loading: finalizedLoading } = useFinalizedCoworkSessions(role);
-  const currentUserId = firebaseUser?.uid ?? '';
+  const currentUserId = user?.id ?? '';
 
   const activeItems: ActionItem[] = React.useMemo(
     () => [
@@ -157,7 +157,7 @@ export default function TasksPage() {
         completedItems={completedItems}
         loading={loading}
         currentUserId={currentUserId}
-        currentUserName={firebaseUser?.displayName}
+        currentUserName={user?.name}
         groupByFields={groupByFields}
       />
     </div>

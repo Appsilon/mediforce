@@ -9,20 +9,20 @@ import { DockerImagesProvider } from '@/contexts/docker-images-context';
 import { OpenRouterCreditsProvider } from '@/contexts/openrouter-credits-context';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { firebaseUser, loading, mustChangePassword } = useAuth();
+  const { user, loading, mustChangePassword } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   React.useEffect(() => {
     if (loading) return;
-    if (!firebaseUser) {
+    if (!user) {
       router.replace('/login');
       return;
     }
     if (mustChangePassword && pathname !== '/change-password') {
       router.replace('/change-password');
     }
-  }, [loading, firebaseUser, mustChangePassword, pathname, router]);
+  }, [loading, user, mustChangePassword, pathname, router]);
 
   if (loading) {
     return (
@@ -32,7 +32,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!firebaseUser) return null;
+  if (!user) return null;
 
   return (
     <DockerImagesProvider>

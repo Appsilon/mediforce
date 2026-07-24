@@ -59,6 +59,23 @@ _Avoid_: "Workflow Instance" (briefly proposed but inconsistent with the
 project's own "Run" vocabulary), "Process Instance" (legacy schema name
 only), "Workflow" alone (ambiguous — Definition or Run?).
 
+**Trigger** *(detached mutable resource — ADR-0011)*:
+What causes a Workflow to run, or makes it hand-startable. Three live kinds:
+`manual` (a person starts a Run), `webhook` (an inbound HTTP call starts a Run),
+`cron` (a schedule starts Runs). `event` is a reserved fourth kind with no
+runtime yet. A Trigger is a **first-class mutable** resource keyed by
+`(Namespace, Workflow, trigger name)`, attached to a Workflow **independently of
+its immutable Workflow Definition** and managed like a Secret — added, toggled,
+retimed, and imported/exported without registering a new Definition version.
+_Code:_ the persisted resource is `TriggerResource*` **only transitionally** —
+the name `Trigger` / `TriggerSchema` is still held by the legacy trigger
+*declaration* embedded in `process-definition.ts`; when the triggers-detachment
+epic makes the Definition trigger-free, `TriggerResource` renames back to
+`Trigger`.
+_Avoid_: conflating the detached Trigger resource with the embedded Definition
+trigger declaration (legacy, being removed), or with the **Trigger Payload** on
+a Workflow Run (the data a firing hands the Run).
+
 **Workflow Step** *(config; static)*:
 A node in a Workflow Definition's DAG. Defines `executor: human | agent |
 script | cowork | action`, optional autonomy level (agent steps),
@@ -227,7 +244,9 @@ _Avoid_: "JWT" (we explicitly chose database sessions, not JWT).
 
 **Membership** *(workspace governance level)*:
 The kind of seat a User holds inside one Workspace: `owner | admin | member`.
-Stored on `workspace_members.membership`. Owners can delete the Workspace and
+Stored in the `workspace_members.role` column (the dedicated `membership`
+column name is deferred until the domain layer adopts it — see ADR-0002).
+Owners can delete the Workspace and
 manage other owners; admins can manage members and workspace settings; members
 can use the Workspace.
 _Avoid_: "Role" alone — that's overloaded with process-domain roles below.

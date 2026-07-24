@@ -11,9 +11,9 @@ export const GetMeInputSchema = z
   .object({
     /**
      * Server-to-server escape hatch: an apiKey caller has no user identity of
-     * its own, so it must name the user whose `me` view it wants. Bearer-token
-     * callers always derive the uid from the verified token; if `uid` is set
-     * for a user caller it MUST match `caller.uid` or the handler 403s.
+     * its own, so it must name the user whose `me` view it wants. User callers
+     * always derive the uid from the verified session; if `uid` is set for a
+     * user caller it MUST match `caller.uid` or the handler 403s.
      */
     uid: z.string().min(1).optional(),
   })
@@ -43,6 +43,13 @@ export const GetMeOutputSchema = z.object({
      * `POST /api/users/me/clear-must-change-password`.
      */
     mustChangePassword: z.boolean(),
+    /**
+     * `true` when the user already has a password credential. The
+     * change-password form uses it to decide whether to ask for the current
+     * password — `false` means first-time set (seeded invite, OAuth-only
+     * account), which `POST /api/users/set-password` accepts without one.
+     */
+    hasPassword: z.boolean(),
   }),
   namespaces: z.array(MeNamespaceSchema),
 });
@@ -58,7 +65,7 @@ export const ListNamespaceMembersInputSchema = NamespaceQuery;
 export const NamespaceMemberWithAuthSchema = NamespaceMemberSchema.extend({
   /**
    * Resolved display name for the member: the workspace-scoped `displayName`
-   * on the member doc when set, otherwise the Firebase Auth profile name
+   * on the member doc when set, otherwise the `auth_users` profile name
    * looked up via `userDirectory.getUserMetadata`, otherwise `null`. UI
    * chains `?? member.uid` to render a stable fallback.
    */
@@ -89,7 +96,6 @@ export const InviteUserInputSchema = z.object({
 export const InviteUserOutputSchema = z.object({
   uid: z.string(),
   email: z.string(),
-  temporaryPassword: z.string(),
   emailSent: z.boolean(),
   isExisting: z.boolean(),
 });
@@ -108,7 +114,6 @@ export const ResendInviteInputSchema = z.object({
 export const ResendInviteOutputSchema = z.object({
   uid: z.string(),
   email: z.string(),
-  temporaryPassword: z.string(),
   emailSent: z.boolean(),
 });
 
@@ -138,3 +143,37 @@ export const ClearMustChangePasswordOutputSchema = z.object({
 
 export type ClearMustChangePasswordInput = z.infer<typeof ClearMustChangePasswordInputSchema>;
 export type ClearMustChangePasswordOutput = z.infer<typeof ClearMustChangePasswordOutputSchema>;
+
+export const SetPasswordInputSchema = z
+  .object({
+    newPassword: z.string().min(8, 'Password must be at least 8 characters.'),
+    /**
+     * Re-authentication for a user caller who already has a password: the
+     * handler bcrypt-compares this against the stored hash and 403s on a
+     * mismatch, so a stolen session cookie cannot be converted into a
+     * permanent password credential.
+     *
+     * Omitted in exactly two cases, both asymmetric on purpose:
+     *  - the target has no `password_hash` yet (invite / first-time set /
+     *    `mustChangePassword` on a seeded account) — there is nothing to
+     *    re-authenticate against;
+     *  - the caller is an apiKey (admin / system path) — it has already
+     *    proven operator-level trust at the auth boundary and by definition
+     *    does not know the user's password.
+     */
+    currentPassword: z.string().min(1).optional(),
+    /**
+     * Server-to-server escape hatch, same rule as
+     * `ClearMustChangePasswordInputSchema`: an apiKey caller must name the
+     * target uid, a user caller must either omit it or pass their own.
+     */
+    uid: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const SetPasswordOutputSchema = z.object({
+  user: z.object({ uid: z.string() }),
+});
+
+export type SetPasswordInput = z.infer<typeof SetPasswordInputSchema>;
+export type SetPasswordOutput = z.infer<typeof SetPasswordOutputSchema>;

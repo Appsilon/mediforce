@@ -31,7 +31,7 @@ export async function createNamespace(
     throw new ConflictError(`Namespace handle '${input.handle}' is already taken`);
   }
 
-  // Pull the caller's Firebase Auth profile name so the owner member doc
+  // Pull the caller's `auth_users` profile name so the owner member doc
   // carries a human-readable `displayName` from day one. Without this, the
   // members list would show the owner's uid until they re-invited themselves.
   // Best-effort: directory unconfigured or lookup failure → no displayName.

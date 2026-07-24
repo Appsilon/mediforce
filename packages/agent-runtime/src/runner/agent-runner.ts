@@ -62,6 +62,14 @@ export class AgentRunner {
         this.tracingOptions.captureContent === true ? result.envelope?.result : undefined,
     });
     if (this.agentRunRepository) {
+      // In-flight cancel guard: if cancelRun reaped this AgentRun to a terminal
+      // state (e.g. `error`) while the plugin was still executing, do NOT
+      // resurrect it with the real completion result. Only terminalize a row
+      // that is still `running`.
+      const existing = await this.agentRunRepository.getById(runId);
+      if (existing && existing.status !== 'running') {
+        return;
+      }
       await this.agentRunRepository.create({
         id: runId,
         processInstanceId: context.processInstanceId,
@@ -202,6 +210,31 @@ export class AgentRunner {
       context, null, fallbackResult.status, 0, errorMessage,
     );
     return { ...fallbackResult, errorMessage };
+  }
+
+  /**
+   * Terminalize the AgentRun row(s) a deploy-interrupted step left `running`
+   * (ADR-0010 §4). When the auto-runner retries an `interrupted` step it spawns a
+   * fresh AgentRun; without this, the original — created by `runWithWorkflowStep`
+   * before the process was recycled — would sit `running` in the Agents history
+   * forever (the SIGTERM hook only touches the `StepExecution`). Mirrors the
+   * orphan cleanup in {@link reapAsTimeout}, but marks them `interrupted` (they
+   * were interrupted, not timed out). Returns how many rows were terminalized.
+   */
+  async markStepRunsInterrupted(processInstanceId: string, stepId: string): Promise<number> {
+    if (!this.agentRunRepository) return 0;
+    const orphaned = (await this.agentRunRepository.getByInstanceId(processInstanceId))
+      .filter((run) => run.stepId === stepId && run.status === 'running');
+    for (const run of orphaned) {
+      // create() upserts on runId — recreating with the same id terminalizes the
+      // orphaned row rather than inserting a duplicate.
+      await this.agentRunRepository.create({
+        ...run,
+        status: 'interrupted',
+        completedAt: new Date().toISOString(),
+      });
+    }
+    return orphaned.length;
   }
 
   /**

@@ -7,15 +7,15 @@ import type {
 } from '../../contract/users';
 
 /**
- * Return the workspace's member list with each member's Firebase Auth
+ * Return the workspace's member list with each member's `auth_users`
  * metadata (email + lastSignInTime) merged in. Read-only — every active
  * member (any role) may read; non-members get an anti-enum 404 rather than
  * a 403 so that namespace existence does not leak to outsiders.
  *
  * apiKey callers bypass the membership gate (server-to-server trust).
  *
- * When `scope.system.userDirectory` is `null` (Firebase Auth not wired —
- * only the in-memory test scope hits this), each member is returned with
+ * When `scope.system.userDirectory` is `null` (no directory wired — only the
+ * in-memory test scope hits this), each member is returned with
  * `email: null` and `lastSignInTime: null`. The list itself still resolves.
  */
 export async function listNamespaceMembers(

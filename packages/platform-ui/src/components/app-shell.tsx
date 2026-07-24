@@ -123,8 +123,8 @@ function buildBreadcrumbs(pathname: string, handle: string, prefix: string): Cru
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { firebaseUser, signOut } = useAuth();
-  const { namespaces } = useAllUserNamespaces(firebaseUser?.uid);
+  const { user, signOut } = useAuth();
+  const { namespaces } = useAllUserNamespaces(user?.id);
   const personalNamespace = namespaces.find((ns) => ns.type === 'personal') ?? null;
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
@@ -168,9 +168,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 const orgLogo = activeNamespace?.type === 'organization' ? activeNamespace.logo : undefined;
                 const avatarSrc = (orgLogo !== undefined && orgLogo !== '' ? orgLogo : undefined)
                   ?? activeNamespace?.avatarUrl
-                  ?? (activeNamespace?.type === 'personal' ? firebaseUser?.photoURL : undefined);
-                const initials = firebaseUser?.displayName !== undefined && firebaseUser?.displayName !== null
-                  ? firebaseUser.displayName
+                  ?? (activeNamespace?.type === 'personal' ? user?.image : undefined);
+                const initials = user?.name !== undefined && user?.name !== null
+                  ? user.name
                       .split(' ')
                       .slice(0, 2)
                       .map((part) => part[0]?.toUpperCase() ?? '')
@@ -218,7 +218,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         )}
                       >
                         <WorkspaceAvatar
-                          source={firebaseUser?.photoURL}
+                          source={user?.image}
                           className="h-5 w-5 shrink-0 rounded-full object-cover"
                           fallback={<User className="h-4 w-4 shrink-0" />}
                         />
@@ -416,10 +416,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2">
             <CommandPaletteTrigger />
             <ThemeToggle />
-            {firebaseUser && (
+            {user && (
               <>
                 <span className="text-sm text-muted-foreground hidden sm:block">
-                  {firebaseUser.displayName || firebaseUser.email}
+                  {user.name || user.email}
                 </span>
                 <button
                   onClick={signOut}

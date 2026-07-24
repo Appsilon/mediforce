@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { CheckCircle2, Clock, XCircle, Circle, Pause, ChevronDown, ChevronRight, User, Bot, Terminal, Zap, Search, FileText, Paperclip } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, Circle, Pause, RotateCcw, ChevronDown, ChevronRight, User, Bot, Terminal, Zap, Search, FileText, Paperclip } from 'lucide-react';
 import type { ProcessInstance, StepExecution, Step, HumanTask } from '@mediforce/platform-core';
 import type { RunOutputFileEntry } from '@mediforce/platform-api/contract';
 import { getControlMode, CONTROL_MODE_LABELS } from '@/lib/control-mode';
@@ -92,8 +92,16 @@ function buildHistory(
 
   // If the current step has no execution record yet (run just started or
   // engine dispatched it but didn't persist an exec yet), add a virtual row.
+  // An `interrupted` execution of the current step already *is* that row (it's
+  // history, not active, so it isn't `isCurrent`); without this it would sit
+  // beside a duplicate virtual "current" row until the retry's fresh execution
+  // lands (ADR-0010 §4).
   const isTerminal = instance.status === 'completed' || instance.status === 'failed';
-  const hasCurrentRow = items.some((i) => i.kind === 'executed' && i.isCurrent);
+  const hasCurrentRow = items.some(
+    (i) => i.kind === 'executed'
+      && (i.isCurrent
+        || (i.execution.stepId === instance.currentStepId && i.execution.status === 'interrupted')),
+  );
   if (instance.currentStepId && !isTerminal && !hasCurrentRow) {
     const step = definitionSteps.find((s) => s.id === instance.currentStepId) ?? null;
     items.push({ kind: 'virtual', stepId: instance.currentStepId, step });
@@ -102,11 +110,15 @@ function buildHistory(
   return items;
 }
 
-type EffectiveStatus = 'pending' | 'running' | 'completed' | 'failed' | 'waiting';
+type EffectiveStatus = 'pending' | 'running' | 'completed' | 'failed' | 'waiting' | 'interrupted';
 
 function getExecEffectiveStatus(exec: StepExecution, instance: ProcessInstance): EffectiveStatus {
   if (exec.status === 'completed') return 'completed';
   if (exec.status === 'failed') return 'failed';
+  // Interrupted-by-deploy (ADR-0010 §4): a historical attempt that was cut short
+  // and superseded by a retry — render it as its own terminal-ish state, never
+  // the animated "Running" (it is not advancing).
+  if (exec.status === 'interrupted') return 'interrupted';
   if (exec.status === 'running' || exec.status === 'pending') {
     if (
       instance.currentStepId === exec.stepId &&
@@ -133,6 +145,8 @@ function StatusIcon({ status }: { status: EffectiveStatus }) {
       return <XCircle className="h-4 w-4 text-red-500 shrink-0" />;
     case 'waiting':
       return <Pause className="h-4 w-4 text-amber-500 shrink-0" />;
+    case 'interrupted':
+      return <RotateCcw className="h-4 w-4 text-muted-foreground shrink-0" />;
     case 'pending':
     default:
       return <Circle className="h-4 w-4 text-muted-foreground shrink-0" />;
@@ -146,6 +160,7 @@ function StatusLabel({ status }: { status: EffectiveStatus }) {
     failed: 'text-red-700 dark:text-red-300',
     waiting: 'text-amber-700 dark:text-amber-300',
     pending: 'text-muted-foreground',
+    interrupted: 'text-muted-foreground',
   };
   const labels: Record<EffectiveStatus, string> = {
     completed: 'Completed',
@@ -153,6 +168,7 @@ function StatusLabel({ status }: { status: EffectiveStatus }) {
     failed: 'Failed',
     waiting: 'Waiting',
     pending: 'Pending',
+    interrupted: 'Interrupted',
   };
   return <span className={cn('text-xs', styles[status])}>{labels[status]}</span>;
 }

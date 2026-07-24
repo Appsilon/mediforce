@@ -4,13 +4,14 @@ import type { AgentOAuthToken } from '@mediforce/platform-core';
 
 // ---- Mocks ----
 
-const mockVerifyIdToken = vi.fn();
+const mockResolveSessionUserId = vi.fn();
 const mockTokenListByAgent = vi.fn();
 const mockGetMember = vi.fn();
 const mockGetMembershipsForUser = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
-  getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
+  getSharedPostgresClient: () => ({ db: {} }),
+  resolveSessionUserId: (...args: unknown[]) => mockResolveSessionUserId(...args),
 }));
 
 vi.mock('@/lib/platform-services', () => ({
@@ -36,12 +37,12 @@ import { GET } from '../route';
 function makeGetRequest(
   agentId: string,
   namespace: string | null,
-  authHeader: string | null = 'Bearer valid-token',
+  sessionCookie: string | null = 'authjs.session-token=tok-123',
 ): NextRequest {
   const url = new URL(`http://localhost/api/agents/${agentId}/oauth`);
   if (namespace !== null) url.searchParams.set('namespace', namespace);
   const headers: Record<string, string> = {};
-  if (authHeader !== null) headers.Authorization = authHeader;
+  if (sessionCookie !== null) headers.cookie = sessionCookie;
   return new NextRequest(url.toString(), { method: 'GET', headers });
 }
 
@@ -70,7 +71,7 @@ function buildToken(
 describe('GET /api/agents/:id/oauth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockVerifyIdToken.mockResolvedValue({ uid: 'uid-1' });
+    mockResolveSessionUserId.mockResolvedValue('uid-1');
     mockGetMember.mockResolvedValue(memberAppsilon);
     mockGetMembershipsForUser.mockResolvedValue([{ handle: 'appsilon', role: 'member' as const }]);
   });
@@ -129,7 +130,7 @@ describe('GET /api/agents/:id/oauth', () => {
     expect(json.tokens).toEqual([]);
   });
 
-  it('[ERROR] 401 when auth header missing', async () => {
+  it('[ERROR] 401 when session cookie missing', async () => {
     const res = await GET(
       makeGetRequest('agent-1', 'appsilon', null),
       { params: makeParams('agent-1') },
@@ -138,8 +139,8 @@ describe('GET /api/agents/:id/oauth', () => {
     expect(mockTokenListByAgent).not.toHaveBeenCalled();
   });
 
-  it('[ERROR] 401 when token verification fails', async () => {
-    mockVerifyIdToken.mockRejectedValue(new Error('bad token'));
+  it('[ERROR] 401 when session cannot be resolved', async () => {
+    mockResolveSessionUserId.mockResolvedValue(null);
 
     const res = await GET(
       makeGetRequest('agent-1', 'appsilon'),

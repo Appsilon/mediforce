@@ -2,11 +2,13 @@ import type { AgentRunner, PluginRegistry } from '@mediforce/agent-runtime';
 import type {
   AuditRepository,
   BlobStore,
+  CredentialsRepository,
   CronTriggerStateRepository,
   EmailProviderInfo,
   ModelRegistryRepository,
   NamespaceRepository,
   PlatformSettingsRepository,
+  TriggerRepository,
   UserDirectoryService,
   UserProfileRepository,
 } from '@mediforce/platform-core';
@@ -31,6 +33,7 @@ import type { AuthorizedHumanTaskRepository } from './authorized-human-task-repo
 import type { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
 import type { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';
 import type { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
+import type { AuthorizedTriggerRepository } from './authorized-trigger-repository';
 import type { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository';
 import type { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository';
 import type { AuthorizedWorkflowSecretRepository } from './authorized-workflow-secret-repository';
@@ -74,12 +77,14 @@ export interface CallerScope {
   readonly agentOAuthTokens: AuthorizedAgentOAuthTokenRepository;
   readonly workspaceSecrets: AuthorizedWorkspaceSecretRepository;
   readonly workflowSecrets: AuthorizedWorkflowSecretRepository;
+  readonly triggers: AuthorizedTriggerRepository;
 
   // Deployment-global pass-throughs
   readonly models: ModelRegistryRepository;
   readonly plugins: PluginsRegistryView;
   readonly workspaces: NamespaceRepository;
   readonly userProfiles: UserProfileRepository;
+  readonly credentials: CredentialsRepository;
   readonly cron: CronTriggerStateRepository;
 
   // System services (engine, manual trigger, etc.) — handlers use these
@@ -104,6 +109,12 @@ export interface SystemServices {
   readonly manualTrigger: ManualTrigger;
   readonly cronTrigger: CronTrigger;
   readonly webhookRouter: WebhookRouter;
+  /**
+   * Unwrapped {@link TriggerRepository} for the cron heartbeat's
+   * cross-namespace `listEnabledByType('cron')` sweep (system-actor only,
+   * ADR-0011). Workspace-scoped callers use `scope.triggers`.
+   */
+  readonly triggers: TriggerRepository;
   readonly agentRunner: AgentRunner;
   /**
    * Unscoped byte store for task attachments (ADR-0003). Reached only after a
@@ -122,15 +133,15 @@ export interface SystemServices {
   readonly audit: AuditRepository;
   readonly runKicker: RunKicker;
   /**
-   * Invite-flow surface (Firebase Auth user creation + password reset). `null`
-   * when not wired; handlers throw `PreconditionFailedError` in that case so
-   * tests can run without a Firebase Admin SDK.
+   * Invite-flow surface (seed an `auth_users` row + workspace membership).
+   * `null` when not wired; handlers throw `PreconditionFailedError` in that
+   * case so tests can run without a database.
    */
   readonly inviteService: InviteService | null;
   /**
-   * Invite/workspace email surface. `null` when Mailgun env vars are unset —
-   * handlers detect that and skip email delivery while still returning the
-   * temporary password (matching today's behavior).
+   * Invite/workspace email surface. `null` when Mailgun/SMTP env vars are
+   * unset — handlers detect that and skip email delivery while still seeding
+   * the invite.
    */
   readonly inviteNotificationService: InviteNotificationService | null;
   /**
@@ -141,7 +152,7 @@ export interface SystemServices {
    */
   readonly dockerImages: DockerImagesService | null;
   /**
-   * Directory lookup for Firebase Auth user metadata (email, lastSignInTime).
+   * Directory lookup for `auth_users` metadata (email, lastSignInTime).
    * `null` when not configured — handlers that consume it (e.g.
    * `listNamespaceMembers`) degrade gracefully by returning null fields per
    * member rather than failing the whole response.

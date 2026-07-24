@@ -29,7 +29,7 @@ UI over [`supply-intelligence`](../packages/supply-intelligence.md). Ships separ
 ## Dev / test
 
 - Dev: `npm run dev` → port **9004** (not 9003 — that's platform-ui).
-- E2E: Playwright; `NEXT_PUBLIC_USE_EMULATORS=true` for emulator tests.
+- E2E: Playwright; `E2E_FULL_SUITE=true` selects the full (setup + api + ui) suite.
 
 ## Relationships
 

@@ -77,6 +77,21 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
     return this.raw.getLatestStepExecution(id, stepId);
   };
 
+  updateStepExecution = async (
+    id: string,
+    executionId: string,
+    updates: Partial<StepExecution>,
+  ): Promise<void> => {
+    const existing = await this.getById(id);
+    if (existing === null) {
+      throw new ForbiddenError();
+    }
+    if (updates.instanceId !== undefined && updates.instanceId !== id) {
+      throw new ForbiddenError();
+    }
+    await this.raw.updateStepExecution(id, executionId, updates);
+  };
+
   /**
    * Update is workspace-gated through `getById`. Callers must look up first.
    *

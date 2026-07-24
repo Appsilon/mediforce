@@ -52,7 +52,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
 function CommandPaletteProviderInner({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<PaletteState>({ kind: 'closed' });
   const pathname = usePathname();
-  const { firebaseUser } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const open = React.useCallback(() => setState({ kind: 'list' }), []);
@@ -123,19 +123,18 @@ function CommandPaletteProviderInner({ children }: { children: React.ReactNode }
       return {
         pathname: pathname ?? '/',
         user: {
-          uid: firebaseUser?.uid ?? '',
-          displayName: firebaseUser?.displayName ?? null,
-          email: firebaseUser?.email ?? null,
+          uid: user?.id ?? '',
+          displayName: user?.name ?? null,
+          email: user?.email ?? null,
         },
         close,
         toast,
-        getIdToken: async () => (firebaseUser !== null ? firebaseUser.getIdToken() : null),
       };
     }
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [close, firebaseUser, pathname, toast]);
+  }, [close, user, pathname, toast]);
 
   const ctxValue = React.useMemo<CommandPaletteContextValue>(
     () => ({ open, close, openCommand, state, commands: COMMANDS, globalShortcuts }),

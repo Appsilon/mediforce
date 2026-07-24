@@ -194,6 +194,31 @@ function contract(
       expect(all).toHaveLength(1);
     });
 
+    it('update patches a running run to terminal status', async () => {
+      const instanceId = randomUUID();
+      await registerInstance(instanceId, 'ws-1');
+      const run = await repo.create(
+        runFor(instanceId, {
+          status: 'running',
+          envelope: null,
+          completedAt: null,
+          fallbackReason: null,
+        }),
+      );
+
+      await repo.update(run.id, {
+        status: 'error',
+        completedAt: '2026-01-01T12:30:00.000Z',
+        fallbackReason: 'Cancelled by user',
+      });
+
+      const fetched = await repo.getById(run.id);
+      expect(fetched?.status).toBe('error');
+      expect(fetched?.completedAt).toBe('2026-01-01T12:30:00.000Z');
+      expect(fetched?.fallbackReason).toBe('Cancelled by user');
+      expect(fetched?.envelope).toBeNull();
+    });
+
     it('getById returns null for unknown id', async () => {
       const missing = await repo.getById(randomUUID());
       expect(missing).toBeNull();

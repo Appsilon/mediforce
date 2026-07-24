@@ -38,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -85,7 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -100,10 +100,10 @@ jobs:
   e2e-tests:
     # ADR-0001: L3 API + L4 UI E2E against Postgres. Runs the `api` Playwright
     # project (browserless HTTP journeys) and then the `authenticated` UI
-    # project (Chromium journeys) against a real Postgres container with the
-    # Firebase Auth emulator. Sign-in uses the Auth emulator (no NextAuth), so
-    # both lanes share this job's setup. UI runs under workers:1, adding
-    # wall-clock for ~30 journeys.
+    # project (Chromium journeys) against a real Postgres container. Identity
+    # is NextAuth over Postgres (ADR-0002) — auth-setup seeds `auth_users` +
+    # `auth_sessions` directly, so no external identity service is needed.
+    # UI runs under workers:1, adding wall-clock for ~30 journeys.
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
@@ -125,7 +125,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -149,23 +149,6 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm --filter @mediforce/platform-ui exec playwright install-deps chromium
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - name: Install Firebase CLI
-        run: npm install -g firebase-tools
-
-      # Only the Auth emulator is needed: Firestore is fully removed
-      # (ADR-0001 final cutover, #534). Firebase Auth remains the identity
-      # provider, so auth-setup still seeds users here.
-      - name: Start Firebase Emulators
-        working-directory: packages/platform-ui
-        run: |
-          firebase emulators:start --project demo-mediforce --only auth --config firebase.ci.json &
-          curl --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:9099/
-
       # NEXT_PUBLIC_* values are baked into the bundle, so cache key includes
       # them as a literal suffix. Bump the suffix if you change any value below.
       - name: Cache .next build for E2E
@@ -173,46 +156,28 @@ jobs:
         uses: actions/cache@v6
         with:
           path: packages/platform-ui/.next
-          key: next-e2e-v1-${{ runner.os }}-${{ hashFiles('packages/*/src/**/*.ts', 'packages/*/src/**/*.tsx', 'packages/*/src/**/*.js', 'packages/*/src/**/*.jsx', 'packages/*/src/**/*.css', 'packages/platform-ui/public/**', 'packages/platform-ui/next.config.mjs', 'packages/*/tsconfig.json', 'tsconfig.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml') }}-env-fake-api-key-localhost-demo-mediforce-demo-mediforce.appspot.com-000000000000-1:000000000000:web:fake-true-http://localhost:9007
+          key: next-e2e-v2-${{ runner.os }}-${{ hashFiles('packages/*/src/**/*.ts', 'packages/*/src/**/*.tsx', 'packages/*/src/**/*.js', 'packages/*/src/**/*.jsx', 'packages/*/src/**/*.css', 'packages/platform-ui/public/**', 'packages/platform-ui/next.config.mjs', 'packages/*/tsconfig.json', 'tsconfig.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml') }}-env-http://localhost:9007
 
       - name: Build platform-ui for E2E
         if: steps.next-cache.outputs.cache-hit != 'true'
         run: cd packages/platform-ui && pnpm build:e2e
         env:
-          NEXT_PUBLIC_FIREBASE_API_KEY: fake-api-key
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-mediforce
-          FIREBASE_PROJECT_ID: demo-mediforce
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
-          NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:fake'
           PLATFORM_API_KEY: ci-e2e-test-key
           SECRETS_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
 
       - name: Run API E2E against Postgres
         run: pnpm test:e2e:api
         env:
-          NEXT_PUBLIC_FIREBASE_API_KEY: fake-api-key
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-mediforce
-          FIREBASE_PROJECT_ID: demo-mediforce
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
-          NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:fake'
           PLATFORM_API_KEY: ci-e2e-test-key
           SECRETS_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
           MEDIFORCE_DISABLE_EMAIL: 'true'
 
       # L4 UI journeys reuse the same prebuilt server (start:e2e,
-      # reuseExistingServer) + Auth emulator + Postgres as the API lane.
+      # reuseExistingServer) + Postgres as the API lane.
       # workspace-docker.journey.ts self-skips under CI (#239).
       - name: Run UI E2E against Postgres
         run: pnpm test:e2e:ui
         env:
-          NEXT_PUBLIC_FIREBASE_API_KEY: fake-api-key
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-mediforce
-          FIREBASE_PROJECT_ID: demo-mediforce
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
-          NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:fake'
           PLATFORM_API_KEY: ci-e2e-test-key
           SECRETS_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
           MEDIFORCE_DISABLE_EMAIL: 'true'

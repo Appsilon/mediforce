@@ -9,7 +9,7 @@ type StepEntry = {
   name: string;
   type: 'creation' | 'review' | 'decision' | 'terminal';
   executorType: 'human' | 'agent' | 'script' | 'cowork' | 'action' | 'unknown';
-  status: 'completed' | 'running' | 'pending';
+  status: 'completed' | 'running' | 'pending' | 'failed';
   input: Record<string, unknown> | null;
   output: Record<string, unknown> | null;
   executions: StepExecution[];

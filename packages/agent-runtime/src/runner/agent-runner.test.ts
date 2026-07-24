@@ -665,3 +665,86 @@ describe('AgentRunner.reapAsTimeout (issue #868)', () => {
     expect(inst?.pauseReason).toBe('agent_escalated');
   });
 });
+
+describe('AgentRunner in-flight cancel guard', () => {
+  it('does not resurrect an AgentRun that cancelRun reaped to error while the plugin was running', async () => {
+    const instanceRepository = new InMemoryProcessInstanceRepository();
+    const auditRepository = new InMemoryAuditRepository();
+    const eventLog = new InMemoryAgentEventLog();
+    const agentRunRepo = new InMemoryAgentRunRepository();
+    await createTestInstance(instanceRepository);
+    const runner = new AgentRunner(instanceRepository, auditRepository, eventLog, agentRunRepo);
+
+    const envelope = makeValidEnvelope();
+    // Plugin that mid-run reproduces cancelRun's reaping: flip the still-running
+    // AgentRun to `error` and the instance to `failed`, then emit a valid result.
+    const cancellingPlugin: StepExecutorPlugin = {
+      initialize: async () => {},
+      run: async (emit: EmitFn) => {
+        const running = (await agentRunRepo.getByInstanceId('instance-1'))
+          .filter((run) => run.status === 'running');
+        for (const run of running) {
+          await agentRunRepo.update(run.id, {
+            status: 'error',
+            fallbackReason: 'Cancelled by user',
+            completedAt: new Date().toISOString(),
+          });
+        }
+        await instanceRepository.update('instance-1', { status: 'failed', error: 'Cancelled by user' });
+        await emit({ type: 'result', payload: envelope, timestamp: new Date().toISOString() });
+      },
+    };
+
+    await runner.runWithWorkflowStep(cancellingPlugin, makeWorkflowContext({ autonomyLevel: 'L4' }));
+
+    const runs = await agentRunRepo.getByInstanceId('instance-1');
+    expect(runs).toHaveLength(1);
+    expect(runs[0]!.status).toBe('error');
+    expect(runs[0]!.fallbackReason).toBe('Cancelled by user');
+  });
+});
+
+describe('AgentRunner.markStepRunsInterrupted (issue #907)', () => {
+  it('terminalizes only the running AgentRun(s) of the given step as interrupted', async () => {
+    const instanceRepository = new InMemoryProcessInstanceRepository();
+    const auditRepository = new InMemoryAuditRepository();
+    const eventLog = new InMemoryAgentEventLog();
+    const agentRunRepo = new InMemoryAgentRunRepository();
+    await createTestInstance(instanceRepository);
+    const runner = new AgentRunner(instanceRepository, auditRepository, eventLog, agentRunRepo);
+
+    const base = {
+      processInstanceId: 'instance-1',
+      pluginId: 'test-plugin',
+      autonomyLevel: 'L4' as const,
+      envelope: null,
+      fallbackReason: null,
+      startedAt: new Date(Date.now() - 60 * 60_000).toISOString(),
+    };
+    // Orphaned running run for the interrupted step — should be terminalized.
+    await agentRunRepo.create({ ...base, id: 'run-interrupted', stepId: 'step-1', status: 'running', completedAt: null });
+    // A completed run of the same step — must be left untouched.
+    await agentRunRepo.create({ ...base, id: 'run-done', stepId: 'step-1', status: 'completed', completedAt: new Date().toISOString() });
+    // A running run of a different step — must be left untouched.
+    await agentRunRepo.create({ ...base, id: 'run-other-step', stepId: 'step-2', status: 'running', completedAt: null });
+
+    const count = await runner.markStepRunsInterrupted('instance-1', 'step-1');
+
+    expect(count).toBe(1);
+    const interrupted = await agentRunRepo.getById('run-interrupted');
+    expect(interrupted?.status).toBe('interrupted');
+    expect(interrupted?.completedAt).not.toBeNull();
+    expect((await agentRunRepo.getById('run-done'))?.status).toBe('completed');
+    expect((await agentRunRepo.getById('run-other-step'))?.status).toBe('running');
+  });
+
+  it('is a no-op when the step has no running AgentRun (e.g. script steps)', async () => {
+    const instanceRepository = new InMemoryProcessInstanceRepository();
+    const agentRunRepo = new InMemoryAgentRunRepository();
+    await createTestInstance(instanceRepository);
+    const runner = new AgentRunner(instanceRepository, new InMemoryAuditRepository(), new InMemoryAgentEventLog(), agentRunRepo);
+
+    const count = await runner.markStepRunsInterrupted('instance-1', 'step-1');
+    expect(count).toBe(0);
+  });
+});
