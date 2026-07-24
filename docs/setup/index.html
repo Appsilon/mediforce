@@ -505,92 +505,8 @@
     </div>
   </div>
 
-  <!-- Step 3: Firebase -->
+  <!-- Step 3: Domain -->
   <div class="step" id="step-3">
-    <h2>Firebase</h2>
-    <p class="subtitle">Authentication backend. Create a project and paste the configuration.</p>
-
-    <div class="guidance">
-      <div class="guidance-title">Setup steps</div>
-      <ol>
-        <li>Open <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a> &rarr; <strong>Add project</strong></li>
-        <li>Go to <strong>Authentication</strong> &rarr; Get started &rarr; enable <strong>Email/Password</strong></li>
-        <li>Go to <strong>Authentication</strong> &rarr; <strong>Settings</strong> &rarr; <strong>Authorized domains</strong> &rarr; add your domain (e.g. <code>demo.mediforce.ai</code>) &mdash; <em>sign-in will fail without this!</em></li>
-        <li>Go to <strong>Project Settings</strong> &rarr; <strong>General</strong> &rarr; add a <strong>Web app</strong> (&lt;/&gt; icon)</li>
-        <li>Copy the config snippet below</li>
-        <li>Go to <strong>Project Settings</strong> &rarr; <strong>Service Accounts</strong> &rarr; <strong>Generate new private key</strong></li>
-        <li>Drop the downloaded JSON below</li>
-      </ol>
-    </div>
-
-    <div class="field">
-      <label for="fb-config-paste">Web app config snippet</label>
-      <textarea id="fb-config-paste" rows="10" placeholder='Paste the firebaseConfig snippet from Firebase Console here, e.g.:
-
-const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "my-project.firebaseapp.com",
-  projectId: "my-project",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:abc123..."
-};' oninput="parseFirebaseConfig()"></textarea>
-      <div class="error-msg" id="fb-config-paste-error"></div>
-      <div class="hint">Firebase Console &rarr; Project Settings &rarr; General &rarr; Your apps &rarr; SDK setup and configuration &rarr; copy the config object</div>
-      <div id="fb-parsed-ok" style="display:none; margin-top:8px; padding:8px 12px; background:var(--accent-light); border-radius:var(--radius); font-size:13px; color:var(--accent);">
-        &#10003; Parsed: <strong id="fb-parsed-project"></strong>
-      </div>
-    </div>
-    <!-- Hidden fields populated by parser -->
-    <input type="hidden" id="fb-api-key" />
-    <input type="hidden" id="fb-auth-domain" />
-    <input type="hidden" id="fb-project-id" />
-    <input type="hidden" id="fb-messaging-id" />
-    <input type="hidden" id="fb-app-id" />
-    <div class="field">
-      <label for="fb-sa-file">Admin Service Account JSON</label>
-      <div class="file-drop" id="fb-sa-drop" onclick="document.getElementById('fb-sa-file').click()" ondragover="event.preventDefault(); this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="event.preventDefault(); this.classList.remove('dragover'); handleSaFile(event.dataTransfer.files[0])">
-        <div id="fb-sa-drop-label">
-          <span style="font-size:24px; display:block; margin-bottom:4px;">&#128196;</span>
-          Drop the .json file here or <strong>click to browse</strong>
-        </div>
-      </div>
-      <input type="file" id="fb-sa-file" accept=".json,application/json" style="display:none" onchange="handleSaFile(this.files[0])" />
-      <textarea id="fb-sa-json" style="display:none"></textarea>
-      <div class="error-msg" id="fb-sa-json-error"></div>
-      <div class="hint">The .json file downloaded from Firebase Console &rarr; Service Accounts &rarr; Generate new private key</div>
-    </div>
-
-    <div class="nav">
-      <button class="btn btn-secondary" onclick="goPrev()">Back</button>
-      <button class="btn btn-primary" onclick="goNext()">Next</button>
-    </div>
-  </div>
-
-  <!-- Step 4: API Keys -->
-  <div class="step" id="step-4">
-    <h2>API Keys</h2>
-    <p class="subtitle">LLM provider keys for agent execution.</p>
-
-    <div class="field">
-      <label for="openrouter-key">OpenRouter API Key</label>
-      <input type="password" id="openrouter-key" placeholder="sk-or-..." />
-      <div class="error-msg" id="openrouter-key-error"></div>
-      <div class="hint">Get one at <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a></div>
-    </div>
-    <div class="field">
-      <label for="openai-key">OpenAI API Key <span class="optional">(optional)</span></label>
-      <input type="password" id="openai-key" placeholder="sk-..." />
-      <div class="error-msg" id="openai-key-error"></div>
-    </div>
-
-    <div class="nav">
-      <button class="btn btn-secondary" onclick="goPrev()">Back</button>
-      <button class="btn btn-primary" onclick="goNext()">Next</button>
-    </div>
-  </div>
-
-  <!-- Step 5: Domain -->
-  <div class="step" id="step-5">
     <h2>Domain</h2>
     <p class="subtitle">HTTPS domain for your instance. Caddy handles TLS automatically.</p>
 
@@ -674,6 +590,83 @@ const firebaseConfig = {
         <span>Browsers will show a security warning with a self-signed certificate. Fine for testing, not recommended for production.</span>
       </div>
     </div>
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="goPrev()">Back</button>
+      <button class="btn btn-primary" onclick="goNext()">Next</button>
+    </div>
+  </div>
+
+  <!-- Step 4: API Keys -->
+  <div class="step" id="step-4">
+    <h2>API Keys</h2>
+    <p class="subtitle">LLM provider keys for agent execution.</p>
+
+    <div class="field">
+      <label for="openrouter-key">OpenRouter API Key</label>
+      <input type="password" id="openrouter-key" placeholder="sk-or-..." />
+      <div class="error-msg" id="openrouter-key-error"></div>
+      <div class="hint">Get one at <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a></div>
+    </div>
+    <div class="field">
+      <label for="openai-key">OpenAI API Key <span class="optional">(optional)</span></label>
+      <input type="password" id="openai-key" placeholder="sk-..." />
+      <div class="error-msg" id="openai-key-error"></div>
+    </div>
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="goPrev()">Back</button>
+      <button class="btn btn-primary" onclick="goNext()">Next</button>
+    </div>
+  </div>
+
+  <!-- Step 5: Sign-in -->
+  <div class="step" id="step-5">
+    <h2>Sign-in</h2>
+    <p class="subtitle">Authentication runs on NextAuth (ADR-0002) &mdash; users live in Postgres, there is no Firebase project.</p>
+
+    <div class="guidance">
+      <div class="guidance-title">Create a Google OAuth client</div>
+      <ol>
+        <li>Open <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console &rarr; Credentials</a></li>
+        <li><strong>Create credentials</strong> &rarr; <strong>OAuth client ID</strong> &rarr; <strong>Web application</strong></li>
+        <li>Authorised JavaScript origin: <code id="oauth-origin">https://your-domain</code></li>
+        <li>Authorised redirect URI (exactly, including the path): <code id="oauth-callback">https://your-domain/api/auth/callback/google</code></li>
+        <li>Copy the client ID and client secret below</li>
+      </ol>
+    </div>
+
+    <div class="field">
+      <label for="google-client-id">Google OAuth Client ID</label>
+      <input type="text" id="google-client-id" placeholder="1234567890-abc.apps.googleusercontent.com" />
+      <div class="error-msg" id="google-client-id-error"></div>
+    </div>
+
+    <div class="field">
+      <label for="google-client-secret">Google OAuth Client Secret</label>
+      <input type="password" id="google-client-secret" placeholder="GOCSPX-..." />
+      <div class="error-msg" id="google-client-secret-error"></div>
+    </div>
+
+    <div class="field">
+      <label for="allowed-email-domains">Allowed email domains</label>
+      <input type="text" id="allowed-email-domains" placeholder="e.g. appsilon.com, yourcompany.com" />
+      <div class="hint">Comma-separated. Enforced on every OAuth sign-in (ADR-0002 &sect;4a).</div>
+      <div class="error-msg" id="allowed-email-domains-error"></div>
+    </div>
+
+    <div class="warning">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>Leave the domain list empty and <strong>any Google account on earth</strong> could sign in. The server refuses to boot in that state, so it is required here.</span>
+    </div>
+
+    <label class="toggle-row" style="cursor:pointer;">
+      <span>Also enable email + password sign-in</span>
+      <div class="toggle">
+        <input type="checkbox" id="password-auth-toggle" />
+        <span class="slider"></span>
+      </div>
+    </label>
 
     <div class="nav">
       <button class="btn btn-secondary" onclick="goPrev()">Back</button>
@@ -776,7 +769,7 @@ ssh -t root@<span class="use-ip">IP</span> bash /tmp/bootstrap.sh</pre>
 
 <script>
 const TOTAL_STEPS = 7;
-const STEP_LABELS = ['GitHub', 'Server', 'Firebase', 'LLM', 'Domain', 'Email', 'Deploy'];
+const STEP_LABELS = ['GitHub', 'Server', 'Domain', 'LLM', 'Sign-in', 'Email', 'Deploy'];
 let currentStep = 1;
 
 // --- Progress bar ---
@@ -822,6 +815,7 @@ function showStep(n) {
   updateProgress();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
+  if (n === 5) updateOauthUrls();
   if (n === 7) buildReview();
 }
 
@@ -841,79 +835,6 @@ function setError(id, msg) {
 }
 
 function val(id) { return (document.getElementById(id)?.value || '').trim(); }
-
-// --- Firebase SA file upload ---
-function handleSaFile(file) {
-  if (!file) return;
-  clearError('fb-sa-json');
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const content = e.target.result;
-    try {
-      const parsed = JSON.parse(content);
-      if (parsed.type !== 'service_account') {
-        setError('fb-sa-json', 'JSON "type" is not "service_account". Wrong file?');
-        return;
-      }
-      document.getElementById('fb-sa-json').value = content;
-      const label = document.getElementById('fb-sa-drop-label');
-      const drop = document.getElementById('fb-sa-drop');
-      label.textContent = '';
-      const check = document.createElement('span');
-      check.style.cssText = 'color:var(--success); font-size:18px;';
-      check.textContent = '✓';
-      const fname = document.createElement('strong');
-      fname.textContent = ' ' + file.name + ' ';
-      const proj = document.createElement('span');
-      proj.style.color = 'var(--text-secondary)';
-      proj.textContent = '(' + parsed.project_id + ')';
-      label.append(check, fname, proj);
-      drop.classList.add('file-loaded');
-    } catch {
-      setError('fb-sa-json', 'File is not valid JSON.');
-    }
-  };
-  reader.readAsText(file);
-}
-
-// --- Firebase config parser ---
-function parseFirebaseConfig() {
-  const raw = val('fb-config-paste');
-  const okBox = document.getElementById('fb-parsed-ok');
-  clearError('fb-config-paste');
-  okBox.style.display = 'none';
-
-  if (!raw) return;
-
-  // Extract key:value pairs from JS object literal or JSON
-  const fieldMap = {
-    apiKey: 'fb-api-key',
-    authDomain: 'fb-auth-domain',
-    projectId: 'fb-project-id',
-    messagingSenderId: 'fb-messaging-id',
-    appId: 'fb-app-id',
-  };
-
-  let parsed = 0;
-  for (const [jsKey, inputId] of Object.entries(fieldMap)) {
-    // Match both JS (apiKey: "val") and JSON ("apiKey": "val") formats
-    const re = new RegExp(`["']?${jsKey}["']?\\s*:\\s*["']([^"']+)["']`);
-    const m = raw.match(re);
-    if (m) {
-      document.getElementById(inputId).value = m[1];
-      parsed++;
-    }
-  }
-
-  if (parsed >= 5) {
-    okBox.style.display = 'block';
-    document.getElementById('fb-parsed-project').textContent = val('fb-project-id');
-  } else if (parsed > 0) {
-    setError('fb-config-paste', `Only parsed ${parsed}/6 fields. Make sure you copied the full config snippet.`);
-  } else {
-    setError('fb-config-paste', 'Could not parse. Paste the firebaseConfig object from Firebase Console.');
-  }
-}
 
 function validateStep(step) {
   let ok = true;
@@ -938,19 +859,17 @@ function validateStep(step) {
   }
 
   if (step === 3) {
-    clearError('fb-config-paste');
-    clearError('fb-sa-json');
-    if (!val('fb-api-key') || !val('fb-project-id')) {
-      fail('fb-config-paste', 'Paste the Firebase config snippet and make sure it parses correctly.');
-    }
-    const saJson = val('fb-sa-json');
-    if (!saJson) {
-      fail('fb-sa-json', 'Required. Paste the entire service account JSON file.');
-    } else {
-      try {
-        const parsed = JSON.parse(saJson);
-        if (parsed.type !== 'service_account') fail('fb-sa-json', 'JSON must have "type": "service_account". This doesn\'t look like a service account key.');
-      } catch { fail('fb-sa-json', 'Invalid JSON. Paste the raw file content.'); }
+    clearError('subdomain');
+    clearError('custom-domain');
+    const type = getDomainType();
+    if (type === 'mediforce') {
+      const sub = val('subdomain');
+      if (!sub) fail('subdomain', 'Required.');
+      else if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(sub)) fail('subdomain', 'Lowercase letters, digits, hyphens only.');
+    } else if (type === 'custom') {
+      const d = val('custom-domain');
+      if (!d) fail('custom-domain', 'Required.');
+      else if (!/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/.test(d)) fail('custom-domain', 'Enter a valid domain.');
     }
   }
 
@@ -965,17 +884,28 @@ function validateStep(step) {
   }
 
   if (step === 5) {
-    clearError('subdomain');
-    clearError('custom-domain');
-    const type = getDomainType();
-    if (type === 'mediforce') {
-      const sub = val('subdomain');
-      if (!sub) fail('subdomain', 'Required.');
-      else if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(sub)) fail('subdomain', 'Lowercase letters, digits, hyphens only.');
-    } else if (type === 'custom') {
-      const d = val('custom-domain');
-      if (!d) fail('custom-domain', 'Required.');
-      else if (!/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/.test(d)) fail('custom-domain', 'Enter a valid domain.');
+    clearError('google-client-id');
+    clearError('google-client-secret');
+    clearError('allowed-email-domains');
+    const clientId = val('google-client-id');
+    const clientSecret = val('google-client-secret');
+    const domains = val('allowed-email-domains');
+    const passwordAuth = document.getElementById('password-auth-toggle').checked;
+
+    if (!clientId && !passwordAuth) {
+      fail('google-client-id', 'Required unless you enable email + password sign-in — otherwise nobody can sign in.');
+    } else if (clientId && !clientId.endsWith('.apps.googleusercontent.com')) {
+      fail('google-client-id', 'Expected an ID ending in .apps.googleusercontent.com');
+    }
+    if (clientId && !clientSecret) fail('google-client-secret', 'Required when a Google client ID is set.');
+
+    if (clientId) {
+      if (!domains) {
+        fail('allowed-email-domains', 'Required with Google sign-in — the server refuses to boot without it.');
+      } else if (!domains.split(',').map(d => d.trim()).filter(Boolean)
+                   .every(d => /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(d.toLowerCase()))) {
+        fail('allowed-email-domains', 'Use bare domains, comma-separated — e.g. appsilon.com, not @appsilon.com');
+      }
     }
   }
 
@@ -1086,6 +1016,13 @@ function getBaseUrl() {
   return domain ? `https://${domain}` : `http://${val('server-ip')}`;
 }
 
+// --- OAuth redirect URI (must match what Google has registered, exactly) ---
+function updateOauthUrls() {
+  const base = getBaseUrl();
+  document.getElementById('oauth-origin').textContent = base;
+  document.getElementById('oauth-callback').textContent = `${base}/api/auth/callback/google`;
+}
+
 // --- Masking ---
 function mask(v) {
   if (!v) return '(empty)';
@@ -1105,15 +1042,17 @@ function buildReview() {
     ['IP Address', val('server-ip')],
     ['Domain', domain || `${val('server-ip')} (no domain)`],
     ['URL', getBaseUrl()],
-    ['Firebase', null],
-    ['Project ID', val('fb-project-id')],
-    ['Auth Domain', val('fb-auth-domain')],
-    ['Admin SA', val('fb-sa-json') ? 'Provided (✓)' : 'Missing'],
+    ['Sign-in', null],
+    ['Google Client ID', val('google-client-id') || '(not set)'],
+    ['Google Client Secret', val('google-client-secret') ? mask(val('google-client-secret')) : '(not set)'],
+    ['Allowed email domains', val('allowed-email-domains') || '(none — OAuth disabled)'],
+    ['Password sign-in', document.getElementById('password-auth-toggle').checked ? 'Enabled' : 'Disabled'],
     ['API Keys', null],
     ['OpenRouter', mask(val('openrouter-key'))],
     ['OpenAI', val('openai-key') ? mask(val('openai-key')) : '(not set)'],
     ['Auto-generated', null],
     ['Platform API Key', 'Generated on server'],
+    ['Auth Secret', 'Generated on server'],
     ['Secrets Encryption Key', 'Generated on server'],
     ['Postgres Password', 'Generated on server'],
   ];
@@ -1150,9 +1089,8 @@ function generateScript() {
   const repo = val('repo') || 'Appsilon/mediforce';
   const isPrivate = document.getElementById('private-repo').checked;
 
-  const fbSaB64 = btoa(val('fb-sa-json'));
-
   const emailEnabled = document.getElementById('email-toggle').checked;
+  const passwordAuth = document.getElementById('password-auth-toggle').checked;
 
   let s = '';
   s += '#!/bin/bash\n';
@@ -1167,15 +1105,11 @@ function generateScript() {
   s += `DOMAIN=${shellEscape(caddySite)}\n`;
   s += `BASE_URL=${shellEscape(baseUrl)}\n\n`;
 
-  s += '# Firebase web config\n';
-  s += `NEXT_PUBLIC_FIREBASE_API_KEY=${shellEscape(val('fb-api-key'))}\n`;
-  s += `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${shellEscape(val('fb-auth-domain'))}\n`;
-  s += `NEXT_PUBLIC_FIREBASE_PROJECT_ID=${shellEscape(val('fb-project-id'))}\n`;
-  s += `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${shellEscape(val('fb-messaging-id'))}\n`;
-  s += `NEXT_PUBLIC_FIREBASE_APP_ID=${shellEscape(val('fb-app-id'))}\n\n`;
-
-  s += '# Firebase Admin SA (base64-encoded)\n';
-  s += `FIREBASE_SA_B64=${shellEscape(fbSaB64)}\n\n`;
+  s += '# NextAuth / Auth.js v5 (ADR-0002) — server-side runtime env\n';
+  s += `GOOGLE_CLIENT_ID=${shellEscape(val('google-client-id'))}\n`;
+  s += `GOOGLE_CLIENT_SECRET=${shellEscape(val('google-client-secret'))}\n`;
+  s += `ALLOWED_EMAIL_DOMAINS=${shellEscape(val('allowed-email-domains'))}\n`;
+  s += `ENABLE_PASSWORD_AUTH=${shellEscape(passwordAuth ? 'true' : '')}\n\n`;
 
   s += '# API keys\n';
   s += `OPENROUTER_API_KEY=${shellEscape(val('openrouter-key'))}\n`;
@@ -1189,6 +1123,7 @@ function generateScript() {
 
   s += '# Auto-generated secrets (unique per server)\n';
   s += 'PLATFORM_API_KEY=$(openssl rand -base64 32)\n';
+  s += 'AUTH_SECRET=$(openssl rand -hex 32)\n';
   s += 'SECRETS_ENCRYPTION_KEY=$(openssl rand -hex 32)\n';
   s += "POSTGRES_PASSWORD=$(openssl rand -base64 32 | tr -d '=/+')\n\n";
 
@@ -1298,31 +1233,24 @@ function generateScript() {
   s += 'fi\n';
   s += 'echo "✓ Repo cloned at $(sudo -u deploy git -C $DEPLOY_DIR rev-parse --short HEAD)"\n\n';
 
-  // Step 7: Firebase Admin SA
-  s += '# ── 7. Firebase Admin SA ──\n';
-  s += 'mkdir -p "$DEPLOY_DIR/secrets"\n';
-  s += 'echo "$FIREBASE_SA_B64" | base64 -d > "$DEPLOY_DIR/secrets/firebase-admin-sa.json"\n';
-  s += 'chmod 600 "$DEPLOY_DIR/secrets/firebase-admin-sa.json"\n';
-  s += 'chown deploy:deploy "$DEPLOY_DIR/secrets" "$DEPLOY_DIR/secrets/firebase-admin-sa.json"\n';
-  s += 'echo "✓ Firebase Admin SA key"\n\n';
-
-  // Step 8: Env files
-  s += '# ── 8. Environment files ──\n';
+  // Step 6: Env files
+  s += '# ── 6. Environment files ──\n';
 
   // .env (docker compose)
   s += "cat > \"$DEPLOY_DIR/.env\" << 'ENVEOF'\n";
   s += `# Auto-generated by mediforce setup wizard\n`;
-  s += `NEXT_PUBLIC_FIREBASE_API_KEY=${val('fb-api-key')}\n`;
-  s += `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${val('fb-auth-domain')}\n`;
-  s += `NEXT_PUBLIC_FIREBASE_PROJECT_ID=${val('fb-project-id')}\n`;
-  s += `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${val('fb-messaging-id')}\n`;
-  s += `NEXT_PUBLIC_FIREBASE_APP_ID=${val('fb-app-id')}\n`;
   s += `NEXT_PUBLIC_APP_URL=${baseUrl}\n`;
   s += 'ENVEOF\n';
 
   // Append secrets using shell variables (these are generated at runtime)
   s += '{\n';
   s += '  echo "PLATFORM_API_KEY=$PLATFORM_API_KEY"\n';
+  s += '  echo "AUTH_SECRET=$AUTH_SECRET"\n';
+  s += `  echo "AUTH_URL=${baseUrl}"\n`;
+  s += '  echo "GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID"\n';
+  s += '  echo "GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET"\n';
+  s += '  echo "ALLOWED_EMAIL_DOMAINS=$ALLOWED_EMAIL_DOMAINS"\n';
+  s += '  echo "ENABLE_PASSWORD_AUTH=$ENABLE_PASSWORD_AUTH"\n';
   s += '  echo "SECRETS_ENCRYPTION_KEY=$SECRETS_ENCRYPTION_KEY"\n';
   s += '  echo "DOCKER_OPENROUTER_API_KEY=$OPENROUTER_API_KEY"\n';
   s += '  echo "DOCKER_DEEPSEEK_API_KEY="\n';
@@ -1333,17 +1261,14 @@ function generateScript() {
   s += `  echo "MAILGUN_DOMAIN=${emailEnabled ? val('mailgun-domain') : ''}"\n`;
   s += `  echo "MAILGUN_FROM_EMAIL=${emailEnabled ? val('mailgun-from') : ''}"\n`;
   s += `  echo "MAILGUN_SENDER_NAME=${emailEnabled ? (val('mailgun-sender') || 'Mediforce') : 'Mediforce'}"\n`;
+  // Without this the server refuses to boot when no email provider is set.
+  s += `  echo "MEDIFORCE_DISABLE_EMAIL=${emailEnabled ? 'false' : 'true'}"\n`;
   s += '} >> "$DEPLOY_DIR/.env"\n';
   s += 'chmod 600 "$DEPLOY_DIR/.env"\n';
   s += 'chown deploy:deploy "$DEPLOY_DIR/.env"\n\n';
 
   // .env.local (Next.js)
   s += "cat > \"$DEPLOY_DIR/packages/platform-ui/.env.local\" << 'ENVEOF'\n";
-  s += `NEXT_PUBLIC_FIREBASE_API_KEY=${val('fb-api-key')}\n`;
-  s += `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${val('fb-auth-domain')}\n`;
-  s += `NEXT_PUBLIC_FIREBASE_PROJECT_ID=${val('fb-project-id')}\n`;
-  s += `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${val('fb-messaging-id')}\n`;
-  s += `NEXT_PUBLIC_FIREBASE_APP_ID=${val('fb-app-id')}\n`;
   s += `APP_BASE_URL=${baseUrl}\n`;
   s += 'NAMESPACE=\n';
   s += 'ENVEOF\n';
@@ -1352,27 +1277,32 @@ function generateScript() {
   s += '  echo "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"\n';
   s += `  echo "OPENAI_API_KEY=${val('openai-key')}"\n`;
   s += '  echo "PLATFORM_API_KEY=$PLATFORM_API_KEY"\n';
+  s += '  echo "AUTH_SECRET=$AUTH_SECRET"\n';
+  s += '  echo "GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID"\n';
+  s += '  echo "GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET"\n';
+  s += '  echo "ALLOWED_EMAIL_DOMAINS=$ALLOWED_EMAIL_DOMAINS"\n';
+  s += '  echo "ENABLE_PASSWORD_AUTH=$ENABLE_PASSWORD_AUTH"\n';
   s += '} >> "$DEPLOY_DIR/packages/platform-ui/.env.local"\n';
   s += 'chmod 600 "$DEPLOY_DIR/packages/platform-ui/.env.local"\n';
   s += 'chown deploy:deploy "$DEPLOY_DIR/packages/platform-ui/.env.local"\n';
   s += 'echo "✓ Environment files"\n\n';
 
-  // Step 9: Postgres data dir
-  s += '# ── 9. Postgres data dir ──\n';
+  // Step 7: Postgres data dir
+  s += '# ── 7. Postgres data dir ──\n';
   s += 'docker run --rm -v /var/lib:/host/var/lib alpine:latest \\\n';
   s += "  sh -c 'mkdir -p /host/var/lib/mediforce/postgres-data && chown -R 999:999 /host/var/lib/mediforce/postgres-data'\n";
   s += 'echo "✓ Postgres data dir"\n\n';
 
-  // Step 10: Firewall
-  s += '# ── 10. Firewall ──\n';
+  // Step 8: Firewall
+  s += '# ── 8. Firewall ──\n';
   s += 'ufw allow 22/tcp\n';
   s += 'ufw allow 80/tcp\n';
   s += 'ufw allow 443/tcp\n';
   s += 'ufw --force enable\n';
   s += 'echo "✓ Firewall (22, 80, 443)"\n\n';
 
-  // Step 11: Pull pre-built images + start platform
-  s += '# ── 11. First deploy ──\n';
+  // Step 9: Pull pre-built images + start platform
+  s += '# ── 9. First deploy ──\n';
   s += 'echo ""\n';
   s += 'echo "▸ Starting platform — pulling pre-built images..."\n';
   s += 'echo ""\n';
@@ -1391,8 +1321,8 @@ function generateScript() {
   s += 'docker compose -f docker-compose.prod.yml ps\n';
   s += 'echo ""\n';
 
-  // Step 12: Build agent images in background
-  s += '# ── 12. Build agent images (background) ──\n';
+  // Step 10: Build agent images in background
+  s += '# ── 10. Build agent images (background) ──\n';
   s += 'echo "▸ Building agent images in background..."\n';
   s += 'echo "  Workflows will be available once images finish building."\n';
   s += 'echo "  Monitor progress: tail -f /var/log/mediforce-deploy.log"\n';

@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { createTestUser, deleteAuthUser } from '../helpers/emulator';
 import { seedPostgresPersonalNamespace, seedPostgresUserProfile } from '../helpers/postgres-seed';
-import { trackPageErrors, allowPageErrors } from '../helpers/page-errors';
+import { trackPageErrors } from '../helpers/page-errors';
 
 const INVITED_EMAIL = 'invited-user@mediforce.dev';
 const INVITED_TEMP_PASSWORD = 'TempPass123!';
@@ -44,20 +44,15 @@ test.describe('Forced Password Change Journey', () => {
     await page.waitForURL('**/change-password', { timeout: 30_000 });
     await expect(page.getByRole('heading', { name: 'Set your password' })).toBeVisible({ timeout: 10_000 });
 
+    // This account was seeded WITH a temp password, so the change is a
+    // replacement, not a first-time set: the form asks for the current
+    // password and the handler bcrypt-verifies it.
+    await page.getByLabel('Current password').fill(INVITED_TEMP_PASSWORD);
+
     await page.getByLabel('New password').click();
     await page.getByLabel('New password').fill(NEW_PASSWORD);
     await page.getByLabel('Confirm password').fill(NEW_PASSWORD);
 
-    // Submitting changes the password, which revokes the user's existing ID
-    // token (Firebase moves `validSince` to now). The client re-authenticates
-    // immediately, but for a sub-second window background providers on the
-    // landing page (docker images, namespace) can fire with a token whose
-    // whole-second `auth_time` has not yet overtaken `validSince`. The Auth
-    // emulator's admin SDK rejects those as revoked — production
-    // `verifyIdToken` does not check revocation, so this transient 401 cannot
-    // happen there. Scope the tolerance to the post-submit window so a 401
-    // anywhere earlier in the journey still fails the test.
-    allowPageErrors(page, ['the server responded with a status of 401']);
     await page.getByRole('button', { name: /set password and continue/i }).click();
 
     // After clearing mustChangePassword the page redirects to workspace-selection,

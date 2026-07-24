@@ -91,8 +91,8 @@ Handler stays one file. New consumers wrap it from outside.
 1. Parse the `NextRequest` body / query / path params via the contract's
    input schema. Zod failure → `400` with the validation issues in
    `error.details`.
-2. Resolve `CallerIdentity` (currently from Firebase ID token middleware
-   set by [Filip's PR #220]; post-NextAuth ADR-0002 from cookie session).
+2. Resolve `CallerIdentity` — from the NextAuth session cookie (browser) or
+   `X-Api-Key` (server-to-server), resolved in `proxy.ts` + `api-auth.ts` (ADR-0002 §6).
 3. Build `CallerScope` via `createCallerScope(rawServices, caller)`.
 4. Invoke the handler `(input, scope) => Promise<output>`.
 5. Catch `ApiError` → status from the mapping table (see ADR-0005
@@ -118,7 +118,7 @@ Trivial reads skip the handler file entirely via `listAdapter` /
 ## What never goes in a handler
 
 - `NextRequest`, `NextResponse`, `cookies()`, any Next.js import.
-- Postgres / Drizzle imports (Firebase Admin SDK is Auth-only now).
+- Postgres / Drizzle imports.
 - Raw repositories from `@mediforce/platform-core/interfaces`.
   Handler receives `CallerScope` only; the static guard
   `no-raw-repo-imports.test.ts` (ADR-0004 §9) enforces this in CI.

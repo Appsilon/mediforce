@@ -473,6 +473,8 @@ export {
   MeNamespaceSchema,
   ClearMustChangePasswordInputSchema,
   ClearMustChangePasswordOutputSchema,
+  SetPasswordInputSchema,
+  SetPasswordOutputSchema,
   type ListNamespaceMembersInput,
   type ListNamespaceMembersOutput,
   type NamespaceMemberWithAuth,
@@ -485,6 +487,8 @@ export {
   type MeNamespace,
   type ClearMustChangePasswordInput,
   type ClearMustChangePasswordOutput,
+  type SetPasswordInput,
+  type SetPasswordOutput,
 } from './users';
 
 export {

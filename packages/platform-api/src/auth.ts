@@ -5,11 +5,11 @@ import { ForbiddenError } from './errors';
  *
  * `apiKey` callers are server-to-server (CLI, agent runtime, partner
  * integrations) and bypass namespace restrictions — they're trusted to scope
- * themselves. `user` callers come from a Firebase ID token; the route layer
- * resolves the user's namespace membership before the handler runs.
+ * themselves. `user` callers come from a NextAuth session cookie; the route
+ * layer resolves the user's namespace membership before the handler runs.
  *
  * Framework-free on purpose: handlers receive this shape as plain data, so
- * unit tests can fabricate a caller without spinning up Firebase. The Next.js
+ * unit tests can fabricate a caller without a session or a database. The Next.js
  * adapter (`platform-ui/src/lib/api-auth.ts`) is responsible for producing it
  * from a `Request`.
  */
@@ -22,6 +22,15 @@ export type CallerIdentity =
       readonly uid: string;
       readonly namespaces: ReadonlySet<string>;
       readonly namespaceRoles: ReadonlyMap<string, NamespaceRole>;
+      /**
+       * The database-session token this request authenticated with, when the
+       * boundary resolved one from the session cookie. Handlers must not use
+       * it as an identity (the uid is that); its single purpose is letting a
+       * session-revoking handler spare the caller's own session — see
+       * `setPassword`. Optional so non-cookie caller shapes (tests, future
+       * per-user PATs) stay constructible.
+       */
+      readonly sessionToken?: string;
       readonly isSystemActor: false;
     };
 

@@ -33,9 +33,8 @@ function dockerAvailable(): boolean {
 }
 
 const DATA_DIR = '/tmp/mediforce-e2e-data';
-// CI overrides PLATFORM_API_KEY via the workflow env; locally bootstrap_e2e.py
-// writes `test-api-key` into .env.local. Read from env with a local fallback so
-// both paths work.
+// CI overrides PLATFORM_API_KEY via the workflow env; locally it comes from
+// .env.local. Read from env with a local fallback so both paths work.
 const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
 const AUTH = { 'X-Api-Key': API_KEY };
 const POLL_INTERVAL_MS = 1_500;
@@ -65,14 +64,13 @@ async function pollUntilTerminal(
 test.describe('Docker-backed workspace E2E', () => {
   test.describe.configure({ timeout: 360_000, retries: 0 });
 
-  // Skipped on CI AND broken locally — tracked in #239.
-  // Root cause: server-side API routes use the Firebase client SDK, which sends
-  // requests without an auth token in emulator mode. firestore.rules then deny
-  // the write (request.auth = null), the handler bubbles the FirebaseError as
-  // a 500, and the test fails at the first POST before the workspace flow even
-  // starts. Fix is server-side admin SDK adoption — out of scope for #213.
-  test.skip(process.env.CI === 'true', 'Blocked by #239 (Firestore rules + client-SDK auth)');
-  test.skip(process.env.NEXT_PUBLIC_USE_EMULATORS === 'true', 'Blocked by #239 — Firestore rules deny writes in emulator mode');
+  // Skipped on CI AND broken locally — tracked in #239. The original root
+  // cause (Firebase client SDK writes denied by firestore.rules) no longer
+  // exists after the Firestore and Firebase Auth cutovers; the skip is kept
+  // verbatim so this change does not alter which journeys run. #239 needs
+  // re-triage against the Postgres + NextAuth stack before it can be lifted.
+  test.skip(process.env.CI === 'true', 'Blocked by #239');
+  test.skip(process.env.E2E_FULL_SUITE === 'true', 'Blocked by #239');
   test.skip(!dockerAvailable(), 'Docker daemon not available');
 
   test.beforeAll(() => {

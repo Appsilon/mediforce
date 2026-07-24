@@ -13,7 +13,7 @@ test.describe('Sign-in Journey', () => {
     const uid = await createTestUser(SIGN_IN_EMAIL, SIGN_IN_PASSWORD, 'Journey User');
     // The user's single personal workspace. handle + displayName live on the
     // `workspaces` row now (the legacy `users/{uid}` doc fields are not carried
-    // over — identity comes from Firebase Auth, membership from
+    // over — identity comes from `auth_users`, membership from
     // `workspace_members`). Post-sign-in resolves to this one handle.
     await seedPostgresPersonalNamespace('journey-user', uid, 'Journey User');
   });

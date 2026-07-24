@@ -14,7 +14,7 @@ export default function ToolDetailPage() {
   const handle = params.handle;
   const toolId = params.toolId;
 
-  const { firebaseUser, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [entry, setEntry] = useState<ToolCatalogEntry | null>(null);
   const [agents, setAgents] = useState<AgentDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,9 +47,9 @@ export default function ToolDetailPage() {
   }, [handle, toolId]);
 
   useEffect(() => {
-    if (authLoading || firebaseUser === null) return;
+    if (authLoading || user === null) return;
     void refresh();
-  }, [authLoading, firebaseUser, refresh]);
+  }, [authLoading, user, refresh]);
 
   const usingAgents = useMemo(() => {
     if (entry === null) return [];

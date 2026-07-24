@@ -626,8 +626,8 @@ function FileNameLink({ file }: { file: FileItem }) {
   if (!file.downloadUrl) {
     return <span className="truncate">{file.name}</span>;
   }
-  // Same-origin API URLs (attachment blobs, ADR-0003) need the Bearer token, so
-  // they can't be a bare `<a href>`. Absolute external URLs open directly.
+  // Same-origin API URLs (attachment blobs, ADR-0003) go through `apiFetch` so
+  // a non-200 surfaces as an error. Absolute external URLs open directly.
   if (file.downloadUrl.startsWith('/api/')) {
     const downloadUrl = file.downloadUrl;
     return (

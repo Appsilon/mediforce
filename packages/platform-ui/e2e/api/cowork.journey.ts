@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
-  bearerHeaders,
+  sessionCookieHeaders,
   setupMultiNamespaceCallers,
   type MultiNamespaceFixture,
 } from '../helpers/multi-namespace';
@@ -48,7 +48,7 @@ test.describe('GET /api/cowork/* — API E2E', () => {
 
   test('by id: outsider user → 404 (cross-namespace anti-enum)', async ({ request }) => {
     const res = await request.get(`/api/cowork/${SESSION_ID}`, {
-      headers: bearerHeaders(callers.outsider),
+      headers: sessionCookieHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
   });
@@ -65,7 +65,7 @@ test.describe('GET /api/cowork/* — API E2E', () => {
 
   test('by-instance: outsider user → 404 (was 403 pre-migration)', async ({ request }) => {
     const res = await request.get(`/api/cowork/by-instance/${INSTANCE_ID}`, {
-      headers: bearerHeaders(callers.outsider),
+      headers: sessionCookieHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
   });

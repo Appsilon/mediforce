@@ -2,6 +2,7 @@ import type { AgentRunner, PluginRegistry } from '@mediforce/agent-runtime';
 import type {
   AuditRepository,
   BlobStore,
+  CredentialsRepository,
   EmailProviderInfo,
   ModelRegistryRepository,
   NamespaceRepository,
@@ -82,6 +83,7 @@ export interface CallerScope {
   readonly plugins: PluginsRegistryView;
   readonly workspaces: NamespaceRepository;
   readonly userProfiles: UserProfileRepository;
+  readonly credentials: CredentialsRepository;
 
   // System services (engine, manual trigger, etc.) — handlers use these
   // when delegating to engine machinery (resume, advance, create-run).
@@ -129,15 +131,15 @@ export interface SystemServices {
   readonly audit: AuditRepository;
   readonly runKicker: RunKicker;
   /**
-   * Invite-flow surface (Firebase Auth user creation + password reset). `null`
-   * when not wired; handlers throw `PreconditionFailedError` in that case so
-   * tests can run without a Firebase Admin SDK.
+   * Invite-flow surface (seed an `auth_users` row + workspace membership).
+   * `null` when not wired; handlers throw `PreconditionFailedError` in that
+   * case so tests can run without a database.
    */
   readonly inviteService: InviteService | null;
   /**
-   * Invite/workspace email surface. `null` when Mailgun env vars are unset —
-   * handlers detect that and skip email delivery while still returning the
-   * temporary password (matching today's behavior).
+   * Invite/workspace email surface. `null` when Mailgun/SMTP env vars are
+   * unset — handlers detect that and skip email delivery while still seeding
+   * the invite.
    */
   readonly inviteNotificationService: InviteNotificationService | null;
   /**
@@ -148,7 +150,7 @@ export interface SystemServices {
    */
   readonly dockerImages: DockerImagesService | null;
   /**
-   * Directory lookup for Firebase Auth user metadata (email, lastSignInTime).
+   * Directory lookup for `auth_users` metadata (email, lastSignInTime).
    * `null` when not configured — handlers that consume it (e.g.
    * `listNamespaceMembers`) degrade gracefully by returning null fields per
    * member rather than failing the whole response.

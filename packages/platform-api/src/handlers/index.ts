@@ -109,6 +109,7 @@ export { inviteUser } from './users/invite-user';
 export { resendInvite } from './users/resend-invite';
 export { getMe } from './users/get-me';
 export { clearMustChangePassword } from './users/clear-must-change-password';
+export { setPassword } from './users/set-password';
 
 export { getNamespace } from './namespaces/get-namespace';
 export { createNamespace } from './namespaces/create-namespace';

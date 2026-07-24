@@ -15,8 +15,9 @@ export const ATTACHMENT_MAX_BYTES = 104_857_600;
  * workspace-gated without a parent lookup — unlike HumanTask, which resolves
  * its namespace via the parent ProcessInstance.
  *
- * `uploadedBy` is a Firebase uid `text` with no FK: ADR-0002 (auth) lands
- * after this ADR, so there is no `auth_users` table to reference yet.
+ * `uploadedBy` is a uid `text` with no FK to `auth_users`: attachments
+ * outlive the accounts that created them, and an audit trail must not be
+ * rewritten when a user is removed.
  *
  * Soft-delete via `deletedAt` (null = active). DELETE flags the row and keeps
  * the blob; blob garbage-collection is a later sweep (ADR-0003 §7).

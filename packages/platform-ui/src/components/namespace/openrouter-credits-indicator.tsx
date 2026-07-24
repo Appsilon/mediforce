@@ -17,7 +17,7 @@ interface OpenRouterCreditsIndicatorProps {
 }
 
 export function OpenRouterCreditsIndicator({ handle }: OpenRouterCreditsIndicatorProps) {
-  const { firebaseUser } = useAuth();
+  const { user } = useAuth();
   const [credits, setCredits] = React.useState<NamespaceOpenRouterCredits | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [hidden, setHidden] = React.useState(true);
@@ -27,7 +27,7 @@ export function OpenRouterCreditsIndicator({ handle }: OpenRouterCreditsIndicato
   }, []);
 
   React.useEffect(() => {
-    if (!handle || !firebaseUser?.uid) return;
+    if (!handle || !user?.id) return;
     let cancelled = false;
     setLoading(true);
     mediforce.system
@@ -42,7 +42,7 @@ export function OpenRouterCreditsIndicator({ handle }: OpenRouterCreditsIndicato
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [handle, firebaseUser?.uid]);
+  }, [handle, user?.id]);
 
   function toggleVisibility() {
     const next = !hidden;

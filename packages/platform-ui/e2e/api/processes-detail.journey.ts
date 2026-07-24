@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
-  bearerHeaders,
+  sessionCookieHeaders,
   setupMultiNamespaceCallers,
   type MultiNamespaceFixture,
 } from '../helpers/multi-namespace';
@@ -47,7 +47,7 @@ test.describe('GET /api/processes/* — API E2E', () => {
 
   test('process instance: outsider user → 404 (no namespace leak)', async ({ request }) => {
     const res = await request.get(`/api/processes/${INSTANCE_ID}`, {
-      headers: bearerHeaders(callers.outsider),
+      headers: sessionCookieHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
   });
@@ -78,7 +78,7 @@ test.describe('GET /api/processes/* — API E2E', () => {
 
   test('audit: outsider user → 404 (cross-namespace anti-enum)', async ({ request }) => {
     const res = await request.get(`/api/processes/${INSTANCE_ID}/audit`, {
-      headers: bearerHeaders(callers.outsider),
+      headers: sessionCookieHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
   });
@@ -105,7 +105,7 @@ test.describe('GET /api/processes/* — API E2E', () => {
 
   test('steps: outsider user → 404 (cross-namespace anti-enum)', async ({ request }) => {
     const res = await request.get(`/api/processes/${INSTANCE_ID}/steps`, {
-      headers: bearerHeaders(callers.outsider),
+      headers: sessionCookieHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
   });

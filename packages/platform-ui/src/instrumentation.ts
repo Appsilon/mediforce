@@ -1,13 +1,10 @@
 export async function register(): Promise<void> {
   // Only validate on the server runtime (not edge, not build-time).
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    // import() + webpackIgnore keeps node:fs out of webpack's dependency graph.
-    // webpackIgnore works on import() in webpack 5; it does NOT work on require().
-    const { existsSync } = await import(/* webpackIgnore: true */ 'node:fs');
     // validateEnv lives in a node-only module (it calls process.exit) so the
     // Edge runtime build never parses it. See instrumentation-node.ts.
     const { validateEnv } = await import('./instrumentation-node');
-    validateEnv(existsSync);
+    validateEnv();
 
     // OTel trace export (ADR-0007) — no-op unless OTEL_EXPORTER_OTLP_ENDPOINT
     // is set. See instrumentation-otel.ts.

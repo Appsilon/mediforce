@@ -59,7 +59,7 @@ Only `@mediforce/platform-api/client` (and `/contract`, `/services`) are exporte
 | Command              | What runs                                                | Port  | When to use                                |
 |----------------------|----------------------------------------------------------|-------|--------------------------------------------|
 | `pnpm dev`           | Real Firebase + Docker agents                            | 9003  | Default — most realistic local setup       |
-| `pnpm dev:mock`      | Mocked agents + in-memory data                           | 9007  | Fastest spin-up, no Firebase / Docker      |
+| `pnpm dev:mock`      | Mocked agents + seeded demo data                         | 9007  | Fastest spin-up, no cloud keys             |
 | `pnpm dev:no-docker` | Agents via host `claude` CLI (no Docker)                 | 9003  | Local agent debugging without containers   |
 | `pnpm dev:queue`     | Queue mode: BullMQ worker + Redis (`docker compose up`)  | 9003 + bull-board on 3100 | Testing queue-based agent runs |
 

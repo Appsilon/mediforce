@@ -13,8 +13,8 @@ flowing from one run into the next:
     4. Run 3 — `previousRun` chains forward to `{ message: "from run 2" }`.
 
 Requirements:
-    - Dev server at http://localhost:9003 with NEXT_PUBLIC_USE_EMULATORS=true
-      (or MEDIFORCE_URL pointing elsewhere + MEDIFORCE_API_KEY set).
+    - Dev server at http://localhost:9003 (`pnpm dev`), or MEDIFORCE_URL
+      pointing elsewhere + MEDIFORCE_API_KEY set.
     - Docker running (script step pulls python:3.12-slim the first time).
 """
 

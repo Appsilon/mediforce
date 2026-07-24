@@ -38,11 +38,12 @@ COPY . .
 # NEXT_PUBLIC_* placeholders — replaced at container start by docker-entrypoint.sh.
 # Pass real values as build args to bake them in (local dev), or leave as
 # placeholders for generic registry images (CI).
-ARG NEXT_PUBLIC_FIREBASE_API_KEY=__NEXT_PUBLIC_FIREBASE_API_KEY__
-ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=__NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN__
-ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID=__NEXT_PUBLIC_FIREBASE_PROJECT_ID__
-ARG NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=__NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID__
-ARG NEXT_PUBLIC_FIREBASE_APP_ID=__NEXT_PUBLIC_FIREBASE_APP_ID__
+#
+# Only NEXT_PUBLIC_* belongs here: those are inlined into the client bundle, so
+# they have to exist at build time. Auth config (AUTH_SECRET, GOOGLE_CLIENT_ID /
+# _SECRET, ALLOWED_EMAIL_DOMAINS, OIDC_*) is read by the server at runtime from
+# the container environment — never add it as a build arg, which would bake a
+# secret into the image's layer history.
 ARG NEXT_PUBLIC_APP_URL=__NEXT_PUBLIC_APP_URL__
 ARG NEXT_PUBLIC_GIT_SHA=__NEXT_PUBLIC_GIT_SHA__
 
@@ -58,11 +59,9 @@ RUN pnpm --filter @mediforce/platform-ui build
 #
 # Derived from `deps` + source rather than `builder`: the migration container
 # needs only the workspace, devDeps (`drizzle-kit`), and migration files — not
-# the Next.js build. Deriving from `builder` would force the arg-less `migrate`
-# service build to run `pnpm build`, whose `/workspaces/new` prerender
-# initializes the Firebase client and fails with `auth/invalid-api-key` because
-# the `NEXT_PUBLIC_FIREBASE_*` build args are only passed to the `platform-ui`
-# service. The image is short-lived; size is not a concern.
+# the Next.js build. Deriving from `builder` would make every `migrate` service
+# build wait on `pnpm build` for output it then throws away. The image is
+# short-lived; size is not a concern.
 FROM base AS migrate
 WORKDIR /app
 COPY --from=deps /app ./

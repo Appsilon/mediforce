@@ -1,6 +1,7 @@
 import {
   PostgresAgentEventRepository,
   PostgresUserProfileRepository,
+  PostgresCredentialsRepository,
   PostgresHandoffRepository,
   PostgresAgentDefinitionRepository,
   PostgresModelRegistryRepository,
@@ -22,13 +23,12 @@ import {
   PostgresAgentEventLog,
   PostgresPlatformSettingsRepository,
   getSharedPostgresClient,
-  FirebaseInviteService,
+  PostgresInviteService,
   validateSecretsKey,
   createMailgunSender,
   createSmtpSender,
   EmailNotificationService,
-  FirebaseUserDirectoryService,
-  getAdminAuth,
+  PostgresUserDirectoryService,
 } from '@mediforce/platform-infra';
 import type {
   AgentDefinitionRepository,
@@ -54,6 +54,7 @@ import type {
   ToolCatalogRepository,
   UserDirectoryService,
   UserProfileRepository,
+  CredentialsRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import {
@@ -62,13 +63,11 @@ import {
   isLocalAgentMode,
   type DockerImagesService,
 } from './docker-images-service';
-import { sendInviteEmail, sendWorkspaceNotificationEmail } from './invite-emails';
+import { sendWorkspaceNotificationEmail } from './invite-emails';
 import { normalizeBaseUrl } from '../contract/config';
 import type {
   InviteNotificationService,
   InviteService,
-  InvitedUser,
-  SendInviteEmailInput,
   SendWorkspaceNotificationEmailInput,
 } from './invite-notification';
 import {
@@ -132,6 +131,7 @@ export interface PlatformServices {
   toolCatalogRepo: ToolCatalogRepository;
   namespaceRepo: NamespaceRepository;
   userProfileRepo: UserProfileRepository;
+  credentialsRepo: CredentialsRepository;
   oauthProviderRepo: OAuthProviderRepository;
   agentOAuthTokenRepo: AgentOAuthTokenRepository;
   modelRegistryRepo: ModelRegistryRepository;
@@ -144,71 +144,11 @@ export interface PlatformServices {
   emailProviderInfo: EmailProviderInfo | null;
   dockerImages: DockerImagesService;
   /**
-   * Firebase Auth metadata lookup (uid → email, lastSignInTime). Always wired
-   * in production (depends on Firebase Auth, not Mailgun). Handlers consume
-   * via `scope.system.userDirectory`.
+   * User metadata lookup (uid → email, lastSignInTime) against `auth_users`.
+   * Always wired in production (depends on Postgres, not Mailgun). Handlers
+   * consume via `scope.system.userDirectory`.
    */
   userDirectory: UserDirectoryService;
-}
-
-/**
- * Narrow ports used by the invite-service adapter. Defined here so this file
- * doesn't import `firebase-admin/*` directly — that dependency stays inside
- * `platform-infra`. `getAdminAuth()` returns an `Auth` that satisfies the
- * `AuthPort` shape structurally.
- */
-interface UserRecordPort {
-  readonly email?: string;
-  readonly metadata: { readonly lastSignInTime: string | null };
-}
-interface AuthPort {
-  getUser(uid: string): Promise<UserRecordPort>;
-}
-
-/**
- * Adapts `FirebaseInviteService` onto the framework-free `InviteService`
- * interface that handlers consume. Adds read-side methods (`getUserEmail`,
- * `isInvitePending`) directly here so the Firebase service stays focused on
- * writes.
- */
-class FirebaseInviteServiceAdapter implements InviteService {
-  constructor(
-    private readonly firebase: FirebaseInviteService,
-    private readonly adminAuth: AuthPort,
-    private readonly userProfileRepo: UserProfileRepository,
-  ) {}
-
-  async createInvitedUser(email: string, displayName: string | undefined): Promise<InvitedUser> {
-    return this.firebase.createInvitedUser(email, displayName, undefined);
-  }
-
-  async resetInvitePassword(uid: string): Promise<string> {
-    return this.firebase.resetInvitePassword(uid);
-  }
-
-  async getUserEmail(uid: string): Promise<string | null> {
-    try {
-      const record = await this.adminAuth.getUser(uid);
-      const email = record.email;
-      return typeof email === 'string' && email !== '' ? email : null;
-    } catch {
-      return null;
-    }
-  }
-
-  async isInvitePending(uid: string): Promise<boolean> {
-    let lastSignInTime: string | null = '';
-    try {
-      const record = await this.adminAuth.getUser(uid);
-      lastSignInTime = record.metadata.lastSignInTime;
-    } catch {
-      // Treat unknown users as not pending — handlers will surface a 404.
-      return false;
-    }
-    const mustChangePassword = (await this.userProfileRepo.getProfile(uid))?.mustChangePassword ?? false;
-    const hasNeverSignedIn = lastSignInTime === null || lastSignInTime === '';
-    return mustChangePassword || hasNeverSignedIn;
-  }
 }
 
 /**
@@ -222,19 +162,6 @@ class EmailInviteNotificationService implements InviteNotificationService {
     private readonly appUrl: string,
     private readonly senderName: string,
   ) {}
-
-  async sendInviteEmail(input: SendInviteEmailInput): Promise<void> {
-    const appUrl = normalizeBaseUrl(input.baseUrl) ?? this.appUrl;
-    await sendInviteEmail(
-      {
-        toEmail: input.toEmail,
-        temporaryPassword: input.temporaryPassword,
-        appUrl,
-        senderName: this.senderName,
-      },
-      this.sendEmail,
-    );
-  }
 
   async sendWorkspaceNotificationEmail(input: SendWorkspaceNotificationEmailInput): Promise<void> {
     const appUrl = normalizeBaseUrl(input.baseUrl) ?? this.appUrl;
@@ -281,6 +208,7 @@ export function getPlatformServices(): PlatformServices {
   const toolCatalogRepo: ToolCatalogRepository = new PostgresToolCatalogRepository(pg);
   const namespaceRepo: NamespaceRepository = new PostgresNamespaceRepository(pg);
   const userProfileRepo: UserProfileRepository = new PostgresUserProfileRepository(pg);
+  const credentialsRepo: CredentialsRepository = new PostgresCredentialsRepository(pg);
   const oauthProviderRepo: OAuthProviderRepository = new PostgresOAuthProviderRepository(pg);
   const agentOAuthTokenRepo: AgentOAuthTokenRepository =
     new PostgresAgentOAuthTokenRepository(pg);
@@ -400,12 +328,12 @@ export function getPlatformServices(): PlatformServices {
   const notificationService = emailSender
     ? new EmailNotificationService(emailSender)
     : undefined;
-  // Wired whenever Firebase Auth is available — independent of email provider.
-  // Email-disabled deployments still need uid → email/lastSignInTime lookups
-  // for the namespace-members endpoint.
-  const userDirectoryService: UserDirectoryService = new FirebaseUserDirectoryService(
-    getAdminAuth(),
-  );
+  // ADR-0002: reads the global `user_roles` + `auth_users` from Postgres
+  // (off Firebase Auth) behind the same port. `getUsersByRole` targeting
+  // depends on the one-time `seed-user-roles` having populated `user_roles`.
+  // `lastSignInTime` comes from `auth_users.last_sign_in_at`, stamped by
+  // `recordSignIn` on every successful sign-in.
+  const userDirectoryService: UserDirectoryService = new PostgresUserDirectoryService(pg);
 
   const engine = new WorkflowEngine(
     processRepo,
@@ -449,12 +377,12 @@ export function getPlatformServices(): PlatformServices {
 
   const webhookRouter = new WebhookRouter(engine, processRepo, triggerRepo);
 
-  // FirebaseInviteService writes to the Firebase Auth user store (identity
-  // stays on Firebase Auth) and records the must-change-password flag via the
-  // Postgres user-profile repository.
-  const adminAuth = getAdminAuth();
-  const firebaseInvite = new FirebaseInviteService(adminAuth, userProfileRepo);
-  const inviteService = new FirebaseInviteServiceAdapter(firebaseInvite, adminAuth, userProfileRepo);
+  // Seed-based invite (PLAN-0002 §3.1): pre-seeds `auth_users` + workspace
+  // membership + global roles in Postgres. No temp password, no credentials
+  // email — the invitee signs in later via Google (verified-email auto-link)
+  // or by setting a password. `PostgresInviteService` structurally implements
+  // the framework-free `InviteService` port handlers consume.
+  const inviteService: InviteService = new PostgresInviteService(pg);
   // `appUrl` matches the legacy invite route's fallback so dev-without-
   // NEXT_PUBLIC_PLATFORM_URL still renders sensible links.
   const inviteAppUrl =
@@ -497,6 +425,7 @@ export function getPlatformServices(): PlatformServices {
     toolCatalogRepo,
     namespaceRepo,
     userProfileRepo,
+    credentialsRepo,
     oauthProviderRepo,
     agentOAuthTokenRepo,
     modelRegistryRepo,

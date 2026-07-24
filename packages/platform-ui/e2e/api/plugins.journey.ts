@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
-  bearerHeaders,
+  sessionCookieHeaders,
   setupMultiNamespaceCallers,
   type MultiNamespaceFixture,
 } from '../helpers/multi-namespace';
@@ -33,7 +33,7 @@ test.describe('GET /api/plugins — API E2E', () => {
   test('outsider user sees the same list shape — no namespace gate', async ({ request }) => {
     const apiKeyRes = await request.get('/api/plugins', { headers: apiKeyHeaders() });
     const userRes = await request.get('/api/plugins', {
-      headers: bearerHeaders(callers.outsider),
+      headers: sessionCookieHeaders(callers.outsider),
     });
     expect(userRes.status(), await userRes.text()).toBe(200);
 

@@ -109,13 +109,8 @@ export function NewTicketView({ ctx }: CommandViewProps) {
 
     setSubmitting(true);
     try {
-      const token = await ctx.getIdToken();
-      if (token === null) {
-        setError('You must be signed in to file a ticket.');
-        setSubmitting(false);
-        return;
-      }
-
+      // The NextAuth session cookie rides `apiFetch` same-origin (ADR-0002 §6);
+      // an unauthenticated caller gets a 401 handled below.
       const response = await apiFetch('/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -5,7 +5,7 @@ import type { MeNamespace } from '@mediforce/platform-api/contract';
 const replaceMock = vi.fn();
 
 interface AuthState {
-  firebaseUser: { uid: string; displayName: string | null; email: string | null } | null;
+  user: { id: string; name: string | null; email: string | null; image: string | null; roles: string[] } | null;
   loading: boolean;
 }
 interface NsState {
@@ -44,7 +44,7 @@ beforeEach(() => {
   replaceMock.mockClear();
   localStorage.clear();
   authState = {
-    firebaseUser: { uid: 'u1', displayName: 'Test User', email: 'test@mediforce.dev' },
+    user: { id: 'u1', name: 'Test User', email: 'test@mediforce.dev', image: null, roles: [] },
     loading: false,
   };
   nsState = { namespaces: [], loading: false, isError: false, error: null };

@@ -384,7 +384,7 @@
           <h3>Workflow secrets</h3>
           <p>API keys, tokens, credentials - encrypted at rest with <strong>AES-256-GCM</strong>. Injected into agent containers at runtime, never stored in workflow definitions or logs.</p>
           <div class="fc-detail">
-            Secrets stored as <strong>iv:ciphertext:authTag</strong> in Firestore. Template syntax <code style="color:#60A5FA;background:rgba(96,165,250,0.1);padding:1px 5px;border-radius:3px;">{{SECRET_NAME}}</code> resolved at execution time. Pre-flight validation catches missing secrets before workflow starts.
+            Secrets stored as <strong>iv:ciphertext:authTag</strong> in Postgres. Template syntax <code style="color:#60A5FA;background:rgba(96,165,250,0.1);padding:1px 5px;border-radius:3px;">{{SECRET_NAME}}</code> resolved at execution time. Pre-flight validation catches missing secrets before workflow starts.
           </div>
         </div>
       </div>

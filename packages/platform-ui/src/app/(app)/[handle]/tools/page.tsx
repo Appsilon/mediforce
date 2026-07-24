@@ -163,7 +163,7 @@ export default function ToolsPage() {
   const params = useParams<{ handle: string }>();
   const handle = params.handle;
   const { canAdmin } = useNamespaceRole(handle);
-  const { firebaseUser, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [entries, setEntries] = useState<ToolCatalogEntry[]>([]);
   const [agents, setAgents] = useState<AgentDefinition[]>([]);
@@ -191,11 +191,11 @@ export default function ToolsPage() {
   }, [handle]);
 
   useEffect(() => {
-    // Wait for Firebase auth state to settle so apiFetch can attach a Bearer
-    // token — middleware 401s /api/admin/* requests without it.
-    if (authLoading || firebaseUser === null) return;
+    // Wait for the session to resolve before fetching — the proxy 401s
+    // /api/admin/* requests made before the user is known to be signed in.
+    if (authLoading || user === null) return;
     void refresh();
-  }, [authLoading, firebaseUser, refresh]);
+  }, [authLoading, user, refresh]);
 
   const filteredStdio = useMemo(() => {
     const q = query.trim().toLowerCase();

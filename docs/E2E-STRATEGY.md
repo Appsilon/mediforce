@@ -16,31 +16,54 @@ Tests run with `fullyParallel: true`. This is safe because:
 
 - **Read-only tests** share seed data freely — multiple tests can read the same workflow instance, task, or agent definition without conflict.
 - **Mutating tests** (cancel run, approve task) each get a **dedicated seed data instance** in `seed-data.ts` (e.g., `proc-cancel-target`). No other test reads from or writes to that instance.
-- **Fresh Firestore emulator** is seeded once per test run via `auth-setup.ts`. Tests don't create or delete data — they only read shared fixtures or mutate their isolated ones.
+- **Postgres** is seeded once per test run via `auth-setup.ts`. Tests don't create or delete data — they only read shared fixtures or mutate their isolated ones.
 
 When adding a new test that **changes state**, create a new dedicated entry in `seed-data.ts` with a unique ID. Document which test owns it with a comment. Never mutate an instance that read-only tests depend on.
 
+## Authentication
+
+There is no Firebase Auth emulator (ADR-0002). Identity lives in Postgres:
+`auth_users` rows plus NextAuth **database sessions** in `auth_sessions`.
+
+`e2e/auth-setup.ts` seeds the fixture namespace, then calls
+`seedAuthSession` from [`e2e/helpers/auth-session.ts`](../packages/platform-ui/e2e/helpers/auth-session.ts)
+to upsert the test user and open a database session through
+`createDatabaseSession` — the same primitive the real login path uses. The
+returned session token is written into Playwright `storageState` as the
+`authjs.session-token` cookie, so every journey in the `authenticated`
+project is signed in without a browser round trip.
+
+The E2E web server runs with `ENABLE_PASSWORD_AUTH=true` and a fixed
+test-only `AUTH_SECRET` (see `playwright.config.ts`), so journeys that
+exercise the actual login page can sign in with a seeded bcrypt password
+user via `createTestUser` in `e2e/helpers/emulator.ts` (filename is
+historical — it is a Postgres helper).
+
+Playwright's `globalSetup` applies the Drizzle migrations and starts the mock
+OAuth server; a local Postgres reachable via `DATABASE_URL` is the only
+external prerequisite.
+
 ## Retry-Safe State Cleanup
 
-`auth-setup.ts` runs **once per CI invocation**, not once per test. Playwright retries (`retries: 2` on CI) re-run the failing test against the **same Firestore state** the previous attempt left behind. If a test creates or mutates state that survives in Firestore — and the assertion that catches the change comes after the mutation — every retry will see the post-mutation state and fail in a way that looks unrelated to the original cause.
+`auth-setup.ts` runs **once per CI invocation**, not once per test. Playwright retries (`retries: 2` on CI) re-run the failing test against the **same Postgres state** the previous attempt left behind. If a test creates or mutates state that survives in the database — and the assertion that catches the change comes after the mutation — every retry will see the post-mutation state and fail in a way that looks unrelated to the original cause.
 
 This is a fixture leak across retries. It surfaces as: first run fails for the real reason, retries time out on a setup precondition because the state is no longer pristine.
 
-**Rule:** any journey that writes to Firestore beyond what `auth-setup.ts` seeded must explicitly clean that state at the *start* of the test. Use the `deleteDocument` / `clearEmulators` helpers from `e2e/helpers/emulator.ts`. Do this even when the happy path of the test would clean up at the end — retries don't reach the end.
+**Rule:** any journey that writes to Postgres beyond what `auth-setup.ts` seeded must explicitly clean that state at the *start* of the test. Do this even when the happy path of the test would clean up at the end — retries don't reach the end.
 
 Examples of state that needs explicit reset at test start:
 
-- OAuth tokens written by callback handlers (`agentOAuthTokens/*`)
-- Documents the test inserts via the UI (uploads, new agents, new bindings)
+- OAuth tokens written by callback handlers
+- Rows the test inserts via the UI (uploads, new agents, new bindings)
 - Anything else not present in `auth-setup.ts` seed
 
-Rule of thumb: if the test's first assertion would fail when run twice in a row against the same emulator, it has a fixture leak. Fix it with an explicit reset at the top, not by tightening selectors or bumping timeouts.
+Rule of thumb: if the test's first assertion would fail when run twice in a row against the same database, it has a fixture leak. Fix it with an explicit reset at the top, not by tightening selectors or bumping timeouts.
 
 ## Test Types
 
 | Type | Location | Purpose |
 |------|----------|---------|
-| Smoke | `e2e/smoke.spec.ts` | Login page, auth redirect — no emulators needed |
+| Smoke | `e2e/smoke.spec.ts` | Login page, auth redirect — no seeded session needed |
 | Journey | `e2e/ui/*.journey.ts` | Full feature flows with state verification |
 
 ## File Organization
@@ -48,12 +71,16 @@ Rule of thumb: if the test's first assertion would fail when run twice in a row 
 ```
 e2e/
   auth-setup.ts
+  global-setup.ts       # drizzle migrate + mock OAuth server
   smoke.spec.ts
   helpers/
+    auth-session.ts     # seedAuthSession — auth_users + NextAuth database session
     constants.ts
-    emulator.ts
+    emulator.ts         # Postgres password-user helpers (name is historical)
+    postgres-seed.ts
     seed-data.ts
     page-errors.ts      # trackPageErrors, allowPageErrors, getPageErrors
+  api/
   ui/
     task-review.journey.ts
     workflow-home.journey.ts
@@ -95,7 +122,7 @@ Key patterns:
 - `page.goto` — entry point only, then click links/buttons to navigate
 - `{ timeout: 10_000 }` — on first assertion after page load (data may still be fetching)
 
-When adding a new feature or fixing a bug, write or update the journey test that covers it. Update `seed-data.ts` if new Firestore fixtures are needed.
+When adding a new feature or fixing a bug, write or update the journey test that covers it. Update `seed-data.ts` if new Postgres fixtures are needed.
 
 ## Modifying Existing Tests
 
@@ -141,4 +168,4 @@ Every PR that touches UI must include in its description:
 
 ## Debugging Failed E2E Tests
 
-Use `agent-browser` skill to interact with the app on `localhost:9007` (emulator mode) or `localhost:9003` (dev mode) to understand what the UI shows and why a test fails.
+Use `agent-browser` skill to interact with the app on `localhost:9007` (E2E server) or `localhost:9003` (dev mode) to understand what the UI shows and why a test fails.

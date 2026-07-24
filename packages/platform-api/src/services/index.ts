@@ -9,13 +9,11 @@ export {
 export type {
   InviteService,
   InvitedUser,
+  SeedInviteInput,
   InviteNotificationService,
-  SendInviteEmailInput,
   SendWorkspaceNotificationEmailInput,
 } from './invite-notification';
 export {
-  sendInviteEmail,
   sendWorkspaceNotificationEmail,
-  type SendInviteEmailParams,
   type SendWorkspaceNotificationEmailParams,
 } from './invite-emails';

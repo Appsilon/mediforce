@@ -1,12 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextResponse } from 'next/server';
 
-const mockVerifyIdToken = vi.fn();
+const mockResolveSessionUserId = vi.fn();
 const mockGetMembershipsForUser = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
-  getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
+  getSharedPostgresClient: () => ({ db: {} }),
+  resolveSessionUserId: (...args: unknown[]) => mockResolveSessionUserId(...args),
 }));
+
+const SESSION_COOKIE = { cookie: 'authjs.session-token=session-token-abc' };
 
 import {
   resolveCallerIdentity,
@@ -57,10 +60,10 @@ describe('resolveCallerIdentity', () => {
     expect((result as NextResponse).status).toBe(401);
   });
 
-  it('returns 401 for invalid token', async () => {
-    mockVerifyIdToken.mockRejectedValue(new Error('bad token'));
+  it('returns 401 for an invalid/expired session cookie', async () => {
+    mockResolveSessionUserId.mockResolvedValue(null);
     const result = await resolveCallerIdentity(
-      makeRequest({ Authorization: 'Bearer bad-token' }),
+      makeRequest(SESSION_COOKIE),
       fakeNamespaceRepo,
     );
     expect(result).toBeInstanceOf(NextResponse);
@@ -68,7 +71,7 @@ describe('resolveCallerIdentity', () => {
   });
 
   it('returns user identity with namespaces + roles populated from getMembershipsForUser', async () => {
-    mockVerifyIdToken.mockResolvedValue({ uid: 'user-1' });
+    mockResolveSessionUserId.mockResolvedValue('user-1');
     mockGetMembershipsForUser.mockResolvedValue([
       { handle: 'org-a', role: 'owner' },
       { handle: 'org-b', role: 'admin' },
@@ -76,7 +79,7 @@ describe('resolveCallerIdentity', () => {
     ]);
 
     const result = await resolveCallerIdentity(
-      makeRequest({ Authorization: 'Bearer valid-token' }),
+      makeRequest(SESSION_COOKIE),
       fakeNamespaceRepo,
     );
 
@@ -90,10 +93,12 @@ describe('resolveCallerIdentity', () => {
         ['org-c', 'member'],
       ]),
       isSystemActor: false,
+      // Carried so a password change can revoke every session except this one.
+      sessionToken: 'session-token-abc',
     });
   });
 
-  it('rejects wrong API key and falls through to token check', async () => {
+  it('rejects wrong API key and falls through to the session check', async () => {
     const result = await resolveCallerIdentity(
       makeRequest({ 'X-Api-Key': 'wrong-key' }),
       fakeNamespaceRepo,

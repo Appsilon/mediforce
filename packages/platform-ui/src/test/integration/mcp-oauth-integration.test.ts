@@ -86,14 +86,15 @@ const fake = vi.hoisted(() => {
   };
 });
 
-const mockVerifyIdToken = vi.hoisted(() => vi.fn());
+const mockResolveSessionUserId = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => fake.services,
 }));
 
 vi.mock('@mediforce/platform-infra', () => ({
-  getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
+  getSharedPostgresClient: () => ({ db: {} }),
+  resolveSessionUserId: (...args: unknown[]) => mockResolveSessionUserId(...args),
 }));
 
 // Route handlers imported AFTER vi.mock declarations so they resolve the
@@ -184,7 +185,7 @@ function userInfoResponse(overrides: Record<string, unknown> = {}): Response {
 function adminListProviders(ns: string): Promise<Response> {
   const url = new URL(`http://localhost/api/admin/oauth-providers?namespace=${ns}`);
   const req = new NextRequest(url.toString(), {
-    headers: { Authorization: 'Bearer valid-token' },
+    headers: { cookie: 'authjs.session-token=tok-123' },
   });
   return Promise.resolve(adminProvidersRoute.GET(req));
 }
@@ -195,7 +196,7 @@ function adminCreateProvider(ns: string, body: unknown): Promise<Response> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: 'Bearer valid-token',
+      cookie: 'authjs.session-token=tok-123',
     },
     body: JSON.stringify(body),
   });
@@ -215,7 +216,7 @@ function userStartOAuth(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: 'Bearer valid-token',
+      cookie: 'authjs.session-token=tok-123',
     },
     body: JSON.stringify({ serverName }),
   });
@@ -248,7 +249,7 @@ function userListOAuthTokens(agentId: string, ns: string): Promise<Response> {
   );
   const req = new NextRequest(url.toString(), {
     method: 'GET',
-    headers: { Authorization: 'Bearer valid-token' },
+    headers: { cookie: 'authjs.session-token=tok-123' },
   });
   return Promise.resolve(
     oauthListRoute.GET(req, { params: Promise.resolve({ id: agentId }) }),
@@ -267,7 +268,7 @@ function userDeleteToken(
   );
   const req = new NextRequest(url.toString(), {
     method: 'DELETE',
-    headers: { Authorization: 'Bearer valid-token' },
+    headers: { cookie: 'authjs.session-token=tok-123' },
   });
   return Promise.resolve(
     oauthTokenRoute.DELETE(req, {
@@ -288,7 +289,7 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.PLATFORM_API_KEY = PLATFORM_SECRET;
-    mockVerifyIdToken.mockResolvedValue({ uid: UID });
+    mockResolveSessionUserId.mockResolvedValue(UID);
 
     // Fresh repos per test, attached to the shared services closure.
     providerRepo = new InMemoryOAuthProviderRepository();
@@ -510,7 +511,7 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
   it('[AUTHZ] admin routes reject plain (non-admin) member with 403', async () => {
     const plainUid = 'plain-member-uid';
     fake.addMember('appsilon', plainUid, 'member');
-    mockVerifyIdToken.mockResolvedValue({ uid: plainUid });
+    mockResolveSessionUserId.mockResolvedValue(plainUid);
 
     const createRes = await adminCreateProvider('appsilon', providerCreateInput);
     expect(createRes.status).toBe(403);

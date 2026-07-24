@@ -5,33 +5,15 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+
+const mockResolveSessionUserId = vi.fn();
+
+vi.mock('@mediforce/platform-infra', () => ({
+  getSharedPostgresClient: () => ({ db: {} }),
+  resolveSessionUserId: (...args: unknown[]) => mockResolveSessionUserId(...args),
+}));
+
 import { proxy } from '../../proxy';
-
-const EMULATOR_ISS = 'https://securetoken.google.com/demo-mediforce';
-const EMULATOR_AUD = 'demo-mediforce';
-
-function base64urlEncode(value: string): string {
-  return Buffer.from(value, 'utf8').toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
-}
-
-function buildEmulatorToken(payload: Record<string, unknown>): string {
-  const header = base64urlEncode(JSON.stringify({ alg: 'none', typ: 'JWT' }));
-  const body = base64urlEncode(JSON.stringify(payload));
-  return `${header}.${body}.`;
-}
-
-function validEmulatorPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  const now = Math.floor(Date.now() / 1000);
-  return {
-    iss: EMULATOR_ISS,
-    aud: EMULATOR_AUD,
-    sub: 'test-user-uid',
-    iat: now - 10,
-    exp: now + 3600,
-    email: 'test@mediforce.dev',
-    ...overrides,
-  };
-}
 
 function makeRequest(
   path: string,
@@ -132,60 +114,45 @@ describe('middleware preflight', () => {
   });
 });
 
-describe('middleware Firebase ID token (emulator mode)', () => {
+describe('middleware NextAuth session', () => {
+  const SESSION_COOKIE = 'authjs.session-token=session-token-abc';
+
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.stubEnv('PLATFORM_API_KEY', 'test-secret-key');
-    vi.stubEnv('NEXT_PUBLIC_USE_EMULATORS', 'true');
-    vi.stubEnv('NEXT_PUBLIC_FIREBASE_PROJECT_ID', 'demo-mediforce');
   });
 
-  it('passes when Authorization: Bearer carries a valid emulator ID token', async () => {
-    const token = buildEmulatorToken(validEmulatorPayload());
+  it('passes when a valid session cookie resolves to a uid', async () => {
+    mockResolveSessionUserId.mockResolvedValue('test-user-uid');
     const res = await proxy(
-      makeRequest('/api/agents', { headers: { Authorization: `Bearer ${token}` } }),
+      makeRequest('/api/agents', { headers: { cookie: SESSION_COOKIE } }),
     );
     expect(res.status).not.toBe(401);
   });
 
-  it('returns 401 when Bearer token is malformed (not a JWT)', async () => {
+  it('returns 401 when the session cookie is invalid or expired', async () => {
+    mockResolveSessionUserId.mockResolvedValue(null);
     const res = await proxy(
-      makeRequest('/api/agents', { headers: { Authorization: 'Bearer not-a-jwt' } }),
+      makeRequest('/api/agents', { headers: { cookie: SESSION_COOKIE } }),
     );
     expect(res.status).toBe(401);
   });
 
-  it('returns 401 when Bearer token is expired', async () => {
-    const token = buildEmulatorToken(
-      validEmulatorPayload({ exp: Math.floor(Date.now() / 1000) - 10, iat: Math.floor(Date.now() / 1000) - 3610 }),
-    );
-    const res = await proxy(
-      makeRequest('/api/agents', { headers: { Authorization: `Bearer ${token}` } }),
-    );
-    expect(res.status).toBe(401);
-  });
-
-  it('returns 401 when Bearer token aud does not match project', async () => {
-    const token = buildEmulatorToken(validEmulatorPayload({ aud: 'other-project' }));
-    const res = await proxy(
-      makeRequest('/api/agents', { headers: { Authorization: `Bearer ${token}` } }),
-    );
-    expect(res.status).toBe(401);
-  });
-
-  it('accepts X-Api-Key when present even if Authorization is missing', async () => {
-    // Regression guard: adding Bearer support must not break server-to-server X-Api-Key auth
+  it('accepts X-Api-Key when present even if no session cookie is set', async () => {
+    // Regression guard: session support must not break server-to-server X-Api-Key auth
     const res = await proxy(
       makeRequest('/api/agents', { headers: { 'X-Api-Key': 'test-secret-key' } }),
     );
     expect(res.status).not.toBe(401);
+    expect(mockResolveSessionUserId).not.toHaveBeenCalled();
   });
 
-  it('accepts valid Bearer even when X-Api-Key is wrong', async () => {
+  it('accepts a valid session cookie even when X-Api-Key is wrong', async () => {
     // Either credential is sufficient
-    const token = buildEmulatorToken(validEmulatorPayload());
+    mockResolveSessionUserId.mockResolvedValue('test-user-uid');
     const res = await proxy(
       makeRequest('/api/agents', {
-        headers: { Authorization: `Bearer ${token}`, 'X-Api-Key': 'wrong' },
+        headers: { cookie: SESSION_COOKIE, 'X-Api-Key': 'wrong' },
       }),
     );
     expect(res.status).not.toBe(401);
