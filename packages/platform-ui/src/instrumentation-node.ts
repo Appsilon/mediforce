@@ -1,4 +1,4 @@
-import { parseAllowedDomains } from '@/lib/email-allowlist';
+import { parseAllowedDomains, ALLOW_ANY_DOMAIN } from '@/lib/email-allowlist';
 
 // Node-only: contains process.exit, kept out of the Edge module graph so
 // Turbopack never parses it for the Edge runtime build. Dynamic-imported from
@@ -62,12 +62,24 @@ export function validateEnv(): void {
   const oauthEnabled =
     (typeof process.env.GOOGLE_CLIENT_ID === 'string' && process.env.GOOGLE_CLIENT_ID !== '')
     || (typeof process.env.OIDC_ISSUER === 'string' && process.env.OIDC_ISSUER !== '');
-  if (oauthEnabled && parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS).length === 0) {
-    errors.push(
-      'An OAuth provider (GOOGLE_CLIENT_ID / OIDC_ISSUER) is configured but ALLOWED_EMAIL_DOMAINS is empty. '
-      + 'Any account at the identity provider could sign in — set ALLOWED_EMAIL_DOMAINS to your domain(s) '
-      + '(ADR-0002 §4a).',
-    );
+  if (oauthEnabled) {
+    const allowedDomains = parseAllowedDomains(process.env.ALLOWED_EMAIL_DOMAINS);
+    if (allowedDomains.includes(ALLOW_ANY_DOMAIN)) {
+      // Explicit opt-out (ADR-0002 §4a): the operator chose to open OAuth/OIDC
+      // to any Google account on earth. Boot is allowed, but WARN loudly so the
+      // disabled restriction is visible and auditable in production logs.
+      console.warn(
+        `WARNING: ALLOWED_EMAIL_DOMAINS="${ALLOW_ANY_DOMAIN}" — email-domain restriction is DISABLED. `
+        + 'ANY email domain can sign in via OAuth/OIDC (any Google account on earth). '
+        + 'This is a deliberate opt-out; unset it or list your domain(s) to re-enable pinning (ADR-0002 §4a).',
+      );
+    } else if (allowedDomains.length === 0) {
+      errors.push(
+        'An OAuth provider (GOOGLE_CLIENT_ID / OIDC_ISSUER) is configured but ALLOWED_EMAIL_DOMAINS is empty. '
+        + 'Any account at the identity provider could sign in — set ALLOWED_EMAIL_DOMAINS to your domain(s), '
+        + `or "${ALLOW_ANY_DOMAIN}" to explicitly allow any domain (ADR-0002 §4a).`,
+      );
+    }
   }
 
   // --- DATABASE_URL (ADR-0001: Postgres-only, always required) ---
