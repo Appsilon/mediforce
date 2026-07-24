@@ -51,6 +51,9 @@ export async function getMe(input: GetMeInput, scope: CallerScope): Promise<GetM
     role: roleByHandle.get(n.handle) ?? 'owner',
     ...(n.avatarUrl !== undefined ? { avatarUrl: n.avatarUrl } : {}),
     ...(n.icon !== undefined ? { icon: n.icon } : {}),
+    ...(n.logo !== undefined ? { logo: n.logo } : {}),
+    ...(n.brandPrimaryColor !== undefined ? { brandPrimaryColor: n.brandPrimaryColor } : {}),
+    ...(n.brandAccentColor !== undefined ? { brandAccentColor: n.brandAccentColor } : {}),
   }));
 
   return {

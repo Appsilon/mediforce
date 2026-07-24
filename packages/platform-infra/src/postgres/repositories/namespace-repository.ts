@@ -44,6 +44,9 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       displayName: parsed.displayName,
       avatarUrl: parsed.avatarUrl ?? null,
       icon: parsed.icon ?? null,
+      logo: parsed.logo ?? null,
+      brandPrimaryColor: parsed.brandPrimaryColor ?? null,
+      brandAccentColor: parsed.brandAccentColor ?? null,
       linkedUserId: parsed.linkedUserId ?? null,
       bio: parsed.bio ?? null,
       createdAt: new Date(parsed.createdAt),
@@ -65,6 +68,9 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
         displayName: parsedNs.displayName,
         avatarUrl: parsedNs.avatarUrl ?? null,
         icon: parsedNs.icon ?? null,
+        logo: parsedNs.logo ?? null,
+        brandPrimaryColor: parsedNs.brandPrimaryColor ?? null,
+        brandAccentColor: parsedNs.brandAccentColor ?? null,
         linkedUserId: parsedNs.linkedUserId ?? null,
         bio: parsedNs.bio ?? null,
         createdAt: new Date(parsedNs.createdAt),
@@ -86,6 +92,9 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
     if (updates.displayName !== undefined) set.displayName = updates.displayName;
     if (updates.avatarUrl !== undefined) set.avatarUrl = updates.avatarUrl;
     if (updates.icon !== undefined) set.icon = updates.icon;
+    if (updates.logo !== undefined) set.logo = updates.logo;
+    if (updates.brandPrimaryColor !== undefined) set.brandPrimaryColor = updates.brandPrimaryColor;
+    if (updates.brandAccentColor !== undefined) set.brandAccentColor = updates.brandAccentColor;
     if (updates.linkedUserId !== undefined) set.linkedUserId = updates.linkedUserId;
     if (updates.bio !== undefined) set.bio = updates.bio;
     if (updates.createdAt !== undefined) set.createdAt = new Date(updates.createdAt);
@@ -259,6 +268,9 @@ function toNamespace(row: typeof workspaces.$inferSelect): Namespace {
     createdAt: row.createdAt.toISOString(),
     avatarUrl: row.avatarUrl ?? undefined,
     icon: row.icon ?? undefined,
+    logo: row.logo ?? undefined,
+    brandPrimaryColor: row.brandPrimaryColor ?? undefined,
+    brandAccentColor: row.brandAccentColor ?? undefined,
     linkedUserId: row.linkedUserId ?? undefined,
     bio: row.bio ?? undefined,
   });

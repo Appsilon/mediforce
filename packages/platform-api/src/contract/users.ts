@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import {
+  BrandColorSchema,
   HandleSchema,
   NamespaceMemberSchema,
   NamespaceTypeSchema,
+  WorkspaceLogoSchema,
 } from '@mediforce/platform-core';
 
 export const GetMeInputSchema = z
@@ -24,6 +26,9 @@ export const MeNamespaceSchema = z.object({
   role: z.enum(['owner', 'admin', 'member']),
   avatarUrl: z.string().url().optional(),
   icon: z.string().optional(),
+  logo: WorkspaceLogoSchema.optional(),
+  brandPrimaryColor: BrandColorSchema.optional(),
+  brandAccentColor: BrandColorSchema.optional(),
 });
 
 export const GetMeOutputSchema = z.object({

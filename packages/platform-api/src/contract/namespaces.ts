@@ -3,6 +3,8 @@ import {
   HandleSchema,
   NamespaceSchema,
   NamespaceMemberSchema,
+  BrandColorSchema,
+  WorkspaceLogoSchema,
 } from '@mediforce/platform-core';
 
 export const GetNamespaceInputSchema = z.object({ handle: HandleSchema });
@@ -37,10 +39,19 @@ const UpdateNamespaceFieldsSchema = z.object({
   displayName: z.string().min(1).max(128).optional(),
   bio: z.string().max(2048).optional(),
   icon: z.string().min(1).max(64).optional(),
+  logo: WorkspaceLogoSchema.optional(),
+  brandPrimaryColor: BrandColorSchema.optional(),
+  brandAccentColor: BrandColorSchema.optional(),
 });
 const atLeastOneUpdateField = (v: z.infer<typeof UpdateNamespaceFieldsSchema>): boolean =>
-  v.displayName !== undefined || v.bio !== undefined || v.icon !== undefined;
-const atLeastOneUpdateFieldMessage = 'At least one of displayName, bio, icon must be provided';
+  v.displayName !== undefined ||
+  v.bio !== undefined ||
+  v.icon !== undefined ||
+  v.logo !== undefined ||
+  v.brandPrimaryColor !== undefined ||
+  v.brandAccentColor !== undefined;
+const atLeastOneUpdateFieldMessage =
+  'At least one of displayName, bio, icon, logo, brandPrimaryColor, brandAccentColor must be provided';
 
 export const UpdateNamespaceBodySchema = UpdateNamespaceFieldsSchema.refine(
   atLeastOneUpdateField,
