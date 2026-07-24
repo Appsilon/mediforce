@@ -22,6 +22,26 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { NextRequest } from 'next/server';
+
+// Capture next/server `after()` callbacks — the auto-runner route defers its
+// loop via after(), which throws outside a request scope. Drain them
+// explicitly after driving the run.
+const pendingAfterCallbacks: Array<() => Promise<void>> = [];
+async function flushAfterCallbacks(): Promise<void> {
+  while (pendingAfterCallbacks.length > 0) {
+    const fn = pendingAfterCallbacks.shift()!;
+    await fn();
+  }
+}
+vi.mock('next/server', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('next/server')>();
+  return {
+    ...mod,
+    after: (fn: () => Promise<void>) => {
+      pendingAfterCallbacks.push(fn);
+    },
+  };
+});
 import {
   ActionRegistry,
   httpActionHandler,
@@ -36,10 +56,12 @@ import {
   InMemoryHumanTaskRepository,
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
+  InMemoryTriggerRepository,
   parseWorkflowTemplate,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { createEchoServer } from '../../../../../../scripts/test-echo-server/server';
+import { seedWebhookTriggers } from './seed-webhook-triggers';
 
 // ---- Wiring: in-memory services + handler glue -----------------------------
 
@@ -70,7 +92,8 @@ const services = (() => {
   );
   const actionRegistry = new ActionRegistry();
   actionRegistry.register('http', httpActionHandler);
-  const webhookRouter = new WebhookRouter(engine, processRepo);
+  const triggerRepo = new InMemoryTriggerRepository();
+  const webhookRouter = new WebhookRouter(engine, processRepo, triggerRepo);
   return {
     engine,
     processRepo,
@@ -80,6 +103,11 @@ const services = (() => {
     coworkSessionRepo,
     actionRegistry,
     webhookRouter,
+    triggerRepo,
+    // The auto-runner validates plugin env + models for every run; action-only
+    // workflows have neither, so empty registries let validation pass.
+    pluginRegistry: { list: () => [] },
+    modelRegistryRepo: { list: async () => [] },
   };
 })();
 
@@ -93,6 +121,10 @@ vi.mock('@/lib/platform-services', () => ({
 // skipping the lookup is safe — return an empty record.
 vi.mock('@/app/actions/workflow-secrets', () => ({
   getWorkflowSecretsForRuntime: async () => ({}),
+}));
+
+vi.mock('@/app/actions/namespace-secrets', () => ({
+  getNamespaceSecretsForRuntime: async () => ({}),
 }));
 
 // Imported AFTER vi.mock so handlers receive the in-memory services.
@@ -156,6 +188,12 @@ afterAll(async () => {
 beforeEach(async () => {
   installFetchShim();
 
+  // Fresh repos per test — the services singleton persists across the two
+  // tests in this file, so without this the second saveWorkflowDefinition
+  // throws VersionAlreadyExists and re-seeding duplicates the webhook row.
+  services.processRepo.clear();
+  services.triggerRepo.clear();
+
   // Register the workflow template per decision K — namespace is injected
   // at registration; the file itself stays tenant-agnostic.
   const raw = JSON.parse(readFileSync(TEMPLATE_PATH, 'utf8'));
@@ -184,6 +222,7 @@ beforeEach(async () => {
     }),
   };
   await services.processRepo.saveWorkflowDefinition(definition);
+  await seedWebhookTriggers(services.triggerRepo, definition);
 });
 
 afterEach(() => {
@@ -222,11 +261,12 @@ describe('execution-summaries-api: webhook → http action → polling → echo 
       `http://localhost/api/processes/${webhookJson.runId}/run`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': 'test-api-key' },
         body: JSON.stringify({ triggeredBy: 'webhook' }),
       },
     );
     await runPost(runReq, { params: Promise.resolve({ instanceId: webhookJson.runId }) });
+    await flushAfterCallbacks();
 
     // Poll up to 10s for completion (paranoia margin — auto-runner just ran
     // synchronously above, so completion is already in place).
@@ -236,7 +276,7 @@ describe('execution-summaries-api: webhook → http action → polling → echo 
     while (Date.now() < deadline) {
       const runReq = new NextRequest(
         `http://localhost/api/runs/${webhookJson.runId}`,
-        { method: 'GET' },
+        { method: 'GET', headers: { 'X-Api-Key': 'test-api-key' } },
       );
       const runRes = await runsGet(runReq, {
         params: Promise.resolve({ runId: webhookJson.runId }),

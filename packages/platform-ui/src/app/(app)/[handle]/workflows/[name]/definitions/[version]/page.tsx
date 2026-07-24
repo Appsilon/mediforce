@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Save } from 'lucide-react';
 import { useWorkflowVersion } from '@/hooks/use-workflow-versions';
+import { useWorkflowTriggers } from '@/hooks/use-workflow-triggers';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { StartRunButton } from '@/components/processes/start-run-button';
@@ -29,6 +30,13 @@ export default function WorkflowDefinitionVersionPage() {
   const versionNumber = parseInt(version, 10);
 
   const { definition, loading } = useWorkflowVersion(decodedName, handle, versionNumber);
+  // Hand-startable gate reads the unified triggers table (ADR-0011 / Issue #930),
+  // the same source of truth as the server guard — not the definition's
+  // advisory triggers[]. Stay optimistic while rows load.
+  const { triggers, loading: triggersLoading } = useWorkflowTriggers(decodedName, handle);
+  const hasManualTrigger = triggersLoading
+    ? true
+    : triggers.some((trigger) => trigger.type === 'manual' && trigger.enabled);
 
   const [editedDescription, setEditedDescription] = useState('');
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
@@ -190,7 +198,7 @@ export default function WorkflowDefinitionVersionPage() {
             <StartRunButton
               workflowName={decodedName}
               version={definition.version}
-              hasManualTrigger={definition.triggers?.some((trigger) => trigger.type === 'manual') ?? false}
+              hasManualTrigger={hasManualTrigger}
               archived={definition.archived === true}
             />
             {saveState.status === 'saved' && (

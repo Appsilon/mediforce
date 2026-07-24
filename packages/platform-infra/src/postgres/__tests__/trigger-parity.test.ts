@@ -179,6 +179,21 @@ function contract(name: string, factory: () => Promise<TriggerRepository>) {
     it('rejects create with an invalid payload (empty name)', async () => {
       await expect(repo.create(cron({ name: '' }))).rejects.toThrow();
     });
+
+    it('transferWorkflowNamespace moves every trigger of a workflow, preserving the cursor', async () => {
+      await repo.create(cron({ name: 'a', lastTriggeredAt: T1 }));
+      await repo.create(cron({ name: 'b' }));
+      await repo.create(webhook()); // different workflow — stays put
+      await repo.transferWorkflowNamespace('acme', 'nightly-cleanup', 'globex');
+
+      expect(await repo.listByWorkflow('acme', 'nightly-cleanup')).toEqual([]);
+      const moved = await repo.listByWorkflow('globex', 'nightly-cleanup');
+      expect(moved.map((t) => t.name).sort()).toEqual(['a', 'b']);
+      expect(moved.every((t) => t.namespace === 'globex')).toBe(true);
+      const rowA = moved.find((t) => t.name === 'a');
+      expect(rowA?.type === 'cron' && rowA.lastTriggeredAt).toBe(T1);
+      expect(await repo.listByWorkflow('acme', 'intake')).toEqual([webhook()]);
+    });
   });
 }
 
@@ -219,10 +234,12 @@ describe.skipIf(skipPg)('PostgresTriggerRepository (parity)', () => {
     await testClient.unsafe(
       `TRUNCATE TABLE "${schemaName}"."triggers", "${schemaName}"."workspaces" CASCADE`,
     );
-    // Seed the workspace every trigger row references (triggers.namespace FK).
-    await db
-      .insert(schema.workspaces)
-      .values({ handle: 'acme', type: 'organization', displayName: 'acme' });
+    // Seed the workspaces trigger rows reference (triggers.namespace FK). `globex`
+    // is the transfer target for the transferWorkflowNamespace parity case.
+    await db.insert(schema.workspaces).values([
+      { handle: 'acme', type: 'organization', displayName: 'acme' },
+      { handle: 'globex', type: 'organization', displayName: 'globex' },
+    ]);
     return new PostgresTriggerRepository(db);
   });
 

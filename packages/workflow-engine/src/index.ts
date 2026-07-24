@@ -40,9 +40,7 @@ export type { ReviewState } from './review/review-types';
 
 // Triggers
 export { ManualTrigger } from './triggers/manual-trigger';
-export { WebhookTrigger } from './triggers/webhook-trigger';
 export { CronTrigger } from './triggers/cron-trigger';
-export { TriggerHandler } from './triggers/trigger-handler';
 export { WebhookRouter } from './triggers/webhook-router';
 export type {
   WebhookRouteInput,
@@ -50,7 +48,6 @@ export type {
 } from './triggers/webhook-router';
 export type { TriggerResult, WorkflowTriggerContext } from './triggers/trigger-types';
 export {
-  WebhookPayloadValidationError,
   TriggerNotFoundError,
   ManualTriggerNotDeclaredError,
 } from './triggers/trigger-errors';

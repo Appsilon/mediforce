@@ -43,6 +43,9 @@ export async function deleteWorkflow(
 
   await scope.workflowDefinitions.setDeleted(input.namespace, input.name, true);
 
+  // ADR-0011: cascade — Triggers are meaningless without their workflow.
+  await scope.triggers.deleteByWorkflow(input.namespace, input.name);
+
   if (actualRunCount > 0) {
     const instanceIds = await scope.runs.getIdsByDefinitionName(input.name);
     await scope.runs.softDeleteByDefinitionName(input.name);

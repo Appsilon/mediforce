@@ -1,4 +1,8 @@
-import type { CronTriggerState, ProcessInstance, Trigger, WorkflowDefinition } from '@mediforce/platform-core';
+import type {
+  CronTriggerResource,
+  ProcessInstance,
+  WorkflowDefinition,
+} from '@mediforce/platform-core';
 import { resolveStrandedBudgetMs } from '@mediforce/platform-core';
 import { validateCronSchedule, isDue } from '@mediforce/workflow-engine';
 import type {
@@ -45,25 +49,53 @@ async function strandedBudgetMs(
 }
 
 function evaluateTrigger(
-  trigger: Trigger,
-  state: CronTriggerState | null,
+  trigger: CronTriggerResource,
   definitionCreatedAt: string | undefined,
   now: Date,
 ): Evaluation {
-  const schedule = trigger.schedule;
-  if (!schedule) return { fire: false, reason: 'No schedule defined' };
+  const schedule = trigger.config.schedule;
 
   const validation = validateCronSchedule(schedule);
   if (!validation.valid) return { fire: false, reason: `Invalid schedule: ${validation.error}` };
 
-  const lastTriggeredAt = state
-    ? new Date(state.lastTriggeredAt)
+  const lastTriggeredAt = trigger.lastTriggeredAt
+    ? new Date(trigger.lastTriggeredAt)
     : definitionCreatedAt
       ? new Date(definitionCreatedAt)
       : undefined;
   if (!isDue(schedule, now, lastTriggeredAt)) return { fire: false, reason: 'Not due' };
 
   return { fire: true };
+}
+
+type Resolution = { ok: true; def: WorkflowDefinition } | { ok: false; reason: string };
+
+// Resolve the Workflow Definition version a Cron Trigger fires (ADR-0011):
+// the workflow's default version when it is itself runnable, otherwise the
+// newest live (non-archived, non-deleted) version. Both the default pointer and
+// `getLatestVersion` include archived versions, so selecting from them directly
+// would skip a workflow whose head is archived even though an earlier version
+// is still runnable. Skips deleted or fully-archived targets so a stale row can
+// never fire a ghost run.
+async function resolveTarget(
+  scope: CallerScope,
+  namespace: string,
+  workflowName: string,
+): Promise<Resolution> {
+  if (await scope.workflowDefinitions.isNameDeleted(namespace, workflowName)) {
+    return { ok: false, reason: 'Workflow deleted' };
+  }
+  const versions = await scope.workflowDefinitions.listVersions(namespace, workflowName);
+  if (versions.length === 0) return { ok: false, reason: 'No resolvable version' };
+
+  const live = versions.filter((v) => v.archived !== true && v.deleted !== true);
+  if (live.length === 0) return { ok: false, reason: 'No live version' };
+
+  const defaultVersion = await scope.workflowDefinitions.getDefaultVersion(namespace, workflowName);
+  const def =
+    live.find((v) => v.version === defaultVersion) ??
+    live.reduce((newest, v) => (v.version > newest.version ? v : newest));
+  return { ok: true, def };
 }
 
 // System-actor only — reads across every workspace's definitions; gating
@@ -83,66 +115,78 @@ export async function heartbeat(
   const triggered: TriggeredEntry[] = [];
   const skipped: SkippedEntry[] = [];
 
-  const definitionGroups = await scope.workflowDefinitions.listGroups(false);
-  const cronDefinitions = definitionGroups
-    .map((group) => group.versions.find((v) => v.version === group.latestVersion))
-    .filter((def): def is WorkflowDefinition => def !== undefined)
-    .filter((def) => !def.deleted)
-    .filter((def) => def.triggers.some((t: Trigger) => t.type === 'cron'));
+  // Row-driven (ADR-0011): the unified `triggers` table is the source of truth
+  // for what fires, not the Definition's declared trigger array. Enabled cron
+  // rows across every workspace (system-actor read).
+  const cronRows = await scope.system.triggers.listEnabledByType('cron');
+  const cronTriggers = cronRows.filter(
+    (row): row is CronTriggerResource => row.type === 'cron',
+  );
 
-  for (const def of cronDefinitions) {
-    const cronTriggers = def.triggers.filter((t: Trigger) => t.type === 'cron');
-
-    for (const trigger of cronTriggers) {
-      const state = await scope.cron.get(def.name, trigger.name);
-      const evaluation = evaluateTrigger(trigger, state, def.createdAt, now);
-      const entryHead = {
-        definitionName: def.name,
-        definitionVersion: def.version,
+  for (const trigger of cronTriggers) {
+    const resolution = await resolveTarget(scope, trigger.namespace, trigger.workflowName);
+    if (!resolution.ok) {
+      skipped.push({
+        definitionName: trigger.workflowName,
+        definitionVersion: 0,
         triggerName: trigger.name,
-      };
-
-      if (!evaluation.fire) {
-        skipped.push({ ...entryHead, reason: evaluation.reason });
-        console.log(`[cron-heartbeat] skip '${def.name}/${trigger.name}': ${evaluation.reason}`);
-        continue;
-      }
-
-      const result = await scope.system.cronTrigger.fireWorkflow({
-        namespace: def.namespace,
-        definitionName: def.name,
-        definitionVersion: def.version,
-        triggerName: trigger.name,
-        triggeredBy: 'cron-heartbeat',
-        payload: { schedule: trigger.schedule, firedAt: now.toISOString() },
+        reason: resolution.reason,
       });
-
-      // Persist state AFTER successful fire (at-least-once semantics).
-      await scope.cron.set({
-        definitionName: def.name,
-        triggerName: trigger.name,
-        lastTriggeredAt: now.toISOString(),
-      });
-
-      await scope.system.audit.append({
-        actorId: 'cron-heartbeat',
-        actorType: 'system',
-        actorRole: 'scheduler',
-        action: 'cron.trigger.fired',
-        description: `Cron trigger '${trigger.name}' fired for '${def.name}' v${def.version}`,
-        timestamp: now.toISOString(),
-        inputSnapshot: { ...entryHead, schedule: trigger.schedule },
-        outputSnapshot: { instanceId: result.instanceId },
-        basis: 'Cron trigger schedule due',
-        entityType: 'processInstance',
-        entityId: result.instanceId,
-        processInstanceId: result.instanceId,
-        processDefinitionVersion: String(def.version),
-      });
-
-      await scope.system.runKicker.kick(result.instanceId, { triggeredBy: 'cron-heartbeat' });
-      triggered.push({ ...entryHead, instanceId: result.instanceId });
+      console.log(
+        `[cron-heartbeat] skip '${trigger.workflowName}/${trigger.name}': ${resolution.reason}`,
+      );
+      continue;
     }
+
+    const def = resolution.def;
+    const entryHead = {
+      definitionName: trigger.workflowName,
+      definitionVersion: def.version,
+      triggerName: trigger.name,
+    };
+
+    const evaluation = evaluateTrigger(trigger, def.createdAt, now);
+    if (!evaluation.fire) {
+      skipped.push({ ...entryHead, reason: evaluation.reason });
+      console.log(`[cron-heartbeat] skip '${trigger.workflowName}/${trigger.name}': ${evaluation.reason}`);
+      continue;
+    }
+
+    const result = await scope.system.cronTrigger.fireWorkflow({
+      namespace: def.namespace,
+      definitionName: def.name,
+      definitionVersion: def.version,
+      triggerName: trigger.name,
+      triggeredBy: 'cron-heartbeat',
+      payload: { schedule: trigger.config.schedule, firedAt: now.toISOString() },
+    });
+
+    // Advance the fire cursor AFTER a successful fire (at-least-once semantics).
+    await scope.system.triggers.recordTriggered(
+      trigger.namespace,
+      trigger.workflowName,
+      trigger.name,
+      now.toISOString(),
+    );
+
+    await scope.system.audit.append({
+      actorId: 'cron-heartbeat',
+      actorType: 'system',
+      actorRole: 'scheduler',
+      action: 'cron.trigger.fired',
+      description: `Cron trigger '${trigger.name}' fired for '${def.name}' v${def.version}`,
+      timestamp: now.toISOString(),
+      inputSnapshot: { ...entryHead, namespace: trigger.namespace, schedule: trigger.config.schedule },
+      outputSnapshot: { instanceId: result.instanceId },
+      basis: 'Cron trigger schedule due',
+      entityType: 'processInstance',
+      entityId: result.instanceId,
+      processInstanceId: result.instanceId,
+      processDefinitionVersion: String(def.version),
+    });
+
+    await scope.system.runKicker.kick(result.instanceId, { triggeredBy: 'cron-heartbeat' });
+    triggered.push({ ...entryHead, instanceId: result.instanceId });
   }
 
   // Sweep: resume timer-paused instances whose deadline has passed

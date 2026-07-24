@@ -16,6 +16,11 @@ vi.mock('@/lib/platform-services', () => ({
     auditRepo: { append: mockAuditAppend },
     namespaceRepo: {},
     modelRegistryRepo: { list: vi.fn().mockResolvedValue([]) },
+    triggerRepo: {
+      listByWorkflow: vi.fn().mockResolvedValue([]),
+      create: vi.fn(),
+      deleteByWorkflow: vi.fn(),
+    },
   }),
 }));
 

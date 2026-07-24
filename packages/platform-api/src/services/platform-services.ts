@@ -12,7 +12,6 @@ import {
   PostgresAuditRepository,
   PostgresOAuthProviderRepository,
   PostgresAgentOAuthTokenRepository,
-  PostgresCronTriggerStateRepository,
   PostgresTriggerRepository,
   PostgresAgentRunRepository,
   PostgresHumanTaskRepository,
@@ -39,7 +38,6 @@ import type {
   AuditRepository,
   BlobStore,
   CoworkSessionRepository,
-  CronTriggerStateRepository,
   TriggerRepository,
   EmailProviderInfo,
   HandoffRepository,
@@ -129,7 +127,6 @@ export interface PlatformServices {
   handoffRepo: HandoffRepository;
   agentDefinitionRepo: AgentDefinitionRepository;
   coworkSessionRepo: CoworkSessionRepository;
-  cronTriggerStateRepo: CronTriggerStateRepository;
   triggerRepo: TriggerRepository;
   toolCatalogRepo: ToolCatalogRepository;
   namespaceRepo: NamespaceRepository;
@@ -207,8 +204,6 @@ export function getPlatformServices(): PlatformServices {
   const agentDefinitionRepo: AgentDefinitionRepository = new PostgresAgentDefinitionRepository(pg);
   const coworkSessionRepo: CoworkSessionRepository =
     new PostgresCoworkSessionRepository(pg, instanceRepo);
-  const cronTriggerStateRepo: CronTriggerStateRepository =
-    new PostgresCronTriggerStateRepository(pg);
   const triggerRepo: TriggerRepository = new PostgresTriggerRepository(pg);
   const toolCatalogRepo: ToolCatalogRepository = new PostgresToolCatalogRepository(pg);
   const namespaceRepo: NamespaceRepository = new PostgresNamespaceRepository(pg);
@@ -365,7 +360,7 @@ export function getPlatformServices(): PlatformServices {
   const scriptStepExecutor = new ScriptStepExecutor(pluginRunner);
   const agentStepExecutor = new AgentStepExecutor(agentRunner);
 
-  const manualTrigger = new ManualTrigger(engine, processRepo);
+  const manualTrigger = new ManualTrigger(engine, processRepo, triggerRepo);
 
   const actionRegistry = new ActionRegistry();
   actionRegistry.register('http', httpActionHandler);
@@ -380,7 +375,7 @@ export function getPlatformServices(): PlatformServices {
     actionRegistry.register('email', createEmailActionHandler(emailSender));
   }
 
-  const webhookRouter = new WebhookRouter(engine, processRepo);
+  const webhookRouter = new WebhookRouter(engine, processRepo, triggerRepo);
 
   // Seed-based invite (PLAN-0002 §3.1): pre-seeds `auth_users` + workspace
   // membership + global roles in Postgres. No temp password, no credentials
@@ -426,7 +421,6 @@ export function getPlatformServices(): PlatformServices {
     handoffRepo,
     agentDefinitionRepo,
     coworkSessionRepo,
-    cronTriggerStateRepo,
     triggerRepo,
     toolCatalogRepo,
     namespaceRepo,

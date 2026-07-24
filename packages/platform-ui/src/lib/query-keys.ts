@@ -63,6 +63,12 @@ export const queryKeys = {
   workflowVersions: (namespace: string, name: string) =>
     ['workflow-versions', namespace, name] as const,
 
+  /** Live trigger rows for a workflow (triggers.list). Distinct from the
+   *  advisory triggers declared on a definition version — this reflects the
+   *  unified `triggers` table's enabled/schedule state (ADR-0011). */
+  workflowTriggers: (namespace: string, name: string) =>
+    ['workflow-triggers', namespace, name] as const,
+
   /** Aggregate step-entry view for a process instance (processes.getSteps). */
   processSteps: (instanceId: string) => ['process-steps', instanceId] as const,
 

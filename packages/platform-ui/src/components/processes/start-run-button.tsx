@@ -3,6 +3,7 @@
 import * as React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Popover from '@radix-ui/react-popover';
+import * as Tooltip from '@radix-ui/react-tooltip';
 import { useRouter } from 'next/navigation';
 import { Play, FlaskConical, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRound, FileInput } from 'lucide-react';
 import { useWorkflowVersions, useWorkflowVersion } from '@/hooks/use-workflow-versions';
@@ -214,7 +215,7 @@ export function StartRunButton({
   const disabledReason: string | null = archived
     ? 'Workflow is archived'
     : !hasManualTrigger
-      ? 'This workflow has no manual trigger'
+      ? 'Manual trigger is stopped — start it in the Triggers tab to run this workflow by hand'
       : effectiveVersion === 0
         ? 'No workflow version available'
         : null;
@@ -374,23 +375,24 @@ export function StartRunButton({
   if (!showVersionPicker || definitions.length <= 1) {
     return (
       <div>
-        <div className="relative inline-flex">
-          <button
-            disabled={isDisabled}
-            onClick={() => handleStart()}
-            title={tooltip}
-            aria-disabled={isDisabled}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap',
-              buttonClasses,
-              isDisabled && 'opacity-50 cursor-not-allowed',
-            )}
-          >
-            {buttonIcon}
-            {buttonLabel}
-          </button>
-          {warningBadge}
-        </div>
+        <InstantTooltip label={tooltip}>
+          <div className="relative inline-flex">
+            <button
+              disabled={isDisabled}
+              onClick={() => handleStart()}
+              aria-disabled={isDisabled}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap',
+                buttonClasses,
+                isDisabled && 'opacity-50 cursor-not-allowed',
+              )}
+            >
+              {buttonIcon}
+              {buttonLabel}
+            </button>
+            {warningBadge}
+          </div>
+        </InstantTooltip>
         {errorBanner}
         {preflightDialog}
       </div>
@@ -399,11 +401,11 @@ export function StartRunButton({
 
   return (
     <div>
+      <InstantTooltip label={tooltip}>
       <div className="relative inline-flex">
         <button
           disabled={isDisabled}
           onClick={() => handleStart()}
-          title={tooltip}
           aria-disabled={isDisabled}
           className={cn(
             'inline-flex items-center gap-1.5 rounded-l-md px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap',
@@ -418,7 +420,6 @@ export function StartRunButton({
           <Popover.Trigger asChild>
             <button
               disabled={isDisabled}
-              title={tooltip}
               aria-disabled={isDisabled}
               className={cn(
                 'inline-flex items-center rounded-r-md border-l border-white/20 px-1.5 py-1.5 transition-colors',
@@ -461,9 +462,38 @@ export function StartRunButton({
         </Popover.Root>
         {warningBadge}
       </div>
+      </InstantTooltip>
       {errorBanner}
       {preflightDialog}
     </div>
+  );
+}
+
+/**
+ * Wraps a control in a zero-delay tooltip. Renders children untouched when there
+ * is no `label` (e.g. the button is enabled). Uses the wrapper as the trigger so
+ * the tooltip still shows over a **disabled** button — a disabled `<button>`
+ * swallows its own hover events, and the native `title` tooltip both misses that
+ * and only appears after the browser's ~1s delay.
+ */
+function InstantTooltip({ label, children }: { label?: string; children: React.ReactNode }) {
+  if (label === undefined || label === '') return <>{children}</>;
+  return (
+    <Tooltip.Provider delayDuration={0}>
+      <Tooltip.Root>
+        <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
+        <Tooltip.Portal>
+          <Tooltip.Content
+            side="top"
+            sideOffset={6}
+            className="z-50 max-w-xs rounded-lg border bg-popover px-3 py-2 text-xs shadow-md animate-in fade-in-0 zoom-in-95"
+          >
+            {label}
+            <Tooltip.Arrow className="fill-popover" />
+          </Tooltip.Content>
+        </Tooltip.Portal>
+      </Tooltip.Root>
+    </Tooltip.Provider>
   );
 }
 

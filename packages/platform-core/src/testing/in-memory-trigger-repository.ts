@@ -15,6 +15,11 @@ import type { TriggerRepository, TriggerUpdate } from '../interfaces/trigger-rep
 export class InMemoryTriggerRepository implements TriggerRepository {
   private readonly store = new Map<string, TriggerResource>();
 
+  /** Test helper: drop all stored triggers (mirrors InMemoryProcessRepository.clear). */
+  clear(): void {
+    this.store.clear();
+  }
+
   private key(namespace: string, workflowName: string, name: string): string {
     return JSON.stringify([namespace, workflowName, name]);
   }
@@ -100,6 +105,21 @@ export class InMemoryTriggerRepository implements TriggerRepository {
       if (trigger.namespace === namespace && trigger.workflowName === workflowName) {
         this.store.delete(key);
       }
+    }
+  }
+
+  async transferWorkflowNamespace(
+    sourceNamespace: string,
+    workflowName: string,
+    targetNamespace: string,
+  ): Promise<void> {
+    const matches = [...this.store.entries()].filter(
+      ([, t]) => t.namespace === sourceNamespace && t.workflowName === workflowName,
+    );
+    for (const [key, trigger] of matches) {
+      this.store.delete(key);
+      const moved = { ...trigger, namespace: targetNamespace };
+      this.store.set(this.key(targetNamespace, workflowName, trigger.name), moved);
     }
   }
 }

@@ -2,11 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockTransferNamespace = vi.fn();
+const mockTriggerTransfer = vi.fn();
 const mockAuditAppend = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
     processRepo: { transferWorkflowNamespace: mockTransferNamespace },
+    triggerRepo: { transferWorkflowNamespace: mockTriggerTransfer },
     auditRepo: { append: mockAuditAppend },
     namespaceRepo: {},
   }),
@@ -59,6 +61,7 @@ describe('POST /api/workflow-definitions/:name/transfer', () => {
       targetNamespace: 'tgt',
     });
     expect(mockTransferNamespace).toHaveBeenCalledWith('src', 'my-wf', 'tgt');
+    expect(mockTriggerTransfer).toHaveBeenCalledWith('src', 'my-wf', 'tgt');
     expect(mockAuditAppend).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'workflow.transferred', entityId: 'my-wf' }),
     );
