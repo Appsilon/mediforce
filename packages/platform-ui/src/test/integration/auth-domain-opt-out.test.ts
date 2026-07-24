@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+// auth.ts wires NextAuth (which pulls in `next/server`) at module load; stub the
+// NextAuth surface so the signIn decision path imports cleanly under the unit
+// runner. buildAuthConfig itself does not need the real library.
+vi.mock('next-auth', () => ({
+  default: () => ({ auth: {}, handlers: {}, signIn: () => {}, signOut: () => {} }),
+}));
+vi.mock('next-auth/providers/google', () => ({ default: () => ({ id: 'google', type: 'oauth' }) }));
+vi.mock('@auth/drizzle-adapter', () => ({ DrizzleAdapter: () => ({}) }));
+
 // auth.ts opens a Postgres client at module load; stub the infra layer so the
 // signIn decision path can be exercised without a database.
 vi.mock('@mediforce/platform-infra', () => ({
