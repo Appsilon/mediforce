@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { User, AlertCircle } from 'lucide-react';
 import { getWorkspaceIcon, WORKSPACE_DEFAULT_KEY } from '@/lib/workspace-icons';
+import { WorkspaceAvatar } from '@/components/workspace-avatar';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import type { MeNamespace } from '@mediforce/platform-api/contract';
@@ -36,20 +37,31 @@ function OrgCard({
         <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-lg overflow-hidden border-2 border-transparent group-hover:border-primary transition-colors duration-150">
           {(() => {
             if (isPersonal) {
-              return namespace.avatarUrl !== undefined ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={namespace.avatarUrl} alt={label} className="h-full w-full object-cover" />
-              ) : (
-                <div className="h-full w-full flex items-center justify-center bg-muted">
-                  <User className="h-10 w-10 text-muted-foreground" />
-                </div>
+              return (
+                <WorkspaceAvatar
+                  source={namespace.avatarUrl}
+                  alt={label}
+                  className="h-full w-full object-cover"
+                  fallback={(
+                    <div className="h-full w-full flex items-center justify-center bg-muted">
+                      <User className="h-10 w-10 text-muted-foreground" />
+                    </div>
+                  )}
+                />
               );
             }
             const Icon = getWorkspaceIcon(namespace.icon);
             return (
-              <div className="h-full w-full flex items-center justify-center bg-primary/10">
-                <Icon className="h-10 w-10 text-primary" />
-              </div>
+              <WorkspaceAvatar
+                source={namespace.logo}
+                alt={label}
+                className="h-full w-full object-cover"
+                fallback={(
+                  <div className="h-full w-full flex items-center justify-center bg-primary/10">
+                    <Icon className="h-10 w-10 text-primary" />
+                  </div>
+                )}
+              />
             );
           })()}
         </div>

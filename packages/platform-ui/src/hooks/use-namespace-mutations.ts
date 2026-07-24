@@ -21,7 +21,7 @@ import { queryKeys } from '@/lib/query-keys';
 
 /**
  * PATCH /api/namespaces/:handle — write workspace metadata (displayName,
- * bio, icon). Optimistic patch on `['namespace', handle]` so the UI flips
+ * bio, icon, logo, brand colors). Optimistic patch on `['namespace', handle]` so the UI flips
  * immediately; the entity-echo replaces the cache in `onSuccess`. Falls
  * back to the snapshot on error.
  *
@@ -48,6 +48,9 @@ export function useUpdateNamespace(handle: string) {
             ...prev.namespace,
             ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
             ...(input.icon !== undefined ? { icon: input.icon } : {}),
+            ...(input.logo !== undefined ? { logo: input.logo } : {}),
+            ...(input.brandPrimaryColor !== undefined ? { brandPrimaryColor: input.brandPrimaryColor } : {}),
+            ...(input.brandAccentColor !== undefined ? { brandAccentColor: input.brandAccentColor } : {}),
             ...(input.bio !== undefined ? { bio: input.bio } : {}),
           },
         };
@@ -73,6 +76,9 @@ export function useUpdateNamespace(handle: string) {
                   displayName: data.namespace.displayName,
                   ...(data.namespace.icon !== undefined ? { icon: data.namespace.icon } : {}),
                   ...(data.namespace.avatarUrl !== undefined ? { avatarUrl: data.namespace.avatarUrl } : {}),
+                  ...(data.namespace.logo !== undefined ? { logo: data.namespace.logo } : {}),
+                  ...(data.namespace.brandPrimaryColor !== undefined ? { brandPrimaryColor: data.namespace.brandPrimaryColor } : {}),
+                  ...(data.namespace.brandAccentColor !== undefined ? { brandAccentColor: data.namespace.brandAccentColor } : {}),
                 }
               : n,
           ),

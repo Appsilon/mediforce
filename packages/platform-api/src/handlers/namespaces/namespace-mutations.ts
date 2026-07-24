@@ -20,10 +20,15 @@ import type {
   UpdateNamespaceOutput,
 } from '../../contract/namespaces';
 
+const BRANDING_FIELDS = ['icon', 'logo', 'brandPrimaryColor', 'brandAccentColor'] as const;
+
 /**
- * Edit workspace `displayName`, `bio`, `icon`. Owner/admin only.
- * Two-state semantics: undefined leaves the field untouched, any string
- * overwrites it (empty string is the cleared state for `bio`).
+ * Edit workspace `displayName`, `bio`, `icon`, `logo`, and brand colors.
+ * Owner/admin only. Two-state semantics: undefined leaves the field untouched,
+ * any string overwrites it (empty string is the cleared state for `bio`, `logo`,
+ * and the brand colors — cleared branding falls back to the icon + default
+ * palette). Branding is organization-only: a personal namespace renders the
+ * linked user's avatar, so icon/logo/colors have nowhere to show.
  */
 export async function updateNamespace(
   input: UpdateNamespaceInput,
@@ -34,9 +39,22 @@ export async function updateNamespace(
   const existing = await scope.workspaces.getNamespace(input.handle);
   if (existing === null) throw new NotFoundError(`Namespace "${input.handle}" not found`);
 
+  if (existing.type === 'personal') {
+    const attempted = BRANDING_FIELDS.filter((field) => input[field] !== undefined);
+    if (attempted.length > 0) {
+      throw new PreconditionFailedError(
+        `Branding (${attempted.join(', ')}) can only be set on an organization workspace.`,
+        { handle: input.handle, type: existing.type, fields: attempted },
+      );
+    }
+  }
+
   const updates: NamespaceUpdates = {
     ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
     ...(input.icon !== undefined ? { icon: input.icon } : {}),
+    ...(input.logo !== undefined ? { logo: input.logo } : {}),
+    ...(input.brandPrimaryColor !== undefined ? { brandPrimaryColor: input.brandPrimaryColor } : {}),
+    ...(input.brandAccentColor !== undefined ? { brandAccentColor: input.brandAccentColor } : {}),
     ...(input.bio !== undefined ? { bio: input.bio } : {}),
   };
 
@@ -45,10 +63,15 @@ export async function updateNamespace(
   const namespace = await scope.workspaces.getNamespace(input.handle);
   if (namespace === null) throw new NotFoundError(`Namespace "${input.handle}" not found`);
 
+  // The logo is a multi-KB base64 data URL; record only whether it was set or
+  // cleared so the audit snapshot stays small.
+  const { logo, ...auditableUpdates } = updates;
+  const logoSnapshot = logo === undefined ? {} : { logo: logo === '' ? 'cleared' : 'updated' };
+
   await emitAudit(scope.system.audit, scope.caller, {
     action: 'namespace.updated',
     description: `Namespace '${input.handle}' updated`,
-    inputSnapshot: { handle: input.handle, ...updates },
+    inputSnapshot: { handle: input.handle, ...auditableUpdates, ...logoSnapshot },
     outputSnapshot: { handle: namespace.handle, displayName: namespace.displayName },
     basis: 'Owner/admin edited workspace via API',
     entityType: 'namespace',

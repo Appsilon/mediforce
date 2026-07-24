@@ -38,6 +38,26 @@ describe('UpdateNamespace schemas', () => {
   it('UpdateNamespaceInputSchema accepts bio: "" to clear', () => {
     expect(UpdateNamespaceInputSchema.safeParse({ handle: 'acme', bio: '' }).success).toBe(true);
   });
+
+  it('accepts brand colors as #rrggbb hex and "" to clear', () => {
+    expect(UpdateNamespaceBodySchema.safeParse({ brandPrimaryColor: '#0d9488' }).success).toBe(true);
+    expect(UpdateNamespaceBodySchema.safeParse({ brandAccentColor: '#F59E0B' }).success).toBe(true);
+    expect(UpdateNamespaceBodySchema.safeParse({ brandPrimaryColor: '' }).success).toBe(true);
+  });
+
+  it('rejects malformed brand colors', () => {
+    expect(UpdateNamespaceBodySchema.safeParse({ brandPrimaryColor: 'teal' }).success).toBe(false);
+    expect(UpdateNamespaceBodySchema.safeParse({ brandPrimaryColor: '#fff' }).success).toBe(false);
+    expect(UpdateNamespaceBodySchema.safeParse({ brandAccentColor: '0d9488' }).success).toBe(false);
+  });
+
+  it('accepts a base64 image data URL logo and "" to clear, rejects non-images', () => {
+    const logo = 'data:image/png;base64,iVBORw0KGgo=';
+    expect(UpdateNamespaceBodySchema.safeParse({ logo }).success).toBe(true);
+    expect(UpdateNamespaceBodySchema.safeParse({ logo: '' }).success).toBe(true);
+    expect(UpdateNamespaceBodySchema.safeParse({ logo: 'https://example.com/a.png' }).success).toBe(false);
+    expect(UpdateNamespaceBodySchema.safeParse({ logo: 'data:text/html;base64,PHNjcmlwdD4=' }).success).toBe(false);
+  });
 });
 
 describe('UpdateNamespaceMemberRoleBodySchema', () => {
