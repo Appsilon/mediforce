@@ -665,4 +665,27 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page).toHaveURL(/\/definitions\/1$/);
     await expect(page.getByRole('button', { name: /save & start run/i })).toBeEnabled();
   });
+
+  // ── Save & Dry Run resolver flow ───────────────────────────────────────────
+
+  test('Save & Dry Run sits beside Save & Start Run and opens the version dialog', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    // The header now exposes a dedicated "Save & Dry Run" button next to
+    // "Save & Start Run" — the mode is fixed by the button, not chosen in a dialog.
+    const saveAndDryRun = page.getByRole('button', { name: /save & dry run/i });
+    await expect(saveAndDryRun).toBeEnabled({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: /save & start run/i })).toBeEnabled();
+
+    // It runs the same save-then-start handshake: parks a resolver and opens the
+    // version-name dialog. Cancelling aborts without starting a run.
+    await saveAndDryRun.click();
+    await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 5_000 });
+    await page.getByRole('button', { name: /^cancel$/i }).click();
+    await expect(page.getByRole('heading', { name: /name this version/i })).not.toBeVisible();
+    await expect(page).toHaveURL(/\/definitions\/1$/);
+    await expect(saveAndDryRun).toBeEnabled();
+  });
 });

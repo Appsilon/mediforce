@@ -262,7 +262,20 @@ export default function NewWorkflowPage() {
             <StartRunButton
               workflowName={toWorkflowId(workflowName) || 'workflow'}
               hasManualTrigger
+              label="Save & Dry Run"
+              mode="dry-run"
+              disabled={!canSave}
+              preflightEnabled={false}
+              onBeforeStart={() => new Promise<number | undefined>((resolve) => {
+                startAfterSaveResolverRef.current = resolve;
+                setDialogOpen(true);
+              })}
+            />
+            <StartRunButton
+              workflowName={toWorkflowId(workflowName) || 'workflow'}
+              hasManualTrigger
               label="Save & Start Run"
+              mode="production"
               disabled={!canSave}
               preflightEnabled={false}
               onBeforeStart={() => new Promise<number | undefined>((resolve) => {

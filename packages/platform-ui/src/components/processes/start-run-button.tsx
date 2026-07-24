@@ -39,6 +39,13 @@ interface StartRunButtonProps {
    * 404 against a not-yet-created workflow.
    */
   preflightEnabled?: boolean;
+  /**
+   * Fixes the run mode this button starts. When set, the button carries the
+   * intent (e.g. "Save & Dry Run" -> 'dry-run') so the preflight dialog no
+   * longer re-asks Dry Run vs Start — it shows a single confirm for this mode.
+   * Left undefined, the button is mode-agnostic and the dialog offers both.
+   */
+  mode?: 'production' | 'dry-run';
 }
 
 export function StartRunButton({
@@ -51,6 +58,7 @@ export function StartRunButton({
   disabled = false,
   onBeforeStart,
   preflightEnabled = true,
+  mode,
 }: StartRunButtonProps) {
   const router = useRouter();
   const handle = useHandleFromPath();
@@ -225,7 +233,7 @@ export function StartRunButton({
       setPendingVersion(targetVersion);
       setDialogOpen(true);
     } else {
-      executeStart(targetVersion);
+      executeStart(targetVersion, mode === 'dry-run');
     }
   }
 
@@ -243,11 +251,16 @@ export function StartRunButton({
     <p className="mt-1 text-xs text-destructive max-w-xs truncate" title={error}>{error}</p>
   ) : null;
 
-  const buttonClasses = 'bg-primary text-primary-foreground hover:bg-primary/90';
+  const isDryRun = mode === 'dry-run';
+  const buttonClasses = isDryRun
+    ? 'border border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-700 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/40'
+    : 'bg-primary text-primary-foreground hover:bg-primary/90';
 
   const buttonIcon = starting || preflightLoading || runningBeforeStart
     ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-    : <Play className="h-3.5 w-3.5" />;
+    : isDryRun
+      ? <FlaskConical className="h-3.5 w-3.5" />
+      : <Play className="h-3.5 w-3.5" />;
 
   const buttonLabel = starting ? 'Starting...' : runningBeforeStart ? 'Saving...' : preflightLoading ? 'Checking...' : (label ?? 'Start Run');
 
@@ -362,27 +375,31 @@ export function StartRunButton({
             <Dialog.Close className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors">
               Cancel
             </Dialog.Close>
-            <button
-              onClick={() => executeStart(pendingVersion, true)}
-              disabled={inputBlocked}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 hover:bg-violet-100 dark:border-violet-700 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 px-3 py-1.5 text-sm font-medium text-violet-700 dark:text-violet-300 transition-colors',
-                inputBlocked && 'opacity-50 cursor-not-allowed',
-              )}
-            >
-              <FlaskConical className="h-3.5 w-3.5" />
-              Dry Run
-            </button>
-            <button
-              onClick={() => executeStart(pendingVersion)}
-              disabled={inputBlocked}
-              className={cn(
-                'rounded-md bg-primary hover:bg-primary/90 px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors',
-                inputBlocked && 'opacity-50 cursor-not-allowed',
-              )}
-            >
-              {startButtonLabel}
-            </button>
+            {mode !== 'production' && (
+              <button
+                onClick={() => executeStart(pendingVersion, true)}
+                disabled={inputBlocked}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 hover:bg-violet-100 dark:border-violet-700 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 px-3 py-1.5 text-sm font-medium text-violet-700 dark:text-violet-300 transition-colors',
+                  inputBlocked && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                <FlaskConical className="h-3.5 w-3.5" />
+                Dry Run
+              </button>
+            )}
+            {mode !== 'dry-run' && (
+              <button
+                onClick={() => executeStart(pendingVersion)}
+                disabled={inputBlocked}
+                className={cn(
+                  'rounded-md bg-primary hover:bg-primary/90 px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors',
+                  inputBlocked && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                {startButtonLabel}
+              </button>
+            )}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

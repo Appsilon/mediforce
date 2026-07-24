@@ -235,7 +235,20 @@ export default function WorkflowDefinitionVersionPage() {
               version={definition.version}
               hasManualTrigger={hasManualTrigger}
               archived={definition.archived === true}
+              label="Save & Dry Run"
+              mode="dry-run"
+              onBeforeStart={() => new Promise<number | undefined>((resolve) => {
+                startAfterSaveResolverRef.current = resolve;
+                setDialogOpen(true);
+              })}
+            />
+            <StartRunButton
+              workflowName={decodedName}
+              version={definition.version}
+              hasManualTrigger={definition.triggers?.some((trigger) => trigger.type === 'manual') ?? false}
+              archived={definition.archived === true}
               label="Save & Start Run"
+              mode="production"
               onBeforeStart={() => new Promise<number | undefined>((resolve) => {
                 startAfterSaveResolverRef.current = resolve;
                 setDialogOpen(true);
