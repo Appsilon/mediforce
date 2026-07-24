@@ -70,6 +70,15 @@ The Co-Work Workflow Designer Workflow (`apps/workflow-designer/src/workflow-des
 - The canvas-mutation tool schema and its handlers — translating an LLM tool call into calls against the existing `addStep`/`updateStep`/`removeStep`/etc. functions already in `workflow-editor-canvas.tsx`. The Co-Work Designer Workflow's equivalent (`update_artifact`) mutated a JSON artifact tracked by the engine, which does not apply here.
 - Streaming: not present anywhere in the current cowork implementation (explicitly deferred, see `docs/adr/draft/cowork-streaming.md` and issue #516). Request/response is the starting point for the AI Assistant pane too; streaming is a follow-up if response latency proves it necessary.
 
+**Tool boundary — editing vs. execution:**
+
+The assistant's tools split by what they act on, and that boundary decides where each tool lives:
+
+- *Draft-editing* tools (`add_step`/`update_step`/`remove_step`) mutate the **unsaved canvas draft** client-side. They stay in the assistant handler as a pure reducer.
+- *Execution/testing* tools (dry-run: start a run, poll status, complete a human task, read logs) act on a **registered** workflow over REST. These already exist as the shared MCP tools in `packages/mediforce-mcp/src/server.ts` (used by the old cowork designer); they belong in the MCP, not duplicated into the assistant handler.
+
+**Why the assistant does not (yet) drive a full dry-run loop:** the assistant is **stateless** — its conversation is `{role, content}` text only (`WorkflowAssistantMessageSchema`), with no tool-call/result turns persisted across requests, and each request runs one synchronous internal loop. A dry-run loop is inherently multi-turn and asynchronous (start → get `runId` → poll → pause on a human step → complete → re-poll → iterate) and needs `runId` to survive between turns. The old cowork designer could do this only because it had a **persisted session** storing full tool turns — which this designer deliberately dropped to stay stateless. So full assistant-driven dry-run is deferred. Dry-run ships as its own effort (`feat/dry-run-improvements`): a **Save & Dry Run** button and making dry-run **mock all agent types** (today `dryRun` is only a tag and `MOCK_AGENT` mocks Claude only). If the assistant later triggers dry-runs, the smallest step is to let it *kick off* a run (returning a `runId` + link) and leave watch/complete to the run UI; the full conversational loop needs the message model extended to round-trip tool turns.
+
 ## Consequences
 
 - The Co-Work Workflow Designer Workflow is deprecated as a workflow creation path and will be removed once the in-canvas AI Assistant (Phase 4) lands; it still ships in this phase because the AI Assistant pane is a placeholder shell.
