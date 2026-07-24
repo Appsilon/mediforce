@@ -85,6 +85,33 @@ _Avoid_: treating a Trigger as part of the Workflow Definition (it isn't — the
 are detached resources), or conflating it with the **Trigger Payload** on a
 Workflow Run (the data a firing hands the Run).
 
+**Trigger Input** *(contract; on the Workflow Definition — `triggerInput`)*:
+The **total, trigger-agnostic input contract** a Workflow declares — the named,
+typed fields a firing must supply, regardless of which Trigger kind fires. Every
+firing is validated against it: declared fields are required/typed, undeclared
+fields are **rejected** (strict), and an empty/absent contract means the payload
+must be **empty**. Opaque un-enumerable input (a proxied third-party JSON body)
+is declared as a single field of `object` type.
+_Status:_ today `triggerInput` is validated **only** on manual/API starts and
+scalar-typed; unifying it across webhook + cron and adding the `object` type is
+the open follow-up.
+_Avoid_: treating `triggerInput` as webhook-body-only or manual-only; using
+**Trigger Context** to carry declared input.
+
+**Trigger Payload** *(runtime; on a Workflow Run)*:
+The **validated, trigger-agnostic** input a firing hands the Run — conforms to
+the Workflow's **Trigger Input** contract and is read by Steps as
+`${triggerPayload.<field>}` no matter which Trigger fired.
+_Avoid_: putting transport metadata (HTTP headers, cron `firedAt`) on it — that
+belongs on **Trigger Context**.
+
+**Trigger Context** *(runtime; on a Workflow Run)*:
+A reserved, **trigger-specific** escape hatch holding the raw transport metadata
+of a firing (webhook `headers`/`query`/`method`/`path`, cron `firedAt`/`schedule`).
+Steps that read `${triggerContext.*}` knowingly re-couple to a Trigger kind.
+_Avoid_: routing declared workflow input through it — declared input is **Trigger
+Payload**.
+
 **Workflow Step** *(config; static)*:
 A node in a Workflow Definition's DAG. Defines `executor: human | agent |
 script | cowork | action`, optional autonomy level (agent steps),
