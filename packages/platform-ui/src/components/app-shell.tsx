@@ -17,6 +17,7 @@ import { ThemeToggle } from './theme-toggle';
 import { CommandPaletteTrigger } from './command-palette';
 import { cn } from '@/lib/utils';
 import { workspaceSwitchHref } from '@/lib/workspace-switch';
+import { formatStepName } from '@/lib/format';
 
 const NAV_ITEMS = [
   { href: '', label: 'Workflows', icon: GitBranch, badge: null, exact: true },
@@ -107,7 +108,7 @@ function buildBreadcrumbs(pathname: string, handle: string, prefix: string): Cru
   if (s0 === 'workflows') {
     if (!s1 || s1 === 'new') return [workflows, { label: 'New Workflow', href: null }];
 
-    const workflowName = decodeURIComponent(s1);
+    const workflowName = formatStepName(decodeURIComponent(s1));
     const workflowHref = `${prefix}/workflows/${s1}`;
     const workflow: Crumb = { label: workflowName, href: workflowHref };
 
