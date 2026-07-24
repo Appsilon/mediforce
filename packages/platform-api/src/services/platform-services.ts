@@ -84,7 +84,7 @@ import {
   PluginRegistry,
   OpenRouterLlmClient,
   ClaudeCodeAgentPlugin,
-  MockClaudeCodeAgentPlugin,
+  MockAgentPlugin,
   OpenCodeAgentPlugin,
   ScriptContainerPlugin,
   DatabricksJobPlugin,
@@ -272,11 +272,11 @@ export function getPlatformServices(): PlatformServices {
 
   const useMockAgent = process.env.MOCK_AGENT === 'true';
   if (useMockAgent) {
-    console.log('[platform-services] MOCK_AGENT=true — using MockClaudeCodeAgentPlugin');
+    console.log('[platform-services] MOCK_AGENT=true — using MockAgentPlugin');
   }
   pluginRegistry.register(
     'claude-code-agent',
-    useMockAgent ? new MockClaudeCodeAgentPlugin() : new ClaudeCodeAgentPlugin(),
+    useMockAgent ? new MockAgentPlugin() : new ClaudeCodeAgentPlugin(),
   );
 
   pluginRegistry.register('opencode-agent', new OpenCodeAgentPlugin());

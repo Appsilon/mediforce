@@ -24,6 +24,7 @@ import {
   ScriptStepExecutor,
   InMemoryAgentEventLog,
   PluginRunner,
+  MockAgentPlugin,
 } from '@mediforce/agent-runtime';
 
 // Mock platform-services module
@@ -277,6 +278,53 @@ describe('executeAgentStep', () => {
         process.env.MOCK_AGENT = originalMockAgent;
       }
     }
+  });
+
+  // ---- Dry run mocks all agent types ----
+
+  describe('dry run mocks all agent types', () => {
+    const dryRunInstance = buildProcessInstance({
+      id: 'inst-wf-001',
+      definitionName: 'community-digest',
+      definitionVersion: '1',
+      currentStepId: 'gather-data',
+      status: 'running',
+      configName: undefined,
+      configVersion: undefined,
+      dryRun: true,
+    });
+
+    for (const pluginId of ['opencode-agent', 'databricks-job'] as const) {
+      it(`[DATA] dry run swaps in MockAgentPlugin instead of ${pluginId}`, async () => {
+        mockInstanceRepo.getById.mockResolvedValue(dryRunInstance);
+        const step: WorkflowStep = { ...firstStep, plugin: pluginId };
+
+        await executeAgentStep('inst-wf-001', 'gather-data', step, {}, 'user-1');
+
+        expect(mockPluginRegistry.get).not.toHaveBeenCalledWith(pluginId);
+        const passedPlugin = mockAgentRunner.runWithWorkflowStep.mock.calls[0][0];
+        expect(passedPlugin).toBeInstanceOf(MockAgentPlugin);
+      });
+    }
+
+    it('[DATA] dry run mocks script-executor steps too (no real plugin resolved)', async () => {
+      mockInstanceRepo.getById.mockResolvedValue(dryRunInstance);
+      const scriptStep: WorkflowStep = {
+        id: 'gather-data', name: 'Gather Data', type: 'creation', executor: 'script', plugin: 'script-container',
+      };
+
+      await executeAgentStep('inst-wf-001', 'gather-data', scriptStep, {}, 'user-1');
+
+      expect(mockPluginRegistry.get).not.toHaveBeenCalledWith('script-container');
+    });
+
+    it('[DATA] a non-dry run still resolves the real plugin from the registry', async () => {
+      const step: WorkflowStep = { ...firstStep, plugin: 'databricks-job' };
+
+      await executeAgentStep('inst-wf-001', 'gather-data', step, {}, 'user-1');
+
+      expect(mockPluginRegistry.get).toHaveBeenCalledWith('databricks-job');
+    });
   });
 
   // ---- Autonomy level resolution ----
