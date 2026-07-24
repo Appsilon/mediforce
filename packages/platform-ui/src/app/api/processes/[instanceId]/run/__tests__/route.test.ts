@@ -519,6 +519,62 @@ describe('POST /api/processes/[instanceId]/run', () => {
       }));
     });
 
+    it('[DATA] first step is a decision — task carries verdicts so the form renders a verdict picker', async () => {
+      const decisionFirstWorkflow = {
+        ...workflowDefinition,
+        steps: [
+          {
+            id: 'manager-proposes',
+            name: 'Manager Proposes',
+            type: 'decision',
+            executor: 'human',
+            params: [{ name: 'employee_name', type: 'string', required: true }],
+            verdicts: {
+              propose: { target: 'done', label: 'Propose' },
+              cancel: { target: 'done', label: 'Cancel' },
+            },
+          },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [
+          { from: 'manager-proposes', to: 'done' },
+        ],
+      };
+
+      mockInstanceGetById.mockImplementation(() =>
+        Promise.resolve({
+          id: 'inst-1',
+          namespace: 'test-ns',
+          definitionName: 'community-digest',
+          definitionVersion: '1',
+          status: 'running',
+          currentStepId: 'manager-proposes',
+          configName: undefined,
+          variables: {},
+          triggerPayload: {},
+        }),
+      );
+
+      mockGetWorkflowDefinition.mockResolvedValue(decisionFirstWorkflow);
+
+      const res = await POST(makeRequest(), { params: makeParams('inst-1') });
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
+
+      // Without verdicts on the task, the UI renders a params-only form (no
+      // verdict picker) and completing the step records no verdict — the engine
+      // then can't route the decision step and pauses with routing_error.
+      const createArg = mockHumanTaskCreate.mock.calls[0][0];
+      expect(createArg.stepId).toBe('manager-proposes');
+      expect(createArg.verdicts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ key: 'propose' }),
+          expect.objectContaining({ key: 'cancel' }),
+        ]),
+      );
+    });
+
     it('[DATA] chained agent steps execute in sequence until human step', async () => {
       const chainedWorkflow = {
         ...workflowDefinition,
