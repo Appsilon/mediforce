@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check, ArrowLeft, ChevronRight, Wrench, Database } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
+import { BrandTheme } from './brand-theme';
+import { WorkspaceAvatar } from './workspace-avatar';
 import * as Popover from '@radix-ui/react-popover';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
@@ -119,13 +121,6 @@ function buildBreadcrumbs(pathname: string, handle: string, prefix: string): Cru
   return [{ label: 'Workflows', href: null }];
 }
 
-function ImgWithFallback({ src, className, fallback }: { src: string; className: string; fallback: React.ReactNode }) {
-  const [errored, setErrored] = React.useState(false);
-  if (errored) return <>{fallback}</>;
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt="" className={className} onError={() => setErrored(true)} />;
-}
-
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
@@ -170,26 +165,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-label="Switch namespace"
             >
               {(() => {
-                const avatarSrc = activeNamespace?.avatarUrl ?? (activeNamespace?.type === 'personal' ? user?.image : undefined) ?? undefined;
+                const orgLogo = activeNamespace?.type === 'organization' ? activeNamespace.logo : undefined;
+                const avatarSrc = (orgLogo !== undefined && orgLogo !== '' ? orgLogo : undefined)
+                  ?? activeNamespace?.avatarUrl
+                  ?? (activeNamespace?.type === 'personal' ? user?.image : undefined);
+                const initials = user?.name !== undefined && user?.name !== null
+                  ? user.name
+                      .split(' ')
+                      .slice(0, 2)
+                      .map((part) => part[0]?.toUpperCase() ?? '')
+                      .join('')
+                  : '?';
                 const avatarFallback = (
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-semibold">
                     {activeNamespace !== null && activeNamespace.type === 'organization' ? (
                       (() => { const Icon = getWorkspaceIcon(activeNamespace.icon); return <Icon className="h-3.5 w-3.5" />; })()
                     ) : (
-                      user?.name
-                        ? user.name
-                            .split(' ')
-                            .slice(0, 2)
-                            .map((part) => part[0]?.toUpperCase() ?? '')
-                            .join('')
-                        : '?'
+                      initials
                     )}
                   </div>
                 );
-                if (avatarSrc) {
-                  return <ImgWithFallback src={avatarSrc} className="h-7 w-7 shrink-0 rounded-md object-cover" fallback={avatarFallback} />;
-                }
-                return avatarFallback;
+                return (
+                  <WorkspaceAvatar
+                    source={avatarSrc}
+                    className="h-7 w-7 shrink-0 rounded-md object-cover"
+                    fallback={avatarFallback}
+                  />
+                );
               })()}
               <span className="flex-1 truncate text-left text-sm font-medium">
                 {activeDisplayName}
@@ -215,11 +217,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           handleFromPath === personalNamespace.handle ? 'text-foreground' : 'text-muted-foreground',
                         )}
                       >
-                        {user?.image ? (
-                          <ImgWithFallback src={user.image} className="h-5 w-5 shrink-0 rounded-full object-cover" fallback={<User className="h-4 w-4 shrink-0" />} />
-                        ) : (
-                          <User className="h-4 w-4 shrink-0" />
-                        )}
+                        <WorkspaceAvatar
+                          source={user?.image}
+                          className="h-5 w-5 shrink-0 rounded-full object-cover"
+                          fallback={<User className="h-4 w-4 shrink-0" />}
+                        />
                         <span className="flex-1 truncate">
                           <span className="block font-medium text-foreground">My profile</span>
                           <span className="block text-xs text-muted-foreground">@{personalNamespace.handle}</span>
@@ -241,7 +243,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           isActive ? 'text-foreground' : 'text-muted-foreground',
                         )}
                       >
-                        {(() => { const Icon = getWorkspaceIcon(ns.icon); return <Icon className="h-4 w-4 shrink-0" />; })()}
+                        <WorkspaceAvatar
+                          source={ns.logo}
+                          className="h-4 w-4 shrink-0 rounded object-cover"
+                          fallback={(() => { const Icon = getWorkspaceIcon(ns.icon); return <Icon className="h-4 w-4 shrink-0" />; })()}
+                        />
                         <span className="flex-1 truncate">
                           <span className="block font-medium text-foreground">{ns.displayName}</span>
                           <span className="block text-xs text-muted-foreground">@{ns.handle}</span>
@@ -334,6 +340,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen flex-col bg-background">
+      <BrandTheme
+        primaryColor={activeNamespace?.brandPrimaryColor}
+        accentColor={activeNamespace?.brandAccentColor}
+      />
       {showRankingsBanner && (
         <div className="flex items-center justify-between bg-amber-100 dark:bg-amber-950/50 px-4 py-1.5 text-xs text-amber-800 dark:text-amber-300 border-b border-amber-200 dark:border-amber-900/50">
           <span>
