@@ -200,7 +200,8 @@ wd = {
     "transitions": transitions,
     # Definitions are trigger-free (Issue #932). Manual hand-start is auto-seeded
     # on register; attach a cron schedule out-of-band with
-    # `mediforce workflow trigger-add --type cron --schedule "*/15 * * * *"`.
+    # `mediforce workflow trigger-add mediforce-fullstack --trigger every-15-min \
+    #    --namespace <workspace-handle> --type cron --schedule "*/15 * * * *"`.
 }
 
 OUT.write_text(json.dumps(wd, indent=2) + "\n")
