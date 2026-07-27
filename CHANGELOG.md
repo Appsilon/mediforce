@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Changed
+- `WebhookTriggerConfigSchema` (+ its `WebhookTriggerConfig` type) moved from `schemas/workflow-definition.ts` to `schemas/trigger.ts`, next to `TriggerResourceSchema` — its only consumers are the detached `webhook` trigger row and trigger-create validation, so it no longer belongs in the now trigger-free definition module. `HttpMethodSchema` stays in `workflow-definition.ts` (still shared with the `http` action step). Pure code-organization move; the `@mediforce/platform-core` barrel exports are unchanged [#932](https://github.com/Appsilon/mediforce/issues/932).
 - Workflow **Triggers** tab polish: the sections now read **Manual → Scheduled (cron) → Webhook** (was Manual → Webhook → cron). The webhook create form drops the HTTP-method selector — the catch-all route only serves `POST`, so webhooks are always created as POST — and shows a live **Full URL** preview (`/api/triggers/webhook/<handle>/<workflow><path>`) under the **Path** input, so the whole endpoint is visible while you type instead of only the caller-chosen suffix. Both the create form and the created webhook row render a ready-to-run `curl` **Example usage** block including the required `X-Api-Key` header and a JSON body. The create button/heading now read "Create webhook trigger" instead of "Add webhook trigger" [#931](https://github.com/Appsilon/mediforce/issues/931).
 
 ### Removed

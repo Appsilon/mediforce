@@ -12,19 +12,9 @@ import { ProcessNotificationConfigSchema } from './process-config';
 import { McpServerConfigSchema } from './mcp-server-config';
 import { StepMcpRestrictionSchema } from './agent-mcp-binding';
 
-/** HTTP method enum used by webhook triggers and the http action handler. */
+/** HTTP method enum used by the http action handler and (via the detached
+ *  Trigger resource) webhook triggers. */
 export const HttpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']);
-
-/** Webhook trigger config: method + url path (relative to /api/triggers/webhook/<ns>/<wf>).
- *  The path discriminates when a workflow has multiple webhook triggers and is
- *  matched verbatim against the suffix segment(s) the caller used. */
-export const WebhookTriggerConfigSchema = z.object({
-  method: HttpMethodSchema,
-  path: z
-    .string()
-    .min(1)
-    .regex(/^\/[A-Za-z0-9_\-/]*$/, 'path must start with "/" and contain url-safe chars only'),
-});
 
 /** http action config: minimal request shape passed to fetch().
  *  `body` accepts any JSON-serializable value or a string template — the action
@@ -88,7 +78,6 @@ export const ActionConfigSchema = z.discriminatedUnion('kind', [
 ]);
 
 export type HttpMethod = z.infer<typeof HttpMethodSchema>;
-export type WebhookTriggerConfig = z.infer<typeof WebhookTriggerConfigSchema>;
 export type HttpActionConfig = z.infer<typeof HttpActionConfigSchema>;
 export type ReshapeActionConfig = z.infer<typeof ReshapeActionConfigSchema>;
 export type EmailActionConfig = z.infer<typeof EmailActionConfigSchema>;

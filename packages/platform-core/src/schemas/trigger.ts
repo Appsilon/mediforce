@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WebhookTriggerConfigSchema } from './workflow-definition';
+import { HttpMethodSchema } from './workflow-definition';
 
 /**
  * The unified, detached Trigger resource (ADR-0011, triggers-detachment epic).
@@ -35,6 +35,17 @@ export const CronTriggerConfigSchema = z.object({
   schedule: z.string().min(1),
 });
 
+/** webhook config: method + url path (relative to /api/triggers/webhook/<ns>/<wf>).
+ *  The path discriminates when a workflow has multiple webhook triggers and is
+ *  matched verbatim against the suffix segment(s) the caller used. */
+export const WebhookTriggerConfigSchema = z.object({
+  method: HttpMethodSchema,
+  path: z
+    .string()
+    .min(1)
+    .regex(/^\/[A-Za-z0-9_\-/]*$/, 'path must start with "/" and contain url-safe chars only'),
+});
+
 /** manual config: nothing — attaching a manual trigger is what makes a Workflow
  *  hand-startable. */
 export const ManualTriggerConfigSchema = z.object({});
@@ -63,6 +74,7 @@ export const TriggerResourceSchema = z.discriminatedUnion('type', [
   ManualTriggerResourceSchema,
 ]);
 
+export type WebhookTriggerConfig = z.infer<typeof WebhookTriggerConfigSchema>;
 export type CronTriggerResource = z.infer<typeof CronTriggerResourceSchema>;
 export type WebhookTriggerResource = z.infer<typeof WebhookTriggerResourceSchema>;
 export type ManualTriggerResource = z.infer<typeof ManualTriggerResourceSchema>;
