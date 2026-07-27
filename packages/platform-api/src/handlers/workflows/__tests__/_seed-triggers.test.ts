@@ -145,6 +145,24 @@ describe('seedTriggersFromDefinition (ADR-0011 / Issue #930)', () => {
     expect(webhook).toHaveLength(0);
   });
 
+  it('remaps a declared cron/webhook named "manual" so the singleton keeps the reserved name', async () => {
+    await seedTriggersFromDefinition(
+      scope(),
+      'team-alpha',
+      def([
+        { type: 'cron', name: 'manual', schedule: '0 3 * * *' },
+        { type: 'webhook', name: 'manual', config: { method: 'POST', path: '/orders' } },
+      ]),
+    );
+
+    const rows = await triggerRepo.listByWorkflow('team-alpha', 'flow');
+    // The hand-start singleton keeps `manual`; the collliding declarations are
+    // collisions are migrated to type-suffixed names rather than dropped or throwing.
+    expect(rows.find((t) => t.name === MANUAL_TRIGGER_NAME)?.type).toBe('manual');
+    expect(rows.find((t) => t.name === 'manual-cron')?.type).toBe('cron');
+    expect(rows.find((t) => t.name === 'manual-webhook')?.type).toBe('webhook');
+  });
+
   it('does not re-seed a webhook row that already exists by name', async () => {
     const now = new Date().toISOString();
     await triggerRepo.create({

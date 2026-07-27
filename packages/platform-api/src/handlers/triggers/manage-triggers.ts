@@ -149,11 +149,19 @@ export async function createTrigger(
     if (hasSchedule) {
       throw new ValidationError('A webhook trigger does not take a schedule');
     }
-    // Method + path are the webhook's identity; the path format (leading slash,
-    // url-safe chars) is validated by the shared config schema so CLI and UI
-    // reject identically.
+    // The catch-all endpoint dispatches POST only, so POST is the sole method a
+    // webhook trigger can ever fire on — default it and reject anything else,
+    // rather than persisting a row that silently 405s. `path` is the webhook's
+    // identity; its format (leading slash, url-safe chars) is validated by the
+    // shared config schema so CLI and UI reject identically.
+    const method = input.method ?? 'POST';
+    if (method !== 'POST') {
+      throw new ValidationError(
+        `A webhook trigger only accepts POST (the endpoint dispatches POST only), got ${method}`,
+      );
+    }
     const config = WebhookTriggerConfigSchema.safeParse({
-      method: input.method,
+      method,
       path: input.path,
     });
     if (!config.success) {

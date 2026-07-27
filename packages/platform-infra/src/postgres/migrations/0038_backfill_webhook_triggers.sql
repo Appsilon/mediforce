@@ -10,6 +10,13 @@
 -- rows carry no fire cursor. `ON CONFLICT DO NOTHING` makes the back-fill
 -- idempotent and never clobbers a row already managed via the API (nor a path
 -- already taken by another webhook on the same workflow).
+--
+-- `manual` is reserved for the hand-start singleton the previous migration
+-- (0037) writes under that primary key. A legacy workflow that declares a
+-- webhook trigger literally named `manual` would collide with it and be dropped
+-- by `ON CONFLICT DO NOTHING`, silently retiring that endpoint. Migrate such a
+-- row to `manual-webhook` instead — the endpoint resolves by config path, never
+-- by name, so only the label changes.
 INSERT INTO "triggers" (
 	"namespace",
 	"workflow_name",
@@ -24,7 +31,7 @@ INSERT INTO "triggers" (
 SELECT
 	latest."workspace",
 	latest."name",
-	elem->>'name',
+	CASE WHEN elem->>'name' = 'manual' THEN 'manual-webhook' ELSE elem->>'name' END,
 	'webhook',
 	true,
 	jsonb_build_object(

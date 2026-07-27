@@ -176,14 +176,29 @@ describe('trigger handlers (cron on the unified table, ADR-0011)', () => {
     expect(result.webhookUrl).toBeNull();
   });
 
-  it('rejects a webhook trigger missing method or path', async () => {
+  it('rejects a webhook trigger missing a path', async () => {
     const scope = buildScope();
-    await expect(
-      createTrigger({ ...base, type: 'webhook', path: '/orders', enabled: true }, scope),
-    ).rejects.toBeInstanceOf(ValidationError);
     await expect(
       createTrigger({ ...base, type: 'webhook', method: 'POST', enabled: true }, scope),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('defaults a webhook method to POST when omitted', async () => {
+    const scope = buildScope();
+    const result = await createTrigger(
+      { ...base, type: 'webhook', triggerName: 'hook', path: '/orders', enabled: true },
+      scope,
+    );
+    expect(result.trigger.type === 'webhook' && result.trigger.config.method).toBe('POST');
+  });
+
+  it('rejects a webhook trigger with a non-POST method — the endpoint is POST-only', async () => {
+    const scope = buildScope();
+    for (const method of ['GET', 'PUT', 'DELETE', 'PATCH'] as const) {
+      await expect(
+        createTrigger({ ...webhook, method, enabled: true }, scope),
+      ).rejects.toBeInstanceOf(ValidationError);
+    }
   });
 
   it('rejects a webhook trigger with a malformed path', async () => {

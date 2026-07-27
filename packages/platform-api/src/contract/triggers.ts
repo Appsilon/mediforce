@@ -8,7 +8,9 @@ import { HttpMethodSchema, TriggerResourceSchema, TriggerTypeSchema } from '@med
  * defaults to `'cron'`. `schedule` is only meaningful for cron — it is optional
  * on the wire and the handler requires it for cron / forbids it elsewhere.
  * `method` + `path` are only meaningful for webhook — optional on the wire, the
- * handler requires them for webhook / forbids them elsewhere. Cron schedule
+ * handler requires `path` for webhook / forbids both elsewhere. `method`
+ * defaults to `POST` and only `POST` is accepted, because the catch-all webhook
+ * endpoint dispatches POST only. Cron schedule
  * syntax is validated in the handlers via `validateCronSchedule` (UTC, 15-minute
  * alignment) and webhook path format via `WebhookTriggerConfigSchema`, so CLI
  * and UI reject identically at one boundary.
@@ -33,8 +35,9 @@ export const CreateTriggerInputSchema = z.object({
   type: TriggerTypeSchema.default('cron'),
   // Cron-only: required for `cron`, forbidden otherwise. Enforced in the handler.
   schedule: z.string().min(1).optional(),
-  // Webhook-only: required for `webhook`, forbidden otherwise. Path format is
-  // validated in the handler via `WebhookTriggerConfigSchema`.
+  // Webhook-only: `path` required for `webhook`, forbidden otherwise. `method`
+  // defaults to POST in the handler and only POST is accepted (the endpoint is
+  // POST-only). Path format is validated via `WebhookTriggerConfigSchema`.
   method: HttpMethodSchema.optional(),
   path: z.string().min(1).optional(),
   enabled: z.boolean().default(true),

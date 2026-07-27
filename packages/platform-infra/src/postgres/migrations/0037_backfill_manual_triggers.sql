@@ -9,6 +9,26 @@
 -- declares. Created only where the workflow has no manual row yet, so a row
 -- already managed via the API (e.g. one a user stopped) is never clobbered.
 -- Manual rows carry an empty config and no fire cursor.
+--
+-- The manual singleton is a reserved resource keyed on the fixed name `manual`.
+-- A legacy workflow may declare a cron trigger literally named `manual`, which
+-- the cron back-fill (0036) will already have written under that primary key.
+-- Left in place it would swallow the singleton INSERT below via
+-- `ON CONFLICT DO NOTHING`, leaving the workflow un-hand-startable. Migrate the
+-- colliding row to `manual-cron` first so the reserved name is free. Cron fires
+-- by `type`, never by name, so only the label changes; the guard skips the
+-- rename in the (vanishingly unlikely) case that `manual-cron` is itself taken.
+UPDATE "triggers" AS c
+SET "trigger_name" = 'manual-cron', "updated_at" = now()
+WHERE c."type" = 'cron'
+	AND c."trigger_name" = 'manual'
+	AND NOT EXISTS (
+		SELECT 1 FROM "triggers" other
+		WHERE other."namespace" = c."namespace"
+			AND other."workflow_name" = c."workflow_name"
+			AND other."trigger_name" = 'manual-cron'
+	);
+--> statement-breakpoint
 INSERT INTO "triggers" (
 	"namespace",
 	"workflow_name",

@@ -27,7 +27,7 @@ const scheduleOptArg = {
 const methodArg = {
   type: 'string',
   required: false,
-  description: 'HTTP method (GET/POST/PUT/DELETE/PATCH). Required for --type webhook',
+  description: 'Webhook HTTP method — only POST is supported; defaults to POST when omitted',
 } as const;
 const pathArg = {
   type: 'string',

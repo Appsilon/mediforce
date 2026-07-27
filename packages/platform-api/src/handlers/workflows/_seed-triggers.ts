@@ -6,6 +6,17 @@ import type { CallerScope } from '../../repositories/index';
 export const MANUAL_TRIGGER_NAME = 'manual';
 
 /**
+ * `manual` is reserved for the hand-start singleton. A definition that declares
+ * a cron/webhook trigger literally named `manual` would collide with the
+ * singleton's primary key, so remap it to a type-suffixed name. Cron fires by
+ * `type` and a webhook resolves by config path — neither uses the trigger name
+ * — so only the label changes. Mirrors migrations 0037/0038.
+ */
+function reservedSafeName(declaredName: string, suffix: 'cron' | 'webhook'): string {
+  return declaredName === MANUAL_TRIGGER_NAME ? `${MANUAL_TRIGGER_NAME}-${suffix}` : declaredName;
+}
+
+/**
  * Seed detached Trigger rows (ADR-0011) for a workflow. Shared by every
  * workflow-create path (register, import via register, copy) so triggers are
  * established regardless of how the definition first landed.
@@ -53,13 +64,14 @@ export async function seedTriggersFromDefinition(
     ) {
       continue;
     }
-    if (existing.some((t) => t.name === trigger.name)) continue;
+    const name = reservedSafeName(trigger.name, 'cron');
+    if (existing.some((t) => t.name === name)) continue;
     const seededAt = new Date().toISOString();
     await scope.triggers.create({
       type: 'cron',
       namespace,
       workflowName: definition.name,
-      name: trigger.name,
+      name,
       enabled: true,
       config: { schedule: trigger.schedule },
       lastTriggeredAt: seededAt,
@@ -74,13 +86,14 @@ export async function seedTriggersFromDefinition(
     if (trigger.type !== 'webhook') continue;
     const config = WebhookTriggerConfigSchema.safeParse(trigger.config);
     if (!config.success) continue;
-    if (existing.some((t) => t.name === trigger.name)) continue;
+    const name = reservedSafeName(trigger.name, 'webhook');
+    if (existing.some((t) => t.name === name)) continue;
     const seededAt = new Date().toISOString();
     await scope.triggers.create({
       type: 'webhook',
       namespace,
       workflowName: definition.name,
-      name: trigger.name,
+      name,
       enabled: true,
       config: config.data,
       lastTriggeredAt: null,
