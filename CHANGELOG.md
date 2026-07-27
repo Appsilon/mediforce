@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-07-26]
+
 ### Fixed
 - `sync-model-rankings.py` follows OpenRouter's rankings endpoint move to the versioned `/api/frontend/v1/rankings/performance` path (old path now 404s), so the model-registry ranking sync works again.
 - Cancelling a run now reaps any in-flight step execution and agent run rows, so cancelled runs no longer leave the current step rendering as `running` forever. The reap is also guarded against a late worker write: a still-executing agent/script whose plugin finishes *after* the cancel no longer resurrects the reaped `StepExecution`/`AgentRun` to `completed` or persists its output/cost onto the cancelled instance — the runtime bails once it sees the parent is no longer active, and terminal `AgentRun` writes only apply to a row still `running` [#912](https://github.com/Appsilon/mediforce/issues/912).
