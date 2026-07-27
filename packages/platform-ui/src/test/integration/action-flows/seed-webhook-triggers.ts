@@ -5,10 +5,9 @@ import {
 } from '@mediforce/platform-core';
 
 /**
- * Seed an enabled `webhook` trigger row into a trigger repo, so the
- * WebhookRouter — which resolves detached table rows, not `definition.triggers`
- * (Issue #931, #932) — matches it. Definitions are trigger-free, so the webhook
- * descriptor is supplied explicitly rather than read from the definition.
+ * Seed an enabled `webhook` trigger row into a trigger repo so the WebhookRouter
+ * can resolve it. The webhook descriptor is supplied explicitly because
+ * definitions are trigger-free.
  */
 export async function seedWebhookTrigger(
   triggerRepo: InMemoryTriggerRepository,

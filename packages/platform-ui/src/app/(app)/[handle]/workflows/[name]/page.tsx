@@ -189,14 +189,13 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const [showArchivedRuns, setShowArchivedRuns] = React.useState(false);
 
   const { versions, loading: versionsLoading } = useWorkflowVersions(decodedName, handle);
-  // The page header reads the full latest definition (visibility, triggers,
-  // steps[], repo, url, copiedFrom) which the metadata summary does not
-  // carry. Fetch it once per workflow.
+  // The page header reads the full latest definition (visibility, steps[], repo,
+  // url, copiedFrom) which the metadata summary does not carry. Fetch it once
+  // per workflow.
   const latestVersionNumber = versions[0]?.version ?? null;
   const { definition: latest } = useWorkflowVersion(decodedName, handle, latestVersionNumber);
-  // Live trigger rows (enabled/schedule) — the header summary reflects these,
-  // not the advisory triggers declared on the definition, so stopping a cron
-  // trigger in the Triggers tab immediately updates the header.
+  // Live trigger rows (enabled/schedule) drive the header summary, so stopping
+  // a cron trigger in the Triggers tab immediately updates the header.
   const { cronTriggers, triggers, loading: triggersLoading } = useWorkflowTriggers(decodedName, handle);
   const { data: runs, loading: runsLoading } = useProcessInstances('all', decodedName, showArchivedRuns, handle);
   const { data: activeTasks } = useMyActionableTasks();
@@ -244,9 +243,8 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const currentVisibility = visibilityOverride ?? latest?.visibility ?? 'private';
   const isPrivate = currentVisibility === 'private';
   // Hand-startable iff an enabled `manual` trigger row exists (ADR-0011 / Issue
-  // #930) — same source of truth as the server guard, not the definition's
-  // advisory triggers[]. Stay optimistic while the rows load so the button
-  // doesn't flash disabled; the server guard is the real gate.
+  // #930). Stay optimistic while the rows load so the button doesn't flash
+  // disabled; the server guard is the real gate.
   const hasManualTrigger = triggersLoading
     ? true
     : triggers.some((trigger) => trigger.type === 'manual' && trigger.enabled);

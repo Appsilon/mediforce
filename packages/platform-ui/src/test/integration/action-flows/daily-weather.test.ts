@@ -264,8 +264,7 @@ beforeEach(async () => {
     version: 1,
   };
   await services.processRepo.saveWorkflowDefinition(definition);
-  // The manual guard now gates on an enabled manual trigger row (ADR-0011),
-  // not the definition's advisory `triggers[]`.
+  // The manual guard gates on an enabled manual trigger row (ADR-0011).
   const seededAt = new Date().toISOString();
   await services.triggerRepo.create({
     type: 'manual',

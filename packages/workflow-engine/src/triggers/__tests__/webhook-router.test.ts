@@ -33,13 +33,9 @@ const definition: WorkflowDefinition = {
     },
   ],
   transitions: [],
-  // The definition's advisory triggers are no longer what the router reads —
-  // resolution is against the detached `triggers` table (Issue #931). Kept
-  // here only because the schema requires at least one declared trigger.
 };
 
-/** An enabled `webhook` row in the unified triggers table — what the router
- *  now resolves against instead of `definition.triggers`. */
+/** An enabled `webhook` row in the unified triggers table. */
 function webhookRow(
   overrides: Partial<Extract<TriggerResource, { type: 'webhook' }>> = {},
 ): TriggerResource {
@@ -214,7 +210,7 @@ describe('WebhookRouter', () => {
     expect(result.status).toBe(404);
   });
 
-  it('resolves against the triggers table, not the definition triggers', async () => {
+  it('resolves against the detached triggers table', async () => {
     // Attach a second webhook at a NEW path that the definition never
     // declared. The router must resolve it purely from the table.
     await triggerRepo.create(
