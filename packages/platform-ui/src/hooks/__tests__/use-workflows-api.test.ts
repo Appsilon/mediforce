@@ -8,6 +8,7 @@ describe('mapApiToDefinitionGroups', () => {
       namespace: 'acme',
       latestVersion: 2,
       defaultVersion: 1,
+      manualStartEnabled: true,
       definition: {
         name: 'test-workflow',
         version: 2,

@@ -84,7 +84,8 @@ export function useProcessDefinitions(includeCompletedRuns: boolean = true) {
             },
           ],
           stepCount: def.steps.length,
-          hasManualTrigger: def.triggers.some((t) => t.type === 'manual'),
+          // Hand-start gate reads the triggers table, not `def.triggers` (Issue #930).
+          hasManualTrigger: g.manualStartEnabled,
           externalSkillsRepo: def.externalSkillsRepo,
           url: def.url,
           archived: def.archived,

@@ -11,7 +11,6 @@ import {
   InMemoryAgentDefinitionRepository,
   InMemoryAuditRepository,
   InMemoryCoworkSessionRepository,
-  InMemoryCronTriggerStateRepository,
   InMemoryHandoffRepository,
   InMemoryHumanTaskRepository,
   InMemoryOAuthProviderRepository,
@@ -47,7 +46,6 @@ describe('createCallerScope', () => {
     expect(scope.models).toBeDefined();
     expect(scope.plugins).toBeDefined();
     expect(scope.workspaces).toBeDefined();
-    expect(scope.cron).toBeDefined();
 
     // System services bag (engine, triggers — null-typed in test scope, but
     // shape must exist so handlers can typecheck against `scope.system.*`).
@@ -130,7 +128,6 @@ describe('createCallerScope', () => {
     const handoffRepo = new InMemoryHandoffRepository(instanceRepo);
     const agentDefinitionRepo = new InMemoryAgentDefinitionRepository();
     const coworkSessionRepo = new InMemoryCoworkSessionRepository(instanceRepo);
-    const cronTriggerStateRepo = new InMemoryCronTriggerStateRepository();
     const toolCatalogRepo = new InMemoryToolCatalogRepository();
     const oauthProviderRepo = new InMemoryOAuthProviderRepository();
     const agentOAuthTokenRepo = new InMemoryAgentOAuthTokenRepository();
@@ -143,14 +140,10 @@ describe('createCallerScope', () => {
       handoffRepo,
       agentDefinitionRepo,
       coworkSessionRepo,
-      cronTriggerStateRepo,
       toolCatalogRepo,
       oauthProviderRepo,
       agentOAuthTokenRepo,
     });
-
-    // Pass-throughs must be the same identity-equal objects we passed in.
-    expect(scope.cron).toBe(cronTriggerStateRepo);
 
     // Workspace-scoped wrappers must exist and respond to one canonical
     // read each — if the wiring is wrong this throws or returns the wrong

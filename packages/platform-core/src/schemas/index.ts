@@ -280,11 +280,6 @@ export {
 } from './namespace-secret';
 
 export {
-  CronTriggerStateSchema,
-  type CronTriggerState,
-} from './cron-trigger-state';
-
-export {
   TriggerTypeSchema,
   TriggerResourceSchema,
   CronTriggerResourceSchema,

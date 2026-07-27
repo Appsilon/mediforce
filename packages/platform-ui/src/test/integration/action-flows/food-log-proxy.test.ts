@@ -18,6 +18,27 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { NextRequest } from 'next/server';
+
+// Capture next/server `after()` callbacks — the auto-runner route defers its
+// loop via after(), which throws outside a request scope. Drain them
+// explicitly after driving the run.
+const pendingAfterCallbacks: Array<() => Promise<void>> = [];
+async function flushAfterCallbacks(): Promise<void> {
+  while (pendingAfterCallbacks.length > 0) {
+    const fn = pendingAfterCallbacks.shift()!;
+    await fn();
+  }
+}
+vi.mock('next/server', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('next/server')>();
+  return {
+    ...mod,
+    after: (fn: () => Promise<void>) => {
+      pendingAfterCallbacks.push(fn);
+    },
+  };
+});
+
 import {
   ActionRegistry,
   httpActionHandler,
@@ -33,10 +54,12 @@ import {
   InMemoryHumanTaskRepository,
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
+  InMemoryTriggerRepository,
   parseWorkflowTemplate,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { createEchoServer } from '../../../../../../scripts/test-echo-server/server';
+import { seedWebhookTriggers } from './seed-webhook-triggers';
 
 // Distinct port from execution-summaries-api so the two e2e files don't
 // fight when run in the same vitest process (vitest.config.action-flows.ts
@@ -69,7 +92,8 @@ const services = (() => {
   const actionRegistry = new ActionRegistry();
   actionRegistry.register('http', httpActionHandler);
   actionRegistry.register('reshape', reshapeActionHandler);
-  const webhookRouter = new WebhookRouter(engine, processRepo);
+  const triggerRepo = new InMemoryTriggerRepository();
+  const webhookRouter = new WebhookRouter(engine, processRepo, triggerRepo);
   return {
     engine,
     processRepo,
@@ -79,6 +103,11 @@ const services = (() => {
     coworkSessionRepo,
     actionRegistry,
     webhookRouter,
+    triggerRepo,
+    // The auto-runner validates plugin env + models for every run; action-only
+    // workflows have neither, so empty registries let validation pass.
+    pluginRegistry: { list: () => [] },
+    modelRegistryRepo: { list: async () => [] },
   };
 })();
 
@@ -89,6 +118,10 @@ vi.mock('@/lib/platform-services', () => ({
 
 vi.mock('@/app/actions/workflow-secrets', () => ({
   getWorkflowSecretsForRuntime: async () => ({}),
+}));
+
+vi.mock('@/app/actions/namespace-secrets', () => ({
+  getNamespaceSecretsForRuntime: async () => ({}),
 }));
 
 const { POST: webhookPost } = await import(
@@ -161,6 +194,7 @@ beforeEach(async () => {
     }),
   };
   await services.processRepo.saveWorkflowDefinition(definition);
+  await seedWebhookTriggers(services.triggerRepo, definition);
 });
 
 afterEach(() => {
@@ -192,11 +226,12 @@ describe('food-log-proxy: webhook → http → reshape → polling', () => {
       `http://localhost/api/processes/${webhookJson.runId}/run`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': 'test-api-key' },
         body: JSON.stringify({ triggeredBy: 'webhook' }),
       },
     );
     await runPost(runReq, { params: Promise.resolve({ instanceId: webhookJson.runId }) });
+    await flushAfterCallbacks();
 
     const deadline = Date.now() + 10_000;
     let polledStatus = 'unknown';
@@ -204,7 +239,7 @@ describe('food-log-proxy: webhook → http → reshape → polling', () => {
     while (Date.now() < deadline) {
       const pollReq = new NextRequest(
         `http://localhost/api/runs/${webhookJson.runId}`,
-        { method: 'GET' },
+        { method: 'GET', headers: { 'X-Api-Key': 'test-api-key' } },
       );
       const pollRes = await runsGet(pollReq, {
         params: Promise.resolve({ runId: webhookJson.runId }),

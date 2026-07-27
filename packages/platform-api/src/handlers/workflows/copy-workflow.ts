@@ -5,6 +5,7 @@ import type {
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, NotFoundError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
+import { seedTriggersFromDefinition } from './_seed-triggers';
 
 interface ScopedInput extends CopyWorkflowInput {
   targetNamespace: string;
@@ -65,6 +66,14 @@ export async function copyWorkflow(
     createdAt: new Date().toISOString(),
     archived: undefined,
     deleted: undefined,
+  });
+
+  // ADR-0011: seed detached trigger rows for the copy so a copied workflow stays
+  // hand-startable (declared `manual`) / keeps its schedule (declared `cron`) —
+  // the guard and heartbeat read the table, not the copied definition.
+  await seedTriggersFromDefinition(scope, input.targetNamespace, {
+    name: copyName,
+    triggers: source.triggers,
   });
 
   const actor = actorFromCaller(scope);

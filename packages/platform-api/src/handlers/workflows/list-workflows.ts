@@ -22,6 +22,14 @@ export async function listWorkflows(
       ? groups.filter((group) => group.namespace === input.namespace)
       : groups;
 
+  // Hand-start gate reads the `triggers` table (ADR-0011 / Issue #930), not
+  // `definition.triggers`. One cross-namespace read of enabled manual rows, then
+  // a Set lookup per card — no per-card N+1.
+  const enabledManual = await scope.system.triggers.listEnabledByType('manual');
+  const manualStartByWorkflow = new Set(
+    enabledManual.map((t) => `${t.namespace}:${t.workflowName}`),
+  );
+
   // One run summary per card. The summaries come from count() aggregations +
   // a bounded latest-3 query (no full-collection read), so fanning out here
   // is cheap — there is no N+1-of-reads, just N cheap aggregations. The home
@@ -57,6 +65,7 @@ export async function listWorkflows(
         defaultVersion: group.defaultVersion,
         definition: latest,
         runSummary: { ...rawSummary, stepsByVersion },
+        manualStartEnabled: manualStartByWorkflow.has(`${group.namespace}:${group.name}`),
       };
     }),
   );

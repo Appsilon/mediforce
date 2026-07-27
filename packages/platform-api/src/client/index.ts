@@ -44,6 +44,16 @@ import {
   ImportWorkflowInputSchema,
   GetManifestInputSchema,
   GetManifestOutputSchema,
+  ListTriggersInputSchema,
+  ListTriggersOutputSchema,
+  CreateTriggerInputSchema,
+  CreateTriggerOutputSchema,
+  UpdateTriggerInputSchema,
+  UpdateTriggerOutputSchema,
+  SetTriggerEnabledInputSchema,
+  SetTriggerEnabledOutputSchema,
+  DeleteTriggerInputSchema,
+  DeleteTriggerOutputSchema,
   DockerInfoResponseSchema,
   OpenRouterCreditsInputSchema,
   OpenRouterCreditsOutputSchema,
@@ -272,6 +282,16 @@ import {
   type ImportWorkflowOutput,
   type GetManifestInput,
   type GetManifestOutput,
+  type ListTriggersInput,
+  type ListTriggersOutput,
+  type CreateTriggerInput,
+  type CreateTriggerOutput,
+  type UpdateTriggerInput,
+  type UpdateTriggerOutput,
+  type SetTriggerEnabledInput,
+  type SetTriggerEnabledOutput,
+  type DeleteTriggerInput,
+  type DeleteTriggerOutput,
   type GetRunInput,
   type GetRunOutput,
   type StartRunInput,
@@ -561,6 +581,14 @@ export class Mediforce {
     transferNamespace: (input: TransferWorkflowInput) => Promise<TransferWorkflowOutput>;
     importFromRepo: (input: ImportWorkflowInput) => Promise<ImportWorkflowOutput>;
     getManifest: (input: GetManifestInput) => Promise<GetManifestOutput>;
+  };
+
+  readonly triggers: {
+    list: (input: ListTriggersInput) => Promise<ListTriggersOutput>;
+    create: (input: CreateTriggerInput) => Promise<CreateTriggerOutput>;
+    update: (input: UpdateTriggerInput) => Promise<UpdateTriggerOutput>;
+    setEnabled: (input: SetTriggerEnabledInput) => Promise<SetTriggerEnabledOutput>;
+    delete: (input: DeleteTriggerInput) => Promise<DeleteTriggerOutput>;
   };
 
   readonly runs: {
@@ -1110,6 +1138,66 @@ export class Mediforce {
         const res = await this.request(`/api/workflow-definitions/manifest${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.getManifest');
         return GetManifestOutputSchema.parse(body);
+      },
+    };
+
+    this.triggers = {
+      list: async (input) => {
+        const v = ListTriggersInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: v.namespace });
+        const res = await this.request(
+          `/api/workflow-definitions/${encodeURIComponent(v.definitionName)}/triggers${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.triggers.list');
+        return ListTriggersOutputSchema.parse(body);
+      },
+      create: (input) => {
+        const v = CreateTriggerInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions/${encodeURIComponent(v.definitionName)}/triggers`,
+          {
+            namespace: v.namespace,
+            triggerName: v.triggerName,
+            type: v.type,
+            schedule: v.schedule,
+            method: v.method,
+            path: v.path,
+            enabled: v.enabled,
+          },
+          CreateTriggerOutputSchema,
+          'mediforce.triggers.create',
+        );
+      },
+      update: (input) => {
+        const v = UpdateTriggerInputSchema.parse(input);
+        return this.sendJson(
+          'PATCH',
+          `/api/workflow-definitions/${encodeURIComponent(v.definitionName)}/triggers/${encodeURIComponent(v.triggerName)}`,
+          { namespace: v.namespace, schedule: v.schedule },
+          UpdateTriggerOutputSchema,
+          'mediforce.triggers.update',
+        );
+      },
+      setEnabled: (input) => {
+        const v = SetTriggerEnabledInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions/${encodeURIComponent(v.definitionName)}/triggers/${encodeURIComponent(v.triggerName)}/enabled`,
+          { namespace: v.namespace, enabled: v.enabled },
+          SetTriggerEnabledOutputSchema,
+          'mediforce.triggers.setEnabled',
+        );
+      },
+      delete: async (input) => {
+        const v = DeleteTriggerInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: v.namespace });
+        const res = await this.request(
+          `/api/workflow-definitions/${encodeURIComponent(v.definitionName)}/triggers/${encodeURIComponent(v.triggerName)}${qs}`,
+          { method: 'DELETE' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.triggers.delete');
+        return DeleteTriggerOutputSchema.parse(body);
       },
     };
 

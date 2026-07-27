@@ -92,6 +92,22 @@ export class PostgresTriggerRepository implements TriggerRepository {
       .delete(triggers)
       .where(and(eq(triggers.namespace, namespace), eq(triggers.workflowName, workflowName)));
   }
+
+  async transferWorkflowNamespace(
+    sourceNamespace: string,
+    workflowName: string,
+    targetNamespace: string,
+  ): Promise<void> {
+    await this.db
+      .update(triggers)
+      .set({ namespace: targetNamespace })
+      .where(
+        and(
+          eq(triggers.namespace, sourceNamespace),
+          eq(triggers.workflowName, workflowName),
+        ),
+      );
+  }
 }
 
 function pkWhere(namespace: string, workflowName: string, name: string) {

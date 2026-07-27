@@ -34,6 +34,14 @@ import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility
 import { workflowCopyCommand } from './commands/workflow-copy';
 import { workflowDeleteCommand } from './commands/workflow-delete';
 import {
+  workflowTriggerListCommand,
+  workflowTriggerAddCommand,
+  workflowTriggerUpdateCommand,
+  workflowTriggerStartCommand,
+  workflowTriggerStopCommand,
+  workflowTriggerRemoveCommand,
+} from './commands/workflow-trigger';
+import {
   systemStatusCommand,
   systemImagesCommand,
   systemDiskCommand,
@@ -113,6 +121,12 @@ export const TREE: Record<string, BranchEntry> = {
       copy: { description: 'Copy workflow to another namespace', fn: workflowCopyCommand },
       archive: { description: 'Archive/unarchive workflow versions', fn: workflowArchiveCommand },
       delete: { description: 'Soft-delete a workflow + cascade', fn: workflowDeleteCommand },
+      'trigger-list': { description: 'List triggers attached to a workflow', fn: workflowTriggerListCommand },
+      'trigger-add': { description: 'Add a trigger to a workflow (--type cron)', fn: workflowTriggerAddCommand },
+      'trigger-update': { description: 'Change a cron trigger schedule', fn: workflowTriggerUpdateCommand },
+      'trigger-start': { description: 'Start (enable) a trigger', fn: workflowTriggerStartCommand },
+      'trigger-stop': { description: 'Stop (disable) a trigger', fn: workflowTriggerStopCommand },
+      'trigger-remove': { description: 'Delete a trigger', fn: workflowTriggerRemoveCommand },
     },
   },
   run: {

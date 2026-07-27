@@ -3,7 +3,6 @@ import type {
   AuditRepository,
   BlobStore,
   CredentialsRepository,
-  CronTriggerStateRepository,
   EmailProviderInfo,
   ModelRegistryRepository,
   NamespaceRepository,
@@ -85,7 +84,6 @@ export interface CallerScope {
   readonly workspaces: NamespaceRepository;
   readonly userProfiles: UserProfileRepository;
   readonly credentials: CredentialsRepository;
-  readonly cron: CronTriggerStateRepository;
 
   // System services (engine, manual trigger, etc.) — handlers use these
   // when delegating to engine machinery (resume, advance, create-run).

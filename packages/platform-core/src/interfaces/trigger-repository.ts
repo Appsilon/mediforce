@@ -36,4 +36,12 @@ export interface TriggerRepository {
   ): Promise<void>;
   delete(namespace: string, workflowName: string, name: string): Promise<void>;
   deleteByWorkflow(namespace: string, workflowName: string): Promise<void>;
+  /** Move every trigger row for a workflow to a new namespace, following a
+   *  workflow definition transfer (ADR-0011). The trigger `name`, enabled
+   *  state, and fire cursor are preserved so the schedule survives the move. */
+  transferWorkflowNamespace(
+    sourceNamespace: string,
+    workflowName: string,
+    targetNamespace: string,
+  ): Promise<void>;
 }

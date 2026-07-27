@@ -37,9 +37,10 @@ export async function seedPostgresNamespace(
 
     // ── 0. Wipe prior fixture rows ──────────────────────────────────────────
     // Delete only the workspace handles that e2e tests own. Every child table
-    // (workspace_members, workflow_definitions, workflow_meta, process_instances,
-    // step_executions, human_tasks, agent_runs, audit_events, cowork_sessions,
-    // cowork_turns, agents, tool_catalog_entries, oauth_providers) carries
+    // (workspace_members, workflow_definitions, workflow_meta, triggers,
+    // process_instances, step_executions, human_tasks, agent_runs, audit_events,
+    // cowork_sessions, cowork_turns, agents, tool_catalog_entries, oauth_providers)
+    // carries
     // "FOREIGN KEY (workspace) REFERENCES workspaces(handle) ON DELETE CASCADE",
     // so one DELETE cascades the full fixture tree without touching workspaces
     // that belong to the developer (e.g. their personal namespace + registered
@@ -154,6 +155,34 @@ export async function seedPostgresNamespace(
           ${(wd.createdAt as string | undefined) ?? new Date().toISOString()}
         )
         ON CONFLICT (workspace, name, version) DO NOTHING
+      `;
+    }
+
+    // ── 3b. manual trigger singletons ───────────────────────────────────────
+    // Production seeds one enabled `manual` trigger row per workflow on register
+    // (seedTriggersFromDefinition, ADR-0011 / Issue #930). Hand-start is gated on
+    // that row, so a workflow seeded straight into Postgres without it has a
+    // permanently disabled Start Run button. Mirror the invariant: one enabled
+    // `manual` row per unique `(namespace, name)` — none of the fixture
+    // definitions declare cron/webhook triggers, so the manual singleton is the
+    // whole story.
+    const seededManualWorkflows = new Set<string>();
+    for (const wd of Object.values(data.workflowDefinitions)) {
+      const namespace = wd.namespace as string;
+      const name = wd.name as string;
+      const key = `${namespace}\u0000${name}`;
+      if (seededManualWorkflows.has(key)) continue;
+      seededManualWorkflows.add(key);
+      const seededAt = (wd.createdAt as string | undefined) ?? new Date().toISOString();
+      await sql`
+        INSERT INTO triggers (
+          namespace, workflow_name, trigger_name, type, enabled, config,
+          last_triggered_at, created_at, updated_at
+        ) VALUES (
+          ${namespace}, ${name}, 'manual', 'manual', true, ${sql.json({})},
+          ${null}, ${seededAt}, ${seededAt}
+        )
+        ON CONFLICT (namespace, workflow_name, trigger_name) DO NOTHING
       `;
     }
 
