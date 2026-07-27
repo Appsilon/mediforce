@@ -44,12 +44,19 @@ export function validateEnv(): void {
 
     // --- At least one auth provider (ADR-0002 §4) ---
     const googleEnabled = typeof process.env.GOOGLE_CLIENT_ID === 'string' && process.env.GOOGLE_CLIENT_ID !== '';
-    const passwordEnabled = process.env.ENABLE_PASSWORD_AUTH === 'true';
+    // Password sign-in is on by default (see password-login route); only an
+    // explicit ENABLE_PASSWORD_AUTH=false turns it off.
+    const passwordEnabled = process.env.ENABLE_PASSWORD_AUTH !== 'false';
     const oidcEnabled = typeof process.env.OIDC_ISSUER === 'string' && process.env.OIDC_ISSUER !== '';
-    if (!googleEnabled && !passwordEnabled && !oidcEnabled) {
+    // A magic-link-only deployment is a valid provider set. `ENABLE_MAGIC_LINK`
+    // with email disabled/unconfigured is caught at auth-config build (auth.ts),
+    // so no duplicate check here.
+    const magicLinkEnabled = process.env.ENABLE_MAGIC_LINK === 'true';
+    if (!googleEnabled && !passwordEnabled && !oidcEnabled && !magicLinkEnabled) {
       errors.push(
-        'No auth provider is configured. Set GOOGLE_CLIENT_ID, ENABLE_PASSWORD_AUTH=true, or OIDC_ISSUER '
-        + '(ADR-0002 §4) — otherwise no one can sign in.',
+        'No auth provider is available: ENABLE_PASSWORD_AUTH=false disabled the default password sign-in and no '
+        + 'other provider is configured. Remove that override, or set GOOGLE_CLIENT_ID, ENABLE_MAGIC_LINK=true, or '
+        + 'OIDC_ISSUER (ADR-0002 §4) — otherwise no one can sign in.',
       );
     }
   }
@@ -108,6 +115,33 @@ export function validateEnv(): void {
         'Email is enabled but no email provider is configured. '
         + 'Set MAILGUN_* or SMTP_* env vars, or set MEDIFORCE_DISABLE_EMAIL=true to start without email.',
       );
+    }
+
+    // --- APP_BASE_URL must be a real public origin when email actually sends ---
+    // Invite-activation and magic-link emails embed an absolute link
+    // (`${APP_BASE_URL}/api/auth/callback/email...`). With no APP_BASE_URL the
+    // link falls back to http://localhost:PORT (see app-base-url.ts) — a dead
+    // link in the recipient's inbox that silently breaks first-password login.
+    // Only enforced in production with a real provider configured: local dev
+    // (NODE_ENV=development) and the file sink never send to a real inbox, so
+    // the base URL is irrelevant there.
+    if (isProduction && (hasMailgun || hasSmtp)) {
+      const localHosts = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1']);
+      const rawBaseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+      let baseUrlHost = '';
+      try {
+        baseUrlHost = new URL(rawBaseUrl).hostname;
+      } catch {
+        baseUrlHost = '';
+      }
+      if (baseUrlHost === '' || localHosts.has(baseUrlHost)) {
+        errors.push(
+          'Email is enabled but APP_BASE_URL is not set to a public origin. '
+          + 'Activation and magic-link emails would link to http://localhost and be '
+          + "dead in the recipient's inbox. Set APP_BASE_URL to this deployment's "
+          + 'public URL (e.g. https://app.example.com), or MEDIFORCE_DISABLE_EMAIL=true.',
+        );
+      }
     }
   }
 

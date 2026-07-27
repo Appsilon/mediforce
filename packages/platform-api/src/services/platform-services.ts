@@ -26,11 +26,12 @@ import {
   getSharedPostgresClient,
   PostgresInviteService,
   validateSecretsKey,
-  createMailgunSender,
-  createSmtpSender,
+  resolveEmailSenderFromEnv,
   EmailNotificationService,
   PostgresUserDirectoryService,
+  mintVerificationToken,
 } from '@mediforce/platform-infra';
+import type { Database } from '@mediforce/platform-infra';
 import type {
   AgentDefinitionRepository,
   AgentEventRepository,
@@ -65,11 +66,12 @@ import {
   isLocalAgentMode,
   type DockerImagesService,
 } from './docker-images-service';
-import { sendWorkspaceNotificationEmail } from './invite-emails';
+import { sendWorkspaceNotificationEmail, sendInviteSetupEmail } from './invite-emails';
 import { normalizeBaseUrl } from '../contract/config';
 import type {
   InviteNotificationService,
   InviteService,
+  SendActivationEmailInput,
   SendWorkspaceNotificationEmailInput,
 } from './invite-notification';
 import {
@@ -154,16 +156,28 @@ export interface PlatformServices {
   userDirectory: UserDirectoryService;
 }
 
+/** Invite-activation links live for 7 days — long enough for a colleague to
+ *  act, independent of the Email provider's short login maxAge. */
+const ACTIVATION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 /**
  * Adapts a `SendEmailFn` into the `InviteNotificationService`
  * interface — delegates to the existing pure email-body helpers and supplies
  * deployment config (app URL, sender name) so handlers never see env vars.
+ *
+ * `db` + `authSecret` are only touched by `sendActivationEmail`, which mints an
+ * Auth.js-compatible verification token so the existing
+ * `/api/auth/callback/email` handler accepts the activation link. An empty
+ * `authSecret` is fine at construction — it only matters when an activation
+ * email is actually sent.
  */
 class EmailInviteNotificationService implements InviteNotificationService {
   constructor(
     private readonly sendEmail: SendEmailFn,
     private readonly appUrl: string,
     private readonly senderName: string,
+    private readonly db: Database,
+    private readonly authSecret: string,
   ) {}
 
   async sendWorkspaceNotificationEmail(input: SendWorkspaceNotificationEmailInput): Promise<void> {
@@ -174,6 +188,31 @@ class EmailInviteNotificationService implements InviteNotificationService {
         inviterName: input.inviterName,
         workspaceName: input.workspaceName,
         workspaceUrl: `${appUrl}/${input.workspaceHandle}`,
+        appUrl,
+        senderName: this.senderName,
+      },
+      this.sendEmail,
+    );
+  }
+
+  async sendActivationEmail(input: SendActivationEmailInput): Promise<void> {
+    const appUrl = normalizeBaseUrl(input.baseUrl) ?? this.appUrl;
+    const email = input.toEmail.toLowerCase();
+    const raw = await mintVerificationToken(
+      this.db,
+      email,
+      new Date(Date.now() + ACTIVATION_TOKEN_TTL_MS),
+      this.authSecret,
+    );
+    const activationUrl = `${appUrl}/api/auth/callback/email?callbackUrl=${encodeURIComponent(
+      '/change-password',
+    )}&token=${raw}&email=${encodeURIComponent(email)}`;
+    await sendInviteSetupEmail(
+      {
+        toEmail: input.toEmail,
+        ...(input.inviterName !== undefined ? { inviterName: input.inviterName } : {}),
+        ...(input.workspaceName !== undefined ? { workspaceName: input.workspaceName } : {}),
+        activationUrl,
         appUrl,
         senderName: this.senderName,
       },
@@ -249,86 +288,19 @@ export function getPlatformServices(): PlatformServices {
     otelTracingOptions,
   );
 
-  const emailDisabled = process.env.MEDIFORCE_DISABLE_EMAIL === 'true';
-  const mailgunApiKey = process.env.MAILGUN_API_KEY ?? '';
-  const mailgunDomain = process.env.MAILGUN_DOMAIN ?? '';
-  const mailgunFrom = process.env.MAILGUN_FROM_EMAIL ?? '';
-  const mailgunSenderName = process.env.MAILGUN_SENDER_NAME ?? 'Mediforce';
-  const mailgunConfigured = mailgunApiKey !== '' && mailgunDomain !== '' && mailgunFrom !== '';
-
-  const smtpHost = process.env.SMTP_HOST ?? '';
-  const smtpPort = process.env.SMTP_PORT ?? '';
-  const smtpUser = process.env.SMTP_USER ?? '';
-  const smtpPass = process.env.SMTP_PASS ?? '';
-  const smtpSecure = process.env.SMTP_SECURE !== 'false';
-  const smtpFrom = process.env.SMTP_FROM_EMAIL ?? '';
-  const smtpSenderName = process.env.SMTP_SENDER_NAME ?? 'Mediforce';
-  const smtpConfigured = smtpHost !== '' && smtpFrom !== '';
-
-  const rawEmailProvider = process.env.EMAIL_PROVIDER || undefined;
-  if (rawEmailProvider !== undefined && rawEmailProvider !== 'mailgun' && rawEmailProvider !== 'smtp') {
-    throw new Error(
-      `EMAIL_PROVIDER="${rawEmailProvider}" is not valid. Use "mailgun" or "smtp".`,
-    );
-  }
-  const explicitProvider = rawEmailProvider as 'mailgun' | 'smtp' | undefined;
-  const resolvedProvider = resolveEmailProvider(explicitProvider, mailgunConfigured, smtpConfigured);
-
-  if (emailDisabled) {
+  // Resolve the email provider once (shared with the NextAuth magic-link
+  // provider). `null` means email is disabled; a misconfiguration throws.
+  const resolvedEmail = resolveEmailSenderFromEnv();
+  if (resolvedEmail === null) {
     console.log('[platform-services] MEDIFORCE_DISABLE_EMAIL=true — email handler and notifications disabled');
+  } else {
+    console.log(`[platform-services] Email provider: ${resolvedEmail.provider === 'mailgun' ? 'Mailgun' : 'SMTP'}`);
   }
 
-  let emailSender: SendEmailFn | undefined;
-  let emailProviderInfo: EmailProviderInfo | null = null;
-
-  if (!emailDisabled && resolvedProvider === 'mailgun') {
-    if (!mailgunConfigured) {
-      const missing = [
-        !mailgunApiKey && 'MAILGUN_API_KEY',
-        !mailgunDomain && 'MAILGUN_DOMAIN',
-        !mailgunFrom && 'MAILGUN_FROM_EMAIL',
-      ].filter(Boolean).join(', ');
-      throw new Error(
-        `EMAIL_PROVIDER=mailgun but config incomplete (missing: ${missing}). ` +
-        `Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.`,
-      );
-    }
-    emailSender = createMailgunSender({
-      apiKey: mailgunApiKey,
-      domain: mailgunDomain,
-      defaultFrom: mailgunFrom,
-      defaultSenderName: mailgunSenderName,
-    });
-    emailProviderInfo = { provider: 'mailgun', configured: true, from: mailgunFrom };
-    console.log('[platform-services] Email provider: Mailgun');
-  } else if (!emailDisabled && resolvedProvider === 'smtp') {
-    if (!smtpConfigured) {
-      const missing = [
-        !smtpHost && 'SMTP_HOST',
-        !smtpFrom && 'SMTP_FROM_EMAIL',
-      ].filter(Boolean).join(', ');
-      throw new Error(
-        `EMAIL_PROVIDER=smtp but config incomplete (missing: ${missing}). ` +
-        `Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.`,
-      );
-    }
-    emailSender = createSmtpSender({
-      host: smtpHost,
-      port: smtpPort !== '' ? Number(smtpPort) : 587,
-      secure: smtpSecure,
-      user: smtpUser,
-      pass: smtpPass,
-      defaultFrom: smtpFrom,
-      defaultSenderName: smtpSenderName,
-    });
-    emailProviderInfo = { provider: 'smtp', configured: true, from: smtpFrom };
-    console.log('[platform-services] Email provider: SMTP');
-  } else if (!emailDisabled && resolvedProvider === null) {
-    throw new Error(
-      'Email is enabled but no email provider is configured. ' +
-      'Set MAILGUN_* or SMTP_* env vars, or set MEDIFORCE_DISABLE_EMAIL=true to start without email.',
-    );
-  }
+  const emailSender: SendEmailFn | undefined = resolvedEmail?.send;
+  const emailProviderInfo: EmailProviderInfo | null = resolvedEmail
+    ? { provider: resolvedEmail.provider, configured: true, from: resolvedEmail.from }
+    : null;
 
   const notificationService = emailSender
     ? new EmailNotificationService(emailSender)
@@ -392,9 +364,15 @@ export function getPlatformServices(): PlatformServices {
   // NEXT_PUBLIC_PLATFORM_URL still renders sensible links.
   const inviteAppUrl =
     process.env.NEXT_PUBLIC_PLATFORM_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
-  const senderName = resolvedProvider === 'mailgun' ? mailgunSenderName : smtpSenderName;
+  const senderName = resolvedEmail?.senderName ?? 'Mediforce';
   const inviteNotificationService = emailSender
-    ? new EmailInviteNotificationService(emailSender, inviteAppUrl, senderName)
+    ? new EmailInviteNotificationService(
+        emailSender,
+        inviteAppUrl,
+        senderName,
+        getSharedPostgresClient().db,
+        process.env.AUTH_SECRET ?? '',
+      )
     : null;
 
   const dockerImages: DockerImagesService = isLocalAgentMode()
@@ -459,20 +437,4 @@ export function getPlatformServices(): PlatformServices {
   }
 
   return services;
-}
-
-function resolveEmailProvider(
-  explicit: 'mailgun' | 'smtp' | undefined,
-  mailgunConfigured: boolean,
-  smtpConfigured: boolean,
-): 'mailgun' | 'smtp' | null {
-  if (explicit !== undefined) return explicit;
-  if (mailgunConfigured && smtpConfigured) {
-    throw new Error(
-      'Both Mailgun and SMTP env vars are set. Set EMAIL_PROVIDER=mailgun or EMAIL_PROVIDER=smtp to disambiguate.',
-    );
-  }
-  if (mailgunConfigured) return 'mailgun';
-  if (smtpConfigured) return 'smtp';
-  return null;
 }

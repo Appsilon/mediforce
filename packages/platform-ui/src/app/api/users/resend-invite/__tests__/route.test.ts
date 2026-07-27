@@ -11,6 +11,8 @@ const mockGetUserEmail = vi.fn();
 const mockIsInvitePending = vi.fn();
 const mockGetNamespace = vi.fn();
 const mockSendWorkspaceEmail = vi.fn();
+const mockSendActivationEmail = vi.fn();
+const mockSetMustChangePassword = vi.fn();
 const mockAuditAppend = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
@@ -26,8 +28,12 @@ vi.mock('@/lib/platform-services', () => ({
       getUserEmail: mockGetUserEmail,
       isInvitePending: mockIsInvitePending,
     },
+    userProfileRepo: {
+      setMustChangePassword: mockSetMustChangePassword,
+    },
     inviteNotificationService: {
       sendWorkspaceNotificationEmail: mockSendWorkspaceEmail,
+      sendActivationEmail: mockSendActivationEmail,
     },
     instanceRepo: { getById: vi.fn() },
     auditRepo: { append: mockAuditAppend },
@@ -88,6 +94,8 @@ describe('POST /api/users/resend-invite', () => {
     mockIsInvitePending.mockResolvedValue(true);
     mockGetNamespace.mockResolvedValue(null);
     mockSendWorkspaceEmail.mockResolvedValue(undefined);
+    mockSendActivationEmail.mockResolvedValue(undefined);
+    mockSetMustChangePassword.mockResolvedValue(undefined);
     mockAuditAppend.mockResolvedValue(undefined);
   });
 
@@ -106,12 +114,16 @@ describe('POST /api/users/resend-invite', () => {
       emailSent: true,
     });
     expect(mockIsInvitePending).toHaveBeenCalledWith('uid-target');
-    expect(mockSendWorkspaceEmail).toHaveBeenCalledWith({
+    // A pending invitee gets the activation email (fresh setup link) and the
+    // credential-setup gate re-asserted — not the plain workspace notification.
+    expect(mockSetMustChangePassword).toHaveBeenCalledWith('uid-target', true);
+    expect(mockSendActivationEmail).toHaveBeenCalledWith({
       toEmail: 'pending@example.test',
       inviterName: 'alpha',
       workspaceName: 'alpha',
       workspaceHandle: 'alpha',
     });
+    expect(mockSendWorkspaceEmail).not.toHaveBeenCalled();
   });
 
   it('[AUTH] unauthenticated request → 401', async () => {

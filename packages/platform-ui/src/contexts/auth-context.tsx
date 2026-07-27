@@ -11,15 +11,18 @@ import { useUserMe } from '@/hooks/use-user-me';
 export type SessionUser = Session['user'];
 
 const PASSWORD_LOGIN_PATH = '/api/auth/password-login';
+const MAGIC_LINK_LOGIN_PATH = '/api/auth/magic-link-login';
 
 interface AuthContextValue {
   user: SessionUser | null;
   loading: boolean;
   mustChangePassword: boolean;
-  emailAuthEnabled: boolean | null; // null = provider list not loaded yet
+  passwordAuthEnabled: boolean | null; // null = provider list not loaded yet
   googleAuthEnabled: boolean | null; // null = provider list not loaded yet
+  magicLinkEnabled: boolean | null; // null = provider list not loaded yet
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
+  signInWithMagicLink: (email: string) => Promise<void>;
   clearMustChangePassword: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -37,32 +40,47 @@ export class CredentialsSignInError extends Error {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status, update: refreshSession } = useSession();
-  const [emailAuthEnabled, setEmailAuthEnabled] = React.useState<boolean | null>(null);
+  const [passwordAuthEnabled, setPasswordAuthEnabled] = React.useState<boolean | null>(null);
   const [googleAuthEnabled, setGoogleAuthEnabled] = React.useState<boolean | null>(null);
+  const [magicLinkEnabled, setMagicLinkEnabled] = React.useState<boolean | null>(null);
   const qc = useQueryClient();
 
   const user = session?.user ?? null;
   const isAuthenticated = status === 'authenticated';
 
   // Which sign-in methods this deployment enabled (ADR-0002 §4). OAuth comes
-  // from NextAuth's own /api/auth/providers; password sign-in is not an Auth.js
-  // provider (see `/api/auth/password-login`) so it reports itself.
+  // from NextAuth's own /api/auth/providers; password sign-in and magic-link
+  // login are not gated by Auth.js provider presence (the Email provider is
+  // always registered when email is configured, to power invite links), so each
+  // reports its login-page display flag from its own route.
   React.useEffect(() => {
     let active = true;
     getProviders()
       .then((providers) => {
-        if (active) setGoogleAuthEnabled(providers?.google !== undefined);
+        if (active) {
+          setGoogleAuthEnabled(providers?.google !== undefined);
+        }
       })
       .catch(() => {
-        if (active) setGoogleAuthEnabled(false);
+        if (active) {
+          setGoogleAuthEnabled(false);
+        }
       });
     fetch(PASSWORD_LOGIN_PATH)
       .then((res) => res.json())
       .then((body: { enabled?: boolean }) => {
-        if (active) setEmailAuthEnabled(body.enabled === true);
+        if (active) setPasswordAuthEnabled(body.enabled === true);
       })
       .catch(() => {
-        if (active) setEmailAuthEnabled(false);
+        if (active) setPasswordAuthEnabled(false);
+      });
+    fetch(MAGIC_LINK_LOGIN_PATH)
+      .then((res) => res.json())
+      .then((body: { enabled?: boolean }) => {
+        if (active) setMagicLinkEnabled(body.enabled === true);
+      })
+      .catch(() => {
+        if (active) setMagicLinkEnabled(false);
       });
     return () => {
       active = false;
@@ -118,6 +136,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [refreshSession],
   );
 
+  const signInWithMagicLink = React.useCallback(async (email: string) => {
+    // `redirect: false` so we stay on `/login` and render our own styled
+    // "check your email" confirmation instead of Auth.js's unstyled default
+    // verify-request page. The callbackUrl is still baked into the emailed link,
+    // so clicking it mints the same `auth_sessions` row + cookie as Google and
+    // lands on the workspace selection.
+    await signIn('email', { email, redirect: false, callbackUrl: '/workspace-selection' });
+  }, []);
+
   const clearMustChangePassword = React.useCallback(async () => {
     await mediforce.users.clearMustChangePassword();
     // refetchQueries (not invalidateQueries) so the `me` cache holds the fresh
@@ -137,10 +164,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         loading,
         mustChangePassword,
-        emailAuthEnabled,
+        passwordAuthEnabled,
         googleAuthEnabled,
+        magicLinkEnabled,
         signInWithGoogle,
         signInWithEmail,
+        signInWithMagicLink,
         clearMustChangePassword,
         signOut,
       }}

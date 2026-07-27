@@ -12,8 +12,11 @@ export type {
   SeedInviteInput,
   InviteNotificationService,
   SendWorkspaceNotificationEmailInput,
+  SendActivationEmailInput,
 } from './invite-notification';
 export {
   sendWorkspaceNotificationEmail,
   type SendWorkspaceNotificationEmailParams,
+  sendInviteSetupEmail,
+  type SendInviteSetupEmailParams,
 } from './invite-emails';
