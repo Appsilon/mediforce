@@ -86,6 +86,15 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
       await ensureImage(request.imageBuild);
     }
 
+    // Remove any stale container holding this name (crashed/killed/retried
+    // attempt). `docker run --rm` only cleans up on a clean exit, so without this
+    // a retry hits `Conflict. The container name "…" is already in use` (exit 125).
+    await new Promise<void>((resolve) => {
+      const rm = spawn('docker', ['rm', '-f', request.containerName], { stdio: 'ignore' });
+      rm.on('close', () => resolve());
+      rm.on('error', () => resolve());
+    });
+
     const { logFile } = request;
     let logDirReady: Promise<void> | null = null;
     if (logFile) {

@@ -42,6 +42,19 @@ async function prepareLocalOutputDir(data: { inputFiles?: Record<string, string>
   return { localOutputDir, patchedArgs };
 }
 
+/**
+ * Best-effort removal of a pre-existing container by name before `docker run`.
+ * Idempotent: succeeds whether or not a container with that name exists, and
+ * never rejects — a failure here must not block the run.
+ */
+function removeStaleContainer(containerName: string): Promise<void> {
+  return new Promise((resolve) => {
+    const rm = spawn('docker', ['rm', '-f', containerName], { stdio: 'ignore' });
+    rm.on('close', () => resolve());
+    rm.on('error', () => resolve());
+  });
+}
+
 async function processDockerJob(rawData: unknown): Promise<DockerJobResult> {
   const data = DockerJobDataSchema.parse(rawData);
   const logFile = data.logFile;
@@ -51,6 +64,11 @@ async function processDockerJob(rawData: unknown): Promise<DockerJobResult> {
   if (data.imageBuild) {
     await ensureImage(data.imageBuild);
   }
+
+  // Remove any stale container holding this name (from a crashed/killed/retried
+  // attempt). `docker run --rm` only cleans up on a clean exit, so without this a
+  // retry hits `Conflict. The container name "…" is already in use` (exit 125).
+  await removeStaleContainer(data.containerName);
 
   return prepareLocalOutputDir(data).then(({ localOutputDir, patchedArgs }) => new Promise<DockerJobResult>((resolve, reject) => {
     const child = spawn('docker', patchedArgs, {
