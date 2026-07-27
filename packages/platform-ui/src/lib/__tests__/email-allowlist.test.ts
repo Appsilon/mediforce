@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseAllowedDomains, isEmailDomainAllowed } from '../email-allowlist';
+import { parseAllowedDomains, isEmailDomainAllowed, ALLOW_ANY_DOMAIN } from '../email-allowlist';
 
 describe('parseAllowedDomains', () => {
   it('splits, trims, lowercases and drops blanks', () => {
@@ -35,5 +35,10 @@ describe('isEmailDomainAllowed', () => {
 
   it('matches the second domain in a multi-domain list', () => {
     expect(isEmailDomainAllowed('bob@acme.io', ['appsilon.com', 'acme.io'])).toBe(true);
+  });
+
+  it('allows any domain when the "*" opt-out sentinel is present', () => {
+    expect(isEmailDomainAllowed('mallory@evil.com', [ALLOW_ANY_DOMAIN])).toBe(true);
+    expect(isEmailDomainAllowed('anyone@anywhere.io', parseAllowedDomains('*'))).toBe(true);
   });
 });
