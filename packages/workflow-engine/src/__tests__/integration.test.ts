@@ -43,7 +43,6 @@ const mixedLoopDef: WorkflowDefinition = {
     { from: 'review', to: 'finalize' },
     { from: 'finalize', to: 'done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start' }],
 };
 
 // Variable propagation: the gather step's output must land in
@@ -64,7 +63,6 @@ const propagationDef: WorkflowDefinition = {
     { from: 'gather', to: 'done', when: 'else' },
     { from: 'enrich', to: 'done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start' }],
 };
 
 // Crash + recovery loop.
@@ -82,7 +80,6 @@ const recoveryDef: WorkflowDefinition = {
     { from: 'start', to: 'process' },
     { from: 'process', to: 'done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start' }],
 };
 
 // Verdict-based routing: approve → approved, revise → back to draft.
@@ -111,7 +108,6 @@ const verdictRoutingDef: WorkflowDefinition = {
     { from: 'review', to: 'approved' },
     { from: 'review', to: 'draft' },
   ],
-  triggers: [{ type: 'manual', name: 'Start' }],
 };
 
 describe('WorkflowEngine integration: full execution loop', () => {

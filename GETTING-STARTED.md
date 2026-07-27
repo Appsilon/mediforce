@@ -161,9 +161,6 @@ curl -X POST "http://localhost:9003/api/workflow-definitions?namespace=my-namesp
     "name": "my-first-workflow",
     "description": "A simple workflow to get started",
     "preamble": "This workflow demonstrates the basic structure.",
-    "triggers": [
-      { "name": "manual", "type": "manual" }
-    ],
     "steps": [
       {
         "id": "do-work",
@@ -204,10 +201,14 @@ The API returns:
 **Key concepts:**
 - `namespace` — groups your workflows (used in query param)
 - `name` — unique workflow identifier within namespace
-- `triggers` — how workflows start (manual, cron, etc.)
 - `steps` — human tasks, agent tasks, or both
 - `transitions` — rules for moving between steps
 - `verdicts` — for review steps, define where each outcome goes
+
+Workflows are **trigger-free**: how a workflow starts (manual, cron, webhook) is
+not part of the definition. Manual hand-start works by default; attach a schedule
+or webhook after registering with `mediforce workflow trigger-add` or the UI
+**Triggers** tab (see [ADR-0011](docs/adr/0011-triggers-detached-unified-resource.md)).
 
 **Step types:** `creation` (creates/modifies data), `review` (human verdict),
 `decision` (conditional branch), `terminal` (end).
@@ -275,9 +276,6 @@ Workflows combine human tasks and AI agent tasks with configurable autonomy.
   "name": "document-review",
   "description": "Upload documents, AI analyzes, human reviews",
   "preamble": "Review uploaded documents with AI assistance.",
-  "triggers": [
-    { "name": "manual", "type": "manual" }
-  ],
   "steps": [
     {
       "id": "upload",
@@ -445,7 +443,7 @@ your address matches the allowlist.
 
 Check: `namespace` query param present, valid step `type`
 (`creation`/`review`/`decision`/`terminal`), required fields (`name`,
-`triggers`, `steps`, `transitions`).
+`steps`, `transitions`).
 
 ### `mediforce: missing API key`
 

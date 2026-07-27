@@ -97,7 +97,6 @@ export default function WorkflowDefinitionVersionPage() {
           description: editedDescription.trim() || undefined,
           steps,
           transitions: mergedTransitions,
-          triggers: definition.triggers,
           roles: definition.roles,
           env: definition.env,
           notifications: definition.notifications,

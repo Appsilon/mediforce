@@ -7,7 +7,6 @@
   "expectedError": "review steps must not have outgoing transitions",
   "definition": {
     "name": "anti-transition-from-review",
-    "triggers": [{ "type": "manual", "name": "manual" }],
     "steps": [
       { "id": "create", "name": "Create", "type": "creation", "executor": "human" },
       {

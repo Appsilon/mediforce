@@ -36,13 +36,6 @@ const definition: WorkflowDefinition = {
   // The definition's advisory triggers are no longer what the router reads —
   // resolution is against the detached `triggers` table (Issue #931). Kept
   // here only because the schema requires at least one declared trigger.
-  triggers: [
-    {
-      type: 'webhook',
-      name: 'main',
-      config: { method: 'POST', path: '/execution-summaries' },
-    },
-  ],
 };
 
 /** An enabled `webhook` row in the unified triggers table — what the router

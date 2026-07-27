@@ -9,7 +9,6 @@ const sourceDefinition: WorkflowDefinition = {
   visibility: 'public',
   steps: [{ id: 'step-1', name: 'Step 1', executor: 'human', assignedRole: 'reviewer' }],
   transitions: [{ from: 'step-1', to: '__end__' }],
-  triggers: [{ type: 'manual', name: 'manual' }],
   createdAt: '2026-05-01T00:00:00Z',
 };
 

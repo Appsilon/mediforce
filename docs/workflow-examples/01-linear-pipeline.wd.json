@@ -2,9 +2,6 @@
   "name": "tutorial-linear-pipeline",
   "title": "Linear Pipeline",
   "description": "Simplest workflow pattern: human fills a form, a script processes it, done. Demonstrates params, script-container with inlineScript, and basic transitions.",
-  "triggers": [
-    { "type": "manual", "name": "manual" }
-  ],
   "roles": ["operator"],
   "steps": [
     {

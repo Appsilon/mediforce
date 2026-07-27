@@ -3,12 +3,6 @@
   "namespace": "appsilon",
   "description": "Meta-workflow that designs Mediforce WorkflowDefinitions. Create a new workflow from a natural language idea, or load and edit an existing one. Uses collaborative human+AI conversation for iterative design with live validation and visual diagrams.",
   "preamble": "## Domain Context\nThis workflow generates structured workflow definitions for the Mediforce platform. All clinical and pharma terminology in workflow descriptions refers to domain modeling constructs.",
-  "triggers": [
-    {
-      "type": "manual",
-      "name": "manual"
-    }
-  ],
   "roles": [
     "workflow-designer"
   ],

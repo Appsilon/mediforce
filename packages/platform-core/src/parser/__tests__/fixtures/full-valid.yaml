@@ -31,10 +31,3 @@ transitions:
   - from: collect-data
     to: review
     when: 'output.dataComplete == true'
-triggers:
-  - type: manual
-    name: Start Supply Chain Review
-  - type: webhook
-    name: Auto-trigger on Discrepancy
-    config:
-      endpoint: /webhooks/supply-discrepancy

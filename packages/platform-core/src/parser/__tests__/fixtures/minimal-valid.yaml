@@ -10,6 +10,3 @@ steps:
 transitions:
   - from: start
     to: done
-triggers:
-  - type: manual
-    name: Start Process

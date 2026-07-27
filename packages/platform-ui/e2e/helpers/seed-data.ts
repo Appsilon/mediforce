@@ -905,7 +905,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { from: 'human-review', to: 'manager-approval' },
         { from: 'manager-approval', to: 'archived' },
       ],
-      triggers: [{ type: 'manual', name: 'start-review-cycle' }],
     },
     'def-data-quality-review': {
       name: 'Data Quality Review',
@@ -921,7 +920,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { from: 'verify-data-quality', to: 'review-results' },
         { from: 'review-results', to: 'done' },
       ],
-      triggers: [{ type: 'manual', name: 'start-review' }],
     },
   };
 
@@ -1109,7 +1107,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'upload-documents', to: 'done' }],
-      triggers: [{ type: 'manual', name: 'start' }],
     },
     // Example workflow that exercises the run-scoped git workspace with a
     // small real-shaped data pipeline: step 1 generates a CSV dataset, step 2
@@ -1185,7 +1182,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { from: 'generate-data', to: 'summarize' },
         { from: 'summarize', to: 'done' },
       ],
-      triggers: [{ type: 'manual', name: 'start' }],
       createdAt: twoDaysAgo,
     },
     'test:Supply Chain Review:1': {
@@ -1213,7 +1209,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { from: 'human-review', to: 'manager-approval' },
         { from: 'manager-approval', to: 'archived' },
       ],
-      triggers: [{ type: 'manual', name: 'start-review-cycle' }],
       createdAt: twoDaysAgo,
     },
     'test:Data Quality Review:2': {
@@ -1231,7 +1226,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { from: 'verify-data-quality', to: 'review-results' },
         { from: 'review-results', to: 'done' },
       ],
-      triggers: [{ type: 'manual', name: 'start-review' }],
       createdAt: threeDaysAgo,
     },
   };
@@ -1388,7 +1382,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
     ],
     transitions: [{ from: 'process', to: 'done' }],
-    triggers: [{ type: 'manual', name: 'start' }],
     createdAt: twoDaysAgo,
   };
 
@@ -1507,7 +1500,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
     ],
     transitions: [{ from: 'design', to: 'done' }],
-    triggers: [{ type: 'manual', name: 'start-design' }],
     createdAt: twoDaysAgo,
   };
 
@@ -1530,7 +1522,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       { from: 'process-urgent', to: 'finalize' },
       { from: 'finalize', to: 'done' },
     ],
-    triggers: [{ type: 'manual', name: 'start' }],
     createdAt: twoDaysAgo,
   };
 
@@ -1556,7 +1547,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     transitions: [
       { from: 'draft', to: 'review' },
     ],
-    triggers: [{ type: 'manual', name: 'start' }],
     createdAt: twoDaysAgo,
   };
 
@@ -1571,7 +1561,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
     ],
     transitions: [{ from: 'process', to: 'done' }],
-    triggers: [{ type: 'manual', name: 'start' }],
     triggerInput: [
       { name: 'studyId', type: 'string', required: true, description: 'Study identifier' },
       { name: 'priority', type: 'select', required: false, options: ['low', 'normal', 'high'], default: 'normal', description: 'Run priority' },
@@ -1593,7 +1582,6 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
     ],
     transitions: [{ from: 'supply-chain-assessment', to: 'done' }],
-    triggers: [{ type: 'manual', name: 'start' }],
     createdAt: twoDaysAgo,
   };
 

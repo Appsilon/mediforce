@@ -6,7 +6,6 @@ export {
   normalizeSelection,
   StepSchema,
   TransitionSchema,
-  TriggerSchema,
   ProcessDefinitionSchema,
   type Verdict,
   type StepUi,
@@ -14,7 +13,6 @@ export {
   type Selection,
   type Step,
   type Transition,
-  type Trigger,
   type ProcessDefinition,
 } from './process-definition';
 
@@ -184,7 +182,7 @@ export {
   WaitActionConfigSchema,
   ActionConfigSchema,
   validateInputForNextRun,
-  validateExecutorAndTriggers,
+  validateSteps,
   validateTriggerInput,
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,

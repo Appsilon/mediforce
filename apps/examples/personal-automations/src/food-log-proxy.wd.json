@@ -3,16 +3,6 @@
   "title": "Food Log Proxy",
   "description": "Webhook -> http proxy -> reshape. Reference template for chained actions + reshape kind.",
   "preamble": "## Domain Context\nReference workflow. Validates that two chained `executor: 'action'` steps (http + reshape) propagate variables through the engine and that the reshape kind composes cleanly with http output.",
-  "triggers": [
-    {
-      "type": "webhook",
-      "name": "main",
-      "config": {
-        "method": "POST",
-        "path": "/food-log"
-      }
-    }
-  ],
   "steps": [
     {
       "id": "proxy",

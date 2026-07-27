@@ -28,7 +28,7 @@ The pipeline consists of 5 skills, each handling a discrete step:
 
 ```
 src/
-  process-definition.yaml  # Workflow definition (steps, transitions, triggers)
+  process-definition.yaml  # Workflow definition (steps, transitions)
   __tests__/               # Process definition validation tests
 plugins/
   protocol-to-tfl/skills/  # Skill definitions and reference docs

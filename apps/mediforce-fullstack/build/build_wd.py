@@ -198,11 +198,9 @@ wd = {
     "env": json.loads((ENV_FILE if ENV_FILE.exists() else ENV_EXAMPLE).read_text()),
     "steps": steps,
     "transitions": transitions,
-    "triggers": [
-        # Cron paused for now — run on demand via the manual trigger. Re-add
-        # {"type": "cron", "name": "every-15-min", "schedule": "*/15 * * * *"} to resume.
-        {"type": "manual", "name": "manual"},
-    ],
+    # Definitions are trigger-free (Issue #932). Manual hand-start is auto-seeded
+    # on register; attach a cron schedule out-of-band with
+    # `mediforce workflow trigger-add --type cron --schedule "*/15 * * * *"`.
 }
 
 OUT.write_text(json.dumps(wd, indent=2) + "\n")

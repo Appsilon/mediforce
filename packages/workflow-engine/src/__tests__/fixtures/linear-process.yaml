@@ -16,6 +16,3 @@ transitions:
     to: process
   - from: process
     to: done
-triggers:
-  - type: manual
-    name: Start Process

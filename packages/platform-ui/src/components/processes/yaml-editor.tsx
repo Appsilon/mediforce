@@ -161,10 +161,6 @@ const PLACEHOLDER = `name: my-process
 version: 1.0.0
 description: What this process does
 
-triggers:
-  - type: manual
-    name: start
-
 steps:
   - id: step-1
     name: First Step

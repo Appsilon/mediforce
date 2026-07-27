@@ -5,11 +5,10 @@ import {
   InMemoryProcessRepository,
   InMemoryTriggerRepository,
 } from '@mediforce/platform-core/testing';
-import type { WorkflowDefinition } from '@mediforce/platform-core';
-import { MANUAL_TRIGGER_NAME, seedTriggersFromDefinition } from '../_seed-triggers';
+import { MANUAL_TRIGGER_NAME, seedManualTrigger } from '../_seed-triggers';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
-describe('seedTriggersFromDefinition (ADR-0011 / Issue #930)', () => {
+describe('seedManualTrigger (ADR-0011 / Issue #930, #932)', () => {
   let triggerRepo: InMemoryTriggerRepository;
 
   beforeEach(() => {
@@ -25,20 +24,13 @@ describe('seedTriggersFromDefinition (ADR-0011 / Issue #930)', () => {
     });
   }
 
-  const def = (
-    triggers: WorkflowDefinition['triggers'],
-  ): Pick<WorkflowDefinition, 'name' | 'triggers'> => ({ name: 'flow', triggers });
-
-  it('seeds an enabled manual singleton named "manual", independent of the definition', async () => {
-    // Definition declares a differently-named manual trigger — the seed ignores
-    // it and creates the canonical singleton.
-    await seedTriggersFromDefinition(scope(), 'team-alpha', def([{ type: 'manual', name: 'Start Process' }]));
+  it('seeds an enabled manual singleton named "manual"', async () => {
+    await seedManualTrigger(scope(), 'team-alpha', 'flow');
 
     const rows = await triggerRepo.listByWorkflow('team-alpha', 'flow');
-    const manual = rows.filter((t) => t.type === 'manual');
-    expect(manual).toHaveLength(1);
-    expect(manual[0]).toMatchObject({ name: MANUAL_TRIGGER_NAME, enabled: true, config: {} });
-    expect(manual[0].type === 'manual' && manual[0].lastTriggeredAt).toBeNull();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ type: 'manual', name: MANUAL_TRIGGER_NAME, enabled: true, config: {} });
+    expect(rows[0].type === 'manual' && rows[0].lastTriggeredAt).toBeNull();
   });
 
   it('never creates a second manual row when one already exists', async () => {
@@ -55,7 +47,7 @@ describe('seedTriggersFromDefinition (ADR-0011 / Issue #930)', () => {
       updatedAt: now,
     });
 
-    await seedTriggersFromDefinition(scope(), 'team-alpha', def([{ type: 'manual', name: 'manual' }]));
+    await seedManualTrigger(scope(), 'team-alpha', 'flow');
 
     const manual = (await triggerRepo.listByWorkflow('team-alpha', 'flow')).filter(
       (t) => t.type === 'manual',
@@ -65,129 +57,10 @@ describe('seedTriggersFromDefinition (ADR-0011 / Issue #930)', () => {
     expect(manual[0].enabled).toBe(false);
   });
 
-  it('seeds a cron row per declared cron schedule, seed-if-absent', async () => {
-    await seedTriggersFromDefinition(
-      scope(),
-      'team-alpha',
-      def([
-        { type: 'manual', name: 'manual' },
-        { type: 'cron', name: 'nightly', schedule: '0 3 * * *' },
-      ]),
-    );
-
-    const cron = (await triggerRepo.listByWorkflow('team-alpha', 'flow')).filter(
-      (t) => t.type === 'cron',
-    );
-    expect(cron).toHaveLength(1);
-    expect(cron[0]).toMatchObject({ name: 'nightly', enabled: true, config: { schedule: '0 3 * * *' } });
-  });
-
-  it('does not re-seed a cron row that already exists by name', async () => {
-    const now = new Date().toISOString();
-    await triggerRepo.create({
-      type: 'cron',
-      namespace: 'team-alpha',
-      workflowName: 'flow',
-      name: 'nightly',
-      enabled: false,
-      config: { schedule: '0 9 * * *' },
-      lastTriggeredAt: now,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    await seedTriggersFromDefinition(
-      scope(),
-      'team-alpha',
-      def([{ type: 'cron', name: 'nightly', schedule: '0 3 * * *' }]),
-    );
-
-    const nightly = (await triggerRepo.listByWorkflow('team-alpha', 'flow')).find(
-      (t) => t.name === 'nightly',
-    );
-    // Untouched: still disabled with the original schedule.
-    expect(nightly?.enabled).toBe(false);
-    expect(nightly?.type === 'cron' && nightly.config.schedule).toBe('0 9 * * *');
-  });
-
-  it('seeds a webhook row per declared webhook trigger, seed-if-absent (Issue #931)', async () => {
-    await seedTriggersFromDefinition(
-      scope(),
-      'team-alpha',
-      def([
-        { type: 'manual', name: 'manual' },
-        { type: 'webhook', name: 'orders-hook', config: { method: 'POST', path: '/orders' } },
-      ]),
-    );
-
-    const webhook = (await triggerRepo.listByWorkflow('team-alpha', 'flow')).filter(
-      (t) => t.type === 'webhook',
-    );
-    expect(webhook).toHaveLength(1);
-    expect(webhook[0]).toMatchObject({
-      name: 'orders-hook',
-      enabled: true,
-      config: { method: 'POST', path: '/orders' },
-    });
-    expect(webhook[0].type === 'webhook' && webhook[0].lastTriggeredAt).toBeNull();
-  });
-
-  it('skips a webhook trigger whose config is malformed', async () => {
-    await seedTriggersFromDefinition(
-      scope(),
-      'team-alpha',
-      def([{ type: 'webhook', name: 'broken', config: { method: 'POST' } }]),
-    );
-
-    const webhook = (await triggerRepo.listByWorkflow('team-alpha', 'flow')).filter(
-      (t) => t.type === 'webhook',
-    );
-    expect(webhook).toHaveLength(0);
-  });
-
-  it('remaps a declared cron/webhook named "manual" so the singleton keeps the reserved name', async () => {
-    await seedTriggersFromDefinition(
-      scope(),
-      'team-alpha',
-      def([
-        { type: 'cron', name: 'manual', schedule: '0 3 * * *' },
-        { type: 'webhook', name: 'manual', config: { method: 'POST', path: '/orders' } },
-      ]),
-    );
+  it('seeds only the manual singleton — cron/webhook are not derived from the workflow (Issue #932)', async () => {
+    await seedManualTrigger(scope(), 'team-alpha', 'flow');
 
     const rows = await triggerRepo.listByWorkflow('team-alpha', 'flow');
-    // The hand-start singleton keeps `manual`; the collliding declarations are
-    // collisions are migrated to type-suffixed names rather than dropped or throwing.
-    expect(rows.find((t) => t.name === MANUAL_TRIGGER_NAME)?.type).toBe('manual');
-    expect(rows.find((t) => t.name === 'manual-cron')?.type).toBe('cron');
-    expect(rows.find((t) => t.name === 'manual-webhook')?.type).toBe('webhook');
-  });
-
-  it('does not re-seed a webhook row that already exists by name', async () => {
-    const now = new Date().toISOString();
-    await triggerRepo.create({
-      type: 'webhook',
-      namespace: 'team-alpha',
-      workflowName: 'flow',
-      name: 'orders-hook',
-      enabled: false,
-      config: { method: 'GET', path: '/old' },
-      lastTriggeredAt: null,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    await seedTriggersFromDefinition(
-      scope(),
-      'team-alpha',
-      def([{ type: 'webhook', name: 'orders-hook', config: { method: 'POST', path: '/orders' } }]),
-    );
-
-    const hook = (await triggerRepo.listByWorkflow('team-alpha', 'flow')).find(
-      (t) => t.name === 'orders-hook',
-    );
-    // Untouched: still disabled with the original method+path.
-    expect(hook?.enabled).toBe(false);
-    expect(hook?.type === 'webhook' && hook.config.path).toBe('/old');
+    expect(rows.map((t) => t.type)).toEqual(['manual']);
   });
 });

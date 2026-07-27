@@ -47,10 +47,9 @@ export const workflowGetCommand = defineCommand({
         const def = result.definition;
         const stepCount = Array.isArray(def.steps) ? def.steps.length : 0;
         const transCount = Array.isArray(def.transitions) ? def.transitions.length : 0;
-        const triggerCount = Array.isArray(def.triggers) ? def.triggers.length : 0;
         const visibility = def.visibility ?? 'private';
         output.stdout(
-          `${def.name} v${String(def.version)} (namespace: ${def.namespace}, ${visibility}, ${String(stepCount)} steps, ${String(transCount)} transitions, ${String(triggerCount)} triggers)`,
+          `${def.name} v${String(def.version)} (namespace: ${def.namespace}, ${visibility}, ${String(stepCount)} steps, ${String(transCount)} transitions)`,
         );
       }
       output.stdout(json);

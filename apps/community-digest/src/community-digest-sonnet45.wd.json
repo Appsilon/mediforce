@@ -2,12 +2,6 @@
   "name": "community-digest-sonnet45",
   "namespace": "appsilon",
   "description": "Daily GitHub scan → rank changes → draft Discord posts (Claude Sonnet 4.5)",
-  "triggers": [
-    {
-      "name": "manual",
-      "type": "manual"
-    }
-  ],
   "roles": [
     "community-lead"
   ],

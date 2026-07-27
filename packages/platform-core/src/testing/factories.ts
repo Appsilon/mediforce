@@ -74,9 +74,6 @@ export function buildProcessDefinition(
     transitions: [
       { from: 'step-intake', to: 'step-review' },
     ],
-    triggers: [
-      { type: 'manual', name: 'Start Process' },
-    ],
     ...overrides,
   };
 }
@@ -385,9 +382,6 @@ export function buildWorkflowDefinition(
     transitions: [
       { from: 'intake', to: 'review' },
       { from: 'review', to: 'complete' },
-    ],
-    triggers: [
-      { type: 'manual', name: 'Start' },
     ],
     ...overrides,
   };

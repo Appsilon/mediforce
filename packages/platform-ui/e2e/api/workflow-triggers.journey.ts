@@ -47,7 +47,6 @@ function manualOnlyWd(name: string) {
       { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
     ],
     transitions: [{ from: 'noop', to: 'done' }],
-    triggers: [{ type: 'manual', name: 'manual' }],
   };
 }
 

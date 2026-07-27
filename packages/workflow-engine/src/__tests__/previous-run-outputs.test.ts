@@ -21,7 +21,6 @@ const cursorDef: WorkflowDefinition = {
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
   ],
   transitions: [{ from: 'scan', to: 'done' }],
-  triggers: [{ type: 'manual', name: 'Start' }],
   inputForNextRun: [{ stepId: 'scan', output: 'cursor', as: 'cursor' }],
 };
 
@@ -36,7 +35,6 @@ const plainDef: WorkflowDefinition = {
     { id: 'b', name: 'B', type: 'terminal', executor: 'human' },
   ],
   transitions: [{ from: 'a', to: 'b' }],
-  triggers: [{ type: 'manual', name: 'Start' }],
 };
 
 /** WD carrying multiple outputs (some from different steps). */
@@ -54,7 +52,6 @@ const multiDef: WorkflowDefinition = {
     { from: 's1', to: 's2' },
     { from: 's2', to: 'end' },
   ],
-  triggers: [{ type: 'manual', name: 'Start' }],
   inputForNextRun: [
     { stepId: 's1', output: 'cursor', as: 'cursor' },
     { stepId: 's2', output: 'hash', as: 'lastHash' },

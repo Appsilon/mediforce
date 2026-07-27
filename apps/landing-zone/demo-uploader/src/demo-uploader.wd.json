@@ -7,12 +7,6 @@
     "DEMO_CONSOLE_URL": "{{DEMO_CONSOLE_URL}}",
     "DEMO_CONSOLE_API_KEY": "{{DEMO_CONSOLE_API_KEY}}"
   },
-  "triggers": [
-    {
-      "name": "manual",
-      "type": "manual"
-    }
-  ],
   "steps": [
     {
       "id": "review-and-pick",

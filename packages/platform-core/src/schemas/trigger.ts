@@ -10,7 +10,9 @@ import { WebhookTriggerConfigSchema } from './workflow-definition';
  * immutable versioned Definition. It generalises the cron-only overlay
  * (`cron_trigger_state`) to `manual`, `webhook`, and `cron`.
  *
- * Named `TriggerResource*` transitionally — see ADR-0011 / CONTEXT.md "Trigger".
+ * Named `TriggerResource*` — the definition no longer declares triggers
+ * (Issue #932), so this is the single, permanent Trigger schema (there is no
+ * embedded `Trigger` declaration to rename back to). See ADR-0011 / CONTEXT.md.
  *
  * `event` is a reserved future type: no runtime, not part of the union yet.
  */

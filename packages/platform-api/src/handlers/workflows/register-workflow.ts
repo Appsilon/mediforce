@@ -13,7 +13,7 @@ import {
 } from '../../errors';
 import { actorFromCaller } from '../_helpers';
 import { checkRetiredModels } from './retired-model-check';
-import { seedTriggersFromDefinition } from './_seed-triggers';
+import { seedManualTrigger } from './_seed-triggers';
 import { isLocalAgentMode, fetchFromContainerWorker, fetchFromLocalDocker } from '../system/_docker';
 
 interface RegisterScopedInput extends RegisterWorkflowInput {
@@ -104,10 +104,10 @@ export async function registerWorkflow(
     namespace: input.namespace,
   });
 
-  // ADR-0011: seed detached cron/manual Trigger rows for this definition — a
-  // declared `manual` trigger makes the workflow hand-startable by default
-  // (Issue #930), a declared `cron` trigger starts firing. Seed-if-absent.
-  await seedTriggersFromDefinition(scope, input.namespace, definition);
+  // ADR-0011: seed the detached manual Trigger singleton so the workflow is
+  // hand-startable by default (Issue #930). Cron/webhook triggers are created
+  // separately via the triggers table — definitions are trigger-free (Issue #932).
+  await seedManualTrigger(scope, input.namespace, definition.name);
 
   const warnings: RegistrationWarning[] = [];
 

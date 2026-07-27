@@ -19,14 +19,17 @@ steps:
     executor: human
 transitions:
   - { from: scan, to: done }
-triggers:
-  - { type: cron, name: hourly, schedule: '0 * * * *' }
 
 inputForNextRun:
   - stepId: scan
     output: cursor
     as: cursor
 ```
+
+The hourly schedule that drives this monitor is **not** part of the definition —
+attach it out-of-band with `mediforce workflow trigger-add` (or the UI Triggers
+tab) as a `cron` trigger. Definitions are trigger-free (see
+[ADR-0011](adr/0011-triggers-detached-unified-resource.md)).
 
 At run start, the engine:
 

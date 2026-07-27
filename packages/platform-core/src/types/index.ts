@@ -9,7 +9,6 @@ export type {
   Selection,
   Step,
   Transition,
-  Trigger,
   ProcessDefinition,
 } from '../schemas/process-definition';
 

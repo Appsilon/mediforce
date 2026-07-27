@@ -14,7 +14,6 @@ const baseDefinition: ProcessDefinition = {
     { from: 'step-intake', to: 'step-review' },
     { from: 'step-review', to: 'step-done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start' }],
 };
 
 const baseConfig: ProcessConfig = {

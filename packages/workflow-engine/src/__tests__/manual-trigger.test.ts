@@ -27,7 +27,6 @@ const linearDef: WorkflowDefinition = {
     { from: 'start', to: 'process' },
     { from: 'process', to: 'done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start Process' }],
 };
 
 const cronOnlyDef: WorkflowDefinition = {
@@ -40,7 +39,6 @@ const cronOnlyDef: WorkflowDefinition = {
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
   ],
   transitions: [{ from: 'start', to: 'done' }],
-  triggers: [{ type: 'cron', name: 'Nightly', schedule: '0 0 * * *' }],
 };
 
 function manualRow(

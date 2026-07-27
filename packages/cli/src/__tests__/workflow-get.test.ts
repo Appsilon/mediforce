@@ -145,7 +145,6 @@ describe('workflow get command', () => {
     expect(line).toContain('namespace: appsilon');
     expect(line).toContain('3 steps');
     expect(line).toContain('2 transitions');
-    expect(line).toContain('1 triggers');
   });
 
   it('--template strips version, createdAt, namespace from output', async () => {

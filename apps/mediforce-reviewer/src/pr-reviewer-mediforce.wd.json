@@ -9,10 +9,6 @@
     "ANTHROPIC_API_KEY": "",
     "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
   },
-  "triggers": [
-    { "name": "poll-prs", "type": "cron", "schedule": "*/20 * * * *" },
-    { "name": "manual", "type": "manual" }
-  ],
   "steps": [
     {
       "id": "find-pr",

@@ -50,12 +50,6 @@
       "to": "done"
     }
   ],
-  "triggers": [
-    {
-      "type": "manual",
-      "name": "Start"
-    }
-  ],
   "inputForNextRun": [
     {
       "stepId": "set-next",
