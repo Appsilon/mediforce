@@ -1,5 +1,7 @@
+import { readFile, writeFile } from 'node:fs/promises';
+import { TriggerConfigFileSchema, type TriggerConfigFile } from '@mediforce/platform-core';
 import { defineCommand } from '../define-command';
-import { printJson } from '../output';
+import { printJson, printError } from '../output';
 
 const nameArg = {
   type: 'positional',
@@ -166,6 +168,88 @@ export const workflowTriggerStopCommand = defineCommand({
       printJson(output, result);
     } else {
       output.stdout(`Stopped trigger '${result.trigger.name}'`);
+    }
+    return 0;
+  },
+});
+
+export const workflowTriggerExportCommand = defineCommand({
+  name: 'mediforce workflow trigger-export',
+  description:
+    'Export a workflow\'s triggers to a portable trigger-config file (instance-free). Writes to --out or, when omitted, prints the JSON to stdout.',
+  args: {
+    name: nameArg,
+    namespace: namespaceArg,
+    out: { type: 'string', required: false, description: 'File to write the trigger config to (default: stdout)' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.triggers.export({
+      definitionName: args.name,
+      namespace: args.namespace!,
+    });
+    const serialized = `${JSON.stringify(result.triggers, null, 2)}\n`;
+    if (typeof args.out === 'string' && args.out.length > 0) {
+      await writeFile(args.out, serialized, 'utf-8');
+      if (jsonMode) {
+        printJson(output, result);
+      } else {
+        output.stdout(
+          `Exported ${String(result.triggers.length)} trigger(s) from '${args.name}' to ${args.out}`,
+        );
+      }
+      return 0;
+    }
+    // No --out: emit the file contents to stdout so it can be piped/redirected.
+    output.stdout(serialized.trimEnd());
+    return 0;
+  },
+});
+
+export const workflowTriggerImportCommand = defineCommand({
+  name: 'mediforce workflow trigger-import',
+  description:
+    'Import triggers from a portable trigger-config file into a workflow. Skips names that already exist unless --replace is set. Webhook URLs re-derive for this host and cron cursors anchor to now.',
+  args: {
+    name: nameArg,
+    file: { type: 'positional', required: true, description: 'Path to the trigger-config JSON file' },
+    namespace: namespaceArg,
+    replace: { type: 'boolean', description: 'Overwrite triggers whose name already exists' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    let raw: string;
+    try {
+      raw = await readFile(args.file as string, 'utf-8');
+    } catch (err) {
+      printError(output, { error: `Failed to read file: ${String(args.file)} — ${String(err)}` }, jsonMode);
+      return 1;
+    }
+
+    let triggers: TriggerConfigFile;
+    try {
+      const parsed = TriggerConfigFileSchema.safeParse(JSON.parse(raw));
+      if (!parsed.success) {
+        printError(output, { error: 'Invalid trigger-config file', body: parsed.error.issues }, jsonMode);
+        return 1;
+      }
+      triggers = parsed.data;
+    } catch (err) {
+      printError(output, { error: `Invalid JSON: ${String(err)}` }, jsonMode);
+      return 1;
+    }
+
+    const result = await mediforce.triggers.import({
+      definitionName: args.name,
+      namespace: args.namespace!,
+      triggers,
+      replace: args.replace === true,
+    });
+    if (jsonMode) {
+      printJson(output, result);
+    } else {
+      for (const r of result.results) {
+        const suffix = r.webhookUrl !== null ? ` — URL: ${r.webhookUrl}` : '';
+        output.stdout(`${r.outcome}  ${r.type}  ${r.name}${suffix}`);
+      }
     }
     return 0;
   },

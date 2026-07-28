@@ -80,3 +80,65 @@ export type WebhookTriggerResource = z.infer<typeof WebhookTriggerResourceSchema
 export type ManualTriggerResource = z.infer<typeof ManualTriggerResourceSchema>;
 export type TriggerResource = z.infer<typeof TriggerResourceSchema>;
 export type TriggerConfig = TriggerResource['config'];
+
+/**
+ * Portable, instance-free form of a Trigger (Issue #933): `name` + `type` +
+ * `enabled` + the type's config fields, and nothing else. It excludes every
+ * instance/runtime field (`namespace`, `workflowName`, the `lastTriggeredAt`
+ * cursor, the derived URL) because those are re-anchored/re-derived on import,
+ * so an exported file back-fires nothing on the destination. Config fields are
+ * spread from the same `*TriggerConfigSchema` objects the resource uses, so a
+ * portable file validates against the same rules at one boundary.
+ */
+const PortableTriggerBaseSchema = z.object({
+  name: z.string().min(1),
+  enabled: z.boolean(),
+});
+
+const PortableCronTriggerSchema = PortableTriggerBaseSchema.extend({
+  type: z.literal('cron'),
+  ...CronTriggerConfigSchema.shape,
+});
+
+const PortableWebhookTriggerSchema = PortableTriggerBaseSchema.extend({
+  type: z.literal('webhook'),
+  ...WebhookTriggerConfigSchema.shape,
+});
+
+const PortableManualTriggerSchema = PortableTriggerBaseSchema.extend({
+  type: z.literal('manual'),
+});
+
+export const PortableTriggerSchema = z.discriminatedUnion('type', [
+  PortableCronTriggerSchema,
+  PortableWebhookTriggerSchema,
+  PortableManualTriggerSchema,
+]);
+
+/** The `triggers.json` file shape: an array of portable trigger entries. */
+export const TriggerConfigFileSchema = z.array(PortableTriggerSchema);
+
+export type PortableTrigger = z.infer<typeof PortableTriggerSchema>;
+export type TriggerConfigFile = z.infer<typeof TriggerConfigFileSchema>;
+
+/** Strip a stored Trigger down to its portable form — the export projection. */
+export function toPortableTrigger(trigger: TriggerResource): PortableTrigger {
+  if (trigger.type === 'cron') {
+    return {
+      name: trigger.name,
+      type: 'cron',
+      enabled: trigger.enabled,
+      schedule: trigger.config.schedule,
+    };
+  }
+  if (trigger.type === 'webhook') {
+    return {
+      name: trigger.name,
+      type: 'webhook',
+      enabled: trigger.enabled,
+      method: trigger.config.method,
+      path: trigger.config.path,
+    };
+  }
+  return { name: trigger.name, type: 'manual', enabled: trigger.enabled };
+}

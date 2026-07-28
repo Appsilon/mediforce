@@ -6,11 +6,18 @@ import type {
 } from '@mediforce/platform-core';
 import { WebhookTriggerConfigSchema } from '@mediforce/platform-core';
 import { validateCronSchedule } from '@mediforce/workflow-engine';
+import { toPortableTrigger } from '@mediforce/platform-core';
+import type { PortableTrigger } from '@mediforce/platform-core';
 import type {
   CreateTriggerInput,
   CreateTriggerOutput,
   DeleteTriggerInput,
   DeleteTriggerOutput,
+  ExportTriggersInput,
+  ExportTriggersOutput,
+  ImportedTriggerResult,
+  ImportTriggersInput,
+  ImportTriggersOutput,
   ListTriggersInput,
   ListTriggersOutput,
   SetTriggerEnabledInput,
@@ -324,6 +331,102 @@ export async function setTriggerEnabled(
   });
 
   return { trigger };
+}
+
+/**
+ * Export a workflow's triggers to the portable, instance-free file shape
+ * (Issue #933). Strips every runtime/instance field — namespace, workflowName,
+ * the cron fire cursor, the derived callable URL — so the result carries only
+ * config that transfers between instances.
+ */
+export async function exportTriggers(
+  input: ExportTriggersInput,
+  scope: CallerScope,
+): Promise<ExportTriggersOutput> {
+  await assertWorkflowExists(scope, input.namespace, input.definitionName);
+  const triggers = await scope.triggers.listByWorkflow(input.namespace, input.definitionName);
+  return { triggers: triggers.map(toPortableTrigger) };
+}
+
+/** Map a portable entry onto the create-trigger input for the target workflow. */
+function createInputFor(input: ImportTriggersInput, entry: PortableTrigger): CreateTriggerInput {
+  const common = {
+    namespace: input.namespace,
+    definitionName: input.definitionName,
+    triggerName: entry.name,
+    enabled: entry.enabled,
+  };
+  if (entry.type === 'cron') {
+    return { ...common, type: 'cron', schedule: entry.schedule };
+  }
+  if (entry.type === 'webhook') {
+    return { ...common, type: 'webhook', method: entry.method, path: entry.path };
+  }
+  return { ...common, type: 'manual' };
+}
+
+/** The existing row a portable entry collides with, or null. Names collide
+ *  directly; `manual` and `webhook` are also per-workflow singletons, so a
+ *  differently-named row of the same type still collides — `createTrigger`
+ *  would 409 on it, so import must reconcile against it rather than abort. */
+function conflictFor(existing: TriggerResource[], entry: PortableTrigger): TriggerResource | null {
+  const byName = existing.find((t) => t.name === entry.name);
+  if (byName !== undefined) return byName;
+  if (entry.type === 'manual' || entry.type === 'webhook') {
+    return existing.find((t) => t.type === entry.type) ?? null;
+  }
+  return null;
+}
+
+/**
+ * Import a portable trigger-config file into a workflow (Issue #933),
+ * materializing rows in the target namespace. Reuses `createTrigger` per entry
+ * so import inherits its resolution for free: webhook URLs are re-derived for
+ * the target host, cron cursors anchor to `now` (no back-fire), config is
+ * validated, and each create is audited. Conflict policy is seed-if-absent —
+ * a colliding trigger is skipped unless `replace` is set, which drops the
+ * existing row first and recreates it from the file.
+ *
+ * Validate every entry before writing anything: cron schedule alignment is the
+ * one rule the file schema can't express, and import is non-transactional, so a
+ * bad schedule must reject the whole file up front rather than leave the
+ * already-created entries behind as a partial write.
+ */
+export async function importTriggers(
+  input: ImportTriggersInput,
+  scope: CallerScope,
+): Promise<ImportTriggersOutput> {
+  await assertWorkflowExists(scope, input.namespace, input.definitionName);
+  for (const entry of input.triggers) {
+    if (entry.type === 'cron') assertValidSchedule(entry.schedule);
+  }
+
+  let existing = await scope.triggers.listByWorkflow(input.namespace, input.definitionName);
+
+  const results: ImportedTriggerResult[] = [];
+  for (const entry of input.triggers) {
+    const conflict = conflictFor(existing, entry);
+    if (conflict !== null && !input.replace) {
+      results.push({ name: entry.name, type: entry.type, outcome: 'skipped', webhookUrl: null });
+      continue;
+    }
+    // Replace: drop the colliding row directly (bypassing deleteTrigger's manual
+    // guard) so the entry is recreated fresh from the file with a clean cursor.
+    if (conflict !== null) {
+      await scope.triggers.delete(input.namespace, input.definitionName, conflict.name);
+      existing = existing.filter((t) => t.name !== conflict.name);
+    }
+    const created = await createTrigger(createInputFor(input, entry), scope);
+    results.push({
+      name: entry.name,
+      type: entry.type,
+      outcome: conflict !== null ? 'replaced' : 'created',
+      webhookUrl: created.webhookUrl,
+    });
+    existing = [...existing, created.trigger];
+  }
+
+  return { results };
 }
 
 export async function deleteTrigger(

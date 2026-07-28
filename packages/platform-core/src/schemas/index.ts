@@ -284,6 +284,9 @@ export {
   CronTriggerConfigSchema,
   ManualTriggerConfigSchema,
   WebhookTriggerConfigSchema,
+  PortableTriggerSchema,
+  TriggerConfigFileSchema,
+  toPortableTrigger,
   type TriggerType,
   type WebhookTriggerConfig,
   type TriggerResource,
@@ -291,6 +294,8 @@ export {
   type WebhookTriggerResource,
   type ManualTriggerResource,
   type TriggerConfig,
+  type PortableTrigger,
+  type TriggerConfigFile,
 } from './trigger';
 
 export {

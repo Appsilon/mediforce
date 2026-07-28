@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { HttpMethodSchema, TriggerResourceSchema, TriggerTypeSchema } from '@mediforce/platform-core';
+import {
+  HttpMethodSchema,
+  TriggerConfigFileSchema,
+  TriggerResourceSchema,
+  TriggerTypeSchema,
+} from '@mediforce/platform-core';
 
 /**
  * Contract for Trigger management on the unified `triggers` table (ADR-0011).
@@ -71,6 +76,41 @@ export const DeleteTriggerOutputSchema = z.object({
   success: z.literal(true),
 });
 
+/**
+ * Export/import of the portable trigger-config file (Issue #933). Export
+ * projects a workflow's live triggers to their instance-free form; import
+ * materializes them into the target namespace, re-anchoring cron cursors to
+ * `now` and re-deriving webhook URLs for the destination host. `replace`
+ * overwrites an existing trigger of the same name; default is seed-if-absent.
+ */
+export const ExportTriggersInputSchema = z.object({
+  namespace: z.string().min(1),
+  definitionName: z.string().min(1),
+});
+export const ExportTriggersOutputSchema = z.object({
+  triggers: TriggerConfigFileSchema,
+});
+
+export const ImportTriggersInputSchema = z.object({
+  namespace: z.string().min(1),
+  definitionName: z.string().min(1),
+  triggers: TriggerConfigFileSchema,
+  replace: z.boolean().default(false),
+});
+export const ImportedTriggerResultSchema = z.object({
+  name: z.string(),
+  type: TriggerTypeSchema,
+  // What the import did with this entry: created new, replaced an existing row,
+  // or skipped it because the name already existed and `replace` was not set.
+  outcome: z.enum(['created', 'replaced', 'skipped']),
+  // Re-derived relative webhook URL for the target host; null for non-webhook
+  // and for skipped webhooks.
+  webhookUrl: z.string().nullable(),
+});
+export const ImportTriggersOutputSchema = z.object({
+  results: z.array(ImportedTriggerResultSchema),
+});
+
 export type ListTriggersInput = z.infer<typeof ListTriggersInputSchema>;
 export type ListTriggersOutput = z.infer<typeof ListTriggersOutputSchema>;
 export type CreateTriggerInput = z.infer<typeof CreateTriggerInputSchema>;
@@ -81,3 +121,8 @@ export type SetTriggerEnabledInput = z.infer<typeof SetTriggerEnabledInputSchema
 export type SetTriggerEnabledOutput = z.infer<typeof SetTriggerEnabledOutputSchema>;
 export type DeleteTriggerInput = z.infer<typeof DeleteTriggerInputSchema>;
 export type DeleteTriggerOutput = z.infer<typeof DeleteTriggerOutputSchema>;
+export type ExportTriggersInput = z.infer<typeof ExportTriggersInputSchema>;
+export type ExportTriggersOutput = z.infer<typeof ExportTriggersOutputSchema>;
+export type ImportTriggersInput = z.infer<typeof ImportTriggersInputSchema>;
+export type ImportTriggersOutput = z.infer<typeof ImportTriggersOutputSchema>;
+export type ImportedTriggerResult = z.infer<typeof ImportedTriggerResultSchema>;
