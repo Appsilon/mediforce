@@ -42,6 +42,32 @@ function assertValidSchedule(schedule: string): void {
   }
 }
 
+/** Append the `<type>.trigger.deleted` audit event for a removed row. Shared by
+ *  `deleteTrigger` and the import/replace path, which drops rows through the
+ *  repo directly (bypassing `deleteTrigger`) and so must audit the removal
+ *  itself rather than leave it off the trail. */
+async function auditTriggerDeleted(
+  scope: CallerScope,
+  namespace: string,
+  definitionName: string,
+  trigger: TriggerResource,
+  basis: string,
+): Promise<void> {
+  const actor = actorFromCaller(scope);
+  await scope.system.audit.append({
+    ...actor,
+    action: `${trigger.type}.trigger.deleted`,
+    description: `${labelFor(trigger.type)} trigger '${trigger.name}' deleted for '${definitionName}'`,
+    timestamp: new Date().toISOString(),
+    inputSnapshot: { namespace, definitionName, triggerName: trigger.name },
+    outputSnapshot: { deleted: true },
+    basis,
+    entityType: 'trigger',
+    entityId: `${definitionName}/${trigger.name}`,
+    namespace,
+  });
+}
+
 /** The relative endpoint a webhook trigger listens on. Matches the catch-all
  *  route `/api/triggers/webhook/<namespace>/<workflow>/<suffix>` — `path`
  *  already starts with `/`, so it is the suffix verbatim. */
@@ -365,17 +391,23 @@ function createInputFor(input: ImportTriggersInput, entry: PortableTrigger): Cre
   return { ...common, type: 'manual' };
 }
 
-/** The existing row a portable entry collides with, or null. Names collide
- *  directly; `manual` and `webhook` are also per-workflow singletons, so a
- *  differently-named row of the same type still collides — `createTrigger`
- *  would 409 on it, so import must reconcile against it rather than abort. */
-function conflictFor(existing: TriggerResource[], entry: PortableTrigger): TriggerResource | null {
+/** Every existing row a portable entry collides with. A same-name row is one
+ *  collision; `manual` and `webhook` are also per-workflow singletons, so a
+ *  *differently*-named row of the same type is a second, independent collision.
+ *  `createTrigger` would 409 on either, so `replace` must reconcile against ALL
+ *  of them — returning a single conflict silently deletes one and then 409s on
+ *  the other, a partial import. The two can point at different rows (e.g. a
+ *  webhook entry named `manual` collides by name with the manual singleton and
+ *  by type with the existing webhook). */
+function conflictsFor(existing: TriggerResource[], entry: PortableTrigger): TriggerResource[] {
+  const conflicts: TriggerResource[] = [];
   const byName = existing.find((t) => t.name === entry.name);
-  if (byName !== undefined) return byName;
+  if (byName !== undefined) conflicts.push(byName);
   if (entry.type === 'manual' || entry.type === 'webhook') {
-    return existing.find((t) => t.type === entry.type) ?? null;
+    const singleton = existing.find((t) => t.type === entry.type && t.name !== entry.name);
+    if (singleton !== undefined) conflicts.push(singleton);
   }
-  return null;
+  return conflicts;
 }
 
 /**
@@ -405,22 +437,36 @@ export async function importTriggers(
 
   const results: ImportedTriggerResult[] = [];
   for (const entry of input.triggers) {
-    const conflict = conflictFor(existing, entry);
-    if (conflict !== null && !input.replace) {
+    const conflicts = conflictsFor(existing, entry);
+    // The mandatory manual singleton (Issue #930) is never removable. A
+    // non-manual entry that collides with it by name can't free the name
+    // without destroying that invariant, so replace can't apply — skip the
+    // entry rather than delete the manual row and then 409 anyway.
+    const blockedByManual = conflicts.some((c) => c.type === 'manual' && entry.type !== 'manual');
+    if (conflicts.length > 0 && (!input.replace || blockedByManual)) {
       results.push({ name: entry.name, type: entry.type, outcome: 'skipped', webhookUrl: null });
       continue;
     }
-    // Replace: drop the colliding row directly (bypassing deleteTrigger's manual
-    // guard) so the entry is recreated fresh from the file with a clean cursor.
-    if (conflict !== null) {
+    // Replace: drop every colliding row directly (bypassing deleteTrigger's
+    // manual guard) so the entry is recreated fresh from the file with a clean
+    // cursor. The direct repo delete skips the handler's audit append, so emit
+    // it here — a replaced row must still show on the trail.
+    for (const conflict of conflicts) {
       await scope.triggers.delete(input.namespace, input.definitionName, conflict.name);
+      await auditTriggerDeleted(
+        scope,
+        input.namespace,
+        input.definitionName,
+        conflict,
+        'Trigger replaced during import',
+      );
       existing = existing.filter((t) => t.name !== conflict.name);
     }
     const created = await createTrigger(createInputFor(input, entry), scope);
     results.push({
       name: entry.name,
       type: entry.type,
-      outcome: conflict !== null ? 'replaced' : 'created',
+      outcome: conflicts.length > 0 ? 'replaced' : 'created',
       webhookUrl: created.webhookUrl,
     });
     existing = [...existing, created.trigger];
@@ -449,24 +495,13 @@ export async function deleteTrigger(
   }
 
   await scope.triggers.delete(input.namespace, input.definitionName, input.triggerName);
-
-  const actor = actorFromCaller(scope);
-  await scope.system.audit.append({
-    ...actor,
-    action: `${current.type}.trigger.deleted`,
-    description: `${labelFor(current.type)} trigger '${input.triggerName}' deleted for '${input.definitionName}'`,
-    timestamp: new Date().toISOString(),
-    inputSnapshot: {
-      namespace: input.namespace,
-      definitionName: input.definitionName,
-      triggerName: input.triggerName,
-    },
-    outputSnapshot: { deleted: true },
-    basis: 'Trigger deleted via API',
-    entityType: 'trigger',
-    entityId: `${input.definitionName}/${input.triggerName}`,
-    namespace: input.namespace,
-  });
+  await auditTriggerDeleted(
+    scope,
+    input.namespace,
+    input.definitionName,
+    current,
+    'Trigger deleted via API',
+  );
 
   return { success: true as const };
 }

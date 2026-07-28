@@ -89,6 +89,11 @@ export type TriggerConfig = TriggerResource['config'];
  * so an exported file back-fires nothing on the destination. Config fields are
  * spread from the same `*TriggerConfigSchema` objects the resource uses, so a
  * portable file validates against the same rules at one boundary.
+ *
+ * Each variant is `.strict()`: a portable file that still carries an instance
+ * field (`namespace`, `workflowName`, `lastTriggeredAt`, `createdAt`, …) is a
+ * stale runtime dump, not a portable file, and is rejected rather than silently
+ * stripped — so a mislabelled import fails loudly instead of half-applying.
  */
 const PortableTriggerBaseSchema = z.object({
   name: z.string().min(1),
@@ -98,16 +103,16 @@ const PortableTriggerBaseSchema = z.object({
 const PortableCronTriggerSchema = PortableTriggerBaseSchema.extend({
   type: z.literal('cron'),
   ...CronTriggerConfigSchema.shape,
-});
+}).strict();
 
 const PortableWebhookTriggerSchema = PortableTriggerBaseSchema.extend({
   type: z.literal('webhook'),
   ...WebhookTriggerConfigSchema.shape,
-});
+}).strict();
 
 const PortableManualTriggerSchema = PortableTriggerBaseSchema.extend({
   type: z.literal('manual'),
-});
+}).strict();
 
 export const PortableTriggerSchema = z.discriminatedUnion('type', [
   PortableCronTriggerSchema,

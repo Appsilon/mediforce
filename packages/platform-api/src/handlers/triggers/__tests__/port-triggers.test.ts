@@ -12,10 +12,13 @@ import { createTestScope, userCaller } from '../../../repositories/__tests__/cre
 import { NotFoundError, ValidationError } from '../../../errors';
 
 /**
- * L3 round-trip for the portable trigger-config file (Issue #933): export from
- * one namespace, import into another, and assert the detachment guarantees —
- * webhook URLs re-derive for the target host, cron cursors anchor to `now`, and
- * the seed-if-absent conflict policy holds unless `replace` is set.
+ * L2 handler round-trip for the portable trigger-config file (Issue #933):
+ * export from one namespace, import into another (in-memory repos), and assert
+ * the detachment guarantees — webhook URLs re-derive for the target host, cron
+ * cursors anchor to `now`, and the seed-if-absent conflict policy holds unless
+ * `replace` is set. The full HTTP + storage + auth path (route adapters
+ * `GET /triggers/export`, `POST /triggers/import`) is covered at L3 in
+ * `platform-ui/e2e/api/workflow-triggers.journey.ts`.
  */
 describe('trigger export/import (portable config file, Issue #933)', () => {
   let processRepo: InMemoryProcessRepository;
@@ -185,6 +188,95 @@ describe('trigger export/import (portable config file, Issue #933)', () => {
     const manuals = afterReplace.filter((t) => t.type === 'manual');
     expect(manuals).toHaveLength(1);
     expect(manuals[0].name).toBe('start');
+  });
+
+  it('replace reconciles an entry that collides with two different existing rows', async () => {
+    // The webhook entry named 'shared' collides by NAME with the existing cron
+    // 'shared' AND by TYPE with the existing webhook 'hook-a' (webhook is a
+    // singleton). Both must be dropped before recreating — resolving only one
+    // leaves createTrigger to 409 on the other, a partial import.
+    await createTrigger(
+      { namespace: TARGET, definitionName: 'flow', triggerName: 'shared', type: 'cron', schedule: '0 2 * * *', enabled: true },
+      scopeFor(),
+    );
+    await createTrigger(
+      { namespace: TARGET, definitionName: 'flow', triggerName: 'hook-a', type: 'webhook', method: 'POST', path: '/a', enabled: true },
+      scopeFor(),
+    );
+
+    const file = [
+      { name: 'shared', type: 'webhook' as const, enabled: true, method: 'POST' as const, path: '/s' },
+    ];
+    const { results } = await importTriggers(
+      { namespace: TARGET, definitionName: 'flow', triggers: file, replace: true },
+      scopeFor(),
+    );
+    expect(results).toEqual([
+      {
+        name: 'shared',
+        type: 'webhook',
+        outcome: 'replaced',
+        webhookUrl: '/api/triggers/webhook/team-beta/flow/s',
+      },
+    ]);
+
+    const stored = await triggerRepo.listByWorkflow(TARGET, 'flow');
+    // The old cron 'shared' and webhook 'hook-a' are both gone; one webhook 'shared' remains.
+    expect(stored.filter((t) => t.type === 'webhook').map((t) => t.name)).toEqual(['shared']);
+    expect(stored.some((t) => t.type === 'cron')).toBe(false);
+  });
+
+  it('replace never removes the mandatory manual trigger to free its name', async () => {
+    // A webhook entry named 'manual' collides by name with the mandatory manual
+    // singleton (Issue #930), which is never deletable. Replace must skip the
+    // entry rather than delete the manual row (and then fail to create anyway).
+    await createTrigger(
+      { namespace: TARGET, definitionName: 'flow', triggerName: 'manual', type: 'manual', enabled: true },
+      scopeFor(),
+    );
+    await createTrigger(
+      { namespace: TARGET, definitionName: 'flow', triggerName: 'hook', type: 'webhook', method: 'POST', path: '/h', enabled: true },
+      scopeFor(),
+    );
+
+    const file = [
+      { name: 'manual', type: 'webhook' as const, enabled: true, method: 'POST' as const, path: '/m' },
+    ];
+    const { results } = await importTriggers(
+      { namespace: TARGET, definitionName: 'flow', triggers: file, replace: true },
+      scopeFor(),
+    );
+    expect(results).toEqual([
+      { name: 'manual', type: 'webhook', outcome: 'skipped', webhookUrl: null },
+    ]);
+
+    const stored = await triggerRepo.listByWorkflow(TARGET, 'flow');
+    // The manual singleton survived, and the existing webhook was left untouched.
+    expect(stored.some((t) => t.type === 'manual' && t.name === 'manual')).toBe(true);
+    expect(stored.filter((t) => t.type === 'webhook').map((t) => t.name)).toEqual(['hook']);
+  });
+
+  it('audits each row dropped during a replace import', async () => {
+    await createTrigger(
+      { namespace: TARGET, definitionName: 'flow', triggerName: 'nightly', type: 'cron', schedule: '0 2 * * *', enabled: true },
+      scopeFor(),
+    );
+
+    await importTriggers(
+      {
+        namespace: TARGET,
+        definitionName: 'flow',
+        triggers: [{ name: 'nightly', type: 'cron', enabled: true, schedule: '0 6 * * *' }],
+        replace: true,
+      },
+      scopeFor(),
+    );
+
+    const deletionEvents = auditRepo
+      .getAll()
+      .filter((e) => e.action === 'cron.trigger.deleted' && e.entityId === 'flow/nightly');
+    expect(deletionEvents).toHaveLength(1);
+    expect(deletionEvents[0].basis).toBe('Trigger replaced during import');
   });
 
   it('rejects a file with a mis-aligned cron schedule before writing anything', async () => {

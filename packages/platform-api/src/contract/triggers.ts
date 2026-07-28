@@ -101,7 +101,9 @@ export const ImportedTriggerResultSchema = z.object({
   name: z.string(),
   type: TriggerTypeSchema,
   // What the import did with this entry: created new, replaced an existing row,
-  // or skipped it because the name already existed and `replace` was not set.
+  // or skipped it — either because a colliding row existed and `replace` was
+  // not set, or because it would have had to remove the mandatory manual
+  // trigger, which is never deletable.
   outcome: z.enum(['created', 'replaced', 'skipped']),
   // Re-derived relative webhook URL for the target host; null for non-webhook
   // and for skipped webhooks.
