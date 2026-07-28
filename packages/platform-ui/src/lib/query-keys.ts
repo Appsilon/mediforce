@@ -120,4 +120,8 @@ export const queryKeys = {
     /** Per-workspace dashboard summary. */
     summary: (handle: string) => ['monitoring', handle] as const,
   },
+  /** Platform-wide model registry list (not workspace-scoped). */
+  modelRegistry: {
+    list: () => ['model-registry'] as const,
+  },
 } as const;

@@ -11,15 +11,18 @@ interface Props {
   processNameMap: Map<string, string>;
 }
 
+// Only statuses the AgentRunner ever actually assigns — see the comment on
+// STATUS_STYLES in agent-run-list-table.tsx. AgentRunStatusSchema also
+// declares `timed_out` / `low_confidence` / `error`, but those are never
+// written to a real AgentRun (that detail lives on `fallbackReason`), so
+// they're excluded here rather than offered as a filter that never matches.
 const ALL_STATUSES = [
   'running',
   'completed',
-  'timed_out',
-  'low_confidence',
-  'error',
   'escalated',
   'flagged',
   'paused',
+  'interrupted',
 ] as const;
 
 export function AgentsTab({ runs, loading, processNameMap }: Props) {
@@ -30,10 +33,12 @@ export function AgentsTab({ runs, loading, processNameMap }: Props) {
     const total = runs.length;
     const running = runs.filter((r) => r.status === 'running').length;
     const completed = runs.filter((r) => r.status === 'completed').length;
-    const errors = runs.filter((r) => r.status === 'error' || r.status === 'timed_out').length;
-    const flagged = runs.filter(
-      (r) => r.status === 'escalated' || r.status === 'flagged' || r.status === 'low_confidence',
+    // 'error'/'timed_out' are never real AgentRun.status values (see
+    // agent-run-list-table.tsx) — that detail lives on fallbackReason.
+    const errors = runs.filter(
+      (r) => r.fallbackReason === 'error' || r.fallbackReason === 'timeout',
     ).length;
+    const flagged = runs.filter((r) => r.status === 'escalated' || r.status === 'flagged').length;
     return { total, running, completed, errors, flagged };
   }, [runs]);
 

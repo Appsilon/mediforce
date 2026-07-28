@@ -17,13 +17,22 @@ test.describe('Agent Oversight Journey', () => {
     await page.getByRole('tab', { name: 'Agents' }).click();
     await expect(page.getByText('Narrative Summary').first()).toBeVisible({ timeout: 10_000 });
 
-    // Autonomy column shows control mode labels, not raw L-level codes
-    await expect(page.getByRole('columnheader', { name: 'Autonomy' })).toBeVisible();
+    // Control Mode column shows control mode labels, not raw L-level codes
+    await expect(page.getByRole('columnheader', { name: 'Control Mode' })).toBeVisible();
     await expect(page.getByText('Assist').first()).toBeVisible();
     await expect(page.getByText('Autonomous agent').first()).toBeVisible();
 
     // Link to detail page
     const link = page.locator(`a[href*="/agents/${RUN_COMPLETED_1_ID}"]`);
+
+    // Workflow Run column, same row: links to the actual run detail page
+    // (workflow name + runId), not a bare processInstanceId path.
+    const row = page.locator('tr', { has: link });
+    const workflowRunLink = row.locator('a', { hasText: 'Supply Chain Review' });
+    await expect(workflowRunLink).toHaveAttribute(
+      'href',
+      `/${TEST_ORG_HANDLE}/workflows/${encodeURIComponent('Supply Chain Review')}/runs/proc-running-1`,
+    );
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('href', new RegExp(`/agents/${RUN_COMPLETED_1_ID}`));
 
