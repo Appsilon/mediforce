@@ -419,10 +419,13 @@ function conflictsFor(existing: TriggerResource[], entry: PortableTrigger): Trig
  * a colliding trigger is skipped unless `replace` is set, which drops the
  * existing row first and recreates it from the file.
  *
- * Validate every entry before writing anything: cron schedule alignment is the
- * one rule the file schema can't express, and import is non-transactional, so a
- * bad schedule must reject the whole file up front rather than leave the
- * already-created entries behind as a partial write.
+ * Validate every entry before writing anything: import is non-transactional, so
+ * any rule `createTrigger` enforces but the file schema can't must reject the
+ * whole file up front rather than leave the already-created entries behind as a
+ * partial write. Two such rules exist — cron schedule alignment, and webhook
+ * POST-only (`PortableWebhookTriggerSchema` accepts every `HttpMethodSchema`
+ * verb, so a backfilled/hand-authored file can carry a non-POST webhook that
+ * only fails deep in `createTrigger`).
  */
 export async function importTriggers(
   input: ImportTriggersInput,
@@ -431,6 +434,11 @@ export async function importTriggers(
   await assertWorkflowExists(scope, input.namespace, input.definitionName);
   for (const entry of input.triggers) {
     if (entry.type === 'cron') assertValidSchedule(entry.schedule);
+    if (entry.type === 'webhook' && entry.method !== 'POST') {
+      throw new ValidationError(
+        `A webhook trigger only accepts POST (the endpoint dispatches POST only), got ${entry.method}`,
+      );
+    }
   }
 
   let existing = await scope.triggers.listByWorkflow(input.namespace, input.definitionName);

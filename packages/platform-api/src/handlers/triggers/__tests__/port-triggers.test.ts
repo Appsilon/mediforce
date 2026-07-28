@@ -292,6 +292,21 @@ describe('trigger export/import (portable config file, Issue #933)', () => {
     expect(stored.some((t) => t.name === 'nightly')).toBe(false);
   });
 
+  it('rejects a file with a non-POST webhook before writing anything', async () => {
+    // The portable schema accepts any HTTP verb, but a webhook can only fire on
+    // POST — createTrigger rejects the rest. The preflight must catch it up
+    // front so a valid earlier entry is not left behind as a partial write.
+    const file = [
+      { name: 'nightly', type: 'cron' as const, enabled: true, schedule: '0 2 * * *' },
+      { name: 'intake', type: 'webhook' as const, enabled: true, method: 'GET' as const, path: '/intake' },
+    ];
+    await expect(
+      importTriggers({ namespace: TARGET, definitionName: 'flow', triggers: file, replace: false }, scopeFor()),
+    ).rejects.toBeInstanceOf(ValidationError);
+    const stored = await triggerRepo.listByWorkflow(TARGET, 'flow');
+    expect(stored.some((t) => t.name === 'nightly')).toBe(false);
+  });
+
   it('404s exporting a workflow that does not exist', async () => {
     await expect(
       exportTriggers({ namespace: SOURCE, definitionName: 'missing' }, scopeFor()),
