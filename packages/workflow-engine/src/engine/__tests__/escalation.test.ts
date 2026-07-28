@@ -45,7 +45,6 @@ const agentProcessDef: WorkflowDefinition = {
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
   ],
   transitions: [{ from: 'agent-step', to: 'done' }],
-  triggers: [{ type: 'manual', name: 'Start Agent Process' }],
   notifications: [{ event: 'agent_escalation', roles: ['reviewer'] }],
 };
 

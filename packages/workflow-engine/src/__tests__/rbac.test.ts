@@ -23,7 +23,6 @@ const simpleDefinition: WorkflowDefinition = {
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
   ],
   transitions: [{ from: 'start', to: 'done' }],
-  triggers: [{ type: 'manual', name: 'Start RBAC Test' }],
 };
 
 // Definition WITHOUT allowedRoles — any user can execute
@@ -37,7 +36,6 @@ const noRolesDefinition: WorkflowDefinition = {
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
   ],
   transitions: [{ from: 'start', to: 'done' }],
-  triggers: [{ type: 'manual', name: 'Start' }],
 };
 
 const actor: StepActor = { id: 'user-1', role: 'operator' };

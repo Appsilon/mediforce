@@ -55,7 +55,6 @@ export const workflowDefinitions = pgTable(
 
     steps: jsonb('steps').notNull(),
     transitions: jsonb('transitions').notNull(),
-    triggers: jsonb('triggers').notNull(),
     triggerInput: jsonb('trigger_input'),
 
     roles: jsonb('roles'),

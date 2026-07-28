@@ -134,7 +134,7 @@ export async function seedPostgresNamespace(
       await sql`
         INSERT INTO workflow_definitions (
           workspace, name, version, title, description, visibility,
-          steps, transitions, triggers, trigger_input, roles, env,
+          steps, transitions, trigger_input, roles, env,
           notifications, git_workspace, metadata, created_at
         ) VALUES (
           ${wd.namespace as string},
@@ -145,7 +145,6 @@ export async function seedPostgresNamespace(
           ${(wd.visibility as string | undefined) ?? 'private'},
           ${sql.json(wd.steps as unknown)},
           ${sql.json(wd.transitions as unknown)},
-          ${sql.json(wd.triggers as unknown)},
           ${wd.triggerInput ? sql.json(wd.triggerInput as unknown) : null},
           ${wd.roles ? sql.json(wd.roles as unknown) : null},
           ${wd.env ? sql.json(wd.env as unknown) : null},
@@ -160,12 +159,12 @@ export async function seedPostgresNamespace(
 
     // ── 3b. manual trigger singletons ───────────────────────────────────────
     // Production seeds one enabled `manual` trigger row per workflow on register
-    // (seedTriggersFromDefinition, ADR-0011 / Issue #930). Hand-start is gated on
-    // that row, so a workflow seeded straight into Postgres without it has a
+    // (seedManualTrigger, ADR-0011 / Issue #930). Hand-start is gated on that
+    // row, so a workflow seeded straight into Postgres without it has a
     // permanently disabled Start Run button. Mirror the invariant: one enabled
-    // `manual` row per unique `(namespace, name)` — none of the fixture
-    // definitions declare cron/webhook triggers, so the manual singleton is the
-    // whole story.
+    // `manual` row per unique `(namespace, name)`. Cron/webhook triggers are
+    // independent table resources (Issue #932) — seed them explicitly per test
+    // when a schedule/endpoint is under exercise.
     const seededManualWorkflows = new Set<string>();
     for (const wd of Object.values(data.workflowDefinitions)) {
       const namespace = wd.namespace as string;

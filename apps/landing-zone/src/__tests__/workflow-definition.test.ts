@@ -26,13 +26,12 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
     expect(result.data.namespace).toBe('appsilon');
   });
 
-  it('has a manual trigger and no cron trigger', () => {
+  it('does not declare triggers (definitions are trigger-free, Issue #932)', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
 
-    expect(result.data.triggers.find((t) => t.type === 'manual')).toBeDefined();
-    expect(result.data.triggers.find((t) => t.type === 'cron')).toBeUndefined();
+    expect((result.data as Record<string, unknown>).triggers).toBeUndefined();
   });
 
   it('declares inputForNextRun for SFTP listing carry-over', () => {

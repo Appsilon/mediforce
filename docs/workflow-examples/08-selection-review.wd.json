@@ -2,9 +2,6 @@
   "name": "tutorial-selection-review",
   "title": "Selection Review",
   "description": "Fetch a list of options via script, then let a human pick one from the results. Demonstrates the selection review pattern: a script outputs an options array, a review step with selection: 1 presents them for picking, and verdicts route the choice.",
-  "triggers": [
-    { "type": "manual", "name": "manual" }
-  ],
   "roles": ["operator"],
   "steps": [
     {

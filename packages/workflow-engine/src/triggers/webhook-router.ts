@@ -40,9 +40,9 @@ export type WebhookRouteResult =
  *      comparison is exact (no globbing); a stopped webhook resolves to 404.
  *   3. Create the instance, start it, and return `{runId, statusUrl}`.
  *
- * Webhook triggers are detached table resources (Issue #931), NOT the advisory
- * `triggers[]` on the versioned definition — attaching/stopping/removing a
- * webhook takes effect immediately without cutting a new definition version.
+ * Webhook triggers are detached table resources (Issue #931). Attaching,
+ * stopping, or removing a webhook takes effect immediately without cutting a
+ * new definition version.
  *
  * Namespace scoping at the version-lookup level prevents tenant A from
  * accidentally surfacing tenant B's workflow when both registered the same

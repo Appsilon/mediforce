@@ -24,6 +24,3 @@ steps:
 transitions:
   - from: draft
     to: review
-triggers:
-  - type: manual
-    name: Start Review

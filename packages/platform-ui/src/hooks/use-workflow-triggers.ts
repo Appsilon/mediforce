@@ -16,9 +16,8 @@ export type WebhookTrigger = Extract<Trigger, { type: 'webhook' }>;
  * for both the workflow header (enabled/schedule summary) and the Triggers tab —
  * mutations invalidate `workflowTriggers` so both refresh in the same tick.
  *
- * Reflects the unified `triggers` table (ADR-0011), NOT the advisory triggers
- * declared on a definition version. ONE-SHOT per ADR-0006 §4 — refetch on focus
- * plus explicit `invalidate()` after mutations keeps the cache fresh.
+ * Reflects the unified `triggers` table (ADR-0011). ONE-SHOT per ADR-0006 §4 —
+ * refetch on focus plus explicit `invalidate()` after mutations keeps the cache fresh.
  */
 export function useWorkflowTriggers(
   name: string,

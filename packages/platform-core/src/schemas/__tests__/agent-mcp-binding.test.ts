@@ -547,7 +547,6 @@ describe('WorkflowDefinitionSchema with step.mcpRestrictions', () => {
         },
       ],
       transitions: [],
-      triggers: [{ type: 'manual', name: 'Start' }],
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -573,7 +572,6 @@ describe('WorkflowDefinitionSchema with step.mcpRestrictions', () => {
         },
       ],
       transitions: [],
-      triggers: [{ type: 'manual', name: 'Start' }],
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -600,7 +598,6 @@ describe('WorkflowDefinitionSchema with step.mcpRestrictions', () => {
         },
       ],
       transitions: [],
-      triggers: [{ type: 'manual', name: 'Start' }],
     });
     expect(result.success).toBe(true);
   });

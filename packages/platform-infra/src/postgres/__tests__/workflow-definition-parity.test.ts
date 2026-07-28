@@ -40,7 +40,6 @@ function definitionFor(
       },
     ],
     transitions: [],
-    triggers: [{ type: 'manual', name: 'manual' }],
     createdAt: '2026-05-27T00:00:00.000Z',
     ...overrides,
   } as WorkflowDefinition;
@@ -396,13 +395,12 @@ describe.skipIf(skipPg)('PostgresProcessRepository (parity)', () => {
     // the commit-pinned `source` schema landed.
     await testClient.unsafe(
       `INSERT INTO "${schemaName}"."workflow_definitions"
-        (workspace, name, version, visibility, steps, transitions, triggers, source)
-       VALUES ($1, $2, 1, 'private', $3::jsonb, '[]'::jsonb, $4::jsonb, $5::jsonb)`,
+        (workspace, name, version, visibility, steps, transitions, source)
+       VALUES ($1, $2, 1, 'private', $3::jsonb, '[]'::jsonb, $4::jsonb)`,
       [
         ns,
         'legacy-src',
         JSON.stringify([{ id: 'intake', name: 'Intake', type: 'creation', executor: 'human' }]),
-        JSON.stringify([{ type: 'manual', name: 'manual' }]),
         JSON.stringify({ repo: 'https://github.com/Appsilon/x', path: 'a.wd.json', ref: 'main' }),
       ],
     );

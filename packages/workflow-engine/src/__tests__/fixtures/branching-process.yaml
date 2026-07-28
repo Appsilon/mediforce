@@ -25,6 +25,3 @@ transitions:
     to: done
   - from: path-b
     to: done
-triggers:
-  - type: manual
-    name: Start Branching

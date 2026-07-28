@@ -27,7 +27,6 @@ const linearDef: WorkflowDefinition = {
     { from: 'start', to: 'process' },
     { from: 'process', to: 'done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start Process' }],
 };
 
 const cronOnlyDef: WorkflowDefinition = {
@@ -40,7 +39,6 @@ const cronOnlyDef: WorkflowDefinition = {
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
   ],
   transitions: [{ from: 'start', to: 'done' }],
-  triggers: [{ type: 'cron', name: 'Nightly', schedule: '0 0 * * *' }],
 };
 
 function manualRow(
@@ -85,9 +83,8 @@ describe('ManualTrigger', () => {
 
     await processRepo.saveWorkflowDefinition(linearDef);
     await processRepo.saveWorkflowDefinition(cronOnlyDef);
-    // The guard reads the unified triggers table (ADR-0011), not the definition's
-    // advisory `triggers[]`. `linear-process` gets an enabled manual row;
-    // `cron-only-process` gets none.
+    // The guard reads the unified triggers table (ADR-0011). `linear-process`
+    // gets an enabled manual row; `cron-only-process` gets none.
     await triggerRepo.create(manualRow('test', 'linear-process', 'Start Process', true));
   });
 

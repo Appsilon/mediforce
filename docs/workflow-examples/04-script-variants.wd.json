@@ -2,9 +2,6 @@
   "name": "tutorial-script-variants",
   "title": "Script Variants",
   "description": "Chain script steps with different runtimes — JavaScript, Python, and Bash. Each step reads the previous step's output and transforms it further. Demonstrates runtime selection, data passing between scripts, and the script config block.",
-  "triggers": [
-    { "type": "manual", "name": "manual" }
-  ],
   "roles": ["operator"],
   "steps": [
     {

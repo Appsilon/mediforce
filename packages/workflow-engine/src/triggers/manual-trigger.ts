@@ -10,10 +10,9 @@ import { ManualTriggerNotDeclaredError } from './trigger-errors';
  * a new process execution.
  *
  * Gates on an **enabled `manual` trigger row** in the unified triggers table
- * (ADR-0011) keyed by `(namespace, workflowName)` — not on the definition's
- * advisory `triggers[]`. This is the server-side counterpart to the disabled
- * state of the StartRunButton: workflows without an enabled manual trigger
- * cannot be started by callers that bypass the UI gate.
+ * (ADR-0011) keyed by `(namespace, workflowName)`. This is the server-side
+ * counterpart to the disabled state of the StartRunButton: workflows without
+ * an enabled manual trigger cannot be started by callers that bypass the UI gate.
  */
 export class ManualTrigger {
   constructor(

@@ -2,9 +2,6 @@
   "name": "tutorial-conditional-branching",
   "title": "Conditional Branching",
   "description": "Route a request to different paths based on data. Demonstrates decision steps, 'when' expressions with comparisons, the 'else' catch-all, and multiple paths converging on a single terminal.",
-  "triggers": [
-    { "type": "manual", "name": "manual" }
-  ],
   "roles": ["submitter", "reviewer"],
   "steps": [
     {

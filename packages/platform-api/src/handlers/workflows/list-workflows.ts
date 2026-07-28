@@ -22,9 +22,9 @@ export async function listWorkflows(
       ? groups.filter((group) => group.namespace === input.namespace)
       : groups;
 
-  // Hand-start gate reads the `triggers` table (ADR-0011 / Issue #930), not
-  // `definition.triggers`. One cross-namespace read of enabled manual rows, then
-  // a Set lookup per card — no per-card N+1.
+  // Hand-start gate reads the `triggers` table (ADR-0011 / Issue #930). One
+  // cross-namespace read of enabled manual rows, then a Set lookup per card —
+  // no per-card N+1.
   const enabledManual = await scope.system.triggers.listEnabledByType('manual');
   const manualStartByWorkflow = new Set(
     enabledManual.map((t) => `${t.namespace}:${t.workflowName}`),

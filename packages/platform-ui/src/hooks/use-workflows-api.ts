@@ -14,7 +14,6 @@ export interface ApiDefinitionItem {
     name: string;
     version: number;
     steps: Array<{ id: string; type: string }>;
-    triggers: Array<{ type: string; name: string }>;
     title?: string;
     description?: string;
     externalSkillsRepo?: { url: string; commit?: string; auth?: string };
@@ -40,12 +39,11 @@ export function mapApiToDefinitionGroups(
         versions: [{
           version: String(def.version),
           stepCount: def.steps.length,
-          triggerCount: def.triggers.length,
           title: def.title,
           description: def.description,
         }],
         stepCount: def.steps.length,
-        // Hand-start gate reads the triggers table, not `def.triggers` (Issue #930).
+        // Hand-start gate reads the triggers table (Issue #930).
         hasManualTrigger: item.manualStartEnabled ?? false,
         externalSkillsRepo: def.externalSkillsRepo,
         url: def.url,

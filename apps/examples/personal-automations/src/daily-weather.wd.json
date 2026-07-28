@@ -3,17 +3,6 @@
   "title": "Daily weather",
   "description": "Daily 6am weather forecast. Fetches OpenWeatherMap, formats summary, sends via email, Pushover and ntfy.sh.",
   "preamble": "Reference template. Morning weather summary delivered via email and push notifications.",
-  "triggers": [
-    {
-      "type": "cron",
-      "name": "daily-6am",
-      "schedule": "0 6 * * *"
-    },
-    {
-      "type": "manual",
-      "name": "test"
-    }
-  ],
   "steps": [
     {
       "id": "fetch-weather",

@@ -115,9 +115,8 @@ export async function heartbeat(
   const triggered: TriggeredEntry[] = [];
   const skipped: SkippedEntry[] = [];
 
-  // Row-driven (ADR-0011): the unified `triggers` table is the source of truth
-  // for what fires, not the Definition's declared trigger array. Enabled cron
-  // rows across every workspace (system-actor read).
+  // Row-driven (ADR-0011): enabled cron rows across every workspace are the
+  // source of truth (system-actor read).
   const cronRows = await scope.system.triggers.listEnabledByType('cron');
   const cronTriggers = cronRows.filter(
     (row): row is CronTriggerResource => row.type === 'cron',

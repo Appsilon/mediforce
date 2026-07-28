@@ -4,12 +4,6 @@
   "title": "Tealflow Module Explorer",
   "description": "Explore available teal modules via MCP and select which ones to include in a teal app. A minimal example of MCP tool use in a cowork step.",
   "preamble": "## Domain Context\nThis workflow uses the tealflow MCP server to query available teal modules for clinical trial data exploration. All clinical terminology (adverse events, demographics, efficacy endpoints) refers to teal module categories and data analysis constructs.",
-  "triggers": [
-    {
-      "name": "manual",
-      "type": "manual"
-    }
-  ],
   "roles": [
     "analyst"
   ],

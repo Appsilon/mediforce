@@ -22,7 +22,6 @@ const def: WorkflowDefinition = {
     { from: 'upload', to: 'deploy' },
     { from: 'deploy', to: 'done' },
   ],
-  triggers: [{ type: 'manual', name: 'Start' }],
 };
 
 const actor: StepActor = { id: 'user-1', role: 'operator' };

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WebhookTriggerConfigSchema } from './workflow-definition';
+import { HttpMethodSchema } from './workflow-definition';
 
 /**
  * The unified, detached Trigger resource (ADR-0011, triggers-detachment epic).
@@ -10,7 +10,9 @@ import { WebhookTriggerConfigSchema } from './workflow-definition';
  * immutable versioned Definition. It generalises the cron-only overlay
  * (`cron_trigger_state`) to `manual`, `webhook`, and `cron`.
  *
- * Named `TriggerResource*` transitionally — see ADR-0011 / CONTEXT.md "Trigger".
+ * Named `TriggerResource*` — the definition no longer declares triggers
+ * (Issue #932), so this is the single, permanent Trigger schema (there is no
+ * embedded `Trigger` declaration to rename back to). See ADR-0011 / CONTEXT.md.
  *
  * `event` is a reserved future type: no runtime, not part of the union yet.
  */
@@ -31,6 +33,17 @@ const TriggerBaseSchema = z.object({
  *  top-level field on the cron variant, not part of this config.) */
 export const CronTriggerConfigSchema = z.object({
   schedule: z.string().min(1),
+});
+
+/** webhook config: method + url path (relative to /api/triggers/webhook/<ns>/<wf>).
+ *  The path discriminates when a workflow has multiple webhook triggers and is
+ *  matched verbatim against the suffix segment(s) the caller used. */
+export const WebhookTriggerConfigSchema = z.object({
+  method: HttpMethodSchema,
+  path: z
+    .string()
+    .min(1)
+    .regex(/^\/[A-Za-z0-9_\-/]*$/, 'path must start with "/" and contain url-safe chars only'),
 });
 
 /** manual config: nothing — attaching a manual trigger is what makes a Workflow
@@ -61,6 +74,7 @@ export const TriggerResourceSchema = z.discriminatedUnion('type', [
   ManualTriggerResourceSchema,
 ]);
 
+export type WebhookTriggerConfig = z.infer<typeof WebhookTriggerConfigSchema>;
 export type CronTriggerResource = z.infer<typeof CronTriggerResourceSchema>;
 export type WebhookTriggerResource = z.infer<typeof WebhookTriggerResourceSchema>;
 export type ManualTriggerResource = z.infer<typeof ManualTriggerResourceSchema>;

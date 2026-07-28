@@ -2,9 +2,6 @@
   "name": "tutorial-action-steps",
   "title": "Action Steps",
   "description": "Workflow-level side effects without scripts or agents. Demonstrates action executor with http (API call), reshape (data transformation), and email (notification). Actions are declarative — the engine executes them directly.",
-  "triggers": [
-    { "type": "manual", "name": "manual" }
-  ],
   "roles": ["operator"],
   "steps": [
     {

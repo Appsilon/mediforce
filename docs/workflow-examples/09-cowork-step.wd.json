@@ -2,9 +2,6 @@
   "name": "tutorial-cowork-step",
   "title": "Cowork Step",
   "description": "Collaborative human+AI step using the cowork executor. A human and a chat agent work together in real time to produce a structured artifact. Demonstrates cowork config: agent type, systemPrompt, outputSchema, and chat model selection.",
-  "triggers": [
-    { "type": "manual", "name": "manual" }
-  ],
   "roles": ["author"],
   "steps": [
     {

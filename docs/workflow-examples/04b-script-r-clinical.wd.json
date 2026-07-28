@@ -2,9 +2,6 @@
   "name": "tutorial-script-r-clinical",
   "title": "R Script — Clinical Statistics",
   "description": "Use R for clinical data analysis within a workflow. Demonstrates R runtime in script-container, reading step input, computing summary statistics with base R, and writing structured JSON output. Essential pattern for pharma workflows where R is the validated statistical environment.",
-  "triggers": [
-    { "type": "manual", "name": "manual" }
-  ],
   "roles": ["biostatistician"],
   "steps": [
     {

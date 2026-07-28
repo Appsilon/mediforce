@@ -53,7 +53,7 @@ export const SpawnActionConfigSchema = z.object({
 });
 
 // NOTE: No .refine() here — Zod discriminatedUnion requires plain z.object arms.
-// The forEach+array conflict is validated in validateExecutorAndTriggers (superRefine):
+// The forEach+array conflict is validated in validateSteps (superRefine):
 //   if (step.action?.kind === 'spawn' && config.forEach && Array.isArray(config.targets))
 //     → error: "forEach requires a single target template, not an array"
 ```
@@ -225,7 +225,7 @@ Hard cap of 50 spawns per step execution. Error: `"spawn fan-out exceeds maximum
 
 | File | Change |
 |------|--------|
-| `platform-core/schemas/workflow-definition.ts` | Add `SpawnTargetSchema`, `SpawnActionConfigSchema`; extend `ActionConfigSchema` union; add forEach+array validation to `validateExecutorAndTriggers` |
+| `platform-core/schemas/workflow-definition.ts` | Add `SpawnTargetSchema`, `SpawnActionConfigSchema`; extend `ActionConfigSchema` union; add forEach+array validation to `validateSteps` |
 | `platform-core/index.ts` | Re-export new schemas and types |
 | `core-actions/types.ts` | Extend `ActionContext` with `namespace: string`; add `SpawnActionHandler` type alias; extend `InterpolationSources` with optional `item` field |
 | `core-actions/interpolation.ts` | Add `item` as a resolvable root in `resolvePath()` |

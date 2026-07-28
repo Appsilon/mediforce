@@ -10,7 +10,6 @@ import { stopRetryOn4xx } from '@/lib/retry';
 export interface DefinitionVersion {
   version: string;
   stepCount: number;
-  triggerCount: number;
   title?: string;
   description?: string;
 }
@@ -78,13 +77,12 @@ export function useProcessDefinitions(includeCompletedRuns: boolean = true) {
             {
               version: latestVersion,
               stepCount: def.steps.length,
-              triggerCount: def.triggers.length,
               title: def.title,
               description: def.description,
             },
           ],
           stepCount: def.steps.length,
-          // Hand-start gate reads the triggers table, not `def.triggers` (Issue #930).
+          // Hand-start gate reads the triggers table (Issue #930).
           hasManualTrigger: g.manualStartEnabled,
           externalSkillsRepo: def.externalSkillsRepo,
           url: def.url,

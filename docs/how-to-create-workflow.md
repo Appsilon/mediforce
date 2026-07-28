@@ -75,6 +75,16 @@ anti-patterns). They are deliberately small and are **not** production packages.
 For an end-to-end production-style package, read
 [`apps/golden-standard-workflow`](../apps/golden-standard-workflow).
 
+## Attach triggers (not part of the definition)
+
+Definitions are **trigger-free** — do not declare a `triggers` array in the
+`.wd.json`. Manual hand-start works by default: a per-workflow `manual` trigger
+is auto-seeded when you register. To add a schedule or webhook, attach a trigger
+out-of-band after registering with `mediforce workflow trigger-add` (or the UI
+**Triggers** tab); manage them with `trigger-list` / `trigger-update` /
+`trigger-start` / `trigger-stop` / `trigger-remove`. See
+[ADR-0011](adr/0011-triggers-detached-unified-resource.md).
+
 ## Import from git
 
 Import is a **one-time copy**, not a live link, and currently supports public

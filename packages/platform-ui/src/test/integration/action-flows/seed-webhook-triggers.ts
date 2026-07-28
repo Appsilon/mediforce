@@ -1,34 +1,34 @@
 import {
   WebhookTriggerConfigSchema,
   type InMemoryTriggerRepository,
-  type WorkflowDefinition,
+  type WebhookTriggerConfig,
 } from '@mediforce/platform-core';
 
 /**
- * Seed enabled `webhook` trigger rows from a definition's declared webhook
- * triggers into a trigger repo, so the WebhookRouter — which now resolves
- * detached table rows, not `definition.triggers` (Issue #931) — matches them.
- * Mirrors the production `seedTriggersFromDefinition` webhook branch.
+ * Seed an enabled `webhook` trigger row into a trigger repo so the WebhookRouter
+ * can resolve it. The webhook descriptor is supplied explicitly because
+ * definitions are trigger-free.
  */
-export async function seedWebhookTriggers(
+export async function seedWebhookTrigger(
   triggerRepo: InMemoryTriggerRepository,
-  definition: WorkflowDefinition,
+  webhook: {
+    namespace: string;
+    workflowName: string;
+    name: string;
+    config: WebhookTriggerConfig;
+  },
 ): Promise<void> {
+  const config = WebhookTriggerConfigSchema.parse(webhook.config);
   const now = new Date().toISOString();
-  for (const trigger of definition.triggers) {
-    if (trigger.type !== 'webhook') continue;
-    const config = WebhookTriggerConfigSchema.safeParse(trigger.config);
-    if (!config.success) continue;
-    await triggerRepo.create({
-      type: 'webhook',
-      namespace: definition.namespace,
-      workflowName: definition.name,
-      name: trigger.name,
-      enabled: true,
-      config: config.data,
-      lastTriggeredAt: null,
-      createdAt: now,
-      updatedAt: now,
-    });
-  }
+  await triggerRepo.create({
+    type: 'webhook',
+    namespace: webhook.namespace,
+    workflowName: webhook.workflowName,
+    name: webhook.name,
+    enabled: true,
+    config,
+    lastTriggeredAt: null,
+    createdAt: now,
+    updatedAt: now,
+  });
 }

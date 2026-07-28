@@ -5,7 +5,6 @@ import {
   SelectionSchema,
   StepUiSchema,
   TransitionSchema,
-  TriggerSchema,
   RepoSchema,
   CommitShaSchema,
 } from './process-definition';
@@ -13,19 +12,9 @@ import { ProcessNotificationConfigSchema } from './process-config';
 import { McpServerConfigSchema } from './mcp-server-config';
 import { StepMcpRestrictionSchema } from './agent-mcp-binding';
 
-/** HTTP method enum used by webhook triggers and the http action handler. */
+/** HTTP method enum used by the http action handler and (via the detached
+ *  Trigger resource) webhook triggers. */
 export const HttpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']);
-
-/** Webhook trigger config: method + url path (relative to /api/triggers/webhook/<ns>/<wf>).
- *  The path discriminates when a workflow has multiple webhook triggers and is
- *  matched verbatim against the suffix segment(s) the caller used. */
-export const WebhookTriggerConfigSchema = z.object({
-  method: HttpMethodSchema,
-  path: z
-    .string()
-    .min(1)
-    .regex(/^\/[A-Za-z0-9_\-/]*$/, 'path must start with "/" and contain url-safe chars only'),
-});
 
 /** http action config: minimal request shape passed to fetch().
  *  `body` accepts any JSON-serializable value or a string template — the action
@@ -89,7 +78,6 @@ export const ActionConfigSchema = z.discriminatedUnion('kind', [
 ]);
 
 export type HttpMethod = z.infer<typeof HttpMethodSchema>;
-export type WebhookTriggerConfig = z.infer<typeof WebhookTriggerConfigSchema>;
 export type HttpActionConfig = z.infer<typeof HttpActionConfigSchema>;
 export type ReshapeActionConfig = z.infer<typeof ReshapeActionConfigSchema>;
 export type EmailActionConfig = z.infer<typeof EmailActionConfigSchema>;
@@ -342,11 +330,9 @@ const SCRIPT_CONFIG_KEY_PLUGIN: Record<'script' | 'databricks', string> = {
  * makes no sense on other executors. executor='script' steps carry their config
  * under `script` / `databricks` (matching the plugin) — the old shape with
  * script settings under `agent` (and `autonomyLevel`/`cowork` on script steps)
- * is rejected. Webhook triggers must declare a typed config (method+path) —
- * TriggerSchema accepts `config: z.record(...).optional()` for back-compat
- * with cron/manual, so we narrow webhook here.
+ * is rejected.
  */
-function validateExecutorAndTriggers(
+function validateSteps(
   wd: {
     steps: Array<{
       id: string;
@@ -360,7 +346,6 @@ function validateExecutorAndTriggers(
       script?: unknown;
       databricks?: unknown;
     }>;
-    triggers: Array<{ type: string; config?: unknown }>;
   },
   ctx: z.RefinementCtx,
 ): void {
@@ -474,20 +459,6 @@ function validateExecutorAndTriggers(
           }
         }
       }
-    }
-  });
-
-  wd.triggers.forEach((trigger, i) => {
-    if (trigger.type !== 'webhook') return;
-    const parsed = WebhookTriggerConfigSchema.safeParse(trigger.config);
-    if (!parsed.success) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['triggers', i, 'config'],
-        message: `webhook trigger config invalid: ${parsed.error.issues
-          .map((iss) => `${iss.path.join('.')}: ${iss.message}`)
-          .join('; ')}`,
-      });
     }
   });
 }
@@ -654,7 +625,6 @@ export const WorkflowDefinitionBaseSchema = z.object({
   workspace: WorkflowWorkspaceSchema.optional(),
   steps: z.array(WorkflowStepSchema).min(1),
   transitions: z.array(TransitionSchema),
-  triggers: z.array(TriggerSchema).min(1),
   metadata: z.record(z.string(), z.unknown()).optional(),
   copiedFrom: z.object({
     namespace: z.string().min(1),
@@ -704,7 +674,6 @@ export const WorkflowAuthorableSchema = WorkflowDefinitionBaseSchema.pick({
   workspace: true,
   steps: true,
   transitions: true,
-  triggers: true,
   metadata: true,
   inputForNextRun: true,
   triggerInput: true,
@@ -732,13 +701,13 @@ export function resolveCoworkOutputSchema(
 export const WorkflowDefinitionSchema = WorkflowDefinitionBaseSchema.superRefine(
   (wd, ctx) => {
     validateInputForNextRun(wd, ctx);
-    validateExecutorAndTriggers(wd, ctx);
+    validateSteps(wd, ctx);
     validateVerdicts(wd, ctx);
     validateTriggerInput(wd, ctx);
   },
 );
 
-export { validateInputForNextRun, validateExecutorAndTriggers, validateVerdicts, validateTriggerInput };
+export { validateInputForNextRun, validateSteps, validateVerdicts, validateTriggerInput };
 
 /**
  * Default parse path for registering a new WorkflowDefinition (API routes,
@@ -753,7 +722,7 @@ export function parseWorkflowDefinitionForCreation(input: unknown) {
   return WorkflowDefinitionBaseSchema.omit({ version: true, createdAt: true })
     .superRefine((wd, ctx) => {
       validateInputForNextRun(wd, ctx);
-      validateExecutorAndTriggers(wd, ctx);
+      validateSteps(wd, ctx);
       validateVerdicts(wd, ctx);
       validateTriggerInput(wd, ctx);
     })
@@ -774,7 +743,7 @@ export const WorkflowTemplateSchema = WorkflowDefinitionBaseSchema.omit(
   SERVER_MANAGED_WORKFLOW_FIELDS,
 ).superRefine((wd, ctx) => {
   validateInputForNextRun(wd, ctx);
-  validateExecutorAndTriggers(wd, ctx);
+  validateSteps(wd, ctx);
   validateVerdicts(wd, ctx);
   validateTriggerInput(wd, ctx);
 });

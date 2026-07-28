@@ -59,7 +59,7 @@ import {
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { createEchoServer } from '../../../../../../scripts/test-echo-server/server';
-import { seedWebhookTriggers } from './seed-webhook-triggers';
+import { seedWebhookTrigger } from './seed-webhook-triggers';
 
 // Distinct port from execution-summaries-api so the two e2e files don't
 // fight when run in the same vitest process (vitest.config.action-flows.ts
@@ -194,7 +194,12 @@ beforeEach(async () => {
     }),
   };
   await services.processRepo.saveWorkflowDefinition(definition);
-  await seedWebhookTriggers(services.triggerRepo, definition);
+  await seedWebhookTrigger(services.triggerRepo, {
+    namespace: 'examples',
+    workflowName: 'food-log-proxy',
+    name: 'main',
+    config: { method: 'POST', path: '/food-log' },
+  });
 });
 
 afterEach(() => {

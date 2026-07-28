@@ -31,8 +31,7 @@ export default function WorkflowDefinitionVersionPage() {
 
   const { definition, loading } = useWorkflowVersion(decodedName, handle, versionNumber);
   // Hand-startable gate reads the unified triggers table (ADR-0011 / Issue #930),
-  // the same source of truth as the server guard — not the definition's
-  // advisory triggers[]. Stay optimistic while rows load.
+  // the same source of truth as the server guard. Stay optimistic while rows load.
   const { triggers, loading: triggersLoading } = useWorkflowTriggers(decodedName, handle);
   const hasManualTrigger = triggersLoading
     ? true
@@ -97,7 +96,6 @@ export default function WorkflowDefinitionVersionPage() {
           description: editedDescription.trim() || undefined,
           steps,
           transitions: mergedTransitions,
-          triggers: definition.triggers,
           roles: definition.roles,
           env: definition.env,
           notifications: definition.notifications,

@@ -33,8 +33,8 @@ describe('workflow examples', () => {
       expect(((content as Record<string, unknown>).description as string).length).toBeGreaterThan(20);
     });
 
-    it('has at least one trigger', () => {
-      expect(((content as Record<string, unknown>).triggers as unknown[]).length).toBeGreaterThan(0);
+    it('does not declare triggers (definitions are trigger-free, Issue #932)', () => {
+      expect((content as Record<string, unknown>).triggers).toBeUndefined();
     });
 
     it('has exactly one terminal step', () => {

@@ -168,3 +168,22 @@ Also: removed "required sections per SCHEMA.md" wording from SKILL.md — replac
 
 touched: `SCHEMA.md` (rewrite), `STYLE.md` (new), `skills/knowledge-base/SKILL.md` (one line), `wiki/index.md` (header pointers).
 summary: single source of truth for each rule; wiki docs are lean.
+
+## [2026-07-27] file-back | Triggers detached from definitions (Issue #932)
+
+Issue #932 completed the ADR-0011 epic: the `triggers` array is removed from the
+`WorkflowDefinition` / `ProcessDefinition` schemas and migration `0039` drops the
+DB column. **Definitions are now trigger-free** — triggers live solely on the
+unified `triggers` table, managed via `mediforce workflow trigger-*`, the UI
+Triggers tab, or `POST /api/workflow-definitions/:name/triggers`. The `manual`
+trigger is a per-workflow singleton auto-seeded on register.
+
+Reviewed wiki entity/concept pages for definition-embedded trigger claims: none
+found. `workflow-engine.md` (`ManualTrigger` / `WebhookTrigger` / `CronTrigger`
+handlers, "dispatch triggers"), `index.md` (engine feature line, cron-triggered
+digest), `supply-intelligence.md` (risk urgency triggers), and `databricks-job.md`
+("triggers an existing Databricks job") all describe engine/plugin behaviour or
+unrelated uses of the word, not a definition field — left unchanged.
+
+touched: `log.md` (this entry).
+summary: narrative docs (ADR-0011, workflow-capabilities, PREVIOUS_RUN, protocol-to-tfl README) updated for trigger-free definitions; wiki content pages already accurate.

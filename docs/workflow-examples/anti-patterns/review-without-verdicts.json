@@ -7,7 +7,6 @@
   "expectedError": "review step without verdicts has no routing",
   "definition": {
     "name": "anti-review-no-verdicts",
-    "triggers": [{ "type": "manual", "name": "manual" }],
     "steps": [
       { "id": "create", "name": "Create", "type": "creation", "executor": "human" },
       {

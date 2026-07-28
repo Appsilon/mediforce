@@ -61,7 +61,6 @@ test.describe('POST /api/cron/heartbeat — API E2E', () => {
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'noop', to: 'done' }],
-      triggers: [{ type: 'cron', name: 'every-15m', schedule: '*/15 * * * *' }],
     };
     const createWdRes = await request.post(
       `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
@@ -71,6 +70,17 @@ test.describe('POST /api/cron/heartbeat — API E2E', () => {
       },
     );
     expect(createWdRes.status()).toBe(201);
+
+    // Definitions are trigger-free (Issue #932): attach the cron trigger to the
+    // registered workflow via the triggers table.
+    const createTriggerRes = await request.post(
+      `/api/workflow-definitions/${encodeURIComponent(wdName)}/triggers`,
+      {
+        headers: AUTH_HEADERS,
+        data: { namespace: TEST_ORG_HANDLE, triggerName: 'every-15m', type: 'cron', schedule: '*/15 * * * *' },
+      },
+    );
+    expect(createTriggerRes.ok(), await createTriggerRes.text()).toBe(true);
 
     try {
       // Prime trigger state — first heartbeat may fire or skip depending on

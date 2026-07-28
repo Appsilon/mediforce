@@ -61,7 +61,7 @@ import {
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { createEchoServer } from '../../../../../../scripts/test-echo-server/server';
-import { seedWebhookTriggers } from './seed-webhook-triggers';
+import { seedWebhookTrigger } from './seed-webhook-triggers';
 
 // ---- Wiring: in-memory services + handler glue -----------------------------
 
@@ -222,7 +222,12 @@ beforeEach(async () => {
     }),
   };
   await services.processRepo.saveWorkflowDefinition(definition);
-  await seedWebhookTriggers(services.triggerRepo, definition);
+  await seedWebhookTrigger(services.triggerRepo, {
+    namespace: 'examples',
+    workflowName: 'execution-summaries-api',
+    name: 'main',
+    config: { method: 'POST', path: '/execution-summaries' },
+  });
 });
 
 afterEach(() => {
