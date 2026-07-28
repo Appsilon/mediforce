@@ -268,4 +268,106 @@ test.describe('Trigger management — API E2E', () => {
       await deleteWorkflowDefinition(request, wdName);
     }
   });
+
+  test('portable trigger file: export → import round-trips into another workflow (Issue #933)', async ({
+    request,
+  }) => {
+    const sourceName = `e2e-trig-export-${Date.now()}`;
+    const targetName = `e2e-trig-import-${Date.now()}`;
+    const sourceTriggersUrl = `${base}/${encodeURIComponent(sourceName)}/triggers`;
+    const targetTriggersUrl = `${base}/${encodeURIComponent(targetName)}/triggers`;
+
+    // Both workflows start manual-only (seed-on-register, Issue #930).
+    for (const name of [sourceName, targetName]) {
+      const res = await request.post(`${base}?namespace=${TEST_ORG_HANDLE}`, {
+        headers: AUTH_HEADERS,
+        data: manualOnlyWd(name),
+      });
+      expect(res.status(), await res.text()).toBe(201);
+    }
+
+    try {
+      // Attach a cron + webhook to the source, on top of its seeded manual.
+      const cronRes = await request.post(sourceTriggersUrl, {
+        headers: AUTH_HEADERS,
+        data: { namespace: TEST_ORG_HANDLE, triggerName: 'nightly', type: 'cron', schedule: '0 3 * * *' },
+      });
+      expect(cronRes.ok(), await cronRes.text()).toBe(true);
+      const webhookRes = await request.post(sourceTriggersUrl, {
+        headers: AUTH_HEADERS,
+        data: {
+          namespace: TEST_ORG_HANDLE,
+          triggerName: 'webhook',
+          type: 'webhook',
+          method: 'POST',
+          path: '/intake',
+        },
+      });
+      expect(webhookRes.ok(), await webhookRes.text()).toBe(true);
+
+      // Export → portable, instance-free array (proves GET route + auth path).
+      const exportRes = await request.get(
+        `${sourceTriggersUrl}/export?namespace=${TEST_ORG_HANDLE}`,
+        { headers: AUTH_HEADERS },
+      );
+      expect(exportRes.ok(), await exportRes.text()).toBe(true);
+      const { triggers } = (await exportRes.json()) as {
+        triggers: Array<Record<string, unknown>>;
+      };
+      expect(triggers.map((t) => t.name).sort()).toEqual(['manual', 'nightly', 'webhook']);
+      for (const t of triggers) {
+        expect(t).not.toHaveProperty('namespace');
+        expect(t).not.toHaveProperty('lastTriggeredAt');
+      }
+
+      // Import into the target (proves POST route + storage + auth path).
+      const importRes = await request.post(`${targetTriggersUrl}/import`, {
+        headers: AUTH_HEADERS,
+        data: { namespace: TEST_ORG_HANDLE, triggers, replace: false },
+      });
+      expect(importRes.ok(), await importRes.text()).toBe(true);
+      const { results } = (await importRes.json()) as {
+        results: Array<{ name: string; outcome: string; webhookUrl: string | null }>;
+      };
+      const byName = Object.fromEntries(results.map((r) => [r.name, r]));
+      // The seeded manual collides with the target's own manual → skipped;
+      // cron + webhook are created.
+      expect(byName.nightly.outcome).toBe('created');
+      expect(byName.webhook.outcome).toBe('created');
+      expect(byName.manual.outcome).toBe('skipped');
+      // Webhook URL re-derived for the TARGET workflow/host.
+      expect(byName.webhook.webhookUrl).toBe(
+        `/api/triggers/webhook/${TEST_ORG_HANDLE}/${targetName}/intake`,
+      );
+
+      // The target now lists the imported triggers alongside its seeded manual.
+      const listRes = await request.get(`${targetTriggersUrl}?namespace=${TEST_ORG_HANDLE}`, {
+        headers: AUTH_HEADERS,
+      });
+      const list = (await listRes.json()) as { triggers: Array<{ name: string }> };
+      expect(list.triggers.map((t) => t.name).sort()).toEqual(['manual', 'nightly', 'webhook']);
+
+      // Re-import with replace flips the cron schedule on the existing row —
+      // and leaves no duplicate rows behind.
+      const changed = triggers.map((t) =>
+        t.type === 'cron' ? { ...t, schedule: '0 5 * * *' } : t,
+      );
+      const replaceRes = await request.post(`${targetTriggersUrl}/import`, {
+        headers: AUTH_HEADERS,
+        data: { namespace: TEST_ORG_HANDLE, triggers: changed, replace: true },
+      });
+      expect(replaceRes.ok(), await replaceRes.text()).toBe(true);
+      const afterList = await request.get(`${targetTriggersUrl}?namespace=${TEST_ORG_HANDLE}`, {
+        headers: AUTH_HEADERS,
+      });
+      const after = (await afterList.json()) as {
+        triggers: Array<{ name: string; type: string; config: { schedule?: string } }>;
+      };
+      expect(after.triggers.find((t) => t.type === 'cron')?.config.schedule).toBe('0 5 * * *');
+      expect(after.triggers.map((t) => t.name).sort()).toEqual(['manual', 'nightly', 'webhook']);
+    } finally {
+      await deleteWorkflowDefinition(request, sourceName);
+      await deleteWorkflowDefinition(request, targetName);
+    }
+  });
 });

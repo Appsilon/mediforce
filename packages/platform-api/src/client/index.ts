@@ -54,6 +54,10 @@ import {
   SetTriggerEnabledOutputSchema,
   DeleteTriggerInputSchema,
   DeleteTriggerOutputSchema,
+  ExportTriggersInputSchema,
+  ExportTriggersOutputSchema,
+  ImportTriggersInputSchema,
+  ImportTriggersOutputSchema,
   DockerInfoResponseSchema,
   OpenRouterCreditsInputSchema,
   OpenRouterCreditsOutputSchema,
@@ -292,6 +296,10 @@ import {
   type SetTriggerEnabledOutput,
   type DeleteTriggerInput,
   type DeleteTriggerOutput,
+  type ExportTriggersInput,
+  type ExportTriggersOutput,
+  type ImportTriggersInput,
+  type ImportTriggersOutput,
   type GetRunInput,
   type GetRunOutput,
   type StartRunInput,
@@ -589,6 +597,8 @@ export class Mediforce {
     update: (input: UpdateTriggerInput) => Promise<UpdateTriggerOutput>;
     setEnabled: (input: SetTriggerEnabledInput) => Promise<SetTriggerEnabledOutput>;
     delete: (input: DeleteTriggerInput) => Promise<DeleteTriggerOutput>;
+    export: (input: ExportTriggersInput) => Promise<ExportTriggersOutput>;
+    import: (input: ImportTriggersInput) => Promise<ImportTriggersOutput>;
   };
 
   readonly runs: {
@@ -1198,6 +1208,25 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.triggers.delete');
         return DeleteTriggerOutputSchema.parse(body);
+      },
+      export: async (input) => {
+        const v = ExportTriggersInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: v.namespace });
+        const res = await this.request(
+          `/api/workflow-definitions/${encodeURIComponent(v.definitionName)}/triggers/export${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.triggers.export');
+        return ExportTriggersOutputSchema.parse(body);
+      },
+      import: (input) => {
+        const v = ImportTriggersInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions/${encodeURIComponent(v.definitionName)}/triggers/import`,
+          { namespace: v.namespace, triggers: v.triggers, replace: v.replace },
+          ImportTriggersOutputSchema,
+          'mediforce.triggers.import',
+        );
       },
     };
 

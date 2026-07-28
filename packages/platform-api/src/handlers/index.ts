@@ -76,6 +76,8 @@ export {
   updateTrigger,
   setTriggerEnabled,
   deleteTrigger,
+  exportTriggers,
+  importTriggers,
 } from './triggers/manage-triggers';
 
 export { listRuns } from './runs/list-runs';
