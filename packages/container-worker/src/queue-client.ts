@@ -34,10 +34,11 @@ async function getQueue(): Promise<Queue> {
   if (!sharedQueue) {
     const { Queue } = await import('bullmq');
     sharedQueue = new Queue(QUEUE_NAME, {
-      // enableOfflineQueue: false makes `add` reject the moment Redis is
-      // unreachable. Buffering instead leaves the caller waiting on a job that
-      // was never dispatched until its step timeout fires, which reports the
-      // outage as "script execution timed out" with no error attached.
+      // enableOfflineQueue: false covers the flapping case: once the
+      // connection has been ready, a command issued while it is down rejects
+      // instead of being buffered. It does NOT cover a Redis that was already
+      // down when the Queue was constructed — see withDeadline above, which
+      // is what bounds that path.
       connection: { ...getRedisConnection(), enableOfflineQueue: false },
       // Retention is bounded by age as well as count because job payloads carry
       // base64 file contents — a few hundred retained jobs is enough to outgrow

@@ -52,7 +52,10 @@ services:
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      # `redis-cli ping` exits 0 even on NOAUTH, which would report healthy
+      # while every command fails auth — grep the reply instead of trusting
+      # the exit code. Works with auth on and off (empty password).
+      test: ["CMD-SHELL", "redis-cli -a \"${REDIS_PASSWORD:-}\" --no-auth-warning ping | grep -q PONG"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -109,7 +112,7 @@ services:
     expose:
       - "3000"
     environment:
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379
       # ADR-0001 — Postgres is the only storage backend. Migrations run in
       # the `migrate` init container before this service starts
       # (depends_on: { migrate: { condition: service_completed_successfully } }).
@@ -194,7 +197,7 @@ services:
     expose:
       - "3001"
     environment:
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379
       - WORKER_HTTP_PORT=3001
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
