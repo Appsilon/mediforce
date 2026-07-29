@@ -50,7 +50,8 @@ Definition), conflating with the parent Workflow.
 
 **Workflow Run** *(today's `ProcessInstance` — rename to `WorkflowRun` proposed)*:
 One execution of a Workflow Definition. Tracks current step, status,
-accumulated variables, trigger payload, total cost, deleted/archived flags.
+accumulated variables, trigger payload and trigger context, total cost,
+deleted/archived flags.
 **"Run" is the canonical term** — used everywhere in the UI, URLs
 (`/workflows/{name}/runs/{runId}`), API routes (`/api/runs/{runId}`), schema
 comments ("new runs", "archived runs", git branch `run/<runId>`), and
@@ -94,13 +95,14 @@ must be **empty**. Opaque un-enumerable input (a proxied third-party JSON body)
 is declared as a single field of `object` type.
 _Code:_ `TriggerInputFieldSchema` in
 `packages/platform-core/src/schemas/workflow-definition.ts`; enforced by
-`validatePayload` (`validation/payload-validator.ts`) on all three paths —
+`validatePayload` (`validation/payload-validator.ts`) on every firing path —
 `start-run` (manual/API), `WebhookRouter` (body top-level keys → fields, 400 on
-mismatch), and the cron heartbeat (the row's static `config.payload`, also
-checked at attach time by `createTrigger` / `updateTrigger`).
-_Status:_ unified across manual + webhook + cron, with the `object` type, as of
-Issue #1020. An opaque top-level **array** has no dedicated type — it nests under
-an `object` field.
+mismatch), the cron heartbeat (the row's static `config.payload`, also checked
+at attach time by `createTrigger` / `updateTrigger`), and the `spawn` action
+before it fires a child workflow (`packages/core-actions/src/handlers/spawn.ts`).
+_Status:_ unified across manual + webhook + cron + spawned child runs, with the
+`object` type, as of Issue #1020. An opaque top-level **array** has no dedicated
+type — it nests under an `object` field.
 _Avoid_: treating `triggerInput` as webhook-body-only or manual-only; using
 **Trigger Context** to carry declared input.
 
@@ -112,14 +114,18 @@ _Avoid_: putting transport metadata (HTTP headers, cron `firedAt`) on it — tha
 belongs on **Trigger Context**.
 
 **Trigger Context** *(runtime; on a Workflow Run)*:
-A reserved, **trigger-specific** escape hatch holding the raw transport metadata
-of a firing (webhook `headers`/`query`/`method`/`path`, cron `firedAt`/`schedule`).
+A reserved, **trigger-specific** escape hatch holding the transport metadata of
+a firing (webhook `headers`/`query`/`method`/`path`, cron `firedAt`/`schedule`).
+Webhook credential headers — `authorization`, `proxy-authorization`, `cookie`,
+and `x-api-key` — are stripped before the remaining headers are persisted.
 Steps that read `${triggerContext.*}` knowingly re-couple to a Trigger kind.
 _Code:_ `ProcessInstance.triggerContext` (column `process_instances.trigger_context`,
 migration `0040`), exposed to interpolation via `InterpolationSources` in
-`packages/platform-core/src/interpolation.ts`. Populated by each trigger adapter;
-a manual start leaves it empty. Bare identifiers deliberately do **not** fall
-through to it — re-coupling must be spelled out.
+`packages/platform-core/src/interpolation.ts`; webhook header filtering lives in
+`packages/platform-ui/src/app/api/triggers/webhook/[...path]/route.ts`. Populated
+by each trigger adapter; a manual start and spawned child start leave it empty.
+Bare identifiers deliberately do **not** fall through to it — re-coupling must
+be spelled out.
 _Avoid_: routing declared workflow input through it — declared input is **Trigger
 Payload**.
 

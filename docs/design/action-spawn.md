@@ -32,7 +32,8 @@ export const SpawnTargetSchema = z.object({
   definitionVersion: z.number().int().positive().optional(),
   /** Trigger name on the target workflow. Defaults to 'manual'. */
   triggerName: z.string().min(1).default('manual'),
-  /** Payload passed to the child workflow's trigger. Supports ${...} interpolation. */
+  /** Payload passed to the child workflow's trigger. Supports ${...} interpolation
+   *  and must satisfy the target version's triggerInput contract. */
   payload: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -176,8 +177,12 @@ export function createSpawnActionHandler(
 3. **For each target:**
    - Interpolate `payload` against standard sources. In `forEach` mode, add `item` to sources so `${item.field}` resolves.
    - Resolve `definitionVersion`: if omitted, call `processRepo.getLatestWorkflowVersion(namespace, definitionName)`.
+   - Load that definition version and validate the interpolated payload against
+     the child's `triggerInput`; an undeclared, missing, or mistyped field is a
+     spawn error.
    - Call `manualTrigger.fireWorkflow(...)` directly (in-process, no HTTP).
-   - On success, push to `spawned[]`. On error, push to `errors[]`.
+   - On success, push to `spawned[]`. On error, push to `errors[]`; with
+     `continueOnSpawnError: false`, rethrow the first error instead.
 4. **Return output.**
 
 ### Output shape

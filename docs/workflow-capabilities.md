@@ -60,7 +60,10 @@ Handler nuances not visible in the schema (in
 [`core-actions/src/handlers/`](../packages/core-actions/src/handlers/)):
 - `spawn` fan-out is **capped at 50 children per step execution**
   ([`spawn.ts`](../packages/core-actions/src/handlers/spawn.ts)); `continueOnSpawnError`
-  (default `true`) decides whether one failed child aborts the action.
+  (default `true`) decides whether one failed child aborts the action. Each
+  interpolated child payload is validated against that child's `triggerInput`
+  contract before firing; a mismatch is reported in `errors[]` (or aborts when
+  `continueOnSpawnError: false`).
 - `email` supports `cc` / `bcc` / `replyTo` / `html` and is **rate-limited**
   (default 50/run, 30/minute) in [`email.ts`](../packages/core-actions/src/handlers/email.ts).
 - `http` never throws on a non-2xx response — it returns `{ status, headers, body }`;
@@ -250,7 +253,9 @@ workflow out-of-band and managed via
 the UI **Triggers** tab, or `POST /api/workflow-definitions/:name/triggers`. The
 `manual` trigger is a per-workflow singleton auto-seeded on register (hand-start
 works by default). Webhook config is narrowed by `WebhookTriggerConfigSchema`
-([`workflow-definition.ts`](../packages/platform-core/src/schemas/workflow-definition.ts)).
+([`trigger.ts`](../packages/platform-core/src/schemas/trigger.ts)). A cron
+payload can be supplied with `--payload '<json object>'` on `trigger-add` or
+`trigger-update`; it must satisfy the workflow's `triggerInput` contract.
 See [ADR-0011](adr/0011-triggers-detached-unified-resource.md).
 
 The three types are routed the same way regardless of how they are attached:
@@ -258,12 +263,13 @@ The three types are routed the same way regardless of how they are attached:
 | `type` | Routed by | Notes |
 |--------|-----------|-------|
 | `manual` | [`manual-trigger.ts`](../packages/workflow-engine/src/triggers/manual-trigger.ts) | form values come from `triggerInput`; no transport, so `triggerContext` is empty |
-| `webhook` | [`webhook-router.ts`](../packages/workflow-engine/src/triggers/webhook-router.ts) | typed `method` + `path` (exact match, no globbing); the JSON body's **top-level keys map 1:1 onto `triggerInput`** and are validated (400 + per-field `details` on mismatch); the envelope goes to `triggerContext` |
+| `webhook` | [`webhook-router.ts`](../packages/workflow-engine/src/triggers/webhook-router.ts) | typed `method` + `path` (exact match, no globbing); the JSON body's **top-level keys map 1:1 onto `triggerInput`** and are validated (400 + per-field `details` on mismatch); the remaining HTTP envelope goes to `triggerContext` — credential headers are stripped |
 | `cron` | [`cron-trigger.ts`](../packages/workflow-engine/src/triggers/cron-trigger.ts) | `schedule` cron string; scheduler is deployment-side. An optional static `config.payload` per row is the tick's input, validated at attach time and again at fire time (drift skips the tick with a reason); `schedule`/`firedAt` go to `triggerContext` |
 | `event` | — | **in the enum but has no router** ([`triggers/`](../packages/workflow-engine/src/triggers/) has only manual/webhook/cron) — treat as not yet implemented |
 
 `triggerInput` (`TriggerInputFieldSchema`) is the contract every trigger
-validates against, and doubles as the manual-start form: each field has a `type`
+validates against, and doubles as the manual-start form. Spawned child runs use
+the same contract before their manual-style firing. Each field has a `type`
 of `string` / `number` / `boolean` / `date` / `datetime` / `select` /
 `multiselect` / `textarea` / `object`, plus `options` / `default` / `required`
 (it extends `StepParamSchema`). `object` holds an opaque JSON object whose

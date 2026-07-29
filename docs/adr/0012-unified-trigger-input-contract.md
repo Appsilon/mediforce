@@ -7,7 +7,7 @@ status: accepted
 A Workflow Definition's **`triggerInput`** is the **total, trigger-agnostic input
 contract** — the named, typed fields any firing must supply, regardless of which
 Trigger kind fires it. Every firing of every Trigger (`manual`, `webhook`, `cron`)
-validates its payload against `triggerInput`; the validated result is the
+and every spawned child workflow validates its payload against `triggerInput`; the validated result is the
 **Trigger Payload** (`triggerPayload`) that Steps read as `${triggerPayload.<field>}`.
 Raw transport metadata (webhook `headers`/`query`/`method`/`path`, cron
 `firedAt`/`schedule`) lives on a separate **Trigger Context** (`triggerContext`)
@@ -30,7 +30,9 @@ contract is uniform.
 - **One input channel.** The webhook JSON body's top-level keys map 1:1 to
   `triggerInput` fields. Opaque, un-enumerable input (a proxied third-party body)
   is declared as a single field of a new **`object`** type; the sender nests under
-  that key. `triggerContext` is transport-only and never carries input.
+  that key. `triggerContext` is transport-only and never carries input. The
+  webhook adapter strips `authorization`, `proxy-authorization`, `cookie`, and
+  `x-api-key` before persisting the remaining headers in the context.
 - **Cron carries a static payload.** Because cron has no caller, each cron Trigger
   row holds an optional `payload` in its config (editable per row from UI/CLI, so
   two schedules can fire different payloads). It is validated at attach/update time
@@ -65,6 +67,8 @@ contract is uniform.
   nests under an `object` field instead — one escape hatch, not two.
 - The cron trigger config schema grows an optional validated `payload`; the cron
   fire path gains the same validation every other trigger runs.
+- Spawned child workflows use the same validation before firing; failures follow
+  the existing `errors[]` / `continueOnSpawnError` behavior.
 - The webhook UI's example body becomes **derivable from `triggerInput`** rather
   than a guessed placeholder.
 - See `CONTEXT.md` — "Trigger Input", "Trigger Payload", "Trigger Context".
