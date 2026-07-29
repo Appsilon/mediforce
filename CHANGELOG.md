@@ -100,6 +100,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Registering a workflow whose agent step omits a Docker image now **defaults to the golden image** (`mediforce-golden-image`) instead of rejecting the registration with a `ValidationError`; a step that names its own image is unaffected.
 - **Decision steps now route natively by verdict**, like review steps: the engine follows a decision step's verdict targets, and the step editor exposes verdict routing for both `review` and `decision` step types.
 - **Registering a workflow now rejects structurally-invalid definitions** — the graph (reachability, terminal step, dangling transitions/verdict targets) and step references are validated at registration, not just schema-parsed. Note: a previously-stored definition that is incomplete can no longer be re-registered until fixed.
+- The **workflow `validate` endpoint / CLI preflight now runs the same graph + reference gate** as register, so a definition can no longer pass `validate` and then fail `register`.
 
 ### Added
 - `ALLOWED_EMAIL_DOMAINS="*"` is an explicit, logged opt-out that lets any email domain sign in via Google/OIDC — boot WARNs loudly that the restriction is disabled, while an empty/unset allowlist still fails boot (ADR-0002 §4a).
