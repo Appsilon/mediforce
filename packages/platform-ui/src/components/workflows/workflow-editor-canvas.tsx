@@ -22,7 +22,7 @@ import type { NewStepPayload } from '@/lib/control-mode';
 import { BlockPicker } from './block-picker';
 import { StepEditor } from './workflow-editor/step-editor';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
-import { computeMoveEligibility, ensureTerminalConnected } from './workflow-editor-utils';
+import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 
 function JsonCodeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -300,7 +300,17 @@ export function WorkflowEditorCanvas({
     } else if (resolvedInsertAfterId && resolvedInsertAfterId !== terminalStep.id) {
       const insertIdx = editedSteps.findIndex((s) => s.id === resolvedInsertAfterId);
       setEditedSteps((prev) => {
-        const next = [...prev];
+        // Verdicts route independently of transitions: repoint the split edge's
+        // verdict target (or all of this step's verdicts when taking over its
+        // whole outgoing) at the inserted step so review/decision routing goes
+        // through it instead of skipping it.
+        const retargeted = retargetVerdictTargets(
+          prev,
+          resolvedInsertAfterId,
+          insertBeforeId ?? 'all',
+          newId,
+        );
+        const next = [...retargeted];
         next.splice(insertIdx + 1, 0, newStep);
         return next;
       });
@@ -317,7 +327,10 @@ export function WorkflowEditorCanvas({
     } else {
       const terminalIdx = editedSteps.findIndex((s) => s.id === terminalStep.id);
       setEditedSteps((prev) => {
-        const next = [...prev];
+        // Any verdict pointing at the terminal now routes through the inserted
+        // step, mirroring the transition rewiring below.
+        const retargeted = retargetVerdictTargets(prev, 'any', terminalStep.id, newId);
+        const next = [...retargeted];
         next.splice(terminalIdx, 0, newStep);
         return next;
       });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeMoveEligibility, ensureTerminalConnected } from '../workflow-editor-utils';
+import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets } from '../workflow-editor-utils';
 import type { WorkflowStep } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -17,6 +17,49 @@ function tr(from: string, to: string) {
 // ---------------------------------------------------------------------------
 // computeMoveEligibility
 // ---------------------------------------------------------------------------
+
+describe('retargetVerdictTargets', () => {
+  function decision(id: string, verdicts: Record<string, string>): WorkflowStep {
+    return {
+      id, name: id, type: 'decision', executor: 'human',
+      verdicts: Object.fromEntries(
+        Object.entries(verdicts).map(([k, target]) => [k, { target }]),
+      ),
+    };
+  }
+
+  it('repoints only the matching verdict target on the scoped step (edge split)', () => {
+    const steps = [decision('review', { approve: 'ship', reject: 'done' }), step('inserted'), step('ship'), step('done', 'terminal')];
+    const out = retargetVerdictTargets(steps, 'review', 'ship', 'inserted');
+    expect(out[0].verdicts).toEqual({ approve: { target: 'inserted' }, reject: { target: 'done' } });
+  });
+
+  it("match 'all' repoints every verdict of the scoped step", () => {
+    const steps = [decision('review', { approve: 'ship', reject: 'done' }), step('inserted')];
+    const out = retargetVerdictTargets(steps, 'review', 'all', 'inserted');
+    expect(out[0].verdicts).toEqual({ approve: { target: 'inserted' }, reject: { target: 'inserted' } });
+  });
+
+  it("scope 'any' repoints the matching target across every step (insert before terminal)", () => {
+    const steps = [decision('a', { cancel: 'done' }), decision('b', { reject: 'done', approve: 'a' }), step('inserted'), step('done', 'terminal')];
+    const out = retargetVerdictTargets(steps, 'any', 'done', 'inserted');
+    expect(out[0].verdicts).toEqual({ cancel: { target: 'inserted' } });
+    expect(out[1].verdicts).toEqual({ reject: { target: 'inserted' }, approve: { target: 'a' } });
+  });
+
+  it('leaves steps without verdicts untouched and returns the same reference on no-op', () => {
+    const steps = [decision('review', { approve: 'ship' }), step('plain')];
+    const noop = retargetVerdictTargets(steps, 'review', 'nonexistent', 'inserted');
+    expect(noop).toBe(steps);
+  });
+
+  it('does not scope to a step that is not the target of the edit', () => {
+    const steps = [decision('a', { go: 'x' }), decision('b', { go: 'x' })];
+    const out = retargetVerdictTargets(steps, 'a', 'x', 'inserted');
+    expect(out[0].verdicts).toEqual({ go: { target: 'inserted' } });
+    expect(out[1].verdicts).toEqual({ go: { target: 'x' } });
+  });
+});
 
 describe('computeMoveEligibility', () => {
   it('returns empty sets for a single step with no transitions', () => {

@@ -44,6 +44,47 @@ export function computeMoveEligibility(
 }
 
 /**
+ * Rewire `verdicts[*].target` when a step is inserted onto an edge or removed.
+ *
+ * Review/decision steps route by their verdict targets, independently of plain
+ * transitions. A canvas edit that rewires only transitions leaves verdicts
+ * pointing at the old target, so the engine routes straight there at runtime —
+ * skipping an inserted step, or dangling on a deleted one. This applies the same
+ * target remap to verdicts that the transition rewiring applies to edges.
+ *
+ * `scope` is a step id (only that step's verdicts) or `'any'` (every step).
+ * `match` is the target id to repoint, or `'all'` to repoint every verdict of
+ * the scoped step(s). Returns a new array only when something changed; otherwise
+ * the original reference (so callers can skip no-op updates).
+ */
+export function retargetVerdictTargets(
+  steps: WorkflowStep[],
+  scope: string | 'any',
+  match: string | 'all',
+  newTarget: string,
+): WorkflowStep[] {
+  let changed = false;
+  const next = steps.map((step) => {
+    if (scope !== 'any' && step.id !== scope) return step;
+    if (!step.verdicts) return step;
+    let stepChanged = false;
+    const verdicts = Object.fromEntries(
+      Object.entries(step.verdicts).map(([key, verdict]) => {
+        if ((match === 'all' || verdict.target === match) && verdict.target !== newTarget) {
+          stepChanged = true;
+          return [key, { ...verdict, target: newTarget }];
+        }
+        return [key, verdict];
+      }),
+    );
+    if (!stepChanged) return step;
+    changed = true;
+    return { ...step, verdicts };
+  });
+  return changed ? next : steps;
+}
+
+/**
  * Ensures every non-terminal step has at least one outgoing transition that
  * points to the terminal step.  If no terminal step exists, one is appended.
  *
