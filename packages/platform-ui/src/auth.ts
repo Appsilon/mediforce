@@ -109,7 +109,7 @@ export function buildProviders(db: Database): Provider[] {
         if (!shouldSendMagicLink({ userExists: credential !== null, domainAllowed })) {
           return;
         }
-        const { subject, text, html } = buildMagicLinkEmail(url);
+        const { subject, text, html } = buildMagicLinkEmail(url, resolvedEmail.senderName);
         await resolvedEmail.send({ to: [identifier], subject, text, html });
       },
     } as Provider);
