@@ -95,4 +95,34 @@ describe.skipIf(skipPg)('mintVerificationToken', () => {
     const b = await mintVerificationToken(db, 'b@example.test', new Date(Date.now() + 1000), 's');
     expect(a).not.toBe(b);
   });
+
+  it('re-minting for the same identifier replaces the prior token (resend)', async () => {
+    const secret = 's';
+    const expires = new Date(Date.now() + 1000);
+    const first = await mintVerificationToken(db, 'resend@example.test', expires, secret);
+    const second = await mintVerificationToken(db, 'resend@example.test', expires, secret);
+
+    const rows = await db
+      .select()
+      .from(authVerificationTokens)
+      .where(eq(authVerificationTokens.identifier, 'resend@example.test'));
+    // Only the newest token survives — the prior one is gone, so the table
+    // can't grow unbounded and the old link no longer validates.
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.token).toBe(hashVerificationToken(second, secret));
+    expect(rows[0]?.token).not.toBe(hashVerificationToken(first, secret));
+  });
+
+  it('leaves other identifiers untouched when re-minting', async () => {
+    const expires = new Date(Date.now() + 1000);
+    await mintVerificationToken(db, 'keep@example.test', expires, 's');
+    await mintVerificationToken(db, 'other@example.test', expires, 's');
+    await mintVerificationToken(db, 'other@example.test', expires, 's');
+
+    const kept = await db
+      .select()
+      .from(authVerificationTokens)
+      .where(eq(authVerificationTokens.identifier, 'keep@example.test'));
+    expect(kept).toHaveLength(1);
+  });
 });

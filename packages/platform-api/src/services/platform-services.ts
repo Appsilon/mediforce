@@ -65,7 +65,7 @@ import {
   type DockerImagesService,
 } from './docker-images-service';
 import { sendWorkspaceNotificationEmail, sendInviteSetupEmail } from './invite-emails';
-import { normalizeBaseUrl } from '../contract/config';
+import { normalizeBaseUrl, resolveInviteAppUrl } from '../contract/config';
 import type {
   InviteNotificationService,
   InviteService,
@@ -355,15 +355,11 @@ export function getPlatformServices(): PlatformServices {
   // or by setting a password. `PostgresInviteService` structurally implements
   // the framework-free `InviteService` port handlers consume.
   const inviteService: InviteService = new PostgresInviteService(pg);
-  // `appUrl` resolves from the canonical deployment base-URL vars (matching
-  // `getConfiguredAppBaseUrl`: APP_BASE_URL || NEXT_PUBLIC_APP_URL) so
-  // self-service resend emails that pass no baseUrl still link to the real
-  // host on staging/prod, only falling back to localhost in dev. `||` (not
-  // `??`) so a Docker-compose empty-string value counts as unset.
-  const inviteAppUrl =
-    process.env.APP_BASE_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    `http://localhost:${process.env.PORT ?? '3000'}`;
+  // Construction-time fallback app URL for invite/activation emails — used when
+  // a send supplies no per-deployment `platform.baseUrl`. Resolves from the
+  // canonical `APP_BASE_URL`/`NEXT_PUBLIC_APP_URL` vars (normalized), only
+  // falling back to localhost in dev. See `resolveInviteAppUrl`.
+  const inviteAppUrl = resolveInviteAppUrl();
   const senderName = resolvedEmail?.senderName ?? 'Mediforce';
   const inviteNotificationService = emailSender
     ? new EmailInviteNotificationService(

@@ -219,6 +219,25 @@ describe.skipIf(skipPg)('PostgresInviteService', () => {
       expect(await service.isInvitePending(uid)).toBe(false);
     });
 
+    it('is NOT pending for a user with BOTH a password hash and an oauth account', async () => {
+      const { uid } = await service.seedInvite({
+        email: 'both@acme.com',
+        workspaceHandle: 'acme',
+        membership: 'member',
+      });
+      await db.insert(authAccounts).values({
+        userId: uid,
+        type: 'oidc',
+        provider: 'google',
+        providerAccountId: 'google-sub-both',
+      });
+      await db
+        .update(authUsers)
+        .set({ passwordHash: 'bcrypt-hash' })
+        .where(eq(authUsers.id, uid));
+      expect(await service.isInvitePending(uid)).toBe(false);
+    });
+
     it('is NOT pending for an unknown uid', async () => {
       expect(await service.isInvitePending('does-not-exist')).toBe(false);
     });

@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import { authVerificationTokens } from '../postgres/schema/auth-verification-token';
 import type { Database } from '../postgres/client';
 
@@ -18,10 +19,18 @@ export async function mintVerificationToken(
   secret: string, // AUTH_SECRET
 ): Promise<string> {
   const rawToken = randomBytes(32).toString('hex');
-  await db.insert(authVerificationTokens).values({
-    identifier,
-    token: hashVerificationToken(rawToken, secret),
-    expires,
+  // Invalidate any earlier unexpired activation tokens for this identifier so a
+  // "resend" truly REPLACES the prior link (only the newest is valid) instead
+  // of leaving multiple live and letting the table grow unbounded.
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(authVerificationTokens)
+      .where(eq(authVerificationTokens.identifier, identifier));
+    await tx.insert(authVerificationTokens).values({
+      identifier,
+      token: hashVerificationToken(rawToken, secret),
+      expires,
+    });
   });
   return rawToken;
 }

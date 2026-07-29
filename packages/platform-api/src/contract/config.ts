@@ -19,6 +19,23 @@ export function normalizeBaseUrl(value: string | null | undefined): string | und
   return trimmed === '' ? undefined : trimmed;
 }
 
+/**
+ * Construction-time fallback base URL for invite/activation emails when no
+ * per-send `baseUrl` (the DB `platform.baseUrl` setting) is supplied. Resolves
+ * from the canonical deployment vars (`APP_BASE_URL` then `NEXT_PUBLIC_APP_URL`,
+ * matching `getConfiguredAppBaseUrl`), each run through `normalizeBaseUrl` so a
+ * trailing slash can't yield `https://host//login` and an empty-string compose
+ * value counts as unset. Only local dev (neither var set) falls back to
+ * localhost. `env` is a parameter so the resolution is unit-testable.
+ */
+export function resolveInviteAppUrl(env: NodeJS.ProcessEnv = process.env): string {
+  return (
+    normalizeBaseUrl(env.APP_BASE_URL) ??
+    normalizeBaseUrl(env.NEXT_PUBLIC_APP_URL) ??
+    `http://localhost:${env.PORT ?? '3000'}`
+  );
+}
+
 export const GetConfigInputSchema = z.object({ key: z.string().min(1) });
 export type GetConfigInput = z.infer<typeof GetConfigInputSchema>;
 export const GetConfigOutputSchema = z.object({ key: z.string(), value: z.string().nullable() });

@@ -525,6 +525,9 @@ export {
 } from './namespaces';
 
 export {
+  PLATFORM_BASE_URL_SETTING_KEY,
+  normalizeBaseUrl,
+  resolveInviteAppUrl,
   GetConfigInputSchema,
   GetConfigOutputSchema,
   GetConfigByPrefixInputSchema,
