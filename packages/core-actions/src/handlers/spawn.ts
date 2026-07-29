@@ -97,6 +97,7 @@ export function createSpawnActionHandler(
           target.definitionName,
           version,
         );
+        let childPayload = interpolatedPayload;
         if (childDefinition) {
           const validation = validatePayload(
             interpolatedPayload,
@@ -108,6 +109,7 @@ export function createSpawnActionHandler(
                 `v${String(version)}: ${validation.errors.map((error) => error.message).join('; ')}`,
             );
           }
+          childPayload = validation.payload;
         }
 
         const result = await manualTrigger.fireWorkflow({
@@ -116,7 +118,7 @@ export function createSpawnActionHandler(
           definitionVersion: version,
           triggerName: target.triggerName ?? 'manual',
           triggeredBy: 'spawn',
-          payload: interpolatedPayload,
+          payload: childPayload,
           parentInstanceId: ctx.processInstanceId,
           parentDefinitionName: ctx.definitionName,
           ...(ctx.dryRun ? { dryRun: true } : {}),

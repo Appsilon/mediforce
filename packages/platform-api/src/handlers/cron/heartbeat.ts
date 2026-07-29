@@ -18,6 +18,12 @@ import { resolveRunnableVersion } from '../workflows/_resolve-runnable-version';
 
 type Evaluation = { fire: true } | { fire: false; reason: string };
 
+// A firing tick also carries the payload it fires with — the row's static input
+// resolved against the contract's defaults, not the raw config (ADR-0012).
+type PayloadEvaluation =
+  | { fire: true; payload: Record<string, unknown> }
+  | { fire: false; reason: string };
+
 // Fallback age used only when a run's current step (or its definition) can't be
 // resolved: the runtime's default step timeout + grace, derived from the same
 // shared budget helper as the live path (`resolveStrandedBudgetMs`) by passing a
@@ -78,9 +84,9 @@ function evaluateTrigger(
 function evaluatePayload(
   trigger: CronTriggerResource,
   def: WorkflowDefinition,
-): Evaluation {
+): PayloadEvaluation {
   const validation = validatePayload(trigger.config.payload ?? {}, def.triggerInput ?? []);
-  if (validation.valid) return { fire: true };
+  if (validation.valid) return { fire: true, payload: validation.payload };
   const detail = validation.errors.map((error) => error.message).join('; ');
   return {
     fire: false,
@@ -159,7 +165,7 @@ export async function heartbeat(
       // The row's static input (ADR-0012) — trigger-agnostic, so a step reads it
       // as `${triggerPayload.<field>}` like any other firing. The tick's own
       // `schedule`/`firedAt` are transport and ride on `context` instead.
-      payload: trigger.config.payload ?? {},
+      payload: payloadCheck.payload,
       context: { schedule: trigger.config.schedule, firedAt: now.toISOString() },
     });
 

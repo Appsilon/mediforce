@@ -92,7 +92,10 @@ typed fields a firing must supply, regardless of which Trigger kind fires. Every
 firing is validated against it: declared fields are required/typed, undeclared
 fields are **rejected** (strict), and an empty/absent contract means the payload
 must be **empty**. Opaque un-enumerable input (a proxied third-party JSON body)
-is declared as a single field of `object` type.
+is declared as a single field of `object` type. A field's `default` is part of
+the contract, not of the manual form: it is filled in for every firing that
+omitted the field, on every path, so a `required` field with a `default` is
+satisfiable by a payload-less cron row.
 _Code:_ `TriggerInputFieldSchema` in
 `packages/platform-core/src/schemas/workflow-definition.ts`; enforced by
 `validatePayload` (`validation/payload-validator.ts`) on every firing path —
@@ -107,7 +110,8 @@ _Avoid_: treating `triggerInput` as webhook-body-only or manual-only; using
 **Trigger Context** to carry declared input.
 
 **Trigger Payload** *(runtime; on a Workflow Run)*:
-The **validated, trigger-agnostic** input a firing hands the Run — conforms to
+The **validated, trigger-agnostic** input a firing hands the Run — the caller's
+fields plus the contract's defaults for the ones they omitted. It conforms to
 the Workflow's **Trigger Input** contract and is read by Steps as
 `${triggerPayload.<field>}` no matter which Trigger fired.
 _Avoid_: putting transport metadata (HTTP headers, cron `firedAt`) on it — that

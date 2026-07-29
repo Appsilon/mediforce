@@ -206,7 +206,7 @@ function mapBodyToPayload(body: unknown, definition: WorkflowDefinition): Mapped
         },
       };
     }
-    return { ok: true, payload };
+    return { ok: true, payload: validation.payload };
   }
 
   // `undefined`/`null` is an absent body, not a malformed one: a contract-free
@@ -224,7 +224,7 @@ function mapBodyToPayload(body: unknown, definition: WorkflowDefinition): Mapped
         },
       };
     }
-    return { ok: true, payload: {} };
+    return { ok: true, payload: validation.payload };
   }
 
   return {

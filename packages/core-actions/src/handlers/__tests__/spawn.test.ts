@@ -19,7 +19,10 @@ function makeProcessRepo(
   // Child `triggerInput` contracts by workflow name. A name with no entry
   // resolves to a definition with no contract, so payloads pass freely — the
   // default for tests that aren't about validation.
-  contracts?: Record<string, Array<{ name: string; type?: string; required?: boolean }>>,
+  contracts?: Record<
+    string,
+    Array<{ name: string; type?: string; required?: boolean; default?: unknown }>
+  >,
 ) {
   return {
     getLatestWorkflowVersion: vi.fn().mockImplementation((_ns: string, name: string) => {
@@ -342,6 +345,34 @@ describe('createSpawnActionHandler', () => {
 
       expect(result.spawnedCount).toBe(1);
       expect(result.errorCount).toBe(0);
+    });
+
+    it('fires the child with its own contract default for an omitted field', async () => {
+      // The default is the child's, not the parent's: a spawn that never
+      // mentions `locale` still starts the child on the value its own contract
+      // declares, exactly as a manual start of that child would.
+      const trigger = makeTrigger();
+      const repo = makeProcessRepo(undefined, {
+        'child-wf': [
+          { name: 'email', type: 'string', required: true },
+          { name: 'locale', type: 'string', default: 'en-US' },
+        ],
+      });
+      const handler = createSpawnActionHandler(trigger as never, repo as never);
+
+      await handler(
+        {
+          targets: { definitionName: 'child-wf', payload: { email: 'alice@test.com' } },
+          continueOnSpawnError: true,
+        },
+        baseCtx,
+      );
+
+      expect(trigger.fireWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: { email: 'alice@test.com', locale: 'en-US' },
+        }),
+      );
     });
 
     it('reports a mistyped payload key as a spawn error instead of firing', async () => {

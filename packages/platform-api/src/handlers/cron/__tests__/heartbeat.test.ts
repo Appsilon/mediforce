@@ -288,6 +288,76 @@ describe('heartbeat handler', () => {
     expect(result.skipped[0]!.reason).toContain('region');
   });
 
+  it('fires a row with the contract default for a field its static payload omits', async () => {
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'regional-report',
+        namespace: 'team-alpha',
+        version: 1,
+        triggerInput: [
+          { name: 'region', type: 'string', required: true },
+          { name: 'format', type: 'string', required: false, default: 'pdf' },
+        ],
+      }),
+    );
+    await seedCron({
+      namespace: 'team-alpha',
+      workflowName: 'regional-report',
+      name: 'nightly-us',
+      schedule: '*/15 * * * *',
+      lastTriggeredAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      payload: { region: 'us' },
+    });
+    const fireWorkflow = vi
+      .fn()
+      .mockResolvedValue({ instanceId: 'i', status: 'created' as const });
+    const scope = createTestScope({ processRepo, instanceRepo, auditRepo, triggerRepo });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow } });
+
+    const result = await heartbeat({}, scope);
+
+    expect(result.triggered).toHaveLength(1);
+    expect(fireWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: { region: 'us', format: 'pdf' } }),
+    );
+  });
+
+  it('fires a payload-less row whose required field carries a default', async () => {
+    // A cron row can carry no static input at all, so a required field with a
+    // default used to make the workflow un-fireable from cron: the default was
+    // read only by the Start Run form, and the row skipped every tick.
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'defaulted-input',
+        namespace: 'team-alpha',
+        version: 1,
+        triggerInput: [
+          { name: 'region', type: 'string', required: true, default: 'global' },
+        ],
+      }),
+    );
+    await seedCron({
+      namespace: 'team-alpha',
+      workflowName: 'defaulted-input',
+      name: 'nightly',
+      schedule: '*/15 * * * *',
+      lastTriggeredAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    });
+    const fireWorkflow = vi
+      .fn()
+      .mockResolvedValue({ instanceId: 'i', status: 'created' as const });
+    const scope = createTestScope({ processRepo, instanceRepo, auditRepo, triggerRepo });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow } });
+
+    const result = await heartbeat({}, scope);
+
+    expect(result.skipped).toHaveLength(0);
+    expect(result.triggered).toHaveLength(1);
+    expect(fireWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: { region: 'global' } }),
+    );
+  });
+
   it('resolves against the default version when set (not latest)', async () => {
     await processRepo.saveWorkflowDefinition(
       buildWorkflowDefinition({ name: 'versioned', namespace: 'team-alpha', version: 1 }),

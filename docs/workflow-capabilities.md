@@ -274,8 +274,20 @@ of `string` / `number` / `boolean` / `date` / `datetime` / `select` /
 `multiselect` / `textarea` / `object`, plus `options` / `default` / `required`
 (it extends `StepParamSchema`). `object` holds an opaque JSON object whose
 contents the definition does not enumerate — the way a proxied third-party body
-enters a run. Validation is **total and always on**: undeclared fields are a hard
-error, and an empty/absent `triggerInput` means the payload must be empty.
+enters a run; the Start Run form renders it as a JSON textarea and blocks
+submission while the text is not a JSON object. Validation is **total and always
+on**: undeclared fields are a hard error, and an empty/absent `triggerInput`
+means the payload must be empty.
+
+A field's `default` belongs to the contract, not to the form: `validatePayload`
+fills it in for every field a firing left out (`undefined` or `null` — a supplied
+`false` / `0` / `''` is a value and survives) and returns the resolved payload
+that the manual, webhook, cron and `spawn` paths all fire with. So a `required`
+field with a `default` is satisfiable by a cron row carrying no payload, and the
+default is type-checked like any other value. See
+[`payload-validator.ts`](../packages/platform-core/src/validation/payload-validator.ts)
+and the field-by-field tour in
+[`07-trigger-varieties.wd.json`](workflow-examples/07-trigger-varieties.wd.json).
 
 ## Workflow-level fields (the envelope)
 

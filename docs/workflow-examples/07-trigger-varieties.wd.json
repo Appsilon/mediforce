@@ -1,7 +1,7 @@
 {
   "name": "tutorial-trigger-input",
   "title": "Trigger Input",
-  "description": "Demonstrates the unified Trigger Input contract (ADR-0012): triggerInput is the workflow's total input contract and every trigger validates against it, so ${triggerPayload.<field>} reads identically no matter which one fired. Start it by hand (the Start Run form renders these fields), POST {\"source\":\"edc\",\"priority\":\"urgent\"} to its webhook, or attach a cron row carrying that same object as its static payload — all three produce the same triggerPayload. Triggers are independent table resources managed via `mediforce workflow trigger-*` (ADR-0011, Issue #932).",
+  "description": "Demonstrates the unified Trigger Input contract (ADR-0012) across every field type it supports: string, number, boolean, date, datetime, select, multiselect, textarea and object. triggerInput is the workflow's total input contract and every trigger validates against it, so ${triggerPayload.<field>} reads identically no matter which one fired. Start it by hand (the Start Run form renders one widget per type, including a JSON textarea for `object`), POST {\"source\":\"edc\",\"priority\":\"urgent\",\"domains\":[\"AE\"],\"sourceRecord\":{\"subjectId\":\"S-014\"}} to its webhook, or attach a cron row carrying that same object as its static payload — all three produce the same triggerPayload, and a field the firing omits falls back to its declared `default` on every path. Triggers themselves are independent table resources managed via `mediforce workflow trigger-*` (ADR-0011, Issue #932).",
   "env": {
     "APP_BASE_URL": "{{APP_BASE_URL}}"
   },
@@ -10,13 +10,53 @@
       "name": "source",
       "type": "string",
       "required": true,
-      "description": "Data source identifier. Supplied by whichever trigger fires: the manual Start Run form, the webhook body's top-level `source` key, or the cron row's static payload."
+      "description": "Data source identifier. The only required field: a firing that omits it is rejected on every path, because no `default` covers it."
+    },
+    {
+      "name": "batchSize",
+      "type": "number",
+      "default": 100,
+      "description": "Records per batch. A number, not a numeric string — a webhook posting \"100\" is rejected. Omitted firings (a cron row, a body without the key) land on 100."
+    },
+    {
+      "name": "dryRun",
+      "type": "boolean",
+      "default": false,
+      "description": "Process without persisting. A supplied `false` is a value, not an omission, so it is never replaced by the default."
     },
     {
       "name": "priority",
-      "type": "string",
-      "required": false,
-      "description": "Processing priority: normal or urgent. Optional, so a firing may omit it — but an undeclared field is rejected on every path."
+      "type": "select",
+      "options": ["low", "normal", "urgent"],
+      "default": "normal",
+      "description": "One of `options` — anything else is rejected. Drives the routing below via `variables.record.priority`."
+    },
+    {
+      "name": "domains",
+      "type": "multiselect",
+      "options": ["AE", "DM", "EX", "LB"],
+      "default": ["AE"],
+      "description": "SDTM domains to process. An array whose every item must be in `options`; a `required` multiselect additionally rejects an empty array."
+    },
+    {
+      "name": "cutoffDate",
+      "type": "date",
+      "description": "Data cutoff, a date string any `Date.parse` accepts (`2026-03-31`). Optional and defaultless, so an omitting firing simply has no `cutoffDate` key."
+    },
+    {
+      "name": "startsAt",
+      "type": "datetime",
+      "description": "Instant to process from, validated like `date` but carrying a time (`2026-03-31T09:15:00.000Z`). The Start Run form submits it as a UTC ISO string."
+    },
+    {
+      "name": "notes",
+      "type": "textarea",
+      "description": "Free text for the run log. Same string validation as `string` — only the manual form's widget differs."
+    },
+    {
+      "name": "sourceRecord",
+      "type": "object",
+      "description": "The escape hatch for input this workflow does not enumerate — a proxied third-party body nests under this one key. Must be a JSON object: an array or a scalar is rejected, so `${triggerPayload.sourceRecord.<key>}` always has something to walk. There is deliberately no `array` type."
     }
   ],
   "roles": ["operator"],
@@ -26,13 +66,22 @@
       "name": "Record the firing",
       "type": "creation",
       "executor": "action",
-      "description": "Reads the validated input the same way for every trigger kind. `triggerPayload.*` is the contract; `triggerContext.*` is the transport escape hatch — empty on a manual start, so a step depending on it has knowingly coupled itself to one trigger kind.",
+      "description": "Reads the validated input the same way for every trigger kind. `triggerPayload.*` is the contract — a single `${...}` placeholder returns the value with its type intact, so `batchSize` stays a number and `sourceRecord` stays an object. `triggerContext.*` is the transport escape hatch, empty on a manual start, so a step depending on it has knowingly coupled itself to one trigger kind.",
       "action": {
         "kind": "reshape",
         "config": {
           "values": {
             "source": "${triggerPayload.source}",
+            "batchSize": "${triggerPayload.batchSize}",
+            "dryRun": "${triggerPayload.dryRun}",
             "priority": "${triggerPayload.priority}",
+            "domains": "${triggerPayload.domains}",
+            "cutoffDate": "${triggerPayload.cutoffDate}",
+            "startsAt": "${triggerPayload.startsAt}",
+            "notes": "${triggerPayload.notes}",
+            "sourceRecord": "${triggerPayload.sourceRecord}",
+            "subjectId": "${triggerPayload.sourceRecord.subjectId}",
+            "label": "${triggerPayload.source} batch of ${triggerPayload.batchSize}",
             "firedViaMethod": "${triggerContext.method}",
             "firedAt": "${triggerContext.firedAt}"
           }
@@ -40,21 +89,14 @@
       }
     },
     {
-      "id": "route",
-      "name": "Route by Priority",
-      "type": "decision",
-      "executor": "human",
-      "description": "Route based on triggerInput priority — urgent skips review."
-    },
-    {
       "id": "process",
       "name": "Process Data",
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "description": "Process the data source.",
+      "description": "A script step reads the trigger payload from /output/input.json, where the run's triggerPayload fields sit at the top level and previous step outputs are under `steps.<id>`.",
       "script": {
-        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst source = input.variables?.source || 'unknown';\nwriteFileSync('/output/result.json', JSON.stringify({ processed: true, source, summary: `Processed ${source}` }));\n",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst { source, batchSize, dryRun, domains } = input;\nwriteFileSync('/output/result.json', JSON.stringify({ processed: dryRun !== true, source, batchSize, domains, summary: `Processed ${source} (${domains.join(', ')}) in batches of ${batchSize}` }));\n",
         "runtime": "javascript"
       }
     },
@@ -78,10 +120,8 @@
     }
   ],
   "transitions": [
-    { "from": "record", "to": "route" },
-    { "from": "route", "to": "process", "when": "variables.priority == \"urgent\"" },
-    { "from": "route", "to": "process", "when": "else" },
-    { "from": "process", "to": "done", "when": "variables.priority == \"urgent\"" },
+    { "from": "record", "to": "process" },
+    { "from": "process", "to": "done", "when": "variables.record.priority == \"urgent\"" },
     { "from": "process", "to": "review", "when": "else" }
   ]
 }

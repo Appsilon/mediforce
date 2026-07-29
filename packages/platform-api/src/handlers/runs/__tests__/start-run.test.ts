@@ -86,6 +86,53 @@ describe('startRun handler', () => {
     ]);
   });
 
+  it('fires with a declared default for an optional field the caller omitted', async () => {
+    // The `default` belongs to the contract, not to the Start Run form: an API
+    // start that omits the field must land on the same value the prefilled form
+    // would have sent (ADR-0012).
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'defaulted',
+        namespace: 'team-alpha',
+        version: 1,
+        triggerInput: [
+          { name: 'studyId', type: 'string', required: true },
+          { name: 'region', type: 'string', required: false, default: 'global' },
+        ],
+      }),
+    );
+    await instanceRepo.create(
+      buildProcessInstance({ id: 'inst-defaulted', namespace: 'team-alpha' }),
+    );
+
+    const fireWorkflow = vi.fn().mockResolvedValue({
+      instanceId: 'inst-defaulted',
+      status: 'created' as const,
+    });
+    const scope = createTestScope({
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+    Object.assign(scope.system, { manualTrigger: { fireWorkflow } });
+
+    await startRun(
+      {
+        namespace: 'team-alpha',
+        definitionName: 'defaulted',
+        triggerName: 'manual',
+        triggeredBy: 'u-1',
+        payload: { studyId: 'S-1' },
+      },
+      scope,
+    );
+
+    expect(fireWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: { studyId: 'S-1', region: 'global' } }),
+    );
+  });
+
   it('throws NotFoundError when the definition name is unknown', async () => {
     const fireWorkflow = vi.fn();
     const scope = createTestScope({

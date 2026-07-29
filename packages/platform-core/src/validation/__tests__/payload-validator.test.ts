@@ -159,6 +159,32 @@ describe('validatePayload', () => {
     expect(result.valid).toBe(true);
   });
 
+  it('rejects a non-string datetime', () => {
+    const result = validatePayload(
+      { startsAt: 1718700000000 },
+      [field({ name: 'startsAt', type: 'datetime' })],
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]!.message).toMatch(/datetime string/);
+  });
+
+  it('rejects an unparseable datetime string', () => {
+    const result = validatePayload(
+      { startsAt: 'tomorrow-ish' },
+      [field({ name: 'startsAt', type: 'datetime' })],
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]!.message).toMatch(/not a valid datetime/);
+  });
+
+  it('accepts a valid ISO datetime', () => {
+    const result = validatePayload(
+      { startsAt: '2026-06-18T09:15:00.000Z' },
+      [field({ name: 'startsAt', type: 'datetime' })],
+    );
+    expect(result.valid).toBe(true);
+  });
+
   it('collects multiple errors', () => {
     const result = validatePayload(
       { extra: 'x' },
@@ -238,6 +264,73 @@ describe('validatePayload', () => {
       const result = validatePayload({ entry: null }, opaque);
       expect(result.valid).toBe(false);
       expect(result.errors[0]!.message).toMatch(/required/);
+    });
+  });
+
+  // A `default` belongs to the contract, not to the manual form that used to be
+  // the only thing reading it — a webhook, cron row or spawn that omits the
+  // field must land on the same value the Start Run form would have prefilled.
+  describe('defaults', () => {
+    it('fills an absent field from its default', () => {
+      const result = validatePayload({}, [field({ name: 'region', default: 'eu' })]);
+      expect(result.valid).toBe(true);
+      expect(result.payload).toEqual({ region: 'eu' });
+    });
+
+    it('satisfies a required field that has a default', () => {
+      const result = validatePayload({}, [
+        field({ name: 'region', required: true, default: 'eu' }),
+      ]);
+      expect(result.valid).toBe(true);
+      expect(result.payload).toEqual({ region: 'eu' });
+    });
+
+    it('lets a supplied value win over the default', () => {
+      const result = validatePayload({ region: 'us' }, [field({ name: 'region', default: 'eu' })]);
+      expect(result.payload).toEqual({ region: 'us' });
+    });
+
+    it('keeps a supplied falsy value instead of the default', () => {
+      const result = validatePayload(
+        { dryRun: false, retries: 0 },
+        [
+          field({ name: 'dryRun', type: 'boolean', default: true }),
+          field({ name: 'retries', type: 'number', default: 3 }),
+        ],
+      );
+      expect(result.valid).toBe(true);
+      expect(result.payload).toEqual({ dryRun: false, retries: 0 });
+    });
+
+    it('treats an explicit null as absent and applies the default', () => {
+      const result = validatePayload({ region: null }, [field({ name: 'region', default: 'eu' })]);
+      expect(result.valid).toBe(true);
+      expect(result.payload).toEqual({ region: 'eu' });
+    });
+
+    it('validates the default like any other value, so a mistyped one is caught', () => {
+      const result = validatePayload({}, [field({ name: 'count', type: 'number', default: 'ten' })]);
+      expect(result.valid).toBe(false);
+      expect(result.errors[0]!.field).toBe('count');
+      expect(result.errors[0]!.message).toMatch(/number/);
+    });
+
+    it('leaves a defaultless absent field out of the payload', () => {
+      const result = validatePayload({ region: 'eu' }, [
+        field({ name: 'region' }),
+        field({ name: 'note' }),
+      ]);
+      expect(result.valid).toBe(true);
+      expect(result.payload).toEqual({ region: 'eu' });
+    });
+
+    it('returns the payload unchanged when no field declares a default', () => {
+      const payload = { region: 'eu', tags: ['safety'] };
+      const result = validatePayload(payload, [
+        field({ name: 'region' }),
+        field({ name: 'tags', type: 'multiselect', options: ['safety'] }),
+      ]);
+      expect(result.payload).toEqual(payload);
     });
   });
 

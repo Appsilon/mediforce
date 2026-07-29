@@ -8,14 +8,21 @@ export interface PayloadValidationError {
 export interface PayloadValidationResult {
   valid: boolean;
   errors: PayloadValidationError[];
+  /** The payload the firing should actually carry: what the caller supplied
+   *  plus the declared `default` of every field they left out. Callers fire
+   *  with this, never with their own input — a `default` belongs to the
+   *  contract, so a webhook, cron row or spawn that omits the field must land
+   *  on the same value the Start Run form prefills. */
+  payload: Record<string, unknown>;
 }
 
 export function validatePayload(
-  payload: Record<string, unknown>,
+  rawPayload: Record<string, unknown>,
   triggerInput: TriggerInputField[],
 ): PayloadValidationResult {
   const errors: PayloadValidationError[] = [];
   const declaredNames = new Set(triggerInput.map((f) => f.name));
+  const payload = applyDefaults(rawPayload, triggerInput);
 
   for (const key of Object.keys(payload)) {
     if (!declaredNames.has(key)) {
@@ -45,7 +52,28 @@ export function validatePayload(
     }
   }
 
-  return { valid: errors.length === 0, errors };
+  return { valid: errors.length === 0, errors, payload };
+}
+
+/** Fill in the `default` of every declared field the caller left out. `null` is
+ *  absent, the same way the required check reads it, so a caller clearing
+ *  a field gets the default rather than a hole. A supplied `false` / `0` / `''`
+ *  is a value and survives. The result is validated like any other payload, so
+ *  a default that violates its own declared type fails loudly at fire time. */
+function applyDefaults(
+  payload: Record<string, unknown>,
+  triggerInput: TriggerInputField[],
+): Record<string, unknown> {
+  const resolved = { ...payload };
+
+  for (const field of triggerInput) {
+    const value = resolved[field.name];
+    if ((value === undefined || value === null) && field.default !== undefined) {
+      resolved[field.name] = field.default;
+    }
+  }
+
+  return resolved;
 }
 
 function validateFieldType(
@@ -75,11 +103,12 @@ function validateFieldType(
       return null;
 
     case 'date':
+    case 'datetime':
       if (typeof value !== 'string') {
-        return { field: name, message: `'${name}' must be a date string` };
+        return { field: name, message: `'${name}' must be a ${type} string` };
       }
       if (isNaN(Date.parse(value))) {
-        return { field: name, message: `'${name}' is not a valid date` };
+        return { field: name, message: `'${name}' is not a valid ${type}` };
       }
       return null;
 

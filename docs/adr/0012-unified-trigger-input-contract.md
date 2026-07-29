@@ -33,6 +33,13 @@ contract is uniform.
   that key. `triggerContext` is transport-only and never carries input. The
   webhook adapter strips `authorization`, `proxy-authorization`, `cookie`, and
   `x-api-key` before persisting the remaining headers in the context.
+- **A field's `default` belongs to the contract, not to the form.** `validatePayload`
+  fills the declared default in for every field a firing omitted (`undefined`/`null`;
+  a supplied `false` / `0` / `''` is a value) and returns the resolved payload every
+  path fires with — otherwise "the same contract for every trigger" would still mean
+  a different payload per trigger, since only the manual form ever read `default`.
+  A `required` field with a `default` is therefore satisfiable by a payload-less
+  cron row, and a default that violates its own declared type fails at fire time.
 - **Cron carries a static payload.** Because cron has no caller, each cron Trigger
   row holds an optional `payload` in its config (editable per row from UI/CLI, so
   two schedules can fire different payloads). It is validated at attach/update time

@@ -151,6 +151,50 @@ describe('WebhookRouter', () => {
     expect(instance?.currentStepId).toBe('echo');
   });
 
+  it('fills in a declared default for a field the body omits', async () => {
+    // The `default` belongs to the contract, so a sender who leaves the field
+    // out lands on the same value a manual firing would (ADR-0012).
+    const withDefault: WorkflowDefinition = {
+      ...definition,
+      name: 'defaulted-summaries',
+      triggerInput: [
+        { name: 'summary', type: 'object', required: true },
+        { name: 'label', type: 'string', required: false, default: 'nightly' },
+      ],
+    };
+    await processRepo.saveWorkflowDefinition(withDefault);
+    await triggerRepo.create(webhookRow({ workflowName: 'defaulted-summaries' }));
+
+    const instanceRepo = new InMemoryProcessInstanceRepository();
+    router = new WebhookRouter(
+      new WorkflowEngine(
+        processRepo,
+        instanceRepo,
+        new InMemoryAuditRepository(),
+        undefined,
+        undefined,
+        undefined,
+        new InMemoryHumanTaskRepository(),
+        new InMemoryCoworkSessionRepository(),
+      ),
+      processRepo,
+      triggerRepo,
+    );
+
+    const result = await router.route({
+      namespace: 'examples',
+      workflowName: 'defaulted-summaries',
+      suffix: '/execution-summaries',
+      method: 'POST',
+      body: validBody,
+    });
+    expect(result.status).toBe(202);
+    if (result.status !== 202) return;
+
+    const instance = await instanceRepo.getById(result.runId);
+    expect(instance?.triggerPayload).toEqual({ ...validBody, label: 'nightly' });
+  });
+
   it('rejects a body carrying a field the contract does not declare', async () => {
     const result = await router.route({
       namespace: 'examples',
