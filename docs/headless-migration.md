@@ -912,7 +912,7 @@ interface RunKicker {
   });
   ```
 
-  (Corrected after the fact: the Phase-3 snippet originally included `newExecutionId` in `outputSnapshot`. The field was affirmatively false — `engine.retryStep` creates no new execution, so the value was always the pre-retry failed execution's id, identical to `inputSnapshot.previousExecutionId`. Removed from the handler; forward linkage is tracked in [#832](https://github.com/Appsilon/mediforce/issues/832).)
+  (Corrected after the fact: `newExecutionId` has been removed from `outputSnapshot` in both the snippet above and the handler. The field was affirmatively false — `engine.retryStep` creates no new execution, so the value was always the pre-retry failed execution's id, identical to `inputSnapshot.previousExecutionId`. Forward linkage is tracked in [#832](https://github.com/Appsilon/mediforce/issues/832).)
 
 - **`unclaimTask` endpoint — NOT added.** PR501 deleted `unclaimTask` Server Action + `UnclaimButton` component as dead code (zero source callers). Phase 3 does not introduce a `POST /api/tasks/:taskId/unclaim` endpoint. If a future use case lands, opens its own ticket.
 

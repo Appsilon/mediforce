@@ -239,6 +239,7 @@ export async function seedPostgresNamespace(
       ...data.completedSupplyChainStepExecutions,
       ...data.stepFailureStepExecutions,
       ...data.retryTestStepExecutions,
+      ...data.retryAuditStepExecutions,
       ...data.agentEscalatedCancelStepExecutions,
       ...data.workflowRunStepExecutions,
     };
