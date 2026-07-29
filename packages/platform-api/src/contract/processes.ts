@@ -101,6 +101,11 @@ export const StepEntrySchema = z.object({
   input: z.record(z.string(), z.unknown()).nullable(),
   output: z.record(z.string(), z.unknown()).nullable(),
   executions: z.array(StepExecutionSchema),
+  /** Tool grants configured on the step beyond the executor's default set
+   *  (e.g. `WebFetch`, `WebSearch`). Only meaningful for `executorType:
+   *  'agent'` steps whose plugin honours an allow-list (claude-code-agent);
+   *  undefined otherwise. */
+  allowedTools: z.array(z.string()).optional(),
 });
 
 export const GetProcessStepsInputSchema = z.object({

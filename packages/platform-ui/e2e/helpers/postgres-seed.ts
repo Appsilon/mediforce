@@ -1,6 +1,13 @@
 import postgres from 'postgres';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { TEST_ORG_HANDLE } from './constants';
-import { buildSeedData } from './seed-data';
+import { buildSeedData, AGENT_LOG_FILENAME, AGENT_LOG_FIXTURE_CONTENT } from './seed-data';
+
+// Matches LOGS_DIR in packages/platform-ui/src/app/api/step-logs/route.ts —
+// the AgentLogViewer pipeline reads step logs from this local tmp directory.
+const STEP_LOGS_DIR = join(tmpdir(), 'mediforce-step-logs');
 
 /**
  * Postgres seed for the full E2E fixture (ADR-0001 §5.2 #9), invoked
@@ -514,6 +521,29 @@ export async function seedPostgresNamespace(
         ON CONFLICT (workspace, id) DO NOTHING
       `;
     }
+
+    // ── 14. agent_events (+ the log file they point at) ─────────────────────
+    // Real AgentLogViewer pipeline, not a mocked UI: the event announces a
+    // log file path exactly like a live run does, and /api/step-logs reads
+    // the file from disk at request time — so it has to actually exist here.
+    for (const [id, event] of Object.entries(data.agentEvents)) {
+      await sql`
+        INSERT INTO agent_events (
+          id, process_instance_id, step_id, type, payload, sequence, timestamp
+        ) VALUES (
+          ${id},
+          ${event.processInstanceId as string},
+          ${event.stepId as string},
+          ${event.type as string},
+          ${sql.json(event.payload as unknown)},
+          ${event.sequence as number},
+          ${event.timestamp as string}
+        )
+        ON CONFLICT (id) DO NOTHING
+      `;
+    }
+    await mkdir(STEP_LOGS_DIR, { recursive: true });
+    await writeFile(join(STEP_LOGS_DIR, AGENT_LOG_FILENAME), AGENT_LOG_FIXTURE_CONTENT, 'utf-8');
   } finally {
     await sql.end({ timeout: 5 });
   }

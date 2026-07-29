@@ -36,6 +36,20 @@ test.describe('Agent Oversight Journey', () => {
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('href', new RegExp(`/agents/${RUN_COMPLETED_1_ID}`));
 
+    // Permissions column: real tool grant read from the step's config in
+    // the process instance's pinned workflow-definition version (a live
+    // join via mediforce.processes.getSteps), not a hardcoded display.
+    await expect(row.getByText('WebFetch')).toBeVisible({ timeout: 10_000 });
+
+    // Log column: clicking "View" expands the right panel with the real
+    // execution log (seeded via an agent activity log AgentEvent + a fixture
+    // file on disk — the same pipeline a live run uses, not a mocked panel).
+    await row.getByRole('button', { name: 'View' }).click();
+    await expect(page.getByText('Agent Log')).toBeVisible();
+    await expect(page.getByText('Reviewed 12 vendor submissions. No issues detected.')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('grep -c missing vendor-submissions.csv')).toBeVisible();
+    await page.getByTitle('Close panel').click();
+
     // Navigate to agent run detail by clicking the link
     await link.click();
     await page.waitForURL(`**/${TEST_ORG_HANDLE}/agents/${RUN_COMPLETED_1_ID}`, { timeout: 20_000 });
