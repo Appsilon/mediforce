@@ -840,15 +840,26 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
       for (const n of prev) positioned.set(n.id, n.position);
 
       const newIds = computedNodes.filter((n) => !prevById.has(n.id)).map((n) => n.id);
+      // Stagger new nodes that would otherwise land on the same anchor (multiple
+      // blocks added below one parent, or unconnected blocks that all default to
+      // buildLayout's origin) so each lands beside the previous instead of on top.
+      const NODE_STAGGER_X = NODE_WIDTH + 40;
+      const placedForAnchor = new Map<string, number>();
       for (const id of newIds) {
         const parents = parentOf.get(id) ?? [];
         const parentPos = parents.length === 1 ? positioned.get(parents[0]) : undefined;
+        const anchorKey = parents.length === 1 ? parents[0] : '__no-parent__';
+        const siblingIdx = placedForAnchor.get(anchorKey) ?? 0;
+        placedForAnchor.set(anchorKey, siblingIdx + 1);
         if (parentPos) {
           const parentHeight = heightById.get(parents[0]) ?? NODE_INNER_HEIGHT;
-          positioned.set(id, { x: parentPos.x, y: parentPos.y + parentHeight + ROW_GAP });
+          positioned.set(id, {
+            x: parentPos.x + siblingIdx * NODE_STAGGER_X,
+            y: parentPos.y + parentHeight + ROW_GAP,
+          });
         } else {
           const fresh = computedNodes.find((n) => n.id === id);
-          if (fresh) positioned.set(id, fresh.position);
+          if (fresh) positioned.set(id, { x: fresh.position.x + siblingIdx * NODE_STAGGER_X, y: fresh.position.y });
         }
       }
 
