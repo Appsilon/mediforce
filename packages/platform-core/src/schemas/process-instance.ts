@@ -19,7 +19,14 @@ export const ProcessInstanceSchema = z.object({
   currentStepId: z.string().nullable(),
   variables: z.record(z.string(), z.unknown()),
   triggerType: z.enum(['manual', 'webhook', 'cron']),
+  /** The firing's **validated** input — conforms to the definition's
+   *  `triggerInput` contract whichever trigger fired it (ADR-0012). */
   triggerPayload: z.record(z.string(), z.unknown()),
+  /** Transport metadata of the firing (webhook `headers`/`query`/`method`/`path`,
+   *  cron `firedAt`/`schedule`). Carries no declared input. Optional: manual
+   *  starts have no transport, and runs created before ADR-0012 have no column
+   *  value — both parse as `undefined` rather than needing a backfill. */
+  triggerContext: z.record(z.string(), z.unknown()).optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   createdBy: z.string().min(1),

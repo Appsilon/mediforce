@@ -104,6 +104,16 @@ function validateFieldType(
       }
       return null;
 
+    case 'object':
+      // Opaque by design (ADR-0012): the Definition declares "a JSON object
+      // lands here" and nothing about its contents. Arrays are rejected so
+      // `${triggerPayload.<name>.<key>}` always has something to walk; an
+      // opaque array nests under an object field instead.
+      if (typeof value !== 'object' || Array.isArray(value)) {
+        return { field: name, message: `'${name}' must be a JSON object` };
+      }
+      return null;
+
     default:
       return null;
   }

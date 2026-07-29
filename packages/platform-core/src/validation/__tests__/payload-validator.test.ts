@@ -205,4 +205,54 @@ describe('validatePayload', () => {
       expect(result.errors.length).toBe(3);
     });
   });
+
+  // ADR-0012: `object` is how an un-enumerable body (a proxied third-party JSON
+  // blob) enters a Run without a second, unvalidated input channel.
+  describe('object fields', () => {
+    const opaque = [field({ name: 'entry', type: 'object', required: true })];
+
+    it('accepts an arbitrary nested JSON object', () => {
+      const result = validatePayload(
+        { entry: { meal: 'lunch', items: [{ kcal: 500 }], nested: { deep: true } } },
+        opaque,
+      );
+      expect(result.valid).toBe(true);
+    });
+
+    it('accepts an empty object', () => {
+      expect(validatePayload({ entry: {} }, opaque).valid).toBe(true);
+    });
+
+    it('rejects an array — it has no keys to walk', () => {
+      const result = validatePayload({ entry: [1, 2] }, opaque);
+      expect(result.valid).toBe(false);
+      expect(result.errors[0]!.message).toMatch(/JSON object/);
+    });
+
+    it('rejects a scalar', () => {
+      expect(validatePayload({ entry: 'text' }, opaque).valid).toBe(false);
+      expect(validatePayload({ entry: 7 }, opaque).valid).toBe(false);
+    });
+
+    it('treats null as absent, so a required object field is reported missing', () => {
+      const result = validatePayload({ entry: null }, opaque);
+      expect(result.valid).toBe(false);
+      expect(result.errors[0]!.message).toMatch(/required/);
+    });
+  });
+
+  // The contract is *total*: an empty triggerInput means "this workflow takes no
+  // input", not "anything goes". Every trigger relies on this to reject a
+  // firing that carries fields the workflow never declared.
+  describe('empty contract', () => {
+    it('accepts an empty payload', () => {
+      expect(validatePayload({}, []).valid).toBe(true);
+    });
+
+    it('rejects any field at all', () => {
+      const result = validatePayload({ anything: 1 }, []);
+      expect(result.valid).toBe(false);
+      expect(result.errors[0]!.field).toBe('anything');
+    });
+  });
 });

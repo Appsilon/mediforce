@@ -109,6 +109,45 @@ function contract(
       expect(fetched?.variables).toEqual({ caseId: 'case-99', priority: 'high' });
     });
 
+    // ADR-0012: `triggerPayload` is the validated declared input and
+    // `triggerContext` the transport metadata. They live in separate columns and
+    // must round-trip independently — a dropped mapping in `toInstance`/`create`
+    // would silently strip `${triggerContext.*}` from every run.
+    it('round-trips triggerContext alongside triggerPayload', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      const instance = instanceFor('ws-1', {
+        triggerType: 'webhook',
+        triggerPayload: { summary: { nested: true } },
+        triggerContext: {
+          headers: { 'x-trace': 'abc' },
+          query: {},
+          method: 'POST',
+          path: '/intake',
+        },
+      });
+      await repo.create(instance);
+
+      const fetched = await repo.getById(instance.id);
+      expect(fetched?.triggerPayload).toEqual({ summary: { nested: true } });
+      expect(fetched?.triggerContext).toEqual({
+        headers: { 'x-trace': 'abc' },
+        query: {},
+        method: 'POST',
+        path: '/intake',
+      });
+    });
+
+    it('leaves triggerContext undefined for a firing with no transport', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      const instance = instanceFor('ws-1', { triggerType: 'manual' });
+      await repo.create(instance);
+
+      const fetched = await repo.getById(instance.id);
+      expect(fetched?.triggerContext).toBeUndefined();
+    });
+
     it('getById returns null for unknown id', async () => {
       const { repo } = await factory();
       expect(await repo.getById(`inst-missing-${randomUUID()}`)).toBeNull();

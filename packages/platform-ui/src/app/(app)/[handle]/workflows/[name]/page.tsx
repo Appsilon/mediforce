@@ -188,12 +188,31 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const [activeTab, setActiveTab] = React.useState(initialTab);
   const [showArchivedRuns, setShowArchivedRuns] = React.useState(false);
 
-  const { versions, loading: versionsLoading } = useWorkflowVersions(decodedName, handle);
+  const {
+    versions,
+    defaultVersion,
+    loading: versionsLoading,
+  } = useWorkflowVersions(decodedName, handle);
   // The page header reads the full latest definition (visibility, steps[], repo,
   // url, copiedFrom) which the metadata summary does not carry. Fetch it once
   // per workflow.
   const latestVersionNumber = versions[0]?.version ?? null;
   const { definition: latest } = useWorkflowVersion(decodedName, handle, latestVersionNumber);
+  // The Triggers tab needs the contract a *firing* will be validated against,
+  // which is the version a trigger resolves — the default when set, else the
+  // newest live one (server-side `resolveRunnableVersion`). Reading the latest
+  // version instead would label the cron payload editor with fields the server
+  // then rejects, whenever the default is pinned behind the head.
+  const runnableVersionNumber =
+    versions.find((version) => version.version === defaultVersion && version.archived !== true)
+      ?.version
+    ?? versions.find((version) => version.archived !== true)?.version
+    ?? null;
+  const { definition: runnable, loading: runnableLoading } = useWorkflowVersion(
+    decodedName,
+    handle,
+    runnableVersionNumber,
+  );
   // Live trigger rows (enabled/schedule) drive the header summary, so stopping
   // a cron trigger in the Triggers tab immediately updates the header.
   const { cronTriggers, triggers, loading: triggersLoading } = useWorkflowTriggers(decodedName, handle);
@@ -565,7 +584,12 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
         {/* Triggers tab */}
         <Tabs.Content value="triggers" className="flex-1 p-6">
           <div className="max-w-2xl">
-            <TriggersPanel handle={handle} definitionName={decodedName} />
+            <TriggersPanel
+              handle={handle}
+              definitionName={decodedName}
+              triggerInput={runnable?.triggerInput ?? []}
+              contractLoading={versionsLoading || runnableLoading}
+            />
           </div>
         </Tabs.Content>
 

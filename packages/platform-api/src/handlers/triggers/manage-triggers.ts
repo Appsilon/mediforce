@@ -4,7 +4,7 @@ import type {
   TriggerResource,
   WebhookTriggerResource,
 } from '@mediforce/platform-core';
-import { WebhookTriggerConfigSchema } from '@mediforce/platform-core';
+import { WebhookTriggerConfigSchema, validatePayload } from '@mediforce/platform-core';
 import { validateCronSchedule } from '@mediforce/workflow-engine';
 import { toPortableTrigger } from '@mediforce/platform-core';
 import type { PortableTrigger } from '@mediforce/platform-core';
@@ -28,6 +28,7 @@ import type {
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
+import { resolveRunnableVersion } from '../workflows/_resolve-runnable-version';
 
 function labelFor(type: TriggerResource['type']): string {
   if (type === 'cron') return 'Cron';
@@ -39,6 +40,44 @@ function assertValidSchedule(schedule: string): void {
   const validation = validateCronSchedule(schedule);
   if (!validation.valid) {
     throw new ValidationError(`Invalid cron schedule: ${validation.error}`);
+  }
+}
+
+/**
+ * Attach-time half of ADR-0012's two-stage cron payload check: a cron row whose
+ * static payload violates the workflow's `triggerInput` is rejected on write, so
+ * the failure lands on the person editing the trigger instead of surfacing hours
+ * later as a silently skipped tick.
+ *
+ * Validated against the version the heartbeat would actually resolve — same
+ * helper, so the two stages can't disagree about which contract applies. A
+ * workflow with no resolvable version can still take a trigger (rows outlive
+ * archived versions), so an unresolvable target skips the check and leaves the
+ * verdict to fire time.
+ */
+async function assertPayloadMatchesContract(
+  scope: CallerScope,
+  namespace: string,
+  definitionName: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const resolution = await resolveRunnableVersion(scope, namespace, definitionName);
+  if (!resolution.ok) return;
+
+  const validation = validatePayload(payload, resolution.def.triggerInput ?? []);
+  if (!validation.valid) {
+    // A payload-less row on an input-requiring workflow lands here too, and the
+    // bare "required field missing" reads like a bug rather than "you owe this
+    // trigger a payload" — so say what to do about it.
+    const hint =
+      Object.keys(payload).length === 0
+        ? ' — a cron trigger on a workflow that requires input must carry a payload'
+        : '';
+    throw new ValidationError(
+      `Trigger payload does not match the triggerInput of '${definitionName}' ` +
+        `v${String(resolution.def.version)}: ` +
+        `${validation.errors.map((error) => error.message).join('; ')}${hint}`,
+    );
   }
 }
 
@@ -163,13 +202,24 @@ export async function createTrigger(
       throw new ValidationError('A cron trigger does not take a method or path');
     }
     assertValidSchedule(input.schedule as string);
+    await assertPayloadMatchesContract(
+      scope,
+      input.namespace,
+      input.definitionName,
+      input.payload ?? {},
+    );
     const cron: CronTriggerResource = {
       type: 'cron',
       namespace: input.namespace,
       workflowName: input.definitionName,
       name: input.triggerName,
       enabled: input.enabled,
-      config: { schedule: input.schedule as string },
+      config: {
+        schedule: input.schedule as string,
+        // Omitted rather than stored as `{}` when absent, so a payload-less row
+        // is byte-identical to one written before ADR-0012.
+        ...(input.payload === undefined ? {} : { payload: input.payload }),
+      },
       // Anchor the fire cursor to creation time so the schedule starts at its next
       // slot rather than back-firing history from the workflow's createdAt on the
       // next heartbeat.
@@ -181,6 +231,11 @@ export async function createTrigger(
   } else if (input.type === 'webhook') {
     if (hasSchedule) {
       throw new ValidationError('A webhook trigger does not take a schedule');
+    }
+    if (input.payload !== undefined) {
+      throw new ValidationError(
+        'A webhook trigger does not take a payload — its input comes from the request body',
+      );
     }
     // The catch-all endpoint dispatches POST only, so POST is the sole method a
     // webhook trigger can ever fire on — default it and reject anything else,
@@ -221,6 +276,11 @@ export async function createTrigger(
     if (hasWebhookConfig) {
       throw new ValidationError('A manual trigger does not take a method or path');
     }
+    if (input.payload !== undefined) {
+      throw new ValidationError(
+        'A manual trigger does not take a payload — the person starting the run supplies it',
+      );
+    }
     const manual: ManualTriggerResource = {
       type: 'manual',
       namespace: input.namespace,
@@ -253,6 +313,7 @@ export async function createTrigger(
       triggerName: input.triggerName,
       type: input.type,
       ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+      ...(input.payload === undefined ? {} : { payload: input.payload }),
       ...(input.method === undefined ? {} : { method: input.method }),
       ...(input.path === undefined ? {} : { path: input.path }),
       enabled: input.enabled,
@@ -268,35 +329,84 @@ export async function createTrigger(
   return { trigger: created, webhookUrl };
 }
 
+/**
+ * Edit a cron row's config — its schedule, its static payload, or both.
+ *
+ * `config` is written whole (it is one jsonb column), so an omitted field is
+ * carried over from the current row rather than dropped: updating only the
+ * payload must not silently erase the schedule.
+ */
 export async function updateTrigger(
   input: UpdateTriggerInput,
   scope: CallerScope,
 ): Promise<UpdateTriggerOutput> {
-  assertValidSchedule(input.schedule);
-  await loadTriggerOr404(scope, input.namespace, input.definitionName, input.triggerName);
+  if (input.schedule === undefined && input.payload === undefined) {
+    throw new ValidationError('Nothing to update — pass a schedule, a payload, or both');
+  }
+  if (input.schedule !== undefined) assertValidSchedule(input.schedule);
+
+  const current = await loadTriggerOr404(
+    scope,
+    input.namespace,
+    input.definitionName,
+    input.triggerName,
+  );
+  // Only cron rows carry an editable config: a webhook's `path` is its identity
+  // (rebinding it is a delete + create) and a manual row has no config at all.
+  // The pre-ADR-0012 handler took `schedule` unconditionally and would happily
+  // stamp one onto a webhook row, corrupting it.
+  if (current.type !== 'cron') {
+    throw new ValidationError(
+      `Only cron triggers have an editable schedule or payload; '${input.triggerName}' is ${current.type}`,
+    );
+  }
+  if (input.payload !== undefined) {
+    await assertPayloadMatchesContract(
+      scope,
+      input.namespace,
+      input.definitionName,
+      input.payload,
+    );
+  }
+
+  const schedule = input.schedule ?? current.config.schedule;
+  // `payload: {}` is a deliberate clear, so drop the key entirely rather than
+  // storing an empty object — that keeps a cleared row identical to one that
+  // never had a payload, including in the portable export.
+  const payload = input.payload === undefined ? current.config.payload : input.payload;
+  const hasPayload = payload !== undefined && Object.keys(payload).length > 0;
 
   const now = new Date().toISOString();
   const trigger = await scope.triggers.update(
     input.namespace,
     input.definitionName,
     input.triggerName,
-    { config: { schedule: input.schedule }, updatedAt: now },
+    {
+      config: { schedule, ...(hasPayload ? { payload } : {}) },
+      updatedAt: now,
+    },
   );
+
+  const changed = [
+    ...(input.schedule === undefined ? [] : [`schedule set to '${schedule}'`]),
+    ...(input.payload === undefined ? [] : [hasPayload ? 'payload updated' : 'payload cleared']),
+  ].join(', ');
 
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
     ...actor,
     action: 'cron.trigger.updated',
-    description: `Cron trigger '${input.triggerName}' schedule set to '${input.schedule}' for '${input.definitionName}'`,
+    description: `Cron trigger '${input.triggerName}' ${changed} for '${input.definitionName}'`,
     timestamp: now,
     inputSnapshot: {
       namespace: input.namespace,
       definitionName: input.definitionName,
       triggerName: input.triggerName,
-      schedule: input.schedule,
+      ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+      ...(input.payload === undefined ? {} : { payload: input.payload }),
     },
-    outputSnapshot: { schedule: input.schedule },
-    basis: 'Trigger schedule updated via API',
+    outputSnapshot: { schedule, ...(hasPayload ? { payload } : {}) },
+    basis: 'Trigger config updated via API',
     entityType: 'trigger',
     entityId: `${input.definitionName}/${input.triggerName}`,
     namespace: input.namespace,
@@ -383,7 +493,12 @@ function createInputFor(input: ImportTriggersInput, entry: PortableTrigger): Cre
     enabled: entry.enabled,
   };
   if (entry.type === 'cron') {
-    return { ...common, type: 'cron', schedule: entry.schedule };
+    return {
+      ...common,
+      type: 'cron',
+      schedule: entry.schedule,
+      ...(entry.payload === undefined ? {} : { payload: entry.payload }),
+    };
   }
   if (entry.type === 'webhook') {
     return { ...common, type: 'webhook', method: entry.method, path: entry.path };
@@ -433,7 +548,19 @@ export async function importTriggers(
 ): Promise<ImportTriggersOutput> {
   await assertWorkflowExists(scope, input.namespace, input.definitionName);
   for (const entry of input.triggers) {
-    if (entry.type === 'cron') assertValidSchedule(entry.schedule);
+    if (entry.type === 'cron') {
+      assertValidSchedule(entry.schedule);
+      // A file authored against a different workflow can carry a payload this
+      // one's contract rejects. Pre-checked here for the same reason as the
+      // schedule: import is non-transactional, so a failure discovered halfway
+      // through leaves the earlier entries behind as a partial write.
+      await assertPayloadMatchesContract(
+        scope,
+        input.namespace,
+        input.definitionName,
+        entry.payload ?? {},
+      );
+    }
     if (entry.type === 'webhook' && entry.method !== 'POST') {
       throw new ValidationError(
         `A webhook trigger only accepts POST (the endpoint dispatches POST only), got ${entry.method}`,

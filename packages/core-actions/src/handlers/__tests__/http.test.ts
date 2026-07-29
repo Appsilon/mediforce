@@ -6,7 +6,8 @@ const baseCtx: ActionContext = {
   stepId: 'echo',
   processInstanceId: 'inst-1',
   sources: {
-    triggerPayload: { body: { hello: 'world' }, method: 'POST' },
+    triggerPayload: { entry: { hello: 'world' } },
+    triggerContext: { method: 'POST' },
     steps: {},
     variables: {},
     secrets: {},
@@ -36,7 +37,7 @@ describe('httpActionHandler', () => {
       {
         method: 'POST',
         url: 'http://localhost:9099/anything',
-        body: '${triggerPayload.body}',
+        body: '${triggerPayload.entry}',
       },
       baseCtx,
     );

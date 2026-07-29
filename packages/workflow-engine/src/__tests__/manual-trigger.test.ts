@@ -11,7 +11,7 @@ import {
   ManualTrigger,
   ManualTriggerNotDeclaredError,
 } from '../index';
-import type { WorkflowTriggerContext } from '../index';
+import type { WorkflowFiring } from '../index';
 
 const linearDef: WorkflowDefinition = {
   name: 'linear-process',
@@ -89,8 +89,8 @@ describe('ManualTrigger', () => {
   });
 
   function makeContext(
-    overrides: Partial<WorkflowTriggerContext> = {},
-  ): WorkflowTriggerContext {
+    overrides: Partial<WorkflowFiring> = {},
+  ): WorkflowFiring {
     return {
       namespace: 'test',
       definitionName: 'linear-process',

@@ -146,6 +146,41 @@ describe('startRun handler', () => {
     expect(fireWorkflow).not.toHaveBeenCalled();
   });
 
+  it('rejects a non-empty payload when the WD declares no triggerInput', async () => {
+    // The contract is total (ADR-0012): an empty/absent triggerInput means the
+    // workflow takes no input, so validation runs unconditionally. The old
+    // `triggerInput.length > 0` guard let this through, which is what allowed
+    // each trigger to invent its own payload shape.
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'no-input', namespace: 'team-alpha', version: 1 }),
+    );
+
+    const fireWorkflow = vi.fn();
+    const scope = createTestScope({
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+    Object.assign(scope.system, { manualTrigger: { fireWorkflow } });
+
+    const err = await startRun(
+      {
+        namespace: 'team-alpha',
+        definitionName: 'no-input',
+        triggerName: 'manual',
+        triggeredBy: 'u-1',
+        payload: { stray: 'field' },
+      },
+      scope,
+    ).catch((e) => e);
+
+    expect(err).toBeInstanceOf(HandlerError);
+    expect((err as HandlerError).code).toBe('validation');
+    expect((err as HandlerError).details).toMatchObject([{ field: 'stray' }]);
+    expect(fireWorkflow).not.toHaveBeenCalled();
+  });
+
   it('hides a private foreign-namespace WD from a non-member caller (anti-enum 404)', async () => {
     // The authorized WD wrapper returns null for a private WD outside the
     // caller's namespaces. The handler maps that null to NotFoundError, so

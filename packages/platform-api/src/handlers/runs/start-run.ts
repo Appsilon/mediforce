@@ -44,11 +44,14 @@ export async function startRun(
 
   const payload = input.payload ?? {};
 
-  if (definition.triggerInput && definition.triggerInput.length > 0) {
-    const validation = validatePayload(payload, definition.triggerInput);
-    if (!validation.valid) {
-      throw new HandlerError('validation', 'Invalid payload', validation.errors);
-    }
+  // Unconditional (ADR-0012): `triggerInput` is the workflow's *total* input
+  // contract, so an empty contract means "this workflow takes no input" and a
+  // caller passing fields anyway is rejected — the same rule the webhook and
+  // cron paths now apply. The old `length > 0` guard made an empty contract mean
+  // "anything goes", which is what let each trigger invent its own payload shape.
+  const validation = validatePayload(payload, definition.triggerInput ?? []);
+  if (!validation.valid) {
+    throw new HandlerError('validation', 'Invalid payload', validation.errors);
   }
 
   let result;

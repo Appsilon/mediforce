@@ -14,10 +14,19 @@ function makeTrigger(results?: Map<string, { instanceId: string }>) {
   };
 }
 
-function makeProcessRepo(latestVersions?: Record<string, number>) {
+function makeProcessRepo(
+  latestVersions?: Record<string, number>,
+  // Child `triggerInput` contracts by workflow name. A name with no entry
+  // resolves to a definition with no contract, so payloads pass freely — the
+  // default for tests that aren't about validation.
+  contracts?: Record<string, Array<{ name: string; type?: string; required?: boolean }>>,
+) {
   return {
     getLatestWorkflowVersion: vi.fn().mockImplementation((_ns: string, name: string) => {
       return Promise.resolve(latestVersions?.[name] ?? 3);
+    }),
+    getWorkflowDefinition: vi.fn().mockImplementation((_ns: string, name: string) => {
+      return Promise.resolve({ name, triggerInput: contracts?.[name] ?? [] });
     }),
   };
 }
@@ -52,7 +61,9 @@ const baseCtx: ActionContext = {
 describe('createSpawnActionHandler', () => {
   it('spawns single target', async () => {
     const trigger = makeTrigger();
-    const repo = makeProcessRepo();
+    // The child declares the key this spawn sends — a spawn firing validates
+    // against the child's contract like any other firing (ADR-0012).
+    const repo = makeProcessRepo(undefined, { 'child-wf': [{ name: 'key', type: 'string' }] });
     const handler = createSpawnActionHandler(trigger as never, repo as never);
 
     const result = asSpawn(await handler(
@@ -102,7 +113,12 @@ describe('createSpawnActionHandler', () => {
 
   it('spawns with forEach — one child per array element', async () => {
     const trigger = makeTrigger();
-    const repo = makeProcessRepo();
+    const repo = makeProcessRepo(undefined, {
+      'gather-perspective': [
+        { name: 'userId', type: 'string' },
+        { name: 'email', type: 'string' },
+      ],
+    });
     const handler = createSpawnActionHandler(trigger as never, repo as never);
 
     const result = asSpawn(await handler(
@@ -301,5 +317,83 @@ describe('createSpawnActionHandler', () => {
 
     expect(result.errorCount).toBe(1);
     expect(result.errors[0].message).toContain('not found');
+  });
+
+  // ADR-0012: a spawned child's `triggerInput` is its total input contract, so a
+  // spawn firing is validated exactly like a manual or API start. Without this a
+  // typo'd payload key interpolated to '' inside the child while the identical
+  // payload sent to POST /api/runs returned 400 — the same workflow behaving
+  // two ways depending on who started it.
+  describe('child triggerInput contract', () => {
+    const contract = { 'child-wf': [{ name: 'email', type: 'string', required: true }] };
+
+    it('spawns when the payload satisfies the child contract', async () => {
+      const trigger = makeTrigger();
+      const repo = makeProcessRepo(undefined, contract);
+      const handler = createSpawnActionHandler(trigger as never, repo as never);
+
+      const result = asSpawn(await handler(
+        {
+          targets: { definitionName: 'child-wf', payload: { email: 'alice@test.com' } },
+          continueOnSpawnError: true,
+        },
+        baseCtx,
+      ));
+
+      expect(result.spawnedCount).toBe(1);
+      expect(result.errorCount).toBe(0);
+    });
+
+    it('reports a mistyped payload key as a spawn error instead of firing', async () => {
+      const trigger = makeTrigger();
+      const repo = makeProcessRepo(undefined, contract);
+      const handler = createSpawnActionHandler(trigger as never, repo as never);
+
+      const result = asSpawn(await handler(
+        {
+          targets: { definitionName: 'child-wf', payload: { emial: 'alice@test.com' } },
+          continueOnSpawnError: true,
+        },
+        baseCtx,
+      ));
+
+      expect(trigger.fireWorkflow).not.toHaveBeenCalled();
+      expect(result.spawnedCount).toBe(0);
+      expect(result.errors[0]!.message).toContain('emial');
+      expect(result.errors[0]!.message).toContain('email');
+    });
+
+    it('throws when continueOnSpawnError is false', async () => {
+      const trigger = makeTrigger();
+      const repo = makeProcessRepo(undefined, contract);
+      const handler = createSpawnActionHandler(trigger as never, repo as never);
+
+      await expect(
+        handler(
+          {
+            targets: { definitionName: 'child-wf', payload: {} },
+            continueOnSpawnError: false,
+          },
+          baseCtx,
+        ),
+      ).rejects.toThrow(/email/);
+    });
+
+    it('rejects a non-empty payload when the child declares no contract', async () => {
+      const trigger = makeTrigger();
+      const repo = makeProcessRepo();
+      const handler = createSpawnActionHandler(trigger as never, repo as never);
+
+      const result = asSpawn(await handler(
+        {
+          targets: { definitionName: 'child-wf', payload: { stray: 1 } },
+          continueOnSpawnError: true,
+        },
+        baseCtx,
+      ));
+
+      expect(trigger.fireWorkflow).not.toHaveBeenCalled();
+      expect(result.errors[0]!.message).toContain('stray');
+    });
   });
 });

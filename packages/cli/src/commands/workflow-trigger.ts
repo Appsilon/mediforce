@@ -16,10 +16,16 @@ const typeArg = {
   default: 'cron',
   description: "Trigger type: 'cron', 'manual', or 'webhook'",
 } as const;
-const scheduleArg = {
+const scheduleUpdateArg = {
   type: 'string',
-  required: true,
+  required: false,
   description: '5-field cron schedule (UTC; minutes must be :00/:15/:30/:45)',
+} as const;
+const payloadArg = {
+  type: 'string',
+  required: false,
+  description:
+    "JSON object of static input every tick hands the run, e.g. '{\"region\":\"eu\"}'. Must satisfy the workflow's triggerInput. Cron only; pass '{}' to clear",
 } as const;
 const scheduleOptArg = {
   type: 'string',
@@ -37,9 +43,33 @@ const pathArg = {
   description: 'URL path, leading slash (e.g. /orders). Required for --type webhook',
 } as const;
 
-function scheduleOf(trigger: { type: string; config: unknown }): string {
+/** Parse a `--payload` argument. Returns `undefined` when the flag was omitted
+ *  (leave the payload alone) and an error string when it isn't a JSON object —
+ *  the contract maps top-level keys to `triggerInput` fields, so an array or a
+ *  scalar has nothing to map. */
+function parsePayload(raw: unknown): { payload?: Record<string, unknown> } | { error: string } {
+  if (typeof raw !== 'string' || raw.length === 0) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    return { error: `--payload is not valid JSON: ${String(err)}` };
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return { error: '--payload must be a JSON object whose keys are triggerInput field names' };
+  }
+  return { payload: parsed as Record<string, unknown> };
+}
+
+/** One-line rendering of a trigger's config. Cron rows include their static
+ *  payload, because two schedules on one workflow are only distinguishable by it
+ *  (`nightly-us` vs `nightly-eu`) — a list that shows the cadence alone makes
+ *  them look identical. */
+function configOf(trigger: { type: string; config: unknown }): string {
   if (trigger.type === 'cron') {
-    return (trigger.config as { schedule: string }).schedule;
+    const config = trigger.config as { schedule: string; payload?: Record<string, unknown> };
+    const hasPayload = config.payload !== undefined && Object.keys(config.payload).length > 0;
+    return hasPayload ? `${config.schedule}  ${JSON.stringify(config.payload)}` : config.schedule;
   }
   if (trigger.type === 'webhook') {
     const config = trigger.config as { method: string; path: string };
@@ -64,7 +94,7 @@ export const workflowTriggerListCommand = defineCommand({
     } else {
       for (const t of result.triggers) {
         const state = t.enabled ? 'enabled ' : 'disabled';
-        output.stdout(`${state}  ${t.type}  ${t.name}  ${scheduleOf(t)}`.trimEnd());
+        output.stdout(`${state}  ${t.type}  ${t.name}  ${configOf(t)}`.trimEnd());
       }
     }
     return 0;
@@ -78,6 +108,7 @@ export const workflowTriggerAddCommand = defineCommand({
     name: nameArg,
     trigger: triggerArg,
     schedule: scheduleOptArg,
+    payload: payloadArg,
     method: methodArg,
     path: pathArg,
     namespace: namespaceArg,
@@ -85,11 +116,17 @@ export const workflowTriggerAddCommand = defineCommand({
   },
   async run({ args, output, mediforce, jsonMode }) {
     const type = (args.type ?? 'cron') as 'cron' | 'manual' | 'webhook';
+    const parsed = parsePayload(args.payload);
+    if ('error' in parsed) {
+      printError(output, { error: parsed.error }, jsonMode);
+      return 1;
+    }
     const result = await mediforce.triggers.create({
       definitionName: args.name,
       triggerName: args.trigger!,
       type,
       ...(args.schedule ? { schedule: args.schedule } : {}),
+      ...(parsed.payload === undefined ? {} : { payload: parsed.payload }),
       ...(args.method ? { method: args.method as 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' } : {}),
       ...(args.path ? { path: args.path } : {}),
       namespace: args.namespace!,
@@ -98,7 +135,7 @@ export const workflowTriggerAddCommand = defineCommand({
     if (jsonMode) {
       printJson(output, result);
     } else {
-      const detail = scheduleOf(result.trigger);
+      const detail = configOf(result.trigger);
       const suffix = detail.length > 0 ? ` (${detail})` : '';
       output.stdout(
         `Added ${result.trigger.type} trigger '${result.trigger.name}'${suffix} to '${args.name}'`,
@@ -113,21 +150,36 @@ export const workflowTriggerAddCommand = defineCommand({
 
 export const workflowTriggerUpdateCommand = defineCommand({
   name: 'mediforce workflow trigger-update',
-  description: 'Change the schedule of an existing cron trigger.',
-  args: { name: nameArg, trigger: triggerArg, schedule: scheduleArg, namespace: namespaceArg },
+  description:
+    "Change an existing cron trigger's schedule, its static payload, or both.",
+  args: {
+    name: nameArg,
+    trigger: triggerArg,
+    schedule: scheduleUpdateArg,
+    payload: payloadArg,
+    namespace: namespaceArg,
+  },
   async run({ args, output, mediforce, jsonMode }) {
+    const parsed = parsePayload(args.payload);
+    if ('error' in parsed) {
+      printError(output, { error: parsed.error }, jsonMode);
+      return 1;
+    }
+    if (args.schedule === undefined && parsed.payload === undefined) {
+      printError(output, { error: 'Pass --schedule, --payload, or both' }, jsonMode);
+      return 1;
+    }
     const result = await mediforce.triggers.update({
       definitionName: args.name,
       triggerName: args.trigger!,
-      schedule: args.schedule!,
+      ...(args.schedule ? { schedule: args.schedule } : {}),
+      ...(parsed.payload === undefined ? {} : { payload: parsed.payload }),
       namespace: args.namespace!,
     });
     if (jsonMode) {
       printJson(output, result);
     } else {
-      output.stdout(
-        `Updated trigger '${result.trigger.name}' schedule to '${scheduleOf(result.trigger)}'`,
-      );
+      output.stdout(`Updated trigger '${result.trigger.name}' (${configOf(result.trigger)})`);
     }
     return 0;
   },

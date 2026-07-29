@@ -1,7 +1,7 @@
 {
   "name": "tutorial-trigger-input",
   "title": "Trigger Input",
-  "description": "Demonstrates triggerInput fields that the user fills at trigger time, accessible as variables.* in when expressions. Triggers (manual, webhook, cron) are independent table resources managed via `mediforce workflow trigger-*` — they are no longer declared on the definition (ADR-0011, Issue #932).",
+  "description": "Demonstrates the unified Trigger Input contract (ADR-0012): triggerInput is the workflow's total input contract and every trigger validates against it, so ${triggerPayload.<field>} reads identically no matter which one fired. Start it by hand (the Start Run form renders these fields), POST {\"source\":\"edc\",\"priority\":\"urgent\"} to its webhook, or attach a cron row carrying that same object as its static payload — all three produce the same triggerPayload. Triggers are independent table resources managed via `mediforce workflow trigger-*` (ADR-0011, Issue #932).",
   "env": {
     "APP_BASE_URL": "{{APP_BASE_URL}}"
   },
@@ -10,17 +10,35 @@
       "name": "source",
       "type": "string",
       "required": true,
-      "description": "Data source identifier"
+      "description": "Data source identifier. Supplied by whichever trigger fires: the manual Start Run form, the webhook body's top-level `source` key, or the cron row's static payload."
     },
     {
       "name": "priority",
       "type": "string",
       "required": false,
-      "description": "Processing priority: normal or urgent"
+      "description": "Processing priority: normal or urgent. Optional, so a firing may omit it — but an undeclared field is rejected on every path."
     }
   ],
   "roles": ["operator"],
   "steps": [
+    {
+      "id": "record",
+      "name": "Record the firing",
+      "type": "creation",
+      "executor": "action",
+      "description": "Reads the validated input the same way for every trigger kind. `triggerPayload.*` is the contract; `triggerContext.*` is the transport escape hatch — empty on a manual start, so a step depending on it has knowingly coupled itself to one trigger kind.",
+      "action": {
+        "kind": "reshape",
+        "config": {
+          "values": {
+            "source": "${triggerPayload.source}",
+            "priority": "${triggerPayload.priority}",
+            "firedViaMethod": "${triggerContext.method}",
+            "firedAt": "${triggerContext.firedAt}"
+          }
+        }
+      }
+    },
     {
       "id": "route",
       "name": "Route by Priority",
@@ -60,6 +78,7 @@
     }
   ],
   "transitions": [
+    { "from": "record", "to": "route" },
     { "from": "route", "to": "process", "when": "variables.priority == \"urgent\"" },
     { "from": "route", "to": "process", "when": "else" },
     { "from": "process", "to": "done", "when": "variables.priority == \"urgent\"" },

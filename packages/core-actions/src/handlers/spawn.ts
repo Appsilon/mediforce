@@ -1,4 +1,5 @@
 import type { SpawnActionConfig, SpawnTargetConfig, ProcessRepository } from '@mediforce/platform-core';
+import { validatePayload } from '@mediforce/platform-core';
 import { interpolate } from '../interpolation';
 import type { SpawnActionHandler, InterpolationSources } from '../types';
 
@@ -47,7 +48,7 @@ interface RunKicker {
 
 export function createSpawnActionHandler(
   manualTrigger: WorkflowTrigger,
-  processRepo: Pick<ProcessRepository, 'getLatestWorkflowVersion'>,
+  processRepo: Pick<ProcessRepository, 'getLatestWorkflowVersion' | 'getWorkflowDefinition'>,
   runKicker?: RunKicker,
 ): SpawnActionHandler {
   return async (config, ctx) => {
@@ -84,6 +85,29 @@ export function createSpawnActionHandler(
           throw new Error(
             `workflow definition '${target.definitionName}' not found in namespace '${namespace}'`,
           );
+        }
+
+        // The child's `triggerInput` is its total input contract (ADR-0012), so
+        // a spawned firing is validated exactly like a manual or API start —
+        // otherwise a typo'd payload key would silently interpolate to '' in the
+        // child while the same payload sent to POST /api/runs returned 400.
+        // Reported through `errors[]` so `continueOnSpawnError` still applies.
+        const childDefinition = await processRepo.getWorkflowDefinition(
+          namespace,
+          target.definitionName,
+          version,
+        );
+        if (childDefinition) {
+          const validation = validatePayload(
+            interpolatedPayload,
+            childDefinition.triggerInput ?? [],
+          );
+          if (!validation.valid) {
+            throw new Error(
+              `payload does not match the triggerInput of '${target.definitionName}' ` +
+                `v${String(version)}: ${validation.errors.map((error) => error.message).join('; ')}`,
+            );
+          }
         }
 
         const result = await manualTrigger.fireWorkflow({

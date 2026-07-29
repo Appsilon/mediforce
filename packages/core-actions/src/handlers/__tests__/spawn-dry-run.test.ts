@@ -11,6 +11,13 @@ function makeTrigger() {
 function makeProcessRepo() {
   return {
     getLatestWorkflowVersion: vi.fn().mockResolvedValue(2),
+    // These targets carry no payload, so an empty contract accepts them — the
+    // spawn handler validates against the child's `triggerInput` (ADR-0012).
+    getWorkflowDefinition: vi
+      .fn()
+      .mockImplementation((_ns: string, name: string) =>
+        Promise.resolve({ name, triggerInput: [] }),
+      ),
   };
 }
 

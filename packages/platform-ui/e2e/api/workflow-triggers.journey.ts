@@ -50,6 +50,18 @@ function manualOnlyWd(name: string) {
   };
 }
 
+/** Same shape plus a `triggerInput` contract. Under ADR-0012 every firing
+ *  validates against it, so a webhook body needs declared fields to carry —
+ *  `order` required and `note` optional, which exercises both the happy path and
+ *  the rejections. Kept separate from `manualOnlyWd` because a *required* field
+ *  also blocks attaching a payload-less cron row, which the cron tests rely on. */
+function webhookContractWd(name: string) {
+  return { ...manualOnlyWd(name), triggerInput: [
+    { name: 'order', type: 'number', required: true },
+    { name: 'note', type: 'string', required: false },
+  ] };
+}
+
 test.describe('Trigger management — API E2E', () => {
   test('add → list → update → stop → heartbeat-skip → delete lifecycle', async ({ request }) => {
     const wdName = `e2e-triggermgmt-${Date.now()}`;
@@ -149,7 +161,7 @@ test.describe('Trigger management — API E2E', () => {
 
     const createWdRes = await request.post(`${base}?namespace=${TEST_ORG_HANDLE}`, {
       headers: AUTH_HEADERS,
-      data: manualOnlyWd(wdName),
+      data: webhookContractWd(wdName),
     });
     expect(createWdRes.status(), await createWdRes.text()).toBe(201);
 
@@ -190,6 +202,33 @@ test.describe('Trigger management — API E2E', () => {
       expect(fireRes.status(), await fireRes.text()).toBe(202);
       const fired = (await fireRes.json()) as { runId: string };
       expect(fired.runId.length).toBeGreaterThan(0);
+
+      // ADR-0012: the body's top-level keys ARE the triggerInput contract, and
+      // it is enforced end-to-end — through the real route, not just the router.
+      const undeclaredRes = await request.post(created.webhookUrl, {
+        headers: AUTH_HEADERS,
+        data: { order: 42, undeclared: 'nope' },
+      });
+      expect(undeclaredRes.status()).toBe(400);
+      const undeclaredBody = (await undeclaredRes.json()) as {
+        error: string;
+        details?: Array<{ field: string }>;
+      };
+      // Per-field errors travel on `details`, mirroring what start-run returns
+      // for a rejected manual payload.
+      expect(undeclaredBody.details?.map((d) => d.field)).toContain('undeclared');
+
+      const missingRes = await request.post(created.webhookUrl, {
+        headers: AUTH_HEADERS,
+        data: { note: 'no order here' },
+      });
+      expect(missingRes.status()).toBe(400);
+
+      const mistypedRes = await request.post(created.webhookUrl, {
+        headers: AUTH_HEADERS,
+        data: { order: 'forty-two' },
+      });
+      expect(mistypedRes.status()).toBe(400);
 
       // Remove the webhook → the endpoint stops resolving (404).
       const delRes = await request.delete(`${webhookTriggerUrl}?namespace=${TEST_ORG_HANDLE}`, {

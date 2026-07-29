@@ -27,13 +27,22 @@ const definition: WorkflowDefinition = {
         config: {
           method: 'POST',
           url: 'http://localhost:9099/anything',
-          body: '${triggerPayload.body}',
+          body: '${triggerPayload.summary}',
         },
       },
     },
   ],
   transitions: [],
+  // ADR-0012: the body's top-level keys ARE these fields. `summary` is `object`
+  // because callers post opaque JSON — the escape hatch for an un-enumerable body.
+  triggerInput: [
+    { name: 'summary', type: 'object', required: true },
+    { name: 'label', type: 'string', required: false },
+  ],
 };
+
+/** A body satisfying `definition`'s contract. */
+const validBody = { summary: { hello: 'world' } };
 
 /** An enabled `webhook` row in the unified triggers table. */
 function webhookRow(
@@ -88,7 +97,7 @@ describe('WebhookRouter', () => {
       workflowName: 'execution-summaries-api',
       suffix: '/execution-summaries',
       method: 'POST',
-      body: { hello: 'world' },
+      body: validBody,
     });
 
     expect(result.status).toBe(202);
@@ -116,7 +125,7 @@ describe('WebhookRouter', () => {
       workflowName: 'execution-summaries-api',
       suffix: '/execution-summaries',
       method: 'POST',
-      body: { hello: 'world' },
+      body: validBody,
       headers: { 'x-trace': 'abc' },
     });
     expect(result.status).toBe(202);
@@ -125,15 +134,117 @@ describe('WebhookRouter', () => {
     const instance = await instanceRepo.getById(result.runId);
     expect(instance).not.toBeNull();
     expect(instance?.triggerType).toBe('webhook');
-    expect(instance?.triggerPayload).toEqual({
-      body: { hello: 'world' },
+    // The payload is the *validated contract*, not the HTTP envelope — a step
+    // reading `${triggerPayload.summary}` gets the same thing a manual or cron
+    // firing would hand it (ADR-0012).
+    expect(instance?.triggerPayload).toEqual(validBody);
+    // The envelope moved to triggerContext, and `body` is not on it: a step can
+    // no longer reach the raw request through either namespace.
+    expect(instance?.triggerContext).toEqual({
       headers: { 'x-trace': 'abc' },
       query: {},
       method: 'POST',
       path: '/execution-summaries',
     });
+    expect(instance?.triggerContext).not.toHaveProperty('body');
     expect(instance?.status).toBe('running');
     expect(instance?.currentStepId).toBe('echo');
+  });
+
+  it('rejects a body carrying a field the contract does not declare', async () => {
+    const result = await router.route({
+      namespace: 'examples',
+      workflowName: 'execution-summaries-api',
+      suffix: '/execution-summaries',
+      method: 'POST',
+      body: { ...validBody, sneaky: 1 },
+    });
+    expect(result.status).toBe(400);
+    if (result.status !== 400) return;
+    expect(result.details?.map((e) => e.field)).toEqual(['sneaky']);
+  });
+
+  it('rejects a body missing a required field', async () => {
+    const result = await router.route({
+      namespace: 'examples',
+      workflowName: 'execution-summaries-api',
+      suffix: '/execution-summaries',
+      method: 'POST',
+      body: { label: 'nightly' },
+    });
+    expect(result.status).toBe(400);
+    if (result.status !== 400) return;
+    expect(result.details?.[0]?.field).toBe('summary');
+  });
+
+  it('rejects a value of the wrong type', async () => {
+    const result = await router.route({
+      namespace: 'examples',
+      workflowName: 'execution-summaries-api',
+      suffix: '/execution-summaries',
+      method: 'POST',
+      // `summary` is `object`; a bare array has no keys to walk.
+      body: { summary: [1, 2] },
+    });
+    expect(result.status).toBe(400);
+    if (result.status !== 400) return;
+    expect(result.details?.[0]?.message).toMatch(/JSON object/);
+  });
+
+  it('rejects a body that is not a JSON object at all', async () => {
+    const result = await router.route({
+      namespace: 'examples',
+      workflowName: 'execution-summaries-api',
+      suffix: '/execution-summaries',
+      method: 'POST',
+      body: 'plain text',
+    });
+    expect(result.status).toBe(400);
+  });
+
+  it('names the expected fields in the rejection', async () => {
+    const result = await router.route({
+      namespace: 'examples',
+      workflowName: 'execution-summaries-api',
+      suffix: '/execution-summaries',
+      method: 'POST',
+      body: {},
+    });
+    expect(result.status).toBe(400);
+    if (result.status !== 400) return;
+    expect(result.error).toContain('summary: object');
+    expect(result.error).toContain('label: string');
+  });
+
+  it('rejects a non-empty body when the workflow declares no triggerInput', async () => {
+    // The contract is *total*: an empty triggerInput means "takes no input",
+    // not "anything goes" (ADR-0012 D2).
+    const contractFree: WorkflowDefinition = {
+      ...definition,
+      name: 'no-input',
+      triggerInput: [],
+      steps: [{ id: 'echo', name: 'echo', type: 'terminal', executor: 'human' }],
+    };
+    await processRepo.saveWorkflowDefinition(contractFree);
+    await triggerRepo.create(webhookRow({ workflowName: 'no-input' }));
+
+    const rejected = await router.route({
+      namespace: 'examples',
+      workflowName: 'no-input',
+      suffix: '/execution-summaries',
+      method: 'POST',
+      body: { anything: 1 },
+    });
+    expect(rejected.status).toBe(400);
+
+    const accepted = await router.route({
+      namespace: 'examples',
+      workflowName: 'no-input',
+      suffix: '/execution-summaries',
+      method: 'POST',
+      body: null,
+    });
+    expect(accepted.status).toBe(202);
   });
 
   it('normalizes suffix without leading slash', async () => {
@@ -142,7 +253,7 @@ describe('WebhookRouter', () => {
       workflowName: 'execution-summaries-api',
       suffix: 'execution-summaries',
       method: 'POST',
-      body: {},
+      body: validBody,
     });
     expect(result.status).toBe(202);
   });
@@ -222,7 +333,7 @@ describe('WebhookRouter', () => {
       workflowName: 'execution-summaries-api',
       suffix: '/reports',
       method: 'POST',
-      body: { hello: 'world' },
+      body: validBody,
     });
     expect(result.status).toBe(202);
   });
@@ -263,7 +374,7 @@ describe('WebhookRouter', () => {
       workflowName: 'execution-summaries-api',
       suffix: '/execution-summaries',
       method: 'POST',
-      body: { hello: 'world' },
+      body: validBody,
     });
     expect(result.status).toBe(202);
   });

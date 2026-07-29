@@ -29,10 +29,21 @@ const TriggerBaseSchema = z.object({
   updatedAt: z.string().datetime(),
 });
 
-/** cron config: the live cadence. (The fire cursor `lastTriggeredAt` is a
- *  top-level field on the cron variant, not part of this config.) */
+/** cron config: the live cadence plus the static input each tick hands the Run.
+ *  (The fire cursor `lastTriggeredAt` is a top-level field on the cron variant,
+ *  not part of this config.)
+ *
+ *  A cron tick has no caller to supply input, so the payload lives on the
+ *  mutable Trigger row rather than the immutable Definition — which is what lets
+ *  two schedules on one workflow fire different constants (`nightly-us` →
+ *  `{region:"us"}`, `nightly-eu` → `{region:"eu"}`). It is validated against the
+ *  workflow's `triggerInput` twice: at attach/update time (fail-fast, rejects
+ *  the write) and again at fire time against the version actually resolved,
+ *  where a drifted contract skips the tick with a reason instead of erroring
+ *  (ADR-0012). */
 export const CronTriggerConfigSchema = z.object({
   schedule: z.string().min(1),
+  payload: z.record(z.string(), z.unknown()).optional(),
 });
 
 /** webhook config: method + url path (relative to /api/triggers/webhook/<ns>/<wf>).
@@ -134,6 +145,9 @@ export function toPortableTrigger(trigger: TriggerResource): PortableTrigger {
       type: 'cron',
       enabled: trigger.enabled,
       schedule: trigger.config.schedule,
+      // Omitted rather than written as `undefined` so a payload-less cron
+      // exports to the same file it did before ADR-0012.
+      ...(trigger.config.payload === undefined ? {} : { payload: trigger.config.payload }),
     };
   }
   if (trigger.type === 'webhook') {

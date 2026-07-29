@@ -92,9 +92,15 @@ firing is validated against it: declared fields are required/typed, undeclared
 fields are **rejected** (strict), and an empty/absent contract means the payload
 must be **empty**. Opaque un-enumerable input (a proxied third-party JSON body)
 is declared as a single field of `object` type.
-_Status:_ today `triggerInput` is validated **only** on manual/API starts and
-scalar-typed; unifying it across webhook + cron and adding the `object` type is
-the open follow-up.
+_Code:_ `TriggerInputFieldSchema` in
+`packages/platform-core/src/schemas/workflow-definition.ts`; enforced by
+`validatePayload` (`validation/payload-validator.ts`) on all three paths —
+`start-run` (manual/API), `WebhookRouter` (body top-level keys → fields, 400 on
+mismatch), and the cron heartbeat (the row's static `config.payload`, also
+checked at attach time by `createTrigger` / `updateTrigger`).
+_Status:_ unified across manual + webhook + cron, with the `object` type, as of
+Issue #1020. An opaque top-level **array** has no dedicated type — it nests under
+an `object` field.
 _Avoid_: treating `triggerInput` as webhook-body-only or manual-only; using
 **Trigger Context** to carry declared input.
 
@@ -109,6 +115,11 @@ belongs on **Trigger Context**.
 A reserved, **trigger-specific** escape hatch holding the raw transport metadata
 of a firing (webhook `headers`/`query`/`method`/`path`, cron `firedAt`/`schedule`).
 Steps that read `${triggerContext.*}` knowingly re-couple to a Trigger kind.
+_Code:_ `ProcessInstance.triggerContext` (column `process_instances.trigger_context`,
+migration `0040`), exposed to interpolation via `InterpolationSources` in
+`packages/platform-core/src/interpolation.ts`. Populated by each trigger adapter;
+a manual start leaves it empty. Bare identifiers deliberately do **not** fall
+through to it — re-coupling must be spelled out.
 _Avoid_: routing declared workflow input through it — declared input is **Trigger
 Payload**.
 

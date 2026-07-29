@@ -73,11 +73,17 @@ Handler nuances not visible in the schema (in
 | Use site | Syntax | Roots available | Source |
 |----------|--------|-----------------|--------|
 | Transition `when` | bare, no `${}`: `verdict == "x"`, `output.f > 1`, `&&`, `\|\|`, `!` | `output`, `variables`, `verdict` | [`expression-evaluator.ts`](../packages/workflow-engine/src/expressions/expression-evaluator.ts) |
-| Action configs, `spawn` payloads, `assignedTo`, step `env`, http body | `${...}` templates with dot/index paths | `steps`, `item` (in `forEach`), `triggerPayload`, `variables`, `secrets` | [`interpolation.ts`](../packages/platform-core/src/interpolation.ts) |
+| Action configs, `spawn` payloads, `assignedTo`, step `env`, http body | `${...}` templates with dot/index paths | `steps`, `item` (in `forEach`), `triggerPayload`, `triggerContext`, `variables`, `secrets` | [`interpolation.ts`](../packages/platform-core/src/interpolation.ts) |
 
 Notes that trip people up:
-- A manual trigger's `triggerInput` form values arrive at runtime as
-  `${triggerPayload.*}`, not `${triggerInput.*}`.
+- `triggerInput` is the workflow's **total input contract**, and every trigger
+  validates against it (ADR-0012). Its values arrive at runtime as
+  `${triggerPayload.*}`, not `${triggerInput.*}` — identically whether a manual
+  form, a webhook body, or a cron row's static payload supplied them.
+- `${triggerContext.*}` is the transport escape hatch (webhook
+  `headers`/`query`/`method`/`path`, cron `firedAt`/`schedule`). It carries no
+  declared input, and bare identifiers deliberately do **not** fall through to
+  it — a step reading it has knowingly coupled itself to one trigger kind.
 - `${steps.<id>.<path>}` reads a previous step's output; `getPath` supports
   `a.b`, `a.0.x`, and `a[0].x`, and returns empty for missing paths.
 - `${secrets.NAME}` resolves in any action config field (never in transition
@@ -251,15 +257,19 @@ The three types are routed the same way regardless of how they are attached:
 
 | `type` | Routed by | Notes |
 |--------|-----------|-------|
-| `manual` | [`manual-trigger.ts`](../packages/workflow-engine/src/triggers/manual-trigger.ts) | form values come from `triggerInput`; arrive at runtime as `${triggerPayload.*}` |
-| `webhook` | [`webhook-router.ts`](../packages/workflow-engine/src/triggers/webhook-router.ts) | typed `method` + `path` (exact match, no globbing); payload is `{ body, headers, query, method, path }` |
-| `cron` | [`cron-trigger.ts`](../packages/workflow-engine/src/triggers/cron-trigger.ts) | `schedule` cron string; scheduler is deployment-side |
+| `manual` | [`manual-trigger.ts`](../packages/workflow-engine/src/triggers/manual-trigger.ts) | form values come from `triggerInput`; no transport, so `triggerContext` is empty |
+| `webhook` | [`webhook-router.ts`](../packages/workflow-engine/src/triggers/webhook-router.ts) | typed `method` + `path` (exact match, no globbing); the JSON body's **top-level keys map 1:1 onto `triggerInput`** and are validated (400 + per-field `details` on mismatch); the envelope goes to `triggerContext` |
+| `cron` | [`cron-trigger.ts`](../packages/workflow-engine/src/triggers/cron-trigger.ts) | `schedule` cron string; scheduler is deployment-side. An optional static `config.payload` per row is the tick's input, validated at attach time and again at fire time (drift skips the tick with a reason); `schedule`/`firedAt` go to `triggerContext` |
 | `event` | — | **in the enum but has no router** ([`triggers/`](../packages/workflow-engine/src/triggers/) has only manual/webhook/cron) — treat as not yet implemented |
 
-Manual-start form fields are `triggerInput` (`TriggerInputFieldSchema`): each has
-a `type` of `string` / `number` / `boolean` / `date` / `datetime` / `select` /
-`multiselect` / `textarea`, plus `options` / `default` / `required` (it extends
-`StepParamSchema`).
+`triggerInput` (`TriggerInputFieldSchema`) is the contract every trigger
+validates against, and doubles as the manual-start form: each field has a `type`
+of `string` / `number` / `boolean` / `date` / `datetime` / `select` /
+`multiselect` / `textarea` / `object`, plus `options` / `default` / `required`
+(it extends `StepParamSchema`). `object` holds an opaque JSON object whose
+contents the definition does not enumerate — the way a proxied third-party body
+enters a run. Validation is **total and always on**: undeclared fields are a hard
+error, and an empty/absent `triggerInput` means the payload must be empty.
 
 ## Workflow-level fields (the envelope)
 

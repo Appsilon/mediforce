@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Trigger Input is a workflow's total input contract; every trigger validates against it
@@ -60,7 +60,9 @@ contract is uniform.
   example workflows, fixtures, and tests migrate in the epic; there is no
   deprecation window.
 - `TriggerInputFieldSchema` gains an `object` type; `payload-validator` validates
-  it as an opaque non-null JSON object.
+  it as an opaque non-null JSON object. There is deliberately **no `array` type**:
+  a webhook body maps by top-level key, so an opaque array has nothing to map and
+  nests under an `object` field instead — one escape hatch, not two.
 - The cron trigger config schema grows an optional validated `payload`; the cron
   fire path gains the same validation every other trigger runs.
 - The webhook UI's example body becomes **derivable from `triggerInput`** rather

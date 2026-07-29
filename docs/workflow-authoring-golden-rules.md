@@ -289,8 +289,9 @@ Tool Catalog entries.
 
 | Channel | Use for |
 |---------|---------|
-| `triggerInput` | Manual start form fields |
-| `triggerPayload` | Webhook, cron, or scheduled payload |
+| `triggerInput` | The workflow's **total input contract** — every trigger (manual form, webhook body, cron row payload) validates against it |
+| `triggerPayload` | The validated input at runtime: `${triggerPayload.<field>}`, identical whichever trigger fired |
+| `triggerContext` | Transport-only escape hatch (webhook headers/query/method/path, cron firedAt/schedule) — never declared input |
 | human `params` | Data collected from a human step |
 | `/output/input.json` | Runtime input snapshot for containers |
 | `/output/result.json` | Structured step output |

@@ -46,6 +46,7 @@ describe('heartbeat handler', () => {
     schedule: string;
     enabled?: boolean;
     lastTriggeredAt?: string | null;
+    payload?: Record<string, unknown>;
   }): Promise<unknown> {
     const now = new Date().toISOString();
     return triggerRepo.create({
@@ -54,7 +55,10 @@ describe('heartbeat handler', () => {
       workflowName: opts.workflowName,
       name: opts.name,
       enabled: opts.enabled ?? true,
-      config: { schedule: opts.schedule },
+      config: {
+        schedule: opts.schedule,
+        ...(opts.payload === undefined ? {} : { payload: opts.payload }),
+      },
       lastTriggeredAt: opts.lastTriggeredAt ?? null,
       createdAt: now,
       updatedAt: now,
@@ -127,8 +131,15 @@ describe('heartbeat handler', () => {
         definitionVersion: 1,
         triggerName: 'nightly',
         triggeredBy: 'cron-heartbeat',
+        // ADR-0012: the row's static input is the payload; the tick's own
+        // schedule/firedAt are transport and ride on `context` instead, so a
+        // step never reads `${triggerPayload.schedule}`.
+        payload: {},
+        context: expect.objectContaining({ schedule: '*/15 * * * *' }),
       }),
     );
+    expect(fireWorkflow.mock.calls[0]![0].payload).not.toHaveProperty('schedule');
+    expect(fireWorkflow.mock.calls[0]![0].payload).not.toHaveProperty('firedAt');
 
     // Fire cursor advanced AFTER successful fire.
     const rows = await triggerRepo.listByWorkflow('team-alpha', 'nightly-report');
@@ -159,6 +170,122 @@ describe('heartbeat handler', () => {
 
     // Run kicked.
     expect(kicker.kicks).toEqual([{ instanceId: 'inst-new-1', triggeredBy: 'cron-heartbeat' }]);
+  });
+
+  it('fires each cron row with its own static payload', async () => {
+    // Two schedules on one workflow are only distinguishable by their payload —
+    // this is the reason it lives on the mutable row and not the definition.
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'regional-report',
+        namespace: 'team-alpha',
+        version: 1,
+        triggerInput: [{ name: 'region', type: 'string', required: true }],
+      }),
+    );
+    const anHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    await seedCron({
+      namespace: 'team-alpha',
+      workflowName: 'regional-report',
+      name: 'nightly-us',
+      schedule: '*/15 * * * *',
+      lastTriggeredAt: anHourAgo,
+      payload: { region: 'us' },
+    });
+    await seedCron({
+      namespace: 'team-alpha',
+      workflowName: 'regional-report',
+      name: 'nightly-eu',
+      schedule: '*/15 * * * *',
+      lastTriggeredAt: anHourAgo,
+      payload: { region: 'eu' },
+    });
+
+    const fireWorkflow = vi
+      .fn()
+      .mockResolvedValue({ instanceId: 'i', status: 'created' as const });
+    const scope = createTestScope({ processRepo, instanceRepo, auditRepo, triggerRepo });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow } });
+
+    const result = await heartbeat({}, scope);
+
+    expect(result.triggered).toHaveLength(2);
+    const firedPayloads = fireWorkflow.mock.calls.map((c) => c[0].payload);
+    expect(firedPayloads).toEqual(
+      expect.arrayContaining([{ region: 'us' }, { region: 'eu' }]),
+    );
+  });
+
+  it('skips with a reason when a later version moved the contract under the row', async () => {
+    // Attach-time validation passed against v1; v2 adds a required field the
+    // static payload cannot satisfy. That is drift, not a caller error — it
+    // skips the tick with an audit reason rather than erroring (ADR-0012).
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'drifted',
+        namespace: 'team-alpha',
+        version: 1,
+        triggerInput: [{ name: 'region', type: 'string', required: true }],
+      }),
+    );
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'drifted',
+        namespace: 'team-alpha',
+        version: 2,
+        triggerInput: [
+          { name: 'region', type: 'string', required: true },
+          { name: 'studyId', type: 'string', required: true },
+        ],
+      }),
+    );
+    await seedCron({
+      namespace: 'team-alpha',
+      workflowName: 'drifted',
+      name: 'nightly',
+      schedule: '*/15 * * * *',
+      lastTriggeredAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      payload: { region: 'us' },
+    });
+
+    const fireWorkflow = vi.fn();
+    const scope = createTestScope({ processRepo, instanceRepo, auditRepo, triggerRepo });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow } });
+
+    const result = await heartbeat({}, scope);
+
+    expect(fireWorkflow).not.toHaveBeenCalled();
+    expect(result.triggered).toHaveLength(0);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]!.reason).toContain('studyId');
+    expect(result.skipped[0]!.reason).toContain('triggerInput');
+  });
+
+  it('skips a payload-less row whose workflow requires input', async () => {
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({
+        name: 'needs-input',
+        namespace: 'team-alpha',
+        version: 1,
+        triggerInput: [{ name: 'region', type: 'string', required: true }],
+      }),
+    );
+    await seedCron({
+      namespace: 'team-alpha',
+      workflowName: 'needs-input',
+      name: 'nightly',
+      schedule: '*/15 * * * *',
+      lastTriggeredAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    });
+
+    const fireWorkflow = vi.fn();
+    const scope = createTestScope({ processRepo, instanceRepo, auditRepo, triggerRepo });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow } });
+
+    const result = await heartbeat({}, scope);
+
+    expect(fireWorkflow).not.toHaveBeenCalled();
+    expect(result.skipped[0]!.reason).toContain('region');
   });
 
   it('resolves against the default version when set (not latest)', async () => {
