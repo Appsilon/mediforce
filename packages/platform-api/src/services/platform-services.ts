@@ -355,10 +355,15 @@ export function getPlatformServices(): PlatformServices {
   // or by setting a password. `PostgresInviteService` structurally implements
   // the framework-free `InviteService` port handlers consume.
   const inviteService: InviteService = new PostgresInviteService(pg);
-  // `appUrl` matches the legacy invite route's fallback so dev-without-
-  // NEXT_PUBLIC_PLATFORM_URL still renders sensible links.
+  // `appUrl` resolves from the canonical deployment base-URL vars (matching
+  // `getConfiguredAppBaseUrl`: APP_BASE_URL || NEXT_PUBLIC_APP_URL) so
+  // self-service resend emails that pass no baseUrl still link to the real
+  // host on staging/prod, only falling back to localhost in dev. `||` (not
+  // `??`) so a Docker-compose empty-string value counts as unset.
   const inviteAppUrl =
-    process.env.NEXT_PUBLIC_PLATFORM_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
+    process.env.APP_BASE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    `http://localhost:${process.env.PORT ?? '3000'}`;
   const senderName = resolvedEmail?.senderName ?? 'Mediforce';
   const inviteNotificationService = emailSender
     ? new EmailInviteNotificationService(

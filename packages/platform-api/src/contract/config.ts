@@ -4,7 +4,7 @@ import { z } from 'zod';
  * Platform-settings key holding the deployment's public base URL (e.g.
  * `https://phuse.mediforce.ai`). Read at invite time to build workspace/login
  * links; set via `mediforce config set platform.baseUrl <url>`. Falls back to
- * `NEXT_PUBLIC_PLATFORM_URL` then localhost when unset.
+ * `APP_BASE_URL`/`NEXT_PUBLIC_APP_URL` then localhost when unset.
  */
 export const PLATFORM_BASE_URL_SETTING_KEY = 'platform.baseUrl';
 

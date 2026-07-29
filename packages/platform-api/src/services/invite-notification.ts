@@ -50,7 +50,7 @@ export interface SendWorkspaceNotificationEmailInput {
   /**
    * Overrides the adapter's construction-time app URL when the deployment has
    * configured a `platform.baseUrl` setting. Absent → the adapter falls back to
-   * `NEXT_PUBLIC_PLATFORM_URL` → localhost.
+   * `APP_BASE_URL`/`NEXT_PUBLIC_APP_URL` → localhost.
    */
   readonly baseUrl?: string;
 }
@@ -75,7 +75,7 @@ export interface SendActivationEmailInput {
    * Overrides the adapter's construction-time app URL when the deployment has
    * configured a `platform.baseUrl` setting — same semantics as
    * `SendWorkspaceNotificationEmailInput`. Absent → the adapter falls back to
-   * `NEXT_PUBLIC_PLATFORM_URL` → localhost.
+   * `APP_BASE_URL`/`NEXT_PUBLIC_APP_URL` → localhost.
    */
   readonly baseUrl?: string;
 }
