@@ -87,14 +87,17 @@ export class AgentStepExecutor implements StepExecutor {
       }
     }
 
-    // Persist output to instance.variables + accumulate cost. Fetch the instance
-    // once here — the cancel-marker check below reuses the same read rather than
-    // issuing a back-to-back getById (status/error are not changed by this update,
-    // so the pre-update snapshot is valid for the marker check).
+    // Persist output to instance.variables + accumulate cost. Fetch only when
+    // there is output/cost to write (the no-envelope path skips the DB read);
+    // the cancel-marker check below reuses that read when it runs — status/error
+    // are unchanged by this update, so the pre-update snapshot is valid for it.
     const agentOutput = envelope?.result ?? null;
     const stepCost = costResult.estimatedCostUsd;
-    const instanceAfterRun = await instanceRepo.getById(instanceId);
-    if ((agentOutput !== null || stepCost !== undefined) && instanceAfterRun) {
+    const instanceAfterRun =
+      agentOutput !== null || stepCost !== undefined
+        ? await instanceRepo.getById(instanceId)
+        : null;
+    if (instanceAfterRun) {
       await instanceRepo.update(instanceId, {
         ...(agentOutput !== null ? {
           variables: {
