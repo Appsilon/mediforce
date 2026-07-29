@@ -27,7 +27,16 @@ services:
   redis:
     image: redis:8-alpine
     restart: unless-stopped
-    mem_limit: ${REDIS_MEM_LIMIT:-256m}
+    # maxmemory must stay below mem_limit. Redis cannot see the cgroup cap, so
+    # without its own ceiling it grows until the kernel SIGKILLs it (exit 137)
+    # and then crash-loops reloading an RDB it has no room for. noeviction is
+    # required by BullMQ — jobs must never be evicted out from under a run, so
+    # hitting the ceiling fails writes loudly instead of losing queue state.
+    command: >-
+      redis-server
+      --maxmemory ${REDIS_MAXMEMORY:-768mb}
+      --maxmemory-policy noeviction
+    mem_limit: ${REDIS_MEM_LIMIT:-1g}
     volumes:
       - redis-data:/data
     healthcheck:
