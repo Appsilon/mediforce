@@ -20,6 +20,19 @@ export interface ValidationResult {
  *
  * Intentional cycles (e.g., review loops) are NOT rejected.
  */
+type ProcessStep = ProcessDefinition['steps'][number];
+
+// The engine's StepExecutor only routes via verdict targets on review/decision
+// steps; verdicts on any other step type are never followed at runtime, so the
+// graph checks must not treat them as outgoing routing.
+function routesViaVerdicts(step: ProcessStep | undefined): boolean {
+  return (
+    (step?.type === 'review' || step?.type === 'decision') &&
+    step.verdicts !== undefined &&
+    Object.keys(step.verdicts).length > 0
+  );
+}
+
 export function validateStepGraph(definition: ProcessDefinition): ValidationResult {
   const errors: string[] = [];
   const stepIds = new Set(definition.steps.map((s) => s.id));
@@ -55,6 +68,20 @@ export function validateStepGraph(definition: ProcessDefinition): ValidationResu
     }
   }
 
+  // 3b. Verdicts are only valid routing on review/decision steps
+  for (const step of definition.steps) {
+    if (
+      step.verdicts &&
+      Object.keys(step.verdicts).length > 0 &&
+      step.type !== 'review' &&
+      step.type !== 'decision'
+    ) {
+      errors.push(
+        `Step "${step.id}" has verdicts but is type "${step.type}" — verdicts are only valid on review/decision steps`,
+      );
+    }
+  }
+
   // 4. When-expression validation: if multiple transitions from same step, all must have `when`
   const transitionsBySource = new Map<string, typeof definition.transitions>();
   for (const transition of definition.transitions) {
@@ -64,11 +91,11 @@ export function validateStepGraph(definition: ProcessDefinition): ValidationResu
   }
   for (const [stepId, transitions] of transitionsBySource) {
     if (transitions.length > 1) {
-      // Review steps with verdicts route via verdict targets — their transitions
-      // are informational (for graph visualization) and don't need `when`.
+      // Review/decision steps with verdicts route via verdict targets — their
+      // transitions are informational (for graph visualization) and don't need
+      // `when`. Verdicts on other step types don't route, so no exemption.
       const step = definition.steps.find((s) => s.id === stepId);
-      const hasVerdicts = step?.verdicts && Object.keys(step.verdicts).length > 0;
-      if (!hasVerdicts) {
+      if (!routesViaVerdicts(step)) {
         const missingWhen = transitions.filter((t) => !t.when);
         if (missingWhen.length > 0) {
           errors.push(
@@ -111,9 +138,8 @@ export function validateStepGraph(definition: ProcessDefinition): ValidationResu
     const hasOutgoingTransition = definition.transitions.some(
       (t) => t.from === step.id,
     );
-    const hasVerdicts = step.verdicts && Object.keys(step.verdicts).length > 0;
 
-    if (!hasOutgoingTransition && !hasVerdicts) {
+    if (!hasOutgoingTransition && !routesViaVerdicts(step)) {
       errors.push(
         `Non-terminal step "${step.id}" has no outgoing transitions or verdicts`,
       );
@@ -137,9 +163,9 @@ export function validateStepGraph(definition: ProcessDefinition): ValidationResu
         }
       }
 
-      // Follow verdict targets
+      // Follow verdict targets (only review/decision steps route via verdicts)
       const step = definition.steps.find((s) => s.id === current);
-      if (step?.verdicts) {
+      if (routesViaVerdicts(step) && step?.verdicts) {
         for (const verdict of Object.values(step.verdicts)) {
           if (!reachable.has(verdict.target)) {
             reachable.add(verdict.target);
