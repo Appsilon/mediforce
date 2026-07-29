@@ -26,10 +26,11 @@ function LoginForm() {
   const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
-  const [magicLinkOpen, setMagicLinkOpen] = React.useState(false);
+  // One focused surface at a time: the default 'main' view (Google / password),
+  // or a single secondary form swapped in full-card ('magic' | 'resend').
+  const [view, setView] = React.useState<'main' | 'magic' | 'resend'>('main');
   const [magicLinkEmail, setMagicLinkEmail] = React.useState('');
   const [magicLinkSent, setMagicLinkSent] = React.useState(false);
-  const [resendOpen, setResendOpen] = React.useState(false);
   const [resendEmail, setResendEmail] = React.useState('');
   const [resendSent, setResendSent] = React.useState(false);
 
@@ -130,6 +131,11 @@ function LoginForm() {
   // a deployment with no email at all can't deliver a setup link, so hide it.
   const emailBasedMethodEnabled = passwordAuthEnabled === true || magicLinkEnabled === true;
 
+  function backToMain() {
+    setError(null);
+    setView('main');
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm space-y-6">
@@ -142,151 +148,173 @@ function LoginForm() {
           <p className="text-sm text-destructive text-center" role="alert">{error}</p>
         )}
 
-        <div className="space-y-4">
-          {googleAuthEnabled === true && (
+        {view === 'magic' && (
+          <div className="space-y-4">
             <button
-              onClick={handleGoogleSignIn}
-              disabled={pending}
-              className="w-full flex items-center justify-center gap-3 rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground disabled:opacity-50 transition-colors"
+              type="button"
+              onClick={backToMain}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-              </svg>
-              {pending ? 'Signing in…' : 'Sign in with Google'}
+              ← Back
             </button>
-          )}
-
-          {googleAuthEnabled === true && passwordAuthEnabled === true && (
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">or</span>
-              <div className="flex-1 h-px bg-border" />
-            </div>
-          )}
-
-          {passwordAuthEnabled === true && (
-            <form onSubmit={handleEmailSignIn} className="space-y-3">
-              <div className="space-y-1.5">
-                <label htmlFor="email" className="text-sm font-medium">Email</label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  required
+            {magicLinkSent ? (
+              <p className="text-sm text-muted-foreground text-center" role="status">
+                Check your email for a sign-in link.
+              </p>
+            ) : (
+              <form onSubmit={handleMagicLinkSignIn} className="space-y-3">
+                <div className="space-y-1.5">
+                  <label htmlFor="magic-link-email" className="text-sm font-medium">Email</label>
+                  <input
+                    id="magic-link-email"
+                    type="email"
+                    value={magicLinkEmail}
+                    onChange={(e) => setMagicLinkEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
+                    disabled={pending}
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                  />
+                </div>
+                <button
+                  type="submit"
                   disabled={pending}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label htmlFor="password" className="text-sm font-medium">Password</label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
+                  className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                >
+                  {pending ? 'Sending…' : 'Send sign-in link'}
+                </button>
+              </form>
+            )}
+          </div>
+        )}
+
+        {view === 'resend' && (
+          <div className="space-y-4">
+            <button
+              type="button"
+              onClick={backToMain}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              ← Back
+            </button>
+            {resendSent ? (
+              <p className="text-sm text-muted-foreground text-center" role="status">
+                If your account is awaiting setup, we&apos;ve emailed you a link.
+              </p>
+            ) : (
+              <form onSubmit={handleResendSetupLink} className="space-y-3">
+                <div className="space-y-1.5">
+                  <label htmlFor="resend-setup-email" className="text-sm font-medium">Email</label>
+                  <input
+                    id="resend-setup-email"
+                    type="email"
+                    value={resendEmail}
+                    onChange={(e) => setResendEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
+                    disabled={pending}
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                  />
+                </div>
+                <button
+                  type="submit"
                   disabled={pending}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                />
-              </div>
+                  className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                >
+                  {pending ? 'Sending…' : 'Resend setup link'}
+                </button>
+              </form>
+            )}
+          </div>
+        )}
+
+        {view === 'main' && (
+          <div className="space-y-4">
+            {googleAuthEnabled === true && (
               <button
-                type="submit"
+                onClick={handleGoogleSignIn}
                 disabled={pending}
-                className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                className="w-full flex items-center justify-center gap-3 rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground disabled:opacity-50 transition-colors"
               >
-                {pending ? 'Signing in…' : 'Sign in'}
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                {pending ? 'Signing in…' : 'Sign in with Google'}
               </button>
-            </form>
-          )}
+            )}
 
-          {magicLinkEnabled === true && (
-            <div className="space-y-3">
-              {magicLinkSent ? (
-                <p className="text-sm text-muted-foreground text-center" role="status">
-                  Check your email for a sign-in link.
-                </p>
-              ) : magicLinkOpen ? (
-                <form onSubmit={handleMagicLinkSignIn} className="space-y-3">
-                  <div className="space-y-1.5">
-                    <label htmlFor="magic-link-email" className="text-sm font-medium">Email</label>
-                    <input
-                      id="magic-link-email"
-                      type="email"
-                      value={magicLinkEmail}
-                      onChange={(e) => setMagicLinkEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      required
-                      disabled={pending}
-                      className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                    />
-                  </div>
-                  <button
-                    type="submit"
+            {googleAuthEnabled === true && passwordAuthEnabled === true && (
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted-foreground">or</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+            )}
+
+            {passwordAuthEnabled === true && (
+              <form onSubmit={handleEmailSignIn} className="space-y-3">
+                <div className="space-y-1.5">
+                  <label htmlFor="email" className="text-sm font-medium">Email</label>
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
                     disabled={pending}
-                    className="w-full rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground disabled:opacity-50 transition-colors"
-                  >
-                    {pending ? 'Sending…' : 'Send sign-in link'}
-                  </button>
-                </form>
-              ) : (
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="password" className="text-sm font-medium">Password</label>
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    disabled={pending}
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                >
+                  {pending ? 'Signing in…' : 'Sign in'}
+                </button>
+              </form>
+            )}
+
+            {magicLinkEnabled === true && (
+              <button
+                type="button"
+                onClick={() => setView('magic')}
+                className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Email me a sign-in link
+              </button>
+            )}
+
+            {emailBasedMethodEnabled && (
+              <p className="pt-4 text-center">
                 <button
                   type="button"
-                  onClick={() => setMagicLinkOpen(true)}
-                  className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setView('resend')}
+                  className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors"
                 >
-                  Email me a sign-in link
+                  Expected a setup link? Resend
                 </button>
-              )}
-            </div>
-          )}
-
-          {emailBasedMethodEnabled && (
-            <div className="space-y-3 pt-2">
-              {resendSent ? (
-                <p className="text-sm text-muted-foreground text-center" role="status">
-                  If your account is awaiting setup, we&apos;ve emailed you a link.
-                </p>
-              ) : resendOpen ? (
-                <form onSubmit={handleResendSetupLink} className="space-y-3">
-                  <div className="space-y-1.5">
-                    <label htmlFor="resend-setup-email" className="text-sm font-medium">Email</label>
-                    <input
-                      id="resend-setup-email"
-                      type="email"
-                      value={resendEmail}
-                      onChange={(e) => setResendEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      required
-                      disabled={pending}
-                      className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={pending}
-                    className="w-full rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground disabled:opacity-50 transition-colors"
-                  >
-                    {pending ? 'Sending…' : 'Resend setup link'}
-                  </button>
-                </form>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setResendOpen(true)}
-                  className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Didn&apos;t get your setup link? Resend it
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

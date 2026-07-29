@@ -69,7 +69,12 @@ export default function ChangePasswordPage() {
     }
   }
 
-  if (loading || !user || !mustChangePassword) {
+  // Hold the neutral "Loading…" screen until `me` resolves — `hasPassword`
+  // defaults true while the query is in flight, so rendering early would flash
+  // "Change your password" to a first-time invitee before flipping to "Create
+  // your new password". `isLoading` clears on error too (fail closed via the
+  // default), so a failed query never wedges this on the placeholder.
+  if (loading || !user || !mustChangePassword || userMe.isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-sm text-muted-foreground animate-pulse">Loading…</div>
