@@ -59,3 +59,29 @@ export function formatEventDetails(
       return 'no data';
   }
 }
+
+export interface UserActivityFilters {
+  actorId: string | null;
+  action: string | null;
+  /** `YYYY-MM-DD`, as produced by `<input type="date">` — inclusive of the
+   *  whole local day. */
+  fromDate: string | null;
+  toDate: string | null;
+}
+
+export function filterUserActivity(
+  events: AuditEvent[],
+  filters: UserActivityFilters,
+): AuditEvent[] {
+  const from = filters.fromDate ? new Date(`${filters.fromDate}T00:00:00.000`) : null;
+  const to = filters.toDate ? new Date(`${filters.toDate}T23:59:59.999`) : null;
+
+  return events.filter((event) => {
+    if (filters.actorId !== null && event.actorId !== filters.actorId) return false;
+    if (filters.action !== null && event.action !== filters.action) return false;
+    const eventTime = new Date(event.timestamp);
+    if (from !== null && eventTime < from) return false;
+    if (to !== null && eventTime > to) return false;
+    return true;
+  });
+}
