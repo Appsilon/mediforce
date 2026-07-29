@@ -23,4 +23,12 @@ export class AuthorizedAuditEventRepository extends AuthorizedScope {
     this.caller.isSystemActor
       ? this.raw.getByProcess(processInstanceId)
       : this.raw.getByProcessInNamespaces(processInstanceId, [...this.caller.namespaces]);
+
+  getByNamespace = async (
+    namespace: string,
+    options?: { limit?: number },
+  ): Promise<AuditEvent[]> => {
+    if (!this.caller.isSystemActor && !this.caller.namespaces.has(namespace)) return [];
+    return this.raw.getByNamespace(namespace, options);
+  };
 }

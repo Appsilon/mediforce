@@ -124,4 +124,6 @@ export const queryKeys = {
   modelRegistry: {
     list: () => ['model-registry'] as const,
   },
+  /** Workspace-wide audit trail (Monitoring → Users tab). */
+  namespaceAuditEvents: (handle: string) => ['namespace-audit-events', handle] as const,
 } as const;

@@ -4,12 +4,14 @@ import { hashSync } from 'bcryptjs';
 const mockFindPasswordCredentialByEmail = vi.fn();
 const mockCreateDatabaseSession = vi.fn();
 const mockRecordSignIn = vi.fn();
+const mockRecordSignInAuditEvent = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
   getSharedPostgresClient: () => ({ db: {} }),
   findPasswordCredentialByEmail: (...args: unknown[]) => mockFindPasswordCredentialByEmail(...args),
   createDatabaseSession: (...args: unknown[]) => mockCreateDatabaseSession(...args),
   recordSignIn: (...args: unknown[]) => mockRecordSignIn(...args),
+  recordSignInAuditEvent: (...args: unknown[]) => mockRecordSignInAuditEvent(...args),
   SESSION_TTL_MS: 30 * 24 * 60 * 60 * 1000,
 }));
 
@@ -58,6 +60,30 @@ describe('/api/auth/password-login', () => {
     expect(cookie).toContain('HttpOnly');
     // Feeds the member list's "last seen" column.
     expect(mockRecordSignIn).toHaveBeenCalledWith({}, 'user-1');
+    // Feeds the Users tab activity table (Monitoring → Users).
+    expect(mockRecordSignInAuditEvent).toHaveBeenCalledWith({}, {
+      uid: 'user-1',
+      method: { kind: 'password', ipAddress: null, userAgent: null },
+    });
+  });
+
+  it('captures the client IP and user-agent on the sign-in audit event', async () => {
+    const request = new Request('http://localhost/api/auth/password-login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-forwarded-for': '203.0.113.5, 10.0.0.1',
+        'user-agent': 'Mozilla/5.0 (Test)',
+      },
+      body: JSON.stringify({ email: 'alice@example.com', password: PASSWORD }),
+    });
+
+    await POST(request);
+
+    expect(mockRecordSignInAuditEvent).toHaveBeenCalledWith({}, {
+      uid: 'user-1',
+      method: { kind: 'password', ipAddress: '203.0.113.5', userAgent: 'Mozilla/5.0 (Test)' },
+    });
   });
 
   it('uses the __Secure- cookie name over https', async () => {

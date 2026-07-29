@@ -18,4 +18,11 @@ export interface AuditRepository {
     actorId: string,
     options?: { limit?: number },
   ): Promise<AuditEvent[]>;
+  /** Every event whose resolved workspace is `namespace` — including
+   *  parent-less events written with an explicit `namespace` hint (e.g.
+   *  sign-ins). Newest first. */
+  getByNamespace(
+    namespace: string,
+    options?: { limit?: number },
+  ): Promise<AuditEvent[]>;
 }

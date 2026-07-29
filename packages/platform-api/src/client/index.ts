@@ -102,6 +102,8 @@ import {
   GetProcessOutputSchema,
   ListAuditEventsInputSchema,
   ListAuditEventsOutputSchema,
+  ListNamespaceAuditEventsInputSchema,
+  ListNamespaceAuditEventsOutputSchema,
   ListAgentEventsInputSchema,
   ListAgentEventsOutputSchema,
   GetProcessStepsInputSchema,
@@ -370,6 +372,8 @@ import {
   type GetProcessOutput,
   type ListAuditEventsInput,
   type ListAuditEventsOutput,
+  type ListNamespaceAuditEventsInput,
+  type ListNamespaceAuditEventsOutput,
   type ListAgentEventsInput,
   type ListAgentEventsOutput,
   type GetProcessStepsInput,
@@ -543,6 +547,9 @@ export class Mediforce {
   readonly processes: {
     get: (input: GetProcessInput) => Promise<GetProcessOutput>;
     listAuditEvents: (input: ListAuditEventsInput) => Promise<ListAuditEventsOutput>;
+    listNamespaceAuditEvents: (
+      input: ListNamespaceAuditEventsInput,
+    ) => Promise<ListNamespaceAuditEventsOutput>;
     agentEvents: (input: ListAgentEventsInput) => Promise<ListAgentEventsOutput>;
     getSteps: (input: GetProcessStepsInput) => Promise<GetProcessStepsOutput>;
   };
@@ -872,6 +879,16 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.processes.listAuditEvents');
         return ListAuditEventsOutputSchema.parse(body);
+      },
+      listNamespaceAuditEvents: async (input) => {
+        const validated = ListNamespaceAuditEventsInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          limit: validated.limit !== undefined ? String(validated.limit) : undefined,
+        });
+        const res = await this.request(`/api/audit-events${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.processes.listNamespaceAuditEvents');
+        return ListNamespaceAuditEventsOutputSchema.parse(body);
       },
       agentEvents: async (input) => {
         const validated = ListAgentEventsInputSchema.parse(input);

@@ -56,4 +56,31 @@ test.describe('Monitoring Journey', () => {
     await expect(page.getByRole('heading', { name: 'By role' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'By assignee' })).toBeVisible();
   });
+
+  test('Users tab shows real, workspace-wide user activity — not mocked data', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/monitoring`);
+    await page.getByRole('tab', { name: 'Users' }).click();
+
+    for (const header of ['Date & Time', 'User', 'Event', 'Details']) {
+      await expect(page.getByRole('columnheader', { name: header })).toBeVisible({ timeout: 10_000 });
+    }
+
+    // All four event types the table understands, each backed by a real
+    // seeded audit_events row (see seed-data.ts's audit-signin-*,
+    // audit-workflow-*, audit-task-completed fixtures).
+    await expect(page.getByText('Sign in').first()).toBeVisible();
+    await expect(page.getByText('Workflow triggered')).toBeVisible();
+    await expect(page.getByText('Workflow cancelled')).toBeVisible();
+    await expect(page.getByText('Task completed')).toBeVisible();
+
+    // Details resolve real data, not placeholders: IP for password sign-in,
+    // provider for OAuth sign-in, the actual workflow name (joined via
+    // useProcessNameMap), and the formatted step name.
+    await expect(page.getByText('IP 203.0.113.42')).toBeVisible();
+    await expect(page.getByText('Signed in via google (SSO)')).toBeVisible();
+    await expect(page.getByText('Supply Chain Review')).toBeVisible();
+    await expect(page.getByText('Data Quality Review')).toBeVisible();
+    await expect(page.getByText('Manager Approval')).toBeVisible();
+  });
 });

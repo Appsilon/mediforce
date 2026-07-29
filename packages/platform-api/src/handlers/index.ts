@@ -16,6 +16,7 @@ export { validateModels, type ValidateModelsDeps } from './models/validate-model
 
 export { listAgentEvents } from './processes/list-agent-events';
 export { listAuditEvents } from './processes/list-audit-events';
+export { listNamespaceAuditEvents } from './processes/list-namespace-audit-events';
 export { getProcessSteps } from './processes/get-process-steps';
 export { cancelRun } from './processes/cancel-run';
 export { resumeRun } from './processes/resume-run';

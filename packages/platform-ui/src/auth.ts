@@ -12,6 +12,7 @@ import {
   authVerificationTokens,
   getUserRoles,
   recordSignIn,
+  recordSignInAuditEvent,
   resolveEmailSenderFromEnv,
   findPasswordCredentialByEmail,
 } from '@mediforce/platform-infra';
@@ -163,8 +164,16 @@ export function buildAuthConfig(): NextAuthConfig {
     events: {
       // Fires once per sign-in, unlike the `session` callback which runs on
       // every session read — see `recordSignIn`.
-      async signIn({ user }) {
-        if (typeof user.id === 'string') await recordSignIn(db, user.id);
+      async signIn({ user, account }) {
+        if (typeof user.id !== 'string') return;
+        await recordSignIn(db, user.id);
+        // Auth.js v5's signIn event never receives the request object, so
+        // IP/user-agent aren't capturable here — the provider name (real,
+        // not guessed) is what stands in for "how" on the Users tab.
+        await recordSignInAuditEvent(db, {
+          uid: user.id,
+          method: { kind: 'oauth', provider: account?.provider ?? 'unknown' },
+        });
       },
     },
   };
