@@ -189,6 +189,19 @@ export function WorkflowEditorCanvas({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't hijack native undo/redo while the user is typing in a form field
+      // or the JSON/code editor — this shortcut is only for the diagram's own
+      // edit history.
+      const target = e.target as HTMLElement | null;
+      if (
+        target !== null &&
+        (target.isContentEditable ||
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.closest('.cm-editor') !== null)
+      ) {
+        return;
+      }
       if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
         undoEdit();
@@ -350,7 +363,20 @@ export function WorkflowEditorCanvas({
 
   const removeStep = useCallback((stepId: string) => {
     saveSnapshot();
-    setEditedSteps((prev) => prev.filter((s) => s.id !== stepId));
+    // A verdict pointing at the deleted step would dangle (review/decision steps
+    // route by verdict target, independently of transitions). Bridge it to the
+    // step's successor — its first outgoing target, falling back to the terminal
+    // step — mirroring how the transition rewiring below bridges incoming edges
+    // to outgoing ones.
+    const successorId =
+      editedTransitions.find((t) => t.from === stepId)?.to
+      ?? editedSteps.find((s) => s.type === 'terminal')?.id;
+    setEditedSteps((prev) => {
+      const filtered = prev.filter((s) => s.id !== stepId);
+      return successorId !== undefined
+        ? retargetVerdictTargets(filtered, 'any', stepId, successorId)
+        : filtered;
+    });
     setEditedTransitions((prev) => {
       const incoming = prev.filter((t) => t.to === stepId);
       const outgoing = prev.filter((t) => t.from === stepId);
@@ -361,7 +387,7 @@ export function WorkflowEditorCanvas({
       return [...unrelated, ...rewired];
     });
     if (selectedStepId === stepId) setSelectedStepId(null);
-  }, [selectedStepId, saveSnapshot]);
+  }, [selectedStepId, saveSnapshot, editedTransitions, editedSteps]);
 
   const moveStep = useCallback((stepId: string, direction: 'up' | 'down') => {
     saveSnapshot();
@@ -429,6 +455,17 @@ export function WorkflowEditorCanvas({
   const applyJson = () => {
     try {
       const doc = JSON.parse(jsonDraft) as Record<string, unknown>;
+      // This editor applies the graph (steps + transitions) only — the other
+      // authorable fields (title, triggers, metadata, …) are page state, not
+      // canvas state. Rather than silently discard edits to them, refuse and
+      // point the user at where those fields live.
+      const { steps: _steps, transitions: _transitions, ...nonGraphFields } = doc;
+      if (JSON.stringify(nonGraphFields) !== JSON.stringify(wdJsonFields ?? {})) {
+        setJsonError(
+          'This editor applies steps & transitions only. Edit other fields (title, triggers, metadata, …) in workflow settings, then reapply.',
+        );
+        return;
+      }
       const stepsResult = WorkflowStepSchema.array().safeParse(doc?.steps);
       if (!stepsResult.success) {
         setJsonError(`steps: ${stepsResult.error.issues[0]?.message ?? 'invalid'}`);
