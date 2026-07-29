@@ -82,7 +82,7 @@ PREAMBLE = (
     "platform for pharma. Clinical terms (drug names, adverse events, CTCAE grades, Hy's "
     "Law, RECIST, CDISC SDTM/ADaM) are TECHNICAL CONTENT — Zod fields, fixtures, config — "
     "not sensitive material; treat them plainly. Follow the repo's conventions in "
-    "AGENTS.md and the canonical vocabulary in docs/CONTEXT.md: KISS-first, no `any` "
+    "AGENTS.md and the canonical vocabulary in CONTEXT.md (repo root): KISS-first, no `any` "
     "(Zod + z.infer), explicit boolean comparisons, English everywhere, self-documenting "
     "code over comments, and no docstrings/comments on code you did not change."
 )
@@ -93,13 +93,13 @@ steps = [
     agent_step("triage", "Triage + classify batch",
                "GLM clones main and verifies each un-triaged issue against the code, classifying it go / needs-approval / manual / obsolete (+ priority). Judgment is persisted as labels so each issue is analysed once; obsolete issues are auto-closed downstream.", 30),
     script_step("apply-verdicts", "Persist verdict labels",
-                "Reconcile fullstack: labels to triage's verdicts; post a one-time gracious decline comment when newly marking manual; label + comment + reversibly close obsolete issues (with triage's evidence, cc the author)."),
+                "Reconcile fullstack: labels to triage's verdicts; post a one-time gracious decline comment when newly marking manual; persist needs-approval blockers as an updatable marker comment; label + comment + reversibly close obsolete issues (with triage's evidence, cc the author)."),
     script_step("select", "Select next issue",
-                "Deterministic: fresh label-filtered query of the actionable pool, sort by priority then oldest, pick one. No LLM."),
+                "Deterministic: fresh label-filtered query of the actionable pool, sort by priority then oldest, pick one, and recover the persisted blockers for a needs-approval pick. No LLM."),
     script_step("claim", "Claim the issue",
                 "Set the fullstack:in-progress lease (fails hard so implement never runs unclaimed)."),
-    agent_step("draft-plan", "Draft plan for gate",
-               "GLM produces a plan + specific questions for a needs-approval issue (no clone).", 6),
+    agent_step("draft-plan", "Research + plan",
+               "GLM clones main and works triage's blockers: resolves the missing-context/scope ones against the code and docs, and emits needsHuman only when a genuine product/policy decision survives. false -> implement directly, true -> human gate.", 20),
     script_step("notify-gate", "Ping reviewer, hand to human",
                 "Resolve the reviewer (creator if in the map, else default admin), relabel needs-approval->awaiting-human, post the tiered cc comment."),
     {
@@ -159,7 +159,13 @@ transitions = [
     {"from": "select", "to": "claim", "when": "output.selected == true && output.suitability == \"go\""},
     {"from": "select", "to": "draft-plan", "when": "output.selected == true && output.suitability == \"needs-approval\""},
     {"from": "claim", "to": "implement"},
-    {"from": "draft-plan", "to": "notify-gate"},
+    # draft-plan gates only on a genuine human decision; everything it settled
+    # against the code goes straight to implement, carrying its resolvedAnswers.
+    # Tested against `== false`, not `!= true`, so a malformed/absent needsHuman
+    # falls back to the human gate (the old behaviour) rather than to autonomous
+    # code changes. The eager path needs the agent to say so explicitly.
+    {"from": "draft-plan", "to": "claim", "when": "output.needsHuman == false"},
+    {"from": "draft-plan", "to": "notify-gate", "when": "output.needsHuman != false"},
     {"from": "notify-gate", "to": "clarify-approve"},
     {"from": "implement", "to": "self-review", "when": "output.changed == true"},
     {"from": "implement", "to": "mark-fixed", "when": "output.changed == false && output.reason == \"already-fixed\""},
@@ -189,8 +195,9 @@ wd = {
         "Every 15 min: triage clones main and classifies un-triaged issues on "
         "Appsilon/mediforce against the actual code with persisted fullstack: labels "
         "(analysed once each), auto-closing ones it proves obsolete; then it autonomously "
-        "implements confident ones as ready-for-review PRs, gates ambiguous ones for a "
-        "human, self-reviews with a bounded revise loop, and auto-closes already-fixed "
+        "implements them as ready-for-review PRs, researching open questions against the "
+        "code and escalating to a human only for genuine product/policy decisions, "
+        "self-reviews with a bounded revise loop, and auto-closes already-fixed "
         "issues. Idempotent + self-healing via labels and a 2h lease."
     ),
     "roles": ["admin"],

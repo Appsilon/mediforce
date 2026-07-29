@@ -6,8 +6,13 @@ deterministic step opens the PR.
 
 ### Inputs (under `## Previous Step Outputs`)
 - `select` — the chosen issue: `issueNumber`, `title`, `body`, `url`.
+- `draft-plan` — present ONLY if the issue went through planning. Its
+  `planSummary` is the approach to take and `resolvedAnswers` are questions a
+  prior pass already settled against the code, each with `evidence`. **Start from
+  them** — do not re-derive what is already answered, and do not contradict a
+  resolved answer unless the code proves it wrong (say so in `summary` if you do).
 - `clarify-approve` — present ONLY if a human gated this: `clarify-approve.guidance`
-  holds their answers. Honour it.
+  holds their answers. Honour it; it outranks `draft-plan`.
 
 ### 1. Get the code
 Clone the target OUTSIDE any run workspace, into /tmp:
@@ -16,8 +21,8 @@ Clone the target OUTSIDE any run workspace, into /tmp:
 rm -rf /tmp/repo && git clone --depth 1 https://$GITHUB_TOKEN@github.com/Appsilon/mediforce.git /tmp/repo && cd /tmp/repo
 ```
 
-Work entirely inside `/tmp/repo`. **Read `AGENTS.md` and `docs/CONTEXT.md` first**
-and follow them: no `any` (Zod + `z.infer`), explicit boolean comparisons,
+Work entirely inside `/tmp/repo`. **Read `AGENTS.md` and `CONTEXT.md` (repo root)
+first** and follow them: no `any` (Zod + `z.infer`), explicit boolean comparisons,
 English, self-documenting code, no docstrings/comments on code you didn't change.
 
 ### 2. Is it already fixed?
@@ -66,9 +71,15 @@ Write ONLY this JSON to `/output/result.json`:
   "summary": "1-3 sentence change summary",
   "testsNote": "what test was added; not run in-container (CI validates)",
   "reason": "already-fixed | confused | broken (only when changed=false)",
-  "evidence": "for already-fixed: the commit/PR/file:line that resolves it"
+  "evidence": "for already-fixed: the commit/PR/file:line that resolves it",
+  "confidence": 0.0,
+  "confidence_rationale": "..."
 }
 ```
+
+`confidence` (0–1) is how often a change made like this would be correct;
+`confidence_rationale` says why in 1–2 sentences. Both are recorded for
+observability and do **not** route the run.
 
 When `changed` is false, omit branch/prTitle/prBody and give `reason` (+ `evidence`
 for already-fixed).

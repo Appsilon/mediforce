@@ -29,7 +29,7 @@ tell us if you got it. This is a bounded loop; make each round count.
    cd /tmp/cifix && git fetch --depth 50 origin <publish.branch> && git checkout <publish.branch>
    ```
 3. **Fix the reported failures** following repo conventions (`AGENTS.md`,
-   `docs/CONTEXT.md`): no `any` (Zod + `z.infer`), explicit boolean comparisons,
+   `CONTEXT.md`): no `any` (Zod + `z.infer`), explicit boolean comparisons,
    English, self-documenting code, no docstrings/comments on code you did not
    change. Address the CI errors specifically — a typecheck error names the file
    and position; a failing test names the spec. Keep the fix minimal and on-topic

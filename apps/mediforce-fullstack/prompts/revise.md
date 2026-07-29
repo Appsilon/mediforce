@@ -11,7 +11,7 @@ and re-push. This is a bounded loop (max 2 passes); make the concerns count.
 
 ### Do
 Clone and check out the branch, apply the fixable concerns following repo
-conventions (`AGENTS.md`, `docs/CONTEXT.md`), commit, and re-push the SAME branch:
+conventions (`AGENTS.md`, `CONTEXT.md`), commit, and re-push the SAME branch:
 
 ```
 rm -rf /tmp/revise && git clone --depth 1 https://$GITHUB_TOKEN@github.com/Appsilon/mediforce.git /tmp/revise
