@@ -5,7 +5,9 @@
 
 services:
   redis:
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    # No `command` override here on purpose — compose replaces it wholesale, so
+    # restating it would drop the memory ceiling set in docker-compose.prod.yml.
+    # --requirepass now lives there and reads the same ${REDIS_PASSWORD}.
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
 

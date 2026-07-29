@@ -7,14 +7,28 @@ let sharedQueue: Queue | null = null;
 let sharedQueueEvents: QueueEvents | null = null;
 
 /**
- * Retention is bounded by age as well as count because job payloads carry
- * base64 file contents — a few hundred retained jobs is enough to outgrow a
- * modest Redis memory cap and get the server OOM-killed mid-run.
+ * A job either enters Redis promptly or the queue is not usable. Bounding the
+ * dispatch is what makes that distinction observable: `queue.add` first awaits
+ * BullMQ's connection promise, which settles only on 'ready' or 'end', and
+ * BullMQ's default retry strategy never gives up. A Redis that is unreachable
+ * when the Queue is first constructed therefore leaves `add` pending forever
+ * — `enableOfflineQueue: false` never gets a say, because the command is never
+ * dispatched. Without this deadline the caller waits on a job that was never
+ * queued until its step timeout fires, reporting an outage as a script timeout.
  */
-const JOB_RETENTION = {
-  removeOnComplete: { count: 20, age: 60 * 60 },
-  removeOnFail: { count: 50, age: 24 * 60 * 60 },
-} as const;
+const DISPATCH_TIMEOUT_MS = 10_000;
+
+async function withDeadline<T>(work: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} did not settle within ${timeoutMs}ms`)), timeoutMs);
+  });
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 async function getQueue(): Promise<Queue> {
   if (!sharedQueue) {
@@ -25,7 +39,13 @@ async function getQueue(): Promise<Queue> {
       // was never dispatched until its step timeout fires, which reports the
       // outage as "script execution timed out" with no error attached.
       connection: { ...getRedisConnection(), enableOfflineQueue: false },
-      defaultJobOptions: { ...JOB_RETENTION },
+      // Retention is bounded by age as well as count because job payloads carry
+      // base64 file contents — a few hundred retained jobs is enough to outgrow
+      // a modest Redis memory cap and get the server OOM-killed mid-run.
+      defaultJobOptions: {
+        removeOnComplete: { count: 20, age: 60 * 60 },
+        removeOnFail: { count: 50, age: 24 * 60 * 60 },
+      },
     });
   }
   return sharedQueue;
@@ -55,11 +75,16 @@ export async function enqueueDockerJob(data: DockerJobData): Promise<DockerJobRe
 
   let job: Awaited<ReturnType<Queue['add']>>;
   try {
-    job = await queue.add('docker-run', data, { jobId });
+    job = await withDeadline(
+      queue.add('docker-run', data, { jobId }),
+      DISPATCH_TIMEOUT_MS,
+      'queue.add',
+    );
   } catch (error) {
-    const cause = error instanceof Error ? error.message : String(error);
+    const reason = error instanceof Error ? error.message : String(error);
     throw new Error(
-      `Container queue unavailable — could not dispatch '${data.stepId}' (job ${jobId}) to Redis: ${cause}`,
+      `Container queue unavailable — could not dispatch '${data.stepId}' (job ${jobId}) to Redis: ${reason}`,
+      { cause: error },
     );
   }
 

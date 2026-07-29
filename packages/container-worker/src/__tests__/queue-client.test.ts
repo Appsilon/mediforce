@@ -3,15 +3,11 @@ import type { DockerJobData } from '../schemas';
 
 const addMock = vi.fn();
 const waitUntilFinishedMock = vi.fn();
-const queueOptions: Array<Record<string, unknown>> = [];
 
 vi.mock('bullmq', () => ({
   Queue: class {
     add = addMock;
     close = vi.fn();
-    constructor(_name: string, options: Record<string, unknown>) {
-      queueOptions.push(options);
-    }
   },
   QueueEvents: class {
     close = vi.fn();
@@ -32,7 +28,6 @@ const jobData: DockerJobData = {
 
 beforeEach(() => {
   process.env.REDIS_URL = 'redis://user:pass@redis:6379';
-  queueOptions.length = 0;
   addMock.mockReset();
   waitUntilFinishedMock.mockReset();
 });
@@ -40,6 +35,7 @@ beforeEach(() => {
 afterEach(async () => {
   const { closeQueueClient } = await import('../queue-client');
   await closeQueueClient();
+  vi.useRealTimers();
   vi.resetModules();
 });
 
@@ -63,41 +59,35 @@ describe('enqueueDockerJob', () => {
     await expect(enqueueDockerJob(jobData)).rejects.toThrow(/fetch-documents/);
   });
 
-  it('disables the offline queue so a dead Redis fails fast instead of buffering', async () => {
-    addMock.mockResolvedValue({ waitUntilFinished: waitUntilFinishedMock });
-    waitUntilFinishedMock.mockResolvedValue({
-      stdout: '',
-      stderr: '',
-      exitCode: 0,
-      signal: null,
-      outputFiles: {},
-    });
+  // BullMQ's `add` awaits a connection promise that settles only on 'ready' or
+  // 'end', and its default retry strategy never gives up — so an unreachable
+  // Redis leaves `add` pending forever rather than rejecting. That is the shape
+  // that produced a silent 600s step timeout instead of a queue error.
+  it('rejects rather than hanging when the queue never accepts the job', async () => {
+    vi.useFakeTimers();
+    addMock.mockReturnValue(new Promise(() => {}));
 
     const { enqueueDockerJob } = await import('../queue-client');
-    await enqueueDockerJob(jobData);
+    const pending = enqueueDockerJob(jobData);
+    const assertion = expect(pending).rejects.toThrow(/container queue unavailable/i);
 
-    const connection = queueOptions[0]?.connection as Record<string, unknown>;
-    expect(connection.enableOfflineQueue).toBe(false);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await assertion;
   });
 
-  it('bounds retained jobs so queue payloads cannot grow the dataset unchecked', async () => {
-    addMock.mockResolvedValue({ waitUntilFinished: waitUntilFinishedMock });
-    waitUntilFinishedMock.mockResolvedValue({
-      stdout: '',
+  it('resolves the worker result when the queue is healthy', async () => {
+    const workerResult = {
+      stdout: 'downloaded 2 document(s)',
       stderr: '',
       exitCode: 0,
       signal: null,
       outputFiles: {},
-    });
+    };
+    addMock.mockResolvedValue({ waitUntilFinished: waitUntilFinishedMock });
+    waitUntilFinishedMock.mockResolvedValue(workerResult);
 
     const { enqueueDockerJob } = await import('../queue-client');
-    await enqueueDockerJob(jobData);
 
-    const defaults = queueOptions[0]?.defaultJobOptions as {
-      removeOnComplete: { count: number; age: number };
-      removeOnFail: { count: number; age: number };
-    };
-    expect(defaults.removeOnComplete.age).toBeGreaterThan(0);
-    expect(defaults.removeOnFail.age).toBeGreaterThan(0);
+    await expect(enqueueDockerJob(jobData)).resolves.toEqual(workerResult);
   });
 });

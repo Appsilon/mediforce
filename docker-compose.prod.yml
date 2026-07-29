@@ -27,15 +27,27 @@ services:
   redis:
     image: redis:8-alpine
     restart: unless-stopped
-    # maxmemory must stay below mem_limit. Redis cannot see the cgroup cap, so
-    # without its own ceiling it grows until the kernel SIGKILLs it (exit 137)
-    # and then crash-loops reloading an RDB it has no room for. noeviction is
-    # required by BullMQ — jobs must never be evicted out from under a run, so
-    # hitting the ceiling fails writes loudly instead of losing queue state.
-    command: >-
-      redis-server
-      --maxmemory ${REDIS_MAXMEMORY:-768mb}
-      --maxmemory-policy noeviction
+    # Redis cannot see the cgroup cap, so without a ceiling of its own it grows
+    # until the kernel SIGKILLs it (exit 137) and then crash-loops reloading an
+    # RDB it has no room for. maxmemory bounds the dataset while mem_limit
+    # bounds RSS, and RSS additionally carries allocator fragmentation, the
+    # bundled-module baseline, client output buffers and copy-on-write during
+    # BGSAVE — hence maxmemory at half of mem_limit, not just "below" it.
+    # noeviction is required by BullMQ: jobs must never be evicted out from
+    # under a run, so hitting the ceiling fails writes loudly instead of
+    # silently losing queue state.
+    #
+    # Keep the whole command here. Compose REPLACES `command` rather than
+    # merging it, so an overlay that redefines it (docker-compose.staging.yml
+    # once did, to add --requirepass) silently drops every flag below.
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:-}
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-512mb}
+      - --maxmemory-policy
+      - noeviction
     mem_limit: ${REDIS_MEM_LIMIT:-1g}
     volumes:
       - redis-data:/data
