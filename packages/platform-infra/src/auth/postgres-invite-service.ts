@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import type { Database } from '../postgres/client';
+import { authAccounts } from '../postgres/schema/auth-account';
 import { authSessions } from '../postgres/schema/auth-session';
 import { authUsers } from '../postgres/schema/auth-user';
 import { userRoles } from '../postgres/schema/user-role';
@@ -95,12 +96,18 @@ export class PostgresInviteService {
   }
 
   /**
-   * A seed-based invite is "pending" while the invitee still needs to
-   * establish a session (PLAN-0002 §3.1): no `auth_sessions` row exists for the
-   * uid AND no password has been set (`auth_users.password_hash` is null, i.e.
-   * they never signed in via Credentials and never linked Google). An unknown
-   * uid is treated as not pending so resend-invite surfaces a clean
-   * precondition failure rather than re-notifying a non-existent account.
+   * A seed-based invite is "pending" while the invitee has never established
+   * an identity (PLAN-0002 §3.1). Not pending when ANY of these hold:
+   *   - an `auth_sessions` row exists (they have signed in), OR
+   *   - an `auth_accounts` row exists (they linked an OAuth/OIDC provider,
+   *     e.g. Google — such users legitimately have no password), OR
+   *   - `auth_users.password_hash` is set (they chose a Credentials password).
+   * An OAuth-only user has no password yet is fully set up, so the
+   * `auth_accounts` check must come before the password check — otherwise a
+   * resend-invite would email an existing Google user a bogus "set up your
+   * account" link. An unknown uid is treated as not pending so resend-invite
+   * surfaces a clean precondition failure rather than re-notifying a
+   * non-existent account.
    */
   async isInvitePending(uid: string): Promise<boolean> {
     const sessions = await this.db
@@ -109,6 +116,13 @@ export class PostgresInviteService {
       .where(eq(authSessions.userId, uid))
       .limit(1);
     if (sessions.length > 0) return false;
+
+    const accounts = await this.db
+      .select({ provider: authAccounts.provider })
+      .from(authAccounts)
+      .where(eq(authAccounts.userId, uid))
+      .limit(1);
+    if (accounts.length > 0) return false;
 
     const users = await this.db
       .select({ passwordHash: authUsers.passwordHash })

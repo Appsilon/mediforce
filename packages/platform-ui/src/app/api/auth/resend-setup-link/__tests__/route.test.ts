@@ -16,6 +16,7 @@ vi.mock('@mediforce/platform-infra', () => ({
 const mockIsInvitePending = vi.fn();
 const mockSetMustChangePassword = vi.fn();
 const mockSendActivationEmail = vi.fn();
+const mockPlatformSettingsGet = vi.fn();
 
 let inviteNotificationService: { sendActivationEmail: typeof mockSendActivationEmail } | null = {
   sendActivationEmail: mockSendActivationEmail,
@@ -25,6 +26,7 @@ vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
     inviteService: { isInvitePending: mockIsInvitePending },
     userProfileRepo: { setMustChangePassword: mockSetMustChangePassword },
+    platformSettingsRepo: { get: mockPlatformSettingsGet },
     inviteNotificationService,
   }),
 }));
@@ -56,6 +58,7 @@ describe('POST /api/auth/resend-setup-link', () => {
     mockIsInvitePending.mockResolvedValue(true);
     mockSetMustChangePassword.mockResolvedValue(undefined);
     mockSendActivationEmail.mockResolvedValue(undefined);
+    mockPlatformSettingsGet.mockResolvedValue(null);
   });
 
   it('[HAPPY] pending + allowlisted → sends activation email with only toEmail and flags must-change-password', async () => {
@@ -65,6 +68,18 @@ describe('POST /api/auth/resend-setup-link', () => {
     expect(await res.json()).toEqual({ ok: true });
     expect(mockSetMustChangePassword).toHaveBeenCalledWith('uid-pending', true);
     expect(mockSendActivationEmail).toHaveBeenCalledWith({ toEmail: 'pending@example.test' });
+  });
+
+  it('[BASEURL] passes the configured platform.baseUrl (normalized) to the activation email', async () => {
+    mockPlatformSettingsGet.mockResolvedValue('https://phuse.mediforce.ai/');
+
+    const res = await POST(makeJsonRequest({ email: 'pending@example.test' }));
+
+    expect(res.status).toBe(200);
+    expect(mockSendActivationEmail).toHaveBeenCalledWith({
+      toEmail: 'pending@example.test',
+      baseUrl: 'https://phuse.mediforce.ai',
+    });
   });
 
   it('[ENUM] unknown email → no send, same generic 200', async () => {

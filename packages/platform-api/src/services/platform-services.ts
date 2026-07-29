@@ -65,7 +65,7 @@ import {
   type DockerImagesService,
 } from './docker-images-service';
 import { sendWorkspaceNotificationEmail, sendInviteSetupEmail } from './invite-emails';
-import { normalizeBaseUrl } from '../contract/config';
+import { normalizeBaseUrl, resolveInviteAppUrl } from '../contract/config';
 import type {
   InviteNotificationService,
   InviteService,
@@ -355,10 +355,11 @@ export function getPlatformServices(): PlatformServices {
   // or by setting a password. `PostgresInviteService` structurally implements
   // the framework-free `InviteService` port handlers consume.
   const inviteService: InviteService = new PostgresInviteService(pg);
-  // `appUrl` matches the legacy invite route's fallback so dev-without-
-  // NEXT_PUBLIC_PLATFORM_URL still renders sensible links.
-  const inviteAppUrl =
-    process.env.NEXT_PUBLIC_PLATFORM_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
+  // Construction-time fallback app URL for invite/activation emails — used when
+  // a send supplies no per-deployment `platform.baseUrl`. Resolves from the
+  // canonical `APP_BASE_URL`/`NEXT_PUBLIC_APP_URL` vars (normalized), only
+  // falling back to localhost in dev. See `resolveInviteAppUrl`.
+  const inviteAppUrl = resolveInviteAppUrl();
   const senderName = resolvedEmail?.senderName ?? 'Mediforce';
   const inviteNotificationService = emailSender
     ? new EmailInviteNotificationService(

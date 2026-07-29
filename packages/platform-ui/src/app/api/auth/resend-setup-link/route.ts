@@ -4,6 +4,7 @@ import {
   getSharedPostgresClient,
   findPasswordCredentialByEmail,
 } from '@mediforce/platform-infra';
+import { PLATFORM_BASE_URL_SETTING_KEY, normalizeBaseUrl } from '@mediforce/platform-api/contract';
 import { getPlatformServices } from '@/lib/platform-services';
 import { parseAllowedDomains, isEmailDomainAllowed } from '@/lib/email-allowlist';
 
@@ -79,8 +80,18 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (services.inviteNotificationService !== null) {
     try {
       await services.userProfileRepo.setMustChangePassword(user.id, true);
+      // Prefer the deployment's configured `platform.baseUrl` setting (same as
+      // the admin invite/resend handlers) so a deployment that set only the DB
+      // setting — not the env var — still links to the real host rather than the
+      // adapter's construction-time env fallback.
+      const baseUrl = normalizeBaseUrl(
+        await services.platformSettingsRepo.get(PLATFORM_BASE_URL_SETTING_KEY),
+      );
       // No workspace context — the generic account-setup copy is used.
-      await services.inviteNotificationService.sendActivationEmail({ toEmail: email });
+      await services.inviteNotificationService.sendActivationEmail({
+        toEmail: email,
+        ...(baseUrl !== undefined ? { baseUrl } : {}),
+      });
     } catch (err) {
       // An email/delivery failure must never 500 or leak — log and still return
       // the same generic 200.
