@@ -41,7 +41,10 @@ const INVALID_CREDENTIALS = { error: 'Incorrect email or password.' } as const;
 const DUMMY_HASH = '$2b$12$C6UzMDM.H6dfI/f/IKcEe.4nJmXQXbYCiL5C1xCtBHqAFwUeXPuLW';
 
 function passwordAuthEnabled(): boolean {
-  return process.env.ENABLE_PASSWORD_AUTH === 'true';
+  // On by default — a self-hosted deployment almost always wants password
+  // sign-in, and this keeps the invite / first-password flow working without an
+  // extra env flip. Set ENABLE_PASSWORD_AUTH=false for a Google/OIDC-only estate.
+  return process.env.ENABLE_PASSWORD_AUTH !== 'false';
 }
 
 /** Whether this deployment offers password sign-in — the login page gates its
@@ -90,6 +93,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(INVALID_CREDENTIALS, { status: 401 });
   }
 
+  // Open the same `auth_sessions` row + cookie every other provider gets, so
+  // revocation stays a single row delete (ADR-0002 §3).
   const sessionToken = `${randomUUID()}${randomUUID()}`.replace(/-/g, '');
   const expires = new Date(Date.now() + SESSION_TTL_MS);
   await createDatabaseSession(db, { sessionToken, userId: user.id, expires });

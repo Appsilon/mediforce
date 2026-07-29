@@ -90,3 +90,75 @@ export async function sendWorkspaceNotificationEmail(
     html,
   });
 }
+
+export interface SendInviteSetupEmailParams {
+  toEmail: string;
+  /** Absent for the self-service resend flow, which has no workspace context. */
+  inviterName?: string;
+  /** Absent for the self-service resend flow, which has no workspace context. */
+  workspaceName?: string;
+  activationUrl: string;
+  appUrl: string;
+  senderName: string;
+}
+
+/**
+ * Account-setup email for a PENDING invitee. Framed as "set up your account"
+ * (not a notification): the button is a one-time 7-day sign-in link that logs
+ * the invitee in and lands them on the create-password page.
+ *
+ * When `inviterName` + `workspaceName` are present (admin-driven invite) the
+ * copy names them ("<inviter> invited you to <workspace>"). When absent
+ * (self-service "resend my setup link" recovery) the copy is generic — the
+ * flow has no workspace context.
+ */
+export async function sendInviteSetupEmail(
+  params: SendInviteSetupEmailParams,
+  sendEmail: SendEmailFn,
+): Promise<void> {
+  const hasWorkspaceContext =
+    params.inviterName !== undefined && params.workspaceName !== undefined;
+
+  const heading = hasWorkspaceContext ? 'Set up your account' : 'Finish setting up your account';
+
+  const introHtml = hasWorkspaceContext
+    ? `<strong style="color:#09090b">${escapeHtml(params.inviterName ?? '')}</strong> invited you to
+      <strong style="color:#09090b">${escapeHtml(params.workspaceName ?? '')}</strong>. Click below to sign in and set your password.`
+    : 'Click below to sign in and set your password for your Mediforce account.';
+
+  const bodyHtml = `
+    <p style="margin:0 0 8px;font-size:22px;font-weight:600;color:#09090b;letter-spacing:-0.3px">${escapeHtml(heading)}</p>
+    <p style="margin:0 0 28px;font-size:15px;color:#71717a;line-height:1.5">
+      ${introHtml}
+    </p>
+    <a href="${escapeHtml(params.activationUrl)}" style="display:block;text-align:center;background:#1c8879;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:500">
+      Set up your account
+    </a>`;
+
+  const html = emailLayout(
+    params.senderName,
+    bodyHtml,
+    `This account-setup link was sent to ${params.toEmail} and expires in 7 days. If it has expired, request a new one at ${params.appUrl}/login. If you did not expect this email, you can safely ignore it.`,
+  );
+
+  const introText = hasWorkspaceContext
+    ? `${params.inviterName} invited you to ${params.workspaceName} on ${params.senderName}.`
+    : `Finish setting up your ${params.senderName} account.`;
+
+  const text = [
+    introText,
+    '',
+    'Click below to sign in and set your password:',
+    params.activationUrl,
+    '',
+    'This link expires in 7 days.',
+    `If it has expired, request a new one at ${params.appUrl}/login`,
+  ].join('\n');
+
+  await sendEmail({
+    to: [params.toEmail],
+    subject: `Set up your account on ${params.senderName}`,
+    text,
+    html,
+  });
+}

@@ -4,7 +4,7 @@ export const GetEmailStatusInputSchema = z.object({});
 export type GetEmailStatusInput = z.infer<typeof GetEmailStatusInputSchema>;
 
 export const GetEmailStatusOutputSchema = z.object({
-  provider: z.enum(['mailgun', 'smtp']).nullable(),
+  provider: z.enum(['mailgun', 'smtp', 'file']).nullable(),
   configured: z.boolean(),
   from: z.string().nullable(),
 });

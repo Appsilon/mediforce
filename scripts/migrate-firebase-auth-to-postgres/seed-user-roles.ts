@@ -25,8 +25,8 @@
  * Those columns were deliberately never added — nothing reads them. If a future
  * change introduces them, the raw `customClaims.role` is available on each
  * `FirebaseUserExport` to derive `deployment_admin = role === 'admin'`.
- * `password_hash` stays null (Firebase scrypt is proprietary; passwords are
- * test-only) — email/password users reset if they want one.
+ * `password_hash` stays null here: Firebase passwords are not migrated. Existing
+ * users are re-invited via the activation-link flow and set a fresh password.
  *
  * GATED: dry-run by default. It prints what it WOULD write and exits. Pass
  * `--apply` to actually upsert. Do NOT run `--apply` on staging without the
@@ -151,6 +151,8 @@ async function main(): Promise<void> {
   if (seed.authUsers.length > 0) {
     const now = new Date();
     const rows = seed.authUsers.map((user) => ({ ...user, emailVerified: now }));
+    // Idempotent: a re-run touches only email_verified, upgrading a PR1-seeded
+    // row that lacks it.
     await db
       .insert(authUsers)
       .values(rows)

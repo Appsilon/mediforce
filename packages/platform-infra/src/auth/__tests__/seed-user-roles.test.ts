@@ -18,7 +18,12 @@ describe('buildUserRolesSeed', () => {
   it('emits one auth_users row per user with email, mapping displayName/photoURL', () => {
     const seed = buildUserRolesSeed([FIXTURE[0]!]);
     expect(seed.authUsers).toEqual([
-      { id: 'u1', email: 'alice@x.com', name: 'Alice', image: 'https://img/a' },
+      {
+        id: 'u1',
+        email: 'alice@x.com',
+        name: 'Alice',
+        image: 'https://img/a',
+      },
     ]);
   });
 
@@ -38,7 +43,14 @@ describe('buildUserRolesSeed', () => {
   it('emits no roles for a user without claims but still seeds the auth_users row', () => {
     const seed = buildUserRolesSeed([FIXTURE[3]!]);
     expect(seed.userRoles).toEqual([]);
-    expect(seed.authUsers).toEqual([{ id: 'u4', email: 'dan@x.com', name: null, image: null }]);
+    expect(seed.authUsers).toEqual([
+      {
+        id: 'u4',
+        email: 'dan@x.com',
+        name: null,
+        image: null,
+      },
+    ]);
   });
 
   it('de-duplicates repeated roles within a user', () => {

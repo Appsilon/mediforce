@@ -19,6 +19,10 @@ vi.mock('@mediforce/platform-infra', () => ({
   authVerificationTokens: {},
   getUserRoles: vi.fn(async () => []),
   recordSignIn: vi.fn(async () => {}),
+  // auth.ts registers the Email provider whenever email is configured; null =
+  // no email → no Email provider, which is irrelevant to the domain-opt-out test.
+  resolveEmailSenderFromEnv: () => null,
+  findPasswordCredentialByEmail: vi.fn(async () => null),
 }));
 
 import { buildAuthConfig } from '../../auth';

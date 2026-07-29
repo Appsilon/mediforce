@@ -81,9 +81,13 @@ export default function ChangePasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-headline font-semibold tracking-tight">Set your password</h1>
+          <h1 className="text-2xl font-headline font-semibold tracking-tight">
+            {hasPassword ? 'Change your password' : 'Create your new password'}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Choose a password to continue.
+            {hasPassword
+              ? 'Set a new password to continue.'
+              : 'Set a password to finish setting up your account.'}
           </p>
         </div>
 

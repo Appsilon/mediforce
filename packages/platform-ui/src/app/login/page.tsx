@@ -18,7 +18,7 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
-  const { signInWithGoogle, signInWithEmail, user, loading, mustChangePassword, emailAuthEnabled, googleAuthEnabled } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signInWithMagicLink, user, loading, mustChangePassword, passwordAuthEnabled, googleAuthEnabled, magicLinkEnabled } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -26,6 +26,12 @@ function LoginForm() {
   const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
+  const [magicLinkOpen, setMagicLinkOpen] = React.useState(false);
+  const [magicLinkEmail, setMagicLinkEmail] = React.useState('');
+  const [magicLinkSent, setMagicLinkSent] = React.useState(false);
+  const [resendOpen, setResendOpen] = React.useState(false);
+  const [resendEmail, setResendEmail] = React.useState('');
+  const [resendSent, setResendSent] = React.useState(false);
 
   // Surface a NextAuth OAuth error bounced back as `?error=` (e.g. the sign-in
   // callback rejected an out-of-allowlist email — ADR-0002 §4a).
@@ -46,6 +52,9 @@ function LoginForm() {
         return 'This account is not permitted to sign in. Contact your administrator.';
       case 'Configuration':
         return 'Sign-in is misconfigured on the server. Contact your administrator.';
+      case 'Verification':
+        // Auth.js routes an expired / already-used magic link here.
+        return 'This sign-in link is no longer valid — it may have been used or expired. Request a new one.';
       default:
         return 'Sign in failed. Please try again.';
     }
@@ -79,6 +88,48 @@ function LoginForm() {
     }
   }
 
+  async function handleMagicLinkSignIn(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setPending(true);
+    try {
+      await signInWithMagicLink(magicLinkEmail.trim());
+      // Resolves in place (redirect: false) so we show our own confirmation
+      // rather than Auth.js's default verify-request page. The message is
+      // identical whether or not an email was actually sent (anti-enumeration —
+      // the sender gates on account existence).
+      setMagicLinkSent(true);
+    } catch {
+      setError('Sign in failed. Please try again.');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleResendSetupLink(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setPending(true);
+    try {
+      await fetch('/api/auth/resend-setup-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resendEmail.trim() }),
+      });
+      // The route always answers with the same generic 200 (anti-enumeration),
+      // so the confirmation is identical regardless of whether a link was sent.
+      setResendSent(true);
+    } catch {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  // Some email-based method exists whenever password or magic-link login is on;
+  // a deployment with no email at all can't deliver a setup link, so hide it.
+  const emailBasedMethodEnabled = passwordAuthEnabled === true || magicLinkEnabled === true;
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm space-y-6">
@@ -108,7 +159,7 @@ function LoginForm() {
             </button>
           )}
 
-          {googleAuthEnabled === true && emailAuthEnabled === true && (
+          {googleAuthEnabled === true && passwordAuthEnabled === true && (
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-border" />
               <span className="text-xs text-muted-foreground">or</span>
@@ -116,7 +167,7 @@ function LoginForm() {
             </div>
           )}
 
-          {emailAuthEnabled === true && (
+          {passwordAuthEnabled === true && (
             <form onSubmit={handleEmailSignIn} className="space-y-3">
               <div className="space-y-1.5">
                 <label htmlFor="email" className="text-sm font-medium">Email</label>
@@ -152,6 +203,88 @@ function LoginForm() {
                 {pending ? 'Signing in…' : 'Sign in'}
               </button>
             </form>
+          )}
+
+          {magicLinkEnabled === true && (
+            <div className="space-y-3">
+              {magicLinkSent ? (
+                <p className="text-sm text-muted-foreground text-center" role="status">
+                  Check your email for a sign-in link.
+                </p>
+              ) : magicLinkOpen ? (
+                <form onSubmit={handleMagicLinkSignIn} className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label htmlFor="magic-link-email" className="text-sm font-medium">Email</label>
+                    <input
+                      id="magic-link-email"
+                      type="email"
+                      value={magicLinkEmail}
+                      onChange={(e) => setMagicLinkEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      required
+                      disabled={pending}
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={pending}
+                    className="w-full rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground disabled:opacity-50 transition-colors"
+                  >
+                    {pending ? 'Sending…' : 'Send sign-in link'}
+                  </button>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setMagicLinkOpen(true)}
+                  className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Email me a sign-in link
+                </button>
+              )}
+            </div>
+          )}
+
+          {emailBasedMethodEnabled && (
+            <div className="space-y-3 pt-2">
+              {resendSent ? (
+                <p className="text-sm text-muted-foreground text-center" role="status">
+                  If your account is awaiting setup, we&apos;ve emailed you a link.
+                </p>
+              ) : resendOpen ? (
+                <form onSubmit={handleResendSetupLink} className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label htmlFor="resend-setup-email" className="text-sm font-medium">Email</label>
+                    <input
+                      id="resend-setup-email"
+                      type="email"
+                      value={resendEmail}
+                      onChange={(e) => setResendEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      required
+                      disabled={pending}
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={pending}
+                    className="w-full rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground disabled:opacity-50 transition-colors"
+                  >
+                    {pending ? 'Sending…' : 'Resend setup link'}
+                  </button>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setResendOpen(true)}
+                  className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Didn&apos;t get your setup link? Resend it
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
