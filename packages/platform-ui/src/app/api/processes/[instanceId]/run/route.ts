@@ -498,6 +498,7 @@ export async function POST(
               }
             }
 
+            const resolvedVerdicts = buildTaskVerdicts(currentStep.verdicts);
             await humanTaskRepo.create({
               id: taskId,
               processInstanceId: instanceId,
@@ -514,7 +515,7 @@ export async function POST(
               ...(currentStep.ui ? { ui: currentStep.ui } : {}),
               ...(currentStep.params?.length ? { params: currentStep.params } : {}),
               ...(options ? { options } : {}),
-              ...(buildTaskVerdicts(currentStep.verdicts) ? { verdicts: buildTaskVerdicts(currentStep.verdicts) } : {}),
+              ...(resolvedVerdicts ? { verdicts: resolvedVerdicts } : {}),
             });
 
             await auditRepo.append({
