@@ -1,4 +1,4 @@
-# ADR-0011: Unified Canvas-First Workflow Designer
+# ADR-0012: Unified Canvas-First Workflow Designer
 
 **Status:** Proposed
 **Date:** 2026-06-30
