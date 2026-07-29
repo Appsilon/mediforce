@@ -20,7 +20,7 @@ import type {
 } from '@mediforce/platform-core';
 import type { Selection, TaskVerdict } from '@mediforce/platform-core';
 import { RbacService, RbacError, normalizeSelection, buildTaskVerdicts, interpolate, toProcessDefinition } from '@mediforce/platform-core';
-import { validateStepGraph } from '../graph/graph-validator';
+import { validateStepGraph } from '@mediforce/platform-core';
 import { StepExecutor, type StepActor } from './step-executor';
 import { RoutingError, InvalidTransitionError, ParentInstanceNotFoundError } from './errors';
 import { ReviewTracker } from '../review/review-tracker';

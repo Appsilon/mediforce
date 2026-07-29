@@ -137,6 +137,10 @@ export {
   ensureEntryStepFirst,
   validateStepReferences,
   type ReferenceIssue,
+  validateStepGraph,
+  validateWorkflowGraphAndReferences,
+  type ValidationResult,
+  type WorkflowGraphValidation,
 } from './schemas/index';
 
 export type { Handle } from './schemas/handle';

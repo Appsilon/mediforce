@@ -15,8 +15,8 @@ import {
   mergeVerdictTransitions,
   ensureEntryStepFirst,
   toSlug,
+  validateWorkflowGraphAndReferences,
 } from '@mediforce/platform-core';
-import { validateWorkflowGraphAndReferences } from '@mediforce/workflow-engine';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import type { NewStepPayload } from '@/lib/control-mode';
 import { BlockPicker } from './block-picker';

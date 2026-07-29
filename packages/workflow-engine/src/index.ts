@@ -10,13 +10,15 @@ export {
 } from './engine/transition-resolver';
 export type { ResolvedTransition, TransitionContext } from './engine/transition-resolver';
 
-// Graph
+// Graph — validation gate now lives in platform-core (no engine dependency at
+// design time, per ADR-0011); re-exported here so the engine's public surface
+// is unchanged.
 export {
   validateStepGraph,
   validateWorkflowGraphAndReferences,
   type ValidationResult,
   type WorkflowGraphValidation,
-} from './graph/graph-validator';
+} from '@mediforce/platform-core';
 
 // Engine
 export { WorkflowEngine } from './engine/workflow-engine';

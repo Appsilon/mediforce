@@ -333,3 +333,10 @@ export {
   validateStepReferences,
   type ReferenceIssue,
 } from './workflow-graph';
+
+export {
+  validateStepGraph,
+  validateWorkflowGraphAndReferences,
+  type ValidationResult,
+  type WorkflowGraphValidation,
+} from './graph-validator';

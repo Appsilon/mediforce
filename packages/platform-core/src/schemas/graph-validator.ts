@@ -1,5 +1,6 @@
-import type { ProcessDefinition, WorkflowDefinition, ReferenceIssue } from '@mediforce/platform-core';
-import { toProcessDefinition, validateStepReferences } from '@mediforce/platform-core';
+import type { ProcessDefinition } from './process-definition';
+import type { WorkflowDefinition } from './workflow-definition';
+import { toProcessDefinition, validateStepReferences, type ReferenceIssue } from './workflow-graph';
 
 export interface ValidationResult {
   valid: boolean;
