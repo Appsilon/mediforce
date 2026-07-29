@@ -123,4 +123,20 @@ describe('validateStepReferences', () => {
     const issues = validateStepReferences(steps, transitions);
     expect(issues.some((i) => i.severity === 'warning' && /not upstream/.test(i.message))).toBe(true);
   });
+
+  it('accepts a quoted bracket reference to an existing upstream step', () => {
+    const { steps, transitions } = emailStep("Words: ${steps['intake'].words}");
+    expect(validateStepReferences(steps, transitions).filter((i) => i.severity === 'error')).toEqual([]);
+  });
+
+  it('accepts a double-quoted bracket reference to an existing upstream step', () => {
+    const { steps, transitions } = emailStep('Words: ${steps["intake"].words}');
+    expect(validateStepReferences(steps, transitions).filter((i) => i.severity === 'error')).toEqual([]);
+  });
+
+  it('still errors on a quoted bracket reference to a step that does not exist', () => {
+    const { steps, transitions } = emailStep("Hi ${steps['nope'].value}");
+    const issues = validateStepReferences(steps, transitions);
+    expect(issues.some((i) => i.severity === 'error' && /no step "nope" exists/.test(i.message))).toBe(true);
+  });
 });

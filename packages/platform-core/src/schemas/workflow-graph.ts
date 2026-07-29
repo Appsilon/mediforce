@@ -61,6 +61,28 @@ const HUMAN_COMPLETION_KEYS = new Set([
 
 const PLACEHOLDER_RE = /\$\{([^}]+)\}/g;
 
+/**
+ * Extract the referenced step id and the remaining property path from a
+ * `${steps…}` expression body. Supports dot notation (`steps.id.field`) and
+ * bracket notation (`steps['id']`, `steps["id"]`, `steps[id]`); surrounding
+ * quotes on a bracket key are stripped so the id matches a real step.
+ */
+function parseStepReference(raw: string): { refId: string; subPath: string } | null {
+  const after = raw.slice('steps'.length);
+  const bracket = /^\[\s*(['"]?)(.+?)\1\s*\]/.exec(after);
+  if (bracket) {
+    const refId = bracket[2].trim();
+    if (!refId) return null;
+    const subPath = after.slice(bracket[0].length).replace(/^\./, '');
+    return { refId, subPath };
+  }
+  const dot = /^\.([^.[\]]+)/.exec(after);
+  if (!dot) return null;
+  const refId = dot[1].trim();
+  if (!refId) return null;
+  return { refId, subPath: after.slice(dot[0].length).replace(/^\./, '') };
+}
+
 function collectStrings(value: unknown, out: string[]): void {
   if (typeof value === 'string') out.push(value);
   else if (Array.isArray(value)) for (const v of value) collectStrings(v, out);
@@ -114,11 +136,9 @@ export function validateStepReferences(steps: WorkflowStep[], transitions: Trans
       for (const match of str.matchAll(PLACEHOLDER_RE)) {
         const raw = match[1].trim();
         if (raw !== 'steps' && !raw.startsWith('steps.') && !raw.startsWith('steps[')) continue;
-        const rest = raw.slice('steps'.length).replace(/^[.[]/, '');
-        if (!rest) continue;
-        const refId = /^([^.[\]]+)/.exec(rest)?.[1];
-        if (!refId) continue;
-        const subPath = rest.slice(refId.length).replace(/^[.[]/, '');
+        const parsed = parseStepReference(raw);
+        if (!parsed) continue;
+        const { refId, subPath } = parsed;
 
         const target = stepById.get(refId);
         if (!target) {
