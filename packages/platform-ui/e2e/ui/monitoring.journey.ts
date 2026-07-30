@@ -39,17 +39,43 @@ test.describe('Monitoring Journey', () => {
     expect(summaryBody).toHaveProperty('summary.tasks.pending');
     expect(summaryBody).toHaveProperty('summary.tasks.claimed');
 
-    // Agents is the default active tab now — switch to Workflows to check its
-    // status cards render from the summary response, proving
-    // `MonitoringSummaryCards` mounted with the data `useMonitoringData` delivered.
-    await page.getByRole('tab', { name: 'Workflows' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Status overview' }),
-    ).toBeVisible();
-    await expect(page.getByText('Running', { exact: true })).toBeVisible();
-    await expect(page.getByText('Paused', { exact: true })).toBeVisible();
-    await expect(page.getByText('Failed', { exact: true })).toBeVisible();
-    await expect(page.getByText('Completed', { exact: true })).toBeVisible();
+    // Workflows is the default active tab — its KPI cards render from the
+    // same getWorkflowStatus-derived labels the runs table's own status
+    // badges use (no "Status overview" heading anymore — cards sit directly
+    // at the top of the tab).
+    await expect(page.getByRole('heading', { name: 'Status overview' })).toHaveCount(0);
+    // .first(): the runs table below the KPI cards renders the same words as
+    // per-row status badges, so these labels are no longer unique on the
+    // page — the KPI cards render first in DOM order.
+    await expect(page.getByText('In Progress', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Waiting for human', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Error', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Completed', { exact: true }).first()).toBeVisible();
+
+    // The "All runs" table + its filters now live in this tab (moved from
+    // the standalone /runs page) — the production/dry-run toggle and the
+    // runs table itself both render.
+    await expect(page.getByRole('button', { name: 'Production' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Show archived' })).toBeVisible();
+
+    // Clicking a KPI card filters the table to that status — a "Filtered
+    // by" chip appears, and clicking Clear removes it again.
+    await page.getByRole('button', { name: /Completed/ }).first().click();
+    await expect(page.getByText('Filtered by:')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Clear' })).toBeVisible();
+    await page.getByRole('button', { name: 'Clear' }).click();
+    await expect(page.getByText('Filtered by:')).not.toBeVisible();
+
+    // Run ID column is gone; Cost and Started are sortable (clicking
+    // doesn't error and flips the header's own sort indicator).
+    await expect(page.getByRole('columnheader', { name: 'Run ID' })).toHaveCount(0);
+    const costHeader = page.getByRole('button', { name: /^Cost/ });
+    await expect(costHeader).toBeVisible();
+    await costHeader.click();
+    await costHeader.click();
+    const startedHeader = page.getByRole('button', { name: /^Started/ });
+    await expect(startedHeader).toBeVisible();
+    await startedHeader.click();
 
     // Tasks tab reads the same `useMonitoringData` hook via the workspace-
     // scoped `tasks.list({ namespace })` call — switch and confirm it mounts.

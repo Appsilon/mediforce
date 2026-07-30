@@ -12,16 +12,16 @@ import { TasksTab } from '@/components/monitoring/tasks-tab';
 import { IntegrationsTab } from '@/components/monitoring/integrations-tab';
 
 const TABS = [
+  { value: 'workflows', label: 'Workflows' },
   { value: 'agents', label: 'Agents' },
   { value: 'users', label: 'Users' },
-  { value: 'workflows', label: 'Workflows' },
   { value: 'tasks', label: 'Tasks' },
   { value: 'integrations', label: 'Integrations' },
 ] as const;
 
 export default function MonitoringPage() {
   const { handle } = useParams<{ handle: string }>();
-  const [activeTab, setActiveTab] = useState<string>('agents');
+  const [activeTab, setActiveTab] = useState<string>('workflows');
   const monitoringData = useMonitoringData(handle);
   const { data: agentRuns, loading: agentRunsLoading } = useAgentRuns(handle);
   const processNameMap = useProcessNameMap(handle);

@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils';
 import type { InstanceStatus } from '@mediforce/platform-core';
 import { getWorkflowStatus, type WorkflowDisplayStatus } from '@/lib/workflow-status';
 
-const STATUS_STYLES: Record<WorkflowDisplayStatus, string> = {
+export const STATUS_STYLES: Record<WorkflowDisplayStatus, string> = {
   in_progress: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   waiting_for_human: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
   error: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
