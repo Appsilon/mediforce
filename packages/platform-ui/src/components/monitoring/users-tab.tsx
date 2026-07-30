@@ -144,7 +144,7 @@ export function UsersTab() {
               : filtered.map((event: AuditEvent, i) => (
                 <tr key={`${event.timestamp}-${event.actorId}-${i}`} className="hover:bg-muted/30 transition-colors">
                   <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                    {format(new Date(event.timestamp), 'MMM d, HH:mm')}
+                    {format(new Date(event.timestamp), 'yyyy-MM-dd, HH:mm')}
                   </td>
                   <td className="px-4 py-3 text-xs font-medium">
                     {memberNames.get(event.actorId) ?? event.actorId}

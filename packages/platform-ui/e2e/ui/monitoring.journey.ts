@@ -39,9 +39,10 @@ test.describe('Monitoring Journey', () => {
     expect(summaryBody).toHaveProperty('summary.tasks.pending');
     expect(summaryBody).toHaveProperty('summary.tasks.claimed');
 
-    // Workflows is the default active tab — its status cards render from the
-    // summary response, proving `MonitoringSummaryCards` mounted with the
-    // data `useMonitoringData` delivered.
+    // Agents is the default active tab now — switch to Workflows to check its
+    // status cards render from the summary response, proving
+    // `MonitoringSummaryCards` mounted with the data `useMonitoringData` delivered.
+    await page.getByRole('tab', { name: 'Workflows' }).click();
     await expect(
       page.getByRole('heading', { name: 'Status overview' }),
     ).toBeVisible();

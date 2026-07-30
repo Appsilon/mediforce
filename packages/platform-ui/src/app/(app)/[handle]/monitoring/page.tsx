@@ -21,7 +21,7 @@ const TABS = [
 
 export default function MonitoringPage() {
   const { handle } = useParams<{ handle: string }>();
-  const [activeTab, setActiveTab] = useState<string>('workflows');
+  const [activeTab, setActiveTab] = useState<string>('agents');
   const monitoringData = useMonitoringData(handle);
   const { data: agentRuns, loading: agentRunsLoading } = useAgentRuns(handle);
   const processNameMap = useProcessNameMap(handle);
