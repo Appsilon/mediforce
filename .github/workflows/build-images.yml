@@ -46,6 +46,9 @@ jobs:
       - name: Sanitise platform slug
         run: echo "PLATFORM_SLUG=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_ENV
 
+      - name: Short SHA for the version badge
+        run: echo "GIT_SHA_SHORT=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
       - name: Build & push platform-ui (${{ matrix.platform }})
         uses: docker/build-push-action@v7
         with:
@@ -54,6 +57,10 @@ jobs:
           target: runner
           platforms: ${{ matrix.platform }}
           push: true
+          # ADR-0012 — bake the git SHA into the image so the version badge is
+          # correct without any runtime injection or on-box build-arg plumbing.
+          build-args: |
+            NEXT_PUBLIC_GIT_SHA=${{ env.GIT_SHA_SHORT }}
           tags: |
             ${{ env.IMAGE_PREFIX }}-platform-ui:${{ env.PLATFORM_SLUG }}
           cache-from: type=gha,scope=platform-ui-${{ env.PLATFORM_SLUG }}

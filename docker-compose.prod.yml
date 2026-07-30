@@ -58,11 +58,9 @@ services:
   # service_completed_successfully so the app boot never races a
   # half-applied schema.
   migrate:
-    image: ghcr.io/appsilon/mediforce-migrate:latest
-    build:
-      context: .
-      dockerfile: packages/platform-ui/Dockerfile
-      target: migrate
+    # ADR-0012 — prod is pull-only. The image is the pinned :prod-current the
+    # deploy promoted; there is no on-box build.
+    image: ghcr.io/appsilon/mediforce-migrate:prod-current
     restart: "no"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-mediforce}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mediforce}
@@ -71,18 +69,8 @@ services:
         condition: service_healthy
 
   platform-ui:
-    image: ghcr.io/appsilon/mediforce-platform-ui:latest
-    build:
-      context: .
-      dockerfile: packages/platform-ui/Dockerfile
-      # Build args are for NEXT_PUBLIC_* only — those are inlined into the
-      # client bundle at build time. Auth credentials (AUTH_SECRET,
-      # GOOGLE_CLIENT_SECRET, OIDC_CLIENT_SECRET) are server-side runtime env
-      # and MUST NOT be build args: a build arg ends up in the image layer
-      # history of a registry-pushed image.
-      args:
-        - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
-        - NEXT_PUBLIC_GIT_SHA
+    # ADR-0012 — prod pulls the pinned :prod-current image; no on-box build.
+    image: ghcr.io/appsilon/mediforce-platform-ui:prod-current
     restart: unless-stopped
     mem_limit: ${PLATFORM_UI_MEM_LIMIT:-2g}
     expose:
@@ -93,10 +81,12 @@ services:
       # the `migrate` init container before this service starts
       # (depends_on: { migrate: { condition: service_completed_successfully } }).
       - DATABASE_URL=postgresql://${POSTGRES_USER:-mediforce}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mediforce}
-      # NEXT_PUBLIC_* — injected at container start by docker-entrypoint.sh
-      # (replaces __PLACEHOLDER__ values in pre-built registry images).
+      # NEXT_PUBLIC_APP_URL is per-deployment (different domains), so it is
+      # injected at container start by docker-entrypoint.sh (replaces the
+      # __NEXT_PUBLIC_APP_URL__ placeholder). NEXT_PUBLIC_GIT_SHA is
+      # deployment-invariant and baked into the image at CI build time
+      # (ADR-0012), so it is not passed here.
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
-      - NEXT_PUBLIC_GIT_SHA
       # --- Authentication: NextAuth / Auth.js v5 (ADR-0002) ---
       # Server-side only. `instrumentation-node.ts` refuses to boot without
       # AUTH_SECRET and without at least one provider (Google / password /
@@ -164,10 +154,8 @@ services:
         condition: service_completed_successfully
 
   container-worker:
-    image: ghcr.io/appsilon/mediforce-container-worker:latest
-    build:
-      context: .
-      dockerfile: packages/container-worker/Dockerfile.worker
+    # ADR-0012 — prod pulls the pinned :prod-current image; no on-box build.
+    image: ghcr.io/appsilon/mediforce-container-worker:prod-current
     restart: unless-stopped
     mem_limit: ${AGENT_WORKER_MEM_LIMIT:-1280m}
     expose:
