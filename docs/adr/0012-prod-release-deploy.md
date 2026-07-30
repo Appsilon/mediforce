@@ -62,8 +62,10 @@ image does.
 
 5. **Manual escape hatch: `workflow_dispatch(ref)`** on the same workflow, for
    the two cases a Release cannot serve:
-   - **Rollback** — dispatch the previous SHA (or `prod-previous`); the image
-     already exists, so **skip build**, just retag + pull.
+   - **Rollback** — look up the SHA currently behind `:prod-previous` in ghcr
+     (`docker manifest inspect`/the package's tag list) and dispatch that SHA
+     (`workflow_dispatch(ref)` resolves a git SHA or tag, not a docker tag). Its
+     image already exists, so the run **skips build** and just retags + pulls.
    - **Deliberate SHA at a chosen moment** — e.g. a migration that must run
      *before* the code lands. Dispatch the exact SHA after the pre-step, gated by
      the same Environment approval.

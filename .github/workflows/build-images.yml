@@ -1,9 +1,11 @@
 name: Build & Push Docker Images
 
 on:
+  # main → :latest (staging tracks this). Release/tag builds are owned by
+  # deploy-production.yml (ADR-0012), so this workflow no longer fires on v*
+  # tags — a Release must not repoint :latest or double-build.
   push:
     branches: [main]
-    tags: ['v*']
   workflow_dispatch:
 
 concurrency:

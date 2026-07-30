@@ -70,12 +70,21 @@ jobs:
         run: |
           SKIP=false
           # Only workflow_dispatch (rollback / redeploy) may skip; a release
-          # always builds so it also stamps :<tag>.
+          # always builds so it also stamps :<tag>. Skip only when ALL THREE
+          # images already exist at :<sha> — a partial set must rebuild.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if docker manifest inspect \
-              "${{ env.IMAGE_PREFIX }}-platform-ui:${{ steps.ref.outputs.sha }}" >/dev/null 2>&1; then
+            SHA="${{ steps.ref.outputs.sha }}"
+            ALL=true
+            for image in platform-ui migrate container-worker; do
+              if ! docker manifest inspect \
+                "${{ env.IMAGE_PREFIX }}-${image}:${SHA}" >/dev/null 2>&1; then
+                echo "Missing ${image}:${SHA} — will build."
+                ALL=false
+              fi
+            done
+            if [ "$ALL" = true ]; then
               SKIP=true
-              echo "Image for ${{ steps.ref.outputs.sha }} already exists — skipping build."
+              echo "All three images for ${SHA} already exist — skipping build."
             fi
           fi
           echo "skip_build=$SKIP" >> "$GITHUB_OUTPUT"
@@ -196,13 +205,17 @@ jobs:
               "${REPO}:${SHA}-linux-arm64"
           done
 
-  # Retag in ghcr: prod-previous <- (old prod-current), then prod-current <-
-  # target. First run (no prod-current yet) points both at the target.
-  promote:
+  # Gated by the `production` GitHub Environment protection rule (required
+  # reviewer). The ghcr retag lives HERE, after the approval, so a
+  # rejected/cancelled run never rotates the pointers and destroys the rollback
+  # target. Order inside the job: approval → retag prod-current/prod-previous →
+  # SSH the box to pull :prod-current.
+  deploy:
     needs: [resolve, merge]
     if: always() && needs.resolve.result == 'success' && (needs.merge.result == 'success' || needs.merge.result == 'skipped')
+    environment: production
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
       packages: write
@@ -217,6 +230,8 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      # Retag in ghcr: prod-previous <- (old prod-current), then prod-current <-
+      # target. First run (no prod-current yet) points both at the target.
       - name: Promote prod-current / prod-previous
         run: |
           SHA="${{ needs.resolve.outputs.sha }}"
@@ -233,14 +248,10 @@ jobs:
             fi
           done
 
-  # Gated by the `production` GitHub Environment protection rule (required
-  # reviewer) before it touches the box.
-  deploy:
-    needs: [resolve, promote]
-    environment: production
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
+      # If this SSH pull fails after the retag, prod-current already points at
+      # the new image while the box still runs the old one — an acceptable
+      # fix-forward state; re-dispatching this workflow (or the previous SHA)
+      # reconverges the box.
       - name: Deploy via SSH
         run: |
           mkdir -p ~/.ssh

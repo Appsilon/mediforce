@@ -13,6 +13,10 @@ set -euo pipefail
 # Staging (overlay overrides the app images back to :latest):
 #   COMPOSE_FILES='docker-compose.prod.yml docker-compose.staging.yml' \
 #     /opt/mediforce/scripts/deploy.sh <sha>
+#
+# Rollback correctness depends on the box's git clone at /opt/mediforce staying
+# FULL (not shallow): `git checkout -f <old-sha>` must resolve arbitrary historic
+# SHAs. A shallow re-provision would break checkout of an old ref.
 
 REF="${1:?Usage: deploy.sh <release-tag-or-sha>}"
 
