@@ -34,18 +34,24 @@ function connect(): postgres.Sql {
  *
  * Idempotent: re-running upserts the name + password and returns the stable
  * id, so a Playwright retry after a password change re-seeds cleanly.
+ *
+ * `newUserId` pins the id for a *new* row — pass it when the caller shares an
+ * email with the E2E fixture (`TEST_USER_ID`) so `pnpm seed:dev` and
+ * `auth-setup` agree instead of racing a random uuid against the stable id. An
+ * existing row keeps its own id, which the caller gets back.
  */
 export async function createTestUser(
   email: string,
   password: string,
   displayName: string,
+  newUserId: string = randomUUID(),
 ): Promise<string> {
   const sql = connect();
   try {
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const rows = await sql<{ id: string }[]>`
       INSERT INTO auth_users (id, email, name, email_verified, password_hash)
-      VALUES (${randomUUID()}, ${email}, ${displayName}, now(), ${passwordHash})
+      VALUES (${newUserId}, ${email}, ${displayName}, now(), ${passwordHash})
       ON CONFLICT (email) DO UPDATE SET
         name = EXCLUDED.name,
         password_hash = EXCLUDED.password_hash,
