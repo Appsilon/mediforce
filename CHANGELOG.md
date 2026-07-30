@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Security
+- Workspace members list no longer exposes each member's email or last-sign-in timestamp to plain members: `listNamespaceMembers` now returns `email: null` and `lastSignInTime: null` for non-admin callers (owner/admin/apiKey still see them), and the settings page hides the "Email" and "Last sign in" columns for non-managers. The roster — name, avatar, role and join date — stays visible to all members. `getNamespace` now returns an `adminContact` field (the primary owner's name + email) so the run-start preflight "contact your admin" hint still works for a blocked non-admin — the one member email a plain member may see.
+
 ### Changed
 - Login page reorganized to a single focused view at a time: Google / password is the clear primary, "Email me a sign-in link" is one quiet secondary link, and the rare "resend setup link" recovery is a muted footer — each secondary action swaps the whole card to its own sub-view with a Back link (follow-up to [#1019](https://github.com/Appsilon/mediforce/issues/1019)).
 - `WebhookTriggerConfigSchema` (+ its `WebhookTriggerConfig` type) moved from `schemas/workflow-definition.ts` to `schemas/trigger.ts`, next to `TriggerResourceSchema` — its only consumers are the detached `webhook` trigger row and trigger-create validation, so it no longer belongs in the now trigger-free definition module. `HttpMethodSchema` stays in `workflow-definition.ts` (still shared with the `http` action step). Pure code-organization move; the `@mediforce/platform-core` barrel exports are unchanged [#932](https://github.com/Appsilon/mediforce/issues/932).

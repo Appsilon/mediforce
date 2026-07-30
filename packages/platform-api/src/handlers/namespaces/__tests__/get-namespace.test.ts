@@ -1,8 +1,23 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
+import type { Namespace, NamespaceMember, UserDirectoryService } from '@mediforce/platform-core';
 import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index';
 import { getNamespace } from '../get-namespace';
 import { NotFoundError } from '../../../errors';
+
+const directoryWithOwnerEmail: UserDirectoryService = {
+  async getUsersByRole() {
+    return [];
+  },
+  async getUserMetadata(uid: string) {
+    if (uid !== 'uid-owner') return null;
+    return {
+      displayName: 'Acme Owner',
+      email: 'owner@acme.test',
+      lastSignInTime: '2026-05-01T10:00:00.000Z',
+      photoURL: null,
+    };
+  },
+};
 
 const ACME: Namespace = {
   handle: 'acme',
@@ -43,6 +58,36 @@ describe('getNamespace handler', () => {
 
     expect(result.namespace.handle).toBe('acme');
     expect(result.members.map((m) => m.uid)).toEqual(['uid-owner', 'uid-member']);
+  });
+
+  it('exposes the primary owner as adminContact to a plain member', async () => {
+    const scope = createTestScope({
+      namespaceRepo,
+      userDirectory: directoryWithOwnerEmail,
+      caller: userCaller('uid-member', ['acme']),
+    });
+
+    const result = await getNamespace({ handle: 'acme' }, scope);
+
+    expect(result.adminContact).toEqual({
+      displayName: 'Acme Owner',
+      email: 'owner@acme.test',
+    });
+    // Roster is still email-free — email is only in adminContact, not per row.
+    expect(result.members.every((m) => !('email' in m))).toBe(true);
+  });
+
+  it('returns null adminContact when no directory is wired', async () => {
+    const scope = createTestScope({
+      namespaceRepo,
+      userDirectory: null,
+      caller: userCaller('uid-member', ['acme']),
+    });
+
+    const result = await getNamespace({ handle: 'acme' }, scope);
+
+    // Owner exists, but with no directory there is no email to resolve.
+    expect(result.adminContact).toEqual({ displayName: null, email: null });
   });
 
   it('throws NotFoundError when the namespace does not exist', async () => {

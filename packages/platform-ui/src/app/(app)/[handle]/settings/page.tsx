@@ -930,10 +930,14 @@ export default function WorkspaceConfigPage() {
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">User</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Email</th>
+                    {canManageMembers && (
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Email</th>
+                    )}
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Role</th>
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Joined</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Last sign in</th>
+                    {canManageMembers && (
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Last sign in</th>
+                    )}
                     <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap sr-only">Actions</th>
                   </tr>
                 </thead>
@@ -968,10 +972,12 @@ export default function WorkspaceConfigPage() {
                           </UserProfileLink>
                         </td>
 
-                        {/* Email */}
-                        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                          {member.email ?? '—'}
-                        </td>
+                        {/* Email — owner/admin only; server returns null for members */}
+                        {canManageMembers && (
+                          <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                            {member.email ?? '—'}
+                          </td>
+                        )}
 
                         {/* Role */}
                         <td className="px-4 py-3 whitespace-nowrap">
@@ -994,12 +1000,14 @@ export default function WorkspaceConfigPage() {
                           {formatDate(member.joinedAt)}
                         </td>
 
-                        {/* Last sign in */}
-                        <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">
-                          {member.lastSignInTime === null || member.lastSignInTime === undefined
-                            ? <span className="text-muted-foreground/50">Never</span>
-                            : formatLastSignIn(member.lastSignInTime)}
-                        </td>
+                        {/* Last sign in — owner/admin only; server returns null for members */}
+                        {canManageMembers && (
+                          <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">
+                            {member.lastSignInTime === null || member.lastSignInTime === undefined
+                              ? <span className="text-muted-foreground/50">Never</span>
+                              : formatLastSignIn(member.lastSignInTime)}
+                          </td>
+                        )}
 
                         {/* Actions */}
                         <td className="px-4 py-3 whitespace-nowrap">
