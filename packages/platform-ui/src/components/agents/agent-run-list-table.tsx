@@ -84,18 +84,18 @@ export function AgentRunListTable({
   const [selectedRun, setSelectedRun] = useState<AgentRun | null>(null);
   return (
     <>
-      <div className="rounded-md border overflow-auto">
+      <div className="rounded-md border overflow-clip">
         <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
+          <thead className="sticky top-0 z-10 bg-card">
+            <tr className="border-b bg-muted text-xs text-muted-foreground">
               {['Model', 'Plugin', 'Container', 'Workflow Run', 'Control Mode', 'Permissions', 'Cost', 'Duration', 'Started', 'Status', 'Log'].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                <th key={h} className="px-4 py-2.5 text-left font-medium whitespace-nowrap">
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody>
             {loading
               ? Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
               : runs.length === 0
@@ -109,7 +109,7 @@ export function AgentRunListTable({
               : runs.map((run) => {
                 const workflowName = processNameMap?.get(run.processInstanceId);
                 return (
-                  <tr key={run.id} className="hover:bg-muted/30 transition-colors">
+                  <tr key={run.id} className="border-b last:border-0 transition-colors hover:bg-muted/30">
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {run.envelope?.model ?? '—'}
                     </td>

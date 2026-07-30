@@ -119,18 +119,18 @@ export function UsersTab() {
         </span>
       </div>
 
-      <div className="rounded-md border overflow-auto">
+      <div className="rounded-md border overflow-clip">
         <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
+          <thead className="sticky top-0 z-10 bg-card">
+            <tr className="border-b bg-muted text-xs text-muted-foreground">
               {['Date & Time', 'User', 'Event', 'Details'].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                <th key={h} className="px-4 py-2.5 text-left font-medium whitespace-nowrap">
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody>
             {loading
               ? Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
               : filtered.length === 0
@@ -142,7 +142,7 @@ export function UsersTab() {
                 </tr>
               )
               : filtered.map((event: AuditEvent, i) => (
-                <tr key={`${event.timestamp}-${event.actorId}-${i}`} className="hover:bg-muted/30 transition-colors">
+                <tr key={`${event.timestamp}-${event.actorId}-${i}`} className="border-b last:border-0 transition-colors hover:bg-muted/30">
                   <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                     {format(new Date(event.timestamp), 'yyyy-MM-dd, HH:mm')}
                   </td>

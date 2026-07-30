@@ -198,4 +198,35 @@ test.describe('Monitoring Journey', () => {
     await expect(page.getByText(/illustrative placeholders/i)).toBeVisible();
     await expect(page.getByText('Live', { exact: true })).toBeVisible();
   });
+
+  test('Agents tab KPI cards filter the run table, matching the Workflows tab pattern', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/monitoring`);
+    await page.getByRole('tab', { name: 'Agents' }).click();
+
+    const rows = page.locator('tbody');
+    // `data-quality` is only on the seeded escalated run, `compliance-check`
+    // only on the seeded running run — a clean pair to prove filtering by
+    // status actually narrows rows rather than just toggling chip state.
+    await expect(rows.getByText('Data Quality')).toBeVisible({ timeout: 10_000 });
+    await expect(rows.getByText('Compliance Check')).toBeVisible();
+
+    await page.getByRole('button', { name: /Running/ }).first().click();
+    await expect(page.getByText('Filtered by:')).toBeVisible();
+    await expect(rows.getByText('Compliance Check')).toBeVisible();
+    await expect(rows.getByText('Data Quality')).not.toBeVisible();
+
+    // Clicking the same card again toggles the filter off.
+    await page.getByRole('button', { name: /Running/ }).first().click();
+    await expect(page.getByText('Filtered by:')).not.toBeVisible();
+    await expect(rows.getByText('Data Quality')).toBeVisible();
+
+    await page.getByRole('button', { name: /Flagged/ }).first().click();
+    await expect(rows.getByText('Data Quality')).toBeVisible();
+    await expect(rows.getByText('Compliance Check')).not.toBeVisible();
+
+    await page.getByRole('button', { name: 'Clear' }).click();
+    await expect(page.getByText('Filtered by:')).not.toBeVisible();
+    await expect(rows.getByText('Compliance Check')).toBeVisible();
+  });
 });

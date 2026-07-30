@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AgentRunListTable } from '@/components/agents/agent-run-list-table';
 import type { AgentRun } from '@mediforce/platform-core';
@@ -25,21 +26,52 @@ const ALL_STATUSES = [
   'interrupted',
 ] as const;
 
+type CardKey = 'running' | 'completed' | 'error' | 'flagged';
+
+// Same click-to-filter + hover pattern as the Workflows tab's KPI cards
+// (workflows-tab.tsx) — pill colors match the corresponding status badges
+// AgentRunListTable already renders, so a card and its filtered rows read
+// as the same category.
+const CARD_DEFS: Array<{ key: CardKey; label: string; pillClass: string; match: (run: AgentRun) => boolean }> = [
+  {
+    key: 'running',
+    label: 'Running',
+    pillClass: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    match: (r) => r.status === 'running',
+  },
+  {
+    key: 'completed',
+    label: 'Completed',
+    pillClass: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    match: (r) => r.status === 'completed',
+  },
+  {
+    key: 'error',
+    label: 'Errors',
+    pillClass: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    // 'error'/'timed_out' are never real AgentRun.status values (see
+    // agent-run-list-table.tsx) — that detail lives on fallbackReason.
+    match: (r) => r.fallbackReason === 'error' || r.fallbackReason === 'timeout',
+  },
+  {
+    key: 'flagged',
+    label: 'Flagged / escalated',
+    pillClass: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+    match: (r) => r.status === 'escalated' || r.status === 'flagged',
+  },
+];
+
+const TOTAL_PILL_CLASS = 'bg-gray-100 text-gray-700 dark:bg-gray-800/60 dark:text-gray-400';
+
 export function AgentsTab({ runs, loading, processNameMap }: Props) {
   const [processFilter, setProcessFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [cardFilter, setCardFilter] = useState<CardKey | null>(null);
 
-  const summary = useMemo(() => {
-    const total = runs.length;
-    const running = runs.filter((r) => r.status === 'running').length;
-    const completed = runs.filter((r) => r.status === 'completed').length;
-    // 'error'/'timed_out' are never real AgentRun.status values (see
-    // agent-run-list-table.tsx) — that detail lives on fallbackReason.
-    const errors = runs.filter(
-      (r) => r.fallbackReason === 'error' || r.fallbackReason === 'timeout',
-    ).length;
-    const flagged = runs.filter((r) => r.status === 'escalated' || r.status === 'flagged').length;
-    return { total, running, completed, errors, flagged };
+  const counts = useMemo(() => {
+    const result: Record<CardKey, number> = { running: 0, completed: 0, error: 0, flagged: 0 };
+    for (const def of CARD_DEFS) result[def.key] = runs.filter(def.match).length;
+    return result;
   }, [runs]);
 
   const processNames = useMemo(() => {
@@ -61,46 +93,69 @@ export function AgentsTab({ runs, loading, processNameMap }: Props) {
         if (name !== processFilter) return false;
       }
       if (statusFilter && run.status !== statusFilter) return false;
+      if (cardFilter) {
+        const def = CARD_DEFS.find((d) => d.key === cardFilter);
+        if (def && !def.match(run)) return false;
+      }
       return true;
     });
-  }, [runs, processFilter, statusFilter, processNameMap]);
+  }, [runs, processFilter, statusFilter, cardFilter, processNameMap]);
 
-  const summaryCards = [
-    { label: 'Total runs', value: summary.total, color: 'text-foreground' },
-    { label: 'Running', value: summary.running, color: 'text-blue-600 dark:text-blue-400' },
-    { label: 'Completed', value: summary.completed, color: 'text-green-600 dark:text-green-400' },
-    { label: 'Errors', value: summary.errors, color: 'text-red-600 dark:text-red-400' },
-    { label: 'Flagged / escalated', value: summary.flagged, color: 'text-amber-600 dark:text-amber-400' },
-  ];
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-20 rounded-lg border bg-muted animate-pulse" />
-          ))}
-        </div>
-        <div className="h-48 rounded-lg border bg-muted animate-pulse" />
-      </div>
-    );
-  }
+  const cardFilterLabel = cardFilter ? CARD_DEFS.find((d) => d.key === cardFilter)?.label : null;
 
   return (
     <div className="space-y-6">
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        {summaryCards.map(({ label, value, color }) => (
-          <div key={label} className="rounded-lg border bg-card p-4 space-y-1">
-            <div className={cn('text-3xl font-bold font-headline', color)}>{value}</div>
-            <div className="text-sm text-muted-foreground">{label}</div>
-          </div>
+        <button
+          type="button"
+          onClick={() => setCardFilter(null)}
+          className="rounded-lg border bg-card border-border p-4 space-y-1.5 text-left cursor-pointer transition-colors hover:border-primary/40"
+        >
+          {loading ? (
+            <div className="h-8 w-12 rounded bg-muted animate-pulse" />
+          ) : (
+            <div className="text-3xl font-bold font-headline">{runs.length}</div>
+          )}
+          <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', TOTAL_PILL_CLASS)}>
+            Total runs
+          </span>
+        </button>
+        {CARD_DEFS.map((def) => (
+          <button
+            key={def.key}
+            type="button"
+            onClick={() => setCardFilter((prev) => (prev === def.key ? null : def.key))}
+            className="rounded-lg border bg-card border-border p-4 space-y-1.5 text-left cursor-pointer transition-colors hover:border-primary/40"
+          >
+            {loading ? (
+              <div className="h-8 w-12 rounded bg-muted animate-pulse" />
+            ) : (
+              <div className="text-3xl font-bold font-headline">{counts[def.key]}</div>
+            )}
+            <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', def.pillClass)}>
+              {def.label}
+            </span>
+          </button>
         ))}
       </div>
 
       {/* Run history */}
       <section className="space-y-3">
-        <div className="flex gap-3 items-center">
+        <div className="flex flex-wrap gap-3 items-center">
+          {cardFilterLabel && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              Filtered by: <span className="font-medium text-foreground">{cardFilterLabel}</span>
+              <button
+                onClick={() => setCardFilter(null)}
+                className="inline-flex items-center gap-0.5 text-primary hover:underline"
+              >
+                <X className="h-3 w-3" />
+                Clear
+              </button>
+            </div>
+          )}
+
           <select
             value={processFilter ?? ''}
             onChange={(e) => setProcessFilter(e.target.value || null)}
@@ -128,7 +183,7 @@ export function AgentsTab({ runs, loading, processNameMap }: Props) {
           </select>
 
           <span className="text-sm text-muted-foreground">
-            {processFilter || statusFilter
+            {processFilter || statusFilter || cardFilter
               ? `${filteredRuns.length} of ${runs.length} runs`
               : `${runs.length} runs`}
           </span>
