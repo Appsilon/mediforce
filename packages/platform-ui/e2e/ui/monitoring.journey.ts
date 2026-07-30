@@ -173,4 +173,29 @@ test.describe('Monitoring Journey', () => {
     await expect(rows.getByText('Approve Report')).not.toBeVisible();
     await actionFilter.selectOption({ label: 'All Actions' });
   });
+
+  test('Integrations tab lists services without the removed KPI/health/error chrome', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/monitoring`);
+    await page.getByRole('tab', { name: 'Integrations' }).click();
+
+    // KPI boxes, the "Services" heading, the "Recent integration errors"
+    // section, and per-card "healthy" badges are all gone.
+    await expect(page.getByText('Healthy', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Degraded', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Down', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Services' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Recent integration errors' })).toHaveCount(0);
+
+    // The requested services (+ what was found in the codebase) render as
+    // cards.
+    for (const name of ['Databricks', 'OpenRouter', 'GitHub', 'Mailgun']) {
+      await expect(page.getByText(name, { exact: true })).toBeVisible({ timeout: 10_000 });
+    }
+
+    // The mocked-data disclaimer stays, and OpenRouter is called out as the
+    // one card backed by a real, live value.
+    await expect(page.getByText(/illustrative placeholders/i)).toBeVisible();
+    await expect(page.getByText('Live', { exact: true })).toBeVisible();
+  });
 });
