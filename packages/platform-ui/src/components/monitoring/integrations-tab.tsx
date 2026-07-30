@@ -32,6 +32,14 @@ const SERVICES: ServiceEntry[] = [
     usedIn: ['agent runs', 'cowork chat', 'nightly model-catalog sync'],
   },
   {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    category: 'AI routing',
+    lastUsed: new Date(Date.now() - 90 * 60 * 1000),
+    keyMetric: 'Configured as an alternate opencode-agent model provider',
+    usedIn: ['opencode-agent plugin (deepseek/* models)'],
+  },
+  {
     id: 'github',
     name: 'GitHub',
     category: 'Version control',

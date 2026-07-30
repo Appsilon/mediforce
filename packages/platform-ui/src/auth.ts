@@ -170,10 +170,13 @@ export function buildAuthConfig(): NextAuthConfig {
         // Auth.js v5's signIn event never receives the request object, so
         // IP/user-agent aren't capturable here — the provider name (real,
         // not guessed) is what stands in for "how" on the Users tab.
-        await recordSignInAuditEvent(db, {
+        // Fire-and-forget: this is Monitoring telemetry, not part of the
+        // sign-in contract — a transient DB hiccup here must not fail an
+        // otherwise-successful login.
+        void recordSignInAuditEvent(db, {
           uid: user.id,
           method: { kind: 'oauth', provider: account?.provider ?? 'unknown' },
-        });
+        }).catch(() => {});
       },
     },
   };

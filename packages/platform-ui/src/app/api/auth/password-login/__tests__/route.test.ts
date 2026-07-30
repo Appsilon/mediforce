@@ -40,6 +40,9 @@ describe('/api/auth/password-login', () => {
       image: null,
       passwordHash: PASSWORD_HASH,
     });
+    // Route only fires this and chains `.catch()` — a bare vi.fn() resolves
+    // to undefined by default, which has no `.catch`.
+    mockRecordSignInAuditEvent.mockResolvedValue(undefined);
   });
 
   afterEach(() => {

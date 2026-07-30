@@ -109,14 +109,17 @@ export async function POST(request: Request): Promise<NextResponse> {
   const expires = new Date(Date.now() + SESSION_TTL_MS);
   await createDatabaseSession(db, { sessionToken, userId: user.id, expires });
   await recordSignIn(db, user.id);
-  await recordSignInAuditEvent(db, {
+  // Fire-and-forget: this is Monitoring telemetry, not part of the sign-in
+  // contract — the session cookie is already valid at this point, and a
+  // transient DB hiccup on the audit write must not fail the login response.
+  void recordSignInAuditEvent(db, {
     uid: user.id,
     method: {
       kind: 'password',
       ipAddress: clientIpFrom(request),
       userAgent: request.headers.get('user-agent'),
     },
-  });
+  }).catch(() => {});
 
   const secure = isSecureRequest(request);
   const response = NextResponse.json({ ok: true });

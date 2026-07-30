@@ -37,8 +37,7 @@ export function useNamespaceAuditEvents(handle: string): {
 
 /**
  * uid → display name (falls back to email, then the uid itself) for a
- * workspace's members. Shares its query key with useNamespaceAdminContact,
- * so the two hooks dedupe to one fetch when both are mounted.
+ * workspace's members.
  */
 export function useNamespaceMemberNames(handle: string): Map<string, string> {
   const enabled = handle.length > 0;
