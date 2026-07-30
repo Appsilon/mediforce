@@ -8,14 +8,29 @@ import {
 } from '@mediforce/platform-core';
 
 export const GetNamespaceInputSchema = z.object({ handle: HandleSchema });
+
+/**
+ * Contact details of the workspace's primary owner (earliest-joined `owner`),
+ * exposed to every member so a non-admin can reach someone when a run is
+ * blocked or setup is missing. This is the ONE member email a plain member may
+ * see — the bulk `listNamespaceMembers` roster gates email/last-sign-in to
+ * admins. `null` when the workspace has no owner or no directory is wired.
+ */
+export const NamespaceAdminContactSchema = z.object({
+  displayName: z.string().nullable(),
+  email: z.string().nullable(),
+});
+
 export const GetNamespaceOutputSchema = z.object({
   namespace: NamespaceSchema,
   members: z.array(NamespaceMemberSchema),
   personalHandles: z.record(z.string(), z.string()).optional(),
+  adminContact: NamespaceAdminContactSchema.nullable(),
 });
 
 export type GetNamespaceInput = z.infer<typeof GetNamespaceInputSchema>;
 export type GetNamespaceOutput = z.infer<typeof GetNamespaceOutputSchema>;
+export type NamespaceAdminContact = z.infer<typeof NamespaceAdminContactSchema>;
 
 export const CreateNamespaceInputSchema = z.object({
   handle: HandleSchema,
