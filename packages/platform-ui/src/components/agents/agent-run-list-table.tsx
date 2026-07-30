@@ -84,7 +84,11 @@ export function AgentRunListTable({
   const [selectedRun, setSelectedRun] = useState<AgentRun | null>(null);
   return (
     <>
-      <div className="rounded-md border overflow-clip">
+      {/* overflow-auto, not overflow-clip like RunsTable — this table has 11
+          columns (vs. RunsTable's 9) and reliably overflows a normal
+          viewport width; clip would trap the rightmost Log column's "View"
+          button outside any reachable scroll area. */}
+      <div className="rounded-md border overflow-auto">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10 bg-card">
             <tr className="border-b bg-muted text-xs text-muted-foreground">

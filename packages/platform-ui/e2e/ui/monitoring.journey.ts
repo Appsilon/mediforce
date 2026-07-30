@@ -98,25 +98,30 @@ test.describe('Monitoring Journey', () => {
 
     // Scoped to the table body throughout — the filter dropdowns added below
     // also render options labelled "Sign in" / "Task completed" etc., which
-    // would otherwise collide with a page-wide getByText.
+    // would otherwise collide with a page-wide getByText. `.first()`
+    // everywhere: this table is namespace-wide and unscoped to this test's
+    // own fixtures, so in the full CI suite other journeys running against
+    // the same shared `test` namespace add their own matching rows (e.g.
+    // other cancelled runs) — these assertions only need to prove the real
+    // shape shows up somewhere, not that it's the only occurrence.
     const rows = page.locator('tbody');
 
     // All four event types the table understands, each backed by a real
     // seeded audit_events row (see seed-data.ts's audit-signin-*,
     // audit-workflow-*, audit-task-completed fixtures).
     await expect(rows.getByText('Sign in').first()).toBeVisible({ timeout: 10_000 });
-    await expect(rows.getByText('Workflow triggered')).toBeVisible();
-    await expect(rows.getByText('Workflow cancelled')).toBeVisible();
-    await expect(rows.getByText('Task completed')).toBeVisible();
+    await expect(rows.getByText('Workflow triggered').first()).toBeVisible();
+    await expect(rows.getByText('Workflow cancelled').first()).toBeVisible();
+    await expect(rows.getByText('Task completed').first()).toBeVisible();
 
     // Details resolve real data, not placeholders: IP for password sign-in,
     // provider for OAuth sign-in, the actual workflow name (joined via
     // useProcessNameMap), and the formatted step name.
-    await expect(rows.getByText('IP 203.0.113.42')).toBeVisible();
-    await expect(rows.getByText('Signed in via google (SSO)')).toBeVisible();
-    await expect(rows.getByText('Supply Chain Review')).toBeVisible();
-    await expect(rows.getByText('Data Quality Review')).toBeVisible();
-    await expect(rows.getByText('Manager Approval')).toBeVisible();
+    await expect(rows.getByText('IP 203.0.113.42').first()).toBeVisible();
+    await expect(rows.getByText('Signed in via google (SSO)').first()).toBeVisible();
+    await expect(rows.getByText('Supply Chain Review').first()).toBeVisible();
+    await expect(rows.getByText('Data Quality Review').first()).toBeVisible();
+    await expect(rows.getByText('Manager Approval').first()).toBeVisible();
 
     // Event-type filter actually narrows the rendered table, not just the
     // dropdown's own state. First combobox is the User filter, second is
