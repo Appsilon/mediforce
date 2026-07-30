@@ -1,5 +1,6 @@
 export { listTasks } from './tasks/list-tasks';
 export { claimTask } from './tasks/claim-task';
+export { recordTaskViewed } from './tasks/record-task-viewed';
 export { completeTask } from './tasks/complete-task';
 export { listAttachments } from './tasks/attachments/list';
 export { uploadAttachment } from './tasks/attachments/upload';

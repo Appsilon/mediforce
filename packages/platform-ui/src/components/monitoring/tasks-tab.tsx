@@ -1,42 +1,68 @@
 'use client';
 
-import { useMemo } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { MonitoringData } from '@/hooks/use-monitoring';
+import { useNamespaceAuditEvents, useNamespaceMemberNames } from '@/hooks/use-namespace-audit-events';
+import { useProcessNameMap } from '@/hooks/use-agent-runs';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { routes } from '@/lib/routes';
+import {
+  isTaskActivityEvent,
+  filterTaskActivity,
+  formatTaskEventName,
+  taskIdFromEvent,
+  taskTitleFromEvent,
+} from '@/lib/task-activity-event';
+import type { AuditEvent } from '@mediforce/platform-core';
+
+const EVENT_STYLES: Record<string, string> = {
+  'task.viewed': 'bg-gray-100 text-gray-800 dark:bg-gray-800/60 dark:text-gray-300',
+  'task.claimed': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  'task.completed': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+  'task.attachment_added': 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300',
+  'task.attachment_deleted': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+};
+
+// Fixed order for the filter dropdown — every possible action every time,
+// not just whatever happens to appear in this page's current data.
+const ALL_TASK_ACTIONS = [
+  'task.viewed',
+  'task.claimed',
+  'task.completed',
+  'task.attachment_added',
+  'task.attachment_deleted',
+];
 
 interface Props {
   data: MonitoringData;
 }
 
+function SkeletonRow() {
+  return (
+    <tr>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <td key={i} className="px-4 py-3">
+          <div className="h-4 rounded bg-muted animate-pulse" />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
 export function TasksTab({ data }: Props) {
-  const { tasks, roleCounts, loading } = data;
+  const { tasks } = data;
+  const handle = useHandleFromPath();
+  const { data: events, loading: eventsLoading } = useNamespaceAuditEvents(handle);
+  const memberNames = useNamespaceMemberNames(handle);
+  const processNames = useProcessNameMap(handle);
 
-  const summary = useMemo(() => {
-    const pending = tasks.filter((t) => t.status === 'pending').length;
-    const claimed = tasks.filter((t) => t.status === 'claimed').length;
-    const unassigned = tasks.filter((t) => t.status === 'pending' && t.assignedUserId === null).length;
-    return { pending, claimed, unassigned, total: pending + claimed };
-  }, [tasks]);
-
-  const byAssignee = useMemo(() => {
-    const map = new Map<string, { pending: number; claimed: number }>();
-    for (const task of tasks) {
-      const key = task.assignedUserId ?? '__unassigned__';
-      const entry = map.get(key) ?? { pending: 0, claimed: 0 };
-      if (task.status === 'pending') entry.pending++;
-      if (task.status === 'claimed') entry.claimed++;
-      map.set(key, entry);
-    }
-    return Array.from(map.entries())
-      .map(([userId, counts]) => ({
-        label: userId === '__unassigned__' ? 'Unassigned' : userId,
-        isUnassigned: userId === '__unassigned__',
-        ...counts,
-        total: counts.pending + counts.claimed,
-      }))
-      .sort((a, b) => b.total - a.total);
-  }, [tasks]);
+  const [actorFilter, setActorFilter] = useState<string | null>(null);
+  const [actionFilter, setActionFilter] = useState<string | null>(null);
+  const [fromDate, setFromDate] = useState<string | null>(null);
+  const [toDate, setToDate] = useState<string | null>(null);
 
   const overdueTasks = useMemo(
     () =>
@@ -46,141 +72,143 @@ export function TasksTab({ data }: Props) {
     [tasks],
   );
 
-  const summaryCards = [
-    {
-      label: 'Open tasks',
-      value: summary.total,
-      color: summary.total > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground',
-    },
-    {
-      label: 'Pending (queue)',
-      value: summary.pending,
-      color: 'text-blue-600 dark:text-blue-400',
-    },
-    {
-      label: 'Claimed',
-      value: summary.claimed,
-      color: 'text-violet-600 dark:text-violet-400',
-    },
-    {
-      label: 'Unassigned',
-      value: summary.unassigned,
-      color: summary.unassigned > 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground',
-    },
-  ];
+  const activity = useMemo(() => events.filter(isTaskActivityEvent), [events]);
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-20 rounded-lg border bg-muted animate-pulse" />
-          ))}
-        </div>
-        <div className="h-40 rounded-lg border bg-muted animate-pulse" />
-      </div>
+  // Only actors who actually show up in this workspace's task activity — not
+  // every member, most of whom may never have touched a task.
+  const actors = useMemo(() => {
+    const ids = new Set(activity.map((e) => e.actorId));
+    return Array.from(ids).sort((a, b) =>
+      (memberNames.get(a) ?? a).localeCompare(memberNames.get(b) ?? b),
     );
-  }
+  }, [activity, memberNames]);
+
+  const filtered = useMemo(
+    () => filterTaskActivity(activity, { actorId: actorFilter, action: actionFilter, fromDate, toDate }),
+    [activity, actorFilter, actionFilter, fromDate, toDate],
+  );
+
+  const hasFilter = actorFilter !== null || actionFilter !== null || fromDate !== null || toDate !== null;
 
   return (
     <div className="space-y-8">
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {summaryCards.map(({ label, value, color }) => (
-          <div key={label} className="rounded-lg border bg-card p-4 space-y-1">
-            <div className={cn('text-3xl font-bold font-headline', color)}>{value}</div>
-            <div className="text-sm text-muted-foreground">{label}</div>
+      {/* Task activity */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-3 items-center">
+          <select
+            value={actorFilter ?? ''}
+            onChange={(e) => setActorFilter(e.target.value || null)}
+            className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
+          >
+            <option value="">All Users</option>
+            {actors.map((actorId) => (
+              <option key={actorId} value={actorId}>
+                {memberNames.get(actorId) ?? actorId}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={actionFilter ?? ''}
+            onChange={(e) => setActionFilter(e.target.value || null)}
+            className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
+          >
+            <option value="">All Actions</option>
+            {ALL_TASK_ACTIONS.map((action) => (
+              <option key={action} value={action}>
+                {formatTaskEventName(action)}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <input
+              type="date"
+              value={fromDate ?? ''}
+              onChange={(e) => setFromDate(e.target.value || null)}
+              className="rounded-md border bg-background px-2 py-1.5 text-sm text-foreground"
+              aria-label="From date"
+            />
+            <span>to</span>
+            <input
+              type="date"
+              value={toDate ?? ''}
+              onChange={(e) => setToDate(e.target.value || null)}
+              className="rounded-md border bg-background px-2 py-1.5 text-sm text-foreground"
+              aria-label="To date"
+            />
           </div>
-        ))}
-      </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* By role */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            By role
-          </h2>
-          {roleCounts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No open tasks.</p>
-          ) : (
-            <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                    <th className="px-4 py-2 text-left font-medium">Role</th>
-                    <th className="px-4 py-2 text-right font-medium">Pending</th>
-                    <th className="px-4 py-2 text-right font-medium">Claimed</th>
-                    <th className="px-4 py-2 text-right font-medium">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {roleCounts.map((row) => (
-                    <tr key={row.role} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-2.5 font-medium">{row.role}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-blue-600 dark:text-blue-400">
-                        {row.pending || '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-violet-600 dark:text-violet-400">
-                        {row.claimed || '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
-                        {row.total}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+          <span className="text-sm text-muted-foreground">
+            {hasFilter ? `${filtered.length} of ${activity.length} events` : `${activity.length} events`}
+          </span>
+        </div>
 
-        {/* By assignee */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            By assignee
-          </h2>
-          {byAssignee.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No open tasks.</p>
-          ) : (
-            <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                    <th className="px-4 py-2 text-left font-medium">Assignee</th>
-                    <th className="px-4 py-2 text-right font-medium">Pending</th>
-                    <th className="px-4 py-2 text-right font-medium">Claimed</th>
-                    <th className="px-4 py-2 text-right font-medium">Total</th>
+        <div className="rounded-md border overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr>
+                {['Date & Time', 'Task', 'User', 'Action', 'Workflow'].map((h) => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {eventsLoading
+                ? Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
+                : filtered.length === 0
+                ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                      {hasFilter ? 'No events match these filters.' : 'No task activity recorded yet.'}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {byAssignee.map((row) => (
-                    <tr key={row.label} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-2.5">
-                        <span
-                          className={cn(
-                            'font-medium',
-                            row.isUnassigned && 'text-red-600 dark:text-red-400 italic',
-                          )}
-                        >
-                          {row.label}
+                )
+                : filtered.map((event: AuditEvent, i) => {
+                  const taskId = taskIdFromEvent(event);
+                  const workflowName = event.processInstanceId ? processNames.get(event.processInstanceId) : undefined;
+                  return (
+                    <tr key={`${event.timestamp}-${event.actorId}-${i}`} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                        {format(new Date(event.timestamp), 'yyyy-MM-dd, HH:mm')}
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        {taskId ? (
+                          <Link href={routes.task(handle, taskId)} className="font-medium text-primary hover:underline">
+                            {taskTitleFromEvent(event)}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">no data</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs font-medium">
+                        {memberNames.get(event.actorId) ?? event.actorId}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', EVENT_STYLES[event.action] ?? 'bg-muted text-muted-foreground')}>
+                          {formatTaskEventName(event.action)}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-blue-600 dark:text-blue-400">
-                        {row.pending || '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-violet-600 dark:text-violet-400">
-                        {row.claimed || '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
-                        {row.total}
+                      <td className="px-4 py-3 text-xs">
+                        {event.processInstanceId && workflowName ? (
+                          <Link
+                            href={routes.workflowRun(handle, workflowName, event.processInstanceId)}
+                            className="font-medium text-primary hover:underline"
+                          >
+                            {workflowName}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">no data</span>
+                        )}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Overdue tasks */}

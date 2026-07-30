@@ -53,8 +53,10 @@ export function formatEventDetails(
       const name = event.processInstanceId ? processNames.get(event.processInstanceId) : undefined;
       return name ?? 'no data';
     }
-    case 'task.completed':
-      return event.stepId ? formatStepName(event.stepId) : 'no data';
+    case 'task.completed': {
+      const stepId = event.inputSnapshot.stepId;
+      return typeof stepId === 'string' ? formatStepName(stepId) : 'no data';
+    }
     default:
       return 'no data';
   }

@@ -70,10 +70,18 @@ describe('formatEventDetails', () => {
   });
 
   it('[DATA] task completed shows the formatted step name', () => {
+    // Real writers (complete-task.ts) only ever stamp `stepId` inside
+    // `inputSnapshot` — the top-level `AuditEvent.stepId` field is never set
+    // by any handler, so reading it here would always fall back to "no data".
     const event = buildAuditEvent({
       action: 'task.completed',
-      stepId: 'manager-approval',
+      inputSnapshot: { taskId: 'task-1', stepId: 'manager-approval' },
     });
     expect(formatEventDetails(event, new Map())).toBe('Manager Approval');
+  });
+
+  it('[DATA] task completed falls back to "no data" when the snapshot has no stepId', () => {
+    const event = buildAuditEvent({ action: 'task.completed', inputSnapshot: {} });
+    expect(formatEventDetails(event, new Map())).toBe('no data');
   });
 });

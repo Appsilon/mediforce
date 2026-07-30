@@ -125,6 +125,8 @@ import {
   ListPluginsOutputSchema,
   ClaimTaskInputSchema,
   ClaimTaskOutputSchema,
+  RecordTaskViewedInputSchema,
+  RecordTaskViewedOutputSchema,
   CompleteTaskInputSchema,
   CompleteTaskOutputSchema,
   ListAttachmentsInputSchema,
@@ -253,6 +255,8 @@ import {
   type GetTaskOutput,
   type ClaimTaskInput,
   type ClaimTaskOutput,
+  type RecordTaskViewedInput,
+  type RecordTaskViewedOutput,
   type CompleteTaskInput,
   type CompleteTaskOutput,
   type RegisterWorkflowBody,
@@ -521,6 +525,7 @@ export class Mediforce {
     list: (input: ListTasksInput) => Promise<ListTasksOutput>;
     get: (input: GetTaskInput) => Promise<GetTaskOutput>;
     claim: (input: ClaimTaskInput) => Promise<ClaimTaskOutput>;
+    recordViewed: (input: RecordTaskViewedInput) => Promise<RecordTaskViewedOutput>;
     complete: (input: CompleteTaskInput) => Promise<CompleteTaskOutput>;
     attachments: {
       list: (input: ListAttachmentsInput) => Promise<ListAttachmentsOutput>;
@@ -804,6 +809,16 @@ export class Mediforce {
           undefined,
           ClaimTaskOutputSchema,
           'mediforce.tasks.claim',
+        );
+      },
+      recordViewed: async (input) => {
+        const validated = RecordTaskViewedInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/tasks/${encodeURIComponent(validated.taskId)}/viewed`,
+          undefined,
+          RecordTaskViewedOutputSchema,
+          'mediforce.tasks.recordViewed',
         );
       },
       complete: async (input) => {

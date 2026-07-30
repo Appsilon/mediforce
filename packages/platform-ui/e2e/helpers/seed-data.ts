@@ -823,6 +823,20 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       processInstanceId: 'proc-running-1',
       stepId: 'manager-approval',
     },
+    'audit-task-claimed': {
+      actorId: testUserId,
+      actorType: 'user',
+      actorRole: 'owner',
+      action: 'task.claimed',
+      description: `User '${testUserId}' claimed task 'task-claimed-1' for step 'approve-report'`,
+      timestamp: oneHourAgo,
+      inputSnapshot: { taskId: 'task-claimed-1', userId: testUserId, stepId: 'approve-report' },
+      outputSnapshot: { status: 'claimed', assignedUserId: testUserId },
+      basis: 'User claimed task via UI',
+      entityType: 'humanTask',
+      entityId: 'task-claimed-1',
+      processInstanceId: 'proc-running-1',
+    },
   };
 
   const stepExecutions: Record<string, Record<string, unknown>> = {

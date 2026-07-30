@@ -70,7 +70,7 @@ describe('useMonitoringSummary', () => {
 });
 
 describe('useMonitoringData', () => {
-  it('composes counts from the summary and rows from runs/tasks, scoped to the handle', async () => {
+  it('composes rows from runs/tasks, scoped to the handle, and keeps the summary request alive', async () => {
     summaryMock.mockResolvedValue({
       summary: {
         runs: { running: 2, paused: 1, completed: 3, failed: 1 },
@@ -92,22 +92,16 @@ describe('useMonitoringData', () => {
     const { result } = renderHook(() => useMonitoringData('team-alpha'), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
+    // Still calls the summary endpoint (Workflows tab's KPI cards derive
+    // their own counts from `instances` via getWorkflowStatus, but the
+    // request itself stays wired per ADR-0006 §4 NICE LIVE).
+    expect(summaryMock).toHaveBeenCalledWith({ handle: 'team-alpha' });
     expect(runsListMock).toHaveBeenCalledWith(expect.objectContaining({ namespace: 'team-alpha' }));
     expect(tasksListMock).toHaveBeenCalledWith(
       expect.objectContaining({ namespace: 'team-alpha', status: ['pending', 'claimed'] }),
     );
-    expect(result.current.statusCounts).toEqual({
-      running: 2,
-      paused: 1,
-      failed: 1,
-      completed: 3,
-      created: 1,
-    });
-    expect(result.current.stuckProcesses.map((p) => p.id)).toEqual(['r-1']);
+    expect(result.current.instances.map((i) => i.id)).toEqual(['r-1', 'r-2']);
     expect(result.current.tasks.map((t) => t.id)).toEqual(['t-1']);
-    expect(result.current.roleCounts).toEqual([
-      { role: 'reviewer', pending: 1, claimed: 1, total: 2 },
-    ]);
   });
 
   it('does not fetch when handle is undefined', () => {

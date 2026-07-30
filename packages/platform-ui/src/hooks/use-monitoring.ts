@@ -1,6 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { MonitoringSummary } from '@mediforce/platform-api/contract';
 import { ACTIONABLE_STATUSES } from '@mediforce/platform-api/contract';
@@ -44,26 +43,19 @@ export function useMonitoringSummary(handle: string | undefined): {
 export interface MonitoringData {
   instances: ProcessInstance[];
   tasks: HumanTask[];
-  statusCounts: {
-    running: number;
-    paused: number;
-    failed: number;
-    completed: number;
-    created: number;
-  };
-  stuckProcesses: ProcessInstance[]; // paused instances, sorted oldest first
-  roleCounts: Array<{ role: string; pending: number; claimed: number; total: number }>;
   loading: boolean;
 }
 
 /**
  * Monitoring tabs page data — composes the compact `useMonitoringSummary`
- * aggregate (counts, role breakdown) with the row-level headless hooks the
+ * aggregate (kept alive here so the summary request still fires; the
+ * Workflows tab's KPI cards derive their counts from `instances` directly
+ * via `getWorkflowStatus` instead) with the row-level headless hooks the
  * tabs' tables/lists need (`useProcessInstances`, `mediforce.tasks.list`).
  * STANDARD LIVE per ADR-0006 §4 for the row-level reads.
  */
 export function useMonitoringData(handle: string | undefined): MonitoringData {
-  const { data: summary, loading: summaryLoading } = useMonitoringSummary(handle);
+  const { loading: summaryLoading } = useMonitoringSummary(handle);
 
   const { data: instances, loading: instancesLoading } = useProcessInstances(
     'all',
@@ -87,44 +79,9 @@ export function useMonitoringData(handle: string | undefined): MonitoringData {
   });
   const tasks = tasksQuery.data ?? [];
 
-  const statusCounts = useMemo(
-    () => ({
-      running: summary?.runs.running ?? 0,
-      paused: summary?.runs.paused ?? 0,
-      failed: summary?.runs.failed ?? 0,
-      completed: summary?.runs.completed ?? 0,
-      created: instances.filter((inst) => inst.status === 'created').length,
-    }),
-    [summary, instances],
-  );
-
-  const stuckProcesses = useMemo(
-    () =>
-      instances
-        .filter((inst) => inst.status === 'paused')
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
-    [instances],
-  );
-
-  const roleCounts = useMemo(
-    () =>
-      Object.entries(summary?.roleTaskCounts ?? {})
-        .map(([role, counts]) => ({
-          role,
-          pending: counts.pending,
-          claimed: counts.claimed,
-          total: counts.pending + counts.claimed,
-        }))
-        .sort((a, b) => b.total - a.total),
-    [summary],
-  );
-
   return {
     instances,
     tasks,
-    statusCounts,
-    stuckProcesses,
-    roleCounts,
     loading: summaryLoading || instancesLoading || tasksQuery.isLoading,
   };
 }

@@ -79,9 +79,12 @@ test.describe('Monitoring Journey', () => {
 
     // Tasks tab reads the same `useMonitoringData` hook via the workspace-
     // scoped `tasks.list({ namespace })` call — switch and confirm it mounts.
+    // "By role" / "By assignee" are gone — replaced by the task activity
+    // table (asserted in detail in the next test).
     await page.getByRole('tab', { name: 'Tasks' }).click();
-    await expect(page.getByRole('heading', { name: 'By role' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'By assignee' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'By role' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'By assignee' })).toHaveCount(0);
+    await expect(page.getByRole('columnheader', { name: 'Task' })).toBeVisible({ timeout: 10_000 });
   });
 
   test('Users tab shows real, workspace-wide user activity — not mocked data', async ({ page }) => {
@@ -124,5 +127,50 @@ test.describe('Monitoring Journey', () => {
     await expect(rows.getByText('Supply Chain Review')).not.toBeVisible();
     await expect(rows.getByText('Sign in')).not.toBeVisible();
     await eventFilter.selectOption({ label: 'All Events' });
+  });
+
+  test('Tasks tab shows real task activity — not mocked data', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(`/${TEST_ORG_HANDLE}/monitoring`);
+    await page.getByRole('tab', { name: 'Tasks' }).click();
+
+    // KPI cards are gone — just the activity table + overdue list now.
+    await expect(page.getByText('Open tasks')).toHaveCount(0);
+    await expect(page.getByText('Pending (queue)')).toHaveCount(0);
+
+    for (const header of ['Date & Time', 'Task', 'User', 'Action', 'Workflow']) {
+      await expect(page.getByRole('columnheader', { name: header })).toBeVisible({ timeout: 10_000 });
+    }
+
+    const rows = page.locator('tbody');
+
+    // Two action types, each backed by a real seeded audit_events row (see
+    // seed-data.ts's audit-task-claimed / audit-task-completed fixtures).
+    await expect(rows.getByText('Claimed')).toBeVisible({ timeout: 10_000 });
+    await expect(rows.getByText('Completed')).toBeVisible();
+
+    // "Task" resolves the real step name and links to the real task, not a
+    // placeholder — same formatStepName convention as everywhere else.
+    const taskLink = rows.getByRole('link', { name: 'Manager Approval' });
+    await expect(taskLink).toBeVisible();
+    await expect(taskLink).toHaveAttribute('href', `/${TEST_ORG_HANDLE}/tasks/task-manager-approval`);
+    await expect(rows.getByRole('link', { name: 'Approve Report' })).toBeVisible();
+
+    // "Workflow" resolves the real run's definition name and links to that
+    // specific run — both seeded task events belong to proc-running-1.
+    const workflowLinks = rows.getByRole('link', { name: 'Supply Chain Review' });
+    await expect(workflowLinks.first()).toBeVisible();
+    await expect(workflowLinks.first()).toHaveAttribute(
+      'href',
+      `/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1`,
+    );
+
+    // Action filter narrows the rendered table. First combobox is the User
+    // filter, second is Action.
+    const actionFilter = page.getByRole('combobox').nth(1);
+    await actionFilter.selectOption({ label: 'Completed' });
+    await expect(rows.getByText('Manager Approval')).toBeVisible();
+    await expect(rows.getByText('Approve Report')).not.toBeVisible();
+    await actionFilter.selectOption({ label: 'All Actions' });
   });
 });
