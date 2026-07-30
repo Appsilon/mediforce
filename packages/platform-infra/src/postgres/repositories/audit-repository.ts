@@ -132,6 +132,19 @@ export class PostgresAuditRepository implements AuditRepository {
     const rows = options?.limit ? await base.limit(options.limit) : await base;
     return rows.map((r) => toAuditEvent(r));
   }
+
+  async getByNamespace(
+    namespace: string,
+    options?: { limit?: number },
+  ): Promise<AuditEvent[]> {
+    const base = this.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.workspace, namespace))
+      .orderBy(desc(auditEvents.timestamp));
+    const rows = options?.limit ? await base.limit(options.limit) : await base;
+    return rows.map((r) => toAuditEvent(r));
+  }
 }
 
 function toAuditEvent(row: typeof auditEvents.$inferSelect): AuditEvent {

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ChevronRight, ExternalLink, Archive, ArchiveRestore, XCircle } from 'lucide-react';
+import { ChevronRight, ChevronUp, ChevronDown, ExternalLink, Archive, ArchiveRestore, XCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
@@ -33,6 +33,25 @@ interface RunsTableProps {
   activeTaskByInstance?: Map<string, string>;
 }
 
+type SortField = 'cost' | 'started' | null;
+
+/** Nulls (unknown cost) always sort last regardless of direction — a
+ *  reasonable convention, and avoids "no data" jumping to the top on desc. */
+function compareRuns(a: ProcessInstance, b: ProcessInstance, field: SortField, dir: 1 | -1): number {
+  if (field === 'cost') {
+    const av = a.totalCostUsd;
+    const bv = b.totalCostUsd;
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    return (av - bv) * dir;
+  }
+  if (field === 'started') {
+    return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir;
+  }
+  return 0;
+}
+
 function isCancellable(run: ProcessInstance): boolean {
   const { displayStatus } = getWorkflowStatus(run);
   return displayStatus === 'in_progress' || displayStatus === 'waiting_for_human';
@@ -59,6 +78,8 @@ export function RunsTable({
   const bulkArchiveMutation = useBulkArchiveRuns();
   const [archivingIds, setArchivingIds] = React.useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [sortField, setSortField] = React.useState<SortField>(null);
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc');
   const bulkCancelling = bulkCancelMutation.isPending;
   const bulkArchiving = bulkArchiveMutation.isPending;
   const selectAllRef = React.useRef<HTMLInputElement>(null);
@@ -87,6 +108,21 @@ export function RunsTable({
     selectAllRef.current.checked = allSelected;
     selectAllRef.current.indeterminate = someSelected && !allSelected;
   }, [selectedIds, runs]);
+
+  const sortedRuns = React.useMemo(() => {
+    if (sortField === null) return runs;
+    const dir = sortDirection === 'asc' ? 1 : -1;
+    return [...runs].sort((a, b) => compareRuns(a, b, sortField, dir));
+  }, [runs, sortField, sortDirection]);
+
+  function handleSort(field: 'cost' | 'started') {
+    if (sortField === field) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  }
 
   function toggleAll() {
     if (runs.every((r) => selectedIds.has(r.id))) {
@@ -167,17 +203,16 @@ export function RunsTable({
     `/${handle}/workflows/${encodeURIComponent(run.definitionName)}/runs/${run.id}`
   );
 
-  const dataHeaders = [
-    ...(showProcess ? ['Workflow'] : []),
-    'Run ID',
-    'Version',
-    'Status',
-    'Started by',
-    'Current Step',
-    'Cost',
-    'Started',
-    '', // per-row archive
-    '', // view link
+  const dataHeaders: Array<{ label: string; sortField?: 'cost' | 'started' }> = [
+    ...(showProcess ? [{ label: 'Workflow' }] : []),
+    { label: 'Version' },
+    { label: 'Status' },
+    { label: 'Started by' },
+    { label: 'Current Step' },
+    { label: 'Cost', sortField: 'cost' },
+    { label: 'Started', sortField: 'started' },
+    { label: '' }, // per-row archive
+    { label: '' }, // view link
   ];
 
   if (loading) {
@@ -254,13 +289,25 @@ export function RunsTable({
             </th>
             {dataHeaders.map((h, i) => (
               <th key={i} className="px-4 py-2.5 text-left font-medium">
-                {h}
+                {h.sortField ? (
+                  <button
+                    onClick={() => handleSort(h.sortField!)}
+                    className="inline-flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
+                  >
+                    {h.label}
+                    {sortField === h.sortField ? (
+                      sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3 opacity-30" />
+                    )}
+                  </button>
+                ) : h.label}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {runs.map((run) => {
+          {sortedRuns.map((run) => {
             const isSelected = selectedIds.has(run.id);
             return (
               <tr
@@ -289,9 +336,6 @@ export function RunsTable({
                     </Link>
                   </td>
                 )}
-                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                  {run.id.slice(0, 8)}&hellip;
-                </td>
                 <td className="px-4 py-3 font-mono text-xs">
                   <span title="Definition version">v{run.definitionVersion}</span>
                   {run.configName && (

@@ -14,6 +14,7 @@ export {
   deleteUserSessions,
   SESSION_TTL_MS,
 } from './auth/session-store';
+export { recordSignInAuditEvent, type SignInMethod } from './auth/sign-in-audit';
 export {
   setUserPasswordHash,
   getUserPasswordHash,

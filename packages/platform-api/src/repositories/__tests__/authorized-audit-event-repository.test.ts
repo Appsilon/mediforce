@@ -86,4 +86,38 @@ describe('AuthorizedAuditEventRepository', () => {
       expect(events).toEqual([]);
     });
   });
+
+  describe('getByNamespace', () => {
+    it('returns events for a system-actor caller regardless of namespace', async () => {
+      const wrapper = new AuthorizedAuditEventRepository(apiKeyCaller, raw);
+
+      const events = await wrapper.getByNamespace('team-alpha');
+
+      expect(events).toHaveLength(1);
+      expect(events[0]?.entityId).toBe('task-1');
+    });
+
+    it('returns events for an in-scope user caller', async () => {
+      const wrapper = new AuthorizedAuditEventRepository(
+        userCaller('u-1', ['team-alpha']),
+        raw,
+      );
+
+      const events = await wrapper.getByNamespace('team-alpha');
+
+      expect(events).toHaveLength(1);
+      expect(events[0]?.entityId).toBe('task-1');
+    });
+
+    it('returns empty for an out-of-scope user caller (anti-enum)', async () => {
+      const wrapper = new AuthorizedAuditEventRepository(
+        userCaller('u-1', ['team-alpha']),
+        raw,
+      );
+
+      const events = await wrapper.getByNamespace('team-beta');
+
+      expect(events).toEqual([]);
+    });
+  });
 });

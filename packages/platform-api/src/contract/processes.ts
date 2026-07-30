@@ -63,6 +63,20 @@ export const ListAuditEventsOutputSchema = z.object({
 export type ListAuditEventsInput = z.infer<typeof ListAuditEventsInputSchema>;
 export type ListAuditEventsOutput = z.infer<typeof ListAuditEventsOutputSchema>;
 
+// Workspace-wide audit trail (Monitoring → Users tab) — every event for
+// every user in one namespace, not scoped to a single run.
+export const ListNamespaceAuditEventsInputSchema = z.object({
+  namespace: z.string().min(1),
+  limit: z.number().int().positive().optional(),
+});
+
+export const ListNamespaceAuditEventsOutputSchema = z.object({
+  events: z.array(AuditEventSchema),
+});
+
+export type ListNamespaceAuditEventsInput = z.infer<typeof ListNamespaceAuditEventsInputSchema>;
+export type ListNamespaceAuditEventsOutput = z.infer<typeof ListNamespaceAuditEventsOutputSchema>;
+
 // Per-instance agent-event feed. Mirrors the audit shape: `{ events }`,
 // 404 on missing or out-of-workspace parent. Optional `stepId` narrows to a
 // single step; absent returns the entire instance's event log. Ordering is
@@ -101,6 +115,11 @@ export const StepEntrySchema = z.object({
   input: z.record(z.string(), z.unknown()).nullable(),
   output: z.record(z.string(), z.unknown()).nullable(),
   executions: z.array(StepExecutionSchema),
+  /** Tool grants configured on the step beyond the executor's default set
+   *  (e.g. `WebFetch`, `WebSearch`). Only meaningful for `executorType:
+   *  'agent'` steps whose plugin honours an allow-list (claude-code-agent);
+   *  undefined otherwise. */
+  allowedTools: z.array(z.string()).optional(),
 });
 
 export const GetProcessStepsInputSchema = z.object({

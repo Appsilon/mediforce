@@ -14,6 +14,22 @@ const twoDaysAgo = new Date(Date.now() - 2 * 86400_000).toISOString();
 const threeDaysAgo = new Date(Date.now() - 3 * 86400_000).toISOString();
 const nextWeek = new Date(Date.now() + 7 * 86400_000).toISOString();
 
+// Local-dev-only: gives the Agents-tab "Log" column something real to show
+// via the actual AgentLogViewer pipeline (an AgentEvent announcing a log
+// file path, which /api/step-logs reads from disk) instead of mocking the
+// UI. postgres-seed.ts writes this content to
+// `${tmpdir()}/mediforce-step-logs/${AGENT_LOG_FILENAME}` alongside the
+// agent_events insert for RUN_COMPLETED_1_ID's step.
+export const AGENT_LOG_FILENAME = 'seed-narrative-summary.jsonl';
+export const AGENT_LOG_FIXTURE_CONTENT = [
+  { ts: oneHourAgo, type: 'assistant', subtype: 'tool_call', tool: 'Read', input: { file_path: '/workspace/vendor-submissions.csv' } },
+  { ts: oneHourAgo, type: 'tool_result', tool_name: 'Read', content: '12 rows loaded, all fields present.' },
+  { ts: oneHourAgo, type: 'assistant', subtype: 'tool_call', tool: 'Bash', input: { command: 'grep -c missing vendor-submissions.csv' } },
+  { ts: oneHourAgo, type: 'tool_result', tool_name: 'Bash', content: '0' },
+  { ts: oneHourAgo, type: 'assistant', subtype: 'text', text: 'Reviewed 12 vendor submissions. No issues detected. All items within expected parameters.' },
+  { ts: now, type: 'result', subtype: 'completed' },
+].map((entry) => JSON.stringify(entry)).join('\n');
+
 export interface SeedOptions {
   /** Base URL of the mock OAuth server (from globalSetup). Used to build the
    *  `github-mock` provider fixture so the journey can Connect through it
@@ -674,6 +690,17 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
   };
 
+  const agentEvents: Record<string, Record<string, unknown>> = {
+    'agent-event-1': {
+      processInstanceId: 'proc-running-1',
+      stepId: 'narrative-summary',
+      type: 'status',
+      payload: `agent activity log: /tmp/mediforce-step-logs/${AGENT_LOG_FILENAME}`,
+      sequence: 0,
+      timestamp: oneHourAgo,
+    },
+  };
+
   const auditEvents: Record<string, Record<string, unknown>> = {
     'audit-1': {
       actorId: 'agent:narrative-summary',
@@ -721,6 +748,94 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       entityId: 'proc-completed-1',
       processInstanceId: 'proc-completed-1',
       processDefinitionVersion: '2.1.0',
+    },
+    // Monitoring → Users tab fixtures. No processInstanceId, so
+    // postgres-seed.ts's workspace resolution falls back to TEST_ORG_HANDLE
+    // — same behaviour as a real sign-in event with no parent run.
+    'audit-signin-password': {
+      actorId: testUserId,
+      actorType: 'user',
+      actorRole: 'owner',
+      action: 'user.signed_in',
+      description: 'Signed in with email and password',
+      timestamp: oneHourAgo,
+      inputSnapshot: { method: 'password', ipAddress: '203.0.113.42', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+      outputSnapshot: {},
+      basis: 'Password credential verified',
+      entityType: 'user',
+      entityId: testUserId,
+    },
+    'audit-signin-oauth': {
+      actorId: testUserId,
+      actorType: 'user',
+      actorRole: 'owner',
+      action: 'user.signed_in',
+      description: 'Signed in via google (SSO)',
+      timestamp: twoDaysAgo,
+      inputSnapshot: { method: 'oauth', provider: 'google' },
+      outputSnapshot: {},
+      basis: "OAuth provider 'google' verified the identity",
+      entityType: 'user',
+      entityId: testUserId,
+    },
+    'audit-workflow-triggered': {
+      actorId: testUserId,
+      actorType: 'user',
+      actorRole: 'owner',
+      action: 'instance.started',
+      description: `Started instance 'proc-running-1'`,
+      timestamp: oneHourAgo,
+      inputSnapshot: { instanceId: 'proc-running-1' },
+      outputSnapshot: { currentStepId: 'narrative-summary' },
+      basis: 'Instance start',
+      entityType: 'processInstance',
+      entityId: 'proc-running-1',
+      processInstanceId: 'proc-running-1',
+      processDefinitionVersion: '1',
+    },
+    'audit-workflow-cancelled': {
+      actorId: testUserId,
+      actorType: 'user',
+      actorRole: 'owner',
+      action: 'instance.cancelled',
+      description: `Run cancelled by operator (was running at step 'data-quality')`,
+      timestamp: twoDaysAgo,
+      inputSnapshot: { previousStatus: 'running', currentStepId: 'data-quality' },
+      outputSnapshot: { status: 'failed', error: 'Cancelled by user' },
+      basis: 'User-initiated cancel via UI — double-confirm pattern',
+      entityType: 'processInstance',
+      entityId: 'proc-completed-1',
+      processInstanceId: 'proc-completed-1',
+      processDefinitionVersion: '2.1.0',
+    },
+    'audit-task-completed': {
+      actorId: testUserId,
+      actorType: 'user',
+      actorRole: 'owner',
+      action: 'task.completed',
+      description: `Task resolved for step 'manager-approval'`,
+      timestamp: now,
+      inputSnapshot: { taskId: 'task-manager-approval', stepId: 'manager-approval' },
+      outputSnapshot: { status: 'completed' },
+      basis: 'Task resolved via API',
+      entityType: 'humanTask',
+      entityId: 'task-manager-approval',
+      processInstanceId: 'proc-running-1',
+      stepId: 'manager-approval',
+    },
+    'audit-task-claimed': {
+      actorId: testUserId,
+      actorType: 'user',
+      actorRole: 'owner',
+      action: 'task.claimed',
+      description: `User '${testUserId}' claimed task 'task-claimed-1' for step 'approve-report'`,
+      timestamp: oneHourAgo,
+      inputSnapshot: { taskId: 'task-claimed-1', userId: testUserId, stepId: 'approve-report' },
+      outputSnapshot: { status: 'claimed', assignedUserId: testUserId },
+      basis: 'User claimed task via UI',
+      entityType: 'humanTask',
+      entityId: 'task-claimed-1',
+      processInstanceId: 'proc-running-1',
     },
   };
 
@@ -1192,7 +1307,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       description: 'End-to-end supply chain review process',
       steps: [
         { id: 'vendor-assessment', name: 'Vendor Assessment', type: 'creation', executor: 'agent', autonomyLevel: 'L2', plugin: 'supply-data-collector', agent: { skill: 'vendor-assessment', mcpServers: [{ name: 'postgres-ro', command: 'npx', args: ['-y', '@modelcontextprotocol/server-postgres'], env: { DATABASE_URL: '{{DB_URL}}' }, allowedTools: ['query'] }, { name: 'filesystem', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/data'] }] } },
-        { id: 'narrative-summary', name: 'Narrative Summary', type: 'creation', executor: 'agent', autonomyLevel: 'L3' },
+        { id: 'narrative-summary', name: 'Narrative Summary', type: 'creation', executor: 'agent', autonomyLevel: 'L3', agent: { allowedTools: ['WebFetch'] } },
         { id: 'risk-scoring', name: 'Risk Scoring', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
         { id: 'data-quality', name: 'Data Quality Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
         { id: 'query-status', name: 'Query Status Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L1' },
@@ -1696,5 +1811,5 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     }
   }
 
-  return { humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, modelRegistry };
+  return { humanTasks, processInstances, agentRuns, agentEvents, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, modelRegistry };
 }
